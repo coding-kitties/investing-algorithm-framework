@@ -1,9 +1,9 @@
 import logging
 import json
-from enum import Enum
 from typing import Dict, Any
 
 from urllib.request import urlopen
+from urllib import error
 
 from bot.data.data_providers.data_provider import DataProvider, DataProviderException
 
@@ -32,8 +32,10 @@ class FMPDataProvider(DataProvider):
             response = urlopen(url)
             data = response.read().decode("utf-8")
             data = json.loads(data)
-            logger.info(data)
             return data['symbol'] == ticker
+        except error.HTTPError:
+            logger.info('Hello')
+            return False
         except Exception:
             return False
 

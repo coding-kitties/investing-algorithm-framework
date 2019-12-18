@@ -5,7 +5,6 @@ from typing import Any, Dict
 from bot.data import remove_ticker, get_tickers, add_ticker, get_company_profile
 from bot import __version__, OperationalException
 from bot.data.data_provider_manager import DataProviderManager
-from bot.data.data_providers import DataProviderException
 
 logger = logging.getLogger(__name__)
 
@@ -30,31 +29,36 @@ class Bot:
         logger.info("Adding ticker ...")
 
         if not get_company_profile(ticker, self.config):
-            profile = self.__data_provider_manager.get_profile(ticker)
 
-            if not profile:
-                raise OperationalException("Could not evaluate {} with the data providers".format(ticker))
+            if self.__data_provider_manager.evaluate_ticker(ticker):
 
-            company_name = profile.get('profile', {}).get('companyName', None)
-            category = profile.get('profile', {}).get('industry', None)
+                profile = self.__data_provider_manager.get_profile(ticker)
 
-            if not company_name:
-                raise OperationalException("Could not evaluate company name for ticker {} with the data providers")
+                if not profile:
+                    raise OperationalException("Could not evaluate {} with the data providers".format(ticker))
 
-            if not company_name:
-                raise OperationalException("Could not evaluate category for ticker {} with the data providers")
+                company_name = profile.get('profile', {}).get('companyName', None)
+                category = profile.get('profile', {}).get('industry', None)
 
-            try:
-                add_ticker(
-                    ticker,
-                    company_name=company_name,
-                    category=category,
-                    config=self.config
-                )
-            except Exception:
-                raise OperationalException(
-                    "Something went wrong with adding ticker {} to the registry".format(ticker)
-                )
+                if not company_name:
+                    raise OperationalException("Could not evaluate company name for ticker {} with the data providers")
+
+                if not company_name:
+                    raise OperationalException("Could not evaluate category for ticker {} with the data providers")
+
+                try:
+                    add_ticker(
+                        ticker,
+                        company_name=company_name,
+                        category=category,
+                        config=self.config
+                    )
+                except Exception:
+                    raise OperationalException(
+                        "Something went wrong with adding ticker {} to the registry".format(ticker)
+                    )
+            else:
+                raise OperationalException("Could not evaluate ticker {} with the data providers".format(ticker))
         else:
             raise OperationalException(
                 "Ticker {} is already present in registry".format(ticker)
