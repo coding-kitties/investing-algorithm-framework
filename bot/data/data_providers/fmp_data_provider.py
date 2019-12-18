@@ -11,6 +11,7 @@ PROFILE_ENDPOINT = 'https://financialmodelingprep.com/api/v3/company/profile/{}'
 
 logger = logging.getLogger(__name__)
 
+
 class FMPDataProvider(DataProvider):
 
     def __init__(self, config: Dict[str, Any]):
