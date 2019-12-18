@@ -218,6 +218,10 @@ class Telegram(Service):
         return ConversationHandler.END
 
     @authorized_only
+    def _remove_tickers(self, update: Update, context: CallbackContext):
+        pass
+
+    @authorized_only
     def _cancel_conversation(self, update: Update, context: CallbackContext):
         logger.info("Conversation is canceled")
         message = "Process has been canceled"
