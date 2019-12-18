@@ -1,0 +1,16 @@
+{
+    "max_open_trades": 10,
+    "currency": "euro",
+    "telegram": {
+        "enabled": true,
+        "bot_name": "graham bot",
+        "token": "xxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "chat_id": "867310775"
+    },
+    "tickers": ["AAPL", "MSFT", "AMZN", "GOOGL", "FB", "BABA", "BRK/A", "BRK/B"],
+    "data_providers": {
+        "FMP_data_provider": {
+            "enabled": true
+        }
+    }
+}
