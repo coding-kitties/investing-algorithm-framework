@@ -71,6 +71,8 @@ def add_ticker(ticker: str, company_name: str, category: str, config: Dict[str, 
     con.commit()
     con.close()
 
+def remove_ticker(ticker: str, config: Dict[str, Any]) -> None:
+    pass
 
 def get_company_info(ticker: str, config: Dict[str, any]) -> List[str]:
     con = create_connection(config)

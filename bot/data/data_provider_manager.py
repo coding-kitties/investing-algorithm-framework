@@ -50,3 +50,5 @@ class DataProviderManager:
 
         raise DataProviderException("Could not evaluate ticker {}".format(ticker))
 
+
+

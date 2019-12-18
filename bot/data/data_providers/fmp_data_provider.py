@@ -1,3 +1,4 @@
+import logging
 import json
 from enum import Enum
 from typing import Dict, Any
@@ -8,6 +9,7 @@ from bot.data.data_providers.data_provider import DataProvider, DataProviderExce
 
 PROFILE_ENDPOINT = 'https://financialmodelingprep.com/api/v3/company/profile/{}'
 
+logger = logging.getLogger(__name__)
 
 class FMPDataProvider(DataProvider):
 
@@ -24,14 +26,12 @@ class FMPDataProvider(DataProvider):
         pass
 
     def evaluate_ticker(self, ticker: str) -> bool:
-
         try:
             url = PROFILE_ENDPOINT.format(ticker)
-
             response = urlopen(url)
             data = response.read().decode("utf-8")
             data = json.loads(data)
-
+            logger.info(data)
             return data['symbol'] == ticker
         except Exception:
             return False
@@ -41,8 +41,6 @@ class FMPDataProvider(DataProvider):
         response = urlopen(url)
         data = response.read().decode("utf-8")
         return json.loads(data)
-
-
 
 
 
