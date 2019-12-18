@@ -48,3 +48,6 @@ class Service(ABC):
 
     def _add_ticker(self, ticker: str) -> None:
         self._bot.add_ticker(ticker)
+
+    def _remove_ticker(self, ticker: str) -> None:
+        self._bot.remove_ticker(ticker)

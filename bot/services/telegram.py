@@ -16,13 +16,20 @@ MAX_TELEGRAM_MESSAGE_LENGTH = 4096
 
 # Telegram keyboard buttons
 DEFAULT_KEYBOARD_BUTTONS = [
-    ['/add_tickers'],
+    ['/list_tickers', '/add_or_remove_tickers'],
     ['/help', '/version']
 ]
 
-ADDING_TICKERS_CONVERSATION_BUTTONS = [
+STANDARD_CONVERSATION_BUTTONS = [
     ['/cancel']
 ]
+
+TICKERS_CONVERSATION_BUTTONS = [
+    ['/add_tickers', '/remove_tickers', '/cancel']
+]
+
+# Conversation states
+ADDING, REMOVING, LISTING_TICKERS, CHOOSING = range(4)
 
 
 def authorized_only(command_handler: Callable[..., None]) -> Callable[..., Any]:
@@ -61,10 +68,6 @@ def authorized_only(command_handler: Callable[..., None]) -> Callable[..., Any]:
 class Telegram(Service):
     """  This class handles all telegram communication """
 
-    # Conversation states
-    class AddTickersConversationState:
-        ADDING, TYPING_REPLY, TYPING_CHOICE = range(3)
-
     def __init__(self, bot) -> None:
         """
         Init the Telegram call, and init the super class service
@@ -82,9 +85,14 @@ class Telegram(Service):
 
         # States of adding a ticker
         ticker_conversation_handler = ConversationHandler(
-            entry_points=[CommandHandler('add_tickers', self._start_adding_tickers)],
+            entry_points=[CommandHandler('add_or_remove_tickers', self._start_tickers_conversation)],
             states={
-                self.AddTickersConversationState.ADDING: [MessageHandler(Filters.text, self._add_tickers)],
+                CHOOSING: [
+                    CommandHandler('add_tickers', self._start_adding_tickers),
+                    CommandHandler('remove_tickers', self._start_removing_tickers),
+                ],
+                ADDING: [MessageHandler(Filters.text, self._add_tickers)],
+                REMOVING: [MessageHandler(Filters.text, self._remove_tickers)],
             },
             fallbacks=[CommandHandler('cancel', self._cancel_conversation)]
         )
@@ -93,6 +101,7 @@ class Telegram(Service):
         handles = [
             CommandHandler('help', self._help),
             CommandHandler('version', self._version),
+            CommandHandler('list_tickers', self._list_tickers),
             ticker_conversation_handler
         ]
 
@@ -136,7 +145,8 @@ class Telegram(Service):
 
         message = "*/help:* `This help message`\n" \
                   "*/version:* `Show version`\n" \
-                  "*/add_tickers:* `Add tickers to the registry, so they can be analyzed.`\n"
+                  "*/add_or_remove_tickers:* `Add or remove tickers to the registry`\n" \
+                  "*/list_tickers:* `List all saved tickers in the registry`\n"
 
         self._send_msg(message)
 
@@ -193,10 +203,21 @@ class Telegram(Service):
         self._send_msg('*Version:* `{}`'.format(__version__))
 
     @authorized_only
+    def _start_tickers_conversation(self, update: Update, context: CallbackContext):
+        self._send_msg("Make your choice", keyboard_buttons=TICKERS_CONVERSATION_BUTTONS)
+        return CHOOSING
+
+    @authorized_only
     def _start_adding_tickers(self, update: Update, context: CallbackContext):
         self._send_msg("Please provide the tickers separated by commas, if you submit "
-                       "one ticker you can leave out the comma", keyboard_buttons=ADDING_TICKERS_CONVERSATION_BUTTONS)
-        return self.AddTickersConversationState.ADDING
+                       "one ticker you can leave out the comma", keyboard_buttons=STANDARD_CONVERSATION_BUTTONS)
+        return ADDING
+
+    @authorized_only
+    def _start_removing_tickers(self, update: Update, context: CallbackContext):
+        self._send_msg("Please provide the tickers separated by commas, if you submit "
+                       "one ticker you can leave out the comma", keyboard_buttons=STANDARD_CONVERSATION_BUTTONS)
+        return REMOVING
 
     @authorized_only
     def _add_tickers(self, update: Update, context: CallbackContext):
@@ -216,6 +237,34 @@ class Telegram(Service):
             self._send_msg("{} added".format(added_tickers))
 
         return ConversationHandler.END
+
+    @authorized_only
+    def _remove_tickers(self, update: Update, context: CallbackContext):
+        text = update.message.text
+        tickers = [ticker.strip() for ticker in text.split(',')]
+        removed_tickers = []
+
+        for ticker in tickers:
+
+            try:
+                self._remove_ticker(ticker)
+                removed_tickers.append(ticker)
+            except OperationalException as e:
+                self._send_msg(str(e))
+
+        if removed_tickers:
+            self._send_msg("{} removed".format(removed_tickers))
+
+        return ConversationHandler.END
+
+    @authorized_only
+    def _list_tickers(self, update: Update, context: CallbackContext):
+
+        try:
+            tickers = self._bot.list_tickers()
+            self._send_msg(tickers)
+        except Exception as e:
+            self._send_msg(str(e))
 
     @authorized_only
     def _cancel_conversation(self, update: Update, context: CallbackContext):

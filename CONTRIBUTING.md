@@ -8,6 +8,8 @@ Few pointers for contributions:
 
 - Create your PR against the `develop` branch, not `master`.
 - New features need to contain unit tests and must be PEP8 conformant (max-line-length = 100).
+- Creating a feature, must be done on a branch with prefix `feature_`.
+- Making a hotfix, must be done on a branch with prefix `hotfix_`.
 
 If you are unsure, discuss the feature on our [Slack](https://join.slack.com/t/investingbots/shared_invite/enQtODgwNTg3MzA2MjYyLTdiZjczZDRlNWJjNDdmYThiMGE0MzFhOTg4Y2E0NzQ2OTgxYjA1NzU3ZWJiY2JhOTE1ZGJlZGFiNDU3OTAzMDg)
 or in a [issue](https://github.com/investingbots/value-investing-bot/issues) before a PR.
