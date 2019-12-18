@@ -5,11 +5,11 @@
         "enabled": true,
         "bot_name": "graham bot",
         "token": "xxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        "chat_id": "867310775"
+        "chat_id": "xxxxxxxx"
     },
     "tickers": ["AAPL", "MSFT", "AMZN", "GOOGL", "FB", "BABA", "BRK/A", "BRK/B"],
     "data_providers": {
-        "FMP_data_provider": {
+        "fmp": {
             "enabled": true
         }
     }
