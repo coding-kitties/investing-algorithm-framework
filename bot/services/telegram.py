@@ -219,7 +219,10 @@ class Telegram(Service):
 
     @authorized_only
     def _remove_tickers(self, update: Update, context: CallbackContext):
-        pass
+        text = update.message.text
+        tickers = [ticker.strip() for ticker in text.split(',')]
+        added_tickers = []
+        return ConversationHandler.END
 
     @authorized_only
     def _cancel_conversation(self, update: Update, context: CallbackContext):
