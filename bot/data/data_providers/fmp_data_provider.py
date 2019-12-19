@@ -34,7 +34,6 @@ class FMPDataProvider(DataProvider):
             data = json.loads(data)
             return data['symbol'] == ticker
         except error.HTTPError:
-            logger.info('Hello')
             return False
         except Exception:
             return False
