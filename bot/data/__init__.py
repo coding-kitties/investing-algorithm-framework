@@ -1,6 +1,6 @@
 import logging
 import sqlite3
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
 
 from bot import setup
 
@@ -31,7 +31,7 @@ def create_tables(config: Dict[str, Any]) -> None:
         con.close()
 
     if TRADES_TABLE_NAME not in table_names:
-        logger.info("Creating database table {}...".format(TRADES_TABLE_NAME))
+        logger.info("Creating database table {} ...".format(TRADES_TABLE_NAME))
         con = create_connection(config)
 
         # Create open trades table
@@ -45,42 +45,65 @@ def create_tables(config: Dict[str, Any]) -> None:
 
 
 def add_ticker(ticker: str, company_name: str, category: str, config: Dict[str, Any]) -> None:
+
+    logger.info("Adding ticker {} to registry...".format(ticker))
+
     con = create_connection(config)
     cursor = con.cursor()
 
-    logger.info("Adding ticker {} ...".format(ticker))
+    # Add ticker if not exists
+    insert_statement = """
+           INSERT INTO TICKERS (ticker, company_name, category)
+           VALUES (?, ?, ?);
+       """
 
-    # Get ticker if exists
-    select_statement = """SELECT ticker_id from TICKERS where ticker = ?"""
-    cursor.execute(select_statement, (ticker,))
-
-    result = cursor.fetchall()
-
-    if result:
-        logger.info("Ticker already in database")
-    else:
-        # Add ticker if not exists
-        insert_statement = """
-               INSERT INTO TICKERS (ticker, company_name, category)
-               VALUES (?, ?, ?);
-           """
-
-        data_tuple = (ticker, company_name, category)
-        cursor.execute(insert_statement, data_tuple)
+    data_tuple = (ticker, company_name, category)
+    cursor.execute(insert_statement, data_tuple)
 
     con.commit()
     con.close()
 
 
-def get_company_info(ticker: str, config: Dict[str, any]) -> List[str]:
+def remove_ticker(ticker: str, config: Dict[str, Any]) -> None:
+
+    logger.info("Removing ticker {} from registry ...".format(ticker))
     con = create_connection(config)
     cursor = con.cursor()
 
-    logger.info("Getting {} company info ...".format(ticker))
+    delete_statement = '''
+        DELETE from TICKERS where ticker = ? 
+    '''
+
+    cursor.execute(delete_statement, (ticker,))
+    con.commit()
+    con.close()
+
+
+def get_company_profile(ticker: str, config: Dict[str, any]) -> Tuple[str]:
+    con = create_connection(config)
+    cursor = con.cursor()
+
+    logger.info("Getting {} company info from registry ...".format(ticker))
+
+    cursor.execute(" SELECT * FROM TICKERS WHERE ticker=?", (ticker, ))
+    result = cursor.fetchall()
+
+    con.close()
+    return result
+
+
+def get_tickers(config: Dict[str, any]) -> List[str]:
+    con = create_connection(config)
+    cursor = con.cursor()
+
+    logger.info("Getting all tickers from registry ...")
 
     # Get ticker if exists
-    select_statement = """SELECT ticker_id from TICKERS where ticker = ?"""
-    cursor.execute(select_statement, (ticker,))
+    select_statement = '''
+       SELECT (ticker) from TICKERS
+    '''
+
+    cursor.execute(select_statement)
     result = cursor.fetchall()
     con.close()
     return result
