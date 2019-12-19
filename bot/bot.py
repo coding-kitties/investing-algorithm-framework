@@ -18,12 +18,27 @@ class Bot:
         self.__config = config
         self.__data_provider_manager = DataProviderManager(self.config)
 
+        # Load tickers
+        self._load_tickers()
+
     @property
     def config(self) -> Dict[str, Any]:
         return self.__config
 
     def set_config(self, config: Dict[str, Any]):
         self.__config = config
+
+    def _load_tickers(self):
+        logger.info("Initializing provided tickers from config ...")
+        tickers = self.__config.get('tickers', [])
+
+        for ticker in tickers:
+
+            try:
+                self.add_ticker(ticker)
+            except OperationalException as e:
+                logger.error(str(e))
+                continue
 
     def add_ticker(self, ticker: str) -> None:
         logger.info("Adding ticker ...")
