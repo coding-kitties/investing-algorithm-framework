@@ -1,15 +1,22 @@
 import logging
+import concurrent.futures
 from typing import List, Dict, Any
 
 from bot.data.data_providers import DataProvider, DataProviderException
 from . import get_all_table_names, create_tables
+
+from bot.utils import singleton
 
 logger = logging.getLogger(__name__)
 
 TABLE_NAMES = ['TICKERS', 'TRADES']
 
 
+@singleton
 class DataProviderManager:
+    """
+    DataProviderManager handles all data providers
+    """
 
     def __init__(self, config: Dict[str, Any]) -> None:
 
@@ -49,3 +56,13 @@ class DataProviderManager:
                 return profile
 
         raise DataProviderException("Could not profile for {}".format(ticker))
+
+    def start_data_providers(self):
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+
+            for data_providers in self.registered_modules:
+                executor.submit(data_providers.scrape_data())
+
+
+

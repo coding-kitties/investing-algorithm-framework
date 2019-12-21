@@ -1,6 +1,8 @@
 import logging
+import threading
 from abc import ABC, abstractmethod
 from typing import Dict, Any
+from pandas import DataFrame
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,7 @@ class DataProvider(ABC):
 
     def __init__(self, config: Dict[str, Any]):
         self.__config = config
+        self.data: DataFrame = None
 
     @abstractmethod
     def refresh(self):
@@ -35,10 +38,6 @@ class DataProvider(ABC):
 
     @abstractmethod
     def scrape_data(self, ticker: str = None):
-        pass
-
-    @abstractmethod
-    def get_data(self, ticker: str = None):
         pass
 
     @abstractmethod

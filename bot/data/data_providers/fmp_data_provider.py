@@ -1,12 +1,16 @@
 import logging
 import json
+import requests
 from typing import Dict, Any
 
 from urllib.request import urlopen
 from urllib import error
 
+from pandas import DataFrame
+
 from bot.data.data_providers.data_provider import DataProvider, DataProviderException
 
+TICKER_LIST = 'https://financialmodelingprep.com/api/v3/company/stock/list'
 PROFILE_ENDPOINT = 'https://financialmodelingprep.com/api/v3/company/profile/{}'
 
 logger = logging.getLogger(__name__)
@@ -20,11 +24,15 @@ class FMPDataProvider(DataProvider):
     def refresh(self):
         pass
 
-    def scrape_data(self, ticker: str = None):
-        pass
+    def scrape_data(self, ticker: str = None) -> DataFrame:
 
-    def get_data(self, ticker: str = None):
-        pass
+        if ticker is None:
+            tickers = requests.get(TICKER_LIST).json()
+
+            for ticker in tickers:
+                logger.info(ticker)
+
+        return
 
     def evaluate_ticker(self, ticker: str) -> bool:
         try:
