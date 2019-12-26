@@ -9,43 +9,43 @@ from tests.data.data_providers.setup import DummyDataProvider, DummyObserver
 logger = logging.getLogger(__name__)
 
 
-# def test_initialize_data_providers():
-#     data_provider_one = DummyDataProvider()
-#     data_provider_two = DummyDataProvider()
-#     data_provider_three = DummyDataProvider()
-#
-#     manager = DataProviderManager(
-#         [
-#             data_provider_one,
-#             data_provider_two,
-#             data_provider_three
-#         ]
-#     )
-#
-#     assert len(manager.registered_data_providers) == 3
-#
-#     # When the DataProviderManager is initialized it should not start any threads
-#     assert active_count() == 1
-#
-#
-# def test_start_stop_data_providers():
-#     data_provider_one = DummyDataProvider()
-#     data_provider_two = DummyDataProvider()
-#     data_provider_three = DummyDataProvider()
-#
-#     manager = DataProviderManager([data_provider_one, data_provider_two, data_provider_three], max_workers=2)
-#
-#     manager.start_data_providers()
-#
-#     # Wait for initialization
-#     sleep(1)
-#
-#     assert active_count() == 3
-#
-#     manager.stop_data_providers()
-#
-#     # Should stop all the worker threads immediately
-#     assert active_count() == 1
+def test_initialize_data_providers():
+    data_provider_one = DummyDataProvider()
+    data_provider_two = DummyDataProvider()
+    data_provider_three = DummyDataProvider()
+
+    manager = DataProviderManager(
+        [
+            data_provider_one,
+            data_provider_two,
+            data_provider_three
+        ]
+    )
+
+    assert len(manager.registered_data_providers) == 3
+
+    # When the DataProviderManager is initialized it should not start any threads
+    assert active_count() == 1
+
+
+def test_start_stop_data_providers():
+    data_provider_one = DummyDataProvider()
+    data_provider_two = DummyDataProvider()
+    data_provider_three = DummyDataProvider()
+
+    manager = DataProviderManager([data_provider_one, data_provider_two, data_provider_three], max_workers=2)
+
+    manager.start_data_providers()
+
+    # Wait for initialization
+    sleep(1)
+
+    assert active_count() == 3
+
+    manager.stop_data_providers()
+
+    # Should stop all the worker threads immediately
+    assert active_count() == 1
 
 
 def test_observable_data_providers():
