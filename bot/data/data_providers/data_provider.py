@@ -1,8 +1,8 @@
 import logging
-import threading
 from abc import ABC, abstractmethod
-from typing import Dict, Any
 from pandas import DataFrame
+
+from bot.events.observable import Observable
 
 logger = logging.getLogger(__name__)
 
@@ -26,25 +26,28 @@ class DataProviderException(Exception):
         }
 
 
-class DataProvider(ABC):
+class DataProvider(Observable):
 
-    def __init__(self, config: Dict[str, Any]):
-        self.__config = config
-        self.data: DataFrame = None
+    def __init__(self):
+        super(DataProvider, self).__init__()
+        self._data: DataFrame = None
 
-    @abstractmethod
-    def refresh(self):
-        pass
-
-    @abstractmethod
-    def scrape_data(self, ticker: str = None):
-        pass
+    def start(self):
+        self._data = self.provide_data()
 
     @abstractmethod
-    def evaluate_ticker(self, ticker: str) -> bool:
+    def provide_data(self) -> DataFrame:
         pass
 
-    @abstractmethod
-    def get_profile(self, ticker: str) -> Dict:
-        pass
+    @property
+    def data(self):
 
+        if self._data is None:
+
+            raise DataProviderException("Could not provide data")
+
+        else:
+            return self._data
+
+    def clear(self):
+        self._data = None
