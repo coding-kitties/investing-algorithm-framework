@@ -4,8 +4,11 @@ from bot.events.observer import Observer
 
 
 class Observable(ABC):
+    """
+    Class Observable manages and updates it's observers
+    """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._observers: List[Observer] = []
 
     @abstractmethod
