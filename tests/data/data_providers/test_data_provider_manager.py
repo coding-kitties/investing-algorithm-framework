@@ -1,7 +1,6 @@
 from time import sleep
 import logging
 from threading import active_count
-from bot import setup
 from bot.data.data_provider_manager import DataProviderManager
 
 from tests.data.data_providers.setup import DummyDataProvider, DummyObserver
@@ -10,6 +9,8 @@ logger = logging.getLogger(__name__)
 
 
 def test_initialize_data_providers():
+    logger.info("TEST: test_initialize_data_providers")
+
     data_provider_one = DummyDataProvider()
     data_provider_two = DummyDataProvider()
     data_provider_three = DummyDataProvider()
@@ -27,8 +28,12 @@ def test_initialize_data_providers():
     # When the DataProviderManager is initialized it should not start any threads
     assert active_count() == 1
 
+    logger.info("TEST FINISHED: test_initialize_data_providers")
+
 
 def test_start_stop_data_providers():
+    logger.info("TEST: test_start_stop_data_providers")
+
     data_provider_one = DummyDataProvider()
     data_provider_two = DummyDataProvider()
     data_provider_three = DummyDataProvider()
@@ -46,9 +51,12 @@ def test_start_stop_data_providers():
 
     # Should stop all the worker threads immediately
     assert active_count() == 1
+    logger.info("TEST FINISHED: test_start_stop_data_providers")
 
 
 def test_observable_data_providers():
+    logger.info("TEST: test_observable_data_providers")
+
     observer = DummyObserver()
 
     data_provider_one = DummyDataProvider()
@@ -77,6 +85,8 @@ def test_observable_data_providers():
 
     # Check if the observer is updated by the manager
     assert observer.update_count == 1
+    logger.info("TEST FINISHED: test_observable_data_providers")
+
 
 
 
