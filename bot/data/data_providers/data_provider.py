@@ -3,6 +3,7 @@ from abc import ABC, abstractmethod
 from pandas import DataFrame
 
 from bot.events.observable import Observable
+from bot.events.observer import Observer
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,13 @@ class DataProvider(Observable):
 
     def start(self):
         self._data = self.provide_data()
+        self.notify_observers()
+
+    def add_observer(self, observer: Observer) -> None:
+        super().add_observer(observer)
+
+    def remove_observer(self, observer: Observer) -> None:
+        super().remove_observer(observer)
 
     @abstractmethod
     def provide_data(self) -> DataFrame:
