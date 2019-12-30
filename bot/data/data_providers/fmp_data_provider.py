@@ -11,6 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 class FMPDataProvider(DataProvider):
+    def __init__(self):
+        super(FMPDataProvider, self).__init__()
+        self._id = "FINANCIAL_MODELING_PREP_PROVIDER"
+
+    def get_id(self) -> str:
+        return self._id
 
     def provide_data(self) -> DataFrame:
         symbols_info = requests.get(TICKER_LIST).json()

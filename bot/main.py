@@ -1,102 +1,53 @@
+import sys
 import logging
 from typing import Any, List
 
 # Call settings for general configuration
-# from bot import setup
-# from bot.configuration import Arguments
-# from bot.configuration import Configuration
-# from bot.bot import Bot
-# from bot.services import ServiceManager
+from bot import setup
 
+from bot import OperationalException
+from bot.configuration import Arguments
 
-from abc import ABC, abstractmethod
-from typing import Dict, Any
-from pandas import DataFrame
-import numpy as np
-import sys
-import time
-from datetime import timedelta
-from bot import utils
-from threading import active_count
-from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
 
-class DataProvider(ABC):
-
-    def __init__(self):
-        self._data: DataFrame = None
-
-    def get_name(self) -> str:
-        return self.__class__.__name__
-
-    @property
-    def data(self):
-        return self._data
-
-    def start(self):
-        self._data = self.scrape_data()
-
-    @abstractmethod
-    def scrape_data(self) -> DataFrame:
-        pass
-
-
-class FMPDataProvider(DataProvider):
-
-    def scrape_data(self, ticker: str = None) -> DataFrame:
-        print("faigfheaoigho")
-        time.sleep(5)
-        print("faigfheaoigho")
-        return DataFrame(np.random.randint(1000, size=10000), columns=['ip'])
-
-
-class DataProviderManager:
-
-    def __init__(self):
-        self.registered_data_providers = [FMPDataProvider()]
-        self._jobs = []
-
-    def start_data_providers(self) -> None:
-
-        for data_providers in self.registered_data_providers:
-            job = utils.ScheduledThread(interval=timedelta(seconds=10), execute=data_providers.start)
-            job.start()
-            self._jobs.append(job)
-
-    def stop_data_providers(self) -> None:
-
-        for job in self._jobs:
-            job.stop()
-
-
 def main(sysargv: List[str] = None) -> None:
     """
-    This function will initiate the bot and start the trading loop.
-    :return: None
+    This function will initiate all the services.
     """
 
+    return_code: Any = 1
     try:
-        manager = DataProviderManager()
-        manager.start_data_providers()
-        print(active_count())
-        print('halo')
-        i = 0
+        arguments = Arguments(sysargv)
+        args = arguments.parsed_args
 
-        while 1:
-            print('hallo')
-            time.sleep(3)
+        # Call subcommand.
+        if 'func' in args:
+            return_code = args['func'](args)
+        else:
+            # No subcommand was issued.
+            raise OperationalException(
+                "Usage of Freqtrade requires a subcommand to be specified.\n"
+                "To have the previous behavior (bot executing trades in live/dry-run modes, "
+                "depending on the value of the `dry_run` setting in the config), run freqtrade "
+                "as `freqtrade trade [options...]`.\n"
+                "To see the full list of options available, please use "
+                "`freqtrade --help` or `freqtrade <command> --help`."
+            )
 
     except SystemExit as e:
         return_code = e
     except KeyboardInterrupt:
         logger.info('SIGINT received, aborting ...')
         return_code = 0
+    except OperationalException as e:
+        logger.error(str(e))
+        return_code = 2
     except Exception:
         logger.exception('Fatal exception!')
     finally:
-        sys.exit()
+        sys.exit(return_code)
 
 
 if __name__ == "__main__":

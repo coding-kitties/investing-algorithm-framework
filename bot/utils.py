@@ -1,80 +1,49 @@
 import threading
-from abc import ABC, abstractmethod
+import sys
+from wrapt import synchronized
 from threading import Thread
-from functools import wraps
-from datetime import timedelta
 
 
-def singleton(class_):
-    instances = {}
+class Singleton(type):
+    _instances = {}
 
-    def get_instance(*args, **kwargs):
-        if class_ not in instances:
-            instances[class_] = class_(*args, **kwargs)
-        return instances[class_]
-
-    return get_instance
-
-
-class ScheduledThread(Thread):
-
-    def __init__(self, interval, execute, *args, **kwargs):
-        threading.Thread.__init__(self)
-        self.daemon = False
-        self.stopped = threading.Event()
-        self.interval = interval
-        self.execute = execute
-        self.args = args
-        self.kwargs = kwargs
-
-    def stop(self):
-        print("Thread stopping")
-        self.stopped.set()
-        self.join()
-        print("Thead stopped")
-
-    def run(self):
-        while not self.stopped.wait(self.interval.total_seconds()):
-            self.execute(*self.args, **self.kwargs)
+    @synchronized
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+        return cls._instances[cls]
 
 
-def synchronized(func):
-    @wraps(func)
-    def synchronization_handler(*args):
-        self = args[0]
-        self.mutex.acquire()
-        # print(method.__name__, 'acquired')
-        try:
-            return func(*args)
-        finally:
-            self.mutex.release()
-            # print(method.__name__, 'released')
+class StoppableThread(Thread):
 
-    return synchronization_handler
+    def __init__(self, *args, **keywords):
+        threading.Thread.__init__(self, *args, **keywords)
+        self.killed = False
 
+    def start(self):
+        self.__run_backup = self.run
+        self.run = self.__run
+        threading.Thread.start(self)
 
-def synchronize(provided_class, names=None):
-    """
-        Synchronize methods in the given class.
-        Only synchronize the methods whose names are
-        given, or all methods if names=None.
-    """
-    if type(names) == type(''):
-        names = names.split()
+    def __run(self):
+        sys.settrace(self.globaltrace)
+        self.__run_backup()
+        self.run = self.__run_backup
 
-    for (name, val) in provided_class.__dict__.items():
+    def globaltrace(self, frame, event, arg):
+        if event == 'call':
+            return self.localtrace
+        else:
+            return None
 
-        if callable(val) and name != '__init__' and (names is None or name in names):
-            print("synchronizing", name)
-            provided_class.__dict__[name] = synchronized(val)
+    def localtrace(self, frame, event, arg):
+        if self.killed:
+            if event == 'line':
+                raise SystemExit()
+        return self.localtrace
 
-
-# You can create your own self.mutex, or inherit
-# from this class:
-class Synchronization:
-
-    def __init__(self):
-        self.mutex = threading.RLock()
+    def kill(self):
+        self.killed = True
 
 
 

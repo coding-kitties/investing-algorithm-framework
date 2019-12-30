@@ -73,14 +73,14 @@ def test_observable_data_providers():
 
     manager.start_data_providers()
 
-    # Main thread + 2 workers
+    # Main thread + 2 context
     assert active_count() == 3
 
-    # The workers should be finished after 3 seconds, distributed over 2 iterations makes up for 6 seconds.
+    # The context should be finished after 3 seconds, distributed over 2 iterations makes up for 6 seconds.
     # To be safe we wait 7 seconds
     sleep(7)
 
-    # All workers should have stopped by now
+    # All context should have stopped by now
     assert active_count() == 1
 
     # Check if the observer is updated by the manager

@@ -7,6 +7,7 @@ from bot.events.observer import Observer
 from bot.events.observable import Observable
 from bot.data.data_providers import DataProvider, DataProviderException
 from bot.utils import StoppableThread
+from bot.constants import DEFAULT_MAX_WORKERS
 
 logger = logging.getLogger(__name__)
 
@@ -16,13 +17,12 @@ class DataProviderManager(Observable, Observer):
     DataProviderManager handles all data providers, it spawns for every worker a new thread.
     """
 
-    def __init__(self, data_providers: List[DataProvider] = None, max_workers: int = 2) -> None:
+    def __init__(self, data_providers: List[DataProvider] = None, max_workers: int = DEFAULT_MAX_WORKERS) -> None:
         super(DataProviderManager, self).__init__()
 
         self._max_workers = max_workers
         self._running_jobs: Dict[DataProvider, StoppableThread] = {}
         self._pending_data_providers = Queue()
-
         self._registered_data_providers: List[DataProvider] = []
 
         if data_providers is not None:
@@ -86,6 +86,10 @@ class DataProviderManager(Observable, Observer):
         else:
             self._run_jobs()
 
+    @property
+    def processing(self) -> bool:
+        return len(self._running_jobs) > 0 or not self._pending_data_providers.empty()
+
 
 # Decorator to initialize with config
 class ConfigDataProviderManager(DataProviderManager):
@@ -101,7 +105,7 @@ class ConfigDataProviderManager(DataProviderManager):
             try:
                 logging.info("Initializing FMP data provider")
                 from bot.data.data_providers.fmp_data_provider import FMPDataProvider
-                self.registered_data_providers.append(FMPDataProvider())
+                data_providers.append(FMPDataProvider())
             except Exception as e:
                 raise DataProviderException(str(e))
 

@@ -59,3 +59,7 @@ class DataProvider(Observable):
 
     def clear(self):
         self._data = None
+
+    @abstractmethod
+    def get_id(self) -> str:
+        pass

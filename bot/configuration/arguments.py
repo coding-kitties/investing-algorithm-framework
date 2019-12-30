@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional
 from bot import __version__
 from bot import constants
 from bot import DependencyException
+from bot.configuration.bot_configuration import initialize
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class Arguments:
     @property
     def parsed_args(self) -> Dict[str, Any]:
         """
-        Returnn the list of arguments
+        Return the list of arguments
         :return: List[str] List of arguments
         """
 
@@ -63,7 +64,7 @@ class Arguments:
         parsed_arg = self.parser.parse_args(self.args)
 
         if 'config' in parsed_arg and parsed_arg.config is None or (Path.cwd() / constants.DEFAULT_CONFIG).is_file():
-            parsed_arg.config = [constants.DEFAULT_CONFIG]
+            parsed_arg.config = constants.DEFAULT_CONFIG
         else:
             raise DependencyException("config.json file is not specified, "
                                       "please see the configuration section in the docs")
@@ -75,4 +76,6 @@ class Arguments:
         for command in CLI_COMMANDS:
             argument = CLI_COMMANDS[command]
             self.parser.add_argument(*argument.cli, dest=command, **argument.kwargs)
+
+        self.parser.set_defaults(func=initialize)
 
