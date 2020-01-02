@@ -4,8 +4,9 @@ from pandas import DataFrame
 
 from bot.utils import Singleton
 from bot import OperationalException
+from bot.data import DataProviderExecutor
 from bot.context.bot_state import BotState
-
+from bot.strategies import StrategyExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,9 @@ class BotContext(metaclass=Singleton):
     _analyzed_data: DataFrame = None
     _raw_data_sources: Dict[str, DataFrame] = None
 
+    _strategy_executor = None
+    _data_provider_executor: DataProviderExecutor = None
+
     def __init__(self) -> None:
         self._config = None
 
@@ -42,7 +46,6 @@ class BotContext(metaclass=Singleton):
 
         logger.info("Bot context: Transition to {}".format(state.__name__))
         self._state = state()
-        self._state.run()
 
     @property
     def config(self) -> Dict[str, Any]:
@@ -71,6 +74,30 @@ class BotContext(metaclass=Singleton):
     @raw_data.setter
     def raw_data(self, raw_data_sources: Dict[str, DataFrame]) -> None:
         self._raw_data_sources = raw_data_sources
+
+    @property
+    def data_provider_executor(self) -> DataProviderExecutor:
+
+        if not self._data_provider_executor:
+            raise OperationalException("Currently there is no data provider executor defined for the bot context")
+
+        return self._data_provider_executor
+
+    @data_provider_executor.setter
+    def data_provider_executor(self, executor: DataProviderExecutor) -> None:
+        self._data_provider_executor = executor
+
+    @property
+    def strategy_executor(self) -> StrategyExecutor:
+
+        if not self._strategy_executor:
+            raise OperationalException("Currently there is no strategy executor defined for the bot context")
+
+        return self._strategy_executor
+
+    @strategy_executor.setter
+    def strategy_executor(self, executor: StrategyExecutor) -> None:
+        self._strategy_executor = executor
 
     """
     The BotContext delegates part of its behavior to the current State object.
