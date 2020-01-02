@@ -130,3 +130,8 @@ bot_configuration.db
 *.db
 .idea
 *log*
+
+!plugins/strategies/
+plugins/strategies/*.py
+!plugins/data_providers/
+plugins/data_providers/*.py
