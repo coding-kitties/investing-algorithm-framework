@@ -3,38 +3,59 @@ import argparse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from bot.configuration.cli_options import AVAILABLE_CLI_OPTIONS
+from bot import __version__
 from bot import constants
 from bot import DependencyException
+from bot.configuration.bot_configuration import initialize
 
 logger = logging.getLogger(__name__)
 
 
-ARGS_COMMON = ["version", "config"]
+class Argument:
+
+    def __init__(self, *args, **kwargs):
+        self.cli = args
+        self.kwargs = kwargs
+
+
+# Declarations of the command line interface commands
+CLI_COMMANDS = {
+    "version": Argument(
+        '-V', '--version',
+        action='version',
+        version=f'%(prog)s {__version__}',
+    ),
+    "config": Argument(
+        '-c', '--config',
+        help="Specify configuration file (default: {}".format(constants.DEFAULT_CONFIG),
+        action='append',
+        metavar='PATH',
+    ),
+}
 
 
 class Arguments:
     """
-    Arguments Class. Manage the arguments received by the cli
+    Arguments Class. Functions as a utilities class to manage the arguments received by the command line interface,
     """
 
     def __init__(self, args: Optional[List[str]]) -> None:
-
-        # Map the args
         self.args = args
-        self._parsed_arg: Optional[argparse.Namespace] = None
+        self._parsed_args: Optional[argparse.Namespace] = None
+        self.parser = argparse.ArgumentParser()
 
-    def get_parsed_arg(self) -> Dict[str, Any]:
+    @property
+    def parsed_args(self) -> Dict[str, Any]:
         """
         Return the list of arguments
         :return: List[str] List of arguments
         """
 
-        if self._parsed_arg is None:
-            self._build_sub_commands()
-            self._parsed_arg = self._parse_args()
+        if self._parsed_args is None:
+            self.build_args()
+            self._parsed_args = self._parse_args()
 
-        return vars(self._parsed_arg)
+        return vars(self._parsed_args)
 
     def _parse_args(self) -> argparse.Namespace:
         """
@@ -42,32 +63,19 @@ class Arguments:
         """
         parsed_arg = self.parser.parse_args(self.args)
 
-        # Workaround issue in argparse with action='append' and default value
-        # (see https://bugs.python.org/issue16399)
-        # Allow no-config for certain commands (like downloading / plotting)
-
-        if 'config' in parsed_arg and parsed_arg.config is None and (Path.cwd() / constants.DEFAULT_CONFIG).is_file():
-            parsed_arg.config = [constants.DEFAULT_CONFIG]
+        if 'config' in parsed_arg and parsed_arg.config is None or (Path.cwd() / constants.DEFAULT_CONFIG).is_file():
+            parsed_arg.config = constants.DEFAULT_CONFIG
         else:
             raise DependencyException("config.json file is not specified, "
                                       "please see the configuration section in the docs")
 
         return parsed_arg
 
-    @staticmethod
-    def _build_args(option_list, parser):
+    def build_args(self):
 
-        for val in option_list:
-            opt = AVAILABLE_CLI_OPTIONS[val]
-            parser.add_argument(*opt.cli, dest=val, **opt.kwargs)
+        for command in CLI_COMMANDS:
+            argument = CLI_COMMANDS[command]
+            self.parser.add_argument(*argument.cli, dest=command, **argument.kwargs)
 
-    def _build_sub_commands(self) -> None:
-        """
-        Builds and attaches all sub commands.
-        :return: None
-        """
-
-        # Build main command
-        self.parser = argparse.ArgumentParser(description="Trading bot based on value principles")
-        self._build_args(option_list=ARGS_COMMON, parser=self.parser)
+        self.parser.set_defaults(func=initialize)
 
