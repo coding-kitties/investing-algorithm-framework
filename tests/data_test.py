@@ -4,7 +4,7 @@ import pandas as pd
 from pandas import DataFrame
 from pandas.io.json import json_normalize
 
-from bot.data.data_providers.data_provider import DataProvider
+from bot.data.data_provider.data_provider import DataProvider
 
 TICKER_LIST = 'https://financialmodelingprep.com/api/v3/company/stock/list'
 PROFILE_ENDPOINT = 'https://financialmodelingprep.com/api/v3/company/profile/{}'
