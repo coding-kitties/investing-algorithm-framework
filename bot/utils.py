@@ -2,6 +2,7 @@ import threading
 import sys
 from wrapt import synchronized
 from threading import Thread
+from pandas import DataFrame
 
 
 class Singleton(type):
@@ -46,6 +47,18 @@ class StoppableThread(Thread):
         self.killed = True
 
 
+class DataSource:
 
+    def __init__(self, data: DataFrame, data_provider_id: str) -> None:
+        self._data = data
+        self._data_provider_id = data_provider_id
+
+    @property
+    def data(self) -> DataFrame:
+        return self._data
+
+    @property
+    def data_provider_id(self) -> str:
+        return self._data_provider_id
 
 
