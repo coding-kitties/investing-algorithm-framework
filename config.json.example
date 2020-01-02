@@ -4,13 +4,23 @@
     "telegram": {
         "enabled": true,
         "bot_name": "graham bot",
-        "token": "xxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        "chat_id": "xxxxxxxx"
+        "token": "xxxxxxxxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "chat_id": "xxxxxxxxxxxxxxxxxx"
     },
-    "tickers": ["AAPL", "MSFT", "AMZN", "GOOGL", "FB", "BABA", "BRK/A", "BRK/B"],
     "data_providers": {
         "fmp": {
-            "enabled": true
+            "enabled": true,
+            "plugin": true,
+            "interval": 1,
+            "time_unit": "hour",
+            "class_name": "FMPDataProvider"
+        }
+    },
+    "strategies": {
+        "value_investing_strategy": {
+            "enabled": true,
+            "plugin": true,
+            "class_name": "SampleStrategy"
         }
     }
 }
