@@ -48,16 +48,17 @@ class DataProvider(Observable):
         pass
 
     @property
-    def data(self):
+    def data(self) -> DataFrame:
 
         if self._data is None:
-
-            raise DataProviderException("Could not provide data")
-
+            raise DataProviderException("Could not provide data, data is not set")
         else:
-            return self._data
+            data = self._data
+            self.clean_up()
+            return data
 
-    def clear(self):
+    @abstractmethod
+    def clean_up(self) -> None:
         self._data = None
 
     @abstractmethod
