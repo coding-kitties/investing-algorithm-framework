@@ -22,12 +22,12 @@ class DataProviderRemoteLoader(RemoteLoader):
         modules = self.locate_python_modules(data_providers_dir)
         location = self.locate_class(modules, data_provider_class_name)
         generator = self.create_class_generators(location, data_provider_class_name, DataProvider)
-        data_provider: DataProvider = next(generator, None)
+        instance: DataProvider = next(generator, None)()
 
-        if data_provider and issubclass(data_provider, DataProvider):
-            return data_provider
+        if instance and isinstance(instance, DataProvider):
+            return instance
 
         raise OperationalException(
-            f"Impossible to load Strategy '{data_provider_class_name}'. This strategy does not exist "
+            f"Impossible to load Strategy '{data_provider_class_name}'. This data provider does not exist "
             "or contains Python code errors."
         )

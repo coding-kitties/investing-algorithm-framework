@@ -1,21 +1,21 @@
-from time import sleep
 import logging
+from time import sleep
 from threading import active_count
-from bot.data.data_provider_manager import DataProviderManager
 
-from tests.data.data_providers.setup import DummyDataProvider, DummyObserver
+from bot.data import DataProviderExecutor
+from tests.data.data_provider_executor.setup import DummyDataProvider, DummyObserver
 
 logger = logging.getLogger(__name__)
 
 
 def test_initialize_data_providers():
-    logger.info("TEST: test_initialize_data_providers")
+    logger.info("TEST: test initialization of DataProviderExecutor ")
 
     data_provider_one = DummyDataProvider()
     data_provider_two = DummyDataProvider()
     data_provider_three = DummyDataProvider()
 
-    manager = DataProviderManager(
+    executor = DataProviderExecutor(
         [
             data_provider_one,
             data_provider_two,
@@ -23,12 +23,23 @@ def test_initialize_data_providers():
         ]
     )
 
-    assert len(manager.registered_data_providers) == 3
+    assert len(executor.registered_data_providers) == 3
 
     # When the DataProviderManager is initialized it should not start any threads
     assert active_count() == 1
 
-    logger.info("TEST FINISHED: test_initialize_data_providers")
+    executor = DataProviderExecutor(
+        [
+            data_provider_one,
+        ]
+    )
+
+    assert len(executor.registered_data_providers) == 1
+
+    # When the DataProviderManager is initialized it should not start any threads
+    assert active_count() == 1
+
+    logger.info("TEST FINISHED")
 
 
 def test_start_stop_data_providers():
@@ -38,20 +49,45 @@ def test_start_stop_data_providers():
     data_provider_two = DummyDataProvider()
     data_provider_three = DummyDataProvider()
 
-    manager = DataProviderManager([data_provider_one, data_provider_two, data_provider_three], max_workers=2)
+    executor = DataProviderExecutor(
+        [
+            data_provider_one,
+            data_provider_two,
+            data_provider_three
+        ]
+    )
 
-    manager.start_data_providers()
+    executor.start()
 
     # Wait for initialization
     sleep(1)
 
     assert active_count() == 3
 
-    manager.stop_data_providers()
+    executor.stop()
 
     # Should stop all the worker threads immediately
     assert active_count() == 1
-    logger.info("TEST FINISHED: test_start_stop_data_providers")
+
+    executor = DataProviderExecutor(
+        [
+            data_provider_one,
+        ]
+    )
+
+    executor.start()
+
+    # Wait for initialization
+    sleep(1)
+
+    assert active_count() == 2
+
+    executor.stop()
+
+    # Should stop all the worker threads immediately
+    assert active_count() == 1
+
+    logger.info("TEST FINISHED")
 
 
 def test_observable_data_providers():
@@ -63,15 +99,22 @@ def test_observable_data_providers():
     data_provider_two = DummyDataProvider()
     data_provider_three = DummyDataProvider()
 
-    manager = DataProviderManager([data_provider_one, data_provider_two, data_provider_three], max_workers=2)
-    manager.add_observer(observer)
+    executor = DataProviderExecutor(
+        [
+            data_provider_one,
+            data_provider_two,
+            data_provider_three
+        ]
+    )
 
-    assert len(manager.registered_data_providers) == 3
+    executor.add_observer(observer)
+
+    assert len(executor.registered_data_providers) == 3
 
     # Make sure that only the main thread is running
     assert active_count() == 1
 
-    manager.start_data_providers()
+    executor.start()
 
     # Main thread + 2 context
     assert active_count() == 3
@@ -85,7 +128,7 @@ def test_observable_data_providers():
 
     # Check if the observer is updated by the manager
     assert observer.update_count == 1
-    logger.info("TEST FINISHED: test_observable_data_providers")
+    logger.info("TEST FINISHED")
 
 
 

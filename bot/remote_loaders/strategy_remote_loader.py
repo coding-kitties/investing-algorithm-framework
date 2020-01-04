@@ -22,9 +22,9 @@ class StrategyRemoteLoader(RemoteLoader):
         modules = self.locate_python_modules(strategies_dir)
         location = self.locate_class(modules, strategy_class_name)
         generator = self.create_class_generators(location, strategy_class_name, Strategy)
-        strategy: Strategy = next(generator, None)
+        strategy: Strategy = next(generator, None)()
 
-        if strategy and issubclass(strategy, Strategy):
+        if strategy and isinstance(strategy, Strategy):
             return strategy
 
         raise OperationalException(

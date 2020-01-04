@@ -1,18 +1,23 @@
+import logging
 from queue import Queue
 from abc import abstractmethod
 from wrapt import synchronized
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Tuple
 
 from bot import OperationalException
 from bot.utils import StoppableThread
 from bot.events.observer import Observer
+from bot.executors.executor import Executor
 from bot.events.observable import Observable
 from bot.constants import DEFAULT_MAX_WORKERS
 
 
-class WorkerExecutor(Observable, Observer):
+logger = logging.getLogger(__name__)
+
+
+class WorkerExecutor(Executor, Observer):
     """
-    WorkerExecutor class: Abstract class that will schedule, execute and manage workers.
+    WorkerExecutor class: functions as an abstract class that will schedule, execute and manage workers.
     """
 
     def __init__(self, max_workers: int = DEFAULT_MAX_WORKERS) -> None:

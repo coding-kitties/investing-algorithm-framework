@@ -49,7 +49,7 @@ class StoppableThread(Thread):
 
 class DataSource:
 
-    def __init__(self, data: DataFrame, data_provider_id: str) -> None:
+    def __init__(self, data_provider_id: str,  data: DataFrame) -> None:
         self._data = data
         self._data_provider_id = data_provider_id
 
