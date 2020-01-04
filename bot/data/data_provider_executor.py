@@ -1,10 +1,10 @@
 import logging
-from typing import List, Dict, Tuple
+from typing import List, Tuple
 
 from bot.utils import StoppableThread
 from bot.executors import WorkerExecutor
 from bot.events.observable import Observable
-from bot.data.data_provider.data_provider import DataProvider, DataProviderException
+from bot.data.data_provider.data_provider import DataProvider
 
 logger = logging.getLogger(__name__)
 
@@ -31,31 +31,9 @@ class DataProviderExecutor(WorkerExecutor):
 
         return jobs
 
+    def start(self) -> None:
+        super(DataProviderExecutor, self).start()
+
     @property
     def registered_data_providers(self) -> List[DataProvider]:
         return self._registered_data_providers
-
-
-class ConfigDataProviderExecutor(DataProviderExecutor):
-
-    def __init__(self, config: Dict[str, any], data_providers: List[DataProvider] = None):
-
-        data_providers: List[DataProvider] = []
-
-        # Enable fmp data provider
-        if config.get('data_provider', {}).get('fmp', {}).get('enabled', False):
-            logger.info('Enabling data_provider.fmp ...')
-
-            try:
-                logging.info("Initializing FMP data provider")
-                from bot.data.data_provider.template.fmp_data_provider import FMPDataProvider
-                data_providers.append(FMPDataProvider())
-            except Exception as e:
-                raise DataProviderException(str(e))
-
-        if data_providers is not None:
-
-            for data_provider in data_providers:
-                data_providers.append(data_provider)
-
-        super(ConfigDataProviderExecutor, self).__init__(data_providers)
