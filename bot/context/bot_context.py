@@ -1,12 +1,13 @@
 import logging
-from typing import Dict, Type, Any
 from pandas import DataFrame
+from typing import Dict, Type, Any, List
 
-from bot.utils import Singleton
 from bot import OperationalException
 from bot.data import DataProviderExecutor
 from bot.context.bot_state import BotState
 from bot.strategies import StrategyExecutor
+from bot.utils import Singleton, DataSource
+
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +24,17 @@ class BotContext(metaclass=Singleton):
     """
     _state: BotState = None
 
+    """
+    List of all the buying and selling orders.
+    """
+    _buy_orders: DataFrame = None
+    _sell_orders: DataFrame = None
+
+    """
+    The data sources for the bot
+    """
     _analyzed_data: DataFrame = None
-    _raw_data_sources: Dict[str, DataFrame] = None
+    _data_sources: List[DataSource] = None
 
     _strategy_executor = None
     _data_provider_executor: DataProviderExecutor = None
@@ -68,12 +78,12 @@ class BotContext(metaclass=Singleton):
         self._analyzed_data = data_frame
 
     @property
-    def raw_data(self) -> Dict[str, DataFrame]:
-        return self._raw_data_sources
+    def data_sources(self) -> List[DataSource]:
+        return self._data_sources
 
-    @raw_data.setter
-    def raw_data(self, raw_data_sources: Dict[str, DataFrame]) -> None:
-        self._raw_data_sources = raw_data_sources
+    @data_sources.setter
+    def data_sources(self, data_sources: List[DataSource]) -> None:
+        self._data_sources = data_sources
 
     @property
     def data_provider_executor(self) -> DataProviderExecutor:
