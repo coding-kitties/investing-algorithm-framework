@@ -1,5 +1,5 @@
 import logging
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from pandas import DataFrame
 
 from bot.events.observable import Observable
@@ -18,7 +18,7 @@ class DataProviderException(Exception):
         super().__init__(self)
         self.message = message
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.message
 
     def __json__(self):
@@ -29,11 +29,11 @@ class DataProviderException(Exception):
 
 class DataProvider(Observable):
 
-    def __init__(self):
+    def __init__(self) -> None:
         super(DataProvider, self).__init__()
         self._data: DataFrame = None
 
-    def start(self):
+    def start(self) -> None:
         self._data = self.provide_data()
         self.notify_observers()
 
