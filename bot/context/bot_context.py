@@ -1,15 +1,86 @@
 import logging
 from pandas import DataFrame
+from datetime import datetime
+from collections import namedtuple
 from typing import Dict, Type, Any, List
 
-from bot import OperationalException
-from bot.data import DataProviderExecutor
 from bot.context.bot_state import BotState
 from bot.strategies import StrategyExecutor
 from bot.utils import Singleton, DataSource
+from bot import OperationalException
+from bot.constants import TimeUnit
 
+Appointment = namedtuple('Appointment', 'time_unit interval last_run')
 
 logger = logging.getLogger(__name__)
+
+
+class Scheduler:
+    """
+    Class Scheduler: This is a lazy scheduler, it will schedule appointments. It only runs it's scheduling algorithm
+    when it is asked to. It will then evaluate all the time units and intervals and decide which appointment it needs
+    to return.
+    """
+
+    def __init__(self):
+        self._planning: Dict[str, Appointment] = {}
+
+    def add_appointment(self, appointment_id: str, time_unit: TimeUnit, interval: int = None) -> None:
+        """
+        Function that will add an appointment to the scheduler
+        """
+
+        if appointment_id not in self._planning:
+
+            if time_unit is not TimeUnit.always and interval is None:
+                raise OperationalException("Appoint must set an interval with the corresponding time unit")
+
+            self._planning[appointment_id] = Appointment(time_unit=time_unit, interval=interval, last_run=None)
+
+        else:
+            raise OperationalException("Can't add appointment, appointment id is already taken")
+
+    def schedule_appointments(self) -> List[str]:
+        """
+        Function that will return all appointments that have hit their time threshold
+        """
+        appointments: List[str] = []
+
+        for appointment_id in self._planning:
+
+            if self._planning[appointment_id].last_run is None:
+                appointments.append(appointment_id)
+
+            elif self._planning[appointment_id].time_unit is TimeUnit.always:
+                appointments.append(appointment_id)
+
+            else:
+                now = datetime.now()
+
+                if self._planning[appointment_id].time_unit is TimeUnit.minute:
+                    last_run = self._planning[appointment_id].last_run
+                    elapsed_time = now - last_run
+                    minutes = divmod(elapsed_time.total_seconds(), 60)
+
+                    if minutes[0] >= self._planning[appointment_id].interval:
+                        appointments.append(appointment_id)
+
+                elif self._planning[appointment_id].time_unit is TimeUnit.hour:
+                    last_run = self._planning[appointment_id].last_run
+                    elapsed_time = now - last_run
+                    hours = divmod(elapsed_time.total_seconds(), 3600)
+
+                    if hours[0] >= self._planning[appointment_id].interval:
+                        appointments.append(appointment_id)
+
+            for appointment in appointments:
+                self._planning[appointment] = Appointment(
+                    self._planning[appointment].time_unit,
+                    self._planning[appointment].interval,
+                    datetime.now()
+                )
+
+        return appointments
 
 
 class BotContext(metaclass=Singleton):
@@ -36,8 +107,16 @@ class BotContext(metaclass=Singleton):
     _analyzed_data: DataFrame = None
     _data_sources: List[DataSource] = None
 
+    """
+    Strategy executors
+    """
     _strategy_executor = None
-    _data_provider_executor: DataProviderExecutor = None
+
+    """
+    Data provider executors
+    """
+    _data_provider_executor = None
+    _data_provider_executor = None
 
     def __init__(self) -> None:
         self._config = None
@@ -86,16 +165,27 @@ class BotContext(metaclass=Singleton):
         self._data_sources = data_sources
 
     @property
-    def data_provider_executor(self) -> DataProviderExecutor:
+    def performance_mode(self) -> bool:
+        return self._performance_mode
 
-        if not self._data_provider_executor:
-            raise OperationalException("Currently there is no data provider executor defined for the bot context")
+    @performance_mode.setter
+    def performance_mode(self, flag: bool) -> None:
+        self._performance_mode = flag
 
-        return self._data_provider_executor
+        if flag:
+            logger.info("Bot is running in performance mode ...")
 
-    @data_provider_executor.setter
-    def data_provider_executor(self, executor: DataProviderExecutor) -> None:
-        self._data_provider_executor = executor
+    # @property
+    # def data_provider_executor(self) -> DataProviderExecutor:
+    #
+    #     if not self._data_provider_executor:
+    #         raise OperationalException("Currently there is no data provider executor defined for the bot context")
+    #
+    #     return self._data_provider_executor
+    #
+    # @data_provider_executor.setter
+    # def data_provider_executor(self, executor: DataProviderExecutor) -> None:
+    #     self._data_provider_executor = executor
 
     @property
     def strategy_executor(self) -> StrategyExecutor:
