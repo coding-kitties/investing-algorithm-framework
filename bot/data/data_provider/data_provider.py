@@ -1,9 +1,9 @@
 import logging
-from abc import abstractmethod
+from typing import Dict, Any
 from pandas import DataFrame
+from abc import abstractmethod
 
-from bot.events.observable import Observable
-from bot.events.observer import Observer
+from bot.workers import Worker
 
 logger = logging.getLogger(__name__)
 
@@ -27,25 +27,19 @@ class DataProviderException(Exception):
         }
 
 
-class DataProvider(Observable):
+class DataProvider(Worker):
 
-    def __init__(self) -> None:
+    def __init__(self):
         super(DataProvider, self).__init__()
+
         self._data: DataFrame = None
 
-    def start(self) -> None:
-        self._data = self.provide_data()
-        self.notify_observers()
-
-    def add_observer(self, observer: Observer) -> None:
-        super().add_observer(observer)
-
-    def remove_observer(self, observer: Observer) -> None:
-        super().remove_observer(observer)
-
     @abstractmethod
-    def provide_data(self) -> DataFrame:
+    def provide_data(self, **kwargs: Dict[str, Any]) -> DataFrame:
         pass
+
+    def work(self, **kwargs: Dict[str, Any]) -> None:
+        self._data = self.provide_data()
 
     @property
     def data(self) -> DataFrame:
@@ -57,10 +51,8 @@ class DataProvider(Observable):
             self.clean_up()
             return data
 
-    @abstractmethod
     def clean_up(self) -> None:
         self._data = None
 
-    @abstractmethod
     def get_id(self) -> str:
-        pass
+        return self.__class__.__name__
