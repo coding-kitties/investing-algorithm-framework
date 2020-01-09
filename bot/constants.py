@@ -14,7 +14,8 @@ class TimeUnit(Enum):
 
     second = 'SEC',
     minute = 'MIN',
-    hour = 'HR'
+    hour = 'HR',
+    always = 'ALWAYS'
 
     # Static factory method to convert a string to TimeUnit
     @staticmethod
@@ -28,3 +29,18 @@ class TimeUnit(Enum):
 
         elif value in ('HR', 'hr', 'HOUR', 'hour', 'HOURS', 'hour'):
             return
+
+
+class ExecutionMode(Enum):
+
+    synchronous = 'synchronous',
+    asynchronous = 'asynchronous'
+
+    @staticmethod
+    def from_string(value: str):
+
+        if value in ('async', 'asynchronous'):
+            return ExecutionMode.asynchronous
+
+        if value in ('sync', 'synchronous', 'synchronized'):
+            return ExecutionMode.synchronous
