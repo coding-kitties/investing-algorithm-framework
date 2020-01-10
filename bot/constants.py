@@ -30,6 +30,13 @@ class TimeUnit(Enum):
         elif value in ('HR', 'hr', 'HOUR', 'hour', 'HOURS', 'hour'):
             return
 
+    def equals(self, other):
+
+        if isinstance(other, Enum):
+            return self.value == other.value
+        else:
+            return other == self.value
+
 
 class ExecutionMode(Enum):
 
@@ -44,3 +51,10 @@ class ExecutionMode(Enum):
 
         if value in ('sync', 'synchronous', 'synchronized'):
             return ExecutionMode.synchronous
+
+    def equals(self, other):
+
+        if isinstance(other, Enum):
+            return self.value == other.value
+        else:
+            return other == self.value
