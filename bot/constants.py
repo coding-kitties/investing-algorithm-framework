@@ -31,20 +31,24 @@ class TimeUnit(Enum):
     @staticmethod
     def from_string(value: str):
 
-        if value in ('SEC' 'sec', 'SECOND', 'second', 'SECONDS', 'seconds'):
-            return TimeUnit.SECOND
+        if isinstance(value, str):
 
-        elif value in ('MIN', 'min', 'MINUTE', 'minute', 'MINUTES', 'minutes'):
-            return TimeUnit.MINUTE
+            if value.lower() in ('sec', 'second', 'seconds'):
+                return TimeUnit.SECOND
 
-        elif value in ('HR', 'hr', 'HOUR', 'hour', 'HOURS', 'hour'):
-            return TimeUnit.HOUR
+            elif value.lower() in ('min', 'minute', 'minutes'):
+                return TimeUnit.MINUTE
 
-        elif value in ('always', 'ALWAYS', 'every', 'EVERY', 'continuous', 'CONTINUOUS', 'every_time', 'EVERY_TIME'):
-            return TimeUnit.ALWAYS
+            elif value.lower() in ('hr', 'hour', 'hour'):
+                return TimeUnit.HOUR
+
+            elif value.lower() in ('always', 'every', 'continuous', 'every_time'):
+                return TimeUnit.ALWAYS
+            else:
+                raise OperationalException('Could not convert value {} to a time_unit'.format(value))
 
         else:
-            raise OperationalException('Could not convert value {} to a time_unit'.format(value))
+            raise OperationalException("Could not convert non string value to a time_unit")
 
     def equals(self, other):
 
@@ -55,36 +59,6 @@ class TimeUnit(Enum):
             try:
                 time_unit = TimeUnit.from_string(other)
                 return time_unit == self
-            except OperationalException:
-                pass
-
-            return other == self.value
-
-
-class ExecutionMode(Enum):
-
-    SYNCHRONOUS = 'synchronous',
-    ASYNCHRONOUS = 'asynchronous'
-
-    @staticmethod
-    def from_string(value: str):
-
-        if value in ('async', 'asynchronous'):
-            return ExecutionMode.ASYNCHRONOUS
-
-        elif value in ('sync', 'synchronous', 'synchronized'):
-            return ExecutionMode.SYNCHRONOUS
-        else:
-            raise OperationalException('Could not convert value {} to a ExecutionMode'.format(value))
-
-    def equals(self, other):
-
-        if isinstance(other, Enum):
-            return self.value == other.value
-        else:
-            try:
-                execution_mode = ExecutionMode.from_string(other)
-                return execution_mode == self
             except OperationalException:
                 pass
 
