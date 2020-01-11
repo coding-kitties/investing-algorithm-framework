@@ -1,4 +1,6 @@
 from enum import Enum
+
+from bot import OperationalException
 from bot.settings import BASE_DIR, PLUGIN_STRATEGIES_DIR, PLUGIN_DATA_PROVIDERS_DIR
 """
 bot constants
@@ -28,7 +30,9 @@ class TimeUnit(Enum):
             return TimeUnit.minute
 
         elif value in ('HR', 'hr', 'HOUR', 'hour', 'HOURS', 'hour'):
-            return
+            return TimeUnit.hour
+        else:
+            raise OperationalException('Could not convert value {} to a TimeUnit'.format(value))
 
     def equals(self, other):
 
@@ -49,8 +53,10 @@ class ExecutionMode(Enum):
         if value in ('async', 'asynchronous'):
             return ExecutionMode.asynchronous
 
-        if value in ('sync', 'synchronous', 'synchronized'):
+        elif value in ('sync', 'synchronous', 'synchronized'):
             return ExecutionMode.synchronous
+        else:
+            raise OperationalException('Could not convert value {} to a ExecutionMode'.format(value))
 
     def equals(self, other):
 
