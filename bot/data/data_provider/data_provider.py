@@ -31,7 +31,6 @@ class DataProvider(Worker):
 
     def __init__(self):
         super(DataProvider, self).__init__()
-
         self._data: DataFrame = None
 
     @abstractmethod
@@ -54,5 +53,3 @@ class DataProvider(Worker):
     def clean_up(self) -> None:
         self._data = None
 
-    def get_id(self) -> str:
-        return self.__class__.__name__
