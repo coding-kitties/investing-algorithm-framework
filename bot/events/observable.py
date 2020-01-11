@@ -14,17 +14,11 @@ class Observable(ABC):
     @abstractmethod
     def add_observer(self, observer: Observer) -> None:
 
-        if not self._observers:
-            self._observers = []
-
         if isinstance(observer, Observer) and observer not in self._observers:
             self._observers.append(observer)
 
     @abstractmethod
     def remove_observer(self, observer: Observer) -> None:
-
-        if not self._observers:
-            return
 
         if observer in self._observers:
             self._observers.remove(observer)
