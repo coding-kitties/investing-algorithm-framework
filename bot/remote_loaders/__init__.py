@@ -1,2 +1,1 @@
-from bot.remote_loaders.strategy_remote_loader import StrategyRemoteLoader
 from bot.remote_loaders.data_provider_remote_loader import DataProviderRemoteLoader
