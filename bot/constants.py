@@ -39,7 +39,7 @@ class TimeUnit(Enum):
             elif value.lower() in ('min', 'minute', 'minutes'):
                 return TimeUnit.MINUTE
 
-            elif value.lower() in ('hr', 'hour', 'hour'):
+            elif value.lower() in ('hr', 'hour', 'hours'):
                 return TimeUnit.HOUR
 
             elif value.lower() in ('always', 'every', 'continuous', 'every_time'):
