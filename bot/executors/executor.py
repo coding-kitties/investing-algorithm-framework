@@ -14,25 +14,47 @@ from bot.constants import DEFAULT_MAX_WORKERS
 logger = logging.getLogger(__name__)
 
 
-class Executor(Observable):
+class Executor(Observable, Observer, ABC):
     """
-    Executor class: functions as an abstract class that will handle the executions of workers.
+    Executor class: functions as an abstract class that will handle the executions of workers in asynchronous order.
     """
 
-    def __init__(self):
+    def __init__(self,  max_workers: int = DEFAULT_MAX_WORKERS):
         super(Executor, self).__init__()
 
+        self._max_workers = max_workers
         self._pending_workers: Queue = None
+        self._running_workers: List[Worker] = []
+        self._running_threads: Dict[Worker, StoppableThread] = {}
 
     def start(self) -> None:
+        """
+        Main entry for the executor.
+        """
         self._initialize()
         self.run_jobs()
 
-    @abstractmethod
-    def run_jobs(self) -> None:
-        pass
+    def stop(self) -> None:
+        """
+        Function that will stop all running workers.
+        """
+        for worker in self._running_workers:
+            self.stop_running_worker(worker)
+
+        self.clean_up()
+
+    def clean_up(self):
+        """
+        Clean ups the resources.
+        """
+        self._pending_workers: Queue = None
+        self._running_workers: List[Worker] = []
+        self._running_threads: Dict[Worker, StoppableThread] = {}
 
     def _initialize(self):
+        """
+        Functions that initializes the pending workers.
+        """
         workers = self.create_workers()
 
         if not workers or len(workers) == 0:
@@ -44,52 +66,16 @@ class Executor(Observable):
             self._pending_workers.put(worker)
 
     @abstractmethod
-    def stop_running_worker(self, worker: Worker) -> None:
-        pass
-
-    def clean_up(self):
-        self._pending_workers = None
-
-    def stop(self) -> None:
-        self.clean_up()
-
-    @abstractmethod
     def create_workers(self) -> List[Worker]:
+        """
+        Abstract function that will create the workers.
+        """
         pass
-
-    @property
-    def pending_workers(self) -> Queue:
-        return self._pending_workers
-
-    def add_observer(self, observer: Observer) -> None:
-        super(Executor, self).add_observer(observer)
-
-    def remove_observer(self, observer: Observer) -> None:
-        super(Executor, self).remove_observer(observer)
-
-    @property
-    def processing(self) -> bool:
-
-        if self._pending_workers is not None:
-            return not self.pending_workers.empty()
-
-        return False
-
-
-class AsynchronousExecutor(Executor, Observer, ABC):
-    """
-    AsynchronousExecutor class: functions as an abstract class that will handle the executions of workers in synchronous order
-    """
-
-    def __init__(self,  max_workers: int = DEFAULT_MAX_WORKERS):
-        super(AsynchronousExecutor, self).__init__()
-
-        self._max_workers = max_workers
-        self._running_workers: List[Worker] = []
-        self._running_threads: Dict[Worker, StoppableThread] = {}
 
     def run_jobs(self) -> None:
-
+        """
+        Will start all the workers.
+        """
         worker_iteration = self._max_workers - len(self._running_workers)
 
         while worker_iteration > 0 and not self._pending_workers.empty():
@@ -103,6 +89,9 @@ class AsynchronousExecutor(Executor, Observer, ABC):
 
     @synchronized
     def update(self, observable, **kwargs) -> None:
+        """
+        Observer implementation.
+        """
 
         if observable in self._running_workers:
             self._running_workers.remove(observable)
@@ -114,38 +103,22 @@ class AsynchronousExecutor(Executor, Observer, ABC):
 
     def stop_running_worker(self, worker: Worker) -> None:
         """
-        With only synchronous workers you can't stop a function,
-        you need to wait til the current worker is finished
+        Function that will stop a running worker.
         """
-        self._pending_workers = Queue()
+        thread = self._running_threads[worker]
+        thread.kill()
+
+    def add_observer(self, observer: Observer) -> None:
+        super(Executor, self).add_observer(observer)
+
+    def remove_observer(self, observer: Observer) -> None:
+        super(Executor, self).remove_observer(observer)
 
     @property
     def processing(self) -> bool:
-        return super(AsynchronousExecutor, self).processing \
-               or (self._running_workers is not None and len(self._running_workers) > 0)
-
-
-class SynchronousExecutor(Executor, ABC):
-    """
-    SingleExecutor class: functions as an abstract class that will handle the executions of workers in synchronous order
-    """
-
-    def __init__(self):
-        # Can at most have 1 worker running
-        super(SynchronousExecutor, self).__init__()
-
-    def run_jobs(self) -> None:
-
-        while not self._pending_workers.empty():
-            worker = self._pending_workers.get()
-            worker.start()
-
-        # Let everybody know that we are finished
-        self.notify_observers()
-
-    def stop_running_worker(self, worker: Worker) -> None:
         """
-        With only synchronous workers you can't stop a function,
-        you need to wait til the current worker is finished
+        Property that will show if the executor is running.
         """
-        self._pending_workers = Queue()
+
+        return (self._pending_workers is not None and not self._pending_workers.empty()) or \
+               (self._running_workers is not None and len(self._running_workers) > 0)

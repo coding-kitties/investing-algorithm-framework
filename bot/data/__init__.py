@@ -3,8 +3,8 @@ import sqlite3
 from typing import Dict, Any, List, Tuple
 
 from bot import setup
-from bot.data.data_provider.data_provider import DataProvider
-from bot.data.executors import AsyncDataProviderExecutor, SyncDataProviderExecutor
+from bot.data.data_provider import DataProvider
+from bot.data.executors import DataProviderExecutor
 
 logger = logging.getLogger(__name__)
 

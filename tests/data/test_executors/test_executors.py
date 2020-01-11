@@ -2,7 +2,7 @@ import logging
 from time import sleep
 from threading import active_count
 
-from bot.data import SyncDataProviderExecutor, AsyncDataProviderExecutor
+from bot.data import DataProviderExecutor
 from tests.data.test_executors.setup import DummyDataProviderWorker, DummyObserver
 
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ def test_initialize_executors():
     data_provider_two = DummyDataProviderWorker()
     data_provider_three = DummyDataProviderWorker()
 
-    executor = SyncDataProviderExecutor(
+    executor = DataProviderExecutor(
         [
             data_provider_one,
             data_provider_two,
@@ -26,7 +26,7 @@ def test_initialize_executors():
     assert len(executor.registered_data_providers) == 3
     assert active_count() == 1
 
-    executor = SyncDataProviderExecutor(
+    executor = DataProviderExecutor(
         [
             data_provider_one,
         ]
@@ -40,64 +40,15 @@ def test_initialize_executors():
     logger.info("TEST FINISHED")
 
 
-def test_execution_sync_executor():
-    logger.info("TEST: test sync executor")
+def test_execution_executor():
+    logger.info("TEST: test DataProviderExecutor execution")
 
     observer = DummyObserver()
 
     data_provider_one = DummyDataProviderWorker()
     data_provider_three = DummyDataProviderWorker()
 
-    executor = SyncDataProviderExecutor(
-        [
-            data_provider_one,
-            data_provider_three
-        ]
-    )
-
-    executor.add_observer(observer)
-
-    assert active_count() == 1
-
-    executor.start()
-
-    # Check if the observer is updated by the executor
-    assert observer.update_count == 1
-
-    data_provider_one = DummyDataProviderWorker()
-
-    executor = SyncDataProviderExecutor(
-        [
-            data_provider_one,
-        ]
-    )
-
-    executor.add_observer(observer)
-
-    assert active_count() == 1
-
-    executor.start()
-
-    # Check if the observer is updated by the executor
-    assert observer.update_count == 2
-
-    executor.start()
-
-    # Check if the observer is updated by the executor
-    assert observer.update_count == 3
-
-    logger.info("TEST FINISHED")
-
-
-def test_execution_async_executor():
-    logger.info("TEST: test async executor")
-
-    observer = DummyObserver()
-
-    data_provider_one = DummyDataProviderWorker()
-    data_provider_three = DummyDataProviderWorker()
-
-    executor = AsyncDataProviderExecutor(
+    executor = DataProviderExecutor(
         [
             data_provider_one,
             data_provider_three
@@ -119,7 +70,7 @@ def test_execution_async_executor():
 
     data_provider_one = DummyDataProviderWorker()
 
-    executor = AsyncDataProviderExecutor(
+    executor = DataProviderExecutor(
         [
             data_provider_one,
         ]
