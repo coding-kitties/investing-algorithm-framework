@@ -48,8 +48,6 @@ class RemoteLoader(ABC):
         the class is located.
         """
 
-        logger.info("Searching for class: {}".format(class_name))
-
         for module_path in modules:
             spec = spec_from_file_location(module_path.stem, str(module_path))
             module = module_from_spec(spec)
@@ -64,7 +62,9 @@ class RemoteLoader(ABC):
                 logger.info("Found class {} in module {}".format(class_name, str(module_path)))
                 return module_path
 
-        raise DependencyException("Could not find given class in selection of modules")
+        raise DependencyException("Could not find given class {} in selection of modules. "
+                                  "Please make sure you placed the plugin in the dedicated plugin "
+                                  "directory".format(class_name))
 
     @staticmethod
     def create_class_generators(module_path: Path, class_name: str,
