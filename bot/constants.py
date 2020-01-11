@@ -39,6 +39,10 @@ class TimeUnit(Enum):
 
         elif value in ('HR', 'hr', 'HOUR', 'hour', 'HOURS', 'hour'):
             return TimeUnit.HOUR
+
+        elif value in ('always', 'ALWAYS', 'every', 'EVERY', 'continuous', 'CONTINUOUS', 'every_time', 'EVERY_TIME'):
+            return TimeUnit.ALWAYS
+
         else:
             raise OperationalException('Could not convert value {} to a time_unit'.format(value))
 
