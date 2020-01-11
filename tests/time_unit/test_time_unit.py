@@ -17,7 +17,7 @@ def test_minute():
         assert TimeUnit.HOUR.equals(time_unit)
         assert TimeUnit.HOUR.equals(value)
 
-    for value in ['SEC' 'sec', 'SECOND', 'second', 'SECONDS', 'seconds']:
+    for value in ['SEC', 'sec', 'SECOND', 'second', 'SECONDS', 'seconds']:
         time_unit = TimeUnit.from_string(value)
         assert TimeUnit.SECOND.equals(time_unit)
         assert TimeUnit.SECOND.equals(value)
