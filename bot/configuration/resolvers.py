@@ -1,152 +1,75 @@
 from typing import Dict, Any, List
 
-from bot.strategies import Strategy
 from bot.data import DataProvider
-from bot import DependencyException, OperationalException
-from bot.remote_loaders import StrategyRemoteLoader, DataProviderRemoteLoader
+from bot.constants import TimeUnit
+from bot import DependencyException
+from bot.remote_loaders import DataProviderRemoteLoader
 
 
 def get_data_provider_configurations(config: Dict[str, Any]) -> List[Dict[str, Any]]:
-    data_provider_configurations = config.get('data_providers', {})
+    """
+    Function that validates and loads all the data provider definitions for the given configuration
+    """
+    data_providers_configuration = config.get('data_providers', None)
 
-    entries = []
+    if data_providers_configuration is None:
+        raise DependencyException("Data providers are not defined in the config. Please make sure that you "
+                                  "define some data providers. If you have difficulties creating a data provider, "
+                                  "please see the documentation for examples.")
 
-    if not data_provider_configurations:
-        raise DependencyException(
-            "Could not resolve data providers, please provide the data provider configurations in your config file. "
-            "You could also use de default data providers, that can be found in the data/data_provider/templates"
-            " directory. If you have difficulties creating your own data provider, please see the documentation"
+    for data_provider_config in data_providers_configuration:
+
+        assert data_provider_config.get('id', None) is not None, (
+            "Expected data provider to define an id. Please fix your data provider configuration."
         )
 
-    for data_provider_entry in data_provider_configurations.keys():
-        entry = {
-            'key': data_provider_entry,
-            'class_name': data_provider_configurations[data_provider_entry].get('class_name', None),
-            'enabled': bool(data_provider_configurations[data_provider_entry].get('enabled', False)),
-            'plugin': bool(data_provider_configurations[data_provider_entry].get('plugin', False))
-        }
-        entries.append(entry)
-
-    return entries
-
-
-def get_strategy_configurations(config: Dict[str, Any]) -> List[Dict[str, Any]]:
-    strategy_configurations = config.get('strategies', {})
-
-    entries = []
-
-    if not strategy_configurations:
-        raise DependencyException(
-            "Could not resolve strategies, please provide the strategy configurations in your config file. "
-            "You could also use de default strategies, that can be found in the "
-            "strategies/strategy/templates directory. If you have difficulties creating "
-            "your own strategies, please see the documentation"
+        assert data_provider_config.get('schedule', None) is not None, (
+            "Expected data provider {} to define an schedule. Please fix your data provider "
+            "configuration.".format(data_provider_config.get('id'))
         )
 
-    for strategy_entry in strategy_configurations.keys():
-        entry = {
-            'key': strategy_entry,
-            'class_name': strategy_configurations[strategy_entry].get('class_name', None),
-            'enabled': bool(strategy_configurations[strategy_entry].get('enabled', False)),
-            'plugin': bool(strategy_configurations[strategy_entry].get('plugin', False))
-        }
-        entries.append(entry)
+        if not TimeUnit.ALWAYS.equals(data_provider_config.get('schedule')):
 
-    return entries
-
-
-def get_data_provider_plugins(data_provider_configurations: List[Dict[str, Any]]) -> List[DataProvider]:
-    remote_loader = DataProviderRemoteLoader()
-    data_providers = []
-
-    for entry in data_provider_configurations:
-
-        if not entry.get('enabled', False):
-            continue
-
-        if not entry.get('key', None):
-            raise DependencyException("Configured data provider must specify a identifier name")
-
-        if not entry.get('class_name', None):
-            raise DependencyException(
-                "Configured data provider {} must specify a class name corresponding "
-                "to the data provider implementation".format(entry)
+            assert data_provider_config.get('schedule').get('time_unit', None) is not None, (
+                "Expected data provider {} to define an schedule time_unit. Please fix your data provider "
+                "configuration.".format(data_provider_config.get('id'))
             )
 
-        if not bool(entry.get('plugin', False)):
-            continue
-
-        data_provider: DataProvider = remote_loader.load_data_provider(entry.get('class_name'))
-        data_providers.append(data_provider)
-
-    return data_providers
-
-
-def get_data_provider_templates(data_provider_configurations: List[Dict[str, Any]]) -> List[DataProvider]:
-    data_providers = []
-
-    for entry in data_provider_configurations:
-
-        if not entry.get('key', None):
-            raise DependencyException("Configured data provider must specify a identifier name")
-
-        if bool(entry.get('plugin', False)):
-            continue
-
-        if entry.get("key") == "":
-            continue
-
-        # data_provider: DataProvider = remote_loader.load_data_provider(entry.get('class_name'))
-        # data_providers.append(data_provider)
-
-    return None
-
-
-def get_strategy_plugins(strategy_configurations: List[Dict[str, Any]]) -> List[Strategy]:
-    remote_loader = StrategyRemoteLoader()
-    strategies = []
-
-    for entry in strategy_configurations:
-
-        if not entry.get('enabled', False):
-            continue
-
-        if not entry.get('key', None):
-            raise DependencyException("Configured strategy must specify a identifier name")
-
-        if not entry.get('class_name', None):
-            raise DependencyException(
-                "Configured strategy {} must specify a class name corresponding "
-                "to the strategy implementation".format(entry)
+            assert data_provider_config.get('schedule').get('interval', None) is not None, (
+                "Expected data provider {} to define an schedule interval. Please fix your data provider "
+                "configuration.".format(data_provider_config.get('id'))
             )
 
-        if not bool(entry.get('plugin', False)):
-            continue
+        assert data_provider_config.get('plugin', None) is not None, (
+            "Expected provider for data provider {} to define plugin flag. Please fix your data provider "
+            "configuration. If you make use of one of the templates set the flag to "
+            "false.".format(data_provider_config.get('id'))
+        )
 
-        strategy: Strategy = remote_loader.load_strategy(entry.get('class_name'))
-        strategies.append(strategy)
+        assert data_provider_config.get('class_name', None) is not None, (
+            "Expected provider for data provider {} to define class_name. Please fix your data provider "
+            "configuration.".format(data_provider_config.get('id'))
+        )
 
-    return strategies
+    return data_providers_configuration
 
 
-def get_strategy_templates(strategy_configurations: List[Dict[str, Any]]) -> List[Strategy]:
-    strategies = []
+def load_data_provider(data_provider_configuration: Dict[str, str]) -> DataProvider:
 
-    for entry in strategy_configurations:
+    class_name = data_provider_configuration.get('class_name')
+    plugin = bool(data_provider_configuration.get('plugin'))
+    data_provider: DataProvider = None
 
-        if not entry.get('key', None):
-            raise DependencyException("Configured data provider must specify a identifier name")
+    if plugin:
+        remote_loader = DataProviderRemoteLoader()
+        data_provider = remote_loader.load_data_provider(class_name)
+    else:
+        return None
 
-        if bool(entry.get('plugin', False)):
-            continue
-
-        if entry.get("key") == "":
-            continue
-
-        # data_provider: DataProvider = remote_loader.load_data_provider(entry.get('class_name'))
-        # data_providers.append(data_provider)
-
-    return None
+    assert data_provider.get_id() is data_provider_configuration.get('id'), (
+        "Loaded data provider with id {} does not have the same id '{}' as defined in the configuration. Please fix your "
+        "data provider configuration.".format(data_provider.get_id(), data_provider_configuration.get('id'))
+    )
 
 
 
