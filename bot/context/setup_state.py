@@ -1,85 +1,54 @@
 import logging
-from typing import List
 
 from bot.context.bot_state import BotState
-from bot.context.bot_context import BotContext
-from bot.data import DataProvider, DataProviderExecutor
+from bot.constants import TimeUnit
 from bot.context.data_providing_state import DataProvidingState
-from bot.strategies import ObservableStrategy, StrategyExecutor
-from bot.configuration.resolvers import get_data_provider_configurations, get_strategy_plugins, \
-    get_strategy_templates, get_strategy_configurations, get_data_provider_plugins, get_data_provider_templates
+from bot.configuration.resolvers import get_data_provider_configurations, load_data_provider
 
 logger = logging.getLogger(__name__)
 
 
 class SetupState(BotState):
 
-    def __init__(self):
-        super(SetupState, self).__init__()
-
+    def __init__(self, context):
         logger.info("Initializing setup state ...")
+
+        super(SetupState, self).__init__(context)
 
     def run(self):
         logger.info("Setup state started ...")
 
-        context = BotContext()
+        # Initialize all data provider executors
+        self._initialize_data_providers()
 
-        # Configure and start all the services
+        logger.info("Setup state finished ...")
 
-        # Initialize all data providers
-        data_providers: List[DataProvider] = self._initialize_data_providers()
-        context.data_provider_executor = DataProviderExecutor(data_providers)
+        self.context.transition_to(DataProvidingState)
+        self.context.run()
 
-        # Initializing all strategies
-        strategies: List[ObservableStrategy] = self._initialize_strategies()
-        context.strategy_executor = StrategyExecutor(strategies)
+    def _initialize_data_providers(self) -> None:
+        """
+        Function to load and initialize all the data providers.
+        """
 
-        logger.info("Transitioning to data providing state ...")
+        logger.info("Initializing data providers ...")
 
-        context.transition_to(DataProvidingState)
-        context.run()
+        data_providers_config = get_data_provider_configurations(self.context.config)
 
-    @classmethod
-    def _initialize_data_providers(cls) -> List[DataProvider]:
-        context = BotContext()
+        for data_provider_config in data_providers_config:
+            schedule = data_provider_config.get('schedule')
 
-        data_providers: List[DataProvider] = []
-        data_provider_configurations = get_data_provider_configurations(context.config)
-
-        # Load plugins
-        data_provider_plugins = get_data_provider_plugins(data_provider_configurations)
-
-        # Load templates
-        data_provider_templates = get_data_provider_templates(data_provider_configurations)
-
-        if data_provider_plugins is not None:
-            data_providers += data_provider_plugins
-
-        if data_provider_templates is not None:
-            data_providers += data_provider_templates
-
-        return data_providers
-
-    @classmethod
-    def _initialize_strategies(cls) -> List[ObservableStrategy]:
-        context = BotContext()
-
-        strategies: List[ObservableStrategy] = []
-        strategy_configurations = get_strategy_configurations(context.config)
-
-        # Load plugins
-        strategy_plugins = get_strategy_plugins(strategy_configurations)
-
-        # Load templates
-        strategy_templates = get_strategy_templates(strategy_configurations)
-
-        if strategy_plugins is not None:
-            strategies += [ObservableStrategy(strategy) for strategy in strategy_plugins]
-
-        if strategy_templates is not None:
-            strategies += [ObservableStrategy(strategy) for strategy in strategy_templates]
-
-        return strategies
+            if isinstance(schedule, str):
+                self.context.add_data_provider(
+                    load_data_provider(data_provider_config),
+                    TimeUnit.from_string(schedule),
+                )
+            else:
+                self.context.add_data_provider(
+                    load_data_provider(data_provider_config),
+                    TimeUnit.from_string(schedule.get('time_unit')),
+                    schedule.get('interval')
+                )
 
     def stop(self):
         # Stopping all services
