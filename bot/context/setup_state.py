@@ -2,7 +2,6 @@ import logging
 
 from bot.context.bot_state import BotState
 from bot.constants import TimeUnit
-from bot.context.data_providing_state import DataProvidingState
 from bot.configuration.resolvers import get_data_provider_configurations, load_data_provider
 
 logger = logging.getLogger(__name__)
@@ -23,6 +22,7 @@ class SetupState(BotState):
 
         logger.info("Setup state finished ...")
 
+        from bot.context.data_providing_state import DataProvidingState
         self.context.transition_to(DataProvidingState)
         self.context.run()
 
