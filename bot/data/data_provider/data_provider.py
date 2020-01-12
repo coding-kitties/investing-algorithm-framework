@@ -10,9 +10,8 @@ logger = logging.getLogger(__name__)
 
 class DataProviderException(Exception):
     """
-    Should be raised with a data_provider-formatted message in an _data_provider_* method
-    if ticker is wrong, i.e.:
-    raise DataProviderException('*Status:* `ticker is not valid`')
+    Should be raised when an data_provider related error occurs, for example if an authorization for an API fails,
+    i.e.: raise DataProviderException('Provided api token is false')
     """
     def __init__(self, message: str) -> None:
         super().__init__(self)
@@ -28,6 +27,10 @@ class DataProviderException(Exception):
 
 
 class DataProvider(Worker):
+    """
+    Class DataProvider: An entity which responsibility is to provide data from an external data source. Where a data
+    source is defined as any third party service that provides data, e.g  cloud storage, REST API, or website
+    """
 
     def __init__(self):
         super(DataProvider, self).__init__()
@@ -52,4 +55,5 @@ class DataProvider(Worker):
 
     def clean_up(self) -> None:
         self._data = None
+
 
