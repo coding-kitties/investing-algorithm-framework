@@ -5,8 +5,9 @@ from tests.context.setup_state.setup import TEST_DATA_PROVIDERS_PLUGINS_FILE, TE
 from tests.resources.data_providers.test_data_providers import SampleDataProviderOne, SampleDataProviderTwo
 
 from bot.configuration import Configuration
+from bot.context.setup_state import SetupState
+from bot.context import BotContext, ExecutionScheduler
 from bot.constants import TEST_DATA_PROVIDER_RESOURCES, TimeUnit
-from bot.context import BotContext, SetupState, ExecutionScheduler
 
 
 class TestClass:
