@@ -19,36 +19,31 @@ def get_data_provider_configurations(config: Dict[str, Any]) -> List[Dict[str, A
 
     for data_provider_config in data_providers_configuration:
 
-        assert data_provider_config.get('id', None) is not None, (
-            "Expected data provider to define an id. Please fix your data provider configuration."
+        assert data_provider_config.get('class_name', None) is not None, (
+            "Expected data provider to define a class_name. Please fix your data provider configuration."
         )
 
         assert data_provider_config.get('schedule', None) is not None, (
             "Expected data provider {} to define an schedule. Please fix your data provider "
-            "configuration.".format(data_provider_config.get('id'))
+            "configuration.".format(data_provider_config.get('class_name'))
         )
 
         if not TimeUnit.ALWAYS.equals(data_provider_config.get('schedule')):
 
             assert data_provider_config.get('schedule').get('time_unit', None) is not None, (
                 "Expected data provider {} to define an schedule time_unit. Please fix your data provider "
-                "configuration.".format(data_provider_config.get('id'))
+                "configuration.".format(data_provider_config.get('class_name'))
             )
 
             assert data_provider_config.get('schedule').get('interval', None) is not None, (
                 "Expected data provider {} to define an schedule interval. Please fix your data provider "
-                "configuration.".format(data_provider_config.get('id'))
+                "configuration.".format(data_provider_config.get('class_name'))
             )
 
         assert data_provider_config.get('plugin', None) is not None, (
             "Expected provider for data provider {} to define plugin flag. Please fix your data provider "
             "configuration. If you make use of one of the templates set the flag to "
-            "false.".format(data_provider_config.get('id'))
-        )
-
-        assert data_provider_config.get('class_name', None) is not None, (
-            "Expected provider for data provider {} to define class_name. Please fix your data provider "
-            "configuration.".format(data_provider_config.get('id'))
+            "false.".format(data_provider_config.get('class_name'))
         )
 
     return data_providers_configuration
@@ -62,14 +57,10 @@ def load_data_provider(data_provider_configuration: Dict[str, str]) -> DataProvi
 
     if plugin:
         remote_loader = DataProviderRemoteLoader()
-        data_provider = remote_loader.load_data_provider(class_name)
+        return remote_loader.load_data_provider(class_name)
     else:
         return None
 
-    assert data_provider.get_id() is data_provider_configuration.get('id'), (
-        "Loaded data provider with id {} does not have the same id '{}' as defined in the configuration. Please fix your "
-        "data provider configuration.".format(data_provider.get_id(), data_provider_configuration.get('id'))
-    )
 
 
 
