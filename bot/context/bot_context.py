@@ -57,6 +57,14 @@ class ExecutionScheduler:
             else:
                 now = datetime.now()
 
+                if self._planning[appointment_id].time_unit is TimeUnit.SECOND:
+                    last_run = self._planning[appointment_id].last_run
+                    elapsed_time = now - last_run
+                    seconds = elapsed_time.total_seconds()
+
+                    if seconds >= self._planning[appointment_id].interval:
+                        appointments.append(appointment_id)
+
                 if self._planning[appointment_id].time_unit is TimeUnit.MINUTE:
                     last_run = self._planning[appointment_id].last_run
                     elapsed_time = now - last_run
@@ -150,6 +158,15 @@ class BotContext(metaclass=Singleton):
         """
         self._data_providers[data_provider.get_id()] = data_provider
         self._data_providers_scheduler.add_execution_task(data_provider.get_id(), time_unit, interval)
+
+    def get_scheduled_data_providers(self) -> List[DataProvider]:
+        data_providers = []
+        executions = self._data_providers_scheduler.schedule_executions()
+
+        for data_provider_id in executions:
+            data_providers.append(self._data_providers[data_provider_id])
+
+        return data_providers
 
     def run(self) -> None:
 
