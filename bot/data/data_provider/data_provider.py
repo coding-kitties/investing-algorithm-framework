@@ -44,7 +44,7 @@ class DataProvider(Worker):
     def data(self) -> DataFrame:
 
         if self._data is None:
-            raise DataProviderException("Could not provide data, data is not set")
+            raise DataProviderException("Could not provide data, data is not set by {}".format(self.get_id()))
         else:
             data = self._data
             self.clean_up()
