@@ -5,7 +5,7 @@ from bot.events.observer import Observer
 
 class Observable(ABC):
     """
-    Class Observable manages and updates it's observers
+    Class Observable: manages and updates it's observers.
     """
 
     def __init__(self) -> None:
