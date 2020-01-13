@@ -1,46 +1,33 @@
 {
-    "max_open_trades": 10,
-    "currency": "euro",
+    "execution_time_out": {
+        "time_unit": "ms",
+        "interval": 50
+    },
     "services": {
         "telegram": {
-            "enabled": true,
             "bot_name": "Sample bot",
             "token": "xxxxxxxxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
             "chat_id": "xxxxxxxxxxxxxxxxxx"
         }
     },
-    "data_providers": {
-        performance_mode: false:
-        entries: {
-            "sample_data_provider": {
-                "enabled": true,
-                "plugin": true,
-                "interval": 1,
-                "time_unit": "hour",
-                "class_name": "SampleDataProvider"
+    "data_providers": [
+        {
+            "class_name": "SampleDataProvider",
+            "schedule": "always",
+            "plugin": true
+        },
+        {
+            "class_name": "SampleDataProviderThree",
+            "schedule": "always",
+            "plugin": true
+        },
+        {
+            "class_name": "SampleDataProviderThree",
+            "schedule": {
+                "time_unit": "min",
+                "interval": 2
             },
-            "sample_data_provider_two": {
-                "enabled": true,
-                "plugin": true,
-                "interval": 1,
-                "time_unit": "hour",
-                "class_name": "SampleDataProviderTwo"
-            }
+            "plugin": true
         }
-    },
-    "strategies": {
-        performance_mode: false:
-        entries: {
-            "sample_strategy": {
-                "enabled": true,
-                "plugin": true,
-                "class_name": "SampleStrategy"
-            },
-            "sample_strategy_two": {
-                "enabled": true,
-                "plugin": true,
-                "class_name": "SampleStrategyTwo"
-            }
-        }
-    }
+    ]
 }

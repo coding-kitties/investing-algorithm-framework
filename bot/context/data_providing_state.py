@@ -1,5 +1,5 @@
+import time
 import logging
-from time import sleep
 from typing import List
 from wrapt import synchronized
 
@@ -8,65 +8,67 @@ from bot import OperationalException
 from bot.events.observer import Observer
 from bot.context.bot_state import BotState
 from bot.context.bot_context import BotContext
-from bot.data.data_provider_executor import DataProviderExecutor
+from bot.data import DataProvider, DataProviderExecutor
 
 logger = logging.getLogger(__name__)
 
 
 class DataProvidingState(BotState, Observer):
 
-    def __init__(self) -> None:
-        super(DataProvidingState, self).__init__()
+    def __init__(self, context: BotContext) -> None:
+        super(DataProvidingState, self).__init__(context)
 
         logger.info("Initializing data providing state ...")
 
-        # Initialize the manager
-        context = BotContext()
+        self._data_provider_executor: DataProviderExecutor = None
+        self.data_sources: List[DataSource] = []
 
-        self._data_provider_executor: DataProviderExecutor = context.data_provider_executor
+        self._updated = False
+        self._started = False
+
+    def _initialize(self) -> None:
+        data_providers = self.context.get_scheduled_data_providers()
+        self._data_provider_executor = DataProviderExecutor(data_providers)
         self._data_provider_executor.add_observer(self)
 
-        self._updated = False
-        self._started = False
-
     def _clean_up(self) -> None:
-
-        if self._data_provider_executor.processing:
-            self._data_provider_executor.stop()
-
         self._updated = False
         self._started = False
+        self._data_provider_executor = None
+        self.data_sources = []
 
     def run(self) -> None:
         logger.info("Data providing state started ...")
 
-        data_sources: List[DataSource] = []
-
         if not self._started:
+            self._initialize()
+
+        if len(self._data_provider_executor.registered_data_providers) > 0:
             self._data_provider_executor.start()
 
-        # Sleep till updated
-        while not self._updated:
-            sleep(1)
+            # Sleep till updated
+            while not self._updated:
+                time.sleep(1)
 
-        if self._updated:
+            if self._updated:
 
-            # Collect all data from the data providers
-            for data_provider in self._data_provider_executor.registered_data_providers:
-                data_sources.append(DataSource(data_provider.get_id(), data_provider.data))
+                # Collect all data from the data providers
+                for data_provider in self._data_provider_executor.registered_data_providers:
+                    print(data_provider.get_id())
+                    self.data_sources.append(DataSource(data_provider.get_id(), data_provider.data))
+            else:
+                raise OperationalException("Abruptly ended out of run state")
 
-            context = BotContext()
-            context.data_sources = data_sources
-
-            # Transitioning to another state
-            from bot.context.analyzing_state import AnalyzingState
-            context.transition_to(AnalyzingState)
-            context.run()
-        else:
-            raise OperationalException("Abruptly ended out of run state")
+        # Transitioning to another state
+        from bot.context.analyzing_state import AnalyzingState
+        self.context.transition_to(AnalyzingState)
+        self.context.run()
 
     def stop(self) -> None:
-        pass
+        if self._data_provider_executor is not None and self._data_provider_executor.processing:
+            self._data_provider_executor.stop()
+
+        self._clean_up()
 
     def reconfigure(self) -> None:
         self._clean_up()
