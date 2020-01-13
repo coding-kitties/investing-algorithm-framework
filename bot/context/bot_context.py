@@ -1,14 +1,94 @@
 import logging
-from typing import Dict, Type, Any
-from pandas import DataFrame
+from datetime import datetime
+from collections import namedtuple
+from typing import Dict, Type, Any, List
 
-from bot.utils import Singleton
+from bot.data import DataProvider
+from bot.constants import TimeUnit
 from bot import OperationalException
-from bot.data import DataProviderExecutor
 from bot.context.bot_state import BotState
-from bot.strategies import StrategyExecutor
+from bot.utils import Singleton, DataSource
+
+
+ExecutionTask = namedtuple('ExecutionTask', 'time_unit interval last_run')
 
 logger = logging.getLogger(__name__)
+
+
+class ExecutionScheduler:
+    """
+    Class Scheduler: This is a lazy scheduler, it will schedule appointments. It only runs it's scheduling algorithm
+    when it is asked to. It will then evaluate all the time units and intervals and decide which appointment it needs
+    to return.
+    """
+
+    def __init__(self):
+        self._planning: Dict[str, ExecutionTask] = {}
+
+    def add_execution_task(self, execution_id: str, time_unit: TimeUnit, interval: int = None) -> None:
+        """
+        Function that will add an appointment to the scheduler
+        """
+
+        if execution_id not in self._planning:
+
+            if time_unit is not TimeUnit.ALWAYS and interval is None:
+                raise OperationalException("Appoint must set an interval with the corresponding time unit")
+
+            self._planning[execution_id] = ExecutionTask(time_unit=time_unit, interval=interval, last_run=None)
+
+        else:
+            raise OperationalException("Can't add appointment, appointment id is already taken")
+
+    def schedule_executions(self) -> List[str]:
+        """
+        Function that will return all appointments that have hit their time threshold
+        """
+        appointments: List[str] = []
+
+        for appointment_id in self._planning:
+
+            if self._planning[appointment_id].last_run is None:
+                appointments.append(appointment_id)
+
+            elif self._planning[appointment_id].time_unit is TimeUnit.ALWAYS:
+                appointments.append(appointment_id)
+
+            else:
+                now = datetime.now()
+
+                if self._planning[appointment_id].time_unit is TimeUnit.SECOND:
+                    last_run = self._planning[appointment_id].last_run
+                    elapsed_time = now - last_run
+                    seconds = elapsed_time.total_seconds()
+
+                    if seconds >= self._planning[appointment_id].interval:
+                        appointments.append(appointment_id)
+
+                if self._planning[appointment_id].time_unit is TimeUnit.MINUTE:
+                    last_run = self._planning[appointment_id].last_run
+                    elapsed_time = now - last_run
+                    minutes = divmod(elapsed_time.total_seconds(), 60)
+
+                    if minutes[0] >= self._planning[appointment_id].interval:
+                        appointments.append(appointment_id)
+
+                elif self._planning[appointment_id].time_unit is TimeUnit.HOUR:
+                    last_run = self._planning[appointment_id].last_run
+                    elapsed_time = now - last_run
+                    hours = divmod(elapsed_time.total_seconds(), 3600)
+
+                    if hours[0] >= self._planning[appointment_id].interval:
+                        appointments.append(appointment_id)
+
+            for appointment in appointments:
+                self._planning[appointment] = ExecutionTask(
+                    self._planning[appointment].time_unit,
+                    self._planning[appointment].interval,
+                    datetime.now()
+                )
+
+        return appointments
 
 
 class BotContext(metaclass=Singleton):
@@ -23,11 +103,16 @@ class BotContext(metaclass=Singleton):
     """
     _state: BotState = None
 
-    _analyzed_data: DataFrame = None
-    _raw_data_sources: Dict[str, DataFrame] = None
+    """
+    Data provider related attributes
+    """
+    _data_providers_scheduler = ExecutionScheduler()
+    _data_providers: Dict[str, DataProvider] = {}
 
-    _strategy_executor = None
-    _data_provider_executor: DataProviderExecutor = None
+    """
+    The data sources for the bot
+    """
+    _data_sources: List[DataSource] = None
 
     def __init__(self) -> None:
         self._config = None
@@ -37,7 +122,7 @@ class BotContext(metaclass=Singleton):
         if self._state:
             self._state.stop()
 
-        self._state = bot_state()
+        self._state = bot_state(self)
 
     def transition_to(self, state: Type[BotState]) -> None:
         """
@@ -45,7 +130,7 @@ class BotContext(metaclass=Singleton):
         """
 
         logger.info("Bot context: Transition to {}".format(state.__name__))
-        self._state = state()
+        self._state = state(context=self)
 
     @property
     def config(self) -> Dict[str, Any]:
@@ -60,48 +145,29 @@ class BotContext(metaclass=Singleton):
         self._config = config
 
     @property
-    def analyzed_data(self) -> DataFrame:
-        return self._analyzed_data
+    def data_sources(self) -> List[DataSource]:
+        return self._data_sources
 
-    @analyzed_data.setter
-    def analyzed_data(self, data_frame: DataFrame) -> None:
-        self._analyzed_data = data_frame
+    @data_sources.setter
+    def data_sources(self, data_sources: List[DataSource]) -> None:
+        self._data_sources = data_sources
 
-    @property
-    def raw_data(self) -> Dict[str, DataFrame]:
-        return self._raw_data_sources
+    def add_data_provider(self, data_provider: DataProvider, time_unit: TimeUnit, interval: int = None):
+        """
+        Function to add a data provider to the bot context
+        """
+        self._data_providers[data_provider.get_id()] = data_provider
+        self._data_providers_scheduler.add_execution_task(data_provider.get_id(), time_unit, interval)
 
-    @raw_data.setter
-    def raw_data(self, raw_data_sources: Dict[str, DataFrame]) -> None:
-        self._raw_data_sources = raw_data_sources
+    def get_scheduled_data_providers(self) -> List[DataProvider]:
+        data_providers = []
+        executions = self._data_providers_scheduler.schedule_executions()
 
-    @property
-    def data_provider_executor(self) -> DataProviderExecutor:
+        for data_provider_id in executions:
+            data_providers.append(self._data_providers[data_provider_id])
 
-        if not self._data_provider_executor:
-            raise OperationalException("Currently there is no data provider executor defined for the bot context")
+        return data_providers
 
-        return self._data_provider_executor
-
-    @data_provider_executor.setter
-    def data_provider_executor(self, executor: DataProviderExecutor) -> None:
-        self._data_provider_executor = executor
-
-    @property
-    def strategy_executor(self) -> StrategyExecutor:
-
-        if not self._strategy_executor:
-            raise OperationalException("Currently there is no strategy executor defined for the bot context")
-
-        return self._strategy_executor
-
-    @strategy_executor.setter
-    def strategy_executor(self, executor: StrategyExecutor) -> None:
-        self._strategy_executor = executor
-
-    """
-    The BotContext delegates part of its behavior to the current State object.
-    """
     def run(self) -> None:
 
         if self._state:

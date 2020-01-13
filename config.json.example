@@ -1,26 +1,33 @@
 {
-    "max_open_trades": 10,
-    "currency": "euro",
-    "telegram": {
-        "enabled": true,
-        "bot_name": "graham bot",
-        "token": "xxxxxxxxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-        "chat_id": "xxxxxxxxxxxxxxxxxx"
+    "execution_time_out": {
+        "time_unit": "ms",
+        "interval": 50
     },
-    "data_providers": {
-        "fmp": {
-            "enabled": true,
-            "plugin": true,
-            "interval": 1,
-            "time_unit": "hour",
-            "class_name": "FMPDataProvider"
+    "services": {
+        "telegram": {
+            "bot_name": "Sample bot",
+            "token": "xxxxxxxxxxxxxxx:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+            "chat_id": "xxxxxxxxxxxxxxxxxx"
         }
     },
-    "strategies": {
-        "value_investing_strategy": {
-            "enabled": true,
-            "plugin": true,
-            "class_name": "SampleStrategy"
+    "data_providers": [
+        {
+            "class_name": "SampleDataProvider",
+            "schedule": "always",
+            "plugin": true
+        },
+        {
+            "class_name": "SampleDataProviderThree",
+            "schedule": "always",
+            "plugin": true
+        },
+        {
+            "class_name": "SampleDataProviderThree",
+            "schedule": {
+                "time_unit": "min",
+                "interval": 2
+            },
+            "plugin": true
         }
-    }
+    ]
 }

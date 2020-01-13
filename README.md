@@ -1,19 +1,26 @@
-# Value investing bot 
+# Investing bot 
 
-The value investing bot is a free and open source investing bot written in Python. It is designed to support all 
-major exchanges and be controlled via Telegram. It contains backtesting, plotting and money management tools.
+The investing bot is a free and open source investing bot written in Python. The goal is to give you a configurable bot 
+where you can decide on how you implement your data providers, strategies, and brokers/exchanges. Also we want to allow 
+you to let your bot facilitate multiple users.
+
+It is designed to be controlled via Telegram. As of now, we are aiming to make the configuration of the different 
+components by the use of plugins. Please see the documentation on how to make your own plugin.
 
 ### Disclaimer
-This software is for educational purposes only. Do not risk money which you are afraid to lose. 
+This software is for educational purposes only. Do not risk money which you are afraid to lose. We can't stress this 
+enough: BEFORE YOU START USING MONEY WITH THE BOT, MAKE SURE THAT YOU TESTED YOU STRATEGIES AND DATA PROVIDERS.  
 USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.
 
 Always start by running a investing bot in Dry-run and do not engage money before you understand how it works and what profit/loss you should expect.
 
-We strongly recommend you to have coding and Python knowledge. Do not hesitate to read the source code and understand the mechanism of this bot.
+We strongly recommend you to have coding and Python knowledge, or trust the people that created the plugins your using. 
+Do not hesitate to read the source code and understand the mechanism of this bot or the plugin you're using.
 
-Exchange marketplaces supported
+Brokers/Exchange marketplaces supported
 ------
 Will be updated in the future 
+
 
 Documentation
 ------
@@ -21,20 +28,19 @@ Will be updated in the future
  
 ## Features
 
-- [x] **Based on Python 3.6+**: For botting on any operating system - Windows, macOS and Linux.
+- [x] **Based on Python 3.6+**: Support for all operating systems - Windows, macOS and Linux.
 - [x] **Persistence**: Persistence is achieved through sqlite.
 - [ ] **Dry-run**: Run the bot without playing money.
+- [ ] **REST API**: Manage the bot with the use of a REST API.
 - [ ] **Backtesting**: Run a simulation of your buy/sell strategy.
-- [x] **Tracking of companies**: Add, remove and track companies to track. 
-- [ ] **Stock selection**: Select which stocks you want to trade or want to track by creating a subselection.
-- [x] **Manageable via Telegram**: Manage the bot with Telegram.
+- [ ] **Manageable via Telegram**: Manage the bot with Telegram.
 - [ ] **Display profit/loss**: Display your profit/loss.
 - [ ] **Daily summary of profit/loss**: Provide a daily summary of your profit/loss.
 - [ ] **Performance status report**: Provide a performance status of your current trades.
 
 ## Quick start
 
-The value investing bot provides a Linux/macOS script to install all dependencies and help you to configure the bot.
+The investing bot provides a Linux/macOS script to install all dependencies and help you to configure the bot.
 
 The script will come as a future update
 
@@ -57,10 +63,6 @@ optional arguments:
 ### Telegram RPC commands
 
 Telegram is not mandatory. However, this is a great way to control your bot.
-
-- `/help`: Show help message
-- `/version`: Show version
-- `/add_tickers`: Add tickers to the registry, so they can be analyzed
 
 
 ## Development branches

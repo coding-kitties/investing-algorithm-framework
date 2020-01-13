@@ -1,1 +1,1 @@
-from bot.executors.worker_executor import WorkerExecutor
+from bot.executors.executor import Executor
