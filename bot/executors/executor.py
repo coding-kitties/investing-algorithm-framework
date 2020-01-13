@@ -83,9 +83,9 @@ class Executor(Observable, Observer, ABC):
             worker_iteration -= 1
             thread = StoppableThread(target=worker.start)
             worker.add_observer(self)
-            thread.start()
             self._running_threads[worker] = thread
             self._running_workers.append(worker)
+            thread.start()
 
     @synchronized
     def update(self, observable, **kwargs) -> None:
