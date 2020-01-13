@@ -6,13 +6,22 @@ from bot.events.observer import Observer
 
 
 class Worker(Observable, ABC):
+    """
+    Class Worker: manages the execution of a task and the context around executing it.
+    """
 
     def start(self, **kwargs: Dict[str, Any]) -> None:
+        """
+        Function that will start the worker, and notify its observers when it is finished
+        """
         self.work(**kwargs)
         self.notify_observers()
 
     @abstractmethod
     def work(self, **kwargs: Dict[str, Any]) -> None:
+        """
+        Function that needs to be implemented by a concrete class.
+        """
         pass
 
     def add_observer(self, observer: Observer) -> None:
@@ -23,4 +32,7 @@ class Worker(Observable, ABC):
 
     @abstractmethod
     def get_id(self) -> str:
+        """
+        Function that needs to be implemented by a concrete class to identify the worker.
+        """
         pass
