@@ -24,13 +24,13 @@ class Executor(Observable, Observer, ABC):
 
         self._max_workers = max_workers
         self._pending_workers: Queue = None
-        self._running_workers: List[Worker] = []
         self._running_threads: Dict[Worker, StoppableThread] = {}
 
     def start(self) -> None:
         """
         Main entry for the executor.
         """
+
         self._initialize()
         self.run_jobs()
 
@@ -38,7 +38,8 @@ class Executor(Observable, Observer, ABC):
         """
         Function that will stop all running workers.
         """
-        for worker in self._running_workers:
+
+        for worker in self._running_threads:
             self.stop_running_worker(worker)
 
         self.clean_up()
@@ -47,14 +48,15 @@ class Executor(Observable, Observer, ABC):
         """
         Clean ups the resources.
         """
+
         self._pending_workers: Queue = None
-        self._running_workers: List[Worker] = []
         self._running_threads: Dict[Worker, StoppableThread] = {}
 
     def _initialize(self):
         """
         Functions that initializes the pending workers.
         """
+
         workers = self.create_workers()
 
         if not workers or len(workers) == 0:
@@ -74,9 +76,10 @@ class Executor(Observable, Observer, ABC):
 
     def run_jobs(self) -> None:
         """
-        Will start all the workers.
+        Function that will start all the workers.
         """
-        worker_iteration = self._max_workers - len(self._running_workers)
+
+        worker_iteration = self._max_workers - len(self._running_threads.keys())
 
         while worker_iteration > 0 and not self._pending_workers.empty():
             worker = self._pending_workers.get()
@@ -84,7 +87,6 @@ class Executor(Observable, Observer, ABC):
             thread = StoppableThread(target=worker.start)
             worker.add_observer(self)
             self._running_threads[worker] = thread
-            self._running_workers.append(worker)
             thread.start()
 
     @synchronized
@@ -93,8 +95,8 @@ class Executor(Observable, Observer, ABC):
         Observer implementation.
         """
 
-        if observable in self._running_workers:
-            self._running_workers.remove(observable)
+        if observable in self._running_threads:
+            del self._running_threads[observable]
 
         if not self.processing:
             self.notify_observers()
@@ -105,6 +107,7 @@ class Executor(Observable, Observer, ABC):
         """
         Function that will stop a running worker.
         """
+
         thread = self._running_threads[worker]
         thread.kill()
 
@@ -121,4 +124,4 @@ class Executor(Observable, Observer, ABC):
         """
 
         return (self._pending_workers is not None and not self._pending_workers.empty()) or \
-               (self._running_workers is not None and len(self._running_workers) > 0)
+               (self._running_threads is not None and len(self._running_threads.keys()) > 0)
