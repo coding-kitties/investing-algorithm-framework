@@ -15,7 +15,6 @@ class TestDiscoverPlugin:
 
     def test(self):
         collector = PluginCollector(package_name='bot', plugin_class_type=DataProvider)
-        collector.load_plugins()
 
         for plugin in collector.plugins:
             assert isinstance(plugin, DataProvider)
