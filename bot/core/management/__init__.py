@@ -57,7 +57,7 @@ def get_commands():
     calls.
     """
 
-    commands = {name: 'investing_bot_framework.core' for name in find_commands(__path__[0])}
+    commands = {name: 'bot.core' for name in find_commands(__path__[0])}
 
     return commands
 
@@ -72,7 +72,7 @@ class ManagementUtility:
         self.program_name = os.path.basename(self.argv[0])
 
         if self.program_name == '__main__.py':
-            self.program_name = 'python -m django'
+            self.program_name = 'python -m investing-bot'
         self.settings_exception = None
 
     def execute(self) -> None:

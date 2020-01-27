@@ -18,7 +18,7 @@ class Template:
             raise ImproperlyConfigured("The given bot project directory for the bot does not exist")
 
         self._bot_name = bot_name
-        self._app_directory = bot_project_directory
+        self._bot_project_directory = bot_project_directory
 
     @abstractmethod
     def configure(self) -> None:

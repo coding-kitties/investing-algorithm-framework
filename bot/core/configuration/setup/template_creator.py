@@ -1,13 +1,15 @@
 from abc import ABC, abstractmethod
 
-from investing_bot_framework.core.configuration import Template
+from bot.core.configuration import Template
 
 
 class TemplateCreator(Template, ABC):
 
-    def __init__(self, _bot_project_directory: str, bot_name: str) -> None:
-        super(TemplateCreator, self).__init__(_bot_project_directory, bot_name)
+    def __init__(self,  bot_project_directory: str, bot_name: str) -> None:
+        super(TemplateCreator, self).__init__(bot_project_directory, bot_name)
         self._creation_mode = True
+
+        super(TemplateCreator, self).configure()
 
     @abstractmethod
     def create(self) -> None:

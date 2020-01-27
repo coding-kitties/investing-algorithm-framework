@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from investing_bot_framework.core.configuration.setup.template_creator import TemplateCreator
-from investing_bot_framework.core.configuration.setup.default_template_creators import DefaultBotProjectCreator
+from bot.core.configuration.setup.template_creator import TemplateCreator
+from bot.core.configuration.setup.default_template_creators import DefaultBotProjectCreator
 
 
 class TemplateCreatorFactory(ABC):

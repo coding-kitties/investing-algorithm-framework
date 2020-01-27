@@ -12,12 +12,14 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/pypa/sampleproject",
-    packages=setuptools.find_packages(),
+    packages=setuptools.find_packages(exclude=['tests', 'tests.*']),
+    include_package_data=True,
+    package_data={'bot': ['*.py-template']},
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.6',
-    scripts=['investing_bot_framework/bin/investing-bot-admin'],
+    scripts=['bot/bin/investing-bot-admin'],
 )

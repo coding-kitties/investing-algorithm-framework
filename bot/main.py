@@ -2,10 +2,7 @@ import sys
 import logging
 from typing import Any, List
 
-# Call settings for general configuration
-from bot import setup
-
-from bot import OperationalException
+# Call settings for general configurationfrom bot import OperationalException
 from bot.configuration import Arguments
 
 
