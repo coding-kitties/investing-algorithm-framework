@@ -9,7 +9,7 @@ def main():
     os.environ.setdefault('INVESTING_BOT_FRAMEWORK_SETTINGS_MODULE', '{{ bot_project_name }}.settings')
 
     try:
-        from investing_bot_framework.core.management import execute_from_command_line
+        from bot.core.management import execute_from_command_line
     except ImportError as exc:
         raise ImportError(
             "Couldn't import investing_bot_framework. Are you sure it's installed and "
