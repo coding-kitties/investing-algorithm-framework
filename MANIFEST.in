@@ -1,1 +1,4 @@
-recursive-include investing-bot.templates *
+graft bot
+include AUTHORS
+include INSTALL
+include LICENSE
