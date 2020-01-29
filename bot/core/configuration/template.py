@@ -10,6 +10,10 @@ class Template:
     """
 
     def __init__(self, bot_project_directory: str, bot_name: str) -> None:
+        """
+        bot project directory is the root directory of the given bot. The bot_name will be the same as the root project
+        directory. For simplicity it is explicitly passed as a parameter
+        """
 
         if bot_project_directory is None:
             raise ImproperlyConfigured("The given project directory is None")
