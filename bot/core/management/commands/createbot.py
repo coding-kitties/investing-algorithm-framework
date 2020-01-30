@@ -2,7 +2,7 @@ import os
 from importlib import import_module
 
 from bot.core.management.command import BaseCommand, CommandError
-from bot.core.configuration.setup.template_creator_factories import DefaultTemplateCreatorFactory
+from bot.core.configuration.setup import DefaultBotProjectCreator
 
 
 class CreateBotCommand(BaseCommand):
@@ -46,12 +46,13 @@ class CreateBotCommand(BaseCommand):
             except OSError as e:
                 raise CommandError(e)
 
+        # Use default bot creator
         if not template_creator:
-            template_factory = DefaultTemplateCreatorFactory(directory, bot_name)
+            bot_template_creator = DefaultBotProjectCreator(directory, bot_name)
 
         # Creates templates
-        project_creator = template_factory.create_project_template_creator()
-        project_creator.create()
+        bot_template_creator.configure()
+        bot_template_creator.create()
 
     @staticmethod
     def validate_name(name: str) -> bool:
