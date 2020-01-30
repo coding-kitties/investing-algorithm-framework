@@ -6,7 +6,6 @@ from bot.core.exceptions import ImproperlyConfigured
 from bot.core.configuration.setup.template_creator import TemplateCreator
 
 TEMPLATE_ROOT_DIR = 'templates/bot_project_template'
-TEMPLATE_PROJECT_DIR_NAME = 'bot_project_name'
 
 
 class DefaultBotProjectCreator(TemplateCreator):
@@ -24,18 +23,14 @@ class DefaultBotProjectCreator(TemplateCreator):
 
         for root, dirs, files in os.walk(template_dir):
 
-            destination_dir = self._bot_project_directory
-
             # Get the last part of the path
-            # /home/test_user/bots/investing-bot/bot/templates/bot_project_template ->  bot_project_template
+            # /home/test_user/bots/investing-bot/bot/templates/configuration ->  configuration
             # This is used as the basis for the copying
             path_rest = root[len(template_dir) + 1:]
-            relative_dir = path_rest.replace(TEMPLATE_PROJECT_DIR_NAME, self._bot_name)
 
-            if relative_dir:
-                # Create the directories if they don't exist
-                destination_dir = os.path.join(self._bot_project_directory, relative_dir)
-                os.makedirs(destination_dir, exist_ok=True)
+            # Create the directories if they don't exist
+            destination_dir = os.path.join(self._bot_project_directory, path_rest)
+            os.makedirs(destination_dir, exist_ok=True)
 
             for dirname in dirs[:]:
 
