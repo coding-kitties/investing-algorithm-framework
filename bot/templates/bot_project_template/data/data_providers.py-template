@@ -1,0 +1,5 @@
+from bot.core.data_providers import DataProvider
+
+"""
+Define here all you data providers, e.g. Rest Api's
+"""
