@@ -77,14 +77,3 @@ class DefaultBotProjectCreator(TemplateCreator):
                         "probably using an uncommon filesystem setup.".format(destination_path)
                     )
 
-
-class DefaultBotAppCreator(TemplateCreator):
-
-    def create(self) -> None:
-        settings_file = os.path.join(self._bot_project_directory, 'settings.py')
-
-        if os.path.isfile(settings_file):
-            raise ImproperlyConfigured("Settings file already exists")
-
-    def configure(self) -> None:
-        pass

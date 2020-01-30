@@ -45,7 +45,7 @@ class TestClass:
 
         context._state._initialize_data_providers()
 
-        assert len(context._data_providers) == len(configuration.config.get('data_providers'))
+        assert len(context._data_providers) == len(configuration.config.get('data'))
 
         for data_provider_id in context._data_providers:
             assert data_provider_id in data_providers

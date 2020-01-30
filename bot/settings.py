@@ -7,11 +7,11 @@ PARENT_DIR = os.path.dirname(BASE_DIR)
 
 # Plugin directories
 PLUGIN_STRATEGIES_DIR = os.path.abspath(os.path.join(PARENT_DIR, 'plugins/strategies'))
-PLUGIN_DATA_PROVIDERS_DIR = os.path.abspath(os.path.join(PARENT_DIR, 'plugins/data_providers'))
+PLUGIN_DATA_PROVIDERS_DIR = os.path.abspath(os.path.join(PARENT_DIR, 'plugins/data'))
 
 # Test directories
 TEST_RESOURCES = os.path.abspath(os.path.join(PARENT_DIR, 'tests/resources'))
-TEST_DATA_PROVIDER_RESOURCES = os.path.abspath(os.path.join(TEST_RESOURCES, 'data_providers'))
+TEST_DATA_PROVIDER_RESOURCES = os.path.abspath(os.path.join(TEST_RESOURCES, 'data'))
 TEST_CONFIGURATION_RESOURCES = os.path.abspath(os.path.join(TEST_RESOURCES, 'configurations'))
 
 # Change this when not in development, feature or hot-fix branch

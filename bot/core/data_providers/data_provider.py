@@ -1,11 +1,8 @@
-import logging
 from typing import Dict, Any
 from pandas import DataFrame
 from abc import abstractmethod
 
 from bot.workers import Worker
-
-logger = logging.getLogger(__name__)
 
 
 class DataProviderException(Exception):
@@ -48,13 +45,10 @@ class DataProvider(Worker):
 
         if self._data is None:
             raise DataProviderException("Could not provide data, data is not set by {}".format(self.get_id()))
-        else:
-            data = self._data
-            self.clean_up()
-            return data
+
+        return self._data
 
     def clean_up(self) -> None:
         self._data = None
-
 
 

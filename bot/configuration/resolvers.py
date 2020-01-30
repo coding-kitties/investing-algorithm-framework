@@ -10,7 +10,7 @@ def get_data_provider_configurations(config: Dict[str, Any]) -> List[Dict[str, A
     """
     Function that validates and loads all the data provider definitions for the given configuration
     """
-    data_providers_configuration = config.get('data_providers', None)
+    data_providers_configuration = config.get('data', None)
 
     if data_providers_configuration is None:
         raise DependencyException("Data providers are not defined in the config. Please make sure that you "
