@@ -1,6 +1,9 @@
 import os
+import re
 from importlib import import_module
+from colorama import Fore
 
+from bot.core.exceptions import ImproperlyConfigured
 from bot.core.management.command import BaseCommand, CommandError
 from bot.core.configuration.setup import DefaultBotProjectCreator
 
@@ -21,6 +24,8 @@ class CreateBotCommand(BaseCommand):
         )
 
     def handle(self, **options):
+
+        # Get all the default attributes
         bot_name = options.get('name', None)
         directory = options.get('directory', None)
         template_creator = options.get('template_creator', None)
@@ -29,7 +34,7 @@ class CreateBotCommand(BaseCommand):
 
         # initialize the bot project directory
         if directory is None:
-            directory = os.path.join(os.getcwd(), bot_name)
+            directory = os.path.join(os.getcwd())
 
         else:
             directory = os.path.abspath(os.path.expanduser(directory))
@@ -37,22 +42,18 @@ class CreateBotCommand(BaseCommand):
             if not os.path.exists(directory):
                 raise CommandError("Destination directory {} does not exist, please create it first.".format(directory))
 
-        if not os.path.isdir(directory):
+        try:
+            # Use default bot creator
+            if not template_creator:
+                bot_template_creator = DefaultBotProjectCreator(os.path.join(directory, bot_name), bot_name)
 
-            try:
-                os.makedirs(directory)
-            except FileExistsError:
-                raise CommandError("{} already exists".format(directory))
-            except OSError as e:
-                raise CommandError(e)
+            # Creates templates
+            bot_template_creator.configure()
+            bot_template_creator.create()
+        except ImproperlyConfigured as e:
+            raise CommandError(e.__str__())
 
-        # Use default bot creator
-        if not template_creator:
-            bot_template_creator = DefaultBotProjectCreator(directory, bot_name)
-
-        # Creates templates
-        bot_template_creator.configure()
-        bot_template_creator.create()
+        return Fore.GREEN + "Bot created and initialized in directory {}\n".format(os.path.join(directory, bot_name))
 
     @staticmethod
     def validate_name(name: str) -> bool:
@@ -62,6 +63,10 @@ class CreateBotCommand(BaseCommand):
 
         if name is None:
             raise CommandError("you must provide a bot name")
+
+        if not re.match("^[a-zA-Z]+\w*$", name):
+            raise CommandError("{} is not allowed, value must begin with a letter and "
+                               "only contains the characters of 0-9, A-Z, a-z and _".format(name))
 
         # Make sure it can't be imported
         try:
@@ -76,3 +81,4 @@ class CreateBotCommand(BaseCommand):
             )
 
         return True
+
