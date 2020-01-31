@@ -5,21 +5,20 @@ from shutil import copyfile, copymode
 from bot.core.exceptions import ImproperlyConfigured
 from bot.core.configuration.setup.template_creator import TemplateCreator
 
-TEMPLATE_ROOT_DIR = 'templates/bot_project_template'
-
 
 class DefaultBotProjectCreator(TemplateCreator):
+    TEMPLATE_ROOT_DIR = 'templates/bot_project_template'
 
     def configure(self) -> None:
-        bot_base_dir = os.path.join(self._bot_project_directory, self._bot_name)
+        bot_dir = os.path.join(self._bot_project_directory)
 
-        if os.path.exists(bot_base_dir):
-            raise ImproperlyConfigured("Bot base dir {} already exists".format(self._bot_name))
+        if os.path.exists(bot_dir):
+            raise ImproperlyConfigured("Bot destination directory {} already exists".format(self._bot_name))
 
     def create(self) -> None:
 
         # Find the default template directory
-        template_dir = os.path.join(bot.__path__[0], TEMPLATE_ROOT_DIR)
+        template_dir = os.path.join(bot.__path__[0], self.TEMPLATE_ROOT_DIR)
 
         for root, dirs, files in os.walk(template_dir):
 
