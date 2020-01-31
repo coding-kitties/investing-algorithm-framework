@@ -1,5 +1,4 @@
-import os
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 
 from bot.core.exceptions import ImproperlyConfigured
 
@@ -17,9 +16,6 @@ class Template:
 
         if bot_project_directory is None:
             raise ImproperlyConfigured("The given project directory is None")
-
-        if not os.path.isdir(bot_project_directory):
-            raise ImproperlyConfigured("The given bot project directory for the bot does not exist")
 
         self._bot_name = bot_name
         self._bot_project_directory = bot_project_directory
