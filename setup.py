@@ -6,8 +6,6 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name="investing_bot_framework",
     version="0.0.1",
-    author="Marc van Duyn",
-    author_email="marcvanduyn@gmail.com",
     description="A framework for creating an investment bot",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -16,6 +14,9 @@ setuptools.setup(
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: Operating System :: OS Independent",
+    ],
+    install_requires=[
+        'colorama',
     ],
     python_requires='>=3.6',
     scripts=['bot/bin/investing-bot-admin'],
