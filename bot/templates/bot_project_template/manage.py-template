@@ -6,15 +6,14 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('INVESTING_BOT_FRAMEWORK_SETTINGS_MODULE', '{{ bot_project_name }}.settings')
+    os.environ.setdefault('INVESTING_BOT_FRAMEWORK_SETTINGS_MODULE', 'configuration.settings')
 
     try:
         from bot.core.management import execute_from_command_line
     except ImportError as exc:
         raise ImportError(
-            "Couldn't import investing_bot_framework. Are you sure it's installed and "
-            "available on your PYTHONPATH environment variable? Did you "
-            "forget to activate a virtual environment?"
+            "Couldn't import investing_bot_framework. Are you sure it's installed and available on your PYTHONPATH"
+            "environment variable? Did you forget to activate a virtual environment?"
         ) from exc
     execute_from_command_line(sys.argv)
 
