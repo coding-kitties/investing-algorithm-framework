@@ -1,6 +1,9 @@
 import os
+from typing import Any
 from argparse import ArgumentParser
 from abc import abstractmethod, ABC
+
+from colorama import Fore
 
 
 class CommandError(Exception):
@@ -45,7 +48,7 @@ class BaseCommand(ABC):
     help = ''
     _called_from_command_line = False
 
-    def create_parser(self, program_name, sub_command, **kwargs):
+    def create_parser(self, program_name, sub_command, **kwargs) -> CommandParser:
         """
         Create and return the ``ArgumentParser`` which will be used to
         parse the arguments to this command.
@@ -62,39 +65,45 @@ class BaseCommand(ABC):
         return parser
 
     @abstractmethod
-    def add_arguments(self, parser):
+    def add_arguments(self, parser) -> None:
         """
         Entry point for subclassed commands to add custom arguments.
         """
         pass
 
-    def execute(self, *args, **options):
+    def execute(self, *args, **options) -> Any:
         """
         Try to execute this command, performing system checks if needed (as
         controlled by the ``requires_system_checks`` attribute, except if
         force-skipped).
         """
 
-        output = self.handle(*args, **options)
-        return output
+        try:
+            return self.handle(*args, **options)
+        except CommandError as e:
+            return self.handle_command_error(e)
+
+    @staticmethod
+    def handle_command_error(error: CommandError) -> str:
+        return Fore.RED + error.__str__() + '\n'
 
     @abstractmethod
-    def handle(self, *args, **options):
+    def handle(self, *args, **options) -> Any:
         """
         The actual logic of the command. Subclasses must implement
         this method.
         """
         pass
 
-    def run_from_argv(self, argv):
+    def run_from_argv(self, argv) -> Any:
 
         self._called_from_command_line = True
         parser = self.create_parser(argv[0], argv[1])
 
         options = parser.parse_args(argv[2:])
         cmd_options = vars(options)
+
         # Move positional args out of options to mimic legacy optparse
         args = cmd_options.pop('args', ())
 
-        self.execute(*args, **cmd_options)
-
+        return self.execute(*args, **cmd_options)
