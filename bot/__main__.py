@@ -3,7 +3,7 @@ Invokes bot-admin when the bot framework module is run as a script.
 Example: python -m investing_bot_framework createbot SampleBot
 """
 
-from bot.core import management
+from bot.core.management import execute_from_command_line
 
 if __name__ == "__main__":
-    management.execute_from_command_line()
+    execute_from_command_line()
