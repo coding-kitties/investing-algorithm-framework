@@ -1,5 +1,4 @@
 from typing import Dict, Any
-from pandas import DataFrame
 from abc import abstractmethod
 
 from bot.workers import Worker
@@ -31,17 +30,17 @@ class DataProvider(Worker):
 
     def __init__(self):
         super(DataProvider, self).__init__()
-        self._data: DataFrame = None
+        self._data: Any = None
 
     @abstractmethod
-    def provide_data(self, **kwargs: Dict[str, Any]) -> DataFrame:
+    def provide_data(self, **kwargs: Dict[str, Any]) -> Any:
         pass
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
         self._data = self.provide_data()
 
     @property
-    def data(self) -> DataFrame:
+    def data(self) -> Any:
 
         if self._data is None:
             raise DataProviderException("Could not provide data, data is not set by {}".format(self.get_id()))

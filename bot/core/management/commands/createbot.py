@@ -1,7 +1,6 @@
 import os
 import re
 from importlib import import_module
-from colorama import Fore
 
 from bot.core.exceptions import ImproperlyConfigured
 from bot.core.management.command import BaseCommand, CommandError
@@ -13,6 +12,7 @@ class CreateBotCommand(BaseCommand):
         "Creates a project directory structure for the given bot name in the current directory or optionally "
         "in the given directory."
     )
+
     missing_args_message = "You must provide a bot name."
 
     def add_arguments(self, parser):
@@ -23,7 +23,7 @@ class CreateBotCommand(BaseCommand):
             help='Optional template creator plugin, provided by third party libraries'
         )
 
-    def handle(self, **options):
+    def handle(self, **options) -> str:
 
         # Get all the default attributes
         bot_name = options.get('name', None)
@@ -34,7 +34,15 @@ class CreateBotCommand(BaseCommand):
 
         # initialize the bot project directory
         if directory is None:
-            directory = os.path.join(os.getcwd())
+            directory = os.path.join(os.getcwd(), bot_name)
+
+            if os.path.isdir(directory):
+                raise ImproperlyConfigured(
+                    "Directory {} already exists. Please make sure that the bot project name does not correspond to "
+                    "an existing directory"
+                )
+
+            os.mkdir(directory)
 
         else:
             directory = os.path.abspath(os.path.expanduser(directory))
@@ -45,7 +53,7 @@ class CreateBotCommand(BaseCommand):
         try:
             # Use default bot creator
             if not template_creator:
-                bot_template_creator = DefaultBotProjectCreator(os.path.join(directory, bot_name), bot_name)
+                bot_template_creator = DefaultBotProjectCreator(directory, bot_name)
 
             # Creates templates
             bot_template_creator.configure()
@@ -53,7 +61,7 @@ class CreateBotCommand(BaseCommand):
         except ImproperlyConfigured as e:
             raise CommandError(e.__str__())
 
-        return Fore.GREEN + "Bot created and initialized in directory {}\n".format(os.path.join(directory, bot_name))
+        return "Bot created and initialized in directory {}".format(os.path.join(directory, bot_name))
 
     @staticmethod
     def validate_name(name: str) -> bool:

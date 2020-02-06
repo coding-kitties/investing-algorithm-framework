@@ -5,11 +5,11 @@ from typing import Dict, List
 
 from bot.core.resolvers import ClassCollector
 from bot.core.management.command import BaseCommand
-from bot.core.configuration.settings import Settings
+from bot.core.configuration import settings
 from bot.core.configuration.config_constants import SETTINGS_MODULE_PATH_ENV_NAME
 
 # Load the settings
-settings = Settings(settings_module=os.getenv(SETTINGS_MODULE_PATH_ENV_NAME))
+settings = settings
 
 
 def find_commands(management_dir: str) -> List[str]:

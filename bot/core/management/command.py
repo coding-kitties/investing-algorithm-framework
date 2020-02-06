@@ -45,7 +45,8 @@ class CommandParser(ArgumentParser):
 
 class BaseCommand(ABC):
     # Metadata about this command.
-    help = ''
+    help_message = ''
+    success_message = ''
     _called_from_command_line = False
 
     def create_parser(self, program_name, sub_command, **kwargs) -> CommandParser:
@@ -55,7 +56,7 @@ class BaseCommand(ABC):
         """
         parser = CommandParser(
             prog='%s %s' % (os.path.basename(program_name), sub_command),
-            description=self.help or None,
+            description=self.help_message or None,
             missing_args_message=getattr(self, 'missing_args_message', None),
             called_from_command_line=getattr(self, '_called_from_command_line', None),
             **kwargs
@@ -73,19 +74,39 @@ class BaseCommand(ABC):
 
     def execute(self, *args, **options) -> Any:
         """
-        Try to execute this command, performing system checks if needed (as
-        controlled by the ``requires_system_checks`` attribute, except if
-        force-skipped).
+        Try to execute this command.
         """
 
         try:
-            return self.handle(*args, **options)
+            return self.handle_command_success(self.handle(*args, **options))
         except CommandError as e:
             return self.handle_command_error(e)
 
-    @staticmethod
-    def handle_command_error(error: CommandError) -> str:
-        return Fore.RED + error.__str__() + '\n'
+    def handle_command_error(self, error: CommandError) -> str:
+        """
+        Handling of errors as output to the user
+        """
+
+        message = error.__str__()
+
+        if message is None:
+            return self.format_error_message("Command ended with error")
+
+        return self.format_error_message(error.__str__())
+
+    def handle_command_success(self, message: str = None) -> str:
+        """
+        Handling of successful command execution as output to the user
+        """
+
+        if message is None:
+
+            if self.success_message is not None:
+                return self.format_success_message(self.success_message)
+            else:
+                return self.format_success_message("Command finished")
+        else:
+            return self.format_success_message(message)
 
     @abstractmethod
     def handle(self, *args, **options) -> Any:
@@ -107,3 +128,21 @@ class BaseCommand(ABC):
         args = cmd_options.pop('args', ())
 
         return self.execute(*args, **cmd_options)
+
+    @staticmethod
+    def format_success_message(message: str) -> str:
+        """
+        Utility function to format a success message
+        """
+
+        message = Fore.GREEN + message + '\n'
+        return message
+
+    @staticmethod
+    def format_error_message(message: str) -> str:
+        """
+        Utility function to format an error message
+        """
+
+        message = Fore.GREEN + message + '\n'
+        return message

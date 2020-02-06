@@ -6,7 +6,7 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault('INVESTING_BOT_FRAMEWORK_SETTINGS_MODULE', 'configuration.settings')
+    os.environ.setdefault('INVESTING_BOT_FRAMEWORK_SETTINGS_MODULE', '{{ bot_project_name }}.configuration.settings')
 
     try:
         from bot.core.management import execute_from_command_line

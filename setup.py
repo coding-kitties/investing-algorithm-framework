@@ -16,7 +16,7 @@ setuptools.setup(
         "License :: OSI Approved :: Operating System :: OS Independent",
     ],
     install_requires=[
-        'colorama',
+        'colorama', 'wrapt'
     ],
     python_requires='>=3.6',
     scripts=['bot/bin/investing-bot-admin'],

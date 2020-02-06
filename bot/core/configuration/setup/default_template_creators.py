@@ -1,16 +1,18 @@
 import os
-import bot
 from shutil import copyfile, copymode
 
+import bot
 from bot.core.exceptions import ImproperlyConfigured
 from bot.core.configuration.setup.template_creator import TemplateCreator
 
 
 class DefaultBotProjectCreator(TemplateCreator):
-    TEMPLATE_ROOT_DIR = 'templates/bot_project_template'
+    TEMPLATE_ROOT_DIR = 'templates/bot_project_directory'
+    BOT_PROJECT_NAME_PLACEHOLDER = '{{ bot_project_name }}'
+    BOT_PROJECT_TEMPLATE_DIR_NAME = 'bot_project_template'
 
     def configure(self) -> None:
-        bot_dir = os.path.join(self._bot_project_directory)
+        bot_dir = os.path.join(self._bot_project_directory, self._bot_name)
 
         if os.path.exists(bot_dir):
             raise ImproperlyConfigured("Bot destination directory {} already exists".format(self._bot_name))
@@ -26,6 +28,9 @@ class DefaultBotProjectCreator(TemplateCreator):
             # /home/test_user/bots/investing-bot/bot/templates/configuration ->  configuration
             # This is used as the basis for the copying
             path_rest = root[len(template_dir) + 1:]
+
+            # Replace template bot directory with given bot name
+            path_rest = path_rest.replace(self.BOT_PROJECT_TEMPLATE_DIR_NAME, self._bot_name)
 
             # Create the directories if they don't exist
             destination_dir = os.path.join(self._bot_project_directory, path_rest)
@@ -71,3 +76,17 @@ class DefaultBotProjectCreator(TemplateCreator):
                         "probably using an uncommon filesystem setup.".format(destination_path)
                     )
 
+                # Format placeholders in file if needed
+                if filename in ['manage.py-template', 'settings.py-template']:
+
+                    # Read the file
+                    with open(destination_path, 'r') as file:
+
+                        file_data = file.read()
+
+                    # Replace the placeholder with the bot name
+                    file_data = file_data.replace(self.BOT_PROJECT_NAME_PLACEHOLDER, self._bot_name)
+
+                    # Write the file out again
+                    with open(destination_path, 'w') as file:
+                        file.write(file_data)

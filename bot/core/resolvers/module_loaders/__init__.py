@@ -1,0 +1,1 @@
+from bot.core.resolvers.module_loaders.data_providers_loader import DataProvidersLoader

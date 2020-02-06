@@ -1,7 +1,14 @@
 class ImproperlyConfigured(Exception):
     """
-    Exception class indicating a problem with the configuration of the bot
+    Class ImproperlyConfigured: Exception class indicating a problem with the configuration of the bot
     """
-    def __init__(self, message):
-        # Call the base class constructor with the parameters it needs
+    def __init__(self, message) -> None:
         super(ImproperlyConfigured, self).__init__(message)
+
+
+class OperationalException(Exception):
+    """
+    Class OperationalException: Exception class indicating a problem occurred during running of the bot
+    """
+    def __init__(self, message) -> None:
+        super(OperationalException, self).__init__(message)
