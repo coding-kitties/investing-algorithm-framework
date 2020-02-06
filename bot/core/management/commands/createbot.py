@@ -63,7 +63,7 @@ class CreateBotCommand(BaseCommand):
             raise CommandError(e.__str__())
 
     @staticmethod
-    def validate_name(name: str) -> bool:
+    def validate_name(name: str) -> None:
         """
         Helper function to validate the name of a given bot
         """
@@ -86,6 +86,3 @@ class CreateBotCommand(BaseCommand):
                 "module and cannot be used as a bot name. Please try "
                 "another name.".format(name)
             )
-
-        return True
-
