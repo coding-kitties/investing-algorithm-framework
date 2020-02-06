@@ -2,8 +2,9 @@ import os
 from typing import Any
 from argparse import ArgumentParser
 from abc import abstractmethod, ABC
-
 from colorama import Fore
+
+from bot.core.exceptions import ImproperlyConfigured
 
 
 class CommandError(Exception):
@@ -80,19 +81,19 @@ class BaseCommand(ABC):
         try:
             return self.handle_command_success(self.handle(*args, **options))
         except CommandError as e:
-            return self.handle_command_error(e)
+            return self.handle_command_error("Command error: " + e.__str__())
+        except ImproperlyConfigured as e:
+            return self.handle_command_error("Configuration error: " + e.__str__())
 
-    def handle_command_error(self, error: CommandError) -> str:
+    def handle_command_error(self, error_message: str = None) -> str:
         """
         Handling of errors as output to the user
         """
 
-        message = error.__str__()
-
-        if message is None:
+        if error_message is None:
             return self.format_error_message("Command ended with error")
 
-        return self.format_error_message(error.__str__())
+        return self.format_error_message(error_message)
 
     def handle_command_success(self, message: str = None) -> str:
         """
@@ -144,5 +145,5 @@ class BaseCommand(ABC):
         Utility function to format an error message
         """
 
-        message = Fore.GREEN + message + '\n'
+        message = Fore.RED + message + '\n'
         return message
