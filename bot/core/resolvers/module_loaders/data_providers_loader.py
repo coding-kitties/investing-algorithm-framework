@@ -3,7 +3,7 @@ from typing import List
 from bot.core.exceptions import ImproperlyConfigured
 from bot.core.configuration import settings
 from bot.core.resolvers import ClassCollector
-from bot.core.data_providers import DataProvider
+from bot.core.data.data_providers import DataProvider
 
 
 class DataProvidersLoader:

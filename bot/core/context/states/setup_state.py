@@ -2,7 +2,7 @@ from bot.core.exceptions import ImproperlyConfigured
 from bot.core.configuration import settings
 from bot.core.context.states import BotState
 from bot.core.resolvers import ClassCollector
-from bot.core.data_providers import DataProvider
+from bot.core.data.data_providers import DataProvider
 from bot.core.configuration.config_constants import SETTINGS_DATA_PROVIDER_REGISTERED_APPS
 
 
