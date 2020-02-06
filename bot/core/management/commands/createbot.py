@@ -51,16 +51,13 @@ class CreateBotCommand(BaseCommand):
             if not os.path.exists(directory):
                 raise CommandError("Destination directory {} does not exist, please create it first.".format(directory))
 
-        try:
-            # Use default bot creator
-            if not template_creator:
-                bot_template_creator = DefaultBotProjectCreator(directory, bot_name)
+        # Use default bot creator
+        if not template_creator:
+            bot_template_creator = DefaultBotProjectCreator(directory, bot_name)
 
-            # Creates templates
-            bot_template_creator.configure()
-            bot_template_creator.create()
-        except ImproperlyConfigured as e:
-            raise CommandError(e.__str__())
+        # Creates templates
+        bot_template_creator.configure()
+        bot_template_creator.create()
 
     @staticmethod
     def validate_name(name: str) -> None:
