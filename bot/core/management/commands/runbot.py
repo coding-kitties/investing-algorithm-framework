@@ -1,7 +1,6 @@
 from typing import Any
 
 from bot.core.management.command import BaseCommand, CommandError
-from bot.core.configuration import settings
 from bot.core.context import BotContext
 from bot.core.context.states.setup_state import SetupState
 
@@ -24,23 +23,18 @@ class RunBotCommand(BaseCommand):
 
     def handle(self, *args, **options) -> Any:
 
-        # Load the settings
-        if not settings.configured:
-            raise CommandError(
-                "Settings module is not specified, make sure you have setup a bot project and the bot is valid or that "
-                "you have specified the settings module in your manage.py file"
-            )
-
         cycles = options.get('name', None)
-
-        # Load all the components of the bot
-        # data_providers_loader = DataProvidersLoader()
-        # data_providers = data_providers_loader.load_modules()
 
         # Create an bot context of the bot and run it
         context = BotContext()
         context.initialize(SetupState)
         context.run()
+
+    @staticmethod
+    def validate_cycles(self, cycles: int) -> None:
+
+        if cycles is not None and cycles < 1:
+            raise CommandError("Given cycles arguments is smaller then 1")
 
 
 
