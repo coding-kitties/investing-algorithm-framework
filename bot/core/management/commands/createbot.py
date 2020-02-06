@@ -14,6 +14,7 @@ class CreateBotCommand(BaseCommand):
     )
 
     missing_args_message = "You must provide a bot name."
+    success_message = "Bot created and initialized."
 
     def add_arguments(self, parser):
         parser.add_argument('name', help='Name of the bot.')
@@ -60,8 +61,6 @@ class CreateBotCommand(BaseCommand):
             bot_template_creator.create()
         except ImproperlyConfigured as e:
             raise CommandError(e.__str__())
-
-        return "Bot created and initialized in directory {}".format(os.path.join(directory, bot_name))
 
     @staticmethod
     def validate_name(name: str) -> bool:
