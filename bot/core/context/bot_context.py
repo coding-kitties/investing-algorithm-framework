@@ -3,7 +3,7 @@ from typing import Type, List
 from bot.core.exceptions import OperationalException
 from bot.core.utils import Singleton
 from bot.core.context.states import BotState
-from bot.core.data_providers import DataProvider
+from bot.core.data.data_providers import DataProvider
 
 
 class BotContext(metaclass=Singleton):
@@ -34,6 +34,9 @@ class BotContext(metaclass=Singleton):
         self._state = bot_state(context=self)
 
     def _check_state(self) -> None:
+        """
+        Function that wil check if the state is set
+        """
 
         if self._state is None:
             raise OperationalException(
