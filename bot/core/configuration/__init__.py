@@ -1,11 +1,57 @@
 import os
 from typing import Any
 from importlib import import_module
+from enum import Enum
 
 from bot.core.exceptions import ImproperlyConfigured, OperationalException
 from bot.core.configuration.template import Template
 from bot.core.configuration.config_constants import SETTINGS_MODULE_PATH_ENV_NAME, SETTINGS_STRATEGY_REGISTERED_APPS, \
     SETTINGS_DATA_PROVIDER_REGISTERED_APPS
+
+
+class TimeUnit(Enum):
+
+    SECOND = 'SEC',
+    MINUTE = 'MIN',
+    HOUR = 'HR',
+    ALWAYS = 'ALWAYS'
+
+    # Static factory method to convert a string to time_unit
+    @staticmethod
+    def from_string(value: str):
+
+        if isinstance(value, str):
+
+            if value.lower() in ('sec', 'second', 'seconds'):
+                return TimeUnit.SECOND
+
+            elif value.lower() in ('min', 'minute', 'minutes'):
+                return TimeUnit.MINUTE
+
+            elif value.lower() in ('hr', 'hour', 'hours'):
+                return TimeUnit.HOUR
+
+            elif value.lower() in ('always', 'every', 'continuous', 'every_time'):
+                return TimeUnit.ALWAYS
+            else:
+                raise OperationalException('Could not convert value {} to a time_unit'.format(value))
+
+        else:
+            raise OperationalException("Could not convert non string value to a time_unit")
+
+    def equals(self, other):
+
+        if isinstance(other, Enum):
+            return self.value == other.value
+        else:
+
+            try:
+                time_unit = TimeUnit.from_string(other)
+                return time_unit == self
+            except OperationalException:
+                pass
+
+            return other == self.value
 
 
 class BaseSettings:
@@ -62,8 +108,6 @@ class BaseSettings:
 
     def __getitem__(self, item) -> Any:
 
-        print(item)
-
         if isinstance(item, str):
 
             if not hasattr(self, item):
@@ -72,6 +116,19 @@ class BaseSettings:
             return self.__getattribute__(item)
         else:
             raise OperationalException("Settings attributes can only be referenced by string")
+
+    def get(self, key: str, default: Any = None) -> Any:
+        """
+        Mimics the dict get() functionality
+        """
+
+        try:
+            return self.__getitem__(key)
+        # Ignore exception
+        except OperationalException:
+            pass
+
+        return default
 
 
 def resolve_settings():

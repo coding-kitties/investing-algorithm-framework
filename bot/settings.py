@@ -3,16 +3,6 @@ import logging.config
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PARENT_DIR = os.path.dirname(BASE_DIR)
-
-# Plugin directories
-PLUGIN_STRATEGIES_DIR = os.path.abspath(os.path.join(PARENT_DIR, 'plugins/strategies'))
-PLUGIN_DATA_PROVIDERS_DIR = os.path.abspath(os.path.join(PARENT_DIR, 'plugins/data'))
-
-# Test directories
-TEST_RESOURCES = os.path.abspath(os.path.join(PARENT_DIR, 'tests/resources'))
-TEST_DATA_PROVIDER_RESOURCES = os.path.abspath(os.path.join(TEST_RESOURCES, 'data'))
-TEST_CONFIGURATION_RESOURCES = os.path.abspath(os.path.join(TEST_RESOURCES, 'configurations'))
 
 # Change this when not in development, feature or hot-fix branch
 DEBUG = int(os.environ.get('DEBUG', True))

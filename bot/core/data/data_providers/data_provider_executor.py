@@ -1,19 +1,15 @@
 from typing import List
 
-from bot.workers import Worker
-from bot.data import DataProvider
-from bot.executors import Executor
-from bot.constants import DEFAULT_MAX_WORKERS
+from bot.core.workers import Worker
+from bot.core.data.data_providers import DataProvider
+from bot.core.executors import Executor
+from bot.core.configuration.config_constants import DEFAULT_MAX_WORKERS
 
 
 class DataProviderExecutor(Executor):
 
     def __init__(self, data_providers: List[DataProvider] = None, max_workers: int = DEFAULT_MAX_WORKERS):
-
-        if max_workers:
-            super(DataProviderExecutor, self).__init__(max_workers=max_workers)
-        else:
-            super(DataProviderExecutor, self).__init__()
+        super(DataProviderExecutor, self).__init__(max_workers=max_workers)
 
         self._registered_data_providers: List[DataProvider] = []
 

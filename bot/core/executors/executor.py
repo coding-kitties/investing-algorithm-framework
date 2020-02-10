@@ -1,17 +1,14 @@
-import logging
 from queue import Queue
 from typing import List, Dict
 from wrapt import synchronized
 from abc import abstractmethod, ABC
 
-from bot.workers import Worker
-from bot import OperationalException
-from bot.utils import StoppableThread
-from bot.events.observer import Observer
-from bot.events.observable import Observable
-from bot.constants import DEFAULT_MAX_WORKERS
-
-logger = logging.getLogger(__name__)
+from bot.core.workers import Worker
+from bot.core.exceptions import OperationalException
+from bot.core.utils import StoppableThread
+from bot.core.events.observer import Observer
+from bot.core.events.observable import Observable
+from bot.core.configuration.config_constants import DEFAULT_MAX_WORKERS
 
 
 class Executor(Observable, Observer, ABC):

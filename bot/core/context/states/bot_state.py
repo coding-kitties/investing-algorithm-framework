@@ -1,4 +1,8 @@
 from abc import ABC, abstractmethod
+from typing import Type, List
+from collections import Iterable
+
+from bot.core.context.state_validator import StateValidator
 
 
 class BotState(ABC):
@@ -7,15 +11,30 @@ class BotState(ABC):
     mode for the bot.
     """
 
-    def __init__(self, context) -> None:
+    transition_state_class = None
+    state_validators = None
+
+    def __init__(self, context, state_validator: StateValidator = None) -> None:
         self._bot_context = context
+        self._state_validator = state_validator
+
+    def start(self):
+
+        while True:
+            self.run()
+
+            # Will run unit state has a positive validation and can transition to next state
+            if self.validate_state():
+                break
+
+        self.transition()
 
     @abstractmethod
-    def run(self):
+    def run(self) -> None:
         pass
 
     @abstractmethod
-    def stop(self):
+    def stop(self) -> None:
         pass
 
     @property
@@ -23,7 +42,50 @@ class BotState(ABC):
         return self._bot_context
 
     @abstractmethod
-    def reconfigure(self):
+    def reconfigure(self) -> None:
         pass
+
+    def validate_state(self) -> bool:
+        """
+        Function that will validate the state
+        """
+
+        state_validators = self.get_state_validators()
+
+        if state_validators is None:
+            return True
+
+        for state_validator in state_validators:
+
+            if not state_validator.validate_state(self):
+                return False
+
+        return True
+
+    @property
+    def state_validator(self) -> StateValidator:
+        return self._state_validator
+
+    def transition(self) -> None:
+        bot_state_class = self.get_transition_state_class()
+        self.context.transition_to(bot_state_class)
+        self.context.run()
+
+    def get_transition_state_class(self) -> Type:
+
+        assert getattr(self, 'transition_state_class', None) is not None, (
+            "{} should either include a transition_state_class attribute, or override the "
+            "`get_transition_state_class()`, method.".format(self.__class__.__name__)
+        )
+
+        return self.transition_state_class
+
+    def get_state_validators(self) -> List[StateValidator]:
+
+        if self.state_validators is not None:
+            return [
+                state_validator() for state_validator in getattr(self, 'state_validators')
+                if issubclass(state_validator, StateValidator)
+            ]
 
 

@@ -1,5 +1,6 @@
 from typing import Type, List
 
+from bot.core.configuration import settings
 from bot.core.exceptions import OperationalException
 from bot.core.utils import Singleton
 from bot.core.context.states import BotState
@@ -17,6 +18,9 @@ class BotContext(metaclass=Singleton):
 
     # List of data providers
     _data_providers: List[DataProvider] = []
+
+    # Settings reference
+    settings = settings
 
     def initialize(self, bot_state: Type[BotState]) -> None:
 
@@ -50,7 +54,7 @@ class BotContext(metaclass=Singleton):
         """
 
         self._check_state()
-        self._state.run()
+        self._state.start()
 
     def stop(self) -> None:
         """

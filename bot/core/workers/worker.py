@@ -1,8 +1,8 @@
 from abc import abstractmethod, ABC
 from typing import Dict, Any
 
-from bot.events.observable import Observable
-from bot.events.observer import Observer
+from bot.core.events.observable import Observable
+from bot.core.events.observer import Observer
 
 
 class Worker(Observable, ABC):
@@ -14,6 +14,7 @@ class Worker(Observable, ABC):
         """
         Function that will start the worker, and notify its observers when it is finished
         """
+
         self.work(**kwargs)
         self.notify_observers()
 
