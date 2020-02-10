@@ -6,7 +6,7 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name="investing_bot_framework",
     version="0.0.1",
-    description="A framework for creating an investment bot",
+    description="A framework for creating an investment investing_bot_framework",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/pypa/sampleproject",
@@ -19,6 +19,6 @@ setuptools.setup(
         'colorama', 'wrapt', 'requests'
     ],
     python_requires='>=3.6',
-    scripts=['bot/bin/investing-bot-admin'],
+    scripts=['investing_bot_framework/bin/investing-investing_bot_framework-admin'],
     include_package_data=True,
 )

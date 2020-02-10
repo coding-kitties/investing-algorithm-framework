@@ -1,1 +1,0 @@
-from bot.core.configuration.setup.default_template_creators import DefaultBotProjectCreator
