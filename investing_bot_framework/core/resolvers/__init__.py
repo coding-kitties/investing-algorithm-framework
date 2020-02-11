@@ -1,0 +1,1 @@
+from investing_bot_framework.core.resolvers.class_collector import ClassCollector

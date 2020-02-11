@@ -1,0 +1,4 @@
+graft investing_bot_framework
+include AUTHORS
+include INSTALL
+include LICENSE
