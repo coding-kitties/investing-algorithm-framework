@@ -18,19 +18,15 @@ class DataProviderException(Exception):
     def __str__(self) -> str:
         return self.message
 
-    def __json__(self):
-        return {
-            'msg': self.message
-        }
-
 
 class DataProvider(Worker):
     """
     Class DataProvider: An entity which responsibility is to provide data from an external data source. Where a data
-    source is defined as any third party service that provides data, e.g  cloud storage, REST API, or website
-    """
+    source is defined as any third party service that provides data, e.g  cloud storage, REST API, or website.
 
-    id = None
+    A data provider must always be run with the start function from it´s super class. Otherwise depend observers will
+    not be updated.
+    """
 
     def __init__(self):
         super(DataProvider, self).__init__()
@@ -53,14 +49,6 @@ class DataProvider(Worker):
 
     def clean_up(self) -> None:
         self._data = None
-
-    def get_id(self) -> str:
-        assert getattr(self, 'id', None) is not None, (
-            "{} should either include a id attribute, or override the "
-            "`get_id()`, method.".format(self.__class__.__name__)
-        )
-
-        return getattr(self, 'id')
 
 
 class RestApiDataProvider(RestApiClientMixin, DataProvider, ABC):

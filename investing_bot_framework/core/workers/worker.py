@@ -10,6 +10,8 @@ class Worker(Observable, ABC):
     Class Worker: manages the execution of a task and the context around executing it.
     """
 
+    id = None
+
     def start(self, **kwargs: Dict[str, Any]) -> None:
         """
         Function that will start the worker, and notify its observers when it is finished
@@ -31,9 +33,11 @@ class Worker(Observable, ABC):
     def remove_observer(self, observer: Observer) -> None:
         super(Worker, self).remove_observer(observer)
 
-    @abstractmethod
     def get_id(self) -> str:
-        """
-        Function that needs to be implemented by a concrete class to identify the worker.
-        """
-        pass
+        assert getattr(self, 'id', None) is not None, (
+            "{} should either include a id attribute, or override the "
+            "`get_id()`, method.".format(self.__class__.__name__)
+        )
+
+        return getattr(self, 'id')
+

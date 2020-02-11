@@ -25,7 +25,6 @@ class DefaultBotProjectCreator(TemplateCreator):
         for root, dirs, files in os.walk(template_dir):
 
             # Get the last part of the path
-            # /home/test_user/bots/investing-investing_bot_framework/investing_bot_framework/templates/configuration ->  configuration
             # This is used as the basis for the copying
             path_rest = root[len(template_dir) + 1:]
 

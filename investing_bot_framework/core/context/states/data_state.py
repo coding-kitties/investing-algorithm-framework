@@ -8,18 +8,21 @@ from investing_bot_framework.core.context.states import BotState
 from investing_bot_framework.core.data.data_providers import DataProvider, DataProviderExecutor
 from investing_bot_framework.core.resolvers import ClassCollector
 from investing_bot_framework.core.exceptions import OperationalException
-from investing_bot_framework.core.configuration.config_constants import DEFAULT_MAX_WORKERS, SETTINGS_DATA_PROVIDER_REGISTERED_APPS, \
-    SETTINGS_MAX_WORKERS
+from investing_bot_framework.core.configuration.config_constants import DEFAULT_MAX_WORKERS, SETTINGS_MAX_WORKERS, \
+    SETTINGS_DATA_PROVIDER_REGISTERED_APPS
 
 
 class DataState(BotState, Observer):
     """
-    Represent the data state of a investing_bot_framework. This state will load all the defined data providers and will
+    Represent the data state of a bot. This state will load all the defined data providers and will
     run them.
+
+    If you want to validate the state before transitioning, provide a state validator.
     """
 
     from investing_bot_framework.core.context.states.strategy_state import StrategyState
     transition_state_class = StrategyState
+
     data_providers: List[DataProvider] = []
 
     _data_provider_executor: DataProviderExecutor

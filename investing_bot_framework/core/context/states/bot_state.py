@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from typing import Type, List
-from collections import Iterable
 
 from investing_bot_framework.core.context.state_validator import StateValidator
 
@@ -11,7 +10,10 @@ class BotState(ABC):
     mode for the investing_bot_framework.
     """
 
+    # Transition state for the next BotState
     transition_state_class = None
+
+    # Validator for the current state
     state_validators = None
 
     def __init__(self, context, state_validator: StateValidator = None) -> None:
@@ -61,10 +63,6 @@ class BotState(ABC):
                 return False
 
         return True
-
-    @property
-    def state_validator(self) -> StateValidator:
-        return self._state_validator
 
     def transition(self) -> None:
         bot_state_class = self.get_transition_state_class()

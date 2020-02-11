@@ -1,3 +1,5 @@
+from pydoc import locate
+
 from investing_bot_framework.core.exceptions import ImproperlyConfigured
 from investing_bot_framework.core.context.states import BotState
 from investing_bot_framework.core.resolvers import ClassCollector
@@ -49,15 +51,17 @@ class SetupState(BotState):
 
         # Try to load all the specified data provider modules
         for data_provider_app in data_provider_apps_config:
-            class_collector = ClassCollector(package_path=data_provider_app, class_type=DataProvider)
-
-            if len(class_collector.instances) == 0:
-                raise ImproperlyConfigured(
-                    "Could not load data providers from package {}, are they implemented correctly?. Please make sure "
-                    "that you defined the right package or module. In the case of referring to your own defined data "
-                    "providers make sure that they can be imported. If you have difficulties configuring data "
-                    "providers, consider looking at the documentation.".format(data_provider_app)
-                )
+            instance = locate(data_provider_app)
+            print(instance)
+            # class_collector = ClassCollector(package_path=data_provider_app, class_type=DataProvider)
+            #
+            # if len(class_collector.instances) == 0:
+            #     raise ImproperlyConfigured(
+            #         "Could not load data providers from package {}, are they implemented correctly?. Please make sure "
+            #         "that you defined the right package or module. In the case of referring to your own defined data "
+            #         "providers make sure that they can be imported. If you have difficulties configuring data "
+            #         "providers, consider looking at the documentation.".format(data_provider_app)
+            #     )
 
     def stop(self) -> None:
         # Stopping all services

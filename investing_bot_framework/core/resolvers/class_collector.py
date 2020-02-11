@@ -46,7 +46,6 @@ class ClassCollector:
                 cls_members = inspect.getmembers(module, inspect.isclass)
 
                 for (name, class_definition) in cls_members:
-                    print(name)
 
                     # Only add classes that are a sub class of defined Plugin class, but NOT Plugin itself
                     if issubclass(class_definition, self.class_type) \
