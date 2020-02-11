@@ -25,11 +25,9 @@ class BotState(ABC):
         while True:
             self.run()
 
-            # Will run unit state has a positive validation and can transition to next state
+            # Will run state again if validation is negative
             if self.validate_state():
                 break
-
-        self.transition()
 
     @abstractmethod
     def run(self) -> None:
@@ -64,12 +62,7 @@ class BotState(ABC):
 
         return True
 
-    def transition(self) -> None:
-        bot_state_class = self.get_transition_state_class()
-        self.context.transition_to(bot_state_class)
-        self.context.run()
-
-    def get_transition_state_class(self) -> Type:
+    def get_transition_state_class(self):
 
         assert getattr(self, 'transition_state_class', None) is not None, (
             "{} should either include a transition_state_class attribute, or override the "

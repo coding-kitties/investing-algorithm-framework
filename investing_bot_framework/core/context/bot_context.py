@@ -33,31 +33,45 @@ class BotContext(metaclass=Singleton):
 
         self._state = bot_state(context=self)
 
-    def _check_state(self) -> None:
+    def _check_state(self, raise_exception: bool = False) -> bool:
         """
         Function that wil check if the state is set
         """
 
         if self._state is None:
-            raise OperationalException(
-                "Bot context doesn't have a state, Make sure that you set the state of bot either "
-                "by initializing it or making sure that you transition to a new valid state."
-            )
 
-    def run(self) -> None:
+            if raise_exception:
+                raise OperationalException(
+                    "Bot context doesn't have a state, Make sure that you set the state of bot either "
+                    "by initializing it or making sure that you transition to a new valid state."
+                )
+            else:
+                return False
+
+        return True
+
+    def start(self) -> None:
         """
         Run the current state of the investing_bot_framework
         """
 
-        self._check_state()
+        self._check_state(raise_exception=True)
+        self._run_state()
+
+        while self._check_state():
+            self._run_state()
+
+    def _run_state(self) -> None:
         self._state.start()
+        transition_state = self._state.get_transition_state_class()
+        self.transition_to(transition_state)
 
     def stop(self) -> None:
         """
         Stop the current state of the investing_bot_framework
         """
 
-        self._check_state()
+        self._check_state(raise_exception=True)
         self._state.stop()
 
     def reconfigure(self) -> None:
@@ -65,5 +79,5 @@ class BotContext(metaclass=Singleton):
         Reconfigure the current state of the investing_bot_framework
         """
 
-        self._check_state()
+        self._check_state(raise_exception=True)
         self._state.reconfigure()

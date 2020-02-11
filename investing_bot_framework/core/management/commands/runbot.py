@@ -28,7 +28,7 @@ class RunBotCommand(BaseCommand):
         # Create an investing_bot_framework context of the investing_bot_framework and run it
         context = BotContext()
         context.initialize(SetupState)
-        context.run()
+        context.start()
 
     @staticmethod
     def validate_cycles(self, cycles: int) -> None:
