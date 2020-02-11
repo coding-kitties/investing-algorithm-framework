@@ -19,6 +19,6 @@ setuptools.setup(
         'colorama', 'wrapt', 'requests'
     ],
     python_requires='>=3.6',
-    scripts=['investing_bot_framework/bin/investing-investing_bot_framework-admin'],
+    scripts=['investing_bot_framework/bin/investing-bot-framework-admin'],
     include_package_data=True,
 )
