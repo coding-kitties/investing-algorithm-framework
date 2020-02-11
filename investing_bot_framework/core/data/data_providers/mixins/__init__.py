@@ -1,0 +1,1 @@
+from investing_bot_framework.core.data.data_providers.mixins.rest_api_mixin import RestApiClientMixin

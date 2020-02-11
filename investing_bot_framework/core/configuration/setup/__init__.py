@@ -1,0 +1,1 @@
+from investing_bot_framework.core.configuration.setup.default_template_creators import DefaultBotProjectCreator
