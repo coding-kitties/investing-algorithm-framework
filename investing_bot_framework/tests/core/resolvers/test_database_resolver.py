@@ -22,6 +22,7 @@ class TestDatabaseResolverConfiguration(TestCase, BaseTestMixin):
         self.assertIsNotNone(db.engine)
         self.assertIsNotNone(db.session_factory)
         self.assertIsNotNone(db.database_path)
+        self.assertTrue(os.path.isfile(db.database_path))
 
     def tearDown(self) -> None:
 
