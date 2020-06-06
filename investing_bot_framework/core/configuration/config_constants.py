@@ -11,3 +11,7 @@ SETTINGS_MAX_WORKERS = 'DEFAULT_MAX_WORKERS'
 
 # Operational constants
 DEFAULT_MAX_WORKERS = 2
+
+# Database related constants
+BASE_DIR = 'BASE_DIR'
+DATABASE_NAME = 'DATABASE_NAME'

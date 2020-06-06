@@ -12,3 +12,11 @@ class OperationalException(Exception):
     """
     def __init__(self, message) -> None:
         super(OperationalException, self).__init__(message)
+
+
+class DatabaseOperationalException(Exception):
+    """
+    Class DatabaseOperationalException: Exception class indicating a problem occurred during usage of the database
+    """
+    def __init__(self, message) -> None:
+        super(DatabaseOperationalException, self).__init__(message)
