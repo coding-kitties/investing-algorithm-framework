@@ -4,8 +4,8 @@ from investing_bot_framework.core.context.states import BotState
 
 class SetupState(BotState):
 
-    from investing_bot_framework.core.context.states.data_provider_state import DataProviderState
-    transition_state_class = DataProviderState
+    from investing_bot_framework.core.context.states.data_providing_state import DataProvidingState
+    transition_state_class = DataProvidingState
 
     def __init__(self, context):
         super(SetupState, self).__init__(context)

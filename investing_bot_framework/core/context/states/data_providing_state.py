@@ -8,11 +8,37 @@ from investing_bot_framework.core.context.bot_context import BotContext
 from investing_bot_framework.core.exceptions import OperationalException
 from investing_bot_framework.core.context.states import BotState
 from investing_bot_framework.core.executors import ExecutionScheduler
+from investing_bot_framework.core.workers import Worker
 from investing_bot_framework.core.data_providers import DataProvider
-from investing_bot_framework.core.executors.data_provider_executor import DataProviderExecutor
+from investing_bot_framework.core.executors import Executor
 from investing_bot_framework.core.configuration.config_constants import DEFAULT_MAX_WORKERS, SETTINGS_MAX_WORKERS
 
 logger = logging.getLogger(__name__)
+
+
+class DataProviderExecutor(Executor):
+    """
+    Class DataProviderExecutor: is an executor for DataProvider instances.
+    """
+
+    def __init__(self, data_providers: List[DataProvider] = None, max_workers: int = DEFAULT_MAX_WORKERS):
+        super(DataProviderExecutor, self).__init__(max_workers=max_workers)
+
+        self._registered_data_providers: List[DataProvider] = []
+
+        if data_providers is not None and len(data_providers) > 0:
+            self._registered_data_providers = data_providers
+
+    def create_workers(self) -> List[Worker]:
+        return self._registered_data_providers
+
+    @property
+    def registered_data_providers(self) -> List[DataProvider]:
+        return self._registered_data_providers
+
+    @property
+    def configured(self):
+        return self._registered_data_providers is not None and len(self._registered_data_providers) > 0
 
 
 class DataProviderScheduler(ExecutionScheduler):
@@ -42,7 +68,7 @@ class DataProviderScheduler(ExecutionScheduler):
         return self._configured
 
 
-class DataProviderState(BotState, Observer):
+class DataProvidingState(BotState, Observer):
     """
     Represent the data_providers state of a bot. This state will load all the defined data_providers providers and will
     run them.
@@ -58,19 +84,19 @@ class DataProviderState(BotState, Observer):
     data_provider_scheduler: DataProviderScheduler = None
 
     def __init__(self, context: BotContext) -> None:
-        super(DataProviderState, self).__init__(context)
+        super(DataProvidingState, self).__init__(context)
         self._updated = False
         self.data_provider_executor = None
 
     def _schedule_data_providers(self) -> List[DataProvider]:
 
-        if not DataProviderState.data_provider_scheduler:
-            DataProviderState.data_provider_scheduler = DataProviderScheduler()
+        if not DataProvidingState.data_provider_scheduler:
+            DataProvidingState.data_provider_scheduler = DataProviderScheduler()
 
-        if not DataProviderState.data_provider_scheduler.configured:
-            DataProviderState.data_provider_scheduler.configure(self.registered_data_providers)
+        if not DataProvidingState.data_provider_scheduler.configured:
+            DataProvidingState.data_provider_scheduler.configure(self.registered_data_providers)
 
-        planning = DataProviderState.data_provider_scheduler.schedule_executions()
+        planning = DataProvidingState.data_provider_scheduler.schedule_executions()
         planned_data_providers = []
 
         for data_provider in self.registered_data_providers:
@@ -113,22 +139,13 @@ class DataProviderState(BotState, Observer):
         for data_provider in self.data_provider_executor.registered_data_providers:
             logger.info("Data provider: {} finished running".format(data_provider.get_id()))
 
-    def stop(self) -> None:
-        """
-        Stop all data_providers providers
-        """
-        pass
-
     @synchronized
     def update(self, observable, **kwargs) -> None:
         self._updated = True
 
     @staticmethod
     def register_data_providers(data_providers: List) -> None:
-        DataProviderState.registered_data_providers = data_providers
-
-    def reconfigure(self) -> None:
-        pass
+        DataProvidingState.registered_data_providers = data_providers
 
 
 

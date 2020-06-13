@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Type, List
+from typing import List
 
 from investing_bot_framework.core.context.state_validator import StateValidator
 
@@ -33,17 +33,9 @@ class BotState(ABC):
     def run(self) -> None:
         pass
 
-    @abstractmethod
-    def stop(self) -> None:
-        pass
-
     @property
     def context(self):
         return self._bot_context
-
-    @abstractmethod
-    def reconfigure(self) -> None:
-        pass
 
     def validate_state(self) -> bool:
         """
