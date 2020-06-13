@@ -1,7 +1,7 @@
 from typing import Dict, Any
 from unittest import TestCase
 
-from investing_bot_framework.core.data.data_providers import DataProvider
+from investing_bot_framework.core.data_providers import DataProvider
 from investing_bot_framework.core.events import Observer
 
 
@@ -10,7 +10,7 @@ class TestDataProviderOne(DataProvider):
     id = 'TestDataProviderOne'
 
     def provide_data(self, **kwargs: Dict[str, Any]) -> Any:
-        return "data"
+        return "data_providers"
 
 
 class TestDataProviderTwo(DataProvider):
@@ -18,7 +18,7 @@ class TestDataProviderTwo(DataProvider):
     id = 'TestDataProviderTwo'
 
     def provide_data(self, **kwargs: Dict[str, Any]) -> Any:
-        return "data"
+        return "data_providers"
 
 
 class TestObserver(Observer):
@@ -41,7 +41,7 @@ class DataProviderSetup(TestCase):
         observer = TestObserver()
         data_provider_one.add_observer(observer)
 
-        # Run the data provider
+        # Run the data_providers provider
         data_provider_one.start()
 
         # Observer must have been updated
@@ -54,7 +54,7 @@ class DataProviderSetup(TestCase):
 
         data_provider_two.add_observer(observer)
 
-        # Run the data provider
+        # Run the data_providers provider
         data_provider_two.start()
 
         # Observer must have been updated
