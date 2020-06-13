@@ -2,13 +2,13 @@ from investing_bot_framework.core.data_providers import DataProvider
 from investing_bot_framework.core.utils import TimeUnit
 
 """
-Define here all you data providers, e.g. Rest API client
+Define here all your data providers
 """
 
 
 class MyDataProvider(DataProvider):
     time_unit = TimeUnit.SECOND
-    time_interval = 1
+    time_interval = 10
     id = 'my_data_provider'
 
     def provide_data(self) -> None:

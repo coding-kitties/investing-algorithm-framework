@@ -1,13 +1,18 @@
 from investing_bot_framework.core.context import BotContext
 from investing_bot_framework.core.context.states.setup_state import SetupState
-from investing_bot_framework.core.context.states.data_provider_state import DataProviderState
+from investing_bot_framework.core.context.states.data_providing_state import DataProvidingState
+from investing_bot_framework.core.context.states.strategy_state import StrategyState
 
+# Import custom components
 from bot.data_providers.data_providers import MyDataProvider
+from bot.strategies.strategies import MyStrategy
 
 # Register Initial state
 context = BotContext()
 context.register_initial_state(SetupState)
 
 # Register all data providers
-DataProviderState.register_data_providers([MyDataProvider()])
+DataProvidingState.register_data_providers([MyDataProvider()])
 
+# Register all strategies
+StrategyState.register_strategies([MyStrategy()])
