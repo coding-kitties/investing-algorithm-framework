@@ -2,7 +2,7 @@ from typing import Any
 
 from investing_bot_framework.core.management.command import BaseCommand, CommandError
 from investing_bot_framework.core.context import BotContext
-from investing_bot_framework.core.configuration.config_constants import BOT_CONTEXT_CONFIGURATION
+from investing_bot_framework.core.configuration.config_constants import SETTINGS_BOT_CONTEXT_CONFIGURATION
 from investing_bot_framework.core.configuration import settings
 
 
@@ -28,7 +28,7 @@ class RunBotCommand(BaseCommand):
         settings.configure()
 
         # Load the context configuration
-        __import__(settings[BOT_CONTEXT_CONFIGURATION])
+        __import__(settings[SETTINGS_BOT_CONTEXT_CONFIGURATION])
 
         cycles = options.get('name', None)
 
