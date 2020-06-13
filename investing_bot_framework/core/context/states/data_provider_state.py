@@ -1,4 +1,5 @@
 import time
+import logging
 from typing import List
 from wrapt import synchronized
 
@@ -10,6 +11,8 @@ from investing_bot_framework.core.executors import ExecutionScheduler
 from investing_bot_framework.core.data_providers import DataProvider
 from investing_bot_framework.core.executors.data_provider_executor import DataProviderExecutor
 from investing_bot_framework.core.configuration.config_constants import DEFAULT_MAX_WORKERS, SETTINGS_MAX_WORKERS
+
+logger = logging.getLogger(__name__)
 
 
 class DataProviderScheduler(ExecutionScheduler):
@@ -108,7 +111,7 @@ class DataProviderState(BotState, Observer):
 
         # Collect all data_providers from the data_providers providers
         for data_provider in self.data_provider_executor.registered_data_providers:
-            print("Data provider: {} finished running".format(data_provider.get_id()))
+            logger.info("Data provider: {} finished running".format(data_provider.get_id()))
 
     def stop(self) -> None:
         """

@@ -30,7 +30,6 @@ class BotContext(metaclass=Singleton):
         """
         Function to change the running BotState at runtime.
         """
-
         self._state = bot_state(context=self)
 
     def _check_state(self, raise_exception: bool = False) -> bool:
