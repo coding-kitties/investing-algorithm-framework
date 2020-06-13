@@ -1,4 +1,5 @@
 import os
+import logging.config
 from typing import Any
 from importlib import import_module
 from enum import Enum
@@ -6,7 +7,7 @@ from enum import Enum
 from investing_bot_framework.core.exceptions import ImproperlyConfigured, OperationalException
 from investing_bot_framework.core.configuration.template import Template
 from investing_bot_framework.core.configuration.config_constants import SETTINGS_MODULE_PATH_ENV_NAME, \
-    SETTINGS_STRATEGY_REGISTERED_APPS, SETTINGS_DATA_PROVIDER_REGISTERED_APPS, BASE_DIR
+    SETTINGS_STRATEGY_REGISTERED_APPS, SETTINGS_DATA_PROVIDER_REGISTERED_APPS, BASE_DIR, SETTINGS_LOGGING_CONFIG
 
 
 class TimeUnit(Enum):
@@ -95,6 +96,8 @@ class BaseSettings:
                 setattr(self, setting, setting_value)
 
         self._configured = True
+
+        logging.config.dictConfig(self[SETTINGS_LOGGING_CONFIG])
 
     @property
     def settings_module(self) -> str:
