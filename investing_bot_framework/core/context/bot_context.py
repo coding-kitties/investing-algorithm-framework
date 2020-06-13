@@ -18,7 +18,7 @@ class BotContext(metaclass=Singleton):
     # Settings reference
     settings = settings
 
-    def initialize(self, bot_state: Type[BotState]) -> None:
+    def register_initial_state(self, bot_state: Type[BotState]) -> None:
 
         # Stop the current state of the investing_bot_framework
         if self._state:
@@ -42,7 +42,7 @@ class BotContext(metaclass=Singleton):
 
             if raise_exception:
                 raise OperationalException(
-                    "Bot context doesn't have a state, Make sure that you set the state of bot either "
+                    "Bot context doesn't have a state. Make sure that you set the state of bot either "
                     "by initializing it or making sure that you transition to a new valid state."
                 )
             else:

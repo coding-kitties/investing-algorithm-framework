@@ -17,5 +17,5 @@ class StrategyState(BotState):
         pass
 
     def get_transition_state_class(self) -> Type:
-        from investing_bot_framework.core.context.states.data_state import DataState
-        return DataState
+        from investing_bot_framework.core.context.states.data_provider_state import DataProviderState
+        return DataProviderState
