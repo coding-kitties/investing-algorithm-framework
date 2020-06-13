@@ -1,5 +1,0 @@
-from investing_bot_framework.core.data.data_providers import DataProvider
-
-"""
-Define here all you data providers, e.g. Rest API client
-"""
