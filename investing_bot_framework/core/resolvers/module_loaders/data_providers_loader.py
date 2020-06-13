@@ -3,7 +3,7 @@ from typing import List
 from investing_bot_framework.core.exceptions import ImproperlyConfigured
 from investing_bot_framework.core.configuration import settings
 from investing_bot_framework.core.resolvers import ClassCollector
-from investing_bot_framework.core.data.data_providers import DataProvider
+from investing_bot_framework.core.data_providers import DataProvider
 
 
 class DataProvidersLoader:
@@ -28,7 +28,8 @@ class DataProvidersLoader:
 
         if len(class_collector.instances) == 0:
             raise ImproperlyConfigured(
-                "There are no data providers configured. Make sure you implement data providers or use a plugin"
+                "There are no data_providers providers configured. Make sure you implement data_providers providers "
+                "or use a plugin"
             )
 
         return class_collector.instances
