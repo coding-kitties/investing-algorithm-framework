@@ -1,7 +1,7 @@
 from typing import List
 
 from investing_bot_framework.core.workers import Worker
-from investing_bot_framework.core.data.data_providers import DataProvider
+from investing_bot_framework.core.data_providers import DataProvider
 from investing_bot_framework.core.executors import Executor
 from investing_bot_framework.core.configuration.config_constants import DEFAULT_MAX_WORKERS
 
@@ -16,7 +16,7 @@ class DataProviderExecutor(Executor):
 
         self._registered_data_providers: List[DataProvider] = []
 
-        if data_providers is not None:
+        if data_providers is not None and len(data_providers) > 0:
             self._registered_data_providers = data_providers
 
     def create_workers(self) -> List[Worker]:
@@ -25,3 +25,7 @@ class DataProviderExecutor(Executor):
     @property
     def registered_data_providers(self) -> List[DataProvider]:
         return self._registered_data_providers
+
+    @property
+    def configured(self):
+        return self._registered_data_providers is not None and len(self._registered_data_providers) > 0
