@@ -2,8 +2,7 @@ import logging
 from typing import Dict, Any
 from abc import abstractmethod
 
-from investing_bot_framework.core.workers import Worker
-from investing_bot_framework.core.utils import TimeUnit
+from investing_bot_framework.core.workers import ScheduledWorker
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ class DataProviderException(Exception):
         return self.message
 
 
-class DataProvider(Worker):
+class DataProvider(ScheduledWorker):
     """
     Class DataProvider: An entity which responsibility is to provide data_providers from an external data_providers
     source. Where a data_providers source is defined as any third party service that provides data_providers,
@@ -31,22 +30,6 @@ class DataProvider(Worker):
     A data_providers provider must always be run with the start function from it´s super class. Otherwise depend
     observers will not be updated.
     """
-
-    def get_time_unit(self) -> TimeUnit:
-        assert getattr(self, 'time_unit', None) is not None, (
-            "{} should either include a time_unit attribute, or override the "
-            "`get_time_unit()`, method.".format(self.__class__.__name__)
-        )
-
-        return getattr(self, 'time_unit')
-
-    def get_time_interval(self) -> int:
-        assert getattr(self, 'time_interval', None) is not None, (
-            "{} should either include a time_interval attribute, or override the "
-            "`get_time_interval()`, method.".format(self.__class__.__name__)
-        )
-
-        return getattr(self, 'time_interval')
 
     @abstractmethod
     def provide_data(self) -> None:
