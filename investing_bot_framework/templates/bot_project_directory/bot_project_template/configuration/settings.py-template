@@ -1,3 +1,25 @@
+import logging
+from pathlib import Path
+
 BOT_PROJECT_NAME = '{{ bot_project_name }}'
 
 BOT_CONTEXT_CONFIGURATION = '{{ bot_project_name }}.configuration.context'
+
+BASE_DIR = str(Path(__file__).parent)
+
+LOG_PATH = BASE_DIR
+
+LOG_FILE_NAME = 'log'
+
+# Logger configuration
+logging.basicConfig(level=logging.INFO)
+logFormatter = logging.Formatter("%(asctime)s [%(threadName)] [%(levelname)]  %(message)s")
+rootLogger = logging.getLogger()
+
+fileHandler = logging.FileHandler("{0}/{1}.log".format(LOG_PATH, LOG_FILE_NAME))
+fileHandler.setFormatter(logFormatter)
+rootLogger.addHandler(fileHandler)
+
+consoleHandler = logging.StreamHandler()
+consoleHandler.setFormatter(logFormatter)
+rootLogger.addHandler(consoleHandler)
