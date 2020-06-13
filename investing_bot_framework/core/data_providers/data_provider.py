@@ -1,8 +1,11 @@
+import logging
 from typing import Dict, Any
 from abc import abstractmethod
 
 from investing_bot_framework.core.workers import Worker
 from investing_bot_framework.core.utils import TimeUnit
+
+logger = logging.getLogger(__name__)
 
 
 class DataProviderException(Exception):
@@ -50,6 +53,7 @@ class DataProvider(Worker):
         pass
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
+        logger.info("Starting data provider {}".format(self.get_id()))
         self.provide_data()
 
 
