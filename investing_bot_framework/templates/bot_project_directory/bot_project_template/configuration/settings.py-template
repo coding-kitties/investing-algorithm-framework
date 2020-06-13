@@ -1,25 +1,51 @@
-import logging
+import os
 from pathlib import Path
 
-BOT_PROJECT_NAME = '{{ bot_project_name }}'
+BOT_PROJECT_NAME = 'bot'
 
-BOT_CONTEXT_CONFIGURATION = '{{ bot_project_name }}.configuration.context'
+BOT_CONTEXT_CONFIGURATION = 'bot.configuration.context'
 
-BASE_DIR = str(Path(__file__).parent)
+# Change this when not in development, feature or hot-fix branch
+DEBUG = int(os.environ.get('DEBUG', True))
 
-LOG_PATH = BASE_DIR
+BASE_DIR = str(Path(__file__).parent.parent)
 
 LOG_FILE_NAME = 'log'
 
-# Logger configuration
-logging.basicConfig(level=logging.INFO)
-logFormatter = logging.Formatter("%(asctime)s [%(threadName)] [%(levelname)]  %(message)s")
-rootLogger = logging.getLogger()
+LOG_PATH = "{}{}.log".format(BASE_DIR, LOG_FILE_NAME)
 
-fileHandler = logging.FileHandler("{0}/{1}.log".format(LOG_PATH, LOG_FILE_NAME))
-fileHandler.setFormatter(logFormatter)
-rootLogger.addHandler(fileHandler)
+if DEBUG:
+    logging_level = "DEBUG"
+else:
+    logging_level = "INFO"
 
-consoleHandler = logging.StreamHandler()
-consoleHandler.setFormatter(logFormatter)
-rootLogger.addHandler(consoleHandler)
+# Logging configuration
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(levelname)s %(asctime)s - [thread: %(threadName)-4s %(name)s] %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S'
+        }
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
+        'file': {
+            'formatter': 'standard',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOG_PATH,
+            'backupCount': 10,
+            'maxBytes': 10000,
+        },
+    },
+    'loggers': {
+        '': {
+            'level': logging_level,
+            'handlers': ['console', 'file'],
+        },
+    },
+}
