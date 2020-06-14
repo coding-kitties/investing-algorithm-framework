@@ -3,7 +3,7 @@ from typing import Type
 from investing_bot_framework.core.configuration import settings
 from investing_bot_framework.core.exceptions import OperationalException
 from investing_bot_framework.core.utils import Singleton
-from investing_bot_framework.core.context.states import BotState
+from investing_bot_framework.core.states import BotState
 
 
 class BotContext(metaclass=Singleton):
@@ -19,11 +19,6 @@ class BotContext(metaclass=Singleton):
     settings = settings
 
     def register_initial_state(self, bot_state: Type[BotState]) -> None:
-
-        # Stop the current state of the investing_bot_framework
-        if self._state:
-            self._state.stop()
-
         self._state = bot_state(context=self)
 
     def transition_to(self, bot_state: Type[BotState]) -> None:
@@ -65,18 +60,3 @@ class BotContext(metaclass=Singleton):
         transition_state = self._state.get_transition_state_class()
         self.transition_to(transition_state)
 
-    def stop(self) -> None:
-        """
-        Stop the current state of the investing_bot_framework
-        """
-
-        self._check_state(raise_exception=True)
-        self._state.stop()
-
-    def reconfigure(self) -> None:
-        """
-        Reconfigure the current state of the investing_bot_framework
-        """
-
-        self._check_state(raise_exception=True)
-        self._state.reconfigure()
