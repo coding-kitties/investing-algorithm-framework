@@ -1,69 +1,30 @@
-# Investing bot 
+# Investing Algorithm Framework 
 
-The investing bot is a free and open source investing bot written in Python. The goal is to give you a configurable bot 
-where you can decide on how you implement your data providers, strategies, and brokers/exchanges. Also we want to allow 
-you to let your bot facilitate multiple users.
+The Investing Algorithm Framework is a free and open source Python framework that encourages rapid development and clean, 
+pragmatic design.
 
-It is designed to be controlled via Telegram. As of now, we are aiming to make the configuration of the different 
-components by the use of plugins. Please see the documentation on how to make your own plugin.
+The goal is to give you a configurable investing algorithm where you can decide how you implement your data providers, 
+strategies, and order executors.
 
-### Disclaimer
-This software is for educational purposes only. Do not risk money which you are afraid to lose. We can't stress this 
-enough: BEFORE YOU START USING MONEY WITH THE BOT, MAKE SURE THAT YOU TESTED YOU STRATEGIES AND DATA PROVIDERS.  
-USE THE SOFTWARE AT YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR TRADING RESULTS.
+#####Disclaimer
+If you use this framework for your investments, do not risk money which you are afraid to lose. We can't stress this 
+enough: 
 
-Always start by running a investing bot in Dry-run and do not engage money before you understand how it works and what profit/loss you should expect.
+BEFORE YOU START USING MONEY WITH THE FRAMEWORK, MAKE SURE THAT YOU TESTED YOUR COMPONENTS THOROUGHLY. USE THE SOFTWARE AT 
+YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR INVESTMENT RESULTS.
 
-We strongly recommend you to have coding and Python knowledge, or trust the people that created the plugins your using. 
-Do not hesitate to read the source code and understand the mechanism of this bot or the plugin you're using.
-
-Brokers/Exchange marketplaces supported
-------
-Will be updated in the future 
-
+Also, make sure that you read the source code of any plugin you use or implementation of an algorithm made with this 
+framework.
 
 Documentation
 ------
-Will be updated in the future 
+All documentation is in the "docs" directory and online at "". If you're just getting started, here's how we recommend 
+you read the docs:
+
+* First, read install for instructions on installing Investing Algorithm Framework.
+* Next, work through the tutorials in order. ("Quickstart", "Template algorithm", "Custom algorithm").
+* For concrete algorithm examples you probably want to read through the topical guides.
  
-## Features
-
-- [x] **Based on Python 3.6+**: Support for all operating systems - Windows, macOS and Linux.
-- [x] **Persistence**: Persistence is achieved through sqlite.
-- [ ] **Dry-run**: Run the bot without playing money.
-- [ ] **REST API**: Manage the bot with the use of a REST API.
-- [ ] **Backtesting**: Run a simulation of your buy/sell strategy.
-- [ ] **Manageable via Telegram**: Manage the bot with Telegram.
-- [ ] **Display profit/loss**: Display your profit/loss.
-- [ ] **Daily summary of profit/loss**: Provide a daily summary of your profit/loss.
-- [ ] **Performance status report**: Provide a performance status of your current trades.
-
-## Quick start
-
-The investing bot provides a Linux/macOS script to install all dependencies and help you to configure the bot.
-
-The script will come as a future update
-
-### Bot commands
-
-
-```
-usage: main.py [-h] [-V] [-c PATH]
-
-Trading bot based on value principles
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -V, --version         show program's version number and exit
-  -c PATH, --config PATH
-                        Specify configuration file (default: `config.json`).
-
-```
-
-### Telegram RPC commands
-
-Telegram is not mandatory. However, this is a great way to control your bot.
-
 
 ## Development branches
 
@@ -74,7 +35,6 @@ The project is currently setup in two main branches:
 - `feature/*` - These are feature branches, which are being worked on heavily. Please don't use these unless you want to test a specific feature.
 - `hotfix/*` - These are hot fix branches, which are being worked on heavily. Please don't use these unless you really need to.
 
-## Support
 
 ### Help / Slack
 
