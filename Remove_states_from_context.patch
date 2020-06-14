@@ -1,0 +1,6 @@
+Index: investing_bot_framework/core/context/states/__init__.py
+===================================================================
+--- investing_bot_framework/core/context/states/__init__.py	(revision 59f4076a0c21098a23a0bdef6718b8838b45550b)
++++ investing_bot_framework/core/context/states/__init__.py	(revision 59f4076a0c21098a23a0bdef6718b8838b45550b)
+@@ -1,1 +0,0 @@
+-from investing_bot_framework.core.context.states.bot_state import BotState
