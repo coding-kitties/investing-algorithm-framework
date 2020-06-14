@@ -12,7 +12,12 @@ BASE_DIR = str(Path(__file__).parent.parent)
 
 LOG_FILE_NAME = 'log'
 
-LOG_PATH = "{}{}.log".format(BASE_DIR, LOG_FILE_NAME)
+LOG_DIR = '{}/logs'.format(BASE_DIR)
+
+LOG_PATH = "{}/{}.log".format(LOG_DIR, LOG_FILE_NAME)
+
+if not os.path.isdir(LOG_DIR):
+    os.mkdir(LOG_DIR)
 
 if DEBUG:
     logging_level = "DEBUG"
