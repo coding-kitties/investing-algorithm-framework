@@ -1,15 +1,19 @@
+import logging
+
 from investing_bot_framework.core.exceptions import ImproperlyConfigured
-from investing_bot_framework.core.context.states import BotState
+from investing_bot_framework.core.states import BotState
+
+logger = logging.getLogger(__name__)
 
 
 class SetupState(BotState):
 
-    from investing_bot_framework.core.context.states.data_providing_state import DataProvidingState
+    from investing_bot_framework.core.states.templates.data_providing_state import DataProvidingState
     transition_state_class = DataProvidingState
 
     def __init__(self, context):
         super(SetupState, self).__init__(context)
-        
+
     def run(self) -> None:
         """
         Running the setup state.
@@ -27,10 +31,4 @@ class SetupState(BotState):
                 "manage.py file"
             )
 
-    def stop(self) -> None:
-        # Stopping all services
-        pass
 
-    def reconfigure(self) -> None:
-        # Clean up and reconfigure all the services
-        pass

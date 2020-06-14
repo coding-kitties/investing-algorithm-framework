@@ -2,7 +2,7 @@ import logging
 import time
 from typing import List
 
-from investing_bot_framework.core.context.states import BotState
+from investing_bot_framework.core.states import BotState
 from investing_bot_framework.core.executors import ExecutionScheduler
 from investing_bot_framework.core.exceptions import OperationalException
 from investing_bot_framework.core.workers import Worker
@@ -66,9 +66,6 @@ class StrategyScheduler(ExecutionScheduler):
 
 class StrategyState(BotState, Observer):
 
-    from investing_bot_framework.core.context.states.data_providing_state import DataProvidingState
-    transition_state_class = DataProvidingState
-
     registered_strategies: List = None
     strategy_scheduler: StrategyScheduler = None
 
@@ -126,7 +123,7 @@ class StrategyState(BotState, Observer):
 
         # Collect all strategies from the strategies providers
         for strategies in self.strategy_executor.registered_strategies:
-            logger.info("Data provider: {} finished running".format(strategies.get_id()))
+            logger.info("Strategy: {} finished running".format(strategies.get_id()))
 
     def update(self, observable, **kwargs) -> None:
         self._updated = True
@@ -134,3 +131,8 @@ class StrategyState(BotState, Observer):
     @staticmethod
     def register_strategies(strategies: List) -> None:
         StrategyState.registered_strategies = strategies
+
+    def get_transition_state_class(self):
+        from investing_bot_framework.core.states.templates.ordering_state import OrderingState
+        return OrderingState
+

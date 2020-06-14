@@ -6,7 +6,7 @@ from wrapt import synchronized
 from investing_bot_framework.core.events import Observer
 from investing_bot_framework.core.context.bot_context import BotContext
 from investing_bot_framework.core.exceptions import OperationalException
-from investing_bot_framework.core.context.states import BotState
+from investing_bot_framework.core.states import BotState
 from investing_bot_framework.core.executors import ExecutionScheduler
 from investing_bot_framework.core.workers import Worker
 from investing_bot_framework.core.data_providers import DataProvider
@@ -78,7 +78,7 @@ class DataProvidingState(BotState, Observer):
 
     registered_data_providers: List = None
 
-    from investing_bot_framework.core.context.states.strategy_state import StrategyState
+    from investing_bot_framework.core.states.templates.strategy_state import StrategyState
     transition_state_class = StrategyState
 
     data_provider_scheduler: DataProviderScheduler = None
@@ -87,6 +87,9 @@ class DataProvidingState(BotState, Observer):
         super(DataProvidingState, self).__init__(context)
         self._updated = False
         self.data_provider_executor = None
+
+        if self.registered_data_providers is None or len(self.registered_data_providers) < 1:
+            raise OperationalException("Data providing state has not any data providers configured")
 
     def _schedule_data_providers(self) -> List[DataProvider]:
 
@@ -121,9 +124,6 @@ class DataProvidingState(BotState, Observer):
             self._updated = True
 
     def run(self) -> None:
-
-        if self.registered_data_providers is None:
-            raise OperationalException("Data providing state has not any data providers configured")
 
         # Schedule the data_providers providers
         planned_data_providers = self._schedule_data_providers()
