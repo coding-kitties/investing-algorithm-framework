@@ -14,13 +14,17 @@ class BotState(ABC):
     transition_state_class = None
 
     # Validator for the current state
-    state_validators = None
+    pre_state_validators: List[StateValidator] = None
+    post_state_validators: List[StateValidator] = None
 
-    def __init__(self, context, state_validator: StateValidator = None) -> None:
+    def __init__(self, context) -> None:
         self._bot_context = context
-        self._state_validator = state_validator
 
     def start(self):
+
+        # Will stop the state if pre-conditions are not met
+        if not self.validate_state():
+            return
 
         while True:
             self.run()
@@ -37,12 +41,15 @@ class BotState(ABC):
     def context(self):
         return self._bot_context
 
-    def validate_state(self) -> bool:
+    def validate_state(self, pre_state: bool = False) -> bool:
         """
         Function that will validate the state
         """
 
-        state_validators = self.get_state_validators()
+        if pre_state:
+            state_validators = self.get_pre_state_validators()
+        else:
+            state_validators = self.get_post_state_validators()
 
         if state_validators is None:
             return True
@@ -63,12 +70,18 @@ class BotState(ABC):
 
         return self.transition_state_class
 
-    def get_state_validators(self) -> List[StateValidator]:
+    def get_pre_state_validators(self) -> List[StateValidator]:
 
-        if self.state_validators is not None:
+        if self.pre_state_validators is not None:
             return [
-                state_validator() for state_validator in getattr(self, 'state_validators')
+                state_validator() for state_validator in getattr(self, 'pre_state_validators')
                 if issubclass(state_validator, StateValidator)
             ]
 
+    def get_post_state_validators(self) -> List[StateValidator]:
 
+        if self.post_state_validators is not None:
+            return [
+                state_validator() for state_validator in getattr(self, 'post_state_validators')
+                if issubclass(state_validator, StateValidator)
+            ]
