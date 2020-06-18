@@ -1,4 +1,6 @@
 language: python
+before_install:
+  - echo | ls .
 
 install:
   - pip install -r requirements.txt
