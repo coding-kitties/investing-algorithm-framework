@@ -5,18 +5,18 @@
 The Investing Algorithm Framework is a python framework to build investment algorithms. It encourages rapid development and clean,
 pragmatic design. It is free for personal usage and open source.
 
-In most cases, you'll probably never have to change code on this repo directly if you are building your own algorithm/bot. But if you do, check out CONTRIBUTING.md
+In most cases, you'll probably never have to change code on this repo directly if you are building your algorithm/bot. But if you do, check out CONTRIBUTING.md
 
 If you'd like to chat with investing-algorithm-framework users and developers, [join us on Slack](https://inv-algo-framework.slack.com)
 
 #### Disclaimer
-If you use this framework for your investments, do not risk money which you are afraid to lose. We can't stress this 
-enough: 
+If you use this framework for your investments, do not risk money which you are afraid to lose. We can't stress this
+enough:
 
-BEFORE YOU START USING MONEY WITH THE FRAMEWORK, MAKE SURE THAT YOU TESTED YOUR COMPONENTS THOROUGHLY. USE THE SOFTWARE AT 
+BEFORE YOU START USING MONEY WITH THE FRAMEWORK, MAKE SURE THAT YOU TESTED YOUR COMPONENTS THOROUGHLY. USE THE SOFTWARE AT
 YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR INVESTMENT RESULTS.
 
-Also, make sure that you read the source code of any plugin you use or implementation of an algorithm made with this 
+Also, make sure that you read the source code of any plugin you use or implementation of an algorithm made with this
 framework.
 
 ## Documentation
@@ -43,7 +43,7 @@ Please read our
 [Contributing document](https://github.com/investing-algorithms/investing-algorithm-framework/blob/master/CONTRIBUTING.md)
 to understand the requirements before sending your pull-requests.
 
-**Note** before starting any major new feature work, *please open an issue describing what you are planning to do* or talk to us on [Slack](https://join.slack.com/t/investingbots/shared_invite/enQtODgwNTg3MzA2MjYyLTdiZjczZDRlNWJjNDdmYThiMGE0MzFhOTg4Y2E0NzQ2OTgxYjA1NzU3ZWJiY2JhOTE1ZGJlZGFiNDU3OTAzMDg). 
+**Note** before starting any major new feature work, *please open an issue describing what you are planning to do* or talk to us on [Slack](https://join.slack.com/t/investingbots/shared_invite/enQtODgwNTg3MzA2MjYyLTdiZjczZDRlNWJjNDdmYThiMGE0MzFhOTg4Y2E0NzQ2OTgxYjA1NzU3ZWJiY2JhOTE1ZGJlZGFiNDU3OTAzMDg).
 This will ensure that interested parties can give valuable feedback on the feature, and let others know that you are working on it.
 
 **Important:** Always create your feature or hotfix against the `develop` branch, not `master`.
