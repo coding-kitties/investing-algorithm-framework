@@ -1,7 +1,9 @@
 language: python
+
 before_install:
-  - echo | ls .
-  - echo | ls ./investing_bot_framework/tests/core/executors
+  - virtualenv venv
+  - source venv/bin/activate
+
 install:
   - pip install -r requirements.txt
 
