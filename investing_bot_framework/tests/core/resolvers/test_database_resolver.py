@@ -1,5 +1,4 @@
 import os
-from unittest import TestCase
 from sqlalchemy import Column, String, Integer
 
 from investing_bot_framework.tests.resources import BaseTestMixin, utils
@@ -12,9 +11,9 @@ class TestModel(db.model):
     name = Column(String())
 
 
-class TestDatabaseResolverConfiguration(TestCase, BaseTestMixin):
+class TestDatabaseResolverConfiguration(BaseTestMixin):
 
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
         self.initialize_environment()
 
     def test_configuration(self):
@@ -22,21 +21,21 @@ class TestDatabaseResolverConfiguration(TestCase, BaseTestMixin):
         db.configure()
 
         # Check if all properties are configured
-        self.assertIsNotNone(db.Session)
-        self.assertIsNotNone(db.engine)
-        self.assertIsNotNone(db.session_factory)
-        self.assertIsNotNone(db.database_path)
-        self.assertTrue(os.path.isfile(db.database_path))
+        assert db.Session is not None
+        assert db.engine is not None
+        assert db.session_factory is not None
+        assert db.database_path is not None
+        assert os.path.isfile(db.database_path) == True
 
-    def tearDown(self) -> None:
+    def teardown_method(self) -> None:
 
         if os.path.isfile(db.database_path):
             os.remove(db.database_path)
 
 
-class TestDatabaseResolverModel(TestCase, BaseTestMixin):
+class TestDatabaseResolverModel(BaseTestMixin):
 
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
         self.initialize_environment()
         settings.configure()
         db.configure()
@@ -47,14 +46,14 @@ class TestDatabaseResolverModel(TestCase, BaseTestMixin):
         model = TestModel(name=utils.random_string(10))
         model.save()
         db.session.commit()
-        self.assertEqual(1, len(TestModel.query.all()))
+        assert 1 == len(TestModel.query.all())
 
         model = TestModel(name=utils.random_string(10))
         model.save()
         db.session.commit()
-        self.assertEqual(2, len(TestModel.query.all()))
+        assert 2 == len(TestModel.query.all())
 
-    def tearDown(self) -> None:
+    def teardown_method(self) -> None:
 
         if os.path.isfile(db.database_path):
             os.remove(db.database_path)

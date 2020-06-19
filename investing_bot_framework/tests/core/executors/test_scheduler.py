@@ -1,15 +1,15 @@
 import random
+import pytest
 from uuid import uuid4
-from unittest import TestCase
 from datetime import datetime, timedelta
 
 from investing_bot_framework.core.executors.execution_scheduler import ExecutionScheduler, ExecutionTask
 from investing_bot_framework.core.utils import TimeUnit
 
 
-class TestExecutionScheduler(TestCase):
+class TestExecutionScheduler(object):
 
-    def setUp(self) -> None:
+    def setup_method(self) -> None:
 
         self.execution_task_one = {
             'execution_id': uuid4().__str__(),
@@ -54,17 +54,17 @@ class TestExecutionScheduler(TestCase):
 
         # All tasks must be scheduled the first planning
         planning = scheduler.schedule_executions()
-        self.assertTrue(self.execution_task_one['execution_id'] in planning)
-        self.assertTrue(self.execution_task_two['execution_id'] in planning)
-        self.assertTrue(self.execution_task_three['execution_id'] in planning)
-        self.assertTrue(self.execution_task_four['execution_id'] in planning)
+        assert self.execution_task_one['execution_id'] in planning
+        assert self.execution_task_two['execution_id'] in planning
+        assert self.execution_task_three['execution_id'] in planning
+        assert self.execution_task_four['execution_id'] in planning
 
         # Only Task 1 must be in the planning
         planning = scheduler.schedule_executions()
-        self.assertTrue(self.execution_task_one['execution_id'] in planning)
-        self.assertFalse(self.execution_task_two['execution_id'] in planning)
-        self.assertFalse(self.execution_task_three['execution_id'] in planning)
-        self.assertFalse(self.execution_task_four['execution_id'] in planning)
+        assert self.execution_task_one['execution_id'] in planning
+        assert self.execution_task_two['execution_id'] not in planning
+        assert self.execution_task_three['execution_id'] not in planning
+        assert self.execution_task_four['execution_id'] not in planning
 
         minus_time_delta = datetime.now() - timedelta(seconds=self.execution_task_two['interval'])
         appointments = scheduler._planning.keys()
@@ -79,10 +79,10 @@ class TestExecutionScheduler(TestCase):
 
         # Task 1, 2 must be in the planning
         planning = scheduler.schedule_executions()
-        self.assertTrue(self.execution_task_one['execution_id'] in planning)
-        self.assertTrue(self.execution_task_two['execution_id'] in planning)
-        self.assertFalse(self.execution_task_three['execution_id'] in planning)
-        self.assertFalse(self.execution_task_four['execution_id'] in planning)
+        assert self.execution_task_one['execution_id'] in planning
+        assert self.execution_task_two['execution_id'] in planning
+        assert self.execution_task_three['execution_id'] not in planning
+        assert self.execution_task_four['execution_id'] not in planning
 
         minus_time_delta = datetime.now() - timedelta(minutes=self.execution_task_three['interval'])
         appointments = scheduler._planning.keys()
@@ -97,10 +97,10 @@ class TestExecutionScheduler(TestCase):
 
         # Task 1, 2 and 3 must be in the planning
         planning = scheduler.schedule_executions()
-        self.assertTrue(self.execution_task_one['execution_id'] in planning)
-        self.assertTrue(self.execution_task_two['execution_id'] in planning)
-        self.assertTrue(self.execution_task_three['execution_id'] in planning)
-        self.assertFalse(self.execution_task_four['execution_id'] in planning)
+        assert self.execution_task_one['execution_id'] in planning
+        assert self.execution_task_two['execution_id'] in planning
+        assert self.execution_task_three['execution_id'] in planning
+        assert self.execution_task_four['execution_id'] not in planning
 
         minus_time_delta = datetime.now() - timedelta(hours=self.execution_task_four['interval'])
         appointments = scheduler._planning.keys()
@@ -112,33 +112,33 @@ class TestExecutionScheduler(TestCase):
                 scheduler._planning[appointment].interval,
                 last_run=minus_time_delta
             )
-
+        #
         # Task 1, 2 and 3 must be in the planning
         planning = scheduler.schedule_executions()
-        self.assertTrue(self.execution_task_one['execution_id'] in planning)
-        self.assertTrue(self.execution_task_two['execution_id'] in planning)
-        self.assertTrue(self.execution_task_three['execution_id'] in planning)
-        self.assertTrue(self.execution_task_four['execution_id'] in planning)
+        assert self.execution_task_one['execution_id'] in planning
+        assert self.execution_task_two['execution_id'] in planning
+        assert self.execution_task_three['execution_id'] in planning
+        assert self.execution_task_four['execution_id'] in planning
 
     def test_exceptions(self) -> None:
         scheduler = ExecutionScheduler()
 
-        with self.assertRaises(Exception) as context:
+        with pytest.raises(Exception) as e_info:
             scheduler.add_execution_task(**self.wrong_execution_task_one)
 
-        self.assertTrue("Interval for task time unit is smaller then 1" in str(context.exception))
+        assert "Interval for task time unit is smaller then 1" in str(e_info.value)
 
-        with self.assertRaises(Exception) as context:
+        with pytest.raises(Exception) as e_info:
             scheduler.add_execution_task(**self.wrong_execution_task_two)
 
-        self.assertTrue("Appoint must set an interval with the corresponding time unit" in str(context.exception))
+        assert "Appoint must set an interval with the corresponding time unit" in str(e_info.value)
 
         scheduler.add_execution_task(**self.execution_task_one)
 
-        with self.assertRaises(Exception) as context:
+        with pytest.raises(Exception) as e_info:
             scheduler.add_execution_task(**self.execution_task_one)
 
-        self.assertTrue("Can't add execution task, execution id is already taken" in str(context.exception))
+        assert "Can't add execution task, execution id is already taken" in str(e_info.value)
 
 
 
