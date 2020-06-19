@@ -1,5 +1,4 @@
-from investing_algorithm_framework.tests.core.data.data_providers.resources import TestDataProviderOne, \
-    TestDataProviderTwo, TestObserver
+from tests.core.data_providers.resources import TestDataProviderOne, TestDataProviderTwo, TestObserver
 
 
 def test():

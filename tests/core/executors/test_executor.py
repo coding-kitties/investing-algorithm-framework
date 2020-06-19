@@ -1,8 +1,7 @@
 from threading import active_count
-from unittest import TestCase
 from time import sleep
 
-from investing_algorithm_framework.tests.core.executors.resources import TestExecutor, TestWorkerOne, TestWorkerTwo, \
+from tests.core.executors.resources import TestExecutor, TestWorkerOne, TestWorkerTwo, \
     TestObserver, TestWorkerThree
 
 
