@@ -1,7 +1,8 @@
 import os
 from sqlalchemy import Column, String, Integer
 
-from investing_algorithm_framework.tests.resources import BaseTestMixin, utils
+from tests.resources import BaseTestMixin
+from tests.resources import utils
 from investing_algorithm_framework.core.configuration import settings
 from investing_algorithm_framework.core.extensions import db
 
