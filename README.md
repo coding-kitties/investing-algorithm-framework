@@ -1,4 +1,6 @@
-# Investing Algorithm Framework 
+[![Build Status](https://travis-ci.org/investingbots/investing-bot-framework.svg?branch=master)](https://travis-ci.org/investingbots/investing-bot-framework)
+
+# Investing Algorithm Framework
 
 The Investing Algorithm Framework is a free and open source Python framework that encourages rapid development and clean, 
 pragmatic design.
