@@ -4,12 +4,12 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="investing_bot_framework",
+    name="investing_algorithm_framework",
     version="0.0.1",
-    description="A framework for creating an investment investing_bot_framework",
+    description="A framework for creating an investment algorithm",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/pypa/sampleproject",
+    url="https://github.com/investing-algorithms/investing-algorithm-framework.git",
     packages=setuptools.find_packages(exclude=['tests', 'tests.*']),
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -19,6 +19,6 @@ setuptools.setup(
         'colorama', 'wrapt', 'requests'
     ],
     python_requires='>=3.6',
-    scripts=['investing_bot_framework/bin/investing-bot-framework-admin'],
+    scripts=['investing_algorithm_framework/bin/investing-algorithm-framework-admin'],
     include_package_data=True,
 )
