@@ -3,7 +3,7 @@ from typing import Type
 from investing_bot_framework.core.configuration import settings
 from investing_bot_framework.core.exceptions import OperationalException
 from investing_bot_framework.core.utils import Singleton
-from investing_bot_framework.core.context.states import BotState
+from investing_bot_framework.core.states import BotState
 
 
 class BotContext(metaclass=Singleton):
@@ -18,19 +18,13 @@ class BotContext(metaclass=Singleton):
     # Settings reference
     settings = settings
 
-    def initialize(self, bot_state: Type[BotState]) -> None:
-
-        # Stop the current state of the investing_bot_framework
-        if self._state:
-            self._state.stop()
-
+    def register_initial_state(self, bot_state: Type[BotState]) -> None:
         self._state = bot_state(context=self)
 
     def transition_to(self, bot_state: Type[BotState]) -> None:
         """
         Function to change the running BotState at runtime.
         """
-
         self._state = bot_state(context=self)
 
     def _check_state(self, raise_exception: bool = False) -> bool:
@@ -42,7 +36,7 @@ class BotContext(metaclass=Singleton):
 
             if raise_exception:
                 raise OperationalException(
-                    "Bot context doesn't have a state, Make sure that you set the state of bot either "
+                    "Bot context doesn't have a state. Make sure that you set the state of bot either "
                     "by initializing it or making sure that you transition to a new valid state."
                 )
             else:
@@ -66,18 +60,3 @@ class BotContext(metaclass=Singleton):
         transition_state = self._state.get_transition_state_class()
         self.transition_to(transition_state)
 
-    def stop(self) -> None:
-        """
-        Stop the current state of the investing_bot_framework
-        """
-
-        self._check_state(raise_exception=True)
-        self._state.stop()
-
-    def reconfigure(self) -> None:
-        """
-        Reconfigure the current state of the investing_bot_framework
-        """
-
-        self._check_state(raise_exception=True)
-        self._state.reconfigure()

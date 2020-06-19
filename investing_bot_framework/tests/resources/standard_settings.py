@@ -16,8 +16,8 @@ LOG_DIR = '{}/logs'.format(BASE_DIR)
 
 LOG_PATH = "{}/{}.log".format(LOG_DIR, LOG_FILE_NAME)
 
-if not os.path.isdir(LOG_DIR):
-    os.mkdir(LOG_DIR)
+# if not os.path.isdir(LOG_DIR):
+#     os.mkdir(LOG_DIR)
 
 if DEBUG:
     logging_level = "DEBUG"
@@ -39,18 +39,11 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'standard',
         },
-        'file': {
-            'formatter': 'standard',
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': LOG_PATH,
-            'backupCount': 10,
-            'maxBytes': 10000,
-        },
     },
     'loggers': {
         '': {
             'level': logging_level,
-            'handlers': ['console', 'file'],
+            'handlers': ['console'],
         },
     },
 }

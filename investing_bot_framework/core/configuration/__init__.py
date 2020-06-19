@@ -1,12 +1,13 @@
 import os
+import logging.config
 from typing import Any
 from importlib import import_module
 from enum import Enum
 
 from investing_bot_framework.core.exceptions import ImproperlyConfigured, OperationalException
 from investing_bot_framework.core.configuration.template import Template
-from investing_bot_framework.core.configuration.config_constants import SETTINGS_MODULE_PATH_ENV_NAME, SETTINGS_STRATEGY_REGISTERED_APPS, \
-    SETTINGS_DATA_PROVIDER_REGISTERED_APPS
+from investing_bot_framework.core.configuration.config_constants import SETTINGS_MODULE_PATH_ENV_NAME, \
+    SETTINGS_STRATEGY_REGISTERED_APPS, SETTINGS_DATA_PROVIDER_REGISTERED_APPS, BASE_DIR, SETTINGS_LOGGING_CONFIG
 
 
 class TimeUnit(Enum):
@@ -59,14 +60,17 @@ class BaseSettings:
     Base wrapper for settings module. It will load all the default settings for a given settings module
     """
 
-    def __init__(self, settings_module: str = None) -> None:
+    def __init__(self) -> None:
         self._configured = False
+        self._settings_module = None
+
+    def configure(self, settings_module: str = None) -> None:
         self._settings_module = settings_module
 
-        if self._settings_module is not None:
-            self.configure()
-
-    def configure(self) -> None:
+        if settings_module is None:
+            self.settings_module = os.environ.get(SETTINGS_MODULE_PATH_ENV_NAME)
+        else:
+            self.settings_module = settings_module
 
         if self.settings_module is None:
             raise ImproperlyConfigured("There is no settings module defined")
@@ -93,6 +97,8 @@ class BaseSettings:
 
         self._configured = True
 
+        logging.config.dictConfig(self[SETTINGS_LOGGING_CONFIG])
+
     @property
     def settings_module(self) -> str:
         return self._settings_module
@@ -100,7 +106,6 @@ class BaseSettings:
     @settings_module.setter
     def settings_module(self, settings_module: str) -> None:
         self._settings_module = settings_module
-        self.configure()
 
     @property
     def configured(self) -> bool:
@@ -131,8 +136,4 @@ class BaseSettings:
         return default
 
 
-def resolve_settings():
-    return BaseSettings(os.environ.get(SETTINGS_MODULE_PATH_ENV_NAME))
-
-
-settings = resolve_settings()
+settings = BaseSettings()

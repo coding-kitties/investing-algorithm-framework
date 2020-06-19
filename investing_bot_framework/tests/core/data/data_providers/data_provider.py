@@ -1,64 +1,34 @@
-from typing import Dict, Any
-from unittest import TestCase
-
-from investing_bot_framework.core.data.data_providers import DataProvider
-from investing_bot_framework.core.events import Observer
+from investing_bot_framework.tests.core.data.data_providers.resources import TestDataProviderOne, \
+    TestDataProviderTwo, TestObserver
 
 
-class TestDataProviderOne(DataProvider):
+def test():
+    data_provider_one = TestDataProviderOne()
 
-    id = 'TestDataProviderOne'
+    assert data_provider_one.id is not None
+    assert data_provider_one.get_id() == TestDataProviderOne.id
 
-    def provide_data(self, **kwargs: Dict[str, Any]) -> Any:
-        return "data"
+    observer = TestObserver()
+    data_provider_one.add_observer(observer)
 
+    # Run the data_providers provider
+    data_provider_one.start()
 
-class TestDataProviderTwo(DataProvider):
+    # Observer must have been updated
+    assert observer.update_count == 1
 
-    id = 'TestDataProviderTwo'
+    data_provider_two = TestDataProviderTwo()
 
-    def provide_data(self, **kwargs: Dict[str, Any]) -> Any:
-        return "data"
+    assert data_provider_two.id is not None
+    assert data_provider_two.get_id() == TestDataProviderTwo.id
 
+    data_provider_two.add_observer(observer)
 
-class TestObserver(Observer):
+    # Run the data_providers provider
+    data_provider_two.start()
 
-    def __init__(self) -> None:
-        self.update_count = 0
+    # Observer must have been updated
+    assert observer.update_count == 2
 
-    def update(self, observable, **kwargs) -> None:
-        self.update_count += 1
-
-
-class DataProviderSetup(TestCase):
-
-    def test(self):
-        data_provider_one = TestDataProviderOne()
-
-        self.assertIsNotNone(data_provider_one.id)
-        self.assertEqual(data_provider_one.get_id(), TestDataProviderOne.id)
-
-        observer = TestObserver()
-        data_provider_one.add_observer(observer)
-
-        # Run the data provider
-        data_provider_one.start()
-
-        # Observer must have been updated
-        self.assertEqual(observer.update_count, 1)
-
-        data_provider_two = TestDataProviderTwo()
-
-        self.assertIsNotNone(data_provider_two.id)
-        self.assertEqual(data_provider_two.get_id(), TestDataProviderTwo.id)
-
-        data_provider_two.add_observer(observer)
-
-        # Run the data provider
-        data_provider_two.start()
-
-        # Observer must have been updated
-        self.assertEqual(observer.update_count, 2)
-
-        # Id´s must be different
-        self.assertNotEqual(TestDataProviderOne.id, TestDataProviderTwo.id)
+    # Id´s must be different
+    assert TestDataProviderOne.id != TestDataProviderTwo.id
