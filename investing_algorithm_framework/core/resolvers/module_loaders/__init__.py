@@ -1,0 +1,1 @@
+from investing_algorithm_framework.core.resolvers.module_loaders.data_providers_loader import DataProvidersLoader

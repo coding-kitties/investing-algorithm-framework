@@ -1,1 +1,0 @@
-from investing_bot_framework.core.strategies.strategy import Strategy

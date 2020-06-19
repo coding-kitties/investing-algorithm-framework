@@ -1,2 +1,0 @@
-from investing_bot_framework.core.management.command import BaseCommand
-from investing_bot_framework.core.management.command_manager import execute_from_command_line
