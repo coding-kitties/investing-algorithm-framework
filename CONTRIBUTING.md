@@ -2,21 +2,19 @@
 
 ## Contribute to the value investing bot
 
-Feel like our bot is missing a feature? We welcome your pull requests! 
+Feel like the framework is missing a feature or can be fixed? We welcome your pull requests! 
 
 Few pointers for contributions:
 
-- Create your PR against the `develop` branch, not `master`.
+- Create your branch against the `develop` branch, not `master`.
 - New features need to contain unit tests and must be PEP8 conformant (max-line-length = 100).
 - Creating a feature, must be done on a branch with prefix `feature_`.
 - Making a hotfix, must be done on a branch with prefix `hotfix_`.
 
-If you are unsure, discuss the feature on our [Slack](https://join.slack.com/t/investingbots/shared_invite/enQtODgwNTg3MzA2MjYyLTdiZjczZDRlNWJjNDdmYThiMGE0MzFhOTg4Y2E0NzQ2OTgxYjA1NzU3ZWJiY2JhOTE1ZGJlZGFiNDU3OTAzMDg)
+If you are unsure, discuss the feature or hotfix on our [Slack](https://inv-algo-framework.slack.com)
 or in a [issue](https://github.com/investingbots/value-investing-bot/issues) before a PR.
 
-## Getting started
-
-## Before sending the PR:
+## Rules
 
 ### 1. Run unit tests
 
@@ -46,54 +44,21 @@ pytest tests/test_<file_name>.py::test_<method_name>
 #### Run Flake8
 
 ```bash
-flake8 bot
+flake8 investing_algorithm_framework
 ```
-
-We receive a lot of code that fails the `flake8` checks.
-To help with that, we encourage you to install the git pre-commit 
-hook that will warn you when you try to commit code that fails these checks. 
-Guide for installing them is [here](http://flake8.pycqa.org/en/latest/user/using-hooks.html).
 
 ### 3. Test if all type-hints are correct
 
 #### Run mypy
 
 ``` bash
-mypy bot
+mypy investing_algorithm_framework
 ```
-
-## (Core)-Committer Guide
-
-### Process: Pull Requests
-
-How to prioritize pull requests, from most to least important:
-
-1. Fixes for broken tests. Broken means broken on any supported platform or Python version.
-1. Extra tests to cover corner cases.
-1. Minor edits to docs.
-1. Bug fixes.
-1. Major edits to docs.
-1. Features.
-
-Ensure that each pull request meets all requirements in the Contributing document.
-
-### Process: Issues
-
-If an issue is a bug that needs an urgent fix, mark it for the next patch release.
-Then either fix it or mark as please-help.
-
-For other issues: encourage friendly discussion, moderate debate, offer your thoughts.
 
 ### Process: Your own code changes
 
 All code changes, regardless of who does them, need to be reviewed and merged by someone else.
 This rule applies to all the core committers.
-
-Exceptions:
-
-- Minor corrections and fixes to pull requests submitted by others.
-- While making a formal release, the release manager can make necessary, appropriate changes.
-- Small documentation changes that reinforce existing subject matter. Most commonly being, but not limited to spelling and grammar corrections.
 
 ### Responsibilities
 
@@ -107,11 +72,14 @@ Exceptions:
 
 Contributors may be given commit privileges. Preference will be given to those with:
 
-1. Past contributions to value investing btot and other related open-source projects. Contributions to value investing bot include both code (both accepted and pending) and friendly participation in the issue tracker and Pull request reviews. Quantity and quality are considered.
+1. Past contributions to value investing algorithm framework and other related open-source projects. 
+Contributions to value for the framework include both code (both accepted and pending) and friendly participation in the issue tracker and Pull request reviews. Quantity and quality are considered.
 1. A coding style that the other core committers find simple, minimal, and clean.
 1. Access to resources for cross-platform development and testing.
 1. Time to devote to the project regularly.
 
-Being a Committer does not grant write permission on `develop` or `master` for security reasons (Users trust the value investing bot with their Exchange API keys).
+Being a Committer does not grant write permission on `develop` or `master` for security reasons (Users trust the investing algorithm framework with their financial secrets).
 
-After being Committer for some time, a Committer may be named Core Committer and given full repository access.
+### Help
+
+If you want help, or not sure on how to become a committer for the project, feel free to sent an email to: investing.algorithm.framework@gmail.com
