@@ -33,7 +33,7 @@ To verify that you correctly installed the framework, type python from your shel
 try to import investing-algorithm-framework:
 
 ```python
-import investing-algorithm-framework
-print(investing-algorithm-framework.get_version())
+import investing_algorithm_framework
+print(investing_algorithm_framework.get_version())
 ```
  
