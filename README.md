@@ -25,7 +25,7 @@ found [here](https://github.com/investing-algorithms/investing-algorithm-framewo
 
 
 ## Documentation
-All documentation can be found online at the official website here [here](www.investing-algorithm-framework.com).
+All documentation can be found online at the official website here [here](https://investing-algorithm-framework.com).
 
 For a quick guide on installing the framework look [here](https://github.com/investing-algorithms/investing-algorithm-framework/blob/master/docs/INSTALL.md)
 
@@ -38,16 +38,12 @@ information about the framework, we encourage you to join our slack channel.
 
 ### [Bugs / Issues](https://github.com/investing-algorithms/investing-algorithm-framework/issues?q=is%3Aissue)
 
-If you discover a bug in the framework, please
-[search our issue tracker](https://github.com/investing-algorithms/investing-algorithm-framework/issues?q=is%3Aissue)
-first. If it hasn't been reported, please
-[create a new issue](https://github.com/investing-algorithms/investing-algorithm-framework/issues/new) and
-ensure you follow the template guide so that developers can assist you as quickly as possible.
+If you discover a bug in the framework, please [search our issue tracker](https://github.com/investing-algorithms/investing-algorithm-framework/issues?q=is%3Aissue)
+first. If it hasn't been reported, please [create a new issue](https://github.com/investing-algorithms/investing-algorithm-framework/issues/new).
 
 Feel like the framework is missing a feature? We welcome your pull requests!
 
-Please read our
-[Contributing document](https://github.com/investing-algorithms/investing-algorithm-framework/blob/master/docs/CONTRIBUTING.md)
+Please read our [Contributing document](https://github.com/investing-algorithms/investing-algorithm-framework/blob/master/docs/CONTRIBUTING.md)
 to understand the requirements before sending your pull-requests.
 
 **Note** before starting any major new feature work, *please open an issue describing what you are planning to do* or talk to us on [Slack](https://join.slack.com/t/investingbots/shared_invite/enQtODgwNTg3MzA2MjYyLTdiZjczZDRlNWJjNDdmYThiMGE0MzFhOTg4Y2E0NzQ2OTgxYjA1NzU3ZWJiY2JhOTE1ZGJlZGFiNDU3OTAzMDg).
