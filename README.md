@@ -3,7 +3,7 @@
 # Investing Algorithm Framework
 
 The Investing Algorithm Framework is a python framework to build investment algorithms. It encourages rapid development and clean,
-pragmatic design. It is free for personal usage and open source.
+pragmatic design. It is free for personal usage.
 
 In most cases, you'll probably never have to change code on this repo directly if you are building your algorithm/bot. But if you do, check out CONTRIBUTING.md
 
