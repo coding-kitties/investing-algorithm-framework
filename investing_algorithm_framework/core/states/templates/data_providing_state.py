@@ -4,7 +4,7 @@ from typing import List
 from wrapt import synchronized
 
 from investing_algorithm_framework.core.events import Observer
-from investing_algorithm_framework.core.context.bot_context import BotContext
+from investing_algorithm_framework.core.context.context import Context
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.states import BotState
 from investing_algorithm_framework.core.executors import ExecutionScheduler
@@ -83,7 +83,7 @@ class DataProvidingState(BotState, Observer):
 
     data_provider_scheduler: DataProviderScheduler = None
 
-    def __init__(self, context: BotContext) -> None:
+    def __init__(self, context: Context) -> None:
         super(DataProvidingState, self).__init__(context)
         self._updated = False
         self.data_provider_executor = None
