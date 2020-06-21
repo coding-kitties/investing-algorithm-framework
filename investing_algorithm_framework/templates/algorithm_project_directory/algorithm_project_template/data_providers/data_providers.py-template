@@ -1,5 +1,5 @@
-from investing_bot_framework.core.data_providers import DataProvider
-from investing_bot_framework.core.utils import TimeUnit
+from investing_algorithm_framework.core.data_providers import DataProvider
+from investing_algorithm_framework.core.utils import TimeUnit
 
 """
 Define here all your data providers
