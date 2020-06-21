@@ -17,7 +17,6 @@ setuptools.setup(
     packages=setuptools.find_packages(exclude=['tests', 'tests.*']),
     keywords=['INVESTING', 'BOT', 'ALGORITHM', 'FRAMEWORK'],
     classifiers=[
-        "Framework :: Investing Algorithm Framework",
         "Intended Audience :: Developers",
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.4',
