@@ -4,43 +4,43 @@ from importlib import import_module
 
 from investing_algorithm_framework.core.exceptions import ImproperlyConfigured
 from investing_algorithm_framework.core.management.command import BaseCommand, CommandError
-from investing_algorithm_framework.core.configuration.setup import DefaultBotProjectCreator
+from investing_algorithm_framework.core.configuration.setup.default_template_creators import DefaultProjectCreator
 
 
-class CreateBotCommand(BaseCommand):
+class CreateAlgorithmCommand(BaseCommand):
     help = (
-        "Creates a project directory structure for the given investing_algorithm_framework name in the current directory or optionally "
-        "in the given directory."
+        "Creates a project directory structure for the given investing_algorithm_framework instance in the current "
+        "directory or optionally in the given directory."
     )
 
-    missing_args_message = "You must provide a investing_algorithm_framework name."
-    success_message = "Bot created and initialized."
+    missing_args_message = "You must provide a project name."
+    success_message = "Algorithm created and initialized."
 
     def add_arguments(self, parser):
-        parser.add_argument('name', help='Name of the investing_algorithm_framework.')
+        parser.add_argument('name', help='Name of the algorithm/project.')
         parser.add_argument('directory', nargs='?', help='Optional destination directory')
         parser.add_argument(
             '--template_creator',
             help='Optional template creator plugin, provided by third party libraries'
         )
 
-    def handle(self, **options) -> str:
+    def handle(self, **options) -> None:
 
         # Get all the default attributes
-        bot_name = options.get('name', None)
+        project_name = options.get('name', None)
         directory = options.get('directory', None)
         template_creator = options.get('template_creator', None)
 
-        self.validate_name(bot_name)
+        self.validate_name(project_name)
 
         # initialize the investing_algorithm_framework project directory
         if directory is None:
-            directory = os.path.join(os.getcwd(), bot_name)
+            directory = os.path.join(os.getcwd(), project_name)
 
             if os.path.isdir(directory):
                 raise ImproperlyConfigured(
-                    "Directory {} already exists. Please make sure that the investing_algorithm_framework project name does not correspond to "
-                    "an existing directory"
+                    "Directory {} already exists. Please make sure that the project "
+                    "name does not correspond to an existing directory".format(str(directory))
                 )
 
             os.mkdir(directory)
@@ -49,24 +49,26 @@ class CreateBotCommand(BaseCommand):
             directory = os.path.abspath(os.path.expanduser(directory))
 
             if not os.path.exists(directory):
-                raise CommandError("Destination directory {} does not exist, please create it first.".format(directory))
+                raise CommandError(
+                    "Destination directory {} does not exist, please create it first.".format(str(directory))
+                )
 
         # Use default investing_algorithm_framework creator
         if not template_creator:
-            bot_template_creator = DefaultBotProjectCreator(directory, bot_name)
+            template_creator = DefaultProjectCreator(directory, project_name)
 
         # Creates templates
-        bot_template_creator.configure()
-        bot_template_creator.create()
+        template_creator.configure()
+        template_creator.create()
 
     @staticmethod
     def validate_name(name: str) -> None:
         """
-        Helper function to validate the name of a given investing_algorithm_framework
+        Helper function to validate the name of a given project
         """
 
         if name is None:
-            raise CommandError("you must provide a investing_algorithm_framework name")
+            raise CommandError("you must provide a project name")
 
         if not re.match("^[a-zA-Z]+\w*$", name):
             raise CommandError("{} is not allowed, value must begin with a letter and "
@@ -80,6 +82,6 @@ class CreateBotCommand(BaseCommand):
         else:
             raise CommandError(
                 "'{}' conflicts with the name of an existing Python "
-                "module and cannot be used as a investing_algorithm_framework name. Please try "
+                "module and cannot be used as a project name. Please try "
                 "another name.".format(name)
             )

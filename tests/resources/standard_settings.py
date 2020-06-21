@@ -1,9 +1,9 @@
 import os
 from pathlib import Path
 
-BOT_PROJECT_NAME = 'bot'
+PROJECT_NAME = 'test_project'
 
-BOT_CONTEXT_CONFIGURATION = 'bot.configuration.context'
+CONTEXT_CONFIGURATION = 'test_project.configuration.context'
 
 # Change this when not in development, feature or hot-fix branch
 DEBUG = int(os.environ.get('DEBUG', True))
@@ -15,7 +15,7 @@ LOG_FILE_NAME = 'log'
 LOG_DIR = '{}/logs'.format(BASE_DIR)
 
 LOG_PATH = "{}/{}.log".format(LOG_DIR, LOG_FILE_NAME)
-
+#
 # if not os.path.isdir(LOG_DIR):
 #     os.mkdir(LOG_DIR)
 

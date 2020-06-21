@@ -23,7 +23,7 @@ class TestStandardExecutor:
         assert executor.processing
         assert active_count() == 3
 
-        sleep(2)
+        sleep(3)
 
         # # After finishing only 1 thread must be active
         assert active_count(), 1
@@ -58,13 +58,7 @@ class TestStandardExecutor:
         assert executor.processing
         assert active_count() == 3
 
-        sleep(2)
-
-        # After finishing only two threads must be active (main + last worker, because max workers is 2)
-        assert active_count() == 2
-        assert executor.processing
-
-        sleep(1)
+        sleep(4)
 
         # After finishing only 1 thread must be active
         assert active_count(), 1

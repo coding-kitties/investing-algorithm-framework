@@ -6,13 +6,13 @@ from investing_algorithm_framework.core.utils import Singleton
 from investing_algorithm_framework.core.states import BotState
 
 
-class BotContext(metaclass=Singleton):
+class Context(metaclass=Singleton):
     """
-    The BotContext defines the current state of the running bot. It also maintains a reference to an instance of a
-    BotState subclass, which represents the current state of the BotContext.
+    The Context defines the current state of the running algorithms. It also maintains a reference to an instance of a
+    state subclass, which represents the current state of the context instance.
     """
 
-    # A reference to the current state of the Bot Context.
+    # A reference to the current state of the context.
     _state: BotState = None
 
     # Settings reference
@@ -36,7 +36,7 @@ class BotContext(metaclass=Singleton):
 
             if raise_exception:
                 raise OperationalException(
-                    "Bot context doesn't have a state. Make sure that you set the state of bot either "
+                    "Context doesn't have a state. Make sure that you set the state either "
                     "by initializing it or making sure that you transition to a new valid state."
                 )
             else:
