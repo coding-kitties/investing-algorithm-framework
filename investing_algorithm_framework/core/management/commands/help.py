@@ -17,7 +17,7 @@ class HelpCommand(BaseCommand):
     def handle(self) -> Any:
         usage = [
             "",
-            "This is the command line management for the investing investing_algorithm_framework framework. \n"
+            "This is the command line management for the investing algorithm framework. \n"
             "Type help <sub_command>' for help on a specific sub command.",
             "",
             "Available sub commands:",

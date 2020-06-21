@@ -154,8 +154,6 @@ class DatabaseResolver:
     def make_declarative_base(model_class):
         """
         Creates the declarative base that all models will inherit from.
-
-        :param model_class: base model class to pass to :func:`~sqlalchemy.ext.declarative.declarative_base`.
         """
 
         model = declarative_base(cls=model_class)

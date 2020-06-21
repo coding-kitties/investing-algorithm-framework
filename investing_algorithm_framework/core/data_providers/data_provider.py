@@ -23,11 +23,11 @@ class DataProviderException(Exception):
 
 class DataProvider(ScheduledWorker):
     """
-    Class DataProvider: An entity which responsibility is to provide data_providers from an external data_providers
-    source. Where a data_providers source is defined as any third party service that provides data_providers,
-    e.g  cloud storage, REST API, or website.
+    Class DataProvider: An entity which responsibility is to provide data from an external source.
+    Where a data_providers source is defined as any third party service that provides data e.g  cloud storage,
+    REST API, or website.
 
-    A data_providers provider must always be run with the start function from it´s super class. Otherwise depend
+    A data_provider must always be run with the start function from it´s super class. Otherwise depended
     observers will not be updated.
     """
 

@@ -1,9 +1,9 @@
 import os
 from pathlib import Path
 
-BOT_PROJECT_NAME = 'bot'
+PROJECT_NAME = '{{ project_name }}'
 
-BOT_CONTEXT_CONFIGURATION = 'bot.configuration.context'
+CONTEXT_CONFIGURATION = '{{ project_name }}.configuration.context'
 
 # Change this when not in development, feature or hot-fix branch
 DEBUG = int(os.environ.get('DEBUG', True))
