@@ -1,6 +1,8 @@
 import setuptools
+from investing_algorithm_framework import get_version
 
-VERSION = "0.1"
+VERSION = get_version()
+
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
@@ -13,7 +15,7 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/coding-kitties/investing-algorithm-framework.git",
-    download_url='https://github.com/coding-kitties/investing-algorithm-framework/archive/v0.1.tar.gz',
+    download_url='https://github.com/coding-kitties/investing-algorithm-framework/archive/v0.1.1.tar.gz',
     packages=setuptools.find_packages(exclude=['tests', 'tests.*']),
     keywords=['INVESTING', 'BOT', 'ALGORITHM', 'FRAMEWORK'],
     classifiers=[
