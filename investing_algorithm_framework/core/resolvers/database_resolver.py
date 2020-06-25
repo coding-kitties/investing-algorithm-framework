@@ -8,9 +8,8 @@ from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm.exc import DetachedInstanceError
 from sqlalchemy.exc import DatabaseError
 
-
-from investing_algorithm_framework.core.configuration import settings
-from investing_algorithm_framework.core.configuration.config_constants import BASE_DIR, DATABASE_NAME
+from investing_algorithm_framework.configuration import settings
+from investing_algorithm_framework.configuration.config_constants import BASE_DIR, DATABASE_NAME
 from investing_algorithm_framework.core.exceptions import DatabaseOperationalException
 
 

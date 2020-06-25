@@ -1,7 +1,0 @@
-from investing_algorithm_framework.core.order_executors import OrderExecutor
-
-
-class MyOrderExecutor(OrderExecutor):
-
-    def execute_orders(self) -> None:
-        pass
