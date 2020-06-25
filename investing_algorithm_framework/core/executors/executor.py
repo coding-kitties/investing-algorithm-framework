@@ -8,12 +8,14 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.utils import StoppableThread
 from investing_algorithm_framework.core.events.observer import Observer
 from investing_algorithm_framework.core.events.observable import Observable
-from investing_algorithm_framework.configuration.config_constants import DEFAULT_MAX_WORKERS
+from investing_algorithm_framework.configuration.config_constants import \
+    DEFAULT_MAX_WORKERS
 
 
 class Executor(Observable, Observer, ABC):
     """
-    Executor class: functions as an abstract class that will handle the executions of workers in asynchronous order.
+    Executor class: functions as an abstract class that will handle the
+    executions of workers in asynchronous order.
     """
 
     def __init__(self,  max_workers: int = DEFAULT_MAX_WORKERS):
@@ -57,7 +59,8 @@ class Executor(Observable, Observer, ABC):
         workers = self.create_workers()
 
         if not workers or len(workers) == 0:
-            raise OperationalException("There where no workers initialized for the executor instance")
+            raise OperationalException("There where no workers initialized "
+                                       "for the executor instance")
 
         self._pending_workers = Queue()
 
@@ -76,7 +79,9 @@ class Executor(Observable, Observer, ABC):
         Function that will start all the workers.
         """
 
-        worker_iteration = self._max_workers - len(self._running_threads.keys())
+        worker_iteration = self._max_workers - len(
+            self._running_threads.keys()
+        )
 
         while worker_iteration > 0 and not self._pending_workers.empty():
             worker = self._pending_workers.get()
@@ -120,5 +125,7 @@ class Executor(Observable, Observer, ABC):
         Property that will show if the executor is running.
         """
 
-        return (self._pending_workers is not None and not self._pending_workers.empty()) or \
-               (self._running_threads is not None and len(self._running_threads.keys()) > 0)
+        return (self._pending_workers is not None
+                and not self._pending_workers.empty()) or \
+               (self._running_threads is not None
+                and len(self._running_threads.keys()) > 0)

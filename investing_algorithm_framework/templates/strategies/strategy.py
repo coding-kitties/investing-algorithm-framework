@@ -19,5 +19,3 @@ class Strategy(ScheduledWorker):
     def work(self, **kwargs: Dict[str, Any]) -> None:
         logger.info("Starting strategy {}".format(self.get_id()))
         self.apply_strategy()
-
-

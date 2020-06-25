@@ -3,13 +3,16 @@ import re
 from importlib import import_module
 
 from investing_algorithm_framework.core.exceptions import ImproperlyConfigured
-from investing_algorithm_framework.management.command import BaseCommand, CommandError
-from investing_algorithm_framework.configuration.setup.default_template_creators import DefaultProjectCreator
+from investing_algorithm_framework.management.command import BaseCommand, \
+    CommandError
+from investing_algorithm_framework.configuration.setup.\
+    default_template_creators import DefaultProjectCreator
 
 
 class CreateStandardAlgorithmCommand(BaseCommand):
     help = (
-        "Creates a project directory structure for the given investing_algorithm_framework instance in the current "
+        "Creates a project directory structure for the given "
+        "investing_algorithm_framework instance in the current "
         "directory or optionally in the given directory."
     )
 
@@ -18,10 +21,8 @@ class CreateStandardAlgorithmCommand(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('name', help='Name of the algorithm/project.')
-        parser.add_argument('directory', nargs='?', help='Optional destination directory')
         parser.add_argument(
-            '--template_creator',
-            help='Optional template creator plugin, provided by third party libraries'
+            'directory', nargs='?', help='Optional destination directory'
         )
 
     def handle(self, **options) -> None:
@@ -39,8 +40,9 @@ class CreateStandardAlgorithmCommand(BaseCommand):
 
             if os.path.isdir(directory):
                 raise ImproperlyConfigured(
-                    "Directory {} already exists. Please make sure that the project "
-                    "name does not correspond to an existing directory".format(str(directory))
+                    "Directory {} already exists. Please make sure that "
+                    "the project name does not correspond to an existing "
+                    "directory".format(str(directory))
                 )
 
             os.mkdir(directory)
@@ -50,7 +52,8 @@ class CreateStandardAlgorithmCommand(BaseCommand):
 
             if not os.path.exists(directory):
                 raise CommandError(
-                    "Destination directory {} does not exist, please create it first.".format(str(directory))
+                    "Destination directory {} does not exist, please "
+                    "create it first.".format(str(directory))
                 )
 
         # Use default investing_algorithm_framework creator
@@ -70,9 +73,12 @@ class CreateStandardAlgorithmCommand(BaseCommand):
         if name is None:
             raise CommandError("you must provide a project name")
 
-        if not re.match("^[a-zA-Z]+\w*$", name):
-            raise CommandError("{} is not allowed, value must begin with a letter and "
-                               "only contains the characters of 0-9, A-Z, a-z and _".format(name))
+        if not re.match("^[a-zA-Z_.-]+$", name):
+            raise CommandError(
+                "{} is not allowed, value must begin with a letter and "
+                "only contains the characters of A-Z, "
+                "a-z and _".format(name)
+            )
 
         # Make sure it can't be imported
         try:

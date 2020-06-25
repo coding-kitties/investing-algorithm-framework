@@ -5,13 +5,15 @@ from investing_algorithm_framework.core.exceptions import ImproperlyConfigured
 
 class Template:
     """
-    A template class is responsible for creating a templates for the investing_algorithm_framework.
+    A template class is responsible for creating a templates for the
+    investing_algorithm_framework.
     """
 
     def __init__(self, bot_project_directory: str, bot_name: str) -> None:
         """
-        investing_algorithm_framework project directory is the root directory of the given
-        investing_algorithm_framework. The algorithm_name will be the same as the root project directory. For
+        investing_algorithm_framework project directory is the root
+        directory of the given investing_algorithm_framework. The
+        algorithm_name will be the same as the root project directory. For
         simplicity it is explicitly passed as a parameter
         """
 

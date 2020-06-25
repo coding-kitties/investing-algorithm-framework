@@ -16,8 +16,9 @@ class ScheduledWorker(Worker, ABC):
 
     def get_time_interval(self) -> int:
         assert getattr(self, 'time_interval', None) is not None, (
-            "{} should either include a time_interval attribute, or override the "
-            "`get_time_interval()`, method.".format(self.__class__.__name__)
+            "{} should either include a time_interval attribute, or "
+            "override the `get_time_interval()`, "
+            "method.".format(self.__class__.__name__)
         )
 
         return getattr(self, 'time_interval')

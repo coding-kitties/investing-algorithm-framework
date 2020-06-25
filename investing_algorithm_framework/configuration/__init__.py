@@ -4,9 +4,12 @@ from typing import Any
 from importlib import import_module
 from enum import Enum
 
-from investing_algorithm_framework.core.exceptions import ImproperlyConfigured, OperationalException
-from investing_algorithm_framework.configuration.config_constants import SETTINGS_MODULE_PATH_ENV_NAME, \
-    SETTINGS_STRATEGY_REGISTERED_APPS, SETTINGS_DATA_PROVIDER_REGISTERED_APPS, SETTINGS_LOGGING_CONFIG
+from investing_algorithm_framework.core.exceptions \
+    import ImproperlyConfigured, OperationalException
+from investing_algorithm_framework.configuration.config_constants \
+    import SETTINGS_MODULE_PATH_ENV_NAME, \
+    SETTINGS_STRATEGY_REGISTERED_APPS, SETTINGS_LOGGING_CONFIG, \
+    SETTINGS_DATA_PROVIDER_REGISTERED_APPS
 
 
 class TimeUnit(Enum):
@@ -30,13 +33,19 @@ class TimeUnit(Enum):
             elif value.lower() in ('hr', 'hour', 'hours'):
                 return TimeUnit.HOUR
 
-            elif value.lower() in ('always', 'every', 'continuous', 'every_time'):
+            elif value.lower() in (
+                    'always', 'every', 'continuous', 'every_time'
+            ):
                 return TimeUnit.ALWAYS
             else:
-                raise OperationalException('Could not convert value {} to a time_unit'.format(value))
+                raise OperationalException(
+                    'Could not convert value {} to a time_unit'.format(value)
+                )
 
         else:
-            raise OperationalException("Could not convert non string value to a time_unit")
+            raise OperationalException(
+                "Could not convert non string value to a time_unit"
+            )
 
     def equals(self, other):
 
@@ -55,7 +64,8 @@ class TimeUnit(Enum):
 
 class BaseSettings:
     """
-    Base wrapper for settings module. It will load all the default settings for a given settings module
+    Base wrapper for settings module. It will load all the default settings
+    for a given settings module
     """
 
     def __init__(self) -> None:
@@ -66,7 +76,9 @@ class BaseSettings:
         self._settings_module = settings_module
 
         if settings_module is None:
-            self.settings_module = os.environ.get(SETTINGS_MODULE_PATH_ENV_NAME)
+            self.settings_module = os.environ.get(
+                SETTINGS_MODULE_PATH_ENV_NAME
+            )
         else:
             self.settings_module = settings_module
 
@@ -88,8 +100,11 @@ class BaseSettings:
             if setting.isupper():
                 setting_value = getattr(module, setting)
 
-                if setting in tuple_settings and not isinstance(setting_value, (list, tuple)):
-                    raise ImproperlyConfigured("The %s setting must be a list or a tuple. " % setting)
+                if setting in tuple_settings and \
+                        not isinstance(setting_value, (list, tuple)):
+                    raise ImproperlyConfigured(
+                        "The {} setting must be a list or a "
+                        "tuple.".format(setting))
 
                 setattr(self, setting, setting_value)
 
@@ -114,11 +129,16 @@ class BaseSettings:
         if isinstance(item, str):
 
             if not hasattr(self, item):
-                raise OperationalException("Setting object doesn't have the specific attribute {}".format(item))
+                raise OperationalException(
+                    "Setting object doesn't have the specific "
+                    "attribute {}".format(item)
+                )
 
             return self.__getattribute__(item)
         else:
-            raise OperationalException("Settings attributes can only be referenced by string")
+            raise OperationalException(
+                "Settings attributes can only be referenced by string"
+            )
 
     def get(self, key: str, default: Any = None) -> Any:
         """

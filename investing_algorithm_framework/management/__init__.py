@@ -1,3 +1,4 @@
-from investing_algorithm_framework.management.command import BaseCommand
-from investing_algorithm_framework.management.command_manager import execute_from_command_line
+from .command import BaseCommand
+from .command_manager import execute_from_command_line
 
+__all__ = ['BaseCommand', 'execute_from_command_line']

@@ -8,7 +8,8 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.workers import Worker
 from investing_algorithm_framework.core.executors import Executor
 from investing_algorithm_framework.core.events import Observer
-from investing_algorithm_framework.configuration.config_constants import DEFAULT_MAX_WORKERS, SETTINGS_MAX_WORKERS
+from investing_algorithm_framework.configuration.config_constants \
+    import DEFAULT_MAX_WORKERS, SETTINGS_MAX_WORKERS
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,11 @@ class StrategyExecutor(Executor):
     Class StrategyExecutor: is an executor for Strategy instances.
     """
 
-    def __init__(self, strategies: List = None, max_workers: int = DEFAULT_MAX_WORKERS):
+    def __init__(
+            self,
+            strategies: List = None,
+            max_workers: int = DEFAULT_MAX_WORKERS
+    ):
         super(StrategyExecutor, self).__init__(max_workers=max_workers)
 
         self._registered_strategies: List = []
@@ -35,7 +40,8 @@ class StrategyExecutor(Executor):
 
     @property
     def configured(self):
-        return self._registered_strategies is not None and len(self._registered_strategies) > 0
+        return self._registered_strategies is not None \
+               and len(self._registered_strategies) > 0
 
 
 class StrategyScheduler(ExecutionScheduler):
@@ -80,7 +86,9 @@ class StrategyState(State, Observer):
             StrategyState.strategy_scheduler = StrategyScheduler()
 
         if not StrategyState.strategy_scheduler.configured:
-            StrategyState.strategy_scheduler.configure(self.registered_strategies)
+            StrategyState.strategy_scheduler.configure(
+                self.registered_strategies
+            )
 
         planning = StrategyState.strategy_scheduler.schedule_executions()
         planned_strategies = []
@@ -96,7 +104,9 @@ class StrategyState(State, Observer):
 
         self.strategy_executor = StrategyExecutor(
             strategies=strategies,
-            max_workers=self.context.settings.get(SETTINGS_MAX_WORKERS, DEFAULT_MAX_WORKERS)
+            max_workers=self.context.settings.get(
+                SETTINGS_MAX_WORKERS, DEFAULT_MAX_WORKERS
+            )
         )
 
         if self.strategy_executor.configured:
@@ -109,7 +119,9 @@ class StrategyState(State, Observer):
     def run(self) -> None:
 
         if self.registered_strategies is None:
-            raise OperationalException("Data providing state has not any data providers configured")
+            raise OperationalException(
+                "Data providing state has not any data providers configured"
+            )
 
         # Schedule the strategies providers
         planned_strategies = self._schedule_strategies()
@@ -123,7 +135,9 @@ class StrategyState(State, Observer):
 
         # Collect all strategies from the strategies providers
         for strategies in self.strategy_executor.registered_strategies:
-            logger.info("Strategy: {} finished running".format(strategies.get_id()))
+            logger.info("Strategy: {} finished running".format(
+                strategies.get_id())
+            )
 
     def update(self, observable, **kwargs) -> None:
         self._updated = True
@@ -133,6 +147,6 @@ class StrategyState(State, Observer):
         StrategyState.registered_strategies = strategies
 
     def get_transition_state_class(self):
-        from investing_algorithm_framework.templates.states.ordering_state import OrderingState
+        from investing_algorithm_framework.templates.states.ordering_state \
+            import OrderingState
         return OrderingState
-

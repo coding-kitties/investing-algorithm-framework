@@ -8,8 +8,8 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 
 class Singleton(type):
     """
-    Class Singleton: lets an instance that extends this class function as a Singleton.
-    Only use this in a necessarily case.
+    Class Singleton: lets an instance that extends this class function as a
+    Singleton. Only use this in a necessarily case.
     """
 
     _instances = {}
@@ -18,14 +18,17 @@ class Singleton(type):
     def __call__(cls, *args, **kwargs):
 
         if cls not in cls._instances:
-            cls._instances[cls] = super(Singleton, cls).__call__(*args, **kwargs)
+            cls._instances[cls] = super(Singleton, cls).__call__(
+                *args, **kwargs
+            )
 
         return cls._instances[cls]
 
 
 class StoppableThread(Thread):
     """
-    Class StoppableThread: Functions as a wrapper around a thread to add stop function
+    Class StoppableThread: Functions as a wrapper around a thread to add
+    stop function
     """
 
     def __init__(self, *args, **keywords):
@@ -83,13 +86,19 @@ class TimeUnit(Enum):
             elif value.lower() in ('hr', 'hour', 'hours'):
                 return TimeUnit.HOUR
 
-            elif value.lower() in ('always', 'every', 'continuous', 'every_time'):
+            elif value.lower() in (
+                    'always', 'every', 'continuous', 'every_time'
+            ):
                 return TimeUnit.ALWAYS
             else:
-                raise OperationalException('Could not convert value {} to a time_unit'.format(value))
+                raise OperationalException(
+                    'Could not convert value {} to a time_unit'.format(value)
+                )
 
         else:
-            raise OperationalException("Could not convert non string value to a time_unit")
+            raise OperationalException(
+                "Could not convert non string value to a time_unit"
+            )
 
     def equals(self, other):
 

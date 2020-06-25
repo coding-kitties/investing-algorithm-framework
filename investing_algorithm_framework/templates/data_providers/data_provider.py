@@ -9,7 +9,8 @@ logger = logging.getLogger(__name__)
 
 class DataProviderException(Exception):
     """
-    Should be raised when an data_provider related error occurs, for example if an authorization for an API fails,
+    Should be raised when an data_provider related error occurs, for
+    example if an authorization for an API fails,
     i.e.: raise DataProviderException('Provided api token is false')
     """
 
@@ -23,11 +24,13 @@ class DataProviderException(Exception):
 
 class DataProvider(ScheduledWorker):
     """
-    Class DataProvider: An entity which responsibility is to provide data from an external source.
-    Where a data_providers source is defined as any third party service that provides data e.g  cloud storage,
+    Class DataProvider: An entity which responsibility is to provide data
+    from an external source. Where a data_providers source is defined as
+    any third party service that provides data e.g  cloud storage,
     REST API, or website.
 
-    A data_provider must always be run with the start function from it´s super class. Otherwise depended
+    A data_provider must always be run with the start function from it´s
+    super class. Otherwise depended
     observers will not be updated.
     """
 
@@ -38,5 +41,3 @@ class DataProvider(ScheduledWorker):
     def work(self, **kwargs: Dict[str, Any]) -> None:
         logger.info("Starting data provider {}".format(self.get_id()))
         self.provide_data()
-
-
