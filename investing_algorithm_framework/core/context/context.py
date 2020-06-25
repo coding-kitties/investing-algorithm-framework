@@ -1,9 +1,9 @@
 from typing import Type
 
-from investing_algorithm_framework.core.configuration import settings
+from investing_algorithm_framework.configuration import settings
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.utils import Singleton
-from investing_algorithm_framework.core.states import BotState
+from investing_algorithm_framework.core.state import State
 
 
 class Context(metaclass=Singleton):
@@ -13,15 +13,15 @@ class Context(metaclass=Singleton):
     """
 
     # A reference to the current state of the context.
-    _state: BotState = None
+    _state: State = None
 
     # Settings reference
     settings = settings
 
-    def register_initial_state(self, bot_state: Type[BotState]) -> None:
-        self._state = bot_state(context=self)
+    def register_initial_state(self, state: Type[State]) -> None:
+        self._state = state(context=self)
 
-    def transition_to(self, bot_state: Type[BotState]) -> None:
+    def transition_to(self, bot_state: Type[State]) -> None:
         """
         Function to change the running BotState at runtime.
         """

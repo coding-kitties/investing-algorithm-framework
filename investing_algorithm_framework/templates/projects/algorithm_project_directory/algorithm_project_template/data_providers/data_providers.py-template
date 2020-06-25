@@ -1,0 +1,15 @@
+from investing_algorithm_framework.templates.data_providers import DataProvider
+from investing_algorithm_framework.core.utils import TimeUnit
+
+"""
+Define here all your data providers
+"""
+
+
+class MyDataProvider(DataProvider):
+    time_unit = TimeUnit.SECOND
+    time_interval = 10
+    id = 'my_data_provider'
+
+    def provide_data(self) -> None:
+        pass
