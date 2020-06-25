@@ -11,7 +11,8 @@ from investing_algorithm_framework.core.executors import ExecutionScheduler
 from investing_algorithm_framework.core.workers import Worker
 from investing_algorithm_framework.templates.data_providers import DataProvider
 from investing_algorithm_framework.core.executors import Executor
-from investing_algorithm_framework.configuration.config_constants import DEFAULT_MAX_WORKERS, SETTINGS_MAX_WORKERS
+from investing_algorithm_framework.configuration.config_constants \
+    import DEFAULT_MAX_WORKERS, SETTINGS_MAX_WORKERS
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,11 @@ class DataProviderExecutor(Executor):
     Class DataProviderExecutor: is an executor for DataProvider instances.
     """
 
-    def __init__(self, data_providers: List[DataProvider] = None, max_workers: int = DEFAULT_MAX_WORKERS):
+    def __init__(
+            self,
+            data_providers: List[DataProvider] = None,
+            max_workers: int = DEFAULT_MAX_WORKERS
+    ):
         super(DataProviderExecutor, self).__init__(max_workers=max_workers)
 
         self._registered_data_providers: List[DataProvider] = []
@@ -38,13 +43,14 @@ class DataProviderExecutor(Executor):
 
     @property
     def configured(self):
-        return self._registered_data_providers is not None and len(self._registered_data_providers) > 0
+        return self._registered_data_providers is not None \
+               and len(self._registered_data_providers) > 0
 
 
 class DataProviderScheduler(ExecutionScheduler):
     """
-    Data Provider scheduler that will function as a scheduler to make sure it keeps it state across multiple state,
-    it is defined as a Singleton.
+    Data Provider scheduler that will function as a scheduler to make sure it
+    keeps it state across multiple state, it is defined as a Singleton.
     """
 
     def __init__(self):
@@ -70,15 +76,17 @@ class DataProviderScheduler(ExecutionScheduler):
 
 class DataProvidingState(State, Observer):
     """
-    Represent the data_providers state of a bot. This state will load all the defined data_providers providers and will
-    run them.
+    Represent the data_providers state of a bot. This state will load all \
+    the defined data_providers providers and will run them.
 
-    If you want to validate the state before transitioning, provide a state validator.
+    If you want to validate the state before transitioning, provide a
+    state validator.
     """
 
     registered_data_providers: List = None
 
-    from investing_algorithm_framework.templates.states.strategy_state import StrategyState
+    from investing_algorithm_framework.templates.states.strategy_state \
+        import StrategyState
     transition_state_class = StrategyState
 
     data_provider_scheduler: DataProviderScheduler = None
@@ -88,18 +96,25 @@ class DataProvidingState(State, Observer):
         self._updated = False
         self.data_provider_executor = None
 
-        if self.registered_data_providers is None or len(self.registered_data_providers) < 1:
-            raise OperationalException("Data providing state has not any data providers configured")
+        if self.registered_data_providers is None \
+                or len(self.registered_data_providers) < 1:
+            raise OperationalException(
+                "Data providing state has not any data providers configured"
+            )
 
     def _schedule_data_providers(self) -> List[DataProvider]:
 
         if not DataProvidingState.data_provider_scheduler:
-            DataProvidingState.data_provider_scheduler = DataProviderScheduler()
+            DataProvidingState.data_provider_scheduler = \
+                DataProviderScheduler()
 
         if not DataProvidingState.data_provider_scheduler.configured:
-            DataProvidingState.data_provider_scheduler.configure(self.registered_data_providers)
+            DataProvidingState.data_provider_scheduler.configure(
+                self.registered_data_providers
+            )
 
-        planning = DataProvidingState.data_provider_scheduler.schedule_executions()
+        planning = DataProvidingState.data_provider_scheduler.\
+            schedule_executions()
         planned_data_providers = []
 
         for data_provider in self.registered_data_providers:
@@ -109,11 +124,14 @@ class DataProvidingState(State, Observer):
 
         return planned_data_providers
 
-    def _start_data_providers(self, data_providers: List[DataProvider]) -> None:
+    def _start_data_providers(self, data_providers: List[DataProvider]) \
+            -> None:
 
         self.data_provider_executor = DataProviderExecutor(
             data_providers=data_providers,
-            max_workers=self.context.settings.get(SETTINGS_MAX_WORKERS, DEFAULT_MAX_WORKERS)
+            max_workers=self.context.settings.get(
+                SETTINGS_MAX_WORKERS, DEFAULT_MAX_WORKERS
+            )
         )
 
         if self.data_provider_executor.configured:
@@ -136,8 +154,11 @@ class DataProvidingState(State, Observer):
             time.sleep(1)
 
         # Collect all data_providers from the data_providers providers
-        for data_provider in self.data_provider_executor.registered_data_providers:
-            logger.info("Data provider: {} finished running".format(data_provider.get_id()))
+        for data_provider in self.data_provider_executor\
+                .registered_data_providers:
+            logger.info("Data provider: {} finished running".format(
+                data_provider.get_id())
+            )
 
     @synchronized
     def update(self, observable, **kwargs) -> None:
@@ -146,6 +167,3 @@ class DataProvidingState(State, Observer):
     @staticmethod
     def register_data_providers(data_providers: List) -> None:
         DataProvidingState.registered_data_providers = data_providers
-
-
-

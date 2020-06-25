@@ -3,7 +3,8 @@ from collections import defaultdict
 
 from investing_algorithm_framework.management import BaseCommand
 from investing_algorithm_framework.management.utils import get_commands
-from investing_algorithm_framework.configuration.config_constants import FRAMEWORK_CORE_MODULE_NAME, FRAMEWORK_NAME
+from investing_algorithm_framework.configuration.config_constants import \
+    FRAMEWORK_CORE_MODULE_NAME, FRAMEWORK_NAME
 
 
 class HelpCommand(BaseCommand):
@@ -17,18 +18,21 @@ class HelpCommand(BaseCommand):
     def handle(self) -> Any:
         usage = [
             "",
-            "This is the command line management for the investing algorithm framework. \n"
+            "This is the command line management for the investing "
+            "algorithm framework. \n"
             "Type help <sub_command>' for help on a specific sub command.",
             "",
             "Available sub commands:",
         ]
 
-        # The command list will be entries based on app name with corresponding commands list
+        # The command list will be entries based on app name with
+        # corresponding commands list
         commands_dict = defaultdict(lambda: [])
 
         for name, app in get_commands().items():
 
-            # Change the module name to the framework name for nice presentation
+            # Change the module name to the framework name for
+            # nice presentation
             if app == FRAMEWORK_CORE_MODULE_NAME:
                 app = FRAMEWORK_NAME
 

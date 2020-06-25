@@ -8,7 +8,8 @@ logger = logging.getLogger(__name__)
 
 class SetupState(State):
 
-    from investing_algorithm_framework.templates.states.data_providing_state import DataProvidingState
+    from investing_algorithm_framework.templates.states.data_providing_state \
+        import DataProvidingState
     transition_state_class = DataProvidingState
 
     def __init__(self, context):
@@ -17,18 +18,13 @@ class SetupState(State):
     def run(self) -> None:
         """
         Running the setup state.
-
-        During execution a validation will be performed on:
-
-        - DataProviders
         """
 
         # Load the settings
         if not self.context.settings.configured:
             raise ImproperlyConfigured(
-                "Settings module is not specified, make sure you have setup a investing_algorithm_framework project "
-                "and the investing_algorithm_framework is valid or that you have specified the settings module in your "
-                "manage.py-template file"
+                "Settings module is not specified, make sure you have setup "
+                "a investing_algorithm_framework project and the "
+                "investing_algorithm_framework is valid or that you have "
+                "specified the settings module in your manage.py-template file"
             )
-
-

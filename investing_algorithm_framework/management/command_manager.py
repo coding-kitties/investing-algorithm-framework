@@ -19,7 +19,8 @@ class ManagementUtility:
         self.program_name = os.path.basename(self.argv[0])
 
         if self.program_name == '__main__.py':
-            self.program_name = 'python -m investing-investing_algorithm_framework'
+            self.program_name = 'python -m ' \
+                                'investing-investing_algorithm_framework'
         self.settings_exception = None
 
     def execute(self) -> None:
@@ -31,23 +32,29 @@ class ManagementUtility:
         try:
             sub_command = self.argv[1]
         except IndexError:
-            sub_command = 'help'  # Display help by default if no arguments are given.
+            # Display help by default if no arguments are given.
+            sub_command = 'help'
 
         try:
             # Run the command if it is not a help command
-            if sub_command.lower() not in ['help', '-help', '--help', 'h', '-h']:
-                response = self.fetch_command(sub_command).run_from_argv(self.argv)
+            if sub_command.lower() not in [
+                'help', '-help', '--help', 'h', '-h'
+            ]:
+                response = self.fetch_command(sub_command).\
+                    run_from_argv(self.argv)
             else:
                 # Help for sub command
                 if len(self.argv) > 2:
 
-                    # make the first argument the sub command and the second argument the help option
+                    # make the first argument the sub command and the second
+                    # argument the help option
                     sub_command = self.argv[2]
                     option = '--help'
 
                     self.argv[1] = sub_command
                     self.argv[2] = option
-                    response = self.fetch_command(sub_command).run_from_argv(self.argv)
+                    response = self.fetch_command(sub_command)\
+                        .run_from_argv(self.argv)
                 else:
                     # Show general help command
                     command = HelpCommand()
@@ -57,7 +64,8 @@ class ManagementUtility:
 
         sys.stdout.write(response)
 
-    def fetch_command(self, sub_command: str) -> BaseCommand:
+    @staticmethod
+    def fetch_command(sub_command: str) -> BaseCommand:
         commands = get_commands()
 
         if sub_command not in commands:

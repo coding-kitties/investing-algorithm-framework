@@ -2,9 +2,6 @@ import os
 from typing import Any
 from argparse import ArgumentParser
 from abc import abstractmethod, ABC
-from colorama import Fore
-
-from investing_algorithm_framework.core.exceptions import ImproperlyConfigured
 
 
 class CommandError(Exception):
@@ -25,7 +22,13 @@ class CommandParser(ArgumentParser):
     command is called programmatically.
     """
 
-    def __init__(self, *, missing_args_message=None, called_from_command_line=None, **kwargs):
+    def __init__(
+            self,
+            *,
+            missing_args_message=None,
+            called_from_command_line=None,
+            **kwargs
+    ):
         self.missing_args_message = missing_args_message
         self.called_from_command_line = called_from_command_line
         super().__init__(**kwargs)
@@ -33,7 +36,8 @@ class CommandParser(ArgumentParser):
     def parse_args(self, args=None, namespace=None):
         # Catch missing argument for a better error message
 
-        if self.missing_args_message and not (args or any(not arg.startswith('-') for arg in args)):
+        if self.missing_args_message and not \
+                (args or any(not arg.startswith('-') for arg in args)):
             self.error(self.missing_args_message)
         return super().parse_args(args, namespace)
 
@@ -50,7 +54,8 @@ class BaseCommand(ABC):
     success_message = ''
     _called_from_command_line = False
 
-    def create_parser(self, program_name, sub_command, **kwargs) -> CommandParser:
+    def create_parser(self, program_name, sub_command, **kwargs) \
+            -> CommandParser:
         """
         Create and return the ``ArgumentParser`` which will be used to
         parse the arguments to this command.
@@ -59,7 +64,9 @@ class BaseCommand(ABC):
             prog='%s %s' % (os.path.basename(program_name), sub_command),
             description=self.help_message or None,
             missing_args_message=getattr(self, 'missing_args_message', None),
-            called_from_command_line=getattr(self, '_called_from_command_line', None),
+            called_from_command_line=getattr(
+                self, '_called_from_command_line', None
+            ),
             **kwargs
         )
 

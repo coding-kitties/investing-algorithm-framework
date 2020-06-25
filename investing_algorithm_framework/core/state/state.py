@@ -6,8 +6,9 @@ from investing_algorithm_framework.core.validators import StateValidator
 
 class State(ABC):
     """
-    Represents a state of the Bot, these state are use by the BotContext. Each implemented state represents a work
-    mode for the investing_algorithm_framework.
+    Represents a state of the Bot, these state are use by the BotContext.
+    Each implemented state represents a work mode for the
+    investing_algorithm_framework.
     """
 
     # Transition state for the next BotState
@@ -64,8 +65,9 @@ class State(ABC):
     def get_transition_state_class(self):
 
         assert getattr(self, 'transition_state_class', None) is not None, (
-            "{} should either include a transition_state_class attribute, or override the "
-            "`get_transition_state_class()`, method.".format(self.__class__.__name__)
+            "{} should either include a transition_state_class attribute, "
+            "or override the `get_transition_state_class()`, "
+            "method.".format(self.__class__.__name__)
         )
 
         return self.transition_state_class
@@ -74,14 +76,16 @@ class State(ABC):
 
         if self.pre_state_validators is not None:
             return [
-                state_validator() for state_validator in getattr(self, 'pre_state_validators')
-                if issubclass(state_validator, StateValidator)
+                state_validator() for state_validator in getattr(
+                    self, 'pre_state_validators'
+                ) if issubclass(state_validator, StateValidator)
             ]
 
     def get_post_state_validators(self) -> List[StateValidator]:
 
         if self.post_state_validators is not None:
             return [
-                state_validator() for state_validator in getattr(self, 'post_state_validators')
-                if issubclass(state_validator, StateValidator)
+                state_validator() for state_validator in getattr(
+                    self, 'post_state_validators'
+                ) if issubclass(state_validator, StateValidator)
             ]

@@ -1,4 +1,5 @@
-from investing_algorithm_framework.templates.order_executors import OrderExecutor
+from investing_algorithm_framework.templates.order_executors \
+    import OrderExecutor
 
 
 class MyOrderExecutor(OrderExecutor):

@@ -18,8 +18,10 @@ def find_commands(management_dir: str) -> List[str]:
     """
 
     command_dir = os.path.join(management_dir, 'commands')
-    return [name for _, name, is_pkg in pkgutil.iter_modules([command_dir])
-            if not is_pkg and not name.startswith('_')]
+    return [
+        name for _, name, is_pkg in pkgutil.iter_modules([command_dir])
+        if not is_pkg and not name.startswith('_')
+    ]
 
 
 @functools.lru_cache(maxsize=None)
@@ -29,7 +31,10 @@ def get_commands() -> Dict[str, str]:
     """
 
     # Base commands
-    commands = {name: 'investing_algorithm_framework.management' for name in find_commands(os.path.join(os.path.dirname(__file__)))}
+    commands = {
+        name: 'investing_algorithm_framework.management'
+        for name in find_commands(os.path.join(os.path.dirname(__file__)))
+    }
 
     if not settings.configured:
         return commands
