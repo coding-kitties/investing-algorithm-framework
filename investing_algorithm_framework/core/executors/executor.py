@@ -8,7 +8,7 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.utils import StoppableThread
 from investing_algorithm_framework.core.events.observer import Observer
 from investing_algorithm_framework.core.events.observable import Observable
-from investing_algorithm_framework.core.configuration.config_constants import DEFAULT_MAX_WORKERS
+from investing_algorithm_framework.configuration.config_constants import DEFAULT_MAX_WORKERS
 
 
 class Executor(Observable, Observer, ABC):
