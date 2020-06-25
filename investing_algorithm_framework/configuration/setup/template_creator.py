@@ -21,8 +21,8 @@ class TemplateCreator(Template, ABC):
     @abstractmethod
     def create(self) -> None:
         """
-        Create here the template, it is recommended to first call the configure method, this will check if
-        everything is setup correctly.
+        Create here the template, it is recommended to first call the configure
+        method, this will check if everything is setup correctly.
         """
 
         pass
@@ -37,5 +37,3 @@ class TemplateCreator(Template, ABC):
             st = os.stat(filename)
             new_permissions = stat.S_IMODE(st.st_mode) | stat.S_IWUSR
             os.chmod(filename, new_permissions)
-
-

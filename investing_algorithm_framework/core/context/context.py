@@ -8,8 +8,9 @@ from investing_algorithm_framework.core.state import State
 
 class Context(metaclass=Singleton):
     """
-    The Context defines the current state of the running algorithms. It also maintains a reference to an instance of a
-    state subclass, which represents the current state of the context instance.
+    The Context defines the current state of the running algorithms. It
+    also maintains a reference to an instance of a state subclass, which
+    represents the current state of the context instance.
     """
 
     # A reference to the current state of the context.
@@ -36,8 +37,9 @@ class Context(metaclass=Singleton):
 
             if raise_exception:
                 raise OperationalException(
-                    "Context doesn't have a state. Make sure that you set the state either "
-                    "by initializing it or making sure that you transition to a new valid state."
+                    "Context doesn't have a state. Make sure that you set "
+                    "the state either by initializing it or making sure that "
+                    "you transition to a new valid state."
                 )
             else:
                 return False
@@ -59,4 +61,3 @@ class Context(metaclass=Singleton):
         self._state.start()
         transition_state = self._state.get_transition_state_class()
         self.transition_to(transition_state)
-

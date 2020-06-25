@@ -2,23 +2,27 @@ import os
 from typing import Any
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Query, class_mapper, sessionmaker, scoped_session, Session
+from sqlalchemy.orm import Query, class_mapper, sessionmaker, scoped_session, \
+    Session
 from sqlalchemy.orm.exc import UnmappedClassError
 from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm.exc import DetachedInstanceError
 from sqlalchemy.exc import DatabaseError
 
 from investing_algorithm_framework.configuration import settings
-from investing_algorithm_framework.configuration.config_constants import BASE_DIR, DATABASE_NAME
-from investing_algorithm_framework.core.exceptions import DatabaseOperationalException
+from investing_algorithm_framework.configuration.config_constants import \
+    BASE_DIR, DATABASE_NAME
+from investing_algorithm_framework.core.exceptions import \
+    DatabaseOperationalException
 
 
 class _SessionProperty:
     """
     Wrapper for session property of a Model
 
-    To make sure that each thread gets an scoped session, a new scoped session is created if a new thread
-    accesses the session property of a Model.
+    To make sure that each thread gets an scoped session, a new scoped
+    session is created if a new thread accesses the session property of
+    a Model.
     """
     def __init__(self, db):
         self.db = db
@@ -31,7 +35,8 @@ class _QueryProperty:
     """
     Wrapper for query property of a Model
 
-    This wrapper makes sure that each model gets a Query object with a correct session corresponding to its thread.
+    This wrapper makes sure that each model gets a Query object with a
+    correct session corresponding to its thread.
     """
     def __init__(self, db):
         self.db = db
@@ -139,7 +144,9 @@ class DatabaseResolver:
         database_name = settings.get(DATABASE_NAME)
 
         if database_name is not None:
-            self.database_path = os.path.join(base_dir, database_name, '.sqlite3')
+            self.database_path = os.path.join(
+                base_dir, database_name, '.sqlite3'
+            )
         else:
             self.database_path = os.path.join(base_dir, 'db.sqlite3')
 
@@ -171,7 +178,3 @@ class DatabaseResolver:
 
     def initialize_tables(self):
         self._model.metadata.create_all(self.engine)
-
-
-
-
