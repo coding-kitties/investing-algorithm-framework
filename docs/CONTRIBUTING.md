@@ -47,14 +47,6 @@ pytest tests/test_<file_name>.py::test_<method_name>
 flake8 investing_algorithm_framework
 ```
 
-### 3. Test if all type-hints are correct
-
-#### Run mypy
-
-``` bash
-mypy investing_algorithm_framework
-```
-
 ### Process: Your own code changes
 
 All code changes, regardless of who does them, need to be reviewed and merged by someone else.
