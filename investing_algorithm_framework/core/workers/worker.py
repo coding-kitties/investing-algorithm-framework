@@ -1,8 +1,13 @@
+import logging
 from abc import abstractmethod, ABC
 from typing import Dict, Any
+from wrapt import synchronized
+from datetime import datetime
 
 from investing_algorithm_framework.core.events.observable import Observable
 from investing_algorithm_framework.core.events.observer import Observer
+
+logger = logging.getLogger('investing_algorithm_framework')
 
 
 class Worker(Observable, ABC):
@@ -12,6 +17,7 @@ class Worker(Observable, ABC):
     """
 
     id = None
+    last_run: datetime = None
 
     def start(self, **kwargs: Dict[str, Any]) -> None:
         """
@@ -19,8 +25,11 @@ class Worker(Observable, ABC):
         it is finished
         """
 
+        logger.info("Starting worker {}".format(self.get_id()))
         self.work(**kwargs)
         self.notify_observers()
+        self.update_last_run()
+        logger.info("Worker {} finished".format(self.get_id()))
 
     @abstractmethod
     def work(self, **kwargs: Dict[str, Any]) -> None:
@@ -42,3 +51,17 @@ class Worker(Observable, ABC):
         )
 
         return getattr(self, 'id')
+
+    @classmethod
+    @synchronized
+    def update_last_run(cls) -> None:
+        """
+        Update last run, this function is synchronized, which means that
+        different instances can update the last_run attribute from different
+        threads.
+        """
+        cls.last_run = datetime.now()
+
+    @classmethod
+    def get_last_run(cls):
+        return cls.last_run

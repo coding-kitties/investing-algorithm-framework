@@ -10,11 +10,9 @@ from investing_algorithm_framework.configuration.setup.\
 
 
 class CreateStandardAlgorithmCommand(BaseCommand):
-    help = (
-        "Creates a project directory structure for the given "
-        "investing_algorithm_framework instance in the current "
-        "directory or optionally in the given directory."
-    )
+    help = "Creates a project directory structure for the given " \
+           "investing_algorithm_framework instance in the current " \
+           "directory or optionally in the given directory."
 
     missing_args_message = "You must provide a project name."
     success_message = "Algorithm created and initialized."
@@ -42,7 +40,7 @@ class CreateStandardAlgorithmCommand(BaseCommand):
                 raise ImproperlyConfigured(
                     "Directory {} already exists. Please make sure that "
                     "the project name does not correspond to an existing "
-                    "directory".format(str(directory))
+                    "directory.".format(str(directory))
                 )
 
             os.mkdir(directory)
@@ -71,13 +69,13 @@ class CreateStandardAlgorithmCommand(BaseCommand):
         """
 
         if name is None:
-            raise CommandError("you must provide a project name")
+            raise CommandError("you must provide a project name.")
 
         if not re.match("^[a-zA-Z_.-]+$", name):
             raise CommandError(
                 "{} is not allowed, value must begin with a letter and "
                 "only contains the characters of A-Z, "
-                "a-z and _".format(name)
+                "a-z and _ .".format(name)
             )
 
         # Make sure it can't be imported
