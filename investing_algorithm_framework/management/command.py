@@ -89,6 +89,8 @@ class BaseCommand(ABC):
         if response is None and self.success_message is not None:
             return self.success_message
 
+        return response
+
     @abstractmethod
     def handle(self, *args, **options) -> Any:
         """

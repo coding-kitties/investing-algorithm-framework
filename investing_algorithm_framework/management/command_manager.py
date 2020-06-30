@@ -42,6 +42,7 @@ class ManagementUtility:
             ]:
                 response = self.fetch_command(sub_command).\
                     run_from_argv(self.argv)
+                response = format_success_message(response)
             else:
                 # Help for sub command
                 if len(self.argv) > 2:
@@ -55,10 +56,12 @@ class ManagementUtility:
                     self.argv[2] = option
                     response = self.fetch_command(sub_command)\
                         .run_from_argv(self.argv)
+                    response = format_success_message(response)
                 else:
                     # Show general help command
                     command = HelpCommand()
                     response = command.run_from_argv(self.argv)
+                    response = format_success_message(response)
         except Exception as e:
             response = format_error_message(str(e))
 

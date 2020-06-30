@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/investing-algorithms/investing-algorithm-framework.svg?branch=master)](https://travis-ci.org/investing-algorithms/investing-algorithm-framework)
+[![Build Status](https://travis-ci.org/coding-kitties/investing-algorithm-framework.svg?branch=master)](https://travis-ci.org/investing-algorithms/investing-algorithm-framework)
 
 # Investing Algorithm Framework
 
