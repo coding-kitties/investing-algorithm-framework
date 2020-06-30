@@ -1,4 +1,4 @@
 from investing_algorithm_framework.templates.strategies.strategy \
-    import Strategy
+    import Strategy, ScheduledStrategy, RelationalStrategy
 
-__all__ = ['Strategy']
+__all__ = ['Strategy', 'ScheduledStrategy', 'RelationalStrategy']

@@ -1,68 +1,90 @@
-from threading import active_count
 from time import sleep
+from typing import Dict, Any
 
-from tests.core.executors.resources import TestExecutor, TestWorkerOne, TestWorkerTwo, \
-    TestObserver, TestWorkerThree
+from investing_algorithm_framework.core.executors import Executor
+from investing_algorithm_framework.core.events import Observer
+from investing_algorithm_framework.core.workers import Worker
 
 
-class TestStandardExecutor:
+class TestWorkerOne(Worker):
+    id = 'TestWorkerOne'
 
-    def test(self) -> None:
-        executor = TestExecutor(workers=[TestWorkerOne(), TestWorkerTwo()])
-        observer = TestObserver()
-        executor.add_observer(observer)
+    def work(self, **kwargs: Dict[str, Any]) -> None:
+        # Simulate some work
+        sleep(1)
 
-        # Make sure the initialization is correct
-        assert len(executor.registered_workers) == 2
-        assert active_count() == 1
 
-        # Start the executor
-        executor.start()
+class TestWorkerTwo(Worker):
+    id = 'TestWorkerTwo'
 
-        # 3 Threads must be running
-        assert executor.processing
-        assert active_count() == 3
+    def work(self, **kwargs: Dict[str, Any]) -> None:
+        # Simulate some work
+        sleep(1)
 
-        sleep(3)
 
-        # # After finishing only 1 thread must be active
-        assert active_count(), 1
-        assert not executor.processing
+class TestWorkerThree(Worker):
+    id = 'TestWorkerThree'
 
-        # Observer must have been updated by the executor
-        assert observer.update_count == 1
+    def work(self, **kwargs: Dict[str, Any]) -> None:
+        # Simulate some work
+        sleep(1)
 
-        # Start the executor
-        executor.start()
 
-        # 3 Threads must be running
-        assert executor.processing
-        assert active_count() == 3
+class TestObserver(Observer):
 
-        sleep(2)
+    def __init__(self):
+        self.update_count = 0
 
-        # After finishing only 1 thread must be active
-        assert active_count() == 1
-        assert not executor.processing
+    def update(self, observable, **kwargs) -> None:
+        self.update_count += 1
 
-        # Observer must have been updated by the executor
-        assert observer.update_count == 2
 
-        executor = TestExecutor(workers=[TestWorkerOne(), TestWorkerTwo(), TestWorkerThree()])
-        executor.add_observer(observer)
+def test() -> None:
+    test_worker_observer = TestObserver()
+    test_worker_one = TestWorkerOne()
+    test_worker_one.add_observer(test_worker_observer)
+    test_worker_two = TestWorkerTwo()
+    test_worker_two.add_observer(test_worker_observer)
+    test_worker_three = TestWorkerThree()
+    test_worker_three.add_observer(test_worker_observer)
 
-        # Start the executor
-        executor.start()
+    executor = Executor(workers=[test_worker_one, test_worker_two])
+    test_executor_observer = TestObserver()
+    executor.add_observer(test_executor_observer)
 
-        # 3 Threads must be running
-        assert executor.processing
-        assert active_count() == 3
+    # Make sure the initialization is correct
+    assert len(executor.workers) == 2
 
-        sleep(4)
+    # Start the executor
+    executor.start()
 
-        # After finishing only 1 thread must be active
-        assert active_count(), 1
-        assert not executor.processing
+    # 3 Threads must be running
+    sleep(3)
 
-        # Observer must have been updated by the executor
-        assert observer.update_count == 3
+    # Observers must have been updated by the executor
+    assert test_executor_observer.update_count == 1
+    assert test_worker_observer.update_count == 2
+
+    # Start the executor
+    executor.start()
+
+    sleep(3)
+
+    # Observer must have been updated by the executor
+    assert test_executor_observer.update_count == 2
+    assert test_worker_observer.update_count == 4
+
+    executor = Executor(
+        workers=[test_worker_one, test_worker_two, test_worker_three]
+    )
+    executor.add_observer(test_executor_observer)
+
+    # Start the executor
+    executor.start()
+
+    sleep(4)
+
+    # Observers must have been updated by the executor
+    assert test_executor_observer.update_count == 3
+    assert test_worker_observer.update_count == 7
+

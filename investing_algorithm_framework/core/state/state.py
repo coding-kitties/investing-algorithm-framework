@@ -6,9 +6,9 @@ from investing_algorithm_framework.core.validators import StateValidator
 
 class State(ABC):
     """
-    Represents a state of the Bot, these state are use by the BotContext.
-    Each implemented state represents a work mode for the
-    investing_algorithm_framework.
+    Represents a state of the context, these state are use by the Context.
+    Each implemented state represents a work mode for a application created
+    with investing_algorithm_framework.
     """
 
     # Transition state for the next BotState
@@ -24,7 +24,7 @@ class State(ABC):
     def start(self):
 
         # Will stop the state if pre-conditions are not met
-        if not self.validate_state():
+        if not self.validate_state(pre_state=True):
             return
 
         while True:

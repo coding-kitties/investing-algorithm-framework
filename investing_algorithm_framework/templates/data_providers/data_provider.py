@@ -1,43 +1,60 @@
-import logging
 from typing import Dict, Any
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 
-from investing_algorithm_framework.core.workers import ScheduledWorker
+from investing_algorithm_framework.core.workers import ScheduledWorker, \
+    Worker, RelationalWorker
 
-logger = logging.getLogger(__name__)
 
-
-class DataProviderException(Exception):
+class DataProviderInterface:
     """
-    Should be raised when an data_provider related error occurs, for
-    example if an authorization for an API fails,
-    i.e.: raise DataProviderException('Provided api token is false')
+    Class DataProviderInterface: interface for data provider implementation,
+    this interface can be used to implement a data provider. A client then
+    knows which method to call when presented with a 'data provider'
     """
-
-    def __init__(self, message: str) -> None:
-        super().__init__(self)
-        self.message = message
-
-    def __str__(self) -> str:
-        return self.message
-
-
-class DataProvider(ScheduledWorker):
-    """
-    Class DataProvider: An entity which responsibility is to provide data
-    from an external source. Where a data_providers source is defined as
-    any third party service that provides data e.g  cloud storage,
-    REST API, or website.
-
-    A data_provider must always be run with the start function from it´s
-    super class. Otherwise depended
-    observers will not be updated.
-    """
-
     @abstractmethod
     def provide_data(self) -> None:
         pass
 
+
+class DataProvider(DataProviderInterface, Worker, ABC):
+    """
+    Class DataProvider: makes use of the abstract Worker class and inherits the
+    interface of of the DataProviderInterface.
+
+    This is a Worker instance.
+    """
+
     def work(self, **kwargs: Dict[str, Any]) -> None:
-        logger.info("Starting data provider {}".format(self.get_id()))
+
+        # Call DataProviderInterface
+        self.provide_data()
+
+
+class ScheduledDataProvider(DataProviderInterface, ScheduledWorker, ABC):
+    """
+    Class ScheduledDataProvider: makes use of the abstract ScheduledWorker
+    class and inherits the interface of of the DataProviderInterface.
+
+    This is a ScheduledWorker instance, and therefore you must set the
+    'time_unit' class attribute and the 'time_interval' class attribute.
+    """
+
+    def work(self, **kwargs: Dict[str, Any]) -> None:
+
+        # Call DataProviderInterface
+        self.provide_data()
+
+
+class RelationalDataProvider(RelationalWorker, DataProviderInterface, ABC):
+    """
+    Class RelationalDataProvider: makes use of the abstract RelationalWorker
+    class and inherits the interface of of the DataProviderInterface.
+
+    This is a RelationalWorker instance, and therefore you must link it to
+    another worker instance, by setting the 'run_after' class attribute.
+    """
+
+    def work(self, **kwargs: Dict[str, Any]) -> None:
+
+        # Call DataProviderInterface
         self.provide_data()
