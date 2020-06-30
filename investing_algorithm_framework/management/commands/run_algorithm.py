@@ -8,16 +8,10 @@ from investing_algorithm_framework.configuration import settings
 
 
 class RunAlgorithmCommand(BaseCommand):
-    help_message = (
-        "Runs a instance of an algorithm created with the "
-        "investing_algorithm_framework, by default it will run "
-        "until stopped, if cycles is specified it will run the according "
-        "to the amount of cycles"
-    )
+    help_message = "Runs an instance of an algorithm created with the " \
+                   "investing_algorithm_framework."
 
-    success_message = (
-        "Algorithm is finished running"
-    )
+    success_message = "Algorithm is finished running."
 
     def add_arguments(self, parser) -> None:
         pass

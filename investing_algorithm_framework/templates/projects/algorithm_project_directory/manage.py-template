@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
-Investing algorithm framework's command-line utility for administrative tasks.
+Investing algorithm framework's command-line utility for framework related
+tasks.
 """
 
 import os
@@ -19,7 +20,7 @@ def main():
             execute_from_command_line
     except ImportError as exc:
         raise ImportError(
-            "Couldn't import investing_bot_framework. Are you sure it's "
+            "Couldn't import investing_algorithm_framework. Are you sure it's "
             "installed and available on your PYTHONPATH environment variable? "
             "Did you forget to activate a virtual environment?"
         ) from exc
