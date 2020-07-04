@@ -1,16 +1,17 @@
 from investing_algorithm_framework.templates.strategies \
-    import ScheduledStrategy
-from investing_algorithm_framework.core.utils import TimeUnit
+    import RelationalStrategy
+
+from {{ project_name }}.data_providers.data_providers import MyDataProvider
+from {{ project_name }}.configuration.extensions import logger
 
 """
 Define here all your strategies
 """
 
 
-class MyStrategy(ScheduledStrategy):
-    time_unit = TimeUnit.SECOND
-    time_interval = 10
+class MyStrategy(RelationalStrategy):
     id = 'my_strategy'
+    run_after = MyDataProvider
 
     def apply_strategy(self) -> None:
-        pass
+        logger.info("Running Strategy: {}".format(self.get_id()))

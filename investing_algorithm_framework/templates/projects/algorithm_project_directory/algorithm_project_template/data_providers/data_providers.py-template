@@ -2,6 +2,8 @@ from investing_algorithm_framework.templates.data_providers import \
     ScheduledDataProvider
 from investing_algorithm_framework.core.utils import TimeUnit
 
+from {{ project_name }}.configuration.extensions import logger
+
 """
 Define here all your data providers
 """
@@ -13,4 +15,4 @@ class MyDataProvider(ScheduledDataProvider):
     id = 'my_data_provider'
 
     def provide_data(self) -> None:
-        pass
+        logger.info("Running data provider: {}".format(self.get_id()))

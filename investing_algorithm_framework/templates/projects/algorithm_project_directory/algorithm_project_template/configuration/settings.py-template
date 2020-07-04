@@ -55,5 +55,9 @@ LOGGING = {
             'level': logging_level,
             'handlers': ['console', 'file'],
         },
+        'investing_algorithm_framework': {
+            'level': 'WARNING',
+            'handlers': ['console', 'file'],
+        }
     },
 }
