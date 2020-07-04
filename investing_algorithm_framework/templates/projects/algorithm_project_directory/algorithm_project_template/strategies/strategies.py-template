@@ -1,4 +1,5 @@
-from investing_algorithm_framework.templates.strategies import Strategy
+from investing_algorithm_framework.templates.strategies \
+    import ScheduledStrategy
 from investing_algorithm_framework.core.utils import TimeUnit
 
 """
@@ -6,7 +7,7 @@ Define here all your strategies
 """
 
 
-class MyStrategy(Strategy):
+class MyStrategy(ScheduledStrategy):
     time_unit = TimeUnit.SECOND
     time_interval = 10
     id = 'my_strategy'
