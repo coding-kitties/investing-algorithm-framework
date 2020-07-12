@@ -10,7 +10,7 @@ Define here all your order executors
 
 
 class MyOrderExecutor(RelationalOrderExecutor):
-    id = 'MyOrderExecutor'
+    id = 'my_order_executor'
     run_after = MyStrategy
 
     def execute_orders(self) -> None:
