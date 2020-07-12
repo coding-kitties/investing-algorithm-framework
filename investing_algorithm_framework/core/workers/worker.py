@@ -6,8 +6,10 @@ from datetime import datetime
 
 from investing_algorithm_framework.core.events.observable import Observable
 from investing_algorithm_framework.core.events.observer import Observer
+from investing_algorithm_framework.configuration.config_constants \
+    import FRAMEWORK_NAME
 
-logger = logging.getLogger('investing_algorithm_framework')
+logger = logging.getLogger(FRAMEWORK_NAME)
 
 
 class Worker(Observable, ABC):
@@ -25,10 +27,21 @@ class Worker(Observable, ABC):
         it is finished
         """
 
-        logger.info("Starting worker {}".format(self.get_id()))
-        self.work(**kwargs)
-        self.notify_observers()
-        self.update_last_run()
+        try:
+            logger.info("Starting worker {}".format(self.get_id()))
+        except Exception as e:
+            logger.exception(e)
+            return
+
+        try:
+            self.work(**kwargs)
+            self.notify_observers()
+            self.update_last_run()
+        except Exception as e:
+            logger.error("Error occurred in worker {}".format(self.get_id()))
+            logger.exception(e)
+            self.update_last_run()
+
         logger.info("Worker {} finished".format(self.get_id()))
 
     @abstractmethod
