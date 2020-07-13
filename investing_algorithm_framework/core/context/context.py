@@ -1,9 +1,14 @@
+import logging
 from typing import Type
 
-from investing_algorithm_framework.configuration import settings
+from investing_algorithm_framework.configuration import ContextConfiguration
+from investing_algorithm_framework.configuration.config_constants import \
+    FRAMEWORK_NAME
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.utils import Singleton
 from investing_algorithm_framework.core.state import State
+
+logger = logging.getLogger(FRAMEWORK_NAME)
 
 
 class Context(metaclass=Singleton):
@@ -17,16 +22,16 @@ class Context(metaclass=Singleton):
     _state: State = None
 
     # Settings reference
-    settings = settings
+    _config = ContextConfiguration()
 
     def register_initial_state(self, state: Type[State]) -> None:
         self._state = state(context=self)
 
-    def transition_to(self, bot_state: Type[State]) -> None:
+    def transition_to(self, state: Type[State]) -> None:
         """
         Function to change the running BotState at runtime.
         """
-        self._state = bot_state(context=self)
+        self._state = state(context=self)
 
     def _check_state(self, raise_exception: bool = False) -> bool:
         """
@@ -61,3 +66,7 @@ class Context(metaclass=Singleton):
         self._state.start()
         transition_state = self._state.get_transition_state_class()
         self.transition_to(transition_state)
+
+    @property
+    def config(self) -> ContextConfiguration:
+        return self._config

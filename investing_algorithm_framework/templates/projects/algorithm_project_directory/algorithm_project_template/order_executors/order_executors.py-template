@@ -1,8 +1,17 @@
 from investing_algorithm_framework.templates.order_executors \
-    import OrderExecutor
+    import RelationalOrderExecutor
+
+from {{ project_name }}.configuration.extensions import logger
+from {{ project_name }}.strategies.strategies import MyStrategy
+
+"""
+Define here all your order executors
+"""
 
 
-class MyOrderExecutor(OrderExecutor):
+class MyOrderExecutor(RelationalOrderExecutor):
+    id = 'my_order_executor'
+    run_after = MyStrategy
 
     def execute_orders(self) -> None:
-        pass
+        logger.info("Running order executor: {}".format(self.get_id()))

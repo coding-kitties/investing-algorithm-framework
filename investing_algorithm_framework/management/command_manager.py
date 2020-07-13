@@ -1,12 +1,17 @@
 import os
 import sys
 from colorama import Fore
+import logging
 
 from investing_algorithm_framework.management import BaseCommand
 from investing_algorithm_framework.core.resolvers import ClassResolver
 from investing_algorithm_framework.management.utils import get_commands
 from investing_algorithm_framework.management.commands.help import HelpCommand
 from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.configuration.config_constants \
+    import FRAMEWORK_NAME
+
+logger = logging.getLogger(FRAMEWORK_NAME)
 
 
 class ManagementUtility:
@@ -63,6 +68,7 @@ class ManagementUtility:
                     response = command.run_from_argv(self.argv)
                     response = format_success_message(response)
         except Exception as e:
+            logger.exception(e)
             response = format_error_message(str(e))
 
         sys.stdout.write(response)

@@ -21,7 +21,7 @@ class SetupState(State):
         """
 
         # Load the settings
-        if not self.context.settings.configured:
+        if not self.context.config.configured:
             raise ImproperlyConfigured(
                 "Settings module is not specified, make sure you have setup "
                 "a investing_algorithm_framework project and the "

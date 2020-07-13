@@ -4,7 +4,6 @@ from investing_algorithm_framework.management.command import BaseCommand
 from investing_algorithm_framework.core.context import Context
 from investing_algorithm_framework.configuration.config_constants import \
     SETTINGS_CONTEXT_CONFIGURATION
-from investing_algorithm_framework.configuration import settings
 
 
 class RunAlgorithmCommand(BaseCommand):
@@ -17,14 +16,14 @@ class RunAlgorithmCommand(BaseCommand):
         pass
 
     def handle(self, *args, **options) -> Any:
+        # Call the context
+        context = Context()
 
-        # configure settings
-        settings.configure()
+        # configure the configuration
+        context.config.configure()
 
         # Load the context configuration
-        __import__(settings[SETTINGS_CONTEXT_CONFIGURATION])
+        __import__(context.config[SETTINGS_CONTEXT_CONFIGURATION])
 
-        # Create an investing_algorithm_framework context of the
-        # investing_algorithm_framework and run it
-        context = Context()
+        # run the context
         context.start()

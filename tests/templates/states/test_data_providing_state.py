@@ -1,3 +1,6 @@
+from typing import Dict, Any
+
+import pytest
 from time import sleep
 from investing_algorithm_framework.templates.states.data_providing_state \
     import DataProvidingState
@@ -6,6 +9,7 @@ from investing_algorithm_framework.templates.data_providers.data_provider \
 from investing_algorithm_framework.core.utils import TimeUnit
 from investing_algorithm_framework.core.context import Context
 from investing_algorithm_framework.core.events import Observer
+from investing_algorithm_framework.core.workers import Worker
 
 
 class TestObserver(Observer):
@@ -45,6 +49,21 @@ class TestDataProviderThree(RelationalDataProvider):
         pass
 
 
+class WrongDataProviderOne:
+
+    def provide_data(self) -> None:
+        pass
+
+
+class WrongDataProviderTwo(Worker):
+
+    def work(self, **kwargs: Dict[str, Any]) -> None:
+        pass
+
+    def provide_data(self) -> None:
+        pass
+
+
 def test() -> None:
     observer = TestObserver()
     data_provider_one = TestDataProviderOne()
@@ -73,3 +92,13 @@ def test() -> None:
 
     assert len(data_providing_state.registered_data_providers) == 3
     assert observer.updated == 5
+
+    with pytest.raises(Exception):
+        data_providing_state.register_data_providers([
+            WrongDataProviderOne()
+        ])
+
+    with pytest.raises(Exception):
+        data_providing_state.register_data_providers([
+            WrongDataProviderTwo()
+        ])

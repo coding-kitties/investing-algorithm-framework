@@ -3,7 +3,11 @@ from pathlib import Path
 
 PROJECT_NAME = 'test_project'
 
+# Path that initializes the context
 CONTEXT_CONFIGURATION = 'test_project.configuration.context'
+
+# Amount of concurrent workers each state can use
+MAX_CONCURRENT_WORKERS = 2
 
 # Change this when not in development, feature or hot-fix branch
 DEBUG = int(os.environ.get('DEBUG', True))
