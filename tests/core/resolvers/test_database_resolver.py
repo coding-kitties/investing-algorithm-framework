@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, Integer
 
 from tests.resources import BaseTestMixin
 from tests.resources import utils
-from investing_algorithm_framework.configuration import settings
+from investing_algorithm_framework.configuration import ContextConfiguration
 from investing_algorithm_framework.core.extensions import db
 
 
@@ -17,8 +17,9 @@ class TestDatabaseResolverConfiguration(BaseTestMixin):
     def setup_method(self) -> None:
         self.initialize_environment()
 
-    def test_configuration(self):
-        settings.configure()
+    def test_configuration(self) -> None:
+        config_config = ContextConfiguration()
+        config_config.configure()
         db.configure()
 
         # Check if all properties are configured
@@ -29,16 +30,17 @@ class TestDatabaseResolverConfiguration(BaseTestMixin):
         assert os.path.isfile(db.database_path) == True
 
     def teardown_method(self) -> None:
-
-        if os.path.isfile(db.database_path):
-            os.remove(db.database_path)
+        pass
+        # if os.path.isfile(db.database_path):
+        #     os.remove(db.database_path)
 
 
 class TestDatabaseResolverModel(BaseTestMixin):
 
     def setup_method(self) -> None:
         self.initialize_environment()
-        settings.configure()
+        config_config = ContextConfiguration()
+        config_config.configure()
         db.configure()
         db.initialize_tables()
 

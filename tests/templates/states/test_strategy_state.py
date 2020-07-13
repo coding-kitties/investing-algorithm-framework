@@ -1,3 +1,4 @@
+import pytest
 from time import sleep
 from investing_algorithm_framework.templates.states.strategy_state \
     import StrategyState
@@ -6,6 +7,7 @@ from investing_algorithm_framework.templates.strategies \
 from investing_algorithm_framework.core.utils import TimeUnit
 from investing_algorithm_framework.core.context import Context
 from investing_algorithm_framework.core.events import Observer
+from investing_algorithm_framework.core.workers import Worker
 
 
 class TestObserver(Observer):
@@ -46,6 +48,21 @@ class TestRelationalStrategy(RelationalStrategy):
         pass
 
 
+class WrongStrategyOne:
+
+    def provide_data(self) -> None:
+        pass
+
+
+class WrongStrategyTwo(Worker):
+
+    def work(self, **kwargs) -> None:
+        pass
+
+    def provide_data(self) -> None:
+        pass
+
+
 def test() -> None:
     observer = TestObserver()
     strategy_one = TestStrategy()
@@ -73,3 +90,13 @@ def test() -> None:
 
     assert len(strategy_state.registered_strategies) == 3
     assert observer.updated == 5
+
+    with pytest.raises(Exception):
+        strategy_state.register_strategies([
+            WrongStrategyOne()
+        ])
+
+    with pytest.raises(Exception):
+        strategy_state.register_strategies([
+            WrongStrategyTwo()
+        ])

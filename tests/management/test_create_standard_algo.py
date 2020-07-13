@@ -60,6 +60,13 @@ class TestCreateAlgorithm:
                     'configuration',
                     'settings.py')
             )
+            assert os.path.isfile(
+                os.path.join(
+                    tempdir,
+                    self.project_name,
+                    'configuration',
+                    'extensions.py')
+            )
 
             # Check if all data provider files are present
             assert os.path.isfile(

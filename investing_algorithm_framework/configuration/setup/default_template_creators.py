@@ -93,12 +93,14 @@ class DefaultProjectCreator(TemplateCreator):
                 if filename in [
                     'manage.py-template',
                     'settings.py-template',
-                    'context.py-template'
+                    'context.py-template',
+                    'extensions.py-template',
+                    'data_providers.py-template',
+                    'strategies.py-template',
+                    'order_executors.py-template'
                 ]:
-
                     # Read the file
                     with open(destination_path, 'r') as file:
-
                         file_data = file.read()
 
                     # Replace the placeholder with the

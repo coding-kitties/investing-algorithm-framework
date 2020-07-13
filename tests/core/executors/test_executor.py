@@ -88,3 +88,30 @@ def test() -> None:
     assert test_executor_observer.update_count == 3
     assert test_worker_observer.update_count == 7
 
+    executor = Executor(
+        workers=[test_worker_one]
+    )
+    executor.add_observer(test_executor_observer)
+
+    # Start the executor
+    executor.start()
+
+    sleep(2)
+
+    # Observers must have been updated by the executor
+    assert test_executor_observer.update_count == 4
+    assert test_worker_observer.update_count == 8
+
+
+class TestExceptionWorker(Worker):
+
+    def work(self, **kwargs: Dict[str, Any]) -> None:
+        raise Exception("hello")
+
+
+def test_exception() -> None:
+    test_worker = TestExceptionWorker()
+    executor = Executor(workers=[test_worker])
+    test_executor_observer = TestObserver()
+    executor.add_observer(test_executor_observer)
+    executor.start()
