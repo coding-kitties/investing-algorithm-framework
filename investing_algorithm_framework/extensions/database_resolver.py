@@ -91,6 +91,8 @@ class _QueryProperty:
 
     This wrapper makes sure that each model gets a Query object with a
     correct session corresponding to its thread.
+
+
     """
     def __init__(self, db):
         self.db = db
@@ -107,8 +109,15 @@ class _QueryProperty:
 
 
 class Model(object):
+    """
+    Standard SQL alchemy model
+
+    This model is thread safe
+    """
     table_name = None
     session = None
+
+    # Needed for query property
     query_class = None
     _query = None
 
@@ -306,10 +315,14 @@ class SQLAlchemyDatabaseResolver(SQLAlchemyDatabaseResolverAbstract):
             os.mknod(database_path)
 
         database_url = self.config.get(DATABASE_URL)
-        self.engine = create_engine('sqlite:////{}'.format(database_url))
+        self.engine = create_engine(database_url)
 
 
 class DatabaseResolver(SQLAlchemyDatabaseResolverInterface):
+    """
+    Adapter of the SQLAlchemyDatabaseResolver, for the context config or
+    standard config object.
+    """
 
     def __init__(
             self, query_class=Query, model_class=Model, context: Context = None
@@ -388,92 +401,3 @@ class DatabaseResolver(SQLAlchemyDatabaseResolverInterface):
 
     def initialize_tables(self) -> None:
         self.resolver.initialize_tables()
-
-# class DatabaseResolver:
-#     """
-#     Class DatabaseResolver: resolves a database connection with the use
-#     of SQLAlchemy.
-#
-#     The DatabaseResolver implements session management across threads
-#     to resolve conflicts.
-#     """
-#
-#     def __init__(
-#             self,
-#             query_class=Query,
-#             model_class=Model,
-#             base_dir: str = None,
-#     ) -> None:
-#
-#         self.
-#         self._model = self.make_declarative_base(model_class)
-
-#         self.engine = None
-#         self.session_factory = None
-#         self.Session = None
-#         self.database_path = None
-#
-#     def configure(self):
-#         self.initialize()
-#
-#         self.session_factory = sessionmaker(bind=self.engine)
-#         self.Session = scoped_session(self.session_factory)
-#
-#         if self._model is None:
-#             raise DatabaseOperationalException("Model is not defined")
-#
-#         self._model.session = _SessionProperty(self)
-#
-#         if not getattr(self._model, 'query_class', None):
-#             self._model.query_class = self.Query
-#
-#         self._model.query = _QueryProperty(self)
-#
-#     def initialize(self):
-#
-#         if not self.config.configured:
-#             raise DatabaseOperationalException(
-#                 "Context config is not configured"
-#             )
-#
-#         database_name = self.config.get(DATA_BASE_NAME)
-#
-#         if database_name is not None:
-#             self.database_path = os.path.join(
-#                 self.config.get(BASE_DIR), database_name, '.sqlite3'
-#             )
-#         else:
-#             self.database_path = os.path.join(
-#                 self.config.get(BASE_DIR), 'db.sqlite3'
-#             )
-#
-#         # Only create the database if not exist
-#         if not os.path.isfile(self.database_path):
-#             os.mknod(self.database_path)
-#
-#         self.engine = create_engine('sqlite:////{}'.format(self.database_path))
-#
-#     @staticmethod
-#     def make_declarative_base(model_class):
-#         """
-#         Creates the declarative base that all models will inherit from.
-#         """
-#
-#         model = declarative_base(cls=model_class)
-#         return model
-#
-#     @property
-#     def session(self) -> Session:
-#         """
-#         Returns scoped session of an Session object
-#         """
-#         return self.Session()
-#
-#     @property
-#     def model(self) -> Model:
-#         return self._model
-#
-#     def initialize_tables(self):
-#         self._model.metadata.create_all(self.engine)
-
-
