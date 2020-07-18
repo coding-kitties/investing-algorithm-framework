@@ -87,6 +87,9 @@ class TestDatabaseResolver:
         id = Column(Integer, primary_key=True)
         name = Column(String)
 
+        def __repr__(self):
+            return self.repr(id=self.id, name=self.name)
+
     def test_creating(self):
         self.db.initialize_tables()
         assert len(self.TestModel.query.all()) == 0
