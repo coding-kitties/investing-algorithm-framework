@@ -24,6 +24,12 @@ class TestCreateAlgorithm:
             # Check if manage py is present
             assert os.path.isfile(os.path.join(tempdir, 'manage.py'))
 
+            # Check if docker file is present
+            assert os.path.isfile(os.path.join(tempdir, 'Dockerfile'))
+
+            # Check if requirements.txt is present
+            assert os.path.isfile(os.path.join(tempdir, 'requirements.txt'))
+
             # Check if all directories are present
             assert os.path.isdir(
                 os.path.join(tempdir, self.project_name, 'data_providers')
