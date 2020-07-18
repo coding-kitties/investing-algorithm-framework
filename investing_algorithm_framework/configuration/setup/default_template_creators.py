@@ -91,6 +91,8 @@ class DefaultProjectCreator(TemplateCreator):
 
                 # Format placeholders in file if needed
                 if filename in [
+                    'Dockerfile-template',
+                    'requirements.txt-template',
                     'manage.py-template',
                     'settings.py-template',
                     'context.py-template',
