@@ -108,7 +108,7 @@ class _QueryProperty:
             return None
 
 
-class Model(object):
+class Model:
     """
     Standard SQL alchemy model
 
@@ -154,7 +154,7 @@ class Model(object):
             self.session.rollback()
             raise
 
-    def _repr(self, **fields: Any) -> str:
+    def repr(self, **fields: Any) -> str:
         """
         Helper for __repr__
         """
@@ -163,6 +163,7 @@ class Model(object):
         at_least_one_attached_attribute = False
 
         for key, field in fields.items():
+
             try:
                 field_strings.append(f'{key}={field!r}')
             except DetachedInstanceError:
@@ -232,7 +233,7 @@ class SQLAlchemyDatabaseResolverAbstract(
         return self.Session()
 
     @property
-    def model(self) -> Model:
+    def model(self):
         return self._model
 
     def initialize_tables(self):
@@ -352,7 +353,7 @@ class DatabaseResolver(SQLAlchemyDatabaseResolverInterface):
 
             if self.context is None:
                 raise DatabaseOperationalException(
-                    "Context is not configured with DatabaseResolver instance"
+                    "There is no database configuration"
                 )
 
             if not self.context.config.configured:
@@ -364,12 +365,12 @@ class DatabaseResolver(SQLAlchemyDatabaseResolverInterface):
                 configuration = self.context.config[DATABASE_CONFIG]
             except Exception:
                 raise DatabaseOperationalException(
-                    "Database configuration has no database configuration"
+                    "Context config has no database configuration"
                 )
 
         if configuration is None:
             raise DatabaseOperationalException(
-                "Database configuration has no database configuration"
+                "There is no database configuration"
             )
         try:
             database_type = configuration[DATABASE_TYPE]
