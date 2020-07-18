@@ -5,10 +5,6 @@ from typing import Dict, List
 
 from investing_algorithm_framework.core.resolvers import ClassResolver
 from investing_algorithm_framework.management.command import BaseCommand
-from investing_algorithm_framework.configuration import settings
-
-# Load the settings
-settings = settings
 
 
 def find_commands(management_dir: str) -> List[str]:
@@ -35,9 +31,6 @@ def get_commands() -> Dict[str, str]:
         name: 'investing_algorithm_framework.management'
         for name in find_commands(os.path.join(os.path.dirname(__file__)))
     }
-
-    if not settings.configured:
-        return commands
 
     # Load all the commands from the installed apps
     return commands

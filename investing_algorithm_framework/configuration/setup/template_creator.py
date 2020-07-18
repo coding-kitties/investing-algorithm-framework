@@ -10,6 +10,7 @@ class TemplateCreator(Template, ABC):
     rewrite_template_suffixes = (
         # Allow shipping invalid .py files without byte-compilation.
         ('.py-template', '.py'),
+        ('-template', '')
     )
 
     def __init__(self,  bot_project_directory: str, bot_name: str) -> None:

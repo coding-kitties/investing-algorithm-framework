@@ -2,70 +2,18 @@ import os
 import logging.config
 from typing import Any
 from importlib import import_module
-from enum import Enum
 
 from investing_algorithm_framework.core.exceptions \
     import ImproperlyConfigured, OperationalException
 from investing_algorithm_framework.configuration.config_constants \
-    import SETTINGS_MODULE_PATH_ENV_NAME, \
-    SETTINGS_STRATEGY_REGISTERED_APPS, SETTINGS_LOGGING_CONFIG, \
-    SETTINGS_DATA_PROVIDER_REGISTERED_APPS
+    import SETTINGS_MODULE_PATH_ENV_NAME,  SETTINGS_LOGGING_CONFIG
 
 
-class TimeUnit(Enum):
-    SECOND = 'SEC',
-    MINUTE = 'MIN',
-    HOUR = 'HR',
-    ALWAYS = 'ALWAYS'
-
-    # Static factory method to convert a string to time_unit
-    @staticmethod
-    def from_string(value: str):
-
-        if isinstance(value, str):
-
-            if value.lower() in ('sec', 'second', 'seconds'):
-                return TimeUnit.SECOND
-
-            elif value.lower() in ('min', 'minute', 'minutes'):
-                return TimeUnit.MINUTE
-
-            elif value.lower() in ('hr', 'hour', 'hours'):
-                return TimeUnit.HOUR
-
-            elif value.lower() in (
-                    'always', 'every', 'continuous', 'every_time'
-            ):
-                return TimeUnit.ALWAYS
-            else:
-                raise OperationalException(
-                    'Could not convert value {} to a time_unit'.format(value)
-                )
-
-        else:
-            raise OperationalException(
-                "Could not convert non string value to a time_unit"
-            )
-
-    def equals(self, other):
-
-        if isinstance(other, Enum):
-            return self.value == other.value
-        else:
-
-            try:
-                time_unit = TimeUnit.from_string(other)
-                return time_unit == self
-            except OperationalException:
-                pass
-
-            return other == self.value
-
-
-class BaseSettings:
+class ContextConfiguration:
     """
-    Base wrapper for settings module. It will load all the default settings
-    for a given settings module
+    Base wrapper for ContextConfiguration module. It will load all the
+    default settings for a given settings module and will allow for run time
+    specification
     """
 
     def __init__(self) -> None:
@@ -88,29 +36,20 @@ class BaseSettings:
         # Load the settings module
         module = import_module(self.settings_module)
 
-        # Base components
-        tuple_settings = (
-            SETTINGS_STRATEGY_REGISTERED_APPS,
-            SETTINGS_DATA_PROVIDER_REGISTERED_APPS,
-        )
-
         # Set all the attributes of the settings wrapper
         for setting in dir(module):
 
             if setting.isupper():
                 setting_value = getattr(module, setting)
-
-                if setting in tuple_settings and \
-                        not isinstance(setting_value, (list, tuple)):
-                    raise ImproperlyConfigured(
-                        "The {} setting must be a list or a "
-                        "tuple.".format(setting))
-
                 setattr(self, setting, setting_value)
 
         self._configured = True
 
-        logging.config.dictConfig(self[SETTINGS_LOGGING_CONFIG])
+        try:
+            logging.config.dictConfig(self[SETTINGS_LOGGING_CONFIG])
+        except Exception:
+            # We ignore the error no logging configuration.
+            pass
 
     @property
     def settings_module(self) -> str:
@@ -130,14 +69,14 @@ class BaseSettings:
 
             if not hasattr(self, item):
                 raise OperationalException(
-                    "Setting object doesn't have the specific "
+                    "ContextConfig object doesn't have the specific "
                     "attribute {}".format(item)
                 )
 
             return self.__getattribute__(item)
         else:
             raise OperationalException(
-                "Settings attributes can only be referenced by string"
+                "ContextConfig attributes can only be referenced by string"
             )
 
     def get(self, key: str, default: Any = None) -> Any:
@@ -153,5 +92,12 @@ class BaseSettings:
 
         return default
 
+    def set(self, key: str, value: Any) -> None:
 
-settings = BaseSettings()
+        if hasattr(self, key):
+            raise OperationalException(
+                "ContextConfig object already have the specific "
+                "attribute {} specified".format(key)
+            )
+
+        setattr(self, key, value)

@@ -51,3 +51,7 @@ LOGGING = {
         },
     },
 }
+
+DATABASE_CONFIG = {
+
+}

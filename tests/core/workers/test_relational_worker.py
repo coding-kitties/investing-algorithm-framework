@@ -92,6 +92,12 @@ def test_running() -> None:
     assert relational_worker_two.last_run != relational_worker_one.last_run
     assert TestRelationalWorkerOne.last_run != TestRelationalWorkerTwo.last_run
 
+    previous_run = relational_worker_two.last_run
+
+    relational_worker_two.start()
+
+    assert relational_worker_two.last_run == previous_run
+
 
 def test_observing() -> None:
     # Reset the values
