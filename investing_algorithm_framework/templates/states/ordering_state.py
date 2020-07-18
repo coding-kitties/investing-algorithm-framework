@@ -1,5 +1,4 @@
 from typing import List
-import logging
 
 from investing_algorithm_framework.core.executors import Executor
 from investing_algorithm_framework.core.state import State
