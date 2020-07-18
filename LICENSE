@@ -3,7 +3,7 @@ Business Source License 1.1
 Parameters
 
 Licensor:             coding kitties.
-Licensed Work:        Investing Algorithm Framework
+Licensed Work:        Investing Algorithm Framework.
                       The Licensed Work is (c) 2020 coding kitties.
 Additional Use Grant: You may make use of the Licensed Work, provided that you do
                       not use the Licensed Work for an Algorithm
@@ -14,7 +14,23 @@ Additional Use Grant: You may make use of the Licensed Work, provided that you d
                       contractors) to sell and host applications created with the Licensed
                       Work.
 
-Change Date:          2023-06-20
+                      THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+                      CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED
+                      WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+                      WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+                      PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL
+                      THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+                      ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
+                      OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+                      PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+                      LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+                      HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER
+                      IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+                      NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE
+                      USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+                      POSSIBILITY OF SUCH DAMAGE.
+
+Change Date:          2023-07-16
 
 Change License:       Apache License, Version 2.0
 
