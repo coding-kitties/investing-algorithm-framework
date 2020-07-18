@@ -8,7 +8,7 @@ CONTEXT_CONFIGURATION = '{{ project_name }}.configuration.context'
 # Change this when not in development, feature or hot-fix branch
 DEBUG = int(os.environ.get('DEBUG', True))
 
-BASE_DIR = str(Path(__file__).parent.parent)
+BASE_DIR = str(Path(__file__).parent.parent.parent)
 
 LOG_FILE_NAME = 'log'
 
