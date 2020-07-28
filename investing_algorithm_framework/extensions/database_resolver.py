@@ -11,11 +11,9 @@ from sqlalchemy.ext.declarative import declarative_base, declared_attr
 from sqlalchemy.orm.exc import DetachedInstanceError
 from sqlalchemy.exc import DatabaseError
 
-from investing_algorithm_framework.core.context import Context
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.configuration.config_constants import \
-    DATABASE_NAME, DATABASE_CONFIG, DATABASE_TYPE, DATABASE_DIRECTORY_PATH, \
-    DATABASE_URL
+    DATABASE_NAME, DATABASE_TYPE, DATABASE_DIRECTORY_PATH, DATABASE_URL
 
 
 class DatabaseType(Enum):
@@ -24,6 +22,7 @@ class DatabaseType(Enum):
     """
 
     SQLITE3 = 'SQLITE3',
+    POSTGRESQL = 'POSTGRESQL'
 
     # Static factory method to convert a string to time_unit
     @staticmethod
@@ -34,16 +33,18 @@ class DatabaseType(Enum):
             if value.lower() in ('sqlite', 'sqlite3'):
                 return DatabaseType.SQLITE3
 
+            elif value.lower() in ('postgresql', 'postgres'):
+                return DatabaseType.POSTGRESQL
             else:
                 raise OperationalException(
-                    'Could not convert value {} to a time_unit'.format(
+                    'Could not convert value {} to a data base type'.format(
                         value
                     )
                 )
 
         else:
             raise OperationalException(
-                "Could not convert non string value to a time_unit"
+                "Could not convert non string value to a data base type"
             )
 
     def equals(self, other):
@@ -207,9 +208,9 @@ class SQLAlchemyDatabaseResolverAbstract(
 ):
 
     def __init__(
-                self,
-                query_class=Query,
-                model_class=Model,
+        self,
+        query_class=Query,
+        model_class=Model,
     ) -> None:
         self._configured = False
         self.Query = query_class
@@ -251,6 +252,7 @@ class SQLAlchemyDatabaseResolver(SQLAlchemyDatabaseResolverAbstract):
             query_class, model_class
         )
         self.config = {}
+        self._configured = False
 
     def set_sqlite_config(self, config) -> None:
 
@@ -259,7 +261,7 @@ class SQLAlchemyDatabaseResolver(SQLAlchemyDatabaseResolverAbstract):
             self.config[DATABASE_DIRECTORY_PATH] = config[
                 DATABASE_DIRECTORY_PATH
             ]
-            self.config[DATABASE_TYPE] = 'sqlite3'
+            self.config[DATABASE_TYPE] = DatabaseType.SQLITE3
 
             if not os.path.isdir(self.config[DATABASE_DIRECTORY_PATH]):
                 raise DatabaseOperationalException(
@@ -275,6 +277,16 @@ class SQLAlchemyDatabaseResolver(SQLAlchemyDatabaseResolverAbstract):
             )
 
             self.config[DATABASE_URL] = 'sqlite:////{}'.format(database_path)
+
+            database_path = os.path.join(
+                self.config[DATABASE_DIRECTORY_PATH],
+                self.config[DATABASE_NAME] + '.sqlite3'
+            )
+
+            if not os.path.isfile(database_path):
+                os.mknod(database_path)
+
+            self._configured = True
         except Exception:
             raise DatabaseOperationalException(
                 "Missing configuration settings for sqlite3. For sqlite3 the "
@@ -282,16 +294,51 @@ class SQLAlchemyDatabaseResolver(SQLAlchemyDatabaseResolverAbstract):
                 "DATABASE_NAME"
             )
 
-    def configure(self) -> None:
+    def set_postgresql_config(self, config) -> None:
 
-        if not self.config[DATABASE_TYPE]:
+        try:
+            self.config[DATABASE_URL] = config[DATABASE_URL]
+            self.config[DATABASE_TYPE] = DatabaseType.POSTGRESQL
+            self._configured = True
+        except Exception:
             raise DatabaseOperationalException(
-                "Database type is not specified"
+                "Missing configuration settings for postgresql. For postgresql the "
+                "following attributes are needed: DATABASE_URL"
             )
 
-        if DatabaseType.SQLITE3.equals(self.config[DATABASE_TYPE]):
-            self.initialize_sqlite3()
+    def configure(self, database_config: dict = None) -> None:
 
+        if database_config is None and self.config is None:
+            raise DatabaseOperationalException(
+                "There is no database configuration"
+            )
+
+        if database_config:
+            self.config = database_config
+
+            try:
+                database_type = self.config[DATABASE_TYPE]
+            except Exception:
+                raise DatabaseOperationalException(
+                    "Database type is not specified"
+                )
+
+            if DatabaseType.SQLITE3.equals(database_type):
+                self.set_sqlite_config(self.config)
+
+            elif DatabaseType.POSTGRESQL.equals(database_type):
+                self.set_postgresql_config(self.config)
+
+        if not self.configured:
+            raise DatabaseOperationalException(
+                "Database resolver is not configured"
+            )
+
+        # Create database engine
+        database_url = self.config.get(DATABASE_URL)
+        self.engine = create_engine(database_url)
+
+        # Initialize Session object
         self.session_factory = sessionmaker(bind=self.engine)
         self.Session = scoped_session(self.session_factory)
 
@@ -305,100 +352,6 @@ class SQLAlchemyDatabaseResolver(SQLAlchemyDatabaseResolverAbstract):
 
         self._model.query = _QueryProperty(self)
 
-    def initialize_sqlite3(self):
-
-        database_path = os.path.join(
-            self.config[DATABASE_DIRECTORY_PATH],
-            self.config[DATABASE_NAME] + '.sqlite3'
-        )
-
-        if not os.path.isfile(database_path):
-            os.mknod(database_path)
-
-        database_url = self.config.get(DATABASE_URL)
-        self.engine = create_engine(database_url)
-
-
-class DatabaseResolver(SQLAlchemyDatabaseResolverInterface):
-    """
-    Adapter of the SQLAlchemyDatabaseResolver, for the context config or
-    standard config object.
-    """
-
-    def __init__(
-            self, query_class=Query, model_class=Model, context: Context = None
-    ) -> None:
-        self.resolver = SQLAlchemyDatabaseResolver(query_class, model_class)
-        self.context = context
-
-    def configure(self, database_config: dict = None) -> None:
-        """
-        Function to configure the DatabaseResolver.
-
-        If custom database_config object is passed it will take this
-        configuration to configure the DatabaseResolver.
-
-        The database_config must have the same form as in with the
-        context config:
-
-        {
-            DATABASE_TYPE: <database type>,
-            DATABASE_NAME: <database name>,
-            DATABASE_DIRECTORY_PATH: <DATABASE_DIRECTORY_PATH> (optional)
-        }
-        """
-        configuration = database_config
-
-        if configuration is None:
-
-            if self.context is None:
-                raise DatabaseOperationalException(
-                    "There is no database configuration"
-                )
-
-            if not self.context.config.configured:
-                raise DatabaseOperationalException(
-                    "Context config is not configured"
-                )
-
-            try:
-                configuration = self.context.config[DATABASE_CONFIG]
-            except Exception:
-                raise DatabaseOperationalException(
-                    "Context config has no database configuration"
-                )
-
-        if configuration is None:
-            raise DatabaseOperationalException(
-                "There is no database configuration"
-            )
-        try:
-            database_type = configuration[DATABASE_TYPE]
-        except Exception:
-            raise DatabaseOperationalException(
-                "Database configuration has no database type defined"
-            )
-
-        if DatabaseType.SQLITE3.equals(database_type):
-            self.resolver.set_sqlite_config(configuration)
-        else:
-            raise DatabaseOperationalException(
-                "Database type {} is not supported by "
-                "the DatabaseResolver".format(database_type)
-            )
-
-        self.resolver.configure()
-
-    def make_declarative_base(self, model_class):
-        self.resolver.make_declarative_base(model_class)
-
     @property
-    def session(self) -> Session:
-        return self.resolver.session
-
-    @property
-    def model(self):
-        return self.resolver.model
-
-    def initialize_tables(self) -> None:
-        self.resolver.initialize_tables()
+    def configured(self):
+        return self._configured

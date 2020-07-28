@@ -1,4 +1,3 @@
-from investing_algorithm_framework.extensions.database_resolver import \
-    DatabaseResolver
+from investing_algorithm_framework.extensions.database_resolver import SQLAlchemyDatabaseResolver
 
-__all__ = ['DatabaseResolver']
+__all__ = ['SQLAlchemyDatabaseResolver']
