@@ -18,11 +18,21 @@ class State(ABC):
     pre_state_validators: List[StateValidator] = None
     post_state_validators: List[StateValidator] = None
 
-    def __init__(self, context) -> None:
-        self._bot_context = context
+    # Flag to classify state as an ending state
+    ending_state = False
+
+    def __init__(self, algorithm_context=None) -> None:
+        """
+        Constructor can be called with algorithm_context being None. This
+        is primarily being done for testing reasons.
+
+        Whenever a State instance is submitted to an AlgorithmContext,
+        the AlgorithmContext instance passes itself to the state automatically.
+        """
+
+        self.algorithm_context = algorithm_context
 
     def start(self):
-
         # Will stop the state if pre-conditions are not met
         if not self.validate_state(pre_state=True):
             return
@@ -37,10 +47,6 @@ class State(ABC):
     @abstractmethod
     def run(self) -> None:
         pass
-
-    @property
-    def context(self):
-        return self._bot_context
 
     def validate_state(self, pre_state: bool = False) -> bool:
         """
@@ -64,11 +70,13 @@ class State(ABC):
 
     def get_transition_state_class(self):
 
-        assert getattr(self, 'transition_state_class', None) is not None, (
-            "{} should either include a transition_state_class attribute, "
-            "or override the `get_transition_state_class()`, "
-            "method.".format(self.__class__.__name__)
-        )
+        if not self.ending_state:
+
+            assert getattr(self, 'transition_state_class', None) is not None, (
+                "{} should either include a transition_state_class attribute, "
+                "or override the `get_transition_state_class()`, "
+                "method.".format(self.__class__.__name__)
+            )
 
         return self.transition_state_class
 
