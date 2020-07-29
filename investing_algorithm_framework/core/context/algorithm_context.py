@@ -1,21 +1,16 @@
-import logging
-from typing import Type
+import inspect
 
 from investing_algorithm_framework.configuration import ContextConfiguration
-from investing_algorithm_framework.configuration.config_constants import \
-    FRAMEWORK_NAME
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.utils import Singleton
 from investing_algorithm_framework.core.state import State
 
-logger = logging.getLogger(FRAMEWORK_NAME)
 
-
-class Context(metaclass=Singleton):
+class AlgorithmContext(metaclass=Singleton):
     """
-    The Context defines the current state of the running algorithms. It
+    The AlgorithmContext defines the current state of a running algorithms. It
     also maintains a reference to an instance of a state subclass, which
-    represents the current state of the context instance.
+    represents the current state of the algorithm instance.
     """
 
     # A reference to the current state of the context.
@@ -24,14 +19,8 @@ class Context(metaclass=Singleton):
     # Settings reference
     _config = ContextConfiguration()
 
-    def register_initial_state(self, state: Type[State]) -> None:
-        self._state = state(context=self)
-
-    def transition_to(self, state: Type[State]) -> None:
-        """
-        Function to change the running BotState at runtime.
-        """
-        self._state = state(context=self)
+    def register_initial_state(self, state) -> None:
+        self._transition(state)
 
     def _check_state(self, raise_exception: bool = False) -> bool:
         """
@@ -65,7 +54,26 @@ class Context(metaclass=Singleton):
     def _run_state(self) -> None:
         self._state.start()
         transition_state = self._state.get_transition_state_class()
-        self.transition_to(transition_state)
+        self._transition(transition_state)
+
+    def _transition(self, transition_state) -> None:
+
+        # A class has been provided as State
+        if inspect.isclass(transition_state):
+
+            # Check if subclass of State class
+            if issubclass(transition_state, State):
+                self._state = transition_state(self)
+            else:
+
+                if not callable(getattr(transition_state, "run", None)):
+                    raise OperationalException(
+                        "Provided state class has no run method"
+                    )
+
+                self._state = transition_state()
+        else:
+            self._state = transition_state
 
     @property
     def config(self) -> ContextConfiguration:

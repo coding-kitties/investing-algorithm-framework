@@ -5,7 +5,7 @@ from investing_algorithm_framework.templates.states.ordering_state \
 from investing_algorithm_framework.templates.order_executors \
     import OrderExecutor, ScheduledOrderExecutor, RelationalOrderExecutor
 from investing_algorithm_framework.core.utils import TimeUnit
-from investing_algorithm_framework.core.context import Context
+from investing_algorithm_framework.core.context import AlgorithmContext
 from investing_algorithm_framework.core.events import Observer
 from investing_algorithm_framework.core.workers import Worker
 
@@ -73,7 +73,7 @@ def test() -> None:
     order_executor_three = TestRelationalOrderExecutor()
     order_executor_three.add_observer(observer)
 
-    context = Context()
+    context = AlgorithmContext()
     CustomOrderingState.register_order_executors(
         [order_executor_one, order_executor_two]
     )

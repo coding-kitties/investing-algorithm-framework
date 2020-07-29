@@ -7,7 +7,7 @@ from investing_algorithm_framework.templates.states.data_providing_state \
 from investing_algorithm_framework.templates.data_providers.data_provider \
     import DataProvider, ScheduledDataProvider, RelationalDataProvider
 from investing_algorithm_framework.core.utils import TimeUnit
-from investing_algorithm_framework.core.context import Context
+from investing_algorithm_framework.core.context import AlgorithmContext
 from investing_algorithm_framework.core.events import Observer
 from investing_algorithm_framework.core.workers import Worker
 
@@ -73,7 +73,7 @@ def test() -> None:
     data_provider_three = TestDataProviderThree()
     data_provider_three.add_observer(observer)
 
-    context = Context()
+    context = AlgorithmContext()
     CustomDataProvidingState.register_data_providers(
         [data_provider_one, data_provider_two]
     )

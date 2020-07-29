@@ -5,7 +5,7 @@ from investing_algorithm_framework.templates.states.strategy_state \
 from investing_algorithm_framework.templates.strategies \
     import Strategy, ScheduledStrategy, RelationalStrategy
 from investing_algorithm_framework.core.utils import TimeUnit
-from investing_algorithm_framework.core.context import Context
+from investing_algorithm_framework.core.context import AlgorithmContext
 from investing_algorithm_framework.core.events import Observer
 from investing_algorithm_framework.core.workers import Worker
 
@@ -72,7 +72,7 @@ def test() -> None:
     strategy_three = TestRelationalStrategy()
     strategy_three.add_observer(observer)
 
-    context = Context()
+    context = AlgorithmContext()
     CustomStrategyState.register_strategies([strategy_one, strategy_two])
     strategy_state = CustomStrategyState(context)
     strategy_state.start()

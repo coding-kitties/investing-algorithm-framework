@@ -1,7 +1,7 @@
 from typing import Any
 
 from investing_algorithm_framework.management.command import BaseCommand
-from investing_algorithm_framework.core.context import Context
+from investing_algorithm_framework.core.context import AlgorithmContext
 from investing_algorithm_framework.configuration.config_constants import \
     SETTINGS_CONTEXT_CONFIGURATION
 
@@ -17,7 +17,7 @@ class RunAlgorithmCommand(BaseCommand):
 
     def handle(self, *args, **options) -> Any:
         # Call the context
-        context = Context()
+        context = AlgorithmContext()
 
         # configure the configuration
         context.config.configure()
