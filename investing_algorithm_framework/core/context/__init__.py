@@ -1,3 +1,4 @@
-from investing_algorithm_framework.core.context.context import Context
+from investing_algorithm_framework.core.context.algorithm_context \
+    import AlgorithmContext
 
-__all__ = ['Context']
+__all__ = ['AlgorithmContext']
