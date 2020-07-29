@@ -1,4 +1,4 @@
-![Build Status](https://travis-ci.org/coding-kitties/investing-algorithm-framework.svg?branch=master)
+[![Build Status](https://travis-ci.org/coding-kitties/investing-algorithm-framework.svg?branch=master)](https://travis-ci.org/coding-kitties/investing-algorithm-framework)
 
 # Investing Algorithm Framework
 The Investing Algorithm Framework is a python framework to build investment algorithms. 
