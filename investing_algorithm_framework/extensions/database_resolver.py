@@ -302,8 +302,8 @@ class SQLAlchemyDatabaseResolver(SQLAlchemyDatabaseResolverAbstract):
             self._configured = True
         except Exception:
             raise DatabaseOperationalException(
-                "Missing configuration settings for postgresql. For postgresql the "
-                "following attributes are needed: DATABASE_URL"
+                "Missing configuration settings for postgresql. For "
+                "postgresql the following attributes are needed: DATABASE_URL"
             )
 
     def configure(self, database_config: dict = None) -> None:
