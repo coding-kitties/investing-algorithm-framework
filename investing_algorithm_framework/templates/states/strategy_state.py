@@ -8,6 +8,7 @@ from investing_algorithm_framework.configuration.config_constants \
 from investing_algorithm_framework.core.workers import Worker
 from investing_algorithm_framework.templates.strategies.strategy \
     import StrategyInterface
+from investing_algorithm_framework.core.context import AlgorithmContext
 
 
 class StrategyState(State):
@@ -21,8 +22,8 @@ class StrategyState(State):
 
     registered_strategies: List[Worker] = None
 
-    def __init__(self, context) -> None:
-        super(StrategyState, self).__init__(context)
+    def __init__(self, algorithm_context: AlgorithmContext) -> None:
+        super(StrategyState, self).__init__(algorithm_context)
 
         if self.registered_strategies is None \
                 or len(self.registered_strategies) < 1:
@@ -35,7 +36,7 @@ class StrategyState(State):
         # Execute all the strategies
         executor = Executor(
             workers=self.registered_strategies,
-            max_concurrent_workers=self.context.config.get(
+            max_concurrent_workers=self.algorithm_context.config.get(
                 SETTINGS_MAX_CONCURRENT_WORKERS, DEFAULT_MAX_WORKERS
             )
         )

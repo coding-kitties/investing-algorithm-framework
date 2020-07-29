@@ -2,6 +2,7 @@ import logging
 
 from investing_algorithm_framework.core.exceptions import ImproperlyConfigured
 from investing_algorithm_framework.core.state import State
+from investing_algorithm_framework.core.context import AlgorithmContext
 
 logger = logging.getLogger(__name__)
 
@@ -12,8 +13,8 @@ class SetupState(State):
         import DataProvidingState
     transition_state_class = DataProvidingState
 
-    def __init__(self, context):
-        super(SetupState, self).__init__(context)
+    def __init__(self, algorithm_context: AlgorithmContext):
+        super(SetupState, self).__init__(algorithm_context)
 
     def run(self) -> None:
         """
@@ -21,7 +22,7 @@ class SetupState(State):
         """
 
         # Load the settings
-        if not self.context.config.configured:
+        if not self.algorithm_context.config.configured:
             raise ImproperlyConfigured(
                 "Settings module is not specified, make sure you have setup "
                 "a investing_algorithm_framework project and the "

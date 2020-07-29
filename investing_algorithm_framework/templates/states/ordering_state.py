@@ -4,6 +4,7 @@ from investing_algorithm_framework.core.executors import Executor
 from investing_algorithm_framework.core.state import State
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.workers import Worker
+from investing_algorithm_framework.core.context import AlgorithmContext
 from investing_algorithm_framework.configuration.config_constants import \
     SETTINGS_MAX_CONCURRENT_WORKERS, DEFAULT_MAX_WORKERS
 from investing_algorithm_framework.templates.order_executors.order_executor \
@@ -18,8 +19,8 @@ class OrderingState(State):
 
     registered_order_executors: List[Worker] = None
 
-    def __init__(self, context) -> None:
-        super(OrderingState, self).__init__(context)
+    def __init__(self, algorithm_context: AlgorithmContext) -> None:
+        super(OrderingState, self).__init__(algorithm_context)
 
         if self.registered_order_executors is None \
                 or len(self.registered_order_executors) < 1:
@@ -32,7 +33,7 @@ class OrderingState(State):
         # Execute all the order executors
         executor = Executor(
             workers=self.registered_order_executors,
-            max_concurrent_workers=self.context.config.get(
+            max_concurrent_workers=self.algorithm_context.config.get(
                 SETTINGS_MAX_CONCURRENT_WORKERS, DEFAULT_MAX_WORKERS
             )
         )
