@@ -28,7 +28,12 @@ setuptools.setup(
         "License :: Other/Proprietary License",
     ],
     install_requires=[
-        'colorama', 'wrapt', 'requests', 'SQLAlchemy', 'pytest'
+        'colorama',
+        'wrapt',
+        'requests',
+        'SQLAlchemy',
+        'pytest',
+        'psycopg2==2.8.5'
     ],
     python_requires='>=3.6',
     scripts=['bin/investing-algorithm-framework-admin'],
