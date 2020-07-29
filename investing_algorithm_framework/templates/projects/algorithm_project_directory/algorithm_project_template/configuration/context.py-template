@@ -1,4 +1,4 @@
-from investing_algorithm_framework.core.context import Context
+from investing_algorithm_framework.core.context import AlgorithmContext
 from investing_algorithm_framework.templates.states.setup_state \
     import SetupState
 from investing_algorithm_framework.templates.states.data_providing_state \
@@ -14,8 +14,8 @@ from {{ project_name }}.strategies.strategies import MyStrategy
 from {{ project_name }}.order_executors.order_executors import MyOrderExecutor
 
 # Register Initial state
-context = Context()
-context.register_initial_state(SetupState)
+algorithm_context = AlgorithmContext()
+algorithm_context.register_initial_state(SetupState)
 
 # Register all data providers
 DataProvidingState.register_data_providers([MyDataProvider()])
