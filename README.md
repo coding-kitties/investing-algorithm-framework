@@ -4,23 +4,29 @@
 The Investing Algorithm Framework is a python framework to build investment algorithms. 
 It encourages rapid development and clean, pragmatic design.
 
+All the documentation can be found online at http://investing-algorithm-framework.com
+
 In most cases, you'll probably never have to change code on this repo directly 
-if you are building your algorithm/bot. But if you do, check out CONTRIBUTING.md
+if you are building your algorithm/bot. But if you do, check out the 
+contributing page at the website.
 
 If you'd like to chat with investing-algorithm-framework users 
 and developers, [join us on Slack](https://inv-algo-framework.slack.com)
 
 #### Disclaimer
 If you use this framework for your investments, do not risk money 
-which you are afraid to lose. We can't stress this enough:
+which you are afraid to lose, until you have clear understanding how 
+the framework works. We can't stress this enough:
 
-BEFORE YOU START USING MONEY WITH THE FRAMEWORK, MAKE SURE THAT YOU TESTED YOUR COMPONENTS THOROUGHLY. USE THE SOFTWARE AT
-YOUR OWN RISK. THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR INVESTMENT RESULTS.
+BEFORE YOU START USING MONEY WITH THE FRAMEWORK, MAKE SURE THAT YOU TESTED 
+YOUR COMPONENTS THOROUGHLY. USE THE SOFTWARE AT YOUR OWN RISK. 
+THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR INVESTMENT RESULTS.
 
 Also, make sure that you read the source code of any plugin you use or 
 implementation of an algorithm made with this framework.
 
-For further information regarding usage and licensing we recommend to go to page ...
+For further information regarding usage and licensing we recommend to 
+go to the licensing page at the website.
 
 ## Acknowledgements
 We want to thank all contributors to this project. A full list of all 
@@ -30,9 +36,7 @@ found [here](https://github.com/investing-algorithms/investing-algorithm-framewo
 
 ## Documentation
 All documentation can be found online at the official 
-website here [here](https://investing-algorithm-framework.com).
-
-For a quick guide on installing the framework look [here](https://github.com/investing-algorithms/investing-algorithm-framework/blob/master/docs/INSTALL.md)
+website here [here](http://investing-algorithm-framework.com).
 
 ### Help / Slack
 
