@@ -106,7 +106,7 @@ class TestDatabaseResolver:
         })
         self.db.initialize_tables()
 
-    class TestModel(db.model):
+    class TestModel(db.Model):
         id = Column(Integer, primary_key=True)
         name = Column(String)
 
@@ -191,7 +191,7 @@ class TestDatabaseResolverPostgesql:
         })
         self.db.initialize_tables()
 
-    class TestModel(db.model):
+    class TestModel(db.Model):
         id = Column(Integer, primary_key=True)
         name = Column(String)
 

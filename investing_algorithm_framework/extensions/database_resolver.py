@@ -1,7 +1,6 @@
 import os
 from enum import Enum
-from typing import Any, Dict
-from abc import abstractmethod, ABC
+from typing import Any
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Query, class_mapper, sessionmaker, scoped_session, \
@@ -178,48 +177,20 @@ class Model:
         return f"<{self.__class__.__name__} {id(self)}>"
 
 
-class SQLAlchemyDatabaseResolverInterface(ABC):
+class SQLAlchemyDatabaseResolver:
 
-    @abstractmethod
-    def configure(self, **kwargs: Dict[str, Any]) -> None:
-        pass
-
-    @abstractmethod
-    def make_declarative_base(self, model_class):
-        pass
-
-    @property
-    @abstractmethod
-    def session(self) -> Session:
-        pass
-
-    @property
-    @abstractmethod
-    def model(self):
-        pass
-
-    @abstractmethod
-    def initialize_tables(self) -> None:
-        pass
-
-
-class SQLAlchemyDatabaseResolverAbstract(
-    SQLAlchemyDatabaseResolverInterface, ABC
-):
-
-    def __init__(
-        self,
-        query_class=Query,
-        model_class=Model,
-    ) -> None:
+    def __init__(self, query_class=Query, model_class=Model) -> None:
         self._configured = False
         self.Query = query_class
         self.engine = None
         self.session_factory = None
         self.Session = None
         self._model = self.make_declarative_base(model_class)
+        self.config = {}
+        self._configured = False
 
-    def make_declarative_base(self, model_class):
+    @staticmethod
+    def make_declarative_base(model_class):
         """
         Creates the declarative base that all models will inherit from.
         """
@@ -234,25 +205,11 @@ class SQLAlchemyDatabaseResolverAbstract(
         return self.Session()
 
     @property
-    def model(self):
+    def Model(self):
         return self._model
 
     def initialize_tables(self):
         self._model.metadata.create_all(self.engine)
-
-
-class SQLAlchemyDatabaseResolver(SQLAlchemyDatabaseResolverAbstract):
-
-    def __init__(
-            self,
-            query_class=Query,
-            model_class=Model,
-    ) -> None:
-        super(SQLAlchemyDatabaseResolver, self).__init__(
-            query_class, model_class
-        )
-        self.config = {}
-        self._configured = False
 
     def set_sqlite_config(self, config) -> None:
 
@@ -355,3 +312,7 @@ class SQLAlchemyDatabaseResolver(SQLAlchemyDatabaseResolverAbstract):
     @property
     def configured(self):
         return self._configured
+
+    @property
+    def metadata(self):
+        return self.Model.metadata
