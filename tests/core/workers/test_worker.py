@@ -4,29 +4,29 @@ from investing_algorithm_framework.core.workers import Worker
 from investing_algorithm_framework.core.events import Observer
 
 
-class TestWorker(Worker):
-    id = 'TestWorker'
+class MyWorker(Worker):
+    id = 'MyWorker'
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
 
 
-class TestWorkerTwo(Worker):
-    id = 'TestWorkerTwo'
+class MyWorkerTwo(Worker):
+    id = 'MyWorkerTwo'
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
 
 
-class TestObserver(Observer):
+class MyObserver(Observer):
     updated: int = 0
 
     def update(self, observable, **kwargs) -> None:
-        TestObserver.updated += 1
+        MyObserver.updated += 1
 
 
 def test_last_run() -> None:
-    worker = TestWorker()
+    worker = MyWorker()
     assert worker.last_run is None
     worker.start()
     assert worker.last_run is not None
@@ -37,7 +37,7 @@ def test_last_run() -> None:
     # Check if update is after previous run
     assert worker.last_run > previous_run
 
-    worker_two = TestWorkerTwo()
+    worker_two = MyWorkerTwo()
     assert worker_two.last_run is None
     worker_two.start()
     assert worker_two.last_run is not None
@@ -46,13 +46,13 @@ def test_last_run() -> None:
 
 def test_observing() -> None:
     # Reset the values
-    TestObserver.updated = 0
-    TestWorker.last_run = None
+    MyObserver.updated = 0
+    MyWorker.last_run = None
 
-    worker = TestWorker()
+    worker = MyWorker()
     assert worker.last_run is None
-    worker.add_observer(TestObserver())
-    assert TestObserver.updated == 0
+    worker.add_observer(MyObserver())
+    assert MyObserver.updated == 0
     worker.start()
     assert worker.last_run is not None
-    assert TestObserver.updated == 1
+    assert MyObserver.updated == 1

@@ -1,80 +1,50 @@
-import inspect
-
-from investing_algorithm_framework.configuration import ContextConfiguration
-from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.utils import Singleton
-from investing_algorithm_framework.core.state import State
+from time import sleep
+from investing_algorithm_framework.core.data_providers import \
+    AbstractDataProvider
+from investing_algorithm_framework.core.workers import Worker
 
 
-class AlgorithmContext(metaclass=Singleton):
+class AlgorithmContext:
     """
-    The AlgorithmContext defines the current state of a running algorithms. It
-    also maintains a reference to an instance of a state subclass, which
-    represents the current state of the algorithm instance.
+    The AlgorithmContext defines the context of an algorithm.
+
+    An algorithm consist out of an data provider and a set of
+    strategies that belong to the data provider.
     """
 
-    # A reference to the current state of the context.
-    _state: State = None
+    def __init__(self, data_provider, cycles: int = None):
 
-    # Settings reference
-    _config = ContextConfiguration()
+        assert isinstance(data_provider, AbstractDataProvider), (
+            'Data provider must be an instance of the '
+            'AbstractDataProvider class'
+        )
 
-    def register_initial_state(self, state) -> None:
-        self._transition(state)
+        assert isinstance(data_provider, Worker), (
+            'Data provider must be an instance of the Worker class'
+        )
 
-    def _check_state(self, raise_exception: bool = False) -> bool:
-        """
-        Function that wil check if the state is set
-        """
-
-        if self._state is None:
-
-            if raise_exception:
-                raise OperationalException(
-                    "Context doesn't have a state. Make sure that you set "
-                    "the state either by initializing it or making sure that "
-                    "you transition to a new valid state."
-                )
-            else:
-                return False
-
-        return True
+        self.data_provider = data_provider
+        self.cycles = cycles
 
     def start(self) -> None:
         """
         Run the current state of the investing_algorithm_framework
         """
+        self._run()
 
-        self._check_state(raise_exception=True)
-        self._run_state()
+    def _run(self) -> None:
+        iteration = 0
+        self.data_provider.start()
+        iteration += 1
 
-        while self._check_state():
-            self._run_state()
+        while self.check_context(iteration):
+            sleep(1)
+            self.data_provider.start()
+            iteration += 1
 
-    def _run_state(self) -> None:
-        self._state.start()
-        transition_state = self._state.get_transition_state_class()
-        self._transition(transition_state)
+    def check_context(self, iteration):
 
-    def _transition(self, transition_state) -> None:
+        if self.cycles and self.cycles > 0:
+            return self.cycles > iteration
 
-        # A class has been provided as State
-        if inspect.isclass(transition_state):
-
-            # Check if subclass of State class
-            if issubclass(transition_state, State):
-                self._state = transition_state(self)
-            else:
-
-                if not callable(getattr(transition_state, "run", None)):
-                    raise OperationalException(
-                        "Provided state class has no run method"
-                    )
-
-                self._state = transition_state()
-        else:
-            self._state = transition_state
-
-    @property
-    def config(self) -> ContextConfiguration:
-        return self._config
+        return True

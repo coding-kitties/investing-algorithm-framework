@@ -6,7 +6,7 @@ from datetime import datetime
 
 from investing_algorithm_framework.core.events.observable import Observable
 from investing_algorithm_framework.core.events.observer import Observer
-from investing_algorithm_framework.configuration.config_constants \
+from investing_algorithm_framework.configuration.constants \
     import FRAMEWORK_NAME
 
 logger = logging.getLogger(FRAMEWORK_NAME)
