@@ -4,16 +4,16 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 class Strategy:
     id = None
 
-    def on_raw_data(self, data):
+    def on_raw_data(self, data, algorithm_context):
         raise OperationalException("Not implemented")
 
-    def on_order_book(self, data):
+    def on_order_book(self, data, algorithm_context):
         raise OperationalException("Not implemented")
 
-    def on_tick(self, data):
+    def on_tick(self, data, algorithm_context):
         raise OperationalException("Not implemented")
 
-    def on_quote(self, data):
+    def on_quote(self, data, algorithm_context):
         raise OperationalException("Not implemented")
 
     def get_id(self) -> str:

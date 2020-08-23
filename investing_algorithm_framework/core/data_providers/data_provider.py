@@ -3,12 +3,13 @@ from abc import abstractmethod
 
 from investing_algorithm_framework.core.strategies import Strategy
 from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.core.context import AlgorithmContext
 
 
 class AbstractDataProvider:
     registered_strategies: List[Strategy] = None
 
-    def extract_quote(self, data):
+    def extract_quote(self, data, algorithm_context: AlgorithmContext):
         """
         A quote is the last price at which a security or commodity traded,
         meaning the most recent price to which a buyer and seller agreed and
@@ -24,7 +25,7 @@ class AbstractDataProvider:
 
         raise OperationalException("Not implemented")
 
-    def extract_tick(self, data):
+    def extract_tick(self, data, algorithm_context: AlgorithmContext):
         """
         A tick is the minimum incremental amount at which you can trade a
         security. A tick represents the standard upon which the price of a
@@ -39,7 +40,7 @@ class AbstractDataProvider:
 
         raise OperationalException("Not implemented")
 
-    def extract_order_book(self, data):
+    def extract_order_book(self, data, algorithm_context: AlgorithmContext):
         """
         Function to extract electronic list of buy and sell orders for a
         specific security or financial instrument organized by price level.
@@ -53,22 +54,22 @@ class AbstractDataProvider:
 
         raise OperationalException("Not implemented")
 
-    def provide_data(self):
-        data = self.get_data()
-        self.provide_tick(data)
-        self.provide_quote(data)
-        self.provide_order_book(data)
-        self.provide_raw_data(data)
+    def provide_data(self, algorithm_context: AlgorithmContext):
+        data = self.get_data(algorithm_context)
+        self.provide_tick(data, algorithm_context)
+        self.provide_quote(data, algorithm_context)
+        self.provide_order_book(data, algorithm_context)
+        self.provide_raw_data(data, algorithm_context)
 
     @abstractmethod
-    def get_data(self):
+    def get_data(self, algorithm_context: AlgorithmContext):
         pass
 
-    def provide_order_book(self, data):
+    def provide_order_book(self, data, algorithm_context: AlgorithmContext):
         extracted_data = None
 
         try:
-            extracted_data = self.extract_order_book(data)
+            extracted_data = self.extract_order_book(data, algorithm_context)
         except Exception as e:
 
             if isinstance(e, NotImplementedError):
@@ -77,13 +78,17 @@ class AbstractDataProvider:
         if extracted_data is not None:
 
             for strategy in self.registered_strategies:
-                strategy.on_order_book(extracted_data)
 
-    def provide_quote(self, data):
+                try:
+                    strategy.on_order_book(extracted_data, algorithm_context)
+                except Exception as e:
+                    self.handle_strategy_error(e)
+
+    def provide_quote(self, data, algorithm_context: AlgorithmContext):
         extracted_data = None
 
         try:
-            extracted_data = self.extract_quote(data)
+            extracted_data = self.extract_quote(data, algorithm_context)
         except Exception as e:
 
             if isinstance(e, NotImplementedError):
@@ -92,13 +97,17 @@ class AbstractDataProvider:
         if extracted_data is not None:
 
             for strategy in self.registered_strategies:
-                strategy.on_quote(extracted_data)
 
-    def provide_tick(self, data):
+                try:
+                    strategy.on_quote(extracted_data, algorithm_context)
+                except Exception as e:
+                    self.handle_strategy_error(e)
+
+    def provide_tick(self, data, algorithm_context: AlgorithmContext):
         extracted_data = None
 
         try:
-            extracted_data = self.extract_tick(data)
+            extracted_data = self.extract_tick(data, algorithm_context)
         except Exception as e:
 
             if isinstance(e, NotImplementedError):
@@ -107,19 +116,21 @@ class AbstractDataProvider:
         if extracted_data is not None:
 
             for strategy in self.registered_strategies:
-                strategy.on_tick(extracted_data)
 
-    def provide_raw_data(self, data):
+                try:
+                    strategy.on_tick(extracted_data, algorithm_context)
+                except Exception as e:
+                    self.handle_strategy_error(e)
+
+    def provide_raw_data(self, data, algorithm_context: AlgorithmContext):
 
         if data is not None:
 
             for strategy in self.registered_strategies:
                 try:
-                    strategy.on_raw_data(data)
+                    strategy.on_raw_data(data, algorithm_context)
                 except Exception as e:
-
-                    if isinstance(e, OperationalException):
-                        pass
+                    self.handle_strategy_error(e)
 
     @classmethod
     def register_strategies(cls, strategies: List[Strategy]) -> None:
@@ -144,3 +155,13 @@ class AbstractDataProvider:
             cls.registered_strategies = []
 
         cls.registered_strategies.append(strategy)
+
+    @staticmethod
+    def handle_strategy_error(exception: Exception) -> None:
+
+        if isinstance(exception, OperationalException) \
+                and exception.error_message == 'Not implemented':
+            return
+
+        # Raise the exception again
+        raise exception
