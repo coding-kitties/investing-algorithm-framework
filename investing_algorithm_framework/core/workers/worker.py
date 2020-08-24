@@ -1,12 +1,11 @@
 import logging
 from abc import abstractmethod, ABC
-from typing import Dict, Any
 from wrapt import synchronized
 from datetime import datetime
 
 from investing_algorithm_framework.core.events.observable import Observable
 from investing_algorithm_framework.core.events.observer import Observer
-from investing_algorithm_framework.configuration.config_constants \
+from investing_algorithm_framework.configuration.constants \
     import FRAMEWORK_NAME
 
 logger = logging.getLogger(FRAMEWORK_NAME)
@@ -21,7 +20,7 @@ class Worker(Observable, ABC):
     id = None
     last_run: datetime = None
 
-    def start(self, **kwargs: Dict[str, Any]) -> None:
+    def start(self, **kwargs) -> None:
         """
         Function that will start the worker, and notify its observers when
         it is finished
@@ -45,7 +44,7 @@ class Worker(Observable, ABC):
         logger.info("Worker {} finished".format(self.get_id()))
 
     @abstractmethod
-    def work(self, **kwargs: Dict[str, Any]) -> None:
+    def work(self, **kwargs) -> None:
         """
         Function that needs to be implemented by a concrete class.
         """

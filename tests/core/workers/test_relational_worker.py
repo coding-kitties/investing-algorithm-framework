@@ -6,8 +6,8 @@ from investing_algorithm_framework.core.events import Observer
 from investing_algorithm_framework.core.utils import TimeUnit
 
 
-class TestWorker(Worker):
-    id = 'TestWorker'
+class MyWorker(Worker):
+    id = 'MyWorker'
     time_unit = TimeUnit.SECOND
     time_interval = 1
 
@@ -15,8 +15,8 @@ class TestWorker(Worker):
         pass
 
 
-class TestScheduledWorker(ScheduledWorker):
-    id = 'TestScheduledWorker'
+class MyScheduledWorker(ScheduledWorker):
+    id = 'MyScheduledWorker'
     time_unit = TimeUnit.SECOND
     time_interval = 1
 
@@ -24,17 +24,17 @@ class TestScheduledWorker(ScheduledWorker):
         pass
 
 
-class TestRelationalWorkerOne(RelationalWorker):
-    id = 'TestRelationalWorkerOne'
-    run_after = TestWorker
+class MyRelationalWorkerOne(RelationalWorker):
+    id = 'MyRelationalWorkerOne'
+    run_after = MyWorker
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
 
 
-class TestRelationalWorkerTwo(RelationalWorker):
-    id = 'TestRelationalWorkerTwo'
-    run_after = TestScheduledWorker
+class MyRelationalWorkerTwo(RelationalWorker):
+    id = 'MyRelationalWorkerTwo'
+    run_after = MyScheduledWorker
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
@@ -48,31 +48,31 @@ class TestObserver(Observer):
 
 
 def test_running() -> None:
-    worker = TestWorker()
-    scheduled_worker = TestScheduledWorker()
-    relational_worker_one = TestRelationalWorkerOne()
-    relational_worker_two = TestRelationalWorkerTwo()
+    worker = MyWorker()
+    scheduled_worker = MyScheduledWorker()
+    relational_worker_one = MyRelationalWorkerOne()
+    relational_worker_two = MyRelationalWorkerTwo()
 
     assert worker.last_run is None
-    assert TestWorker.last_run is None
+    assert MyWorker.last_run is None
 
     assert scheduled_worker.last_run is None
     assert scheduled_worker.last_run is None
 
     assert relational_worker_one.last_run is None
-    assert TestRelationalWorkerOne.last_run is None
+    assert MyRelationalWorkerOne.last_run is None
 
     assert relational_worker_two.last_run is None
-    assert TestRelationalWorkerTwo.last_run is None
+    assert MyRelationalWorkerTwo.last_run is None
 
     assert relational_worker_one.run_after != relational_worker_two.run_after
     assert \
-        TestRelationalWorkerOne.run_after != TestRelationalWorkerTwo.run_after
+        MyRelationalWorkerOne.run_after != MyRelationalWorkerTwo.run_after
 
     worker.start()
 
     assert worker.last_run is not None
-    assert TestWorker.last_run is not None
+    assert MyWorker.last_run is not None
 
     relational_worker_one.start()
 
@@ -82,7 +82,7 @@ def test_running() -> None:
     scheduled_worker.start()
 
     assert scheduled_worker.last_run is not None
-    assert TestScheduledWorker.last_run is not None
+    assert MyScheduledWorker.last_run is not None
 
     relational_worker_two.start()
 
@@ -90,7 +90,7 @@ def test_running() -> None:
     assert relational_worker_two.last_run is not None
 
     assert relational_worker_two.last_run != relational_worker_one.last_run
-    assert TestRelationalWorkerOne.last_run != TestRelationalWorkerTwo.last_run
+    assert MyRelationalWorkerOne.last_run != MyRelationalWorkerTwo.last_run
 
     previous_run = relational_worker_two.last_run
 
@@ -102,10 +102,10 @@ def test_running() -> None:
 def test_observing() -> None:
     # Reset the values
     TestObserver.updated = 0
-    TestRelationalWorkerOne.last_run = None
+    MyRelationalWorkerOne.last_run = None
 
-    worker = TestWorker()
-    relational_worker_one = TestRelationalWorkerOne()
+    worker = MyWorker()
+    relational_worker_one = MyRelationalWorkerOne()
     relational_worker_one.add_observer(TestObserver())
     worker.start()
     assert relational_worker_one.last_run is None
