@@ -1,4 +1,0 @@
-import logging
-from {{ project_name }}.configuration.settings import LOGGING_NAME
-
-logger = logging.getLogger(LOGGING_NAME)

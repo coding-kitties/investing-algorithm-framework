@@ -5,6 +5,7 @@ class ImproperlyConfigured(Exception):
     """
     def __init__(self, message) -> None:
         super(ImproperlyConfigured, self).__init__(message)
+        self.error_message = message
 
 
 class OperationalException(Exception):
@@ -14,3 +15,4 @@ class OperationalException(Exception):
     """
     def __init__(self, message) -> None:
         super(OperationalException, self).__init__(message)
+        self.error_message = message

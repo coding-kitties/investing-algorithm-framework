@@ -11,7 +11,7 @@ from sqlalchemy.orm.exc import DetachedInstanceError
 from sqlalchemy.exc import DatabaseError
 
 from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.configuration.config_constants import \
+from investing_algorithm_framework.configuration.constants import \
     DATABASE_NAME, DATABASE_TYPE, DATABASE_DIRECTORY_PATH, DATABASE_URL
 
 

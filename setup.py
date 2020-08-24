@@ -6,6 +6,9 @@ VERSION = get_version()
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+with open('requirements.txt') as f:
+    required = f.read().splitlines()
+
 setuptools.setup(
     name="investing_algorithm_framework",
     version=VERSION,
@@ -27,15 +30,7 @@ setuptools.setup(
         "Topic :: Software Development",
         "License :: Other/Proprietary License",
     ],
-    install_requires=[
-        'colorama',
-        'wrapt',
-        'requests',
-        'SQLAlchemy',
-        'pytest',
-        'psycopg2==2.8.5'
-    ],
+    install_requires=required,
     python_requires='>=3.6',
-    scripts=['bin/investing-algorithm-framework-admin'],
     include_package_data=True,
 )

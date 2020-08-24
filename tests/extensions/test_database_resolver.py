@@ -106,7 +106,7 @@ class TestDatabaseResolver:
         })
         self.db.initialize_tables()
 
-    class TestModel(db.Model):
+    class CustomModel(db.Model):
         id = Column(Integer, primary_key=True)
         name = Column(String)
 
@@ -115,58 +115,58 @@ class TestDatabaseResolver:
 
     def test_creating(self):
         self.db.initialize_tables()
-        assert len(self.TestModel.query.all()) == 0
+        assert len(self.CustomModel.query.all()) == 0
 
-        test_model_one = self.TestModel(name=random_string(10))
+        test_model_one = self.CustomModel(name=random_string(10))
 
-        assert len(self.TestModel.query.all()) == 0
+        assert len(self.CustomModel.query.all()) == 0
 
         test_model_one.save()
 
-        assert len(self.TestModel.query.all()) == 1
+        assert len(self.CustomModel.query.all()) == 1
 
-        test_model_two = self.TestModel(name=random_string(10))
+        test_model_two = self.CustomModel(name=random_string(10))
 
-        assert len(self.TestModel.query.all()) == 1
+        assert len(self.CustomModel.query.all()) == 1
 
         test_model_two.save()
 
-        assert len(self.TestModel.query.all()) == 2
+        assert len(self.CustomModel.query.all()) == 2
         self.db.session.commit()
 
     def test_deleting(self) -> None:
         self.db.initialize_tables()
-        assert len(self.TestModel.query.all()) == 0
+        assert len(self.CustomModel.query.all()) == 0
 
-        test_model_one = self.TestModel(name=random_string(10))
-        test_model_two = self.TestModel(name=random_string(10))
+        test_model_one = self.CustomModel(name=random_string(10))
+        test_model_two = self.CustomModel(name=random_string(10))
         test_model_one.save()
         test_model_two.save()
 
-        assert len(self.TestModel.query.all()) == 2
+        assert len(self.CustomModel.query.all()) == 2
 
         test_model_two.delete()
 
-        assert len(self.TestModel.query.all()) == 1
+        assert len(self.CustomModel.query.all()) == 1
 
         test_model_one.delete()
 
-        assert len(self.TestModel.query.all()) == 0
+        assert len(self.CustomModel.query.all()) == 0
         self.db.session.commit()
 
     def test_updating(self) -> None:
         self.db.initialize_tables()
-        assert len(self.TestModel.query.all()) == 0
+        assert len(self.CustomModel.query.all()) == 0
 
-        test_model_one = self.TestModel(name=random_string(10))
-        test_model_two = self.TestModel(name=random_string(10))
+        test_model_one = self.CustomModel(name=random_string(10))
+        test_model_two = self.CustomModel(name=random_string(10))
         test_model_one.save()
         test_model_two.save()
 
         model_one_name = test_model_two.name
         self.db.session.commit()
 
-        assert len(self.TestModel.query.all()) == 2
+        assert len(self.CustomModel.query.all()) == 2
 
         test_model_one.update(name=random_string(10))
 
@@ -191,7 +191,7 @@ class TestDatabaseResolverPostgesql:
         })
         self.db.initialize_tables()
 
-    class TestModel(db.Model):
+    class MyModel(db.Model):
         id = Column(Integer, primary_key=True)
         name = Column(String)
 
@@ -199,56 +199,56 @@ class TestDatabaseResolverPostgesql:
             return self.repr(id=self.id, name=self.name)
 
     def test_creating(self):
-        assert len(self.TestModel.query.all()) == 0
+        assert len(self.MyModel.query.all()) == 0
 
-        test_model_one = self.TestModel(name=random_string(10))
+        test_model_one = self.MyModel(name=random_string(10))
 
-        assert len(self.TestModel.query.all()) == 0
+        assert len(self.MyModel.query.all()) == 0
 
         test_model_one.save()
 
-        assert len(self.TestModel.query.all()) == 1
+        assert len(self.MyModel.query.all()) == 1
 
-        test_model_two = self.TestModel(name=random_string(10))
+        test_model_two = self.MyModel(name=random_string(10))
 
-        assert len(self.TestModel.query.all()) == 1
+        assert len(self.MyModel.query.all()) == 1
 
         test_model_two.save()
 
-        assert len(self.TestModel.query.all()) == 2
+        assert len(self.MyModel.query.all()) == 2
         self.db.session.commit()
 
     def test_deleting(self) -> None:
-        assert len(self.TestModel.query.all()) == 0
+        assert len(self.MyModel.query.all()) == 0
 
-        test_model_one = self.TestModel(name=random_string(10))
-        test_model_two = self.TestModel(name=random_string(10))
+        test_model_one = self.MyModel(name=random_string(10))
+        test_model_two = self.MyModel(name=random_string(10))
         test_model_one.save()
         test_model_two.save()
 
-        assert len(self.TestModel.query.all()) == 2
+        assert len(self.MyModel.query.all()) == 2
 
         test_model_two.delete()
 
-        assert len(self.TestModel.query.all()) == 1
+        assert len(self.MyModel.query.all()) == 1
 
         test_model_one.delete()
 
-        assert len(self.TestModel.query.all()) == 0
+        assert len(self.MyModel.query.all()) == 0
         self.db.session.commit()
 
     def test_updating(self) -> None:
-        assert len(self.TestModel.query.all()) == 0
+        assert len(self.MyModel.query.all()) == 0
 
-        test_model_one = self.TestModel(name=random_string(10))
-        test_model_two = self.TestModel(name=random_string(10))
+        test_model_one = self.MyModel(name=random_string(10))
+        test_model_two = self.MyModel(name=random_string(10))
         test_model_one.save()
         test_model_two.save()
 
         model_one_name = test_model_two.name
         self.db.session.commit()
 
-        assert len(self.TestModel.query.all()) == 2
+        assert len(self.MyModel.query.all()) == 2
 
         test_model_one.update(name=random_string(10))
 
