@@ -20,6 +20,9 @@ class Worker(Observable, ABC):
     id = None
     last_run: datetime = None
 
+    def __init__(self):
+        super(Worker, self).__init__()
+
     def start(self, **kwargs) -> None:
         """
         Function that will start the worker, and notify its observers when

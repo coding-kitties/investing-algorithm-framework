@@ -1,8 +1,10 @@
+import pytest
+
 from investing_algorithm_framework.core.data_providers import \
     AbstractDataProvider
 from investing_algorithm_framework.core.strategies import Strategy
 from investing_algorithm_framework.core.context import AlgorithmContext
-
+from investing_algorithm_framework.core.exceptions import OperationalException
 
 class MyStrategy(Strategy):
     on_tick_method_called = False
@@ -56,6 +58,19 @@ class DataProviderTwo(AbstractDataProvider):
         return 'tick data'
 
 
+class RandomClass:
+
+    def __init__(self):
+        self.message = 'hello'
+
+
+class WrongDataProvider(AbstractDataProvider):
+    registered_strategies = [RandomClass()]
+
+    def get_data(self, algorithm_context: AlgorithmContext):
+        return 'tick data'
+
+
 def test() -> None:
     data_provider = DataProvider()
     data_provider.provide_data(algorithm_context=None)
@@ -76,6 +91,9 @@ def test_registration() -> None:
     assert len(data_provider.registered_strategies) == 2
 
 
+def test_strategy_initialization() -> None:
 
+    with pytest.raises(OperationalException) as exc_info:
+        WrongDataProvider()
 
-
+    assert str(exc_info.value) == 'RandomClass is not an instance of Strategy'

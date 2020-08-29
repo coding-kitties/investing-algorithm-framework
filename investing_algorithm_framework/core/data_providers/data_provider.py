@@ -7,7 +7,19 @@ from investing_algorithm_framework.core.context import AlgorithmContext
 
 
 class AbstractDataProvider:
-    registered_strategies: List[Strategy] = None
+    registered_strategies: List[Strategy] = []
+
+    def __init__(self):
+
+        for strategy in self.registered_strategies:
+
+            if not isinstance(strategy, Strategy):
+                raise OperationalException(
+                    "{} is not an instance of "
+                    "Strategy".format(strategy.__class__.__name__)
+                )
+
+        super(AbstractDataProvider, self).__init__()
 
     def extract_quote(self, data, algorithm_context: AlgorithmContext):
         """
