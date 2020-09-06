@@ -1,4 +1,3 @@
-from typing import Dict, Any
 from abc import ABC
 from .data_provider import AbstractDataProvider
 from investing_algorithm_framework.core.workers import Worker, \
@@ -7,7 +6,7 @@ from investing_algorithm_framework.core.workers import Worker, \
 
 class DataProvider(AbstractDataProvider, Worker, ABC):
 
-    def work(self, **kwargs) -> None:
+    def work(self, *args, **kwargs) -> None:
 
         assert kwargs['algorithm_context'] is not None, {
             'Data provider must be started with a AlgorithmContext, make '
@@ -15,12 +14,14 @@ class DataProvider(AbstractDataProvider, Worker, ABC):
             'instance.'
         }
 
-        self.provide_data(**kwargs)
+        # Extract algorithm context argument
+        algorithm_context = kwargs['algorithm_context']
+        self.provide_data(algorithm_context)
 
 
 class ScheduledDataProvider(AbstractDataProvider, ScheduledWorker, ABC):
 
-    def work(self, **kwargs: Dict[str, Any]) -> None:
+    def work(self, *args, **kwargs) -> None:
 
         assert kwargs['algorithm_context'] is not None, {
             'Data provider must be started with a AlgorithmContext, make '
@@ -28,12 +29,14 @@ class ScheduledDataProvider(AbstractDataProvider, ScheduledWorker, ABC):
             'instance.'
         }
 
-        self.provide_data(**kwargs)
+        # Extract algorithm context argument
+        algorithm_context = kwargs['algorithm_context']
+        self.provide_data(algorithm_context)
 
 
 class RelationalDataProvider(AbstractDataProvider, RelationalWorker, ABC):
 
-    def work(self, **kwargs: Dict[str, Any]) -> None:
+    def work(self, *args, **kwargs) -> None:
 
         assert kwargs['algorithm_context'] is not None, {
             'Data provider must be started with a AlgorithmContext, make '
@@ -41,7 +44,9 @@ class RelationalDataProvider(AbstractDataProvider, RelationalWorker, ABC):
             'instance.'
         }
 
-        self.provide_data(**kwargs)
+        # Extract algorithm context argument
+        algorithm_context = kwargs['algorithm_context']
+        self.provide_data(algorithm_context)
 
 
 __all__ = [

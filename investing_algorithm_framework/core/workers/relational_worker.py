@@ -15,7 +15,7 @@ class RelationalWorker(Worker, ABC):
     """
     run_after: Worker
 
-    def start(self, **kwargs: Dict[str, Any]) -> None:
+    def start(self, *args, **kwargs) -> None:
 
         # Only run if the last time this worker stared is before
         # the last time the 'run_after' worker had finished.
@@ -33,7 +33,7 @@ class RelationalWorker(Worker, ABC):
                 )
 
             if self.run_after.last_run > self.last_run:
-                super(RelationalWorker, self).start()
+                super(RelationalWorker, self).start(*args, **kwargs)
 
         elif self.run_after.last_run is not None:
-            super(RelationalWorker, self).start()
+            super(RelationalWorker, self).start(*args, **kwargs)

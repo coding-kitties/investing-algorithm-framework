@@ -1,6 +1,5 @@
 from abc import ABC
 from datetime import datetime
-from typing import Dict, Any
 
 from investing_algorithm_framework.core.utils import TimeUnit
 from investing_algorithm_framework.core.workers.worker import Worker
@@ -10,11 +9,11 @@ class ScheduledWorker(Worker, ABC):
     time_unit: TimeUnit = None
     time_interval: int = None
 
-    def start(self, **kwargs: Dict[str, Any]) -> None:
+    def start(self, *args, **kwargs) -> None:
 
         # If the worker has never run, run it
         if self.last_run is None:
-            super(ScheduledWorker, self).start()
+            super(ScheduledWorker, self).start(*args, **kwargs)
 
         else:
             # Get the current time
@@ -25,21 +24,21 @@ class ScheduledWorker(Worker, ABC):
                 seconds = elapsed_time.total_seconds()
 
                 if seconds > self.get_time_interval():
-                    super(ScheduledWorker, self).start()
+                    super(ScheduledWorker, self).start(*args, **kwargs)
 
             # Minute evaluation
             elif self.get_time_unit() is TimeUnit.MINUTE:
                 minutes = divmod(elapsed_time.total_seconds(), 60)
 
                 if minutes > self.get_time_interval():
-                    super(ScheduledWorker, self).start()
+                    super(ScheduledWorker, self).start(*args, **kwargs)
 
             # Hour evaluation
             elif self.get_time_unit() is TimeUnit.HOUR:
                 hours = divmod(elapsed_time.total_seconds(), 3600)
 
                 if hours > self.get_time_interval():
-                    super(ScheduledWorker, self).start()
+                    super(ScheduledWorker, self).start(*args, **kwargs)
 
     def get_time_unit(self) -> TimeUnit:
         assert getattr(self, 'time_unit', None) is not None, (

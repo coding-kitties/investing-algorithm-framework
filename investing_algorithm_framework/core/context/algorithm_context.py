@@ -35,7 +35,7 @@ class AlgorithmContext:
             'Data provider must be an instance of the Worker class'
         )
 
-        self.algorithm_id = algorithm_id
+        self._algorithm_id = algorithm_id
         self.data_provider = data_provider
         self.cycles = cycles
 
@@ -64,10 +64,10 @@ class AlgorithmContext:
         AlgorithmContext instance
         """
 
-        if self.algorithm_id is None:
+        if self._algorithm_id is None:
             raise OperationalException("AlgorithmContext Id is not set")
 
-    def start(self) -> None:
+    def start(self, cycles: int = -1) -> None:
         """
         Run the current state of the investing_algorithm_framework
         """
@@ -76,17 +76,23 @@ class AlgorithmContext:
         if self.initializer is not None:
             self.initializer.initialize(self)
 
-        self._run()
+        self._run(cycles)
 
-    def _run(self) -> None:
+    def _run(self, cycles: int) -> None:
         iteration = 0
         self.data_provider.start(algorithm_context=self)
         iteration += 1
+
+        if cycles != -1 and cycles == iteration:
+            return
 
         while self.check_context(iteration):
             sleep(1)
             self.data_provider.start(algorithm_context=self)
             iteration += 1
+
+            if cycles == iteration:
+                return
 
     def check_context(self, iteration) -> bool:
 
@@ -111,3 +117,6 @@ class AlgorithmContext:
     @property
     def config(self) -> AlgorithmContextConfiguration:
         return self._config
+
+    def get_id(self) -> str:
+        return self._algorithm_id

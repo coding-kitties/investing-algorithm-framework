@@ -23,12 +23,11 @@ class Worker(Observable, ABC):
     def __init__(self):
         super(Worker, self).__init__()
 
-    def start(self, **kwargs) -> None:
+    def start(self, *args, **kwargs) -> None:
         """
         Function that will start the worker, and notify its observers when
         it is finished
         """
-
         try:
             logger.info("Starting worker {}".format(self.get_id()))
         except Exception as e:
@@ -36,7 +35,7 @@ class Worker(Observable, ABC):
             return
 
         try:
-            self.work(**kwargs)
+            self.work(*args, **kwargs)
             self.notify_observers()
             self.update_last_run()
         except Exception as e:
@@ -47,7 +46,7 @@ class Worker(Observable, ABC):
         logger.info("Worker {} finished".format(self.get_id()))
 
     @abstractmethod
-    def work(self, **kwargs) -> None:
+    def work(self, *args, **kwargs) -> None:
         """
         Function that needs to be implemented by a concrete class.
         """
