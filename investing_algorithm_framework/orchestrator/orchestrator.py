@@ -26,6 +26,14 @@ class OrchestratorInterface(ABC):
     def stop_algorithm(self, algorithm_id: str) -> None:
         pass
 
+    @abstractmethod
+    def register_algorithms(self, algorithms: List[AlgorithmContext]) -> None:
+        pass
+
+    @abstractmethod
+    def register_algorithm(self, algorithm: AlgorithmContext) -> None:
+        pass
+
 
 class Orchestrator(OrchestratorInterface):
     registered_algorithms = {}
@@ -36,9 +44,9 @@ class Orchestrator(OrchestratorInterface):
     ) -> None:
 
         if self.registered_algorithms is None \
-                or len(self.registered_algorithms) < 1:
+                or len(self.registered_algorithms.keys()) < 1:
             raise OperationalException(
-                "Orchestrator doesn't have any algorithms configured."
+                "Orchestrator doesn't have any algorithms configured"
             )
 
         # run all algorithms
@@ -50,9 +58,10 @@ class Orchestrator(OrchestratorInterface):
             self, algorithm_id: str, cycles: int = -1, forced_idle: bool = True
     ) -> None:
 
-        if algorithm_id not in self.registered_algorithms:
+        if self.registered_algorithms is None \
+                or len(self.registered_algorithms) < 1:
             raise OperationalException(
-                "There is no algorithm registered with the given ID"
+                "Orchestrator doesn't have any algorithms configured"
             )
 
         self._run_algorithms([algorithm_id], cycles, forced_idle)
@@ -72,6 +81,17 @@ class Orchestrator(OrchestratorInterface):
 
         # Retrieve the algorithm
         for algo_id in algorithm_ids:
+
+            # Throw exception when algorithm is not registered
+            if algo_id not in self.registered_algorithms:
+                raise OperationalException(
+                    "There is algorithm registered with ID: {}".format(algo_id)
+                )
+
+            # If algorithm is already running
+            if algo_id in self._running_algorithms:
+                return
+
             algo = self.registered_algorithms[algo_id]
 
             if algo:
@@ -105,8 +125,7 @@ class Orchestrator(OrchestratorInterface):
     def running_algorithms(self) -> Dict[str, Thread]:
         return self._running_algorithms
 
-    @staticmethod
-    def register_algorithms(algorithms: List[AlgorithmContext]) -> None:
+    def register_algorithms(self, algorithms: List[AlgorithmContext]) -> None:
 
         if Orchestrator.registered_algorithms is None:
             Orchestrator.registered_data_providers = {}
@@ -116,13 +135,12 @@ class Orchestrator(OrchestratorInterface):
             if algo.get_id() in Orchestrator.registered_algorithms:
                 raise OperationalException(
                     "There is already an algorithm registered with the given "
-                    "ID. Make sure that the IDs do not conflict."
+                    "ID. Make sure that the IDs do not conflict"
                 )
 
             Orchestrator.registered_algorithms[algo.get_id()] = algo
 
-    @staticmethod
-    def register_algorithm(algorithm: AlgorithmContext) -> None:
+    def register_algorithm(self, algorithm: AlgorithmContext) -> None:
 
         if Orchestrator.registered_algorithms is None:
             Orchestrator.registered_algorithms = {}
@@ -130,7 +148,7 @@ class Orchestrator(OrchestratorInterface):
         if algorithm.get_id() in Orchestrator.registered_algorithms:
             raise OperationalException(
                 "There is already an algorithm registered with the same "
-                "ID. Make sure that the IDs do not conflict."
+                "ID. Make sure that the IDs do not conflict"
             )
 
         Orchestrator.registered_algorithms[algorithm.get_id()] = algorithm
