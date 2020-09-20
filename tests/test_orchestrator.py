@@ -1,8 +1,10 @@
+import pytest
 from investing_algorithm_framework.core.context import AlgorithmContext
 from investing_algorithm_framework.orchestrator import Orchestrator
 from investing_algorithm_framework.core.data_providers import DataProvider, \
     RelationalDataProvider
 from tests.resources.utils import random_string
+from investing_algorithm_framework.core.exceptions import OperationalException
 
 
 class MyDataProvider(DataProvider):
@@ -102,6 +104,33 @@ def test_running() -> None:
     assert MyDataProviderThree.executed
 
 
+def test_run_all_algorithms() -> None:
+    data_provider = MyDataProvider()
+    data_provider_two = MyDataProviderTwo()
+
+    algorithm_context = AlgorithmContext(random_string(10), data_provider)
+    algorithm_context_two = AlgorithmContext(
+        random_string(10), data_provider_two
+    )
+
+    orchestrator = Orchestrator()
+    orchestrator.register_algorithms(
+        [algorithm_context, algorithm_context_two])
+
+    assert list(orchestrator.registered_algorithms.keys()) == [
+        algorithm_context.get_id(),
+        algorithm_context_two.get_id(),
+    ]
+
+    assert not data_provider.executed
+    assert not data_provider_two.executed
+
+    orchestrator.start_all_algorithms(cycles=1)
+
+    assert data_provider.executed
+    assert data_provider_two.executed
+
+
 def test_forced_idle() -> None:
     data_provider = MyDataProvider()
     algorithm_context = AlgorithmContext(random_string(10), data_provider)
@@ -112,3 +141,24 @@ def test_forced_idle() -> None:
 
     # Check if finished otherwise it will hang here
     assert True
+
+
+def test_running_of_unregistered_algorithm() -> None:
+    orchestrator = Orchestrator()
+    algo_id = random_string(10)
+
+    with pytest.raises(OperationalException) as exc:
+        orchestrator.start_algorithm(algo_id)
+
+    assert exc.value.error_message \
+           == "There is algorithm registered with ID: " + algo_id
+
+
+def test_running_without_registered_algorithms() -> None:
+    orchestrator = Orchestrator()
+
+    with pytest.raises(OperationalException) as exc:
+        orchestrator.start_all_algorithms()
+
+    assert exc.value.error_message \
+           == "Orchestrator doesn't have any algorithms configured"
