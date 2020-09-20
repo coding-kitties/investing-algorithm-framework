@@ -1,7 +1,10 @@
 from cmd import Cmd
+from typing import List
+
 from pyfiglet import Figlet
 
 from .orchestrator import Orchestrator, OrchestratorInterface
+from ..core.context import AlgorithmContext
 
 
 class CommandLineOrchestrator(Cmd, OrchestratorInterface):
@@ -43,6 +46,20 @@ class CommandLineOrchestrator(Cmd, OrchestratorInterface):
         """
         self._orchestrator.stop_algorithm(algorithm_id)
 
+    def register_algorithms(self, algorithms: List[AlgorithmContext]) -> None:
+        """
+        Delegates 'register_algorithms' functionality to an
+        Orchestrator instance
+        """
+        self._orchestrator.register_algorithms(algorithms)
+
+    def register_algorithm(self, algorithm: AlgorithmContext) -> None:
+        """
+        Delegates 'register_algorithm' functionality to an
+        Orchestrator instance
+        """
+        self._orchestrator.register_algorithm(algorithm)
+
     @staticmethod
     def do_exit(inp):
         return True
@@ -51,16 +68,49 @@ class CommandLineOrchestrator(Cmd, OrchestratorInterface):
         """
         start_algorithms <algorithm_id> optional <cycles>
 
-            description
+            <algorithm_id> Optional unique id that identifies your algorithm
+            <cycles> Optional parameter that will specify how many cycles
+            your algorithm will run.
+
+            This command will start all algorithms.
         """
-        self.start_all_algorithms()
 
-    def do_start_algorithm(self, inp):
-        """start_algorithm <algorithm_id> optional <cycles> """
-        self.start_algorithm(inp)
+        # Extract all the algorithm ID's
+        algorithm_ids = list(set(inp.split()))
 
-    def complete_start_algorithm(self, text, line, begidx, endidx):
+        # Start all algorithms if nothing is specified
+        if len(algorithm_ids) < 1:
+            self.start_all_algorithms()
 
+        # Check if algorithms are registered
+        for algorithm_id in algorithm_ids:
+
+            if algorithm_id not in self._orchestrator.registered_algorithms:
+                print(
+                    "There is no registered algorithm "
+                    "belonging to the ID: {}".format(algorithm_id)
+                )
+                return
+
+        # After checks start the given algorithms
+        for algorithm_id in algorithm_ids:
+            print('Starting algorithm {}'.format(algorithm_id))
+            self.start_algorithm(algorithm_id)
+
+    def do_list_running_algorithms(self, inp) -> None:
+
+        if len(self._orchestrator.running_algorithms.keys()) == 0:
+            print("Currently there are no algorithms running")
+            return
+
+        print("Currently running algorithms: ")
+        for algorithm in self._orchestrator.running_algorithms.keys():
+            print(algorithm)
+
+    def complete_start_algorithms(self, text, line, begidx, endidx):
+        """
+        Tab completion for start algorithm
+        """
         if len(self._orchestrator.registered_algorithms.keys()) < 0:
             return "No algorithms registered"
 
@@ -76,6 +126,9 @@ class CommandLineOrchestrator(Cmd, OrchestratorInterface):
         return True
 
     def start(self):
+        """
+        Main loop for the command line orchestrator
+        """
         figlet = Figlet(font='slant')
         print(figlet.renderText('Orchestrator'))
         self.cmdloop()
