@@ -74,13 +74,12 @@ class CommandLineOrchestrator(Cmd, OrchestratorInterface):
 
             This command will start all algorithms.
         """
-
-        # Extract all the algorithm ID's
-        algorithm_ids = list(set(inp.split()))
+        algorithm_ids = self._extract_algorithm_ids(inp)
 
         # Start all algorithms if nothing is specified
         if len(algorithm_ids) < 1:
             self.start_all_algorithms()
+            return
 
         # Check if algorithms are registered
         for algorithm_id in algorithm_ids:
@@ -107,6 +106,27 @@ class CommandLineOrchestrator(Cmd, OrchestratorInterface):
         for algorithm in self._orchestrator.running_algorithms.keys():
             print(algorithm)
 
+    def do_stop_algorithms(self, inp) -> None:
+        algorithm_ids = self._extract_algorithm_ids(inp)
+
+        if len(algorithm_ids) < 1:
+            self.stop_all_algorithms()
+
+        # Check if algorithms are registered
+        for algorithm_id in algorithm_ids:
+
+            if algorithm_id not in self._orchestrator.registered_algorithms:
+                print(
+                    "There is no registered algorithm "
+                    "belonging to the ID: {}".format(algorithm_id)
+                )
+                return
+
+            # After checks start the given algorithms
+        for algorithm_id in algorithm_ids:
+            print("Stopping algorithm {}".format(algorithm_id))
+            self.stop_algorithm(algorithm_id)
+
     def complete_start_algorithms(self, text, line, begidx, endidx):
         """
         Tab completion for start algorithm
@@ -122,6 +142,22 @@ class CommandLineOrchestrator(Cmd, OrchestratorInterface):
             if str(algo).startswith(text)
         ]
 
+    def complete_stop_algorithms(self, text, line, begidx, endix):
+        """
+        Tab completion for the stop algorithm
+        """
+
+        if len(self._orchestrator.running_algorithms.keys()) < 0:
+            return "No algorithms running"
+
+        if len(self._orchestrator.running_algorithms.keys()) == 1:
+            return list(self._orchestrator.running_algorithms.keys())
+
+        return [
+            algo for algo in self._orchestrator.running_algorithms.keys()
+            if str(algo).startswith(text)
+        ]
+
     def do_EOF(self, line):
         return True
 
@@ -132,3 +168,7 @@ class CommandLineOrchestrator(Cmd, OrchestratorInterface):
         figlet = Figlet(font='slant')
         print(figlet.renderText('Orchestrator'))
         self.cmdloop()
+
+    def _extract_algorithm_ids(self, inp) -> List[str]:
+        return list(set(inp.split()))
+

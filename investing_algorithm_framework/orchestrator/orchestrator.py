@@ -1,3 +1,4 @@
+import sys
 from abc import ABC, abstractmethod
 from typing import List, Dict
 from threading import Thread
@@ -5,6 +6,49 @@ from time import sleep
 
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.context import AlgorithmContext
+
+
+class AlgorithmThread(Thread):
+    """
+    Algorithm thread functions primarily as a normal thread, but implements
+    utils functions to stop, start and check if the thread is alive.
+    """
+
+    def __init__(self, *args, **keywords):
+        Thread.__init__(self, *args, **keywords)
+        self.killed = False
+        self.__run_backup = self.run
+        self.run = self.__run
+
+    def start(self):
+        Thread.start(self)
+
+    def __run(self):
+        sys.settrace(self.globaltrace)
+        self.__run_backup()
+        self.run = self.__run_backup
+
+    def globaltrace(self, frame, event, arg):
+        if event == 'call':
+            return self.localtrace
+        else:
+            return None
+
+    """
+    Trace to check if AlgorithmThread needs to be killed.
+    If killed is true it will stop the current thread.
+    """
+    def localtrace(self, frame, event, arg):
+        if self.killed:
+            if event == 'line':
+                raise SystemExit()
+        return self.localtrace
+
+    """
+    Function to kill a given AlgorithmThread
+    """
+    def kill(self):
+        self.killed = True
 
 
 class OrchestratorInterface(ABC):
@@ -36,8 +80,18 @@ class OrchestratorInterface(ABC):
 
 
 class Orchestrator(OrchestratorInterface):
+    """
+    Orchestrator is an instance of the OrchestratorInterface. This is the
+    standard concrete implementation of the OrchestratorInterface.
+
+    The AlgorithmContext instances that are registered at the Orchestrator
+    will be run in a AlgorithmThread.
+
+    If a AlgorithmContext instance is run it will be added to the
+    _running_algorithms attribute.
+    """
     registered_algorithms = {}
-    _running_algorithms = {}
+    _running_algorithms: Dict[str, AlgorithmThread] = {}
 
     def start_all_algorithms(
             self, cycles: int = -1, forced_idle: bool = True
@@ -67,10 +121,25 @@ class Orchestrator(OrchestratorInterface):
         self._run_algorithms([algorithm_id], cycles, forced_idle)
 
     def stop_all_algorithms(self) -> None:
-        print('stopping all algorithms')
+
+        for algorithm_id in self.running_algorithms:
+            self._stop_algorithm(algorithm_id)
 
     def stop_algorithm(self, algorithm_id: str) -> None:
-        print('stopping algorithm {}'.format(algorithm_id))
+        self._stop_algorithm(algorithm_id)
+
+    def _stop_algorithm(self, algorithm_id: str) -> None:
+        algorithm_thread = self._running_algorithms.get(algorithm_id)
+
+        if algorithm_thread is None:
+            return
+
+        # Kill the algorithm
+        algorithm_thread.kill()
+        algorithm_thread.join()
+
+        # Remove the algorithm from the running algorithms
+        self._running_algorithms.pop(algorithm_id)
 
     def _run_algorithms(
             self,
@@ -95,7 +164,7 @@ class Orchestrator(OrchestratorInterface):
             algo = self.registered_algorithms[algo_id]
 
             if algo:
-                algorithm_thread = Thread(
+                algorithm_thread = AlgorithmThread(
                     target=algo.start,
                     args=(cycles, )
                 )
@@ -122,7 +191,7 @@ class Orchestrator(OrchestratorInterface):
                     return
 
     @property
-    def running_algorithms(self) -> Dict[str, Thread]:
+    def running_algorithms(self) -> Dict[str, AlgorithmThread]:
         return self._running_algorithms
 
     def register_algorithms(self, algorithms: List[AlgorithmContext]) -> None:
