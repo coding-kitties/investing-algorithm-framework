@@ -1,6 +1,6 @@
 import os
+import setuptools
 from yolk.pypi import CheeseShop
-from investing_algorithm_framework import get_version
 
 PACKAGE_NAME = 'investing_algorithm_framework'
 
@@ -13,6 +13,12 @@ def get_latest_version_number(package_name):
 
 
 if __name__ == "__main__":
+    import sys
+
+    sys.path.append('../')
+
+    from investing_algorithm_framework import get_version
+    packages = setuptools.find_packages("investing_algorithm_packages")
     released_version = get_latest_version_number(PACKAGE_NAME)
 
     if released_version != get_version():
