@@ -11,7 +11,7 @@ with open('requirements.txt') as f:
 
 setuptools.setup(
     name="investing_algorithm_framework",
-    version="0.1.2",
+    version=get_version(),
     license="BSL-1.1",
     author="coding kitties",
     description="A framework for creating an investment algorithm",
