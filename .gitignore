@@ -135,3 +135,11 @@ bot_configuration.db
 plugins/strategies/*.py
 !plugins/data_providers/
 plugins/data_providers/*.py
+
+.tox
+_test_run/
+bin/
+include/
+lib/
+.Python
+bumpversion.egg-info/
