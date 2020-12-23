@@ -4,4 +4,6 @@ install:
   - pip install -r requirements-test.txt
 script: pytest
 after_success:
+  - pip install yolk3k
+  - pip install twine
   - python ci/upload_package.py
