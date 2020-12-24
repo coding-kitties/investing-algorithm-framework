@@ -14,7 +14,9 @@ jobs:
         - pip install yolk3k
         - pip install twine
         - cd ci
+        - pip install keyring==21.4.0
         - python upload_package.py
+
 
 stages:
   - test
