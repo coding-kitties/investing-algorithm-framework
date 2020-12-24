@@ -16,7 +16,8 @@ jobs:
         - cd ci
         - pip install keyring==21.4.0
         - python upload_package.py
-
+        on:
+          branch: master
 
 stages:
   - test
