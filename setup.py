@@ -28,9 +28,10 @@ setuptools.setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         "Topic :: Software Development",
-        "License :: Other/Proprietary License",
+        'License :: OSI Approved :: Apache Software License',
+        'Operating System :: OS Independent',
     ],
     install_requires=required,
-    python_requires='>=3.6',
+    python_requires='>=3',
     include_package_data=True,
 )
