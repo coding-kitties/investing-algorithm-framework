@@ -1,3 +1,4 @@
+from random import randint
 from time import sleep
 
 from investing_algorithm_framework.core.exceptions import OperationalException
@@ -15,17 +16,23 @@ class AlgorithmContext:
 
     def __init__(
             self,
-            algorithm_id: str,
             data_provider,
+            algorithm_id: str = None,
             initializer=None,
             config: AlgorithmContextConfiguration = None,
             cycles: int = None
     ):
 
+        if algorithm_id is None:
+            self.algorithm_id = randint(1000, 10000)
+        else:
+            self.algorithm_id = algorithm_id
+
         # Check if data_provider is instance of AbstractDataProvider and
         # Worker
         from investing_algorithm_framework.core.data_providers \
             import AbstractDataProvider
+
         assert isinstance(data_provider, AbstractDataProvider), (
             'Data provider must be an instance of the '
             'AbstractDataProvider class'
@@ -35,7 +42,6 @@ class AlgorithmContext:
             'Data provider must be an instance of the Worker class'
         )
 
-        self.algorithm_id = algorithm_id
         self.data_provider = data_provider
         self.cycles = cycles
 
