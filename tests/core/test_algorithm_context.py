@@ -23,29 +23,29 @@ class MyInitializer(AlgorithmContextInitializer):
 
 def test_data_provider_registration() -> None:
 
-    context = AlgorithmContext(MyDataProvider(), random_string(10))
+    context = AlgorithmContext([MyDataProvider()], random_string(10))
 
-    assert context.data_provider is not None
-    assert isinstance(context.data_provider, MyDataProvider)
+    assert context.data_providers is not None
+    assert len(context.data_providers) == 1
 
     with pytest.raises(Exception) as exc_info:
-        AlgorithmContext(MyDataProvider, random_string(10))
+        AlgorithmContext([MyDataProvider], random_string(10))
 
     assert str(exc_info.value) == 'Data provider must be an instance ' \
                                   'of the AbstractDataProvider class'
 
 
 def test_data_provider_id_creation() -> None:
-    context = AlgorithmContext(MyDataProvider())
+    context = AlgorithmContext([MyDataProvider()])
     assert context.algorithm_id is not None
 
 
 def test_running() -> None:
-    context = AlgorithmContext(MyDataProvider(), random_string(10), cycles=1)
+    context = AlgorithmContext([MyDataProvider()], random_string(10), cycles=1)
     context.start()
     assert MyDataProvider.cycles == 1
 
-    context = AlgorithmContext(MyDataProvider(), random_string(10), cycles=2)
+    context = AlgorithmContext([MyDataProvider()], random_string(10), cycles=2)
     context.start()
     assert MyDataProvider.cycles == 3
 
@@ -53,12 +53,12 @@ def test_running() -> None:
 def test_initializer_registration() -> None:
     initializer = MyInitializer()
     context = AlgorithmContext(
-        MyDataProvider(), random_string(10), initializer
+        [MyDataProvider()], random_string(10), initializer
     )
     assert context.initializer is not None
     assert context.initializer is initializer
 
-    context = AlgorithmContext(MyDataProvider(), random_string(10))
+    context = AlgorithmContext([MyDataProvider()], random_string(10))
     context.set_algorithm_context_initializer(initializer)
 
     assert context.initializer is not None
@@ -66,7 +66,7 @@ def test_initializer_registration() -> None:
 
     # Check exceptions
     with pytest.raises(AssertionError) as exc_info:
-        context = AlgorithmContext(MyDataProvider(), random_string(10))
+        context = AlgorithmContext([MyDataProvider()], random_string(10))
         context.set_algorithm_context_initializer(MyInitializer)
 
     assert str(exc_info.value) == 'Initializer must be an instance of ' \
@@ -76,7 +76,7 @@ def test_initializer_registration() -> None:
 def test_config_registration() -> None:
     config = AlgorithmContextConfiguration()
     context = AlgorithmContext(
-        MyDataProvider(), random_string(10),
+        [MyDataProvider()], random_string(10),
         config=config
     )
     assert context.config is not None

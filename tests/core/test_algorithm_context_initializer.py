@@ -24,7 +24,7 @@ def test_initializer() -> None:
     assert not MyInitializer.called
     context = AlgorithmContext(
         algorithm_id='my_algorithm',
-        data_provider=MyDataProvider(),
+        data_providers=[MyDataProvider()],
         initializer=MyInitializer(),
         cycles=1
     )

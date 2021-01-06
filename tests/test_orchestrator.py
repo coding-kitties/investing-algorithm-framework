@@ -22,9 +22,9 @@ def test_registration() -> None:
     data_provider = MyDataProvider()
     data_provider_two = MyDataProviderTwo()
 
-    algorithm_context = AlgorithmContext(data_provider, random_string(10))
+    algorithm_context = AlgorithmContext([data_provider], random_string(10))
     algorithm_context_two = AlgorithmContext(
-        data_provider_two, random_string(10)
+        [data_provider_two], random_string(10)
     )
     orchestrator = Orchestrator()
     orchestrator.register_algorithm(algorithm_context)
