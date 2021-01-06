@@ -1,5 +1,6 @@
 from random import randint
 from time import sleep
+from typing import List
 
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.workers import Worker
@@ -16,7 +17,7 @@ class AlgorithmContext:
 
     def __init__(
             self,
-            data_provider,
+            data_providers: List,
             algorithm_id: str = None,
             initializer=None,
             config: AlgorithmContextConfiguration = None,
@@ -33,16 +34,17 @@ class AlgorithmContext:
         from investing_algorithm_framework.core.data_providers \
             import AbstractDataProvider
 
-        assert isinstance(data_provider, AbstractDataProvider), (
-            'Data provider must be an instance of the '
-            'AbstractDataProvider class'
-        )
+        for data_provider in data_providers:
+            assert isinstance(data_provider, AbstractDataProvider), (
+                'Data provider must be an instance of the '
+                'AbstractDataProvider class'
+            )
 
-        assert isinstance(data_provider, Worker), (
-            'Data provider must be an instance of the Worker class'
-        )
+            assert isinstance(data_provider, Worker), (
+                'Data provider must be an instance of the Worker class'
+            )
 
-        self.data_provider = data_provider
+        self.data_providers = data_providers
         self.cycles = cycles
 
         if initializer is not None:
@@ -86,13 +88,14 @@ class AlgorithmContext:
 
     def _run(self) -> None:
         iteration = 0
-        self.data_provider.start(algorithm_context=self)
-        iteration += 1
 
         while self.check_context(iteration):
-            sleep(1)
-            self.data_provider.start(algorithm_context=self)
+
+            for data_provider in self.data_providers:
+                data_provider.start(algorithm_context=self)
+
             iteration += 1
+            sleep(1)
 
     def check_context(self, iteration) -> bool:
 
