@@ -18,11 +18,22 @@ class MyWorkerTwo(Worker):
         pass
 
 
+class MyWorkerThree(Worker):
+
+    def work(self, **kwargs) -> None:
+        pass
+
+
 class MyObserver(Observer):
     updated: int = 0
 
     def update(self, observable, **kwargs) -> None:
         MyObserver.updated += 1
+
+
+def test_id_generation():
+    worker = MyWorkerThree()
+    assert worker.id is not None
 
 
 def test_last_run() -> None:

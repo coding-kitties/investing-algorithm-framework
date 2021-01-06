@@ -1,4 +1,5 @@
 import logging
+from random import randint
 from abc import abstractmethod, ABC
 from wrapt import synchronized
 from datetime import datetime
@@ -19,6 +20,13 @@ class Worker(Observable, ABC):
 
     id = None
     last_run: datetime = None
+
+    def __init__(self):
+        super().__init__()
+
+        # If ID is none generate a new unique ID
+        if self.id is None:
+            self.id = randint(10000, 100000)
 
     def start(self, **kwargs) -> None:
         """
