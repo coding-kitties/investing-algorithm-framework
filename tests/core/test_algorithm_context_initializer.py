@@ -1,3 +1,4 @@
+from unittest import TestCase
 from investing_algorithm_framework.core.context import \
     AlgorithmContextInitializer
 from investing_algorithm_framework.core.context import AlgorithmContext
@@ -20,13 +21,15 @@ class MyInitializer(AlgorithmContextInitializer):
         MyInitializer.called = True
 
 
-def test_initializer() -> None:
-    assert not MyInitializer.called
-    context = AlgorithmContext(
-        algorithm_id='my_algorithm',
-        data_provider=MyDataProvider(),
-        initializer=MyInitializer(),
-        cycles=1
-    )
-    context.start()
-    assert MyInitializer.called
+class AlgorithmContextInitializer(TestCase):
+
+    def test_initializer(self) -> None:
+        self.assertFalse(MyInitializer.called)
+        context = AlgorithmContext(
+            algorithm_id='my_algorithm',
+            data_providers=[MyDataProvider()],
+            initializer=MyInitializer(),
+            cycles=1
+        )
+        context.start()
+        self.assertTrue(MyInitializer.called)

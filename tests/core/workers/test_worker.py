@@ -1,18 +1,17 @@
 from typing import Dict, Any
-
+from unittest import TestCase
 from investing_algorithm_framework.core.workers import Worker
 from investing_algorithm_framework.core.events import Observer
 
 
 class MyWorker(Worker):
-    id = 'MyWorker'
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
 
 
 class MyWorkerTwo(Worker):
-    id = 'MyWorkerTwo'
+    id = 'my-custom-id'
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
@@ -20,8 +19,11 @@ class MyWorkerTwo(Worker):
 
 class MyWorkerThree(Worker):
 
-    def work(self, **kwargs) -> None:
+    def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
+
+    def get_id(self) -> str:
+        return "method-id"
 
 
 class MyObserver(Observer):
@@ -31,39 +33,43 @@ class MyObserver(Observer):
         MyObserver.updated += 1
 
 
-def test_id_generation():
-    worker = MyWorkerThree()
-    assert worker.id is not None
+class TestBaseWorker(TestCase):
 
+    def setUp(self) -> None:
+        self.worker_one = MyWorker()
+        self.worker_two = MyWorkerTwo()
+        self.worker_three = MyWorkerThree()
 
-def test_last_run() -> None:
-    worker = MyWorker()
-    assert worker.last_run is None
-    worker.start()
-    assert worker.last_run is not None
-    previous_run = worker.last_run
-    worker.start()
-    assert worker.last_run is not None
+    def test_id_generation(self):
+        self.assertIsNotNone(self.worker_one.id)
+        self.assertIsNotNone(self.worker_one.get_id())
+        self.assertEqual("my-custom-id", self.worker_two.get_id())
+        self.assertEqual("method-id", self.worker_three.get_id())
 
-    # Check if update is after previous run
-    assert worker.last_run > previous_run
+    def test_last_run_attribute(self):
+        self.assertIsNone(self.worker_one.last_run)
+        self.worker_one.start()
+        self.assertIsNotNone(self.worker_one.last_run)
 
-    worker_two = MyWorkerTwo()
-    assert worker_two.last_run is None
-    worker_two.start()
-    assert worker_two.last_run is not None
-    assert worker_two != worker.last_run
+        # Store the last run
+        previous_run = self.worker_one.last_run
 
+        self.worker_one.start()
+        self.assertIsNotNone(self.worker_one.last_run)
 
-def test_observing() -> None:
-    # Reset the values
-    MyObserver.updated = 0
-    MyWorker.last_run = None
+        self.assertNotEqual(previous_run, self.worker_one.last_run)
 
-    worker = MyWorker()
-    assert worker.last_run is None
-    worker.add_observer(MyObserver())
-    assert MyObserver.updated == 0
-    worker.start()
-    assert worker.last_run is not None
-    assert MyObserver.updated == 1
+        self.assertIsNone(self.worker_two.last_run)
+        self.worker_two.start()
+
+        self.assertNotEqual(self.worker_two.last_run, self.worker_one.last_run)
+
+    def test_observing(self) -> None:
+        # Reset the values
+        MyObserver.updated = 0
+        self.assertIsNone(self.worker_one.last_run)
+        self.worker_one.add_observer(MyObserver())
+        self.assertEqual(MyObserver.updated, 0)
+        self.worker_one.start()
+        self.assertIsNotNone(self.worker_one.last_run)
+        self.assertEqual(1, MyObserver.updated)
