@@ -124,7 +124,7 @@ class AbstractDataProvider:
 
     def provide_raw_data(self, data, algorithm_context: AlgorithmContext):
 
-        if data is not None:
+        if data is not None and self.registered_strategies:
 
             for strategy in self.registered_strategies:
                 try:
