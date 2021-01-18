@@ -17,16 +17,7 @@ class Worker(Observable, ABC):
     Class Worker: manages the execution of a task and the context around
     executing it.
     """
-
-    id = None
     last_run: datetime = None
-
-    def __init__(self):
-        super().__init__()
-
-        # If ID is none generate a new unique ID
-        if self.id is None:
-            self.id = randint(10000, 100000)
 
     def start(self, **kwargs) -> None:
         """
@@ -63,14 +54,6 @@ class Worker(Observable, ABC):
 
     def remove_observer(self, observer: Observer) -> None:
         super(Worker, self).remove_observer(observer)
-
-    def get_id(self) -> str:
-        assert getattr(self, 'id', None) is not None, (
-            "{} should either include a id attribute, or override the "
-            "`get_id()`, method.".format(self.__class__.__name__)
-        )
-
-        return getattr(self, 'id')
 
     @classmethod
     @synchronized

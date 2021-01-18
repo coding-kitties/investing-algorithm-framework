@@ -14,20 +14,32 @@ class AbstractPortfolioManager(ABC):
         return self._broker
 
     @abstractmethod
-    def get_portfolio_size(self, algorithm_context: AlgorithmContext):
+    def get_portfolio_size(self, algorithm_context: AlgorithmContext) -> float:
         raise NotImplementedError()
 
     @abstractmethod
-    def get_free_portfolio_size(self, algorithm_context: AlgorithmContext):
+    def get_free_portfolio_size(self, algorithm_context: AlgorithmContext) \
+            -> float:
         raise NotImplementedError()
 
     @abstractmethod
-    def get_allocated_portfolio_size(self, algorithm_context: AlgorithmContext):
+    def get_allocated_portfolio_size(
+            self, algorithm_context: AlgorithmContext
+    ) -> float:
         raise NotImplementedError()
 
     @abstractmethod
-    def get_allocated_asset_size(self, asset, algorithm_context: AlgorithmContext):
+    def get_allocated_asset_size(
+            self, asset, algorithm_context: AlgorithmContext
+    ) -> float:
         raise NotImplementedError()
 
-    def order_executed(self, asset: str, max_price: float, quantity: int, commission: float, **kwargs):
+    def order_executed(
+            self,
+            asset: str,
+            max_price: float,
+            quantity: int,
+            commission: float,
+            **kwargs
+    ):
         raise OperationalException("Order executed not implemented")

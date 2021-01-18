@@ -81,7 +81,9 @@ class AlgorithmContext:
                 'AbstractPortfolioManager class'
             )
 
-            self.portfolio_managers[portfolio_manager.broker] = portfolio_manager
+            self.portfolio_managers[
+                portfolio_manager.broker
+            ] = portfolio_manager
 
         self.data_providers = data_providers
         self.cycles = cycles
@@ -101,7 +103,8 @@ class AlgorithmContext:
 
         if config is None:
             self._config = AlgorithmContextConfiguration()
-        elif not isinstance(config, dict) and not isinstance(config, AlgorithmContextConfiguration):
+        elif not isinstance(config, dict) \
+                and not isinstance(config, AlgorithmContextConfiguration):
             raise OperationalException("Given config object is not supported")
 
     def start(self) -> None:
@@ -150,28 +153,45 @@ class AlgorithmContext:
     def config(self) -> AlgorithmContextConfiguration:
         return self._config
 
-    def perform_limit_order(self, broker: str, asset: str, max_price: float, quantity: int, commission: float, **kwargs):
+    def perform_limit_order(
+            self,
+            broker: str,
+            asset: str,
+            max_price: float,
+            quantity: int,
+            commission: float,
+            **kwargs
+    ):
 
         if broker not in self.portfolio_managers:
-            raise OperationalException("There is no portfolio manager linked to the given broker")
+            raise OperationalException(
+                "There is no portfolio manager linked to the given broker"
+            )
 
         if broker not in self.order_executors:
-            raise OperationalException("There is no order executor linked to the given broker")
+            raise OperationalException(
+                "There is no order executor linked to the given broker"
+            )
 
         portfolio_manager = self.portfolio_managers[broker]
         order_executor = self.order_executors[broker]
 
         free_space = portfolio_manager.get_free_portfolio_size(self)
 
-        if (max_price * quantity) + commission  > free_space:
+        if (max_price * quantity) + commission > free_space:
             raise OperationalException(
-                "Cannot execute order because not enough free space in portfolio, "
-                "your current free space is {}".format(free_space)
+                "Cannot execute order because not enough free "
+                "space in portfolio, your current free space is {}".format(
+                    free_space
+                )
             )
 
-        order_executor.execute_limit_order(asset, max_price, quantity, **kwargs)
+        order_executor.execute_limit_order(
+            asset, max_price, quantity, self, **kwargs
+        )
 
         try:
-            portfolio_manager.order_executed(asset, max_price, quantity, **kwargs)
+            portfolio_manager.order_executed(
+                asset, max_price, quantity, commission, **kwargs)
         except OperationalException:
             pass
