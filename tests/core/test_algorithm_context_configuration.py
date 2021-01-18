@@ -1,4 +1,4 @@
-import pytest
+from unittest import TestCase
 from investing_algorithm_framework.core.context \
     import AlgorithmContextConfiguration
 from investing_algorithm_framework.configuration.constants import BASE_DIR, \
@@ -7,26 +7,28 @@ from investing_algorithm_framework.configuration.constants import BASE_DIR, \
 from tests.resources.utils import random_string
 
 
-def test() -> None:
-    config = AlgorithmContextConfiguration()
-    config.load_settings_module('tests.resources.settings')
+class TestAlgorithmContextConfiguration(TestCase):
 
-    assert config[BASE_DIR] is not None
-    assert config[DATABASE_CONFIG] is not None
+    def test(self) -> None:
+        config = AlgorithmContextConfiguration()
+        config.load_settings_module('tests.resources.settings')
 
-    database_config = config[DATABASE_CONFIG]
+        self.assertIsNotNone(config[BASE_DIR])
+        self.assertIsNotNone(config[DATABASE_CONFIG])
 
-    assert database_config[DATABASE_TYPE] is not None
-    assert database_config[DATABASE_NAME] is not None
-    assert database_config[DATABASE_DIRECTORY_PATH] is not None
+        database_config = config[DATABASE_CONFIG]
 
-    new_attribute = random_string(10)
-    new_attribute_value = random_string(10)
+        self.assertIsNotNone(database_config[DATABASE_TYPE])
+        self.assertIsNotNone(database_config[DATABASE_NAME])
+        self.assertIsNotNone(database_config[DATABASE_DIRECTORY_PATH])
 
-    config.set(new_attribute, new_attribute_value)
+        new_attribute = random_string(10)
+        new_attribute_value = random_string(10)
 
-    assert config[new_attribute] is not None
-    assert config[new_attribute] == new_attribute_value
+        config.set(new_attribute, new_attribute_value)
 
-    with pytest.raises(Exception):
-        config.set(new_attribute, random_string(10))
+        self.assertIsNotNone(config[new_attribute])
+        self.assertEqual(config[new_attribute], new_attribute_value)
+
+        with self.assertRaises(Exception):
+            config.set(new_attribute, random_string(10))

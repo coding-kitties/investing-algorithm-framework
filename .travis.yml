@@ -8,7 +8,7 @@ jobs:
   include:
     - stage: test
       script:
-        - pytest
+        - python -m unittest discover -s tests
     - stage: deploy
       script:
         - pip install yolk3k
