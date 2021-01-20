@@ -1,5 +1,6 @@
 from time import sleep
 from typing import Dict, Any
+from unittest import TestCase
 
 from investing_algorithm_framework.core.workers import ScheduledWorker
 from investing_algorithm_framework.core.events import Observer
@@ -8,8 +9,7 @@ from investing_algorithm_framework.core.utils import TimeUnit
 
 class MyWorker(ScheduledWorker):
     time_unit = TimeUnit.SECOND
-    time_interval = 1
-    id = 'MyWorker'
+    time_interval = 3
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
@@ -18,7 +18,6 @@ class MyWorker(ScheduledWorker):
 class MyWorkerTwo(ScheduledWorker):
     time_unit = TimeUnit.SECOND
     time_interval = 1
-    id = 'MyWorkerTwo'
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
@@ -31,53 +30,68 @@ class MyObserver(Observer):
         MyObserver.updated += 1
 
 
-def test_running() -> None:
-    worker = MyWorker()
-    worker_two = MyWorkerTwo()
+class TestScheduledWorker(TestCase):
+    def setUp(self) -> None:
+        self.worker_one = MyWorker()
+        self.worker_two = MyWorkerTwo()
 
-    assert worker.last_run is None
-    assert MyWorker.last_run is None
+    def test_running(self) -> None:
+        self.assertIsNone(self.worker_one.last_run)
+        self.assertIsNone(self.worker_two.last_run)
 
-    assert worker_two.last_run is None
-    assert MyWorkerTwo.last_run is None
+        self.worker_one.start()
+        self.worker_two.start()
 
-    worker.start()
+        self.assertIsNotNone(self.worker_one.last_run)
+        self.assertIsNotNone(self.worker_two.last_run)
 
-    assert worker.last_run is not None
-    assert MyWorker.last_run is not None
+        previous_run_worker_one = self.worker_one.last_run
+        previous_run_worker_two = self.worker_two.last_run
 
-    assert worker_two.last_run is None
-    assert MyWorkerTwo.last_run is None
+        sleep(1)
 
-    previous_run = worker.last_run
-    sleep(1)
-    worker.start()
+        self.worker_one.start()
+        self.worker_two.start()
 
-    assert worker.last_run is not None
-    assert MyWorker.last_run is not None
-    assert previous_run != worker.last_run
+        self.assertEqual(previous_run_worker_one, self.worker_one.last_run)
+        self.assertIsNotNone(self.worker_two.last_run)
+        self.assertNotEqual(previous_run_worker_two, self.worker_two.last_run)
 
-    assert worker_two.last_run is None
-    assert MyWorkerTwo.last_run is None
+        sleep(3)
 
-    worker_two.start()
+        self.worker_one.start()
+        self.worker_two.start()
 
-    assert worker_two.last_run is not None
-    assert MyWorkerTwo.last_run is not None
+        self.assertNotEqual(previous_run_worker_one, self.worker_one.last_run)
+        self.assertNotEqual(previous_run_worker_two, self.worker_two.last_run)
 
-    assert MyWorkerTwo.last_run != MyWorker.last_run
-    assert worker.last_run != worker_two.last_run
+    def test_observing(self) -> None:
+        MyObserver.updated = 0
+        self.assertIsNone(self.worker_one.last_run)
+        self.worker_one.add_observer(MyObserver())
+        self.worker_two.add_observer(MyObserver())
+        self.assertEqual(MyObserver.updated, 0)
+        self.worker_one.start()
+        self.worker_two.start()
+
+        sleep(1)
+
+        self.assertEqual(2, MyObserver.updated)
+
+        self.worker_one.start()
+        self.worker_two.start()
+
+        sleep(1)
+
+        self.assertEqual(3, MyObserver.updated)
+
+        sleep(2)
+
+        self.worker_one.start()
+        self.worker_two.start()
+
+        sleep(1)
+
+        self.assertEqual(5, MyObserver.updated)
 
 
-def test_observing() -> None:
-    # Reset the values
-    MyObserver.updated = 0
-    MyWorker.last_run = None
-
-    worker = MyWorker()
-    assert worker.last_run is None
-    worker.add_observer(MyObserver())
-    assert MyObserver.updated == 0
-    worker.start()
-    assert worker.last_run is not None
-    assert MyObserver.updated == 1

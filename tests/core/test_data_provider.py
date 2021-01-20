@@ -1,3 +1,4 @@
+from unittest import TestCase
 from investing_algorithm_framework.core.data_providers import \
     AbstractDataProvider
 from investing_algorithm_framework.core.strategies import Strategy
@@ -56,26 +57,22 @@ class DataProviderTwo(AbstractDataProvider):
         return 'tick data'
 
 
-def test() -> None:
-    data_provider = DataProvider()
-    data_provider.provide_data(algorithm_context=None)
+class TestDataProvider(TestCase):
 
-    assert MyStrategy.on_tick_method_called
-    assert MyStrategy.on_quote_method_called
-    assert MyStrategy.on_order_book_method_called
+    def test(self) -> None:
+        data_provider = DataProvider()
+        data_provider.provide_data(algorithm_context=None)
 
+        self.assertTrue(MyStrategy.on_tick_method_called)
+        self.assertTrue(MyStrategy.on_quote_method_called)
+        self.assertTrue(MyStrategy.on_order_book_method_called)
 
-def test_registration() -> None:
-    data_provider = DataProviderTwo()
-    data_provider.register_strategy(MyStrategy())
+    def test_registration(self) -> None:
+        data_provider = DataProviderTwo()
+        data_provider.register_strategy(MyStrategy())
 
-    assert len(data_provider.registered_strategies) == 1
+        self.assertEqual(1, len(data_provider.registered_strategies))
 
-    data_provider.register_strategy(MyStrategyTwo())
+        data_provider.register_strategy(MyStrategyTwo())
 
-    assert len(data_provider.registered_strategies) == 2
-
-
-
-
-
+        self.assertEqual(2, len(data_provider.registered_strategies))
