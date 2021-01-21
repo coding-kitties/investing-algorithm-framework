@@ -31,7 +31,11 @@ class MyObserver(Observer):
 
 
 class TestScheduledWorker(TestCase):
+
     def setUp(self) -> None:
+        MyWorker.last_run = None
+        MyWorkerTwo.last_run = None
+
         self.worker_one = MyWorker()
         self.worker_two = MyWorkerTwo()
 

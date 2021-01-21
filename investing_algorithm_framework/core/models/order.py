@@ -2,7 +2,7 @@ from sqlalchemy import Column, DateTime, String, Boolean, Float, Integer
 from datetime import datetime
 
 
-class OrderMixin:
+class Order:
     # Integer id for the Order as the primary key
     id = Column(Integer, primary_key=True)
 

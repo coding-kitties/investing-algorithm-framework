@@ -11,8 +11,6 @@ class MyWorker(Worker):
 
 
 class MyWorkerTwo(Worker):
-    id = 'my-custom-id'
-
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
 
@@ -21,9 +19,6 @@ class MyWorkerThree(Worker):
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
-
-    def get_id(self) -> str:
-        return "method-id"
 
 
 class MyObserver(Observer):
@@ -39,12 +34,6 @@ class TestBaseWorker(TestCase):
         self.worker_one = MyWorker()
         self.worker_two = MyWorkerTwo()
         self.worker_three = MyWorkerThree()
-
-    def test_id_generation(self):
-        self.assertIsNotNone(self.worker_one.id)
-        self.assertIsNotNone(self.worker_one.get_id())
-        self.assertEqual("my-custom-id", self.worker_two.get_id())
-        self.assertEqual("method-id", self.worker_three.get_id())
 
     def test_last_run_attribute(self):
         self.assertIsNone(self.worker_one.last_run)
@@ -65,11 +54,18 @@ class TestBaseWorker(TestCase):
         self.assertNotEqual(self.worker_two.last_run, self.worker_one.last_run)
 
     def test_observing(self) -> None:
-        # Reset the values
-        MyObserver.updated = 0
         self.assertIsNone(self.worker_one.last_run)
+        self.assertIsNone(self.worker_two.last_run)
+        self.assertIsNone(self.worker_three.last_run)
+
+        MyObserver.updated = 0
         self.worker_one.add_observer(MyObserver())
         self.assertEqual(MyObserver.updated, 0)
         self.worker_one.start()
+
         self.assertIsNotNone(self.worker_one.last_run)
+        self.assertIsNone(self.worker_two.last_run)
+        self.assertIsNone(self.worker_three.last_run)
+
+        # self.assertIsNotNone(self.worker_one.last_run)
         self.assertEqual(1, MyObserver.updated)

@@ -1,7 +1,5 @@
 from investing_algorithm_framework.core.context import AlgorithmContext
-from investing_algorithm_framework.orchestrator import Orchestrator
 from investing_algorithm_framework.core.data_providers import DataProvider
-from tests.resources.utils import random_string
 
 
 class MyDataProvider(DataProvider):
@@ -17,19 +15,3 @@ class MyDataProviderTwo(DataProvider):
     def get_data(self, algorithm_context: AlgorithmContext):
         return 'data'
 
-
-def test_registration() -> None:
-    data_provider = MyDataProvider()
-    data_provider_two = MyDataProviderTwo()
-
-    algorithm_context = AlgorithmContext([data_provider], random_string(10))
-    algorithm_context_two = AlgorithmContext(
-        [data_provider_two], random_string(10)
-    )
-    orchestrator = Orchestrator()
-    orchestrator.register_algorithm(algorithm_context)
-    orchestrator.register_algorithm(algorithm_context_two)
-
-    assert orchestrator.registered_algorithms == [
-        algorithm_context, algorithm_context_two
-    ]
