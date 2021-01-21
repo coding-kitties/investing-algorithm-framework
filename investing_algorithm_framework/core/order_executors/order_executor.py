@@ -1,5 +1,4 @@
 from abc import abstractmethod, ABC
-from typing import Dict
 
 from investing_algorithm_framework.core.context import AlgorithmContext
 

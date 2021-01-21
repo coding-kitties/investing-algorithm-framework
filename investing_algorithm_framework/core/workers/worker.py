@@ -1,5 +1,4 @@
 import logging
-from random import randint
 from abc import abstractmethod, ABC
 from wrapt import synchronized
 from datetime import datetime
