@@ -10,19 +10,19 @@ class MyStrategy(Strategy):
     on_quote_method_called = False
     on_order_book_method_called = False
 
-    def on_tick(self, data, algorithm_context: AlgorithmContext):
+    def on_tick(self, data_provider_id, data, algorithm_context: AlgorithmContext):
         MyStrategy.on_tick_method_called = True
 
-    def on_quote(self, data, algorithm_context: AlgorithmContext):
+    def on_quote(self, data_provider_id, data, algorithm_context: AlgorithmContext):
         MyStrategy.on_quote_method_called = True
 
-    def on_order_book(self, data, algorithm_context: AlgorithmContext):
+    def on_order_book(self, data_provider_id, data, algorithm_context: AlgorithmContext):
         MyStrategy.on_order_book_method_called = True
 
 
 class MyStrategyTwo(Strategy):
 
-    def on_tick(self, data, algorithm_context: AlgorithmContext):
+    def on_tick(self, data_provider_id, data, algorithm_context: AlgorithmContext):
         pass
 
 

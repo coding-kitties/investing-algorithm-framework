@@ -34,7 +34,7 @@ class AbstractPortfolioManager(ABC):
     ) -> float:
         raise NotImplementedError()
 
-    def order_executed(
+    def order_executed_notification(
             self,
             asset: str,
             max_price: float,

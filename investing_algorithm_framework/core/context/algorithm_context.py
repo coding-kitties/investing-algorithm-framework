@@ -1,3 +1,4 @@
+import logging
 from random import randint
 from time import sleep
 from typing import List
@@ -5,6 +6,9 @@ from typing import List
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.workers import Worker
 from .algorithm_context_configuration import AlgorithmContextConfiguration
+
+
+logger = logging.getLogger(__name__)
 
 
 class AlgorithmContext:
@@ -179,19 +183,33 @@ class AlgorithmContext:
         free_space = portfolio_manager.get_free_portfolio_size(self)
 
         if (max_price * quantity) + commission > free_space:
-            raise OperationalException(
+            logger.warning(
                 "Cannot execute order because not enough free "
                 "space in portfolio, your current free space is {}".format(
                     free_space
                 )
             )
+            return
 
         order_executor.execute_limit_order(
             asset, max_price, quantity, self, **kwargs
         )
 
+        # Notify the portfolio manager that
+        # the order was executed
         try:
-            portfolio_manager.order_executed(
-                asset, max_price, quantity, commission, **kwargs)
+            portfolio_manager.order_executed_notification(
+                asset, max_price, quantity, commission, **kwargs
+            )
         except OperationalException:
             pass
+
+    def get_space_portfolio_size(self, broker):
+
+        if broker not in self.portfolio_managers:
+            raise OperationalException(
+                "There is no portfolio manager linked to the given broker"
+            )
+
+        portfolio_manager = self.portfolio_managers[broker]
+        return portfolio_manager.get_free_portfolio_size(self)

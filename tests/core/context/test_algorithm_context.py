@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 from investing_algorithm_framework.core.context import AlgorithmContext, \
-    AlgorithmContextInitializer, AlgorithmContextConfiguration
+    AlgorithmContextInitializer
 from investing_algorithm_framework import DataProvider, AbstractOrderExecutor, \
     AbstractPortfolioManager, Strategy
 from tests.resources.utils import random_string
@@ -10,7 +10,7 @@ from tests.resources.utils import random_string
 class MyStrategy(Strategy):
     cycles = 0
 
-    def on_raw_data(self, data, algorithm_context):
+    def on_raw_data(self, data_provider_id, data, algorithm_context):
         MyStrategy.cycles += 1
         algorithm_context.perform_limit_order('test_broker', 'btc', 10, 10, 10)
 
@@ -25,7 +25,8 @@ class MyDataProvider(DataProvider):
 
 
 class MyOrderExecutor(AbstractOrderExecutor):
-    execute_limit_order_called = True
+    cycles = 0
+    execute_limit_order_called = False
 
     def __init__(self):
         super(MyOrderExecutor, self).__init__("test_broker")
@@ -37,6 +38,7 @@ class MyOrderExecutor(AbstractOrderExecutor):
             quantity: int,
             algorithm_context: AlgorithmContext, **kwargs
     ):
+        MyOrderExecutor.cycles += 1
         MyOrderExecutor.execute_limit_order_called = True
 
 
@@ -69,12 +71,22 @@ class MyPortfolioManager(AbstractPortfolioManager):
 
 
 class MyInitializer(AlgorithmContextInitializer):
+    initializer_called = False
 
     def initialize(self, algorithm_context: AlgorithmContext) -> None:
-        pass
+        MyInitializer.initializer_called = True
 
 
 class TestAlgorithmContext(TestCase):
+
+    def setUp(self) -> None:
+        MyOrderExecutor.cycles = 0
+        MyPortfolioManager.portfolio_size_called = False
+        MyPortfolioManager.free_portfolio_size_called = False
+        MyPortfolioManager.get_allocated_portfolio_size_called = False
+        MyPortfolioManager.get_allocated_asset_size_called = False
+        MyDataProvider.cycles = 0
+        MyStrategy.cycles = 0
 
     def test_data_component_registrations(self) -> None:
         context = AlgorithmContext(
@@ -123,7 +135,8 @@ class TestAlgorithmContext(TestCase):
             data_providers=[MyDataProvider()],
             order_executors=[MyOrderExecutor()],
             portfolio_managers=[MyPortfolioManager()],
-            cycles=1
+            cycles=1,
+            initializer=MyInitializer()
         )
 
         context.start()
@@ -132,38 +145,21 @@ class TestAlgorithmContext(TestCase):
         self.assertFalse(MyPortfolioManager.portfolio_size_called)
         self.assertTrue(MyPortfolioManager.free_portfolio_size_called)
         self.assertTrue(MyOrderExecutor.execute_limit_order_called)
+        self.assertTrue(MyInitializer.initializer_called)
 
-
-class TestContextInitialization(TestCase):
-
-    def test_initializer_registration(self) -> None:
-        initializer = MyInitializer()
+    def test_running_two_cycles(self) -> None:
         context = AlgorithmContext(
-            [MyDataProvider()], random_string(10), initializer
-        )
-        self.assertIsNotNone(context.initializer)
-        self.assertEqual(initializer, context.initializer)
-
-        context = AlgorithmContext([MyDataProvider()], random_string(10))
-        context.set_algorithm_context_initializer(initializer)
-
-        self.assertIsNotNone(context.initializer)
-        self.assertEqual(initializer, context.initializer)
-
-        with self.assertRaises(AssertionError) as exc_info:
-            context = AlgorithmContext([MyDataProvider()], random_string(10))
-            context.set_algorithm_context_initializer(MyInitializer)
-
-        self.assertEqual(
-            'Initializer must be an instance of AlgorithmContextInitializer',
-            str(exc_info.exception)
+            data_providers=[MyDataProvider()],
+            order_executors=[MyOrderExecutor()],
+            portfolio_managers=[MyPortfolioManager()],
+            cycles=2,
+            initializer=MyInitializer()
         )
 
-    def test_config_registration(self) -> None:
-        config = AlgorithmContextConfiguration()
-        context = AlgorithmContext(
-            [MyDataProvider()], random_string(10),
-            config=config
-        )
-        self.assertIsNotNone(context.config)
-        self.assertEqual(config, context.config)
+        context.start()
+        self.assertEqual(2, MyDataProvider.cycles)
+        self.assertEqual(2, MyStrategy.cycles)
+        self.assertFalse(MyPortfolioManager.portfolio_size_called)
+        self.assertTrue(MyPortfolioManager.free_portfolio_size_called)
+        self.assertTrue(MyOrderExecutor.execute_limit_order_called)
+        self.assertTrue(MyInitializer.initializer_called)

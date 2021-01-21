@@ -9,8 +9,6 @@ from investing_algorithm_framework.core.utils import TimeUnit
 
 class MyWorker(Worker):
     id = 'MyWorker'
-    time_unit = TimeUnit.SECOND
-    time_interval = 1
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
@@ -24,15 +22,19 @@ class MyWorkerTwo(ScheduledWorker):
         pass
 
 
+worker_one = MyWorker()
+worker_two = MyWorkerTwo()
+
+
 class MyWorkerThree(RelationalWorker):
-    run_after = MyWorker
+    run_after = worker_one
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
 
 
 class MyWorkerFour(RelationalWorker):
-    run_after = MyWorkerTwo
+    run_after = worker_two
 
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
@@ -48,75 +50,98 @@ class TestObserver(Observer):
 class TestRelationalWorker(TestCase):
 
     def setUp(self) -> None:
-        self.worker_one = MyWorker()
-        self.worker_two = MyWorkerTwo()
-        self.worker_three = MyWorkerThree()
-        self.worker_four = MyWorkerFour()
+        worker_one.last_run = None
+        worker_two.last_run = None
+
+        self.relational_worker_one = MyWorkerThree()
+        self.relational_worker_two = MyWorkerFour()
 
     def test_running(self) -> None:
-        self.assertIsNone(self.worker_one.last_run)
-        self.assertIsNone(self.worker_two.last_run)
-        self.assertIsNone(self.worker_three.last_run)
+        self.assertIsNone(worker_one.last_run)
+        self.assertIsNone(worker_two.last_run)
 
-        self.worker_four.start()
-        self.worker_three.start()
-        self.worker_one.start()
-        self.worker_two.start()
+        self.relational_worker_one.start()
+        self.relational_worker_two.start()
 
-        self.assertIsNotNone(self.worker_one.last_run)
-        self.assertIsNotNone(self.worker_two.last_run)
-        self.assertIsNone(self.worker_three.last_run)
-        self.assertIsNone(self.worker_four.last_run)
+        self.assertIsNone(self.relational_worker_one.last_run)
+        self.assertIsNone(self.relational_worker_two.last_run)
 
-        previous_run_worker_one = self.worker_one.last_run
-        previous_run_worker_two = self.worker_two.last_run
+        worker_one.start()
+        worker_two.start()
 
-        sleep(1)
+        self.assertIsNotNone(worker_one.last_run)
+        self.assertIsNotNone(worker_two.last_run)
+        self.assertIsNone(self.relational_worker_one.last_run)
+        self.assertIsNone(self.relational_worker_two.last_run)
 
-        self.worker_four.start()
-        self.worker_three.start()
-        self.worker_one.start()
-        self.worker_two.start()
+        previous_run_worker_one = worker_one.last_run
+        previous_run_worker_two = worker_two.last_run
 
-        self.assertIsNotNone(self.worker_one.last_run)
-        self.assertIsNotNone(self.worker_two.last_run)
-        self.assertIsNotNone(self.worker_three.last_run)
-        self.assertIsNotNone(self.worker_four.last_run)
+        self.relational_worker_one.start()
+        self.relational_worker_two.start()
 
-        self.assertNotEqual(previous_run_worker_one, self.worker_one.last_run)
-        self.assertNotEqual(previous_run_worker_two, self.worker_two.last_run)
+        self.assertIsNotNone(self.relational_worker_one.last_run)
+        self.assertIsNotNone(self.relational_worker_two.last_run)
+
+        previous_run_relational_worker_one = \
+            self.relational_worker_one.last_run
+        previous_run_relational_worker_two = \
+            self.relational_worker_two.last_run
+
+        sleep(2)
+
+        worker_one.start()
+        worker_two.start()
+
+        self.assertNotEqual(previous_run_worker_one, worker_one.last_run)
+        self.assertNotEqual(previous_run_worker_two, worker_two.last_run)
+
+        self.relational_worker_one.start()
+        self.relational_worker_two.start()
+
+        self.assertNotEqual(
+            previous_run_relational_worker_one,
+            self.relational_worker_one.last_run
+        )
+        self.assertNotEqual(
+            previous_run_relational_worker_two,
+            self.relational_worker_two.last_run
+        )
 
     def test_observing(self) -> None:
         observer = TestObserver()
-        self.worker_one.add_observer(observer)
-        self.worker_two.add_observer(observer)
-        self.worker_one.add_observer(observer)
-        self.worker_one.add_observer(observer)
 
-        self.assertIsNone(self.worker_one.last_run)
-        self.assertIsNone(self.worker_two.last_run)
-        self.assertIsNone(self.worker_three.last_run)
+        self.relational_worker_one.add_observer(observer)
+        self.relational_worker_two.add_observer(observer)
 
-        self.worker_four.start()
-        self.worker_three.start()
-        self.worker_one.start()
-        self.worker_two.start()
+        self.relational_worker_one.start()
+        self.relational_worker_two.start()
 
-        self.assertIsNotNone(self.worker_one.last_run)
-        self.assertIsNotNone(self.worker_two.last_run)
-        self.assertIsNone(self.worker_three.last_run)
-        self.assertIsNone(self.worker_four.last_run)
+        self.assertEqual(0, observer.updated)
 
-        sleep(1)
+        worker_one.start()
+        worker_two.start()
+
+        self.assertEqual(0, observer.updated)
+
+        self.relational_worker_one.start()
+        self.relational_worker_two.start()
 
         self.assertEqual(2, observer.updated)
 
-        self.worker_four.start()
-        self.worker_three.start()
-        self.worker_one.start()
-        self.worker_two.start()
+        self.relational_worker_one.start()
+        self.relational_worker_two.start()
 
-        sleep(1)
+        self.assertEqual(2, observer.updated)
+
+        sleep(2)
+
+        worker_one.start()
+        worker_two.start()
+
+        self.assertEqual(2, observer.updated)
+
+        self.relational_worker_one.start()
+        self.relational_worker_two.start()
 
         self.assertEqual(4, observer.updated)
-
