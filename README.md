@@ -1,17 +1,20 @@
 [![Build Status](https://travis-ci.org/coding-kitties/investing-algorithm-framework.svg?branch=master)](https://travis-ci.org/coding-kitties/investing-algorithm-framework)
+[![Downloads](https://pepy.tech/badge/investing-algorithm-framework)](https://pepy.tech/badge/investing-algorithm-framework)
+[![Current Version](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)
 
 # Investing Algorithm Framework
-The Investing Algorithm Framework is a python framework to build investment algorithms. 
+The Investing Algorithm Framework is a python framework for building
+investment algorithms. 
 It encourages rapid development and clean, pragmatic design.
 
-All the documentation can be found online at http://investing-algorithm-framework.com
+All the documentation can be found online at the [documentation webstie](https://investing-algorithm-framework.com)
 
 In most cases, you'll probably never have to change code on this repo directly 
 if you are building your algorithm/bot. But if you do, check out the 
 contributing page at the website.
 
 If you'd like to chat with investing-algorithm-framework users 
-and developers, [join us on Slack](https://inv-algo-framework.slack.com)
+and developers, [join us on Slack](https://inv-algo-framework.slack.com) or [join us on reddit](https://www.reddit.com/r/InvestingAlgorithms/)
 
 #### Disclaimer
 If you use this framework for your investments, do not risk money 
@@ -35,8 +38,8 @@ found [here](https://github.com/investing-algorithms/investing-algorithm-framewo
 
 
 ## Documentation
-All documentation can be found online at the official 
-website here [here](http://investing-algorithm-framework.com).
+All documentation can be found online at the official website here [here](https://investing-algorithm-framework.com).
+
 
 ### Help / Slack
 

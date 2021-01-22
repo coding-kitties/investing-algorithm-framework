@@ -2,8 +2,9 @@ from unittest import TestCase
 
 from investing_algorithm_framework.core.context import AlgorithmContext, \
     AlgorithmContextInitializer
-from investing_algorithm_framework import DataProvider, \
-    AbstractOrderExecutor, AbstractPortfolioManager, Strategy
+from investing_algorithm_framework import DataProvider, AbstractOrderExecutor, \
+    AbstractPortfolioManager, Strategy
+from tests.resources.utils import random_string
 
 
 class MyStrategy(Strategy):

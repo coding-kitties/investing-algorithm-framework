@@ -1,5 +1,7 @@
 from typing import List
 from abc import abstractmethod
+from random import randint
+
 
 from investing_algorithm_framework.core.strategies import Strategy
 from investing_algorithm_framework.core.exceptions import OperationalException
@@ -7,7 +9,26 @@ from investing_algorithm_framework.core.context import AlgorithmContext
 
 
 class AbstractDataProvider:
+    id = None
     registered_strategies: List[Strategy] = None
+
+    def __init__(self, data_provider_id: str = None):
+        super().__init__()
+
+        if self.id is None:
+            self.id = data_provider_id
+
+        # If ID is none generate a new unique ID
+        if self.id is None:
+            self.id = randint(10000, 100000)
+
+    def get_id(self) -> str:
+        assert getattr(self, 'id', None) is not None, (
+            "{} should either include a id attribute, or override the "
+            "`get_id()`, method.".format(self.__class__.__name__)
+        )
+
+        return getattr(self, 'id')
 
     def extract_quote(self, data, algorithm_context: AlgorithmContext):
         """
@@ -80,7 +101,10 @@ class AbstractDataProvider:
             for strategy in self.registered_strategies:
 
                 try:
-                    strategy.on_order_book(extracted_data, algorithm_context)
+                    strategy.on_order_book(
+                        self.id, extracted_data, algorithm_context
+                    )
+ 
                 except Exception as e:
                     self.handle_strategy_error(e)
 
@@ -99,7 +123,9 @@ class AbstractDataProvider:
             for strategy in self.registered_strategies:
 
                 try:
-                    strategy.on_quote(extracted_data, algorithm_context)
+                    strategy.on_quote(
+                        self.id, extracted_data, algorithm_context
+                    )
                 except Exception as e:
                     self.handle_strategy_error(e)
 
@@ -118,17 +144,22 @@ class AbstractDataProvider:
             for strategy in self.registered_strategies:
 
                 try:
-                    strategy.on_tick(extracted_data, algorithm_context)
+                    strategy.on_tick(
+                        self.id, extracted_data, algorithm_context
+                    )
                 except Exception as e:
                     self.handle_strategy_error(e)
 
     def provide_raw_data(self, data, algorithm_context: AlgorithmContext):
 
-        if data is not None:
+        if data is not None and self.registered_strategies:
 
             for strategy in self.registered_strategies:
+
                 try:
-                    strategy.on_raw_data(data, algorithm_context)
+                    strategy.on_raw_data(
+                        self.id, data, algorithm_context
+                    )
                 except Exception as e:
                     self.handle_strategy_error(e)
 

@@ -11,7 +11,7 @@ with open('requirements.txt') as f:
 
 setuptools.setup(
     name="investing_algorithm_framework",
-    version=VERSION,
+    version=get_version(),
     license="BSL-1.1",
     author="coding kitties",
     description="A framework for creating an investment algorithm",
@@ -28,9 +28,10 @@ setuptools.setup(
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
         "Topic :: Software Development",
-        "License :: Other/Proprietary License",
+        'License :: OSI Approved :: Apache Software License',
+        'Operating System :: OS Independent',
     ],
     install_requires=required,
-    python_requires='>=3.6',
+    python_requires='>=3',
     include_package_data=True,
 )
