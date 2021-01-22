@@ -38,8 +38,8 @@ found [here](https://github.com/investing-algorithms/investing-algorithm-framewo
 
 
 ## Documentation
-All documentation can be found online at the official 
-website here [here](https://investing-algorithm-framework.com).
+All documentation can be found online at the official website here [here](https://investing-algorithm-framework.com).
+
 
 ### Help / Slack
 

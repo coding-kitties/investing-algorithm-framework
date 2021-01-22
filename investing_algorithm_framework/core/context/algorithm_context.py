@@ -3,10 +3,10 @@ from random import randint
 from time import sleep
 from typing import List
 
+
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.workers import Worker
 from .algorithm_context_configuration import AlgorithmContextConfiguration
-
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +111,7 @@ class AlgorithmContext:
                 and not isinstance(config, AlgorithmContextConfiguration):
             raise OperationalException("Given config object is not supported")
 
+
     def start(self) -> None:
         """
         Run the current state of the investing_algorithm_framework
@@ -124,7 +125,7 @@ class AlgorithmContext:
 
     def _run(self) -> None:
         iteration = 0
-
+        
         while self.check_context(iteration):
 
             for data_provider in self.data_providers:

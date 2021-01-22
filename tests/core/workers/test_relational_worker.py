@@ -131,7 +131,6 @@ class TestRelationalWorker(TestCase):
 
         self.relational_worker_one.start()
         self.relational_worker_two.start()
-
         self.assertEqual(2, observer.updated)
 
         sleep(2)
@@ -140,7 +139,6 @@ class TestRelationalWorker(TestCase):
         worker_two.start()
 
         self.assertEqual(2, observer.updated)
-
         self.relational_worker_one.start()
         self.relational_worker_two.start()
 

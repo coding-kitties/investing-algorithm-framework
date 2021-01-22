@@ -2,6 +2,7 @@ from typing import List
 from abc import abstractmethod
 from random import randint
 
+
 from investing_algorithm_framework.core.strategies import Strategy
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.context import AlgorithmContext
@@ -103,6 +104,7 @@ class AbstractDataProvider:
                     strategy.on_order_book(
                         self.id, extracted_data, algorithm_context
                     )
+ 
                 except Exception as e:
                     self.handle_strategy_error(e)
 

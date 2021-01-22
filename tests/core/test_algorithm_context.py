@@ -88,4 +88,3 @@ class TestContextInitialization(TestCase):
         )
         self.assertIsNotNone(context.config)
         self.assertEqual(config, context.config)
-  

@@ -56,7 +56,6 @@ class TestScheduledWorker(TestCase):
 
         self.worker_one.start()
         self.worker_two.start()
-
         self.assertEqual(previous_run_worker_one, self.worker_one.last_run)
         self.assertIsNotNone(self.worker_two.last_run)
         self.assertNotEqual(previous_run_worker_two, self.worker_two.last_run)
@@ -97,5 +96,3 @@ class TestScheduledWorker(TestCase):
         sleep(1)
 
         self.assertEqual(5, MyObserver.updated)
-
-

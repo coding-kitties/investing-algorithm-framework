@@ -9,7 +9,6 @@ class MyWorker(Worker):
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
 
-
 class MyWorkerTwo(Worker):
     def work(self, **kwargs: Dict[str, Any]) -> None:
         pass
