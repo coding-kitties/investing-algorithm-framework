@@ -7,7 +7,7 @@ from investing_algorithm_framework.core.portfolio_managers import \
 from investing_algorithm_framework.core.order_executors import \
     AbstractOrderExecutor
 
-VERSION = (0, 1, 4, 'alpha', 0)
+VERSION = (0, 2, 0, 'alpha', 0)
 
 __all__ = [
     'get_version',
