@@ -22,13 +22,20 @@ def add_column_headers_to_csv(file_name: str, column_names: List[str]) -> None:
 def append_dict_as_row_to_csv(
         file_name: str, dict_data: Dict, field_names: List[str]
 ) -> None:
+    result_dict = {field: dict_data[field] for field in field_names}
 
     # Open file in append mode
     with open(file_name, 'a', newline='') as write_obj:
         # Create a writer object from csv module
         dict_writer = csv.DictWriter(write_obj, fieldnames=field_names)
         # Add dictionary as wor in the csv
-        dict_writer.writerow(dict_data)
+        dict_writer.writerow(result_dict)
+
+
+def get_total_amount_of_rows(file_path: str):
+    file = open(file_path)
+    reader = csv.reader(file)
+    return len(list(reader))
 
 
 # Function to convert a csv to a list of data

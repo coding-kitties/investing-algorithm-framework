@@ -1,16 +1,17 @@
 import os
 import random
 import csv
-import pytest
+from unittest import TestCase
 
 from tests.resources.utils import random_string
-from investing_algorithm_framework.utils.csv import remove_row, csv_to_list
+from investing_algorithm_framework.utils.csv import remove_row, csv_to_list, \
+    append_dict_as_row_to_csv, get_total_amount_of_rows
 from investing_algorithm_framework.core.exceptions import OperationalException
 
 
-class Test:
+class Test(TestCase):
 
-    def setup_method(self, test_method):
+    def setUp(self) -> None:
         # Create temp csv file
         self.csv_path = os.path.join('/tmp', random_string(10) + '.csv')
         os.mknod(self.csv_path)
@@ -32,7 +33,7 @@ class Test:
                     ('age', str(random.randint(24, 26))),
                     ('city', random.choice(cities))]))
 
-    def teardown_method(self, test_method):
+    def tearDown(self) -> None:
 
         if os.path.isfile(self.csv_path):
             os.remove(self.csv_path)
@@ -45,6 +46,32 @@ class Test:
         # Test if the row is removed
         assert data[0] != new_data[0]
 
-        with pytest.raises(OperationalException):
+        with self.assertRaises(OperationalException):
             remove_row(self.csv_path, row_index=-2)
 
+    def test_append_dict_as_row(self):
+
+        self.assertEqual(200, get_total_amount_of_rows(self.csv_path))
+        data = {
+            'id': 20,
+            'name': "hello",
+            'age': "age",
+            'city': "amsterdam"
+        }
+
+        append_dict_as_row_to_csv(
+            self.csv_path, data, ['id', 'name', 'age', 'city']
+        )
+        self.assertEqual(201, get_total_amount_of_rows(self.csv_path))
+
+        data = {
+            'id': 20,
+            'name': "hello",
+            'age': "age",
+        }
+
+        append_dict_as_row_to_csv(
+            self.csv_path, data, ['id', 'name', 'age']
+        )
+
+        self.assertEqual(202, get_total_amount_of_rows(self.csv_path))
