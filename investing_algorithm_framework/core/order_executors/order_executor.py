@@ -16,9 +16,10 @@ class AbstractOrderExecutor(ABC):
     def execute_limit_order(
             self,
             asset: str,
-            max_price: float,
-            quantity: int,
+            price: float,
+            amount: int,
+            total: float,
             algorithm_context: AlgorithmContext,
             **kwargs
-    ):
+    ) -> bool:
         raise NotImplementedError()

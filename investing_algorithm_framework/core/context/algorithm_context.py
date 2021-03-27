@@ -1,9 +1,10 @@
+import os
 import logging
 from random import randint
 from time import sleep
 from typing import List
 
-
+from investing_algorithm_framework.core.models import db, Order, OrderType
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.workers import Worker
 from .algorithm_context_configuration import AlgorithmContextConfiguration
@@ -24,16 +25,28 @@ class AlgorithmContext:
             data_providers: List,
             portfolio_managers: List,
             order_executors: List,
+            resources_directory: str,
             algorithm_id: str = None,
             initializer=None,
             config=None,
             cycles: int = None
     ):
 
+        if not os.path.isdir(resources_directory):
+            raise OperationalException(
+                "Resources directory does not exist, make sure to provide "
+                "an empty directory that can be used for storage of resources"
+            )
+
         if algorithm_id is None:
             self.algorithm_id = randint(1000, 10000)
         else:
             self.algorithm_id = algorithm_id
+
+        db.connect_sqlite(
+            resources_directory,
+            "{}.sqlite3".format(algorithm_id)
+        )
 
         if data_providers is None:
             raise OperationalException("No data providers provided")
@@ -111,7 +124,6 @@ class AlgorithmContext:
                 and not isinstance(config, AlgorithmContextConfiguration):
             raise OperationalException("Given config object is not supported")
 
-
     def start(self) -> None:
         """
         Run the current state of the investing_algorithm_framework
@@ -162,9 +174,9 @@ class AlgorithmContext:
             self,
             broker: str,
             asset: str,
-            max_price: float,
-            quantity: int,
-            commission: float,
+            amount:
+            percentage_of_portfolio: float,
+            price: float,
             **kwargs
     ):
 
@@ -181,29 +193,37 @@ class AlgorithmContext:
         portfolio_manager = self.portfolio_managers[broker]
         order_executor = self.order_executors[broker]
 
+        total_space = portfolio_manager.get_portfolio_size(self)
+        requested_space = percentage_of_portfolio * total_space
         free_space = portfolio_manager.get_free_portfolio_size(self)
 
-        if (max_price * quantity) + commission > free_space:
-            logger.warning(
-                "Cannot execute order because not enough free "
-                "space in portfolio, your current free space is {}".format(
-                    free_space
-                )
+        if requested_space > free_space:
+            raise OperationalException(
+                "Request order size exceeds free portfolio size"
             )
-            return
 
-        order_executor.execute_limit_order(
-            asset, max_price, quantity, self, **kwargs
+        order = Order(
+            order_type=OrderType.SELL.value,
+            symbol=asset,
+            completed=False,
+            price=price,
+            percentage_of_portfolio=percentage_of_portfolio
         )
+        order.save()
+        db.session.commit()
 
-        # Notify the portfolio manager that
-        # the order was executed
-        try:
-            portfolio_manager.order_executed_notification(
-                asset, max_price, quantity, commission, **kwargs
-            )
-        except OperationalException:
-            pass
+        if order_executor.execute_limit_order(
+            asset, price, amount=
+        ):
+
+            # Notify the portfolio manager that
+            # the order was executed
+            try:
+                portfolio_manager.order_executed_notification(
+                    asset, max_price, quantity, commission, **kwargs
+                )
+            except OperationalException:
+                pass
 
     def get_space_portfolio_size(self, broker):
 

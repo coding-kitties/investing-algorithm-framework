@@ -1,8 +1,10 @@
 from sqlalchemy import Column, DateTime, String, Boolean, Float, Integer
 from datetime import datetime
+from . import db
+from .order_type import OrderType
 
 
-class Order:
+class Order(db.Model):
     # Integer id for the Order as the primary key
     id = Column(Integer, primary_key=True)
 
@@ -17,6 +19,15 @@ class Order:
 
     # The price of the asset
     price = Column(Float)
+    total_price = Column(Float)
+    commission = Column(Float)
+
+    # Portfolio attributes
+    percentage_of_total_portfolio = Column(Integer)
 
     # Date Time of creation
     created_at = Column(DateTime, default=datetime.now())
+    
+    def __init__(self, order_type, **kwargs):
+        self.order_type = OrderType.from_string(order_type).value
+        super(Order, self).__init__(**kwargs)
