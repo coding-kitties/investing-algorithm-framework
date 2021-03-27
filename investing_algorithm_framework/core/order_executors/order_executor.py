@@ -17,8 +17,7 @@ class AbstractOrderExecutor(ABC):
             self,
             asset: str,
             price: float,
-            amount: int,
-            total: float,
+            amount: float,
             algorithm_context: AlgorithmContext,
             **kwargs
     ) -> bool:

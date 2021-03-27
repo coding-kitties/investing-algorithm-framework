@@ -1,6 +1,6 @@
 from sqlalchemy import Column, DateTime, String, Boolean, Float, Integer
 from datetime import datetime
-from . import db
+from investing_algorithm_framework.core.models import db
 from .order_type import OrderType
 
 
@@ -23,7 +23,7 @@ class Order(db.Model):
     commission = Column(Float)
 
     # Portfolio attributes
-    percentage_of_total_portfolio = Column(Integer)
+    amount = Column(Integer)
 
     # Date Time of creation
     created_at = Column(DateTime, default=datetime.now())

@@ -1,4 +1,5 @@
 from investing_algorithm_framework.utils.version import get_version
+from investing_algorithm_framework.core.context import AlgorithmContext
 from investing_algorithm_framework.core.data_providers import DataProvider, \
     RelationalDataProvider, ScheduledDataProvider
 from investing_algorithm_framework.core.strategies import Strategy
@@ -11,6 +12,7 @@ VERSION = (0, 2, 1, 'alpha', 0)
 
 __all__ = [
     'get_version',
+    "AlgorithmContext",
     'DataProvider',
     'RelationalDataProvider',
     'ScheduledDataProvider',

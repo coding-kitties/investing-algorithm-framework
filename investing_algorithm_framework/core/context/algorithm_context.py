@@ -22,10 +22,10 @@ class AlgorithmContext:
 
     def __init__(
             self,
-            data_providers: List,
-            portfolio_managers: List,
-            order_executors: List,
             resources_directory: str,
+            data_providers: List = None,
+            portfolio_managers: List = None,
+            order_executors: List = None,
             algorithm_id: str = None,
             initializer=None,
             config=None,
@@ -49,13 +49,13 @@ class AlgorithmContext:
         )
 
         if data_providers is None:
-            raise OperationalException("No data providers provided")
+            data_providers = []
 
         if order_executors is None:
-            raise OperationalException("No order executors provided")
+            order_executors = []
 
         if portfolio_managers is None:
-            raise OperationalException("No portfolio managers provided")
+            portfolio_managers = []
 
         # Check if data_provider is instance of AbstractDataProvider and
         # Worker
@@ -174,8 +174,7 @@ class AlgorithmContext:
             self,
             broker: str,
             asset: str,
-            amount:
-            percentage_of_portfolio: float,
+            amount: float,
             price: float,
             **kwargs
     ):
@@ -194,7 +193,7 @@ class AlgorithmContext:
         order_executor = self.order_executors[broker]
 
         total_space = portfolio_manager.get_portfolio_size(self)
-        requested_space = percentage_of_portfolio * total_space
+        requested_space = amount * price
         free_space = portfolio_manager.get_free_portfolio_size(self)
 
         if requested_space > free_space:
@@ -207,23 +206,24 @@ class AlgorithmContext:
             symbol=asset,
             completed=False,
             price=price,
-            percentage_of_portfolio=percentage_of_portfolio
+            amount=amount
         )
         order.save()
         db.session.commit()
 
         if order_executor.execute_limit_order(
-            asset, price, amount=
+            asset, price, amount, self
         ):
+            print("hello")
 
-            # Notify the portfolio manager that
-            # the order was executed
-            try:
-                portfolio_manager.order_executed_notification(
-                    asset, max_price, quantity, commission, **kwargs
-                )
-            except OperationalException:
-                pass
+            # # Notify the portfolio manager that
+            # # the order was executed
+            # try:
+            #     portfolio_manager.order_executed_notification(
+            #         asset, max_price, quantity, commission, **kwargs
+            #     )
+            # except OperationalException:
+            #     pass
 
     def get_space_portfolio_size(self, broker):
 
