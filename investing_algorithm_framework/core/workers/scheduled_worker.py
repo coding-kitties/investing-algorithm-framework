@@ -14,7 +14,7 @@ class ScheduledWorker(Worker, ABC):
 
         # If the worker has never run, run it
         if self.last_run is None:
-            super(ScheduledWorker, self).start()
+            super(ScheduledWorker, self).start(**kwargs)
 
         else:
             # Get the current time
@@ -25,21 +25,21 @@ class ScheduledWorker(Worker, ABC):
                 seconds = elapsed_time.total_seconds()
 
                 if seconds > self.get_time_interval():
-                    super(ScheduledWorker, self).start()
+                    super(ScheduledWorker, self).start(**kwargs)
 
             # Minute evaluation
             elif self.get_time_unit() is TimeUnit.MINUTE:
                 minutes = divmod(elapsed_time.total_seconds(), 60)
 
                 if minutes > self.get_time_interval():
-                    super(ScheduledWorker, self).start()
+                    super(ScheduledWorker, self).start(**kwargs)
 
             # Hour evaluation
             elif self.get_time_unit() is TimeUnit.HOUR:
                 hours = divmod(elapsed_time.total_seconds(), 3600)
 
                 if hours > self.get_time_interval():
-                    super(ScheduledWorker, self).start()
+                    super(ScheduledWorker, self).start(**kwargs)
 
     def get_time_unit(self) -> TimeUnit:
         assert getattr(self, 'time_unit', None) is not None, (
@@ -47,7 +47,12 @@ class ScheduledWorker(Worker, ABC):
             "`get_time_unit()` method.".format(self.__class__.__name__)
         )
 
-        return getattr(self, 'time_unit')
+        time_unit = getattr(self, 'time_unit')
+
+        if isinstance(time_unit, TimeUnit):
+            return time_unit
+        else:
+            return TimeUnit.from_string(time_unit)
 
     def get_time_interval(self) -> int:
         assert getattr(self, 'time_interval', None) is not None, (

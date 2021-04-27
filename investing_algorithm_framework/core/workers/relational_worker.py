@@ -33,7 +33,7 @@ class RelationalWorker(Worker, ABC):
                 )
 
             if self.run_after.last_run > self.last_run:
-                super(RelationalWorker, self).start()
+                super(RelationalWorker, self).start(**kwargs)
 
         elif self.run_after.last_run is not None:
-            super(RelationalWorker, self).start()
+            super(RelationalWorker, self).start(**kwargs)
