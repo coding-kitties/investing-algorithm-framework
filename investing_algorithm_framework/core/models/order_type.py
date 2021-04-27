@@ -9,13 +9,12 @@ class OrderType(Enum):
     def from_string(value: str):
 
         if isinstance(value, str):
+            for order_type in OrderType:
 
-            if value.lower() == 'sell':
-                return OrderType.SELL
-            elif value.lower() == 'buy':
-                return OrderType.BUY
-            else:
-                raise ValueError("Could not convert value to OrderType")
+                if value.upper() == order_type.value:
+                    return order_type
+
+        raise ValueError("Could not convert value to OrderType")
 
     def equals(self, other):
 
