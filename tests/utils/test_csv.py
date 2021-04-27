@@ -14,7 +14,7 @@ class Test(TestCase):
     def setUp(self) -> None:
         # Create temp csv file
         self.csv_path = os.path.join('/tmp', random_string(10) + '.csv')
-        os.mknod(self.csv_path)
+        open(self.csv_path, 'w').close()
 
         records = 200
         fieldnames = ['id', 'name', 'age', 'city']
