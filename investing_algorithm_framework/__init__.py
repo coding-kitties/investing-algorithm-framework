@@ -10,7 +10,7 @@ from investing_algorithm_framework.core.order_executors import \
     AbstractOrderExecutor
 from investing_algorithm_framework.core.utils import TimeUnit
 
-VERSION = (0, 2, 1, 'alpha', 0)
+VERSION = (0, 2, 2, 'alpha', 0)
 
 __all__ = [
     'get_version',
