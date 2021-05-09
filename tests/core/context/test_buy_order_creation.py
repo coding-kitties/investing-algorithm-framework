@@ -49,6 +49,7 @@ class TestOrderModel(TestBase):
         )
         self.assertEqual(1, Position.query.count())
         self.assertEqual(1, Position.query.filter_by(symbol="BTC").count())
+        self.assertEqual(2, Order.query.filter_by(completed=True).count())
 
     def test_order_creation_that_exceeds_free_space(self):
 
@@ -71,6 +72,7 @@ class TestOrderModel(TestBase):
         )
 
         self.assertEqual(0, Position.query.filter_by(symbol="BTC").count())
+        self.assertEqual(0, Order.query.filter_by(completed=True).count())
 
     def test_order_creation_without_matching_portfolio_manager(self):
         with self.assertRaises(OperationalException) as exception_info:
@@ -91,4 +93,4 @@ class TestOrderModel(TestBase):
             0, Order.query.filter_by(order_type=OrderType.BUY.value).count()
         )
         self.assertEqual(0, Position.query.filter_by(symbol="BTC").count())
-
+        self.assertEqual(0, Order.query.filter_by(completed=True).count())

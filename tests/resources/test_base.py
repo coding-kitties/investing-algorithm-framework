@@ -7,6 +7,7 @@ from investing_algorithm_framework import DataProvider, \
 from investing_algorithm_framework.core.models import Order
 from investing_algorithm_framework import TimeUnit
 
+
 class TestBase(TestCase):
     algorithm_context = None
     data_provider = None
@@ -24,8 +25,17 @@ class TestBase(TestCase):
             self.called += 1
 
     class PortfolioManager(AbstractPortfolioManager):
+
         broker = "BINANCE"
         BASE_AMOUNT_USDT = 500
+
+        def get_price(
+                self,
+                first_symbol: str,
+                second_symbol: str,
+                algorithm_context: AlgorithmContext
+        ) -> float:
+            return 20.56
 
         def get_portfolio_size(
                 self, algorithm_context: AlgorithmContext
@@ -64,13 +74,17 @@ class TestBase(TestCase):
 
         def execute_limit_order(
                 self,
-                asset: str,
+                to_be_traded_symbol: str,
+                traded_against_symbol: str,
                 price: float,
                 amount: float,
                 algorithm_context: AlgorithmContext,
                 **kwargs
         ) -> bool:
             pass
+
+        def is_order_executed(self, to_be_traded_symbol: str, traded_against_symbol: str, price: float, amount: float) -> bool:
+            return True
 
     class StandardStrategy(Strategy):
         data_provider_id = None
