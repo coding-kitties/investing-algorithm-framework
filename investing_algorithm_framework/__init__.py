@@ -9,6 +9,8 @@ from investing_algorithm_framework.core.portfolio_managers import \
 from investing_algorithm_framework.core.order_executors import \
     AbstractOrderExecutor
 from investing_algorithm_framework.core.utils import TimeUnit
+from investing_algorithm_framework.core.models import OrderType, Order, \
+    Position
 
 VERSION = (0, 2, 2, 'alpha', 0)
 
@@ -21,5 +23,8 @@ __all__ = [
     'Strategy',
     'AbstractPortfolioManager',
     'AbstractOrderExecutor',
-    "AlgorithmContextInitializer"
+    "AlgorithmContextInitializer",
+    "OrderType",
+    "Order",
+    "Position"
 ]

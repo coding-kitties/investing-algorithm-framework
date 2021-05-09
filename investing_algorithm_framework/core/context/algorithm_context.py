@@ -3,6 +3,7 @@ import logging
 from random import randint
 from time import sleep
 from typing import List, Dict
+from datetime import datetime
 
 from investing_algorithm_framework.core.models import db, Order, OrderType, \
     Position
@@ -30,8 +31,11 @@ class AlgorithmContext:
             algorithm_id: str = None,
             initializer=None,
             config=None,
-            cycles: int = None
+            cycles: int = None,
+            order_validation_interval: int = 5
     ):
+        self.order_validation_interval = order_validation_interval
+        self.order_validation_last_run = None
 
         if not os.path.isdir(resources_directory):
             raise OperationalException(
@@ -213,8 +217,41 @@ class AlgorithmContext:
             for data_provider in self.data_providers:
                 data_provider.start(algorithm_context=self)
 
+            # Perform order validation
+            if self.order_validation_last_run is None:
+                self._validate_orders()
+            else:
+                # Get the current time
+                elapsed_time = datetime.now() - self.order_validation_last_run
+
+                minutes = (elapsed_time.total_seconds() / 60)
+
+                if minutes > self.order_validation_interval:
+                    self._validate_orders()
+
             iteration += 1
             sleep(1)
+
+    def _validate_orders(self):
+
+        open_orders = Order.query.filter_by(completed=False).all()
+
+        for order in open_orders:
+            order_executor = self.order_executors[order.broker]
+
+            if order_executor.validate_order_execution(order):
+                order.completed = True
+
+        db.session.commit()
+
+    def _validate_order(self, order):
+
+        order_executor = self.order_executors[order.broker]
+
+        if order_executor.validate_order_execution(order):
+            order.completed = True
+
+        db.session.commit()
 
     def check_context(self, iteration) -> bool:
 
@@ -281,24 +318,20 @@ class AlgorithmContext:
                 "supported as delimiter"
             )
 
-        if "/" in trading_pair:
-            pairs = trading_pair.split("/")
-        else:
-            pairs = trading_pair.split("-")
-
-        position = Position.query.filter_by(symbol=pairs[0]).first()
-
-        if position is None:
-            position = Position(symbol=pairs[0])
-            position.save()
-
         order = Order(
             order_type=order_type.value,
             trading_pair=trading_pair,
             completed=False,
             price=price,
-            amount=amount
+            amount=amount,
+            broker=broker
         )
+
+        position = Position.query.filter_by(symbol=order.first_symbol).first()
+
+        if position is None:
+            position = Position(symbol=order.first_symbol, broker=broker)
+            position.save()
 
         order.save()
         position.orders.append(order)
@@ -306,8 +339,16 @@ class AlgorithmContext:
         db.session.commit()
 
         order_executor.execute_limit_order(
-            order.trading_pair, order.price, order.amount, self
+            order.first_symbol,
+            order.second_symbol,
+            order.price,
+            order.amount,
+            self
         )
+
+        if self._validate_order(order):
+            order.completed = True
+            db.session.commit()
 
     def get_free_portfolio_size(self, broker):
 
@@ -318,3 +359,51 @@ class AlgorithmContext:
 
         portfolio_manager = self.portfolio_managers[broker]
         return portfolio_manager.get_free_portfolio_size(self)
+
+    def get_portfolio_manager(
+            self, broker_id: str, throw_exception: bool = False
+    ):
+        matching_portfolio_manager = self.portfolio_managers[broker_id]
+
+        if matching_portfolio_manager is None and throw_exception:
+            raise OperationalException(
+                "No corresponding portfolio manager found for broker"
+            )
+
+        return matching_portfolio_manager
+
+    def get_performance(
+        self,
+        first_symbol: str,
+        second_symbol: str,
+        broker: str
+    ):
+        total_worth = 0
+        total_cost = 0
+
+        portfolio_manager = self.get_portfolio_manager(
+            broker_id=broker, throw_exception=True
+        )
+
+        positions_query = Position.query.filter_by(symbol=first_symbol)
+
+        if broker is not None:
+            positions_query.filter_by(broker=broker)
+
+        for position in positions_query.all():
+
+            price = portfolio_manager.get_price(
+                second_symbol, position.symbol, self
+            )
+
+            orders = Order.query\
+                .filter_by(second_symbol=second_symbol)\
+                .filter_by(position=position)\
+                .filter_by(completed=True)\
+                .all()
+
+            for order in orders:
+                total_cost += (order.amount * order.price)
+                total_worth += (order.amount * price)
+
+        return ((total_worth - total_cost) / total_cost) * 100
