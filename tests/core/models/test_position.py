@@ -11,7 +11,7 @@ class TestPosition(TestBase):
         self.algorithm_context.add_portfolio_manager(self.portfolio_manager)
         self.algorithm_context.add_order_executor(self.order_executor)
 
-        self.position = Position("DOT")
+        self.position = Position("DOT", "BINANCE")
         self.position.save()
 
         for i in range(0, 10):

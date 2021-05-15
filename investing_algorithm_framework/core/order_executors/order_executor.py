@@ -2,6 +2,7 @@ from abc import abstractmethod, ABC
 
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.context import AlgorithmContext
+from investing_algorithm_framework.core.models import Order
 
 
 class AbstractOrderExecutor(ABC):
@@ -29,10 +30,33 @@ class AbstractOrderExecutor(ABC):
     @abstractmethod
     def execute_limit_order(
             self,
-            asset: str,
+            to_be_traded_symbol: str,
+            traded_against_symbol: str,
             price: float,
             amount: float,
             algorithm_context: AlgorithmContext,
             **kwargs
+    ) -> bool:
+        raise NotImplementedError()
+
+    def validate_order_execution(self, order: Order):
+
+        if not order.completed:
+            return self.is_order_executed(
+                order.first_symbol,
+                order.second_symbol,
+                order.price,
+                order.amount
+            )
+
+        return True
+
+    @abstractmethod
+    def is_order_executed(
+            self,
+            to_be_traded_symbol: str,
+            traded_against_symbol: str,
+            price: float,
+            amount: float
     ) -> bool:
         raise NotImplementedError()

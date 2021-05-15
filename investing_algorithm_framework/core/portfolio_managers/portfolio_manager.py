@@ -47,6 +47,15 @@ class AbstractPortfolioManager(ABC):
     ) -> float:
         raise NotImplementedError()
 
+    @abstractmethod
+    def get_price(
+            self,
+            fiat_currency: str,
+            symbol: str,
+            algorithm_context: AlgorithmContext
+    ) -> float:
+        raise NotImplementedError()
+
     def order_executed_notification(
             self,
             asset: str,
