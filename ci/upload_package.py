@@ -31,6 +31,6 @@ if __name__ == "__main__":
         print("Hello")
         os.system("python setup.py sdist bdist_wheel")
         print("Buy")
-        
+
         os.system("twine upload -r investing-algorithm-framework dist/*")
         os.system("twine upload -p $pipy_token -u __token__ dist/*")
