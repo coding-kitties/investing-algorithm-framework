@@ -25,9 +25,9 @@ jobs:
         pip install flake8
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
     - name: Upload
+      env:
+        pipy_token: ${{ secrets.PYPI_TOKEN }}
       run: |
-        env:
-          pipy_token: ${{ secrets.PYPI_TOKEN }}
         echo "hello world"
         pip install yolk3k
         pip install twine
