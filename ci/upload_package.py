@@ -20,6 +20,7 @@ if __name__ == "__main__":
     from investing_algorithm_framework import get_version
     released_version = get_latest_version_number(PACKAGE_NAME)
 
+    print(released_version)
     if released_version != get_version():
         os.chdir("../")
 
