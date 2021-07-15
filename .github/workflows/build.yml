@@ -28,7 +28,6 @@ jobs:
       env:
         pipy_token: ${{ secrets.PYPI_TOKEN }}
       run: |
-        echo "hello world"
         pip install yolk3k
         pip install twine
         pip install keyring==21.4.0
