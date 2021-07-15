@@ -1,6 +1,9 @@
 from abc import ABC, abstractmethod
-from .algorithm_context import AlgorithmContext
-from .algorithm_context_configuration import AlgorithmContextConfiguration
+
+from investing_algorithm_framework.core.context.algorithm_context import \
+    AlgorithmContext
+from investing_algorithm_framework.core.context \
+    .algorithm_context_configuration import AlgorithmContextConfiguration
 
 
 class AlgorithmContextInitializer(ABC):
@@ -9,11 +12,14 @@ class AlgorithmContextInitializer(ABC):
         import AlgorithmContext
 
     @abstractmethod
-    def initialize(self, algorithm_context: AlgorithmContext) -> None:
+    def initialize(self, algorithm: AlgorithmContext) -> None:
         raise NotImplementedError()
 
 
+algorithm = AlgorithmContext()
+
 __all__ = [
+    'algorithm',
     'AlgorithmContext',
     'AlgorithmContextInitializer',
     'AlgorithmContextConfiguration'

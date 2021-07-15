@@ -1,15 +1,13 @@
-import os
 import logging
-from random import randint
-from time import sleep
 from typing import List, Dict
-from datetime import datetime
 
-from investing_algorithm_framework.core.models import db, Order, OrderType, \
-    Position
+from investing_algorithm_framework.configuration import Config
 from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.workers import Worker
-from .algorithm_context_configuration import AlgorithmContextConfiguration
+from investing_algorithm_framework.core.models import TimeUnit
+from investing_algorithm_framework.core.portfolio_managers import \
+    AbstractPortfolioManager
+from investing_algorithm_framework.core.workers import Scheduler
+from investing_algorithm_framework.extensions import scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -21,122 +19,131 @@ class AlgorithmContext:
     An algorithm consist out of an data provider and a set of
     strategies that belong to the data provider.
     """
+    _config = None
+    _workers = []
+    _running_workers = []
+    _order_executors = {}
+    _portfolio_managers = {}
+    _initializer = None
+    _initialized = False
 
-    def __init__(
-            self,
-            resources_directory: str,
-            data_providers: List = None,
-            portfolio_managers: List = None,
-            order_executors: List = None,
-            algorithm_id: str = None,
-            initializer=None,
-            config=None,
-            cycles: int = None,
-            order_validation_interval: int = 5
+    # wrap Scheduler to allow for deferred calling
+    @staticmethod
+    def schedule(
+        function=None,
+        worker_id: str = None,
+        time_unit: TimeUnit = TimeUnit.MINUTE,
+        interval=10
     ):
-        self.order_validation_interval = order_validation_interval
-        self.order_validation_last_run = None
 
-        if not os.path.isdir(resources_directory):
-            raise OperationalException(
-                "Resources directory does not exist, make sure to provide "
-                "an empty directory that can be used for storage of resources"
-            )
-
-        if algorithm_id is None:
-            self.algorithm_id = str(randint(1000, 10000))
+        if function:
+            return Scheduler(function, worker_id, time_unit, interval)
         else:
-            self.algorithm_id = algorithm_id
+            def wrapper(f):
+                return Scheduler(f, worker_id, time_unit, interval)
+            return wrapper
 
-        db.connect_sqlite(
-            database_directory_path=resources_directory,
-            database_name=self.algorithm_id
+    def initialize(self, config=None):
+
+        if config is not None:
+            assert isinstance(config, Config), (
+                "Config is not an instance of config"
+            )
+            self._config = config
+        else:
+            self._config = Config()
+
+    def start(self):
+
+        # Initialize the algorithm context
+        if not self._initialized:
+
+            # Run the initializer
+            if self._initializer is not None:
+                self._initializer.initialize(self)
+
+            # Initialize the portfolio managers
+            for portfolio_manager_key in self._portfolio_managers:
+                portfolio_manager = self._portfolio_managers[
+                    portfolio_manager_key
+                ]
+                portfolio_manager.initialize()
+
+        self._initialized = True
+
+        # Start the workers
+        self.start_workers()
+
+    def stop(self):
+        self.stop_all_workers()
+
+    def start_workers(self):
+
+        if not self.running:
+            # Start functional workers
+            for worker in self._workers:
+                worker.add_to_scheduler(scheduler)
+                self._running_workers.append(worker)
+
+    def stop_all_workers(self):
+        scheduler.remove_all_jobs()
+        self._running_workers = []
+
+    def add_worker(self, worker):
+        """
+        Function to ad an worker to list of workers of the
+        algorithm context.
+        """
+
+        assert isinstance(worker, Scheduler), OperationalException(
+            "Worker is not an instance of an Scheduler"
         )
-        db.initialize_tables()
 
-        if data_providers is None:
-            data_providers = []
+        for installed_worker in self._workers:
 
-        if order_executors is None:
-            order_executors = []
+            if installed_worker.worker_id == worker.worker_id:
+                return
 
-        if portfolio_managers is None:
-            portfolio_managers = []
-
-        # Check if data_provider is instance of AbstractDataProvider and
-        # Worker
-        from investing_algorithm_framework.core.data_providers \
-            import AbstractDataProvider
-
-        for data_provider in data_providers:
-            assert isinstance(data_provider, AbstractDataProvider), (
-                'Data provider must be an instance of the '
-                'AbstractDataProvider class'
-            )
-
-            assert isinstance(data_provider, Worker), (
-                'Data provider must be an instance of the Worker class'
-            )
-
-        # Check if order executor is instance of AbstractOrderExecutor
-        from investing_algorithm_framework.core.order_executors \
-            import AbstractOrderExecutor
-
-        self._order_executors = {}
-
-        for order_executor in order_executors:
-            assert isinstance(order_executor, AbstractOrderExecutor), (
-                'Order executor must be an instance of the '
-                'AbstractOrderExecutor class'
-            )
-
-            self.order_executors[order_executor.broker] = order_executor
-
-            # Check if order executor is instance of AbstractOrderExecutor
-        from investing_algorithm_framework.core.portfolio_managers \
-            import AbstractPortfolioManager
-
-        self._portfolio_managers = {}
-
-        for portfolio_manager in portfolio_managers:
-            assert isinstance(portfolio_manager, AbstractPortfolioManager), (
-                'Portfolio manager must be an instance of the '
-                'AbstractPortfolioManager class'
-            )
-
-            self._portfolio_managers[
-                portfolio_manager.broker
-            ] = portfolio_manager
-
-        self._data_providers = data_providers
-        self.cycles = cycles
-
-        if initializer is not None:
-            # Check if initializer is an instance of
-            # AlgorithmContextInitializer
-            from . import AlgorithmContextInitializer
-            assert isinstance(initializer, AlgorithmContextInitializer), (
-                'Initializer must be an instance of '
-                'AlgorithmContextInitializer'
-            )
-
-        self.initializer = initializer
-
-        self._config = config
-
-        if config is None:
-            self._config = AlgorithmContextConfiguration()
-        elif not isinstance(config, dict) \
-                and not isinstance(config, AlgorithmContextConfiguration):
-            raise OperationalException("Given config object is not supported")
-
-    @property
-    def data_providers(self) -> List:
-        return self._data_providers
+        self._workers.append(worker)
 
     @property
     def portfolio_managers(self) -> Dict:
+        portfolio_managers = []
+
+        for key in self._portfolio_managers:
+            portfolio_managers.append(self._portfolio_managers[key])
+
         return self._portfolio_managers
+
+    @property
+    def running(self) -> bool:
+        """
+            An utility property to check if there are active workers for the
+            algorithm.
+        """
+
+        return len(self._running_workers) != 0
+
+    @property
+    def workers(self) -> List:
+        return self._workers
+
+    @property
+    def running_workers(self) -> List:
+        return self._running_workers
+
+    @property
+    def config(self) -> Config:
+        return self._config
+
+    @property
+    def order_executors(self) -> List:
+        order_executors = []
+
+        for order_executor in self.order_executors:
+            order_executors.append(order_executor)
+
+        return order_executors
 
     def add_initializer(self, initializer):
         from investing_algorithm_framework.core.context \
@@ -147,36 +154,7 @@ class AlgorithmContext:
             'AlgorithmContextInitializer class'
         )
 
-        self.initializer = initializer
-
-    def add_data_provider(self, data_provider):
-        # Check if data_provider is instance of AbstractDataProvider and
-        # Worker
-        from investing_algorithm_framework.core.data_providers \
-            import AbstractDataProvider
-
-        assert isinstance(data_provider, AbstractDataProvider), (
-            'Data provider must be an instance of the '
-            'AbstractDataProvider class'
-        )
-
-        assert isinstance(data_provider, Worker), (
-            'Data provider must be an instance of the Worker class'
-        )
-
-        self._data_providers.append(data_provider)
-
-    def add_order_executor(self, order_executor):
-        # Check if order executor is instance of AbstractOrderExecutor
-        from investing_algorithm_framework.core.order_executors \
-            import AbstractOrderExecutor
-
-        assert isinstance(order_executor, AbstractOrderExecutor), (
-            'Order executor must be an instance of the '
-            'AbstractOrderExecutor class'
-        )
-
-        self.order_executors[order_executor.broker] = order_executor
+        self._initializer = initializer
 
     def add_portfolio_manager(self, portfolio_manager):
         # Check if order executor is instance of AbstractPortfolioManager
@@ -188,167 +166,22 @@ class AlgorithmContext:
             'AbstractPortfolioManager class'
         )
 
-        self.portfolio_managers[portfolio_manager.broker] = portfolio_manager
-
-    @property
-    def order_executors(self) -> List:
-        return self._order_executors
-
-    def start(self, cycles: int = None) -> None:
-        """
-        Run the current state of the investing_algorithm_framework
-        """
-        self.cycles = cycles
-
-        # Call initializer if set
-        if self.initializer is not None:
-            self.initializer.initialize(self)
-
-        self._run()
-
-    def _run(self) -> None:
-        iteration = 0
-
-        if len(self.data_providers) == 0:
-            return
-
-        while self.check_context(iteration):
-
-            for data_provider in self.data_providers:
-                data_provider.start(algorithm_context=self)
-
-            # Perform order validation
-            if self.order_validation_last_run is None:
-                self._validate_orders()
-            else:
-                # Get the current time
-                elapsed_time = datetime.now() - self.order_validation_last_run
-
-                minutes = (elapsed_time.total_seconds() / 60)
-
-                if minutes > self.order_validation_interval:
-                    self._validate_orders()
-
-            iteration += 1
-            sleep(1)
-
-    def _validate_orders(self):
-
-        open_orders = Order.query.filter_by(completed=False).all()
-
-        for order in open_orders:
-            order_executor = self.order_executors[order.broker]
-
-            if order_executor.validate_order_execution(order):
-                order.completed = True
-
-        db.session.commit()
-
-    def _validate_order(self, order):
-
-        order_executor = self.order_executors[order.broker]
-
-        if order_executor.validate_order_execution(order):
-            order.completed = True
-
-        db.session.commit()
-
-    def check_context(self, iteration) -> bool:
-
-        if self.cycles and self.cycles > 0:
-            return self.cycles > iteration
-
-        return True
+        self._portfolio_managers[portfolio_manager.broker] = portfolio_manager
 
     def set_algorithm_context_initializer(
             self, algorithm_context_initializer
     ) -> None:
 
         # Check if initializer is an instance of AlgorithmContextInitializer
-        from . import AlgorithmContextInitializer
+        from investing_algorithm_framework.core.context import \
+            AlgorithmContextInitializer
+
         assert isinstance(
             algorithm_context_initializer, AlgorithmContextInitializer
         ), (
             'Initializer must be an instance of AlgorithmContextInitializer'
         )
-        self.initializer = algorithm_context_initializer
-
-    @property
-    def config(self) -> AlgorithmContextConfiguration:
-        return self._config
-
-    def perform_limit_order(
-            self,
-            broker: str,
-            trading_pair: str,
-            amount: float,
-            price: float,
-            order_type: OrderType,
-            **kwargs
-    ):
-
-        if broker not in self.portfolio_managers:
-            raise OperationalException(
-                "There is no portfolio manager linked to the given broker"
-            )
-
-        if broker not in self.order_executors:
-            raise OperationalException(
-                "There is no order executor linked to the given broker"
-            )
-
-        portfolio_manager = self.portfolio_managers[broker]
-        order_executor = self.order_executors[broker]
-        requested_space = amount * price
-
-        if OrderType.BUY.equals(order_type):
-            free_space = portfolio_manager.get_free_portfolio_size(self)
-
-            if free_space is None:
-                raise OperationalException("Free space is not specified")
-
-            if requested_space > free_space:
-                raise OperationalException(
-                    "Request order size exceeds free portfolio size"
-                )
-
-        if "/" not in trading_pair and "-" not in trading_pair:
-            raise OperationalException(
-                "Unsupported trading pair definition, only / and - are "
-                "supported as delimiter"
-            )
-
-        order = Order(
-            order_type=order_type.value,
-            trading_pair=trading_pair,
-            completed=False,
-            price=price,
-            amount=amount,
-            broker=broker
-        )
-
-        position = Position.query.filter_by(symbol=order.first_symbol).first()
-
-        if position is None:
-            position = Position(symbol=order.first_symbol, broker=broker)
-            position.save()
-
-        order.save()
-        position.orders.append(order)
-
-        db.session.commit()
-
-        order_executor.execute_limit_order(
-            order.first_symbol,
-            order.second_symbol,
-            order.price,
-            order.amount,
-            self
-        )
-
-        if self._validate_order(order):
-            order.completed = True
-            db.session.commit()
+        self._initializer = algorithm_context_initializer
 
     def get_free_portfolio_size(self, broker):
 
@@ -362,7 +195,7 @@ class AlgorithmContext:
 
     def get_portfolio_manager(
             self, broker_id: str, throw_exception: bool = False
-    ):
+    ) -> AbstractPortfolioManager:
         matching_portfolio_manager = self.portfolio_managers[broker_id]
 
         if matching_portfolio_manager is None and throw_exception:
@@ -371,39 +204,3 @@ class AlgorithmContext:
             )
 
         return matching_portfolio_manager
-
-    def get_performance(
-        self,
-        first_symbol: str,
-        second_symbol: str,
-        broker: str
-    ):
-        total_worth = 0
-        total_cost = 0
-
-        portfolio_manager = self.get_portfolio_manager(
-            broker_id=broker, throw_exception=True
-        )
-
-        positions_query = Position.query.filter_by(symbol=first_symbol)
-
-        if broker is not None:
-            positions_query.filter_by(broker=broker)
-
-        for position in positions_query.all():
-
-            price = portfolio_manager.get_price(
-                second_symbol, position.symbol, self
-            )
-
-            orders = Order.query\
-                .filter_by(second_symbol=second_symbol)\
-                .filter_by(position=position)\
-                .filter_by(completed=True)\
-                .all()
-
-            for order in orders:
-                total_cost += (order.amount * order.price)
-                total_worth += (order.amount * price)
-
-        return ((total_worth - total_cost) / total_cost) * 100

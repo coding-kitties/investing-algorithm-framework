@@ -1,57 +1,109 @@
-from sqlalchemy import Column, DateTime, String, Boolean, Float, Integer, \
-    ForeignKey
-from sqlalchemy.orm import relationship
 from datetime import datetime
+from random import randint
+
+from sqlalchemy.orm import relationship, validates
+
 from investing_algorithm_framework.core.models import db
-from investing_algorithm_framework.core.exceptions import OperationalException
-from .order_type import OrderType
+from investing_algorithm_framework.core.models.model_extension \
+    import ModelExtension
+from .order_side import OrderSide
 
 
-class Order(db.Model):
+def random_id():
+    """
+    Function to create a random ID. This function checks first if
+    the generated ID is not already taken.
+    Returns: random integer that can be used as an ID
+    """
+    minimal = 100
+    maximal = 1000000000000000000
+    rand = randint(minimal, maximal)
+
+    while Order.query.filter_by(id=rand).first() is not None:
+        rand = randint(minimal, maximal)
+
+    return rand
+
+
+class Order(db.Model, ModelExtension):
+    __tablename__ = "orders"
+
     # Integer id for the Order as the primary key
-    id = Column(Integer, primary_key=True)
+    id = db.Column(
+        db.Integer,
+        primary_key=True,
+        unique=True,
+        default=random_id
+    )
 
     # order type (sell/buy)
-    order_type = Column(String)
+    order_side = db.Column(db.String)
 
-    # broker
-    broker = Column(String)
-
-    first_symbol = Column(String)
-    second_symbol = Column(String)
+    symbol = db.Column(db.String)
+    trading_symbol = db.Column(db.String)
 
     # Set to true, if order is completed at Binance platform
-    completed = Column(Boolean, default=False)
-    terminated = Column(Boolean, default=False)
+    completed = db.Column(db.Boolean, default=False)
+    terminated = db.Column(db.Boolean, default=False)
 
     # The price of the asset
-    price = Column(Float)
-    amount = Column(Float)
-    commission = Column(Float)
+    price = db.Column(db.Float)
+    amount = db.Column(db.Float)
 
-    # Portfolio attributes
-    total_price = Column(Integer)
     # Date Time of creation
-    created_at = Column(DateTime, default=datetime.now())
+    updated_at = db.Column(
+        db.DateTime,
+        default=datetime.utcnow(),
+        onupdate=datetime.utcnow()
+    )
+    created_at = db.Column(db.DateTime, default=datetime.now())
 
-    position_id = Column(Integer, ForeignKey('position.id'))
+    position_id = db.Column(db.Integer, db.ForeignKey('positions.id'))
     position = relationship("Position", back_populates="orders")
 
-    def __init__(self, order_type, trading_pair, price, amount, **kwargs):
-        self.order_type = OrderType.from_string(order_type).value
-
-        if "/" in trading_pair:
-            pairs = trading_pair.split("/")
-        else:
-            pairs = trading_pair.split("-")
-
-        if len(pairs) != 2:
-            raise OperationalException("Trading pair format is not supported")
-
-        self.first_symbol = pairs[0]
-        self.second_symbol = pairs[1]
-
+    def __init__(
+            self,
+            order_side,
+            target_symbol,
+            trading_symbol,
+            price,
+            amount,
+            **kwargs
+    ):
+        self.order_side = OrderSide.from_string(order_side).value
+        self.target_symbol = target_symbol
+        self.trading_symbol = trading_symbol
         self.price = price
         self.amount = amount
         self.total_price = self.amount * self.price
         super(Order, self).__init__(**kwargs)
+
+    @validates(
+        'id',
+        'symbol',
+        'order_side',
+        'order_type',
+        'price',
+        'amount',
+        'position'
+    )
+    def _write_once(self, key, value):
+        existing = getattr(self, key)
+
+        if existing is not None:
+            raise ValueError("{} is write-once".format(key))
+
+        return value
+
+    def __repr__(self):
+        return self.repr(
+            id=self.id,
+            target_symbol=self.target_symbol,
+            trading_symbol=self.trading_symbol,
+            amount=self.amount,
+            price=self.price,
+            total_price=self.total_price,
+            created_at=self.created_at,
+            completed=self.completed,
+            terminated=self.terminated
+        )
