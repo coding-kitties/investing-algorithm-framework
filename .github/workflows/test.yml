@@ -5,10 +5,15 @@ name: App Test
 
 on:
   push:
-    branches: [ '*' ]
+    branches:
+      - '*'         # matches every branch that doesn't contain a '/'
+      - '*/*'       # matches every branch containing a single '/'
+      - '**'        # matches every branch
   pull_request:
-    branches: [ '*' ]
-
+    branches:
+      - '*'         # matches every branch that doesn't contain a '/'
+      - '*/*'       # matches every branch containing a single '/'
+      - '**'        # matches every branch
 jobs:
   build:
 
