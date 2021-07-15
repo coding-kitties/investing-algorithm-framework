@@ -1,5 +1,7 @@
 import logging
+
 from flask import Blueprint, jsonify
+
 from investing_algorithm_framework.exceptions import ApiException
 
 logger = logging.getLogger(__name__)
