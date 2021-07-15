@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
+
 from investing_algorithm_framework.core.context.algorithm_context import \
     AlgorithmContext
-from investing_algorithm_framework.core.context\
+from investing_algorithm_framework.core.context \
     .algorithm_context_configuration import AlgorithmContextConfiguration
 
 

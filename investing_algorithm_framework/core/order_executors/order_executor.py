@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 
 from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.models import Order, db
+from investing_algorithm_framework.core.models import Order
 
 
 class OrderExecutor(ABC):

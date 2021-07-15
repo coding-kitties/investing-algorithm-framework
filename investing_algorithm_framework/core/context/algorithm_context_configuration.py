@@ -1,5 +1,5 @@
-from typing import Any
 from importlib import import_module
+from typing import Any
 
 from investing_algorithm_framework.core.exceptions \
     import ImproperlyConfigured, OperationalException

@@ -1,5 +1,6 @@
 from sqlalchemy import UniqueConstraint, event
 from sqlalchemy.orm import relationship, validates
+
 from investing_algorithm_framework.core.models import db, OrderSide
 from investing_algorithm_framework.core.models.model_extension \
     import ModelExtension

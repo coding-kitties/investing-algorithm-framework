@@ -1,6 +1,8 @@
-from random import randint
-from sqlalchemy.orm import relationship, validates
 from datetime import datetime
+from random import randint
+
+from sqlalchemy.orm import relationship, validates
+
 from investing_algorithm_framework.core.models import db
 from investing_algorithm_framework.core.models.model_extension \
     import ModelExtension

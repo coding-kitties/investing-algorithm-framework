@@ -1,5 +1,6 @@
-from typing import List
 from abc import ABC, abstractmethod
+from typing import List
+
 from investing_algorithm_framework.core.events.observer import Observer
 
 

@@ -1,8 +1,8 @@
 from abc import abstractmethod, ABC
 
+from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import Position, Order, \
     Portfolio, OrderSide, db
-from investing_algorithm_framework.core.exceptions import OperationalException
 
 
 class AbstractPortfolioManager(ABC):

@@ -1,10 +1,11 @@
 from datetime import datetime
+
 from sqlalchemy import UniqueConstraint
 
+from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import db, OrderSide
 from investing_algorithm_framework.core.models.model_extension \
     import ModelExtension
-from investing_algorithm_framework.core.exceptions import OperationalException
 
 
 class Portfolio(db.Model, ModelExtension):

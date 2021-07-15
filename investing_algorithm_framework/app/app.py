@@ -1,11 +1,12 @@
 from flask import Flask
+
 from investing_algorithm_framework.configuration import Config, create_app
 from investing_algorithm_framework.context import Singleton
-from investing_algorithm_framework.extensions import scheduler
-from investing_algorithm_framework.core.models import create_all_tables, \
-    initialize_db
 from investing_algorithm_framework.core.context import algorithm
 from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.core.models import create_all_tables, \
+    initialize_db
+from investing_algorithm_framework.extensions import scheduler
 
 
 class App(metaclass=Singleton):

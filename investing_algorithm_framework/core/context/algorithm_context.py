@@ -1,13 +1,13 @@
 import logging
 from typing import List, Dict
 
-from investing_algorithm_framework.core.models import TimeUnit
-from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.workers import Scheduler
-from investing_algorithm_framework.extensions import scheduler
 from investing_algorithm_framework.configuration import Config
+from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.core.models import TimeUnit
 from investing_algorithm_framework.core.portfolio_managers import \
     AbstractPortfolioManager
+from investing_algorithm_framework.core.workers import Scheduler
+from investing_algorithm_framework.extensions import scheduler
 
 logger = logging.getLogger(__name__)
 

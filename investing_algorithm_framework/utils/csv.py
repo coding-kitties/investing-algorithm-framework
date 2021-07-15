@@ -1,7 +1,8 @@
 import csv
 import shutil
-from typing import Dict, List
 import tempfile
+from typing import Dict, List
+
 from investing_algorithm_framework.core.exceptions import OperationalException
 
 
