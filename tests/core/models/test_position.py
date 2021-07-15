@@ -1,28 +1,26 @@
 from tests.resources import TestBase
-from investing_algorithm_framework.core.models import Order, OrderType, \
-    Position, db
+from investing_algorithm_framework.core.models import Order, Position, db, \
+    OrderSide
 
 
 class TestPosition(TestBase):
 
     def setUp(self) -> None:
         super(TestPosition, self).setUp()
-        self.algorithm_context.add_data_provider(self.data_provider)
-        self.algorithm_context.add_portfolio_manager(self.portfolio_manager)
-        self.algorithm_context.add_order_executor(self.order_executor)
 
-        self.position = Position("DOT", "BINANCE")
-        self.position.save()
+        self.position = Position("DOT")
+        self.position.save(db)
 
         for i in range(0, 10):
             order = Order(
-                trading_pair="DOT/UDST",
+                target_symbol="DOT",
+                trading_symbol="USDT",
                 price=10,
                 amount=10 * i,
-                order_type=OrderType.BUY.value
+                order_side=OrderSide.BUY.value
             )
 
-            order.save()
+            order.save(db)
             self.position.orders.append(order)
 
         db.session.commit()
@@ -36,7 +34,14 @@ class TestPosition(TestBase):
         )
 
     def test_deleting(self):
-        self.position.delete()
+        self.assertEqual(
+            10, Order.query.filter_by(position=self.position).count()
+        )
+        self.assertEqual(
+            1, Position.query.count()
+        )
+
+        self.position.delete(db)
 
         self.assertEqual(0, Order.query.count())
         self.assertEqual(0, Position.query.count())

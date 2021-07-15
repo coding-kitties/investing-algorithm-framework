@@ -1,11 +1,10 @@
 from abc import abstractmethod, ABC
 
 from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.context import AlgorithmContext
-from investing_algorithm_framework.core.models import Order
+from investing_algorithm_framework.core.models import Order, db
 
 
-class AbstractOrderExecutor(ABC):
+class OrderExecutor(ABC):
     broker = None
 
     def __init__(self, broker: str = None):
@@ -34,7 +33,7 @@ class AbstractOrderExecutor(ABC):
             traded_against_symbol: str,
             price: float,
             amount: float,
-            algorithm_context: AlgorithmContext,
+            algorithm_context,
             **kwargs
     ) -> bool:
         raise NotImplementedError()

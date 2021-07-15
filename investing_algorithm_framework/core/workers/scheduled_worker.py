@@ -2,19 +2,43 @@ from abc import ABC
 from datetime import datetime
 from typing import Dict, Any
 
-from investing_algorithm_framework.core.utils import TimeUnit
+from investing_algorithm_framework.core.models import TimeUnit
 from investing_algorithm_framework.core.workers.worker import Worker
 
 
 class ScheduledWorker(Worker, ABC):
     time_unit: TimeUnit = None
     time_interval: int = None
+    __function = None
+
+    def __init__(
+            self,
+            function=None,
+            time_unit: TimeUnit = TimeUnit.MINUTE.value,
+            interval: int = 10
+    ):
+        if function is not None:
+            self.__function = function
+            self.time_unit = time_unit
+            self.time_interval = interval
+
+        super(ScheduledWorker, self).__init__()
+
+    def _start(self, **kwargs):
+        if self.__function is not None:
+            self.__function()
+        else:
+            super(ScheduledWorker, self).start(**kwargs)
 
     def start(self, **kwargs: Dict[str, Any]) -> None:
 
         # If the worker has never run, run it
         if self.last_run is None:
-            super(ScheduledWorker, self).start(**kwargs)
+
+            if self.__function is not None:
+                self.__function()
+            else:
+                super(ScheduledWorker, self).start(**kwargs)
 
         else:
             # Get the current time

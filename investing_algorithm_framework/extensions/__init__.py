@@ -1,4 +1,3 @@
-from investing_algorithm_framework.extensions.database_resolver \
-    import SQLAlchemyDatabaseResolver
+from investing_algorithm_framework.extensions.scheduler import scheduler
 
-__all__ = ['SQLAlchemyDatabaseResolver']
+__all__ = ["scheduler"]

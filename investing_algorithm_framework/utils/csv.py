@@ -35,7 +35,9 @@ def append_dict_as_row_to_csv(
 def get_total_amount_of_rows(file_path: str):
     file = open(file_path)
     reader = csv.reader(file)
-    return len(list(reader))
+    rows_count = len(list(reader))
+    file.close()
+    return rows_count
 
 
 # Function to convert a csv to a list of data
