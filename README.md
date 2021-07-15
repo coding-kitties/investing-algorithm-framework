@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/coding-kitties/investing-algorithm-framework.svg?branch=master)](https://travis-ci.org/coding-kitties/investing-algorithm-framework)
+[![Tests](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml/badge.svg)](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml)
 [![Downloads](https://pepy.tech/badge/investing-algorithm-framework)](https://pepy.tech/badge/investing-algorithm-framework)
 [![Current Version](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)
 
