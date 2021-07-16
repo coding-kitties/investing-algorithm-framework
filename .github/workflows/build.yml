@@ -25,8 +25,9 @@ jobs:
       run: |
         pip install wheel
         python ./setup.py sdist bdist_wheel
+    - name:
     - name: Upload
-      if: github.ref == 'refs/heads/master'
+      if: github.event.base_ref == 'refs/heads/master'
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         user: __token__
