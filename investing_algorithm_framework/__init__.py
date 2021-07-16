@@ -7,7 +7,7 @@ from investing_algorithm_framework.core.models import OrderSide, Order, \
     Position, TimeUnit, db, Portfolio
 from investing_algorithm_framework.globals import current_app
 
-VERSION = (0, 3, 0, 'alpha', 0)
+VERSION = (0, 3, 1, 'alpha', 0)
 
 __all__ = [
     'get_version',
