@@ -23,8 +23,10 @@ jobs:
         if [ -f requirements-build.txt ]; then pip install -r requirements-build.txt; fi
     - name: Echo
       run: |
-        echo ${{github.ref}}
-        echo ${{github.event.base_ref}}
+        raw=$(git branch -r --contains ${{ github.ref }})
+        branch=${raw/origin\/}
+        echo ::set-env name=BRANCH::$branch
+        echo ${{ env.BRANCH }}
     - name: Build
       run: |
         pip install wheel
