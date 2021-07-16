@@ -27,7 +27,7 @@ jobs:
       run: |
         raw=$(git branch -r --contains ${{ github.ref }})
         branch=${raw/origin\/}
-        echo branch
+        echo $branch
     - name: Build
       run: |
         pip install wheel
