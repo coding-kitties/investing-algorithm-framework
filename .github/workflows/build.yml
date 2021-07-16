@@ -24,14 +24,16 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         if [ -f requirements-build.txt ]; then pip install -r requirements-build.txt; fi
+    - name: Build
+      run: |
+        python ./setup.py sdist bdist_wheel
     - name: Upload
-#      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/release')
+      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/release')
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         user: __token__
         password: ${{ secrets.PYPI_TOKEN }}
-      run: |
-        python ./setup.py sdist bdist_wheel
+#        python ./setup.py sdist bdist_wheel
 
 #        pip install yolk3k
 #        pip install twine
