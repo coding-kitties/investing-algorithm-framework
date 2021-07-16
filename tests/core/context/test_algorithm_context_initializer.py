@@ -1,16 +1,29 @@
+from investing_algorithm_framework.core.context import AlgorithmContext
 from tests.resources.test_base import TestBase
+from investing_algorithm_framework import AlgorithmContextInitializer
+
+
+class Initializer(AlgorithmContextInitializer):
+
+    def initialize(self, algorithm: AlgorithmContext) -> None:
+        TestAlgorithmContextInitialization.initialize_has_run += 1
 
 
 class TestAlgorithmContextInitialization(TestBase):
+    initialize_has_run = 0
 
     def setUp(self) -> None:
         super(TestAlgorithmContextInitialization, self).setUp()
-        self.algorithm_context.add_initializer(self.context_initializer)
-        self.algorithm_context.add_data_provider(self.data_provider)
-        self.algorithm_context.add_portfolio_manager(self.portfolio_manager)
-        self.algorithm_context.add_order_executor(self.order_executor)
+        TestAlgorithmContextInitialization.initialize_has_run = 0
+        self.algo_app.algorithm.add_initializer(Initializer())
+        self.algo_app.algorithm.start()
 
-    def test_running_single_cycle(self) -> None:
-        self.algorithm_context.start(cycles=2)
-        self.assertEqual(2, self.data_provider.cycles)
-        self.assertEqual(1, self.context_initializer.called)
+    def test(self):
+        self.assertEqual(
+            1, TestAlgorithmContextInitialization.initialize_has_run
+        )
+        self.algo_app.algorithm.stop()
+        self.algo_app.algorithm.start()
+        self.assertEqual(
+            1, TestAlgorithmContextInitialization.initialize_has_run
+        )

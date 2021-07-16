@@ -1,170 +1,36 @@
 import os
-from unittest import TestCase
-from investing_algorithm_framework import DataProvider, \
-    AbstractPortfolioManager, AbstractOrderExecutor, \
-    AlgorithmContextInitializer, AlgorithmContext, Strategy, \
-    RelationalDataProvider, ScheduledDataProvider
-from investing_algorithm_framework.core.models import Order
-from investing_algorithm_framework import TimeUnit
+from flask_testing import TestCase
+from investing_algorithm_framework.configuration.constants import \
+    DATABASE_CONFIG, DATABASE_NAME, RESOURCES_DIRECTORY
+from investing_algorithm_framework.core.models import db
+from investing_algorithm_framework.app import App
+from investing_algorithm_framework.configuration.settings import TestConfig
+
 
 class TestBase(TestCase):
-    algorithm_context = None
-    data_provider = None
-    scheduled_data_provider = None
-    relational_data_provider = None
-    strategy = None
-    portfolio_manager = None
-    order_executor = None
-    context_initializer = None
+    resources_dir = os.path.join(
+        os.path.abspath(os.path.dirname(__file__)), 'databases'
+    )
+    algo_app = App(resources_directory=resources_dir, config=TestConfig)
 
-    class ContextInitializer(AlgorithmContextInitializer):
-        called = 0
+    def create_app(self):
+        self.algo_app._initialize_flask_app()
+        return self.algo_app._flask_app
 
-        def initialize(self, algorithm_context: AlgorithmContext) -> None:
-            self.called += 1
+    def setUp(self):
+        self.algo_app.start_database()
+        self.algo_app.start_scheduler()
 
-    class PortfolioManager(AbstractPortfolioManager):
-        broker = "BINANCE"
-        BASE_AMOUNT_USDT = 500
+    def tearDown(self):
+        db.session.remove()
+        db.drop_all()
 
-        def get_portfolio_size(
-                self, algorithm_context: AlgorithmContext
-        ) -> float:
-            orders = Order.query.all()
-            allocated = 0
-
-            for order in orders:
-                allocated += order.total_price
-
-            return self.BASE_AMOUNT_USDT - allocated
-
-        def get_free_portfolio_size(
-                self, algorithm_context: AlgorithmContext
-        ) -> float:
-            orders = Order.query.all()
-            allocated = 0
-
-            for order in orders:
-                allocated += order.total_price
-
-            return self.BASE_AMOUNT_USDT - allocated
-
-        def get_allocated_portfolio_size(
-                self, algorithm_context: AlgorithmContext
-        ) -> float:
-            pass
-
-        def get_allocated_asset_size(
-                self, asset, algorithm_context: AlgorithmContext
-        ) -> float:
-            pass
-
-    class OrderExecutor(AbstractOrderExecutor):
-        broker = "BINANCE"
-
-        def execute_limit_order(
-                self,
-                asset: str,
-                price: float,
-                amount: float,
-                algorithm_context: AlgorithmContext,
-                **kwargs
-        ) -> bool:
-            pass
-
-    class StandardStrategy(Strategy):
-        data_provider_id = None
-        called = 0
-        on_tick_method_called = False
-        on_quote_method_called = False
-        on_order_book_method_called = False
-        on_raw_data_called = False
-
-        def get_id(self) -> str:
-            return self.__class__.__name__
-
-        def on_raw_data(self, data_provider_id, data, algorithm_context):
-            self.data_provider_id = data_provider_id
-            self.called += 1
-            self.on_raw_data_called = True
-
-        def on_order_book(self, data_provider_id, data, algorithm_context):
-            self.on_order_book_method_called = True
-
-        def on_quote(self, data_provider_id, data, algorithm_context):
-            self.on_quote_method_called = True
-
-        def on_tick(self, data_provider_id, data, algorithm_context):
-            self.on_tick_method_called = True
-
-    class StandardDataProvider(DataProvider):
-        registered_strategies = []
-        cycles = 0
-
-        def extract_tick(self, data, algorithm_context: AlgorithmContext):
-            return data
-
-        def extract_quote(self, data, algorithm_context: AlgorithmContext):
-            return data
-
-        def extract_order_book(self, data, algorithm_context: AlgorithmContext):
-            return data
-
-        def get_data(self, algorithm_context: AlgorithmContext):
-            self.cycles += 1
-            return "test_data"
-
-    class RelationalDataProvider(RelationalDataProvider):
-        registered_strategies = []
-        cycles = 0
-
-        def extract_tick(self, data, algorithm_context: AlgorithmContext):
-            return data
-
-        def extract_quote(self, data, algorithm_context: AlgorithmContext):
-            return data
-
-        def extract_order_book(self, data, algorithm_context: AlgorithmContext):
-            return data
-
-        def get_data(self, algorithm_context: AlgorithmContext):
-            self.cycles += 1
-            return "test_data"
-
-    class ScheduledDataProvider(ScheduledDataProvider):
-        time_unit = TimeUnit.SECOND
-        time_interval = 2
-        cycles = 0
-
-        def get_data(self, algorithm_context: AlgorithmContext):
-            self.cycles += 1
-            return "test_data"
-
-    def setUp(self) -> None:
-        resources_path = os.path.abspath(
-            os.path.join(os.path.realpath(__file__), os.pardir)
+        database_directory_path = self.app.config.get(RESOURCES_DIRECTORY)
+        database_name = self.app.config.get(DATABASE_CONFIG).get(DATABASE_NAME)
+        database_path = os.path.join(
+            database_directory_path,
+            "{}.sqlite3".format(database_name)
         )
 
-        self.data_provider = self.StandardDataProvider()
-        self.relational_data_provider = self.RelationalDataProvider()
-        self.scheduled_data_provider = self.ScheduledDataProvider()
-        self.relational_data_provider.run_after = self.data_provider
-        self.portfolio_manager = self.PortfolioManager()
-        self.order_executor = self.OrderExecutor()
-        self.strategy = self.StandardStrategy()
-        self.algorithm_context = AlgorithmContext(
-            resources_directory=resources_path
-        )
-        self.context_initializer = self.ContextInitializer()
-
-    def tearDown(self) -> None:
-        resources_path = os.path.abspath(
-            os.path.join(os.path.realpath(__file__), os.pardir)
-        )
-
-        resource_files = os.listdir(resources_path)
-
-        for item in resource_files:
-            if item.endswith(".sqlite3") or item.endswith(".sqlite3-journal"):
-                os.remove(os.path.join(resources_path, item))
-
+        if os.path.isfile(database_path):
+            os.remove(database_path)

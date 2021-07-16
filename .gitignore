@@ -143,3 +143,4 @@ include/
 lib/
 .Python
 bumpversion.egg-info/
+*.sqlite3

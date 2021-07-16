@@ -1,3 +1,9 @@
 wrapt==1.11.2
-SQLAlchemy==1.4.11
-sqlalchemy-toolbox==0.1.2
+Flask==1.1.1
+Flask-Cors==3.0.9
+marshmallow==3.5.0
+Flask-SQLAlchemy==2.5.1
+Flask-APScheduler==1.12.2
+setuptools~=51.0.0
+SQLAlchemy~=1.4.11
+Werkzeug~=1.0.1
