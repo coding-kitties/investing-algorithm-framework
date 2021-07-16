@@ -28,13 +28,13 @@ jobs:
         raw=$(git branch -r --contains ${{ github.ref }})
         branch=${raw/origin\/}
         echo $branch
-        if [ -f $branch == "master" ]; then exit 1; fi
+        echo "::set-env name=BRANCH_NAME::$branch
     - name: Build
       run: |
         pip install wheel
         python ./setup.py sdist bdist_wheel
     - name: Upload
-      if: github.event.base_ref == 'refs/heads/master'
+      if: github.event.base_ref == 'refs/heads/master' && ${{ env.BRANCH_NAME == 'master' }}
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         user: __token__
