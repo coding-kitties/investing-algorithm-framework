@@ -4,8 +4,10 @@ name: Build
 
 on:
   push:
-    tags:
-      - "v*"
+    branch:
+      - master
+#    tags:
+#      - "v*"
 
 jobs:
   build:
@@ -25,8 +27,7 @@ jobs:
       run: |
         raw=$(git branch -r --contains ${{ github.ref }})
         branch=${raw/origin\/}
-        echo ::set-env name=BRANCH::$branch
-        echo ${{ env.BRANCH }}
+        echo branch
     - name: Build
       run: |
         pip install wheel
