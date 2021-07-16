@@ -28,7 +28,7 @@ jobs:
         if [ -f requirements-build.txt ]; then pip install -r requirements-build.txt; fi
     - name: Upload
       if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/release')
-        uses: pypa/gh-action-pypi-publish@release/v1
+      uses: pypa/gh-action-pypi-publish@release/v1
       with:
         user: __token__
         password: ${{ secrets.PYPI_TOKEN }}
