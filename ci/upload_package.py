@@ -20,7 +20,6 @@ if __name__ == "__main__":
     from investing_algorithm_framework import get_version
     released_version = get_latest_version_number(PACKAGE_NAME)
 
-    print(released_version)
     if released_version != get_version():
         os.chdir("../")
 
@@ -28,9 +27,6 @@ if __name__ == "__main__":
         if os.path.isdir('dist'):
             shutil.rmtree('dist')
 
-        print("Hello")
         os.system("python setup.py sdist bdist_wheel")
-        print("Buy")
-        os.system("ls")
         os.system("twine upload -r investing-algorithm-framework dist/*")
         os.system("twine upload -p $pipy_token -u __token__ dist/*")
