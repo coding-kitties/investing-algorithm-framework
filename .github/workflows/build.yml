@@ -22,7 +22,7 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         if [ -f requirements-build.txt ]; then pip install -r requirements-build.txt; fi
     - name: Echo
-      - run: |
+      run: |
         echo ${{github.ref}}
         echo ${{github.event.base_ref}}
     - name: Build
