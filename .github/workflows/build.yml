@@ -26,13 +26,8 @@ jobs:
         pip install wheel
         python ./setup.py sdist bdist_wheel
     - name: Upload
+      if: github.ref == 'refs/heads/master'
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         user: __token__
         password: ${{ secrets.PYPI_TOKEN }}
-#        python ./setup.py sdist bdist_wheel
-
-#        pip install yolk3k
-#        pip install twine
-#        pip install keyring==21.4.0
-#        pip install wheel
