@@ -31,8 +31,9 @@ jobs:
         user: __token__
         password: ${{ secrets.PYPI_TOKEN }}
       run: |
+        python ./setup.py sdist bdist_wheel
+
 #        pip install yolk3k
 #        pip install twine
 #        pip install keyring==21.4.0
 #        pip install wheel
-        python ./setup.py sdist bdist_wheel
