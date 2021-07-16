@@ -28,7 +28,7 @@ jobs:
         raw=$(git branch -r --contains ${{ github.ref }})
         branch=${raw/origin\/}
         echo $branch
-        echo "::set-env name=BRANCH_NAME::$branch
+        echo "::set-env name=BRANCH_NAME::$branch"
     - name: Build
       run: |
         pip install wheel
