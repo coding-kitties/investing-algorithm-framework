@@ -28,6 +28,7 @@ jobs:
         raw=$(git branch -r --contains ${{ github.ref }})
         branch=${raw/origin\/}
         echo $branch
+        if [ -f $branch == "master" ]; then exit 1; fi
     - name: Build
       run: |
         pip install wheel
