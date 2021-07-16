@@ -6,11 +6,9 @@ on:
   push:
     branches:
       - develop
-      - master
   pull_request:
     branches:
       - develop
-      - master
 
 jobs:
   build:
@@ -27,7 +25,7 @@ jobs:
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         if [ -f requirements-build.txt ]; then pip install -r requirements-build.txt; fi
     - name: Upload
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/release')
+#      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/release')
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         user: __token__
