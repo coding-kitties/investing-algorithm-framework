@@ -4,6 +4,8 @@ name: Build
 
 on:
   push:
+    branch:
+      - master
     tags:
       - "v*"
 
@@ -21,12 +23,20 @@ jobs:
         python -m pip install --upgrade pip
         if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
         if [ -f requirements-build.txt ]; then pip install -r requirements-build.txt; fi
+    - name: Set Environment
+      env:
+        ACTIONS_ALLOW_UNSECURE_COMMANDS: 'true'
+      run: |
+        raw=$(git branch -r --contains ${{ github.ref }})
+        branch=${raw/origin\/}
+        echo $branch
+        echo "::set-env name=BRANCH_NAME::$branch"
     - name: Build
       run: |
         pip install wheel
         python ./setup.py sdist bdist_wheel
     - name: Upload
-      if: github.ref == 'refs/heads/master'
+      if: github.event.base_ref == 'refs/heads/master' && ${{ env.BRANCH_NAME == 'master' }}
       uses: pypa/gh-action-pypi-publish@release/v1
       with:
         user: __token__
