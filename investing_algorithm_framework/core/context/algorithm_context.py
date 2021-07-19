@@ -62,12 +62,12 @@ class AlgorithmContext:
             if self._initializer is not None:
                 self._initializer.initialize(self)
 
-            # Initialize the portfolio managers
-            for portfolio_manager_key in self._portfolio_managers:
-                portfolio_manager = self._portfolio_managers[
-                    portfolio_manager_key
-                ]
-                portfolio_manager.initialize()
+        # Initialize the portfolio managers
+        for portfolio_manager_key in self._portfolio_managers:
+            portfolio_manager = self._portfolio_managers[
+                portfolio_manager_key
+            ]
+            portfolio_manager.initialize()
 
         self._initialized = True
 
