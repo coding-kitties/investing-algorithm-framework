@@ -5,6 +5,7 @@ from investing_algorithm_framework.configuration.constants import \
 from investing_algorithm_framework.core.models import db
 from investing_algorithm_framework.app import App
 from investing_algorithm_framework.configuration.settings import TestConfig
+from investing_algorithm_framework.configuration.setup import setup_database
 
 
 class TestBase(TestCase):
@@ -15,6 +16,7 @@ class TestBase(TestCase):
 
     def create_app(self):
         self.algo_app._initialize_flask_app()
+        setup_database(self.algo_app._flask_app)
         return self.algo_app._flask_app
 
     def setUp(self):
@@ -25,8 +27,9 @@ class TestBase(TestCase):
         db.session.remove()
         db.drop_all()
 
-        database_directory_path = self.app.config.get(RESOURCES_DIRECTORY)
-        database_name = self.app.config.get(DATABASE_CONFIG).get(DATABASE_NAME)
+        database_directory_path = self.algo_app.config.get(RESOURCES_DIRECTORY)
+        database_name = self.algo_app.config.get(DATABASE_CONFIG)\
+            .get(DATABASE_NAME)
         database_path = os.path.join(
             database_directory_path,
             "{}.sqlite3".format(database_name)
