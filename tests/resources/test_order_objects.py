@@ -1,4 +1,4 @@
-from investing_algorithm_framework import Order, Position, OrderSide, db
+from investing_algorithm_framework import db
 from investing_algorithm_framework.core.portfolio_managers import \
     PortfolioManager
 
@@ -48,6 +48,34 @@ class TestOrderAndPositionsObjectsMixin:
                 price=11
             )
 
+            order.save(db)
+            portfolio_manager.add_sell_order(order)
+
+        db.session.commit()
+
+    @staticmethod
+    def create_buy_orders(amount, tickers, portfolio_manager):
+
+        for ticker in tickers:
+            order = portfolio_manager.create_buy_order(
+                amount=amount,
+                symbol=ticker,
+                price=5
+            )
+            order.save(db)
+            portfolio_manager.add_buy_order(order)
+
+        db.session.commit()
+
+    @staticmethod
+    def create_sell_orders(amount, tickers, portfolio_manager):
+
+        for ticker in tickers:
+            order = portfolio_manager.create_sell_order(
+                amount=amount,
+                symbol=ticker,
+                price=5
+            )
             order.save(db)
             portfolio_manager.add_sell_order(order)
 

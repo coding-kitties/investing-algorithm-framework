@@ -1,3 +1,5 @@
+from random import randint
+
 from sqlalchemy import UniqueConstraint, event
 from sqlalchemy.orm import relationship, validates
 
@@ -6,11 +8,32 @@ from investing_algorithm_framework.core.models.model_extension \
     import ModelExtension
 
 
+def random_id():
+    """
+    Function to create a random ID. This function checks first if
+    the generated ID is not already taken.
+    Returns: random integer that can be used as an ID
+    """
+    minimal = 100
+    maximal = 1000000000000000000
+    rand = randint(minimal, maximal)
+
+    while Position.query.filter_by(id=rand).first() is not None:
+        rand = randint(minimal, maximal)
+
+    return rand
+
+
 class Position(db.Model, ModelExtension):
     __tablename__ = "positions"
 
-    # Integer id for the Order as the primary key
-    id = db.Column(db.Integer, primary_key=True)
+    # Integer id for the Position as the primary key
+    id = db.Column(
+        db.Integer,
+        primary_key=True,
+        unique=True,
+        default=random_id
+    )
 
     # Asset Symbol (e.g. BTC)
     symbol = db.Column(db.String)
@@ -28,7 +51,7 @@ class Position(db.Model, ModelExtension):
 
     # Constraints
     __table_args__ = (
-        UniqueConstraint('symbol', 'portfolio_id', name='_symbol_broker_uc'),
+        UniqueConstraint('symbol', 'portfolio_id', name='_symbol_portfolio_uc'),
     )
 
     def __init__(self, symbol):

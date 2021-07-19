@@ -39,11 +39,11 @@ class Order(db.Model, ModelExtension):
     # order type (sell/buy)
     order_side = db.Column(db.String)
 
-    symbol = db.Column(db.String)
+    target_symbol = db.Column(db.String)
     trading_symbol = db.Column(db.String)
 
     # Set to true, if order is completed at Binance platform
-    completed = db.Column(db.Boolean, default=False)
+    executed = db.Column(db.Boolean, default=False)
     terminated = db.Column(db.Boolean, default=False)
 
     # The price of the asset
@@ -75,12 +75,12 @@ class Order(db.Model, ModelExtension):
         self.trading_symbol = trading_symbol
         self.price = price
         self.amount = amount
-        self.total_price = self.amount * self.price
         super(Order, self).__init__(**kwargs)
 
     @validates(
         'id',
-        'symbol',
+        'target_symbol',
+        'trading_symbol',
         'order_side',
         'order_type',
         'price',
@@ -102,8 +102,8 @@ class Order(db.Model, ModelExtension):
             trading_symbol=self.trading_symbol,
             amount=self.amount,
             price=self.price,
-            total_price=self.total_price,
+            total_price=(self.amount * self.price),
             created_at=self.created_at,
-            completed=self.completed,
+            executed=self.executed,
             terminated=self.terminated
         )

@@ -1,12 +1,15 @@
 from flask import Flask
 
-from investing_algorithm_framework.configuration import Config, create_app
+from investing_algorithm_framework.configuration import Config, create_app, \
+    setup_config
 from investing_algorithm_framework.context import Singleton
 from investing_algorithm_framework.core.context import algorithm
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import create_all_tables, \
     initialize_db
 from investing_algorithm_framework.extensions import scheduler
+from investing_algorithm_framework.configuration.constants import \
+    RESOURCES_DIRECTORY
 
 
 class App(metaclass=Singleton):
@@ -15,41 +18,56 @@ class App(metaclass=Singleton):
     _configured: bool
     _started = False
     _config = None
+    _resource_directory = None
 
     def __init__(
             self, resources_directory: str = None, config=None, arg=None
     ):
-        pass
+        if resources_directory is not None:
+            self._resource_directory = resources_directory
+
+        self._initialize_flask_app()
+        self._initialize_config(config)
 
     def initialize(
             self, resources_directory: str = None, config=None, arg=None
     ):
         if not self.started:
 
-            if config is not None:
-                assert issubclass(config, Config), (
-                    "Config is not an instance of config"
-                )
-                self._config = config()
-
             if resources_directory is not None:
-                self.config.RESOURCES_DIRECTORY = resources_directory
+                self._resource_directory = resources_directory
+
+            self._initialize_flask_app()
+            self._initialize_config(config)
 
     def _initialize_algorithm(self):
         self._algorithm.initialize(config=self.config)
 
-    def _initialize_config(self):
+    def _initialize_config(self, config=None):
 
-        if self.config is None:
-            self._config = Config()
+        if config is not None:
+            assert issubclass(config, Config), (
+                "Config is not an instance of config"
+            )
+            self._config = config()
+
+            if self._resource_directory is not None:
+                self._config[RESOURCES_DIRECTORY] = self._resource_directory
+
+            setup_config(self._flask_app, self.config)
 
     def _initialize_flask_app(self):
-        self._flask_app = create_app(self.config)
+
+        if self._flask_app is None:
+            self._flask_app = create_app()
 
     def start(self):
-        self._initialize_config()
-        self._initialize_algorithm()
         self._initialize_flask_app()
+
+        if self.config is None:
+            self._initialize_config(Config)
+
+        self._initialize_algorithm()
         self.start_database()
         self.start_scheduler()
         self.start_algorithm()
@@ -99,3 +117,6 @@ class App(metaclass=Singleton):
     @property
     def config(self):
         return self._config
+
+    def register_blueprint(self, blueprint):
+        self._flask_app.register_blueprint(blueprint)
