@@ -11,10 +11,7 @@ from investing_algorithm_framework.configuration import ConfigValidator
 from investing_algorithm_framework.configuration.constants import \
     DATABASE_CONFIG, DATABASE_DIRECTORY_PATH, DATABASE_NAME, LOG_LEVEL, \
     SQLALCHEMY_DATABASE_URI, RESOURCES_DIRECTORY
-from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.exceptions import ApiException
-from investing_algorithm_framework.views.operational_views import blueprint \
-    as operational_views_blueprint
 
 logger = logging.getLogger(__name__)
 
@@ -27,19 +24,19 @@ def create_app(config_object=None) -> Flask:
     given configuration from the client.
     """
 
-    if config_object is None:
-        raise OperationalException("Config is not set")
+    # if config_object is None:
+    #     raise OperationalException("Config is not set")
 
     # Setup logging
     app = Flask(__name__.split('.')[0])
     CORS(app, supports_credentials=True)
     app.url_map.strict_slashes = False
 
-    # Load config
-    app.config.from_object(config_object)
-
-    # Validate the configuration
-    ConfigValidator.validate(app.config)
+    # # Load config
+    # app.config.from_object(config_object)
+    #
+    # # Validate the configuration
+    # ConfigValidator.validate(app.config)
 
     # Register blueprints
     register_blueprints(app)
@@ -52,17 +49,25 @@ def create_app(config_object=None) -> Flask:
     logger.info("Connecting to sqlite")
 
     # Initialize the database
-    setup_database(app)
+    # setup_database(app)
 
     return app
 
 
 def register_blueprints(app):
-    app.register_blueprint(operational_views_blueprint)
+    pass
+    # app.register_blueprint(operational_views_blueprint)
+
+
+def setup_config(app, config_object):
+    # Validate the configuration
+    ConfigValidator.validate(config_object)
+
+    # Load config
+    app.config.from_object(config_object)
 
 
 def setup_database(app):
-
     if DATABASE_CONFIG not in app.config:
         database_path = os.path.join(
             app.config[RESOURCES_DIRECTORY],

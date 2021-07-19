@@ -45,8 +45,6 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
             self.portfolio_manager_two
         )
         self.algo_app.algorithm.start()
-        self.portfolio_manager_one._initialize_portfolio()
-        self.portfolio_manager_two._initialize_portfolio()
         self.create_test_objects(self.portfolio_manager_one)
         self.create_test_objects(self.portfolio_manager_two)
 

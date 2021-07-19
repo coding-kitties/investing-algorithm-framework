@@ -4,8 +4,6 @@ name: Build
 
 on:
   push:
-    branch:
-      - master
     tags:
       - "v*"
 
