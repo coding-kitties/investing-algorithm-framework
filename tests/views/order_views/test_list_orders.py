@@ -7,7 +7,7 @@ class PortfolioManagerOne(PortfolioManager):
     base_currency = "USDT"
     broker = "KRAKEN"
 
-    def get_unallocated_size(self) -> float:
+    def get_initial_unallocated_size(self) -> float:
         return 1000
 
 
@@ -15,7 +15,7 @@ class PortfolioManagerTwo(PortfolioManager):
     base_currency = "BUSD"
     broker = "BINANCE"
 
-    def get_unallocated_size(self) -> float:
+    def get_initial_unallocated_size(self) -> float:
         return 2000
 
 

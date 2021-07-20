@@ -41,7 +41,7 @@ class AbstractPortfolioManager(ABC):
             portfolio = Portfolio(
                 broker=self.broker,
                 base_currency=self.base_currency,
-                unallocated=self.get_unallocated_size()
+                unallocated=self.get_initial_unallocated_size()
             )
             portfolio.save(db)
 
@@ -68,7 +68,7 @@ class AbstractPortfolioManager(ABC):
         return getattr(self, 'broker')
 
     @abstractmethod
-    def get_unallocated_size(self) -> float:
+    def get_initial_unallocated_size(self) -> float:
         raise NotImplementedError()
 
     @abstractmethod

@@ -1,7 +1,7 @@
 from flask import Flask
 
 from investing_algorithm_framework.configuration import Config, create_app, \
-    setup_config
+    setup_config, setup_database
 from investing_algorithm_framework.context import Singleton
 from investing_algorithm_framework.core.context import algorithm
 from investing_algorithm_framework.core.exceptions import OperationalException
@@ -9,13 +9,15 @@ from investing_algorithm_framework.core.models import create_all_tables, \
     initialize_db
 from investing_algorithm_framework.extensions import scheduler
 from investing_algorithm_framework.configuration.constants import \
-    RESOURCES_DIRECTORY
+    RESOURCES_DIRECTORY, SQLALCHEMY_DATABASE_URI, DATABASE_DIRECTORY_PATH, \
+    DATABASE_NAME, DATABASE_CONFIG
 
 
 class App(metaclass=Singleton):
     _algorithm = algorithm
     _flask_app: Flask = None
-    _configured: bool
+    _configured: bool = False
+    _database_configured: bool = False
     _started = False
     _config = None
     _resource_directory = None
@@ -27,7 +29,9 @@ class App(metaclass=Singleton):
             self._resource_directory = resources_directory
 
         self._initialize_flask_app()
-        self._initialize_config(config)
+
+        if config is not None:
+            self._config = config
 
     def initialize(
             self, resources_directory: str = None, config=None, arg=None
@@ -38,37 +42,83 @@ class App(metaclass=Singleton):
                 self._resource_directory = resources_directory
 
             self._initialize_flask_app()
-            self._initialize_config(config)
+
+            if config is not None:
+                self._config = config
 
     def _initialize_algorithm(self):
         self._algorithm.initialize(config=self.config)
 
     def _initialize_config(self, config=None):
 
-        if config is not None:
-            assert issubclass(config, Config), (
-                "Config is not an instance of config"
-            )
-            self._config = config()
+        if not self._configured:
+
+            if config is not None:
+                assert issubclass(config, Config), (
+                    "Config is not an instance of config"
+                )
+                self._config = config()
+            elif self._config is not None:
+                self._config = self._config()
+            else:
+                raise OperationalException("No config object set")
 
             if self._resource_directory is not None:
                 self._config[RESOURCES_DIRECTORY] = self._resource_directory
 
-            setup_config(self._flask_app, self.config)
+            self._configured = True
 
     def _initialize_flask_app(self):
 
         if self._flask_app is None:
             self._flask_app = create_app()
 
+    def _initialize_flask_sql_alchemy(self):
+
+        if self._configured and self._database_configured:
+            initialize_db(self._flask_app)
+            create_all_tables()
+
+    def _initialize_flask_config(self):
+
+        if self._configured:
+            setup_config(self._flask_app, self._config)
+
+    def _initialize_database(self):
+
+        if self._configured and not self._database_configured:
+            setup_database(self.config)
+
+            if self.config[DATABASE_CONFIG][DATABASE_DIRECTORY_PATH] is None:
+                raise OperationalException(
+                    f"{DATABASE_DIRECTORY_PATH} is not set in config"
+                )
+
+            if self.config[DATABASE_CONFIG][DATABASE_NAME] is None:
+                raise OperationalException(
+                    f"{DATABASE_NAME} is not set in config"
+                )
+
+            if self.config[SQLALCHEMY_DATABASE_URI] is None:
+                raise OperationalException(
+                    f"{SQLALCHEMY_DATABASE_URI} is not set in config"
+                )
+
+            self._database_configured = True
+
     def start(self):
+
+        # Setup config if it is not set
+        if self._config is None:
+            self._config = Config
+
         self._initialize_flask_app()
-
-        if self.config is None:
-            self._initialize_config(Config)
-
+        self._initialize_config()
+        self._initialize_database()
+        self._initialize_flask_config()
+        self._initialize_flask_sql_alchemy()
         self._initialize_algorithm()
-        self.start_database()
+
         self.start_scheduler()
         self.start_algorithm()
 
@@ -78,10 +128,6 @@ class App(metaclass=Singleton):
             threaded=True,
             use_reloader=False
         )
-
-    def start_database(self):
-        initialize_db(self._flask_app)
-        create_all_tables()
 
     def start_scheduler(self):
 
