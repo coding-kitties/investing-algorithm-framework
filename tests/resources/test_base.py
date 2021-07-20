@@ -16,11 +16,14 @@ class TestBase(TestCase):
 
     def create_app(self):
         self.algo_app._initialize_flask_app()
-        setup_database(self.algo_app._flask_app)
+        self.algo_app._initialize_config()
+        self.algo_app._initialize_database()
+        self.algo_app._initialize_flask_config()
+        self.algo_app._initialize_flask_sql_alchemy()
+
         return self.algo_app._flask_app
 
     def setUp(self):
-        self.algo_app.start_database()
         self.algo_app.start_scheduler()
 
     def tearDown(self):

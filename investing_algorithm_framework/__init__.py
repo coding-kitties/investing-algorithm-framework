@@ -5,12 +5,14 @@ from investing_algorithm_framework.core.portfolio_managers import \
     AbstractPortfolioManager, PortfolioManager
 from investing_algorithm_framework.core.models import OrderSide, Order, \
     Position, TimeUnit, db, Portfolio
+from investing_algorithm_framework.app import App
 from investing_algorithm_framework.globals import current_app
 from investing_algorithm_framework.views import *
 
 VERSION = (0, 4, 0, 'alpha', 0)
 
 __all__ = [
+    "App",
     'get_version',
     'AbstractPortfolioManager',
     'PortfolioManager',

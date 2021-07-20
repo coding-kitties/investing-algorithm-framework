@@ -24,22 +24,10 @@ def create_app(config_object=None) -> Flask:
     given configuration from the client.
     """
 
-    # if config_object is None:
-    #     raise OperationalException("Config is not set")
-
     # Setup logging
     app = Flask(__name__.split('.')[0])
     CORS(app, supports_credentials=True)
     app.url_map.strict_slashes = False
-
-    # # Load config
-    # app.config.from_object(config_object)
-    #
-    # # Validate the configuration
-    # ConfigValidator.validate(app.config)
-
-    # Register blueprints
-    register_blueprints(app)
 
     # Register error handler
     register_error_handlers(app)
@@ -48,48 +36,54 @@ def create_app(config_object=None) -> Flask:
 
     logger.info("Connecting to sqlite")
 
-    # Initialize the database
-    # setup_database(app)
-
     return app
 
 
-def register_blueprints(app):
-    pass
-    # app.register_blueprint(operational_views_blueprint)
-
-
-def setup_config(app, config_object):
+def setup_config(flask_app, config_object):
     # Validate the configuration
     ConfigValidator.validate(config_object)
 
-    # Load config
-    app.config.from_object(config_object)
+    for attribute_key in dir(config_object):
+        if attribute_key.isupper():
+            flask_app.config[attribute_key] = \
+                getattr(config_object, attribute_key)
 
 
-def setup_database(app):
-    if DATABASE_CONFIG not in app.config:
+def setup_database(config_object):
+    if DATABASE_CONFIG not in config_object:
         database_path = os.path.join(
-            app.config[RESOURCES_DIRECTORY],
+            config_object[RESOURCES_DIRECTORY],
             '{}.sqlite3'.format(DEFAULT_DATABASE_NAME)
         )
-        app.config[SQLALCHEMY_DATABASE_URI] = database_path
+        config_object[SQLALCHEMY_DATABASE_URI] = database_path
     else:
         database_name = DEFAULT_DATABASE_NAME
-        database_directory_path = app.config.get(RESOURCES_DIRECTORY)
+        database_directory_path = config_object.get(RESOURCES_DIRECTORY)
 
-        if DATABASE_NAME in app.config.get(DATABASE_CONFIG):
-            database_name = app.config.get(DATABASE_CONFIG).get(DATABASE_NAME)
+        if DATABASE_NAME in config_object.get(DATABASE_CONFIG):
+            config_database_name = config_object.get(DATABASE_CONFIG)\
+                .get(DATABASE_NAME)
 
-        if DATABASE_DIRECTORY_PATH in app.config.get(DATABASE_CONFIG):
-            database_directory_path = app.config.get(DATABASE_CONFIG)\
+            if config_database_name is not None:
+                database_name = config_database_name
+
+        if DATABASE_DIRECTORY_PATH in config_object.get(DATABASE_CONFIG):
+            config_database_directory_path = config_object.get(DATABASE_CONFIG)\
                 .get(DATABASE_DIRECTORY_PATH)
 
+            if config_database_directory_path is not None:
+                database_directory_path = config_database_directory_path
+
+        config_object[DATABASE_CONFIG][DATABASE_DIRECTORY_PATH] = \
+            database_directory_path
+        config_object[DATABASE_CONFIG][DATABASE_NAME] = database_name
+
         database_path = os.path.join(
-            database_directory_path, '{}.sqlite3'.format(database_name)
+            config_object[DATABASE_CONFIG][DATABASE_DIRECTORY_PATH],
+            f'{config_object[DATABASE_CONFIG][DATABASE_NAME]}.sqlite3'
         )
 
-    app.config[SQLALCHEMY_DATABASE_URI] = 'sqlite:////{}'.format(database_path)
+    config_object[SQLALCHEMY_DATABASE_URI] = 'sqlite:////{}'.format(database_path)
 
     # Create the database if it not exist
     if not os.path.isfile(database_path):
