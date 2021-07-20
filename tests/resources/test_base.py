@@ -5,7 +5,6 @@ from investing_algorithm_framework.configuration.constants import \
 from investing_algorithm_framework.core.models import db
 from investing_algorithm_framework.app import App
 from investing_algorithm_framework.configuration.settings import TestConfig
-from investing_algorithm_framework.configuration.setup import setup_database
 
 
 class TestBase(TestCase):
