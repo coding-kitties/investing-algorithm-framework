@@ -39,8 +39,11 @@ class Position(db.Model, ModelExtension):
     symbol = db.Column(db.String)
 
     # The price of the asset
-    orders = relationship(
-        "Order", back_populates="position", cascade="all, delete-orphan"
+    orders = db.relationship(
+        "Order",
+        back_populates="position",
+        lazy="dynamic",
+        cascade="all, delete-orphan"
     )
 
     amount = db.Column(db.Float)
