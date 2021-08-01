@@ -85,7 +85,6 @@ class Order(db.Model, ModelExtension):
         'order_type',
         'price',
         'amount',
-        'position'
     )
     def _write_once(self, key, value):
         existing = getattr(self, key)

@@ -54,17 +54,14 @@ def list_orders():
     The response in the view is paginated.
     """
 
-    try:
-        # Query orders
-        query_set = apply_order_query_parameters(Order.query)
+    # Query orders
+    query_set = apply_order_query_parameters(Order.query)
 
-        # Create serializer
-        serializer = OrderSerializer()
+    # Create serializer
+    serializer = OrderSerializer()
 
-        # Paginate query
-        return create_paginated_response(query_set, serializer), 200
-    finally:
-        db.session.close()
+    # Paginate query
+    return create_paginated_response(query_set, serializer), 200
 
 
 @blueprint.route("/api/orders/positions/<int:position_id>", methods=["GET"])
