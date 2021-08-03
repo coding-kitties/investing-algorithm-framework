@@ -28,7 +28,8 @@ SERIALIZATION_DICT = {
     'price',
     'target_symbol',
     'terminated',
-    'trading_symbol'
+    'trading_symbol',
+    'order_type'
 }
 
 

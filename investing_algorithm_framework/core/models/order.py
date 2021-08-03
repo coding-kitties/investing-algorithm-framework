@@ -3,7 +3,7 @@ from random import randint
 
 from sqlalchemy.orm import relationship, validates
 
-from investing_algorithm_framework.core.models import db
+from investing_algorithm_framework.core.models import db, OrderType
 from investing_algorithm_framework.core.models.model_extension \
     import ModelExtension
 from .order_side import OrderSide
@@ -39,6 +39,10 @@ class Order(db.Model, ModelExtension):
     # order type (sell/buy)
     order_side = db.Column(db.String)
 
+    # order_type
+    order_type = db.Column(db.String, default=OrderType.LIMIT.value)
+
+    # Asset specifications
     target_symbol = db.Column(db.String)
     trading_symbol = db.Column(db.String)
 
