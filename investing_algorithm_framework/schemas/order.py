@@ -9,6 +9,7 @@ class OrderSerializer(Schema):
     amount = fields.Float(dump_only=True)
     executed = fields.Bool(dump_only=True)
     terminated = fields.Bool(dump_only=True)
+    order_type = fields.String(dump_only=True)
 
     # Optional fields
     broker = fields.Method("get_broker")
@@ -16,4 +17,8 @@ class OrderSerializer(Schema):
 
     @staticmethod
     def get_broker(obj):
+
+        if obj.position is None:
+            return None
+
         return obj.position.portfolio.broker
