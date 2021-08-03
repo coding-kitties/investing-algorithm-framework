@@ -27,7 +27,8 @@ SERIALIZATION_DICT = {
     'id',
     'price',
     'target_symbol',
-    'terminated',
+    'executed',
+    "successful",
     'trading_symbol',
     'order_type',
     'order_side'
@@ -91,6 +92,26 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             len(data["items"])
         )
         self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
+
+    def test_list_orders_with_pending_query_params(self):
+        position = Position.query.first()
+
+        query_params = {
+            'pending': True
+        }
+
+        response = self.client.get(
+            f"/api/orders/positions/{position.id}",
+            query_string=query_params
+        )
+
+        self.assert200(response)
+        data = json.loads(response.data.decode())
+
+        self.assertEqual(
+            position.orders.filter_by(executed=True).count(),
+            len(data["items"])
+        )
 
     def test_list_orders_with_trading_symbol_query_params(self):
         position = self.portfolio_manager_one.get_positions()[0]

@@ -29,7 +29,7 @@ class TestOrderModel(TestBase):
         self.assertIsNotNone(order.trading_symbol)
         self.assertIsNotNone(order.order_side)
         self.assertFalse(order.executed)
-        self.assertFalse(order.terminated)
+        self.assertFalse(order.successful)
 
     def test_deleting(self):
         for order in Order.query.all():

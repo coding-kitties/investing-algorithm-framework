@@ -139,7 +139,40 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
         self.assertEqual(
             Position.query
                 .filter_by(
-                portfolio=self.portfolio_manager_two.get_portfolio())
+                    portfolio=self.portfolio_manager_two.get_portfolio()
+                )
                 .count(),
             len(positions)
+        )
+
+    def test_get_pending_orders(self):
+        my_portfolio_manager_one = self.algo_app.algorithm \
+            .get_portfolio_manager(MyPortfolioManagerOne.broker)
+
+        positions = my_portfolio_manager_one.get_positions(lazy=True)
+
+        pending_orders = my_portfolio_manager_one.get_pending_orders(lazy=True)
+
+        self.assertEqual(
+            Order.query
+                .filter_by(executed=False)
+                .filter(Order.position_id.in_(
+                    positions.with_entities(Position.id)
+                ))
+                .count(),
+            pending_orders.count()
+        )
+
+        positions = my_portfolio_manager_one\
+            .get_positions(symbol=self.TICKERS[0], lazy=True)
+        pending_orders = my_portfolio_manager_one\
+            .get_pending_orders(symbol=self.TICKERS[0], lazy=True)
+
+        self.assertEqual(
+            Order.query
+                .filter(Order.position_id.in_(
+                    positions.with_entities(Position.id)
+                ))
+                .count(),
+            pending_orders.count()
         )
