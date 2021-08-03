@@ -29,7 +29,8 @@ SERIALIZATION_DICT = {
     'target_symbol',
     'terminated',
     'trading_symbol',
-    'order_type'
+    'order_type',
+    'order_side'
 }
 
 

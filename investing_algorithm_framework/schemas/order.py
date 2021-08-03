@@ -10,6 +10,7 @@ class OrderSerializer(Schema):
     executed = fields.Bool(dump_only=True)
     terminated = fields.Bool(dump_only=True)
     order_type = fields.String(dump_only=True)
+    order_side = fields.String(dump_only=True)
 
     # Optional fields
     broker = fields.Method("get_broker")

@@ -12,7 +12,8 @@ serialization_dict = {
     'terminated',
     'executed',
     'target_symbol',
-    'order_type'
+    'order_type',
+    'order_side'
 }
 
 
