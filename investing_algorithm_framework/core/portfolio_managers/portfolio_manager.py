@@ -72,11 +72,11 @@ class AbstractPortfolioManager(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def get_positions(self, symbol: str = None):
+    def get_positions(self, symbol: str = None, lazy=False):
         raise NotImplementedError()
 
     @abstractmethod
-    def get_orders(self, symbol: str = None):
+    def get_orders(self, symbol: str = None, lazy=False):
         raise NotImplementedError()
 
     @abstractmethod
@@ -101,6 +101,10 @@ class AbstractPortfolioManager(ABC):
             base_currency=self.base_currency
         ).first()
 
+    @abstractmethod
+    def get_pending_orders(self, symbol: str = None, lazy=False):
+        raise NotImplementedError()
+
 
 class PortfolioManager(AbstractPortfolioManager, ABC):
 
@@ -111,19 +115,27 @@ class PortfolioManager(AbstractPortfolioManager, ABC):
     ):
         super(PortfolioManager, self).__init__(broker, base_currency)
 
-    def get_positions(self, symbol: str = None, trading_symbol: str = None):
+    def get_positions(
+            self,
+            symbol: str = None,
+            trading_symbol: str = None,
+            lazy=False
+    ):
 
         if symbol is None:
-            return Position.query\
-                .filter_by(portfolio=self.get_portfolio()) \
-                .all()
+            query_set = Position.query\
+                .filter_by(portfolio=self.get_portfolio())
         else:
-            return Position.query\
-                .filter_by(broker=self.get_broker())\
-                .filter_by(symbol=symbol)\
-                .all()
+            query_set = Position.query\
+                .filter_by(portfolio=self.get_portfolio())\
+                .filter_by(symbol=symbol)
 
-    def get_orders(self, symbol: str = None):
+        if lazy:
+            return query_set
+        else:
+            return query_set.all()
+
+    def get_orders(self, symbol: str = None, lazy=False):
 
         positions = Position.query \
             .filter_by(portfolio=self.get_portfolio()) \
@@ -131,14 +143,38 @@ class PortfolioManager(AbstractPortfolioManager, ABC):
 
         if symbol is None:
 
-            return Order.query\
-                .filter(Order.position_id.in_(positions))\
-                .all()
+            query_set = Order.query\
+                .filter(Order.position_id.in_(positions))
         else:
-            return Order.query \
+            query_set = Order.query \
                 .filter(Order.position_id.in_(positions)) \
+                .filter_by(symbol=symbol)
+
+        if lazy:
+            return query_set
+        else:
+            return query_set.all()
+
+    def get_pending_orders(self, symbol: str = None, lazy=False):
+
+        if symbol is not None:
+            positions = Position.query \
+                .filter_by(portfolio=self.get_portfolio()) \
                 .filter_by(symbol=symbol)\
-                .all()
+                .with_entities(Position.id)
+        else:
+            positions = Position.query \
+                .filter_by(portfolio=self.get_portfolio()) \
+                .with_entities(Position.id)
+
+        query_set = Order.query \
+            .filter(Order.position_id.in_(positions)) \
+            .filter_by(executed=False)\
+
+        if lazy:
+            return query_set
+        else:
+            return query_set.all()
 
     def create_buy_order(
             self,

@@ -48,7 +48,7 @@ class Order(db.Model, ModelExtension):
 
     # Set to true, if order is completed at Binance platform
     executed = db.Column(db.Boolean, default=False)
-    terminated = db.Column(db.Boolean, default=False)
+    successful = db.Column(db.Boolean, default=False, nullable=False)
 
     # The price of the asset
     price = db.Column(db.Float)
@@ -108,5 +108,6 @@ class Order(db.Model, ModelExtension):
             total_price=(self.amount * self.price),
             created_at=self.created_at,
             executed=self.executed,
-            terminated=self.terminated
+            successful=self.successful,
+            position=self.position_id
         )

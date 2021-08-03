@@ -7,10 +7,11 @@ class OrderSerializer(Schema):
     trading_symbol = fields.String(dump_only=True)
     price = fields.Float(dump_only=True)
     amount = fields.Float(dump_only=True)
-    executed = fields.Bool(dump_only=True)
     terminated = fields.Bool(dump_only=True)
     order_type = fields.String(dump_only=True)
     order_side = fields.String(dump_only=True)
+    executed = fields.String(dump_only=True)
+    successful = fields.String(dump_only=True)
 
     # Optional fields
     broker = fields.Method("get_broker")

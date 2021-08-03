@@ -2,7 +2,7 @@ import logging
 
 from flask import Blueprint, request
 
-from investing_algorithm_framework import Order, db, Position, \
+from investing_algorithm_framework import Order, Position, \
     Portfolio, OrderSide
 from investing_algorithm_framework.schemas import OrderSerializer
 from investing_algorithm_framework.views.utils import normalize_query, \
@@ -15,6 +15,7 @@ blueprint = Blueprint("order-views", __name__)
 TARGET_SYMBOL_QUERY_PARAM = "target_symbol"
 TRADING_SYMBOL_QUERY_PARAM = "trading_symbol"
 ORDER_SIDE_QUERY_PARAM = "order_side"
+PENDING = "pending"
 
 
 def apply_order_query_parameters(query_set):
@@ -36,6 +37,9 @@ def apply_order_query_parameters(query_set):
                 query_params[ORDER_SIDE_QUERY_PARAM]
             ).value
         )
+
+    if PENDING in query_params:
+        query_set = query_set.filter_by(executed=query_params[PENDING])
 
     return query_set
 
