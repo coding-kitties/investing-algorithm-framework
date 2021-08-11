@@ -3,11 +3,11 @@ from investing_algorithm_framework import TimeUnit
 from investing_algorithm_framework.extensions import scheduler
 
 
-def worker_one(algorithm):
+def worker_one(_):
     pass
 
 
-def worker_two(algorithm):
+def worker_two(_):
     pass
 
 

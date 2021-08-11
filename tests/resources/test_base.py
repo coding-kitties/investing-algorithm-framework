@@ -39,3 +39,7 @@ class TestBase(TestCase):
 
         if os.path.isfile(database_path):
             os.remove(database_path)
+
+        self.algo_app.algorithm._workers = []
+        self.algo_app.algorithm._order_executors = {}
+        self.algo_app.algorithm._portfolio_managers = {}

@@ -7,3 +7,4 @@ Flask-APScheduler==1.12.2
 setuptools~=51.0.0
 SQLAlchemy~=1.4.11
 Werkzeug~=1.0.1
+ccxt==1.54.35

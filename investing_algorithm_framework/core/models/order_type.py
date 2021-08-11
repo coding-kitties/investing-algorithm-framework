@@ -3,6 +3,7 @@ from enum import Enum
 
 class OrderType(Enum):
     LIMIT = 'LIMIT'
+    MARKET = 'MARKET'
 
     @staticmethod
     def from_string(value: str):

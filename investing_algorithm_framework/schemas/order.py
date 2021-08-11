@@ -14,13 +14,13 @@ class OrderSerializer(Schema):
     successful = fields.String(dump_only=True)
 
     # Optional fields
-    broker = fields.Method("get_broker")
+    identifier = fields.Method("get_identifier")
     position_id = fields.Int(dump_only=True)
 
     @staticmethod
-    def get_broker(obj):
+    def get_identifier(obj):
 
         if obj.position is None:
             return None
 
-        return obj.position.portfolio.broker
+        return obj.position.portfolio.identifier
