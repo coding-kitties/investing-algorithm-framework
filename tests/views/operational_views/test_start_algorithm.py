@@ -3,7 +3,7 @@ from tests.resources.test_base import TestBase
 from investing_algorithm_framework import TimeUnit
 
 
-def test_func(algorithm):
+def test_func(_):
     TestAlgorithmStart.test_func_has_run = True
 
 

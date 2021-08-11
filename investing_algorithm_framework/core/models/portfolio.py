@@ -39,9 +39,9 @@ class Portfolio(db.Model, ModelExtension):
     __tablename__ = "portfolios"
 
     id = db.Column(db.Integer, primary_key=True)
-    base_currency = db.Column(db.String, nullable=False)
+    trading_currency = db.Column(db.String, nullable=False)
     unallocated = db.Column(db.String, nullable=False, default=0)
-    broker = db.Column(db.String, nullable=False)
+    identifier = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow())
     updated_at = db.Column(
         db.DateTime,
@@ -59,13 +59,15 @@ class Portfolio(db.Model, ModelExtension):
     # Constraints
     __table_args__ = (
         UniqueConstraint(
-            'base_currency', 'broker', name='_base_currency_broker_uc'
+            'trading_currency',
+            'identifier',
+            name='_trading_currency_identifier_uc'
         ),
     )
 
-    def __init__(self, base_currency, unallocated, broker, **kwargs):
-        self.broker = broker
-        self.base_currency = base_currency
+    def __init__(self, trading_currency, unallocated, identifier, **kwargs):
+        self.identifier = identifier
+        self.trading_currency = trading_currency
         self.unallocated = unallocated
         super(Portfolio, self).__init__(**kwargs)
 
@@ -76,11 +78,11 @@ class Portfolio(db.Model, ModelExtension):
 
     def validate_buy_order(self, order):
 
-        if not order.trading_symbol == self.base_currency:
+        if not order.trading_symbol == self.trading_currency:
             raise OperationalException(
                 f"Can't add buy order with trading "
                 f"symbol {order.trading_symbol} to "
-                f"portfolio with base currency {self.base_currency}"
+                f"portfolio with base currency {self.trading_currency}"
             )
 
         # Total price can't be greater then unallocated size
@@ -88,9 +90,9 @@ class Portfolio(db.Model, ModelExtension):
 
         if float(self.unallocated) < total_price:
             raise OperationalException(
-                f"Order total: {total_price} {self.base_currency}, is larger "
-                f"then unallocated size: {self.unallocated} "
-                f"{self.base_currency} of the portfolio"
+                f"Order total: {total_price} {self.trading_currency}, "
+                f"is larger then unallocated size: {self.unallocated} "
+                f"{self.trading_currency} of the portfolio"
             )
 
     def add_sell_order(self, order):
@@ -116,11 +118,11 @@ class Portfolio(db.Model, ModelExtension):
                 "Order amount is larger then amount of open position"
             )
 
-        if not order.target_symbol == self.base_currency:
+        if not order.target_symbol == self.trading_currency:
             raise OperationalException(
                 f"Can't add sell order with target "
                 f"symbol {order.target_symbol} to "
-                f"portfolio with base currency {self.broker.base_currency}"
+                f"portfolio with base currency {self.trading_currency}"
             )
 
     def _validate_order(self, order):
@@ -164,9 +166,9 @@ class Portfolio(db.Model, ModelExtension):
     def __repr__(self):
         return self.repr(
             id=self.id,
-            base_currency=self.base_currency,
-            unallocated=f"{self.unallocated} {self.base_currency}",
-            broker=self.broker,
+            trading_currency=self.trading_currency,
+            unallocated=f"{self.unallocated} {self.trading_currency}",
+            identifier=self.identifier,
             created_at=self.created_at,
             updated_at=self.updated_at
         )

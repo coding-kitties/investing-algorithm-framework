@@ -3,7 +3,7 @@ from investing_algorithm_framework.extensions import scheduler
 from investing_algorithm_framework import TimeUnit
 
 
-def test_func(algorithm):
+def test_func(_):
     TestAlgorithmStop.test_func_has_run = True
 
 

@@ -9,8 +9,8 @@ class Test(TestBase):
     def setUp(self) -> None:
         super(Test, self).setUp()
         self.portfolio = Portfolio(
-            base_currency="USDT",
-            broker="BINANCE",
+            trading_currency="USDT",
+            identifier="BINANCE",
             unallocated=1000
         )
         self.portfolio.save(db)

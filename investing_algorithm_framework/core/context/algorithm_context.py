@@ -1,11 +1,9 @@
 import logging
-from typing import List, Dict
+from typing import List
 
 from investing_algorithm_framework.configuration import Config
 from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.models import TimeUnit
-from investing_algorithm_framework.core.portfolio_managers import \
-    AbstractPortfolioManager
+from investing_algorithm_framework.core.models import TimeUnit, OrderType
 from investing_algorithm_framework.core.workers import Scheduler
 from investing_algorithm_framework.extensions import scheduler
 
@@ -67,7 +65,13 @@ class AlgorithmContext:
             portfolio_manager = self._portfolio_managers[
                 portfolio_manager_key
             ]
-            portfolio_manager.initialize()
+            portfolio_manager.initialize(self)
+
+        for order_executor_key in self._order_executors:
+            order_executor = self._order_executors[
+                order_executor_key
+            ]
+            order_executor.initialize(self)
 
         self._initialized = True
 
@@ -107,15 +111,6 @@ class AlgorithmContext:
         self._workers.append(worker)
 
     @property
-    def portfolio_managers(self) -> Dict:
-        portfolio_managers = []
-
-        for key in self._portfolio_managers:
-            portfolio_managers.append(self._portfolio_managers[key])
-
-        return self._portfolio_managers
-
-    @property
     def running(self) -> bool:
         """
             An utility property to check if there are active workers for the
@@ -136,6 +131,19 @@ class AlgorithmContext:
     def config(self) -> Config:
         return self._config
 
+    def add_order_executor(self, order_executor):
+        from investing_algorithm_framework.core.order_executors \
+            import OrderExecutor
+
+        assert isinstance(order_executor, OrderExecutor), (
+            'Initializer must be an instance of the OrderExecutor class'
+        )
+
+        if order_executor.identifier in self._order_executors:
+            raise OperationalException("Order executor id already exists")
+
+        self._order_executors[order_executor.identifier] = order_executor
+
     @property
     def order_executors(self) -> List:
         order_executors = []
@@ -144,6 +152,21 @@ class AlgorithmContext:
             order_executors.append(order_executor)
 
         return order_executors
+
+    def get_order_executor(
+            self, identifier, throw_exception: bool = True
+    ):
+        if identifier not in self._order_executors:
+
+            if throw_exception:
+                raise OperationalException(
+                    f"No corresponding order executor found for "
+                    f"identifier {identifier}"
+                )
+
+            return None
+
+        return self._order_executors[identifier]
 
     def add_initializer(self, initializer):
         from investing_algorithm_framework.core.context \
@@ -159,14 +182,46 @@ class AlgorithmContext:
     def add_portfolio_manager(self, portfolio_manager):
         # Check if order executor is instance of AbstractPortfolioManager
         from investing_algorithm_framework.core.portfolio_managers \
-            import AbstractPortfolioManager
+            import PortfolioManager
 
-        assert isinstance(portfolio_manager, AbstractPortfolioManager), (
+        assert isinstance(portfolio_manager, PortfolioManager), (
             'portfolio manager must be an instance of the '
             'AbstractPortfolioManager class'
         )
 
-        self._portfolio_managers[portfolio_manager.broker] = portfolio_manager
+        if portfolio_manager.identifier in self._portfolio_managers:
+            raise OperationalException(
+                f"Portfolio manager identifier {portfolio_manager.identifier} "
+                f"already exists"
+            )
+
+        self._portfolio_managers[portfolio_manager.identifier] \
+            = portfolio_manager
+
+    @property
+    def portfolio_managers(self) -> List:
+        portfolio_managers = []
+
+        for key in self._portfolio_managers:
+            portfolio_managers.append(self._portfolio_managers[key])
+
+        return portfolio_managers
+
+    def get_portfolio_manager(
+            self, identifier: str, throw_exception: bool = True
+    ):
+
+        if identifier not in self._portfolio_managers:
+
+            if throw_exception:
+                raise OperationalException(
+                    f"No corresponding portfolio manager found for "
+                    f"identifier {identifier}"
+                )
+
+            return None
+
+        return self._portfolio_managers[identifier]
 
     def set_algorithm_context_initializer(
             self, algorithm_context_initializer
@@ -183,24 +238,88 @@ class AlgorithmContext:
         )
         self._initializer = algorithm_context_initializer
 
-    def get_free_portfolio_size(self, broker):
+    def create_limit_buy_order(
+            self, identifier, symbol, price, amount, execute=True
+    ):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        order = portfolio_manager.create_buy_order(
+            symbol, price, amount, OrderType.LIMIT.value
+        )
 
-        if broker not in self.portfolio_managers:
-            raise OperationalException(
-                "There is no portfolio manager linked to the given broker"
-            )
+        if execute:
+            self.execute_limit_buy_order(identifier, order)
 
-        portfolio_manager = self.portfolio_managers[broker]
-        return portfolio_manager.get_free_portfolio_size(self)
+        return order
 
-    def get_portfolio_manager(
-            self, broker_id: str, throw_exception: bool = False
-    ) -> AbstractPortfolioManager:
-        matching_portfolio_manager = self.portfolio_managers[broker_id]
+    def create_limit_sell_order(
+            self, identifier, symbol, price, amount, execute=True
+    ):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        order = portfolio_manager.create_sell_order(
+            symbol, price, amount, OrderType.LIMIT.value
+        )
 
-        if matching_portfolio_manager is None and throw_exception:
-            raise OperationalException(
-                "No corresponding portfolio manager found for broker"
-            )
+        if execute:
+            self.execute_limit_sell_order(identifier, order)
 
-        return matching_portfolio_manager
+        return order
+
+    def create_market_buy_order(
+            self, identifier, symbol, amount, execute=True
+    ):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        order = portfolio_manager.create_buy_order(
+            symbol=symbol, amount=amount, order_type=OrderType.MARKET.value
+        )
+
+        if execute:
+            self.execute_market_buy_order(identifier, order)
+
+        return order
+
+    def create_market_sell_order(
+            self, identifier, symbol, amount, execute=True
+    ):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        order = portfolio_manager.create_sell_order(
+            symbol=symbol, amount=amount, order_type=OrderType.MARKET.value
+        )
+
+        if execute:
+            self.execute_market_sell_order(identifier, order)
+
+        return order
+
+    def execute_limit_sell_order(self, identifier, order):
+        order_executor = self.get_order_executor(identifier)
+        order_executor.execute_limit_order(order, self)
+
+    def execute_limit_buy_order(self, identifier, order):
+        order_executor = self.get_order_executor(identifier)
+        order_executor.execute_limit_order(order, self)
+
+    def execute_market_sell_order(self, identifier, order):
+        order_executor = self.get_order_executor(identifier)
+        order_executor.execute_limit_order(order, self)
+
+    def execute_market_buy_order(self, identifier, order):
+        order_executor = self.get_order_executor(identifier)
+        order_executor.execute_limit_order(order, self)
+
+    def check_order_status(self, identifier, symbol: str = None):
+
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        orders = portfolio_manager.get_pending_orders(symbol)
+
+        order_executor = self.get_order_executor(identifier)
+
+        for order in orders:
+            order_executor.update_order_status(order, self)
+
+    def get_pending_orders(self, identifier, symbol: str = None, lazy=False):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        return portfolio_manager.get_pending_orders(symbol, lazy)
+
+    def get_unallocated_size(self, identifier):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        return portfolio_manager.unallocated

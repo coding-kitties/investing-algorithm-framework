@@ -54,6 +54,9 @@ class Order(db.Model, ModelExtension):
     price = db.Column(db.Float)
     amount = db.Column(db.Float)
 
+    # Reference to oder on the exchange
+    exchange_id = db.Column(db.String)
+
     # Date Time of creation
     updated_at = db.Column(
         db.DateTime,

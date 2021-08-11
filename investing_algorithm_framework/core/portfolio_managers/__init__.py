@@ -1,3 +1,7 @@
-from .portfolio_manager import AbstractPortfolioManager, PortfolioManager
+from .portfolio_manager import PortfolioManager
+from .binance import BinancePortfolioManager
 
-__all__ = ["AbstractPortfolioManager", "PortfolioManager"]
+__all__ = [
+    "PortfolioManager",
+    "BinancePortfolioManager"
+]

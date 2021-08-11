@@ -4,23 +4,23 @@ from investing_algorithm_framework import PortfolioManager, Position
 
 
 class PortfolioManagerOne(PortfolioManager):
-    base_currency = "USDT"
-    broker = "KRAKEN"
+    trading_currency = "USDT"
+    identifier = "KRAKEN"
 
     def get_initial_unallocated_size(self) -> float:
         return 1000
 
 
 class PortfolioManagerTwo(PortfolioManager):
-    base_currency = "BUSD"
-    broker = "BINANCE"
+    trading_currency = "BUSD"
+    identifier = "BINANCE"
 
     def get_initial_unallocated_size(self) -> float:
         return 2000
 
 
 SERIALIZATION_DICT = {
-    'symbol', 'amount', 'id', 'orders', 'broker'
+    'symbol', 'amount', 'id', 'orders', 'identifier'
 }
 
 
@@ -48,6 +48,10 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
         self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
         self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
+    def tearDown(self):
+        super(Test, self).tearDown()
+        self.algo_app.algorithm._portfolio_managers = {}
 
     def test_list_orders(self):
         response = self.client.get("/api/positions")
