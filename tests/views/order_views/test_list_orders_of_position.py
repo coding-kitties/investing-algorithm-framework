@@ -55,16 +55,17 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             self.portfolio_manager_two
         )
         self.algo_app.algorithm.start()
-        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
-        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
-        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
-        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
 
     def tearDown(self):
         super(Test, self).tearDown()
         self.algo_app.algorithm._portfolio_managers = {}
 
     def test_list_orders(self):
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
         position = Position.query.first()
         response = self.client.get(f"/api/orders/positions/{position.id}")
         self.assert200(response)
@@ -77,6 +78,11 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
 
     def test_list_orders_with_target_symbol_query_params(self):
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
         position = Position.query.first()
         query_params = {
             'target_symbol': position.symbol
@@ -98,6 +104,11 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
 
     def test_list_orders_with_pending_query_params(self):
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
         position = Position.query.first()
 
         query_params = {
@@ -118,6 +129,11 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         )
 
     def test_list_orders_with_trading_symbol_query_params(self):
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
         position = self.portfolio_manager_one.get_positions()[0]
 
         query_params = {
@@ -143,6 +159,11 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
 
     def test_list_orders_with_order_side_query_params(self):
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
         position = Position.query.first()
 
         query_params = {
@@ -166,6 +187,11 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
 
     def test_all_query_params(self):
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
         position = Position.query.filter_by(symbol=self.TICKERS[0]).first()
 
         query_params = {

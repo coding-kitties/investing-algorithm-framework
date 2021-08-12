@@ -13,12 +13,6 @@ class MyPortfolioManagerOne(PortfolioManager):
 
 class Test(TestBase):
 
-    def setUp(self) -> None:
-        super(Test, self).setUp()
-
-    def tearDown(self):
-        self.algo_app.algorithm._portfolio_managers = {}
-
     def test(self) -> None:
         self.algo_app.algorithm.add_portfolio_manager(MyPortfolioManagerOne())
         self.assertTrue(

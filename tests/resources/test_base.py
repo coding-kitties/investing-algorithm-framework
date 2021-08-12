@@ -11,21 +11,27 @@ class TestBase(TestCase):
     resources_dir = os.path.join(
         os.path.abspath(os.path.dirname(__file__)), 'databases'
     )
-    algo_app = App(resources_directory=resources_dir, config=TestConfig)
+    algo_app = None
 
     def create_app(self):
+        self.algo_app = App(
+            resources_directory=self.resources_dir, config=TestConfig
+        )
         self.algo_app._initialize_flask_app()
+        self.algo_app._initialize_blueprints()
+        return self.algo_app._flask_app
+
+    def setUp(self):
+        self.algo_app._configured = False
+        self.algo_app._config = TestConfig
         self.algo_app._initialize_config()
         self.algo_app._initialize_database()
         self.algo_app._initialize_flask_config()
         self.algo_app._initialize_flask_sql_alchemy()
-
-        return self.algo_app._flask_app
-
-    def setUp(self):
+        self.algo_app.algorithm.initialize()
         self.algo_app.start_scheduler()
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         db.session.remove()
         db.drop_all()
 
@@ -40,6 +46,4 @@ class TestBase(TestCase):
         if os.path.isfile(database_path):
             os.remove(database_path)
 
-        self.algo_app.algorithm._workers = []
-        self.algo_app.algorithm._order_executors = {}
-        self.algo_app.algorithm._portfolio_managers = {}
+        self.algo_app.reset()

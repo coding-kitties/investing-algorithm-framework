@@ -16,9 +16,9 @@ class TestAlgorithmStart(TestBase):
             test_func, time_unit=TimeUnit.SECONDS, interval=1
         )
         TestAlgorithmStart.test_func_has_run = False
-        self.algo_app.algorithm.stop()
 
     def test_start(self):
+        self.algo_app.algorithm.stop()
         self.assertFalse(TestAlgorithmStart.test_func_has_run)
         response = self.client.get("/start")
         self.assertEqual(200, response.status_code)
@@ -27,6 +27,7 @@ class TestAlgorithmStart(TestBase):
         self.assertTrue(TestAlgorithmStart.test_func_has_run)
 
     def test_start_with_already_stopped_algorithm(self):
+        self.algo_app.algorithm.stop()
         self.assertFalse(TestAlgorithmStart.test_func_has_run)
         response = self.client.get("/start")
         self.assertEqual(200, response.status_code)
@@ -40,5 +41,4 @@ class TestAlgorithmStart(TestBase):
         self.assertTrue(TestAlgorithmStart.test_func_has_run)
 
     def tearDown(self):
-        self.algo_app.algorithm.stop_all_workers()
         super(TestAlgorithmStart, self).tearDown()

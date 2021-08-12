@@ -44,16 +44,13 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             self.portfolio_manager_two
         )
         self.algo_app.algorithm.start()
+
+    def test_list_positions_of_broker(self):
         self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
         self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
         self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
         self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
 
-    def tearDown(self):
-        super(Test, self).tearDown()
-        self.algo_app.algorithm._portfolio_managers = {}
-
-    def test_list_positions_of_broker(self):
         response = self.client.get(
             f"/api/positions/identifiers/{self.portfolio_manager_one.identifier}"
         )
@@ -69,6 +66,11 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
 
     def test_list_positions_of_broker_with_symbol_query_params(self):
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
         query_params = {
             'symbol': self.TICKERS[0]
         }
@@ -81,3 +83,5 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         data = json.loads(response.data.decode())
         self.assertEqual(1, len(data["items"]))
         self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
+
+        self.algo_app.algorithm.stop()
