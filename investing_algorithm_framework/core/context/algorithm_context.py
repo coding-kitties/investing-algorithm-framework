@@ -323,3 +323,12 @@ class AlgorithmContext:
     def get_unallocated_size(self, identifier):
         portfolio_manager = self.get_portfolio_manager(identifier)
         return portfolio_manager.unallocated
+
+    def reset(self):
+        self._config = None
+        self._workers = []
+        self._running_workers = []
+        self._order_executors = {}
+        self._portfolio_managers = {}
+        self._initializer = None
+        self._initialized = False

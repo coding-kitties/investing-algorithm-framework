@@ -1,3 +1,5 @@
+import inspect
+
 from flask import Flask
 
 from investing_algorithm_framework.configuration import Config, create_app, \
@@ -21,14 +23,13 @@ class App(metaclass=Singleton):
     _started = False
     _config = None
     _resource_directory = None
+    _blueprints = []
 
     def __init__(
             self, resources_directory: str = None, config=None, arg=None
     ):
         if resources_directory is not None:
             self._resource_directory = resources_directory
-
-        self._initialize_flask_app()
 
         if config is not None:
             self._config = config
@@ -41,8 +42,6 @@ class App(metaclass=Singleton):
             if resources_directory is not None:
                 self._resource_directory = resources_directory
 
-            self._initialize_flask_app()
-
             if config is not None:
                 self._config = config
 
@@ -54,14 +53,18 @@ class App(metaclass=Singleton):
         if not self._configured:
 
             if config is not None:
-                assert issubclass(config, Config), (
-                    "Config is not an instance of config"
-                )
-                self._config = config()
-            elif self._config is not None:
-                self._config = self._config()
-            else:
+                self._config = config
+
+            if self._config is None:
                 raise OperationalException("No config object set")
+
+            if inspect.isclass(self._config) \
+                    and issubclass(self._config, Config):
+                self._config = self._config()
+            elif type(self._config) is dict:
+                self._config = Config.from_dict(self._config)
+            else:
+                raise OperationalException("Config object not supported")
 
             if self._resource_directory is not None:
                 self._config[RESOURCES_DIRECTORY] = self._resource_directory
@@ -106,6 +109,14 @@ class App(metaclass=Singleton):
 
             self._database_configured = True
 
+    def register_blueprint(self, blueprint):
+        self._blueprints.append(blueprint)
+
+    def _initialize_blueprints(self):
+
+        for blueprint in self._blueprints:
+            self._flask_app.register_blueprint(blueprint)
+
     def start(self):
 
         # Setup config if it is not set
@@ -113,6 +124,7 @@ class App(metaclass=Singleton):
             self._config = Config
 
         self._initialize_flask_app()
+        self._initialize_blueprints()
         self._initialize_config()
         self._initialize_database()
         self._initialize_flask_config()
@@ -164,5 +176,11 @@ class App(metaclass=Singleton):
     def config(self):
         return self._config
 
-    def register_blueprint(self, blueprint):
-        self._flask_app.register_blueprint(blueprint)
+    def reset(self):
+        self._configured = False
+        self._database_configured: bool = False
+        self._started = False
+        self._config = None
+        self._resource_directory = None
+        scheduler.remove_all_jobs()
+        self.algorithm.reset()

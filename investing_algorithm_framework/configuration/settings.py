@@ -132,6 +132,17 @@ class Config(dict):
 
         setattr(self, key, value)
 
+    @staticmethod
+    def from_dict(dictionary):
+        config = Config()
+
+        for attribute_key in dictionary:
+
+            if attribute_key.isupper():
+                config.set(attribute_key, dictionary[attribute_key])
+
+        return config
+
 
 class TestConfig(Config):
     ENV = Environment.TEST.value
