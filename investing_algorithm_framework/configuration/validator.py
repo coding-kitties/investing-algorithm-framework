@@ -19,7 +19,7 @@ class ConfigValidator:
 
         for variable in ConfigValidator.required_variables:
 
-            if variable not in config or config[variable] is None:
+            if variable not in config or config.get(variable, None) is None:
                 raise ImproperlyConfigured(
                     "{} is not set".format(variable)
                 )

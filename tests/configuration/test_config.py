@@ -27,3 +27,9 @@ class TestConfig(TestCase):
     def test_get_item(self):
         config = CustomConfig()
         self.assertIsNotNone(config.get("TEST_ATTRIBUTE"))
+
+    def test_set_item(self):
+        config = CustomConfig()
+        config.set(self.ATTRIBUTE_ONE, self.ATTRIBUTE_ONE)
+        self.assertIsNotNone(config.get(self.ATTRIBUTE_ONE))
+        self.assertIsNotNone(config.ATTRIBUTE_ONE)

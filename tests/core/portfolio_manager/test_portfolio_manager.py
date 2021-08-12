@@ -36,7 +36,6 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
         self.create_test_objects(self.portfolio_manager_two)
 
     def tearDown(self):
-        self.algo_app.algorithm._portfolio_managers = {}
         super(Test, self).tearDown()
 
     def test_id(self):

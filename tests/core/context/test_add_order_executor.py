@@ -24,12 +24,6 @@ class MyOrderExecutorOne(OrderExecutor):
 
 class Test(TestBase):
 
-    def setUp(self) -> None:
-        super(Test, self).setUp()
-
-    def tearDown(self):
-        self.algo_app.algorithm._order_executors = {}
-
     def test(self) -> None:
         self.algo_app.algorithm.add_order_executor(MyOrderExecutorOne())
         self.assertTrue(

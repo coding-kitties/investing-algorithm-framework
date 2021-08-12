@@ -44,16 +44,17 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             self.portfolio_manager_two
         )
         self.algo_app.algorithm.start()
+
+    def tearDown(self):
+        self.algo_app.algorithm.stop()
+        super(Test, self).tearDown()
+
+    def test_list_orders(self):
         self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
         self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
         self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
         self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
 
-    def tearDown(self):
-        super(Test, self).tearDown()
-        self.algo_app.algorithm._portfolio_managers = {}
-
-    def test_list_orders(self):
         response = self.client.get("/api/positions")
         self.assert200(response)
         data = json.loads(response.data.decode())
@@ -62,6 +63,11 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
 
     def test_list_orders_with_target_symbol_query_params(self):
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
         query_params = {
             'symbol': self.TICKERS[0]
         }
