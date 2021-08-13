@@ -2,10 +2,12 @@ from datetime import datetime
 
 from sqlalchemy import UniqueConstraint
 
-from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.models import db, OrderSide
+from investing_algorithm_framework.core.models import db, OrderSide, Order, \
+    OrderType
 from investing_algorithm_framework.core.models.model_extension \
     import ModelExtension
+from investing_algorithm_framework.core.order_validators import \
+    OrderValidatorFactory
 
 
 class Portfolio(db.Model, ModelExtension):
@@ -54,6 +56,7 @@ class Portfolio(db.Model, ModelExtension):
         "Position",
         back_populates="portfolio",
         cascade="all,delete",
+        lazy="dynamic",
     )
 
     # Constraints
@@ -71,62 +74,13 @@ class Portfolio(db.Model, ModelExtension):
         self.unallocated = unallocated
         super(Portfolio, self).__init__(**kwargs)
 
-    def add_buy_order(self, order):
+    def add_order(self, order):
         self._validate_order(order)
-        self.validate_buy_order(order)
         self._add_order_to_position(order)
-
-    def validate_buy_order(self, order):
-
-        if not order.trading_symbol == self.trading_currency:
-            raise OperationalException(
-                f"Can't add buy order with trading "
-                f"symbol {order.trading_symbol} to "
-                f"portfolio with base currency {self.trading_currency}"
-            )
-
-        # Total price can't be greater then unallocated size
-        total_price = order.amount * order.price
-
-        if float(self.unallocated) < total_price:
-            raise OperationalException(
-                f"Order total: {total_price} {self.trading_currency}, "
-                f"is larger then unallocated size: {self.unallocated} "
-                f"{self.trading_currency} of the portfolio"
-            )
-
-    def add_sell_order(self, order):
-        self._validate_order(order)
-        self.validate_sell_order(order)
-        self._add_order_to_position(order)
-
-    def validate_sell_order(self, order):
-        from .position import Position
-
-        position = Position.query\
-            .filter_by(portfolio=self)\
-            .filter_by(symbol=order.trading_symbol)\
-            .first()
-
-        if position is None:
-            raise OperationalException(
-                "Can't add sell order to non existing position"
-            )
-
-        if position.amount < order.amount:
-            raise OperationalException(
-                "Order amount is larger then amount of open position"
-            )
-
-        if not order.target_symbol == self.trading_currency:
-            raise OperationalException(
-                f"Can't add sell order with target "
-                f"symbol {order.target_symbol} to "
-                f"portfolio with base currency {self.trading_currency}"
-            )
 
     def _validate_order(self, order):
-        pass
+        order_validator = OrderValidatorFactory.of(self.identifier)
+        order_validator.validate(order, self)
 
     def _add_order_to_position(self, order):
         from investing_algorithm_framework.core.models import Position
@@ -162,6 +116,38 @@ class Portfolio(db.Model, ModelExtension):
             self.unallocated = (unallocated - total).__str__()
         else:
             self.unallocated = (unallocated + total).__str__()
+
+    def create_buy_order(
+            self,
+            symbol,
+            amount,
+            price=0,
+            order_type=OrderType.LIMIT.value
+    ):
+        return Order(
+            trading_symbol=self.trading_currency,
+            target_symbol=symbol,
+            amount=amount,
+            price=price,
+            order_side=OrderSide.BUY.value,
+            order_type=order_type
+        )
+
+    def create_sell_order(
+            self,
+            symbol,
+            amount,
+            price=0,
+            order_type=OrderType.LIMIT.value
+    ):
+        return Order(
+            trading_symbol=symbol,
+            target_symbol=self.trading_currency,
+            amount=amount,
+            price=price,
+            order_side=OrderSide.SELL.value,
+            order_type=order_type
+        )
 
     def __repr__(self):
         return self.repr(

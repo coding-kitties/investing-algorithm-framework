@@ -2,7 +2,7 @@ from abc import abstractmethod, ABC
 
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import Position, Order, \
-    Portfolio, OrderSide, db, OrderType
+    Portfolio, db, OrderType
 from investing_algorithm_framework.core.identifier import Identifier
 
 
@@ -117,13 +117,8 @@ class PortfolioManager(ABC, Identifier):
             price=0,
             order_type=OrderType.LIMIT.value
     ):
-        return Order(
-            trading_symbol=self.trading_currency,
-            target_symbol=symbol,
-            amount=amount,
-            price=price,
-            order_side=OrderSide.BUY.value,
-            order_type=order_type
+        return self.get_portfolio().create_buy_order(
+            symbol, amount, price, order_type
         )
 
     def create_sell_order(
@@ -133,17 +128,9 @@ class PortfolioManager(ABC, Identifier):
             price=0,
             order_type=OrderType.LIMIT.value
     ):
-        return Order(
-            trading_symbol=symbol,
-            target_symbol=self.trading_currency,
-            amount=amount,
-            price=price,
-            order_side=OrderSide.SELL.value,
-            order_type=order_type
+        return self.get_portfolio().create_sell_order(
+            symbol, amount, price, order_type
         )
 
-    def add_buy_order(self, order):
-        self.get_portfolio().add_buy_order(order)
-
-    def add_sell_order(self, order):
-        self.get_portfolio().add_sell_order(order)
+    def add_order(self, order):
+        self.get_portfolio().add_order(order)

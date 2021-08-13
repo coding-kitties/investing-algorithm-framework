@@ -15,9 +15,9 @@ def initialize_db(app: Flask):
 from investing_algorithm_framework.core.models.order_type import OrderType
 from investing_algorithm_framework.core.models.order_side import OrderSide
 from investing_algorithm_framework.core.models.time_unit import TimeUnit
+from investing_algorithm_framework.core.models.order import Order
 from investing_algorithm_framework.core.models.portfolio import Portfolio
 from investing_algorithm_framework.core.models.position import Position
-from investing_algorithm_framework.core.models.order import Order
 
 __all__ = [
     "db",
