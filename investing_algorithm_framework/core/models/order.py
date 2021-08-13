@@ -71,6 +71,7 @@ class Order(db.Model, ModelExtension):
     def __init__(
             self,
             order_side,
+            order_type,
             target_symbol,
             trading_symbol,
             price,
@@ -78,6 +79,7 @@ class Order(db.Model, ModelExtension):
             **kwargs
     ):
         self.order_side = OrderSide.from_string(order_side).value
+        self.order_type = OrderType.from_string(order_type).value
         self.target_symbol = target_symbol
         self.trading_symbol = trading_symbol
         self.price = price
