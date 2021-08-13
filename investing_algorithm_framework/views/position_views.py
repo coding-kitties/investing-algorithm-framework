@@ -54,7 +54,7 @@ def list_positions_of_broker(identifier):
     """
     View for listing of the positions of an identifier/broker. This view
     will list all the positions corresponding to the given broker/portfolio.
-
+    
     You can provide to this view the following query params:
         - symbol: the symbol that is traded in the orders that belong to the
         position.
