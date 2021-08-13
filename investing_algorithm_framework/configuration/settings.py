@@ -107,14 +107,41 @@ class Config(dict):
         return item is not None
 
     def __getitem__(self, item):
-        return getattr(self, item, None)
+        return getattr(self, item)
 
-    def __getattribute__(self, item):
+    def get(self, key: str, default=None):
+        """
+        Mimics the dict get() functionality
+        """
+
         try:
-            return super(Config, self).__getattribute__(item)
-        except Exception as e:
-            logger.error(e)
-            return None
+            return self.__getitem__(key)
+        # Ignore exception
+        except OperationalException:
+            pass
+
+        return default
+
+    def set(self, key: str, value) -> None:
+
+        if hasattr(self, key):
+            raise OperationalException(
+                "ContextConfig object already have the specific "
+                "attribute {} specified".format(key)
+            )
+
+        setattr(self, key, value)
+
+    @staticmethod
+    def from_dict(dictionary):
+        config = Config()
+
+        for attribute_key in dictionary:
+
+            if attribute_key.isupper():
+                config.set(attribute_key, dictionary[attribute_key])
+
+        return config
 
 
 class TestConfig(Config):

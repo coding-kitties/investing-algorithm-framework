@@ -3,7 +3,7 @@ from random import randint
 
 from sqlalchemy.orm import relationship, validates
 
-from investing_algorithm_framework.core.models import db
+from investing_algorithm_framework.core.models import db, OrderType
 from investing_algorithm_framework.core.models.model_extension \
     import ModelExtension
 from .order_side import OrderSide
@@ -39,16 +39,23 @@ class Order(db.Model, ModelExtension):
     # order type (sell/buy)
     order_side = db.Column(db.String)
 
+    # order_type
+    order_type = db.Column(db.String, default=OrderType.LIMIT.value)
+
+    # Asset specifications
     target_symbol = db.Column(db.String)
     trading_symbol = db.Column(db.String)
 
     # Set to true, if order is completed at Binance platform
     executed = db.Column(db.Boolean, default=False)
-    terminated = db.Column(db.Boolean, default=False)
+    successful = db.Column(db.Boolean, default=False, nullable=False)
 
     # The price of the asset
     price = db.Column(db.Float)
     amount = db.Column(db.Float)
+
+    # Reference to oder on the exchange
+    exchange_id = db.Column(db.String)
 
     # Date Time of creation
     updated_at = db.Column(
@@ -64,6 +71,7 @@ class Order(db.Model, ModelExtension):
     def __init__(
             self,
             order_side,
+            order_type,
             target_symbol,
             trading_symbol,
             price,
@@ -71,6 +79,7 @@ class Order(db.Model, ModelExtension):
             **kwargs
     ):
         self.order_side = OrderSide.from_string(order_side).value
+        self.order_type = OrderType.from_string(order_type).value
         self.target_symbol = target_symbol
         self.trading_symbol = trading_symbol
         self.price = price
@@ -104,5 +113,6 @@ class Order(db.Model, ModelExtension):
             total_price=(self.amount * self.price),
             created_at=self.created_at,
             executed=self.executed,
-            terminated=self.terminated
+            successful=self.successful,
+            position=self.position_id
         )

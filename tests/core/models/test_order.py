@@ -1,5 +1,6 @@
 from tests.resources import TestBase
-from investing_algorithm_framework.core.models import Order, OrderSide, db
+from investing_algorithm_framework.core.models import Order, OrderSide, db, \
+    OrderType
 
 
 class TestOrderModel(TestBase):
@@ -13,7 +14,8 @@ class TestOrderModel(TestBase):
                 trading_symbol="USDT",
                 price=10,
                 amount=10 * i,
-                order_side=OrderSide.BUY.value
+                order_side=OrderSide.BUY.value,
+                order_type=OrderType.LIMIT.value
             )
 
             order.save(db)
@@ -29,7 +31,7 @@ class TestOrderModel(TestBase):
         self.assertIsNotNone(order.trading_symbol)
         self.assertIsNotNone(order.order_side)
         self.assertFalse(order.executed)
-        self.assertFalse(order.terminated)
+        self.assertFalse(order.successful)
 
     def test_deleting(self):
         for order in Order.query.all():

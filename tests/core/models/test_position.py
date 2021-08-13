@@ -1,6 +1,6 @@
 from tests.resources import TestBase
 from investing_algorithm_framework.core.models import Order, Position, db, \
-    OrderSide
+    OrderSide, OrderType
 
 
 class TestPosition(TestBase):
@@ -17,7 +17,8 @@ class TestPosition(TestBase):
                 trading_symbol="USDT",
                 price=10,
                 amount=10 * i,
-                order_side=OrderSide.BUY.value
+                order_side=OrderSide.BUY.value,
+                order_type=OrderType.LIMIT.value
             )
 
             order.save(db)

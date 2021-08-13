@@ -5,16 +5,16 @@ from investing_algorithm_framework import PortfolioManager, Order, OrderSide, \
 
 
 class PortfolioManagerOne(PortfolioManager):
-    base_currency = "USDT"
-    broker = "KRAKEN"
+    trading_currency = "USDT"
+    identifier = "KRAKEN"
 
     def get_initial_unallocated_size(self) -> float:
         return 1000
 
 
 class PortfolioManagerTwo(PortfolioManager):
-    base_currency = "BUSD"
-    broker = "BINANCE"
+    trading_currency = "BUSD"
+    identifier = "BINANCE"
 
     def get_initial_unallocated_size(self) -> float:
         return 2000
@@ -27,8 +27,11 @@ SERIALIZATION_DICT = {
     'id',
     'price',
     'target_symbol',
-    'terminated',
     'trading_symbol',
+    'order_type',
+    'order_side',
+    'executed',
+    'successful',
 }
 
 
@@ -52,18 +55,22 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             self.portfolio_manager_two
         )
         self.algo_app.algorithm.start()
+
+    def tearDown(self):
+        super(Test, self).tearDown()
+
+    def test_list_orders(self):
         self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
         self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
         self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
         self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
 
-    def test_list_orders(self):
         positions = Position.query\
             .filter_by(portfolio=self.portfolio_manager_one.get_portfolio())\
             .with_entities(Position.id)
 
         response = self.client.get(
-            f"/api/orders/brokers/{self.portfolio_manager_one.broker}"
+            f"/api/orders/identifiers/{self.portfolio_manager_one.identifier}"
         )
         self.assert200(response)
         data = json.loads(response.data.decode())
@@ -75,12 +82,17 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
 
     def test_list_orders_with_target_symbol_query_params(self):
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
         query_params = {
             'target_symbol': self.TICKERS[0]
         }
 
         response = self.client.get(
-            f"/api/orders/brokers/{self.portfolio_manager_one.broker}",
+            f"/api/orders/identifiers/{self.portfolio_manager_one.identifier}",
             query_string=query_params
         )
         self.assert200(response)
@@ -99,13 +111,41 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         )
         self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
 
-    def test_list_orders_with_trading_symbol_query_params(self):
+    def test_list_orders_with_pending_query_params(self):
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
         query_params = {
-            'trading_symbol': self.portfolio_manager_one.base_currency
+            'pending': True
         }
 
         response = self.client.get(
-            f"/api/orders/brokers/{self.portfolio_manager_one.broker}",
+            f"/api/orders/identifiers/{self.portfolio_manager_one.identifier}",
+            query_string=query_params
+        )
+
+        self.assert200(response)
+        data = json.loads(response.data.decode())
+
+        self.assertEqual(
+            Order.query.filter_by(executed=True).count(),
+            len(data["items"])
+        )
+
+    def test_list_orders_with_trading_symbol_query_params(self):
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
+        query_params = {
+            'trading_symbol': self.portfolio_manager_one.trading_currency
+        }
+
+        response = self.client.get(
+            f"/api/orders/identifiers/{self.portfolio_manager_one.identifier}",
             query_string=query_params
         )
         self.assert200(response)
@@ -119,7 +159,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             Order.query
                 .filter(Order.position_id.in_(position_ids))
                 .filter_by(
-                    trading_symbol=self.portfolio_manager_one.base_currency
+                    trading_symbol=self.portfolio_manager_one.trading_currency
                 )
                 .count(),
             len(data["items"])
@@ -127,12 +167,17 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
 
     def test_list_orders_with_order_side_query_params(self):
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
         query_params = {
             'order_side': OrderSide.BUY.value
         }
 
         response = self.client.get(
-            f"/api/orders/brokers/{self.portfolio_manager_one.broker}",
+            f"/api/orders/identifiers/{self.portfolio_manager_one.identifier}",
             query_string=query_params
         )
 
@@ -153,14 +198,19 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
 
     def test_all_query_params(self):
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
+        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
+        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
+
         query_params = {
             'target_symbol': self.TICKERS[0],
-            'trading_symbol': self.portfolio_manager_one.base_currency,
+            'trading_symbol': self.portfolio_manager_one.trading_currency,
             'order_side': OrderSide.BUY.value
         }
 
         response = self.client.get(
-            f"/api/orders/brokers/{self.portfolio_manager_one.broker}",
+            f"/api/orders/identifiers/{self.portfolio_manager_one.identifier}",
             query_string=query_params
         )
 
@@ -176,7 +226,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
                 .filter(Order.position_id.in_(position_ids))
                 .filter_by(
                     order_side=OrderSide.BUY.value,
-                    trading_symbol=self.portfolio_manager_one.base_currency,
+                    trading_symbol=self.portfolio_manager_one.trading_currency,
                     target_symbol=self.TICKERS[0]
                 ).count(),
             len(data["items"])

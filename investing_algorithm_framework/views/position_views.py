@@ -47,20 +47,22 @@ def list_positions():
     return create_paginated_response(query_set, serializer), 200
 
 
-@blueprint.route("/api/positions/brokers/<string:broker_name>", methods=["GET"])
-def list_positions_of_broker(broker_name):
+@blueprint.route(
+    "/api/positions/identifiers/<string:identifier>", methods=["GET"]
+)
+def list_positions_of_broker(identifier):
     """
-    View for listing of the positions of an broker. This view will list all
-    the positions corresponding to the given broker/portfolio.
-
+    View for listing of the positions of an identifier/broker. This view
+    will list all the positions corresponding to the given broker/portfolio.
+    
     You can provide to this view the following query params:
         - symbol: the symbol that is traded in the orders that belong to the
         position.
     The response in the view is paginated.
     """
 
-    portfolio = Portfolio.query.filter_by(broker=broker_name).first_or_404(
-        f"Portfolio not found for given broker {broker_name}"
+    portfolio = Portfolio.query.filter_by(identifier=identifier).first_or_404(
+        f"Portfolio not found for given identifier {identifier}"
     )
 
     # Retrieve positions
@@ -69,7 +71,7 @@ def list_positions_of_broker(broker_name):
     )
 
     # Create serializer
-    serializer = PositionSerializer(exclude=["broker"])
+    serializer = PositionSerializer(exclude=["identifier"])
 
     # Paginate query
     return create_paginated_response(query_set, serializer), 200

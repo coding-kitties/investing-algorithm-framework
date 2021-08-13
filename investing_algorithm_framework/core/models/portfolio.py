@@ -2,10 +2,12 @@ from datetime import datetime
 
 from sqlalchemy import UniqueConstraint
 
-from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.models import db, OrderSide
+from investing_algorithm_framework.core.models import db, OrderSide, Order, \
+    OrderType
 from investing_algorithm_framework.core.models.model_extension \
     import ModelExtension
+from investing_algorithm_framework.core.order_validators import \
+    OrderValidatorFactory
 
 
 class Portfolio(db.Model, ModelExtension):
@@ -39,9 +41,9 @@ class Portfolio(db.Model, ModelExtension):
     __tablename__ = "portfolios"
 
     id = db.Column(db.Integer, primary_key=True)
-    base_currency = db.Column(db.String, nullable=False)
+    trading_currency = db.Column(db.String, nullable=False)
     unallocated = db.Column(db.String, nullable=False, default=0)
-    broker = db.Column(db.String, nullable=False)
+    identifier = db.Column(db.String, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow())
     updated_at = db.Column(
         db.DateTime,
@@ -54,77 +56,31 @@ class Portfolio(db.Model, ModelExtension):
         "Position",
         back_populates="portfolio",
         cascade="all,delete",
+        lazy="dynamic",
     )
 
     # Constraints
     __table_args__ = (
         UniqueConstraint(
-            'base_currency', 'broker', name='_base_currency_broker_uc'
+            'trading_currency',
+            'identifier',
+            name='_trading_currency_identifier_uc'
         ),
     )
 
-    def __init__(self, base_currency, unallocated, broker, **kwargs):
-        self.broker = broker
-        self.base_currency = base_currency
+    def __init__(self, trading_currency, unallocated, identifier, **kwargs):
+        self.identifier = identifier
+        self.trading_currency = trading_currency
         self.unallocated = unallocated
         super(Portfolio, self).__init__(**kwargs)
 
-    def add_buy_order(self, order):
+    def add_order(self, order):
         self._validate_order(order)
-        self.validate_buy_order(order)
         self._add_order_to_position(order)
-
-    def validate_buy_order(self, order):
-
-        if not order.trading_symbol == self.base_currency:
-            raise OperationalException(
-                f"Can't add buy order with trading "
-                f"symbol {order.trading_symbol} to "
-                f"portfolio with base currency {self.base_currency}"
-            )
-
-        # Total price can't be greater then unallocated size
-        total_price = order.amount * order.price
-
-        if float(self.unallocated) < total_price:
-            raise OperationalException(
-                f"Order total: {total_price} {self.base_currency}, is larger "
-                f"then unallocated size: {self.unallocated} "
-                f"{self.base_currency} of the portfolio"
-            )
-
-    def add_sell_order(self, order):
-        self._validate_order(order)
-        self.validate_sell_order(order)
-        self._add_order_to_position(order)
-
-    def validate_sell_order(self, order):
-        from .position import Position
-
-        position = Position.query\
-            .filter_by(portfolio=self)\
-            .filter_by(symbol=order.trading_symbol)\
-            .first()
-
-        if position is None:
-            raise OperationalException(
-                "Can't add sell order to non existing position"
-            )
-
-        if position.amount < order.amount:
-            raise OperationalException(
-                "Order amount is larger then amount of open position"
-            )
-
-        if not order.target_symbol == self.base_currency:
-            raise OperationalException(
-                f"Can't add sell order with target "
-                f"symbol {order.target_symbol} to "
-                f"portfolio with base currency {self.broker.base_currency}"
-            )
 
     def _validate_order(self, order):
-        pass
+        order_validator = OrderValidatorFactory.of(self.identifier)
+        order_validator.validate(order, self)
 
     def _add_order_to_position(self, order):
         from investing_algorithm_framework.core.models import Position
@@ -161,12 +117,44 @@ class Portfolio(db.Model, ModelExtension):
         else:
             self.unallocated = (unallocated + total).__str__()
 
+    def create_buy_order(
+            self,
+            symbol,
+            amount,
+            price=0,
+            order_type=OrderType.LIMIT.value
+    ):
+        return Order(
+            trading_symbol=self.trading_currency,
+            target_symbol=symbol,
+            amount=amount,
+            price=price,
+            order_side=OrderSide.BUY.value,
+            order_type=order_type
+        )
+
+    def create_sell_order(
+            self,
+            symbol,
+            amount,
+            price=0,
+            order_type=OrderType.LIMIT.value
+    ):
+        return Order(
+            trading_symbol=symbol,
+            target_symbol=self.trading_currency,
+            amount=amount,
+            price=price,
+            order_side=OrderSide.SELL.value,
+            order_type=order_type
+        )
+
     def __repr__(self):
         return self.repr(
             id=self.id,
-            base_currency=self.base_currency,
-            unallocated=f"{self.unallocated} {self.base_currency}",
-            broker=self.broker,
+            trading_currency=self.trading_currency,
+            unallocated=f"{self.unallocated} {self.trading_currency}",
+            identifier=self.identifier,
             created_at=self.created_at,
             updated_at=self.updated_at
         )

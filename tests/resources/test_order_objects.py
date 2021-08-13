@@ -21,7 +21,7 @@ class TestOrderAndPositionsObjectsMixin:
                 price=9
             )
             order.save(db)
-            portfolio_manager.add_buy_order(order)
+            portfolio_manager.add_order(order)
 
             order = portfolio_manager.create_buy_order(
                 symbol=ticker,
@@ -29,7 +29,7 @@ class TestOrderAndPositionsObjectsMixin:
                 price=9.76
             )
             order.save(db)
-            portfolio_manager.add_buy_order(order)
+            portfolio_manager.add_order(order)
 
         # Create sell orders
         for ticker in self.TICKERS:
@@ -40,7 +40,7 @@ class TestOrderAndPositionsObjectsMixin:
             )
 
             order.save(db)
-            portfolio_manager.add_sell_order(order)
+            portfolio_manager.add_order(order)
 
             order = portfolio_manager.create_sell_order(
                 symbol=ticker,
@@ -49,7 +49,7 @@ class TestOrderAndPositionsObjectsMixin:
             )
 
             order.save(db)
-            portfolio_manager.add_sell_order(order)
+            portfolio_manager.add_order(order)
 
         db.session.commit()
 
@@ -63,7 +63,7 @@ class TestOrderAndPositionsObjectsMixin:
                 price=5
             )
             order.save(db)
-            portfolio_manager.add_buy_order(order)
+            portfolio_manager.add_order(order)
 
         db.session.commit()
 
@@ -77,6 +77,6 @@ class TestOrderAndPositionsObjectsMixin:
                 price=5
             )
             order.save(db)
-            portfolio_manager.add_sell_order(order)
+            portfolio_manager.add_order(order)
 
         db.session.commit()

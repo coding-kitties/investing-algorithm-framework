@@ -7,12 +7,12 @@ class PositionSerializer(Schema):
     amount = fields.Float(dump_only=True)
 
     # Optional fields
-    broker = fields.Method("get_broker")
+    identifier = fields.Method("get_identifier")
     orders = fields.Method("get_orders")
 
     @staticmethod
-    def get_broker(obj):
-        return obj.portfolio.broker
+    def get_identifier(obj):
+        return obj.portfolio.identifier
 
     @staticmethod
     def get_orders(obj):

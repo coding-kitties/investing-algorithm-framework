@@ -2,7 +2,7 @@ import logging
 
 from flask import Blueprint, request
 
-from investing_algorithm_framework import Order, db, Position, \
+from investing_algorithm_framework import Order, Position, \
     Portfolio, OrderSide
 from investing_algorithm_framework.schemas import OrderSerializer
 from investing_algorithm_framework.views.utils import normalize_query, \
@@ -15,6 +15,7 @@ blueprint = Blueprint("order-views", __name__)
 TARGET_SYMBOL_QUERY_PARAM = "target_symbol"
 TRADING_SYMBOL_QUERY_PARAM = "trading_symbol"
 ORDER_SIDE_QUERY_PARAM = "order_side"
+PENDING = "pending"
 
 
 def apply_order_query_parameters(query_set):
@@ -36,6 +37,9 @@ def apply_order_query_parameters(query_set):
                 query_params[ORDER_SIDE_QUERY_PARAM]
             ).value
         )
+
+    if PENDING in query_params:
+        query_set = query_set.filter_by(executed=query_params[PENDING])
 
     return query_set
 
@@ -76,10 +80,10 @@ def list_orders_of_position(position_id):
     return create_paginated_response(query_set, serializer), 200
 
 
-@blueprint.route("/api/orders/brokers/<string:broker_name>", methods=["GET"])
-def list_orders_of_broker(broker_name):
-    portfolio = Portfolio.query.filter_by(broker=broker_name).first_or_404(
-        f"Portfolio not found for given broker {broker_name}"
+@blueprint.route("/api/orders/identifiers/<string:identifier>", methods=["GET"])
+def list_orders_of_broker(identifier):
+    portfolio = Portfolio.query.filter_by(identifier=identifier).first_or_404(
+        f"Portfolio not found for given identifier {identifier}"
     )
 
     # Retrieve positions
@@ -91,7 +95,7 @@ def list_orders_of_broker(broker_name):
     query_set = apply_order_query_parameters(query_set)
 
     # Create serializer
-    serializer = OrderSerializer(exclude=["broker"])
+    serializer = OrderSerializer(exclude=["identifier"])
 
     # Paginate query
     return create_paginated_response(query_set, serializer), 200

@@ -40,6 +40,7 @@ def create_app(config_object=None) -> Flask:
 
 
 def setup_config(flask_app, config_object):
+
     # Validate the configuration
     ConfigValidator.validate(config_object)
 
@@ -50,6 +51,7 @@ def setup_config(flask_app, config_object):
 
 
 def setup_database(config_object):
+
     if DATABASE_CONFIG not in config_object:
         database_path = os.path.join(
             config_object[RESOURCES_DIRECTORY],
