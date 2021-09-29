@@ -5,14 +5,20 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.mixins import \
     ApiSecretKeySpecifierMixin
 
+
 BINANCE_CCXT_ID = "binance"
 logger = logging.getLogger(__name__)
 
 
-class BinanceExchangeClient(ExchangeClient, ApiSecretKeySpecifierMixin):
+class BinanceMarketService(
+    ExchangeClient,
+    ApiSecretKeySpecifierMixin,
+):
+    market = "BINANCE"
     exchange = None
 
     def __init__(self, api_key: str = None, secret_key: str = None):
+        super().__init__()
 
         if api_key is not None:
             self.api_key = api_key

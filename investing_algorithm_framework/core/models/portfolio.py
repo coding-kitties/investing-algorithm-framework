@@ -1,9 +1,11 @@
 from datetime import datetime
 
 from sqlalchemy import UniqueConstraint
+from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import validates
 
-from investing_algorithm_framework.core.models import db, OrderSide, Order, \
-    OrderType
+from investing_algorithm_framework.core.models import db, OrderSide, Order
+from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models.model_extension \
     import ModelExtension
 from investing_algorithm_framework.core.order_validators import \
@@ -41,9 +43,18 @@ class Portfolio(db.Model, ModelExtension):
     __tablename__ = "portfolios"
 
     id = db.Column(db.Integer, primary_key=True)
-    trading_currency = db.Column(db.String, nullable=False)
-    unallocated = db.Column(db.String, nullable=False, default=0)
-    identifier = db.Column(db.String, nullable=False)
+    market = db.Column(db.String, nullable=False)
+    trading_symbol = db.Column(db.String, nullable=False)
+    unallocated = db.Column(db.Float, nullable=False, default=0)
+    realized = db.Column(db.Float, nullable=False, default=0)
+    algorithm_id = db.Column(db.Integer, nullable=False)
+    broker = db.Column(db.String, nullable=False)
+    profile = db.relationship(
+        "AlgorithmPortfolioProfile",
+        uselist=False,
+        cascade="all,delete",
+        back_populates="portfolio",
+    )
     created_at = db.Column(db.DateTime, default=datetime.utcnow())
     updated_at = db.Column(
         db.DateTime,
@@ -53,33 +64,91 @@ class Portfolio(db.Model, ModelExtension):
 
     # Relationships
     positions = db.relationship(
-        "Position",
+        "AlgorithmPosition",
         back_populates="portfolio",
-        cascade="all,delete",
         lazy="dynamic",
+        cascade="all,delete",
     )
 
     # Constraints
     __table_args__ = (
         UniqueConstraint(
-            'trading_currency',
+            'trading_symbol',
             'identifier',
             name='_trading_currency_identifier_uc'
         ),
     )
 
-    def __init__(self, trading_currency, unallocated, identifier, **kwargs):
+    @validates('trading_symbol')
+    def _write_once(self, key, value):
+        existing = getattr(self, key)
+
+        if existing is not None:
+            raise ValueError("{} is write-once".format(key))
+        return value
+
+    def __init__(
+            self, trading_symbol, unallocated, identifier, market, **kwargs
+    ):
         self.identifier = identifier
-        self.trading_currency = trading_currency
+        self.trading_currency = trading_symbol
         self.unallocated = unallocated
+        self.market = market
         super(Portfolio, self).__init__(**kwargs)
 
-    def add_order(self, order):
+    @hybrid_property
+    def delta(self):
+        from investing_algorithm_framework.core.models import Position
+
+        position_ids = self.positions.with_entities(Position.id)
+
+        orders = Order.query \
+            .filter_by(open=True) \
+            .filter_by(order_side=OrderSide.BUY.value) \
+            .filter_by(executed=True) \
+            .filter(Order.position_id.in_(position_ids)) \
+            .all()
+
+        delta = 0
+
+        for order in orders:
+            delta += order.delta
+        return delta
+
+    @hybrid_property
+    def allocated(self):
+        from investing_algorithm_framework.core.models import Position
+
+        position_ids = self.positions.with_entities(Position.id)
+
+        orders = Order.query \
+            .filter_by(order_side=OrderSide.BUY.value) \
+            .filter_by(open=True) \
+            .filter_by(executed=True) \
+            .filter(Order.position_id.in_(position_ids)) \
+            .all()
+
+        allocated = 0
+
+        for order in orders:
+            allocated += order.current_value
+
+        return allocated
+
+    @hybrid_property
+    def allocated_percentage(self):
+        return (self.allocated / (self.allocated + self.unallocated)) * 100
+
+    @hybrid_property
+    def unallocated_percentage(self):
+        return (self.unallocated / self.realized) * 100
+
+    def add_order(self, order, user_ids=None):
         self._validate_order(order)
         self._add_order_to_position(order)
 
     def _validate_order(self, order):
-        order_validator = OrderValidatorFactory.of(self.identifier)
+        order_validator = OrderValidatorFactory.of(self.broker)
         order_validator.validate(order, self)
 
     def _add_order_to_position(self, order):
@@ -90,64 +159,83 @@ class Portfolio(db.Model, ModelExtension):
                 .filter_by(symbol=order.target_symbol) \
                 .filter_by(portfolio=self)\
                 .first()
-        else:
-            position = Position.query \
-                .filter_by(symbol=order.trading_symbol) \
-                .filter_by(portfolio=self) \
-                .first()
 
-        if position is None:
-            position = Position(symbol=order.target_symbol)
-            position.save(db)
-            self.positions.append(position)
+            if position is None:
+                position = Position(symbol=order.target_symbol)
+                position.save(db)
+                self.positions.append(position)
+                db.session.commit()
+
+            position.orders.append(order)
             db.session.commit()
 
-        position.orders.append(order)
-
-        # Update unallocated
-        self._sync_unallocated(order)
-
-        db.session.commit()
-
-    def _sync_unallocated(self, order):
-        total = order.amount * order.price
-        unallocated = float(self.unallocated)
-        if OrderSide.BUY.equals(order.order_side):
-            self.unallocated = (unallocated - total).__str__()
-        else:
-            self.unallocated = (unallocated + total).__str__()
-
-    def create_buy_order(
+    def create_order(
             self,
+            context,
+            order_type,
             symbol,
-            amount,
-            price=0,
-            order_type=OrderType.LIMIT.value
-    ):
-        return Order(
-            trading_symbol=self.trading_currency,
-            target_symbol=symbol,
-            amount=amount,
-            price=price,
+            amount=None,
+            price=None,
             order_side=OrderSide.BUY.value,
-            order_type=order_type
-        )
+            validate_pair=True,
 
-    def create_sell_order(
-            self,
-            symbol,
-            amount,
-            price=0,
-            order_type=OrderType.LIMIT.value
     ):
-        return Order(
-            trading_symbol=symbol,
-            target_symbol=self.trading_currency,
-            amount=amount,
-            price=price,
-            order_side=OrderSide.SELL.value,
-            order_type=order_type
-        )
+        market_service = context.get_market_service(self.market)
+
+        if validate_pair:
+
+            # Check if pair exists
+            if not market_service.pair_exist(
+                symbol, self.trading_symbol
+            ):
+                raise OperationalException(
+                    f"Can't receive price data for "
+                    f"pair {symbol} {self.trading_symbol}"
+                )
+
+        from investing_algorithm_framework.core.models import Order
+
+        if OrderSide.BUY.equals(order_side):
+            order = Order(
+                target_symbol=symbol,
+                trading_symbol=self.trading_symbol,
+                amount=amount,
+                price=price,
+                order_type=order_type,
+                order_side=OrderSide.BUY.value
+            )
+        else:
+            order = Order(
+                target_symbol=self.trading_symbol,
+                trading_symbol=symbol,
+                amount=amount,
+                price=price,
+                order_type=order_type,
+                order_side=OrderSide.SELL.value
+            )
+
+            position = self.positions\
+                .filter_by(symbol=order.trading_symbol)\
+                .first()
+
+            if position is None:
+                raise (
+                    "Can't add sell order to non-existing position"
+                )
+
+            position.orders.append(order)
+
+        return order
+
+    def update(self, db, data, commit: bool = False, **kwargs):
+        self.updated_at = datetime.utcnow()
+        unallocated = data.pop("unallocated", None)
+
+        if unallocated is not None:
+            self.unallocated += unallocated
+            self.realized += unallocated
+
+        super(Portfolio, self).update(db, data, **kwargs)
 
     def __repr__(self):
         return self.repr(

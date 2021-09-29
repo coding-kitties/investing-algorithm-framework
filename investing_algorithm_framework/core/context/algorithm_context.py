@@ -22,6 +22,7 @@ class AlgorithmContext:
     _running_workers = []
     _order_executors = {}
     _portfolio_managers = {}
+    _market_services = {}
     _initializer = None
     _initialized = False
 
@@ -136,7 +137,7 @@ class AlgorithmContext:
             import OrderExecutor
 
         assert isinstance(order_executor, OrderExecutor), (
-            'Initializer must be an instance of the OrderExecutor class'
+            'Provided object must be an instance of the OrderExecutor class'
         )
 
         if order_executor.identifier in self._order_executors:
@@ -148,7 +149,7 @@ class AlgorithmContext:
     def order_executors(self) -> List:
         order_executors = []
 
-        for order_executor in self.order_executors:
+        for order_executor in self._order_executors:
             order_executors.append(order_executor)
 
         return order_executors
@@ -173,7 +174,7 @@ class AlgorithmContext:
             import AlgorithmContextInitializer
 
         assert isinstance(initializer, AlgorithmContextInitializer), (
-            'Initializer must be an instance of the '
+            'Provided object must be an instance of the '
             'AlgorithmContextInitializer class'
         )
 
@@ -185,7 +186,7 @@ class AlgorithmContext:
             import PortfolioManager
 
         assert isinstance(portfolio_manager, PortfolioManager), (
-            'portfolio manager must be an instance of the '
+            'Provided object must be an instance of the '
             'AbstractPortfolioManager class'
         )
 
@@ -222,6 +223,43 @@ class AlgorithmContext:
             return None
 
         return self._portfolio_managers[identifier]
+
+    def add_market_service(self, market_service):
+        from investing_algorithm_framework.core.market_services \
+            import MarketService
+
+        assert isinstance(market_service, MarketService), (
+            'Provided object must be an instance of the MarketService class'
+        )
+
+        if market_service.market in self._market_services:
+            raise OperationalException("Market service market already exists")
+
+        self._order_executors[market_service.market] = market_service
+
+    @property
+    def market_services(self) -> List:
+        market_services = []
+
+        for market_service in self._market_services:
+            market_services.append(market_service)
+
+        return market_services
+
+    def get_market_service(
+            self, market: str, throw_exception: bool = True
+    ):
+        if market not in self._market_services:
+
+            if throw_exception:
+                raise OperationalException(
+                    f"No corresponding market service found for "
+                    f"market {market}"
+                )
+
+            return None
+
+        return self._market_services[market]
 
     def set_algorithm_context_initializer(
             self, algorithm_context_initializer

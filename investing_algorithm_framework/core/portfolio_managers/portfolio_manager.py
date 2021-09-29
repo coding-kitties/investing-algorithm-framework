@@ -1,12 +1,15 @@
 from abc import abstractmethod, ABC
 
 from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.models import Position, Order, \
-    Portfolio, db, OrderType
 from investing_algorithm_framework.core.identifier import Identifier
+from investing_algorithm_framework.core.market_identifier import \
+    MarketIdentifier
+from investing_algorithm_framework.core.models import Position, Order, \
+    Portfolio, db, OrderSide
+from investing_algorithm_framework import current_app
 
 
-class PortfolioManager(ABC, Identifier):
+class PortfolioManager(ABC, Identifier, MarketIdentifier):
     trading_currency = None
 
     @abstractmethod
@@ -22,33 +25,31 @@ class PortfolioManager(ABC, Identifier):
         if portfolio is None:
             portfolio = Portfolio(
                 identifier=self.identifier,
-                trading_currency=self.trading_currency,
-                unallocated=self.get_initial_unallocated_size()
+                trading_symbol=self.trading_currency,
+                unallocated=self.get_initial_unallocated_size(),
+                market=self.get_market()
             )
             portfolio.save(db)
 
     def get_portfolio(self) -> Portfolio:
-        return Portfolio.query.filter_by(
-            identifier=self.identifier,
-            trading_currency=self.trading_currency
-        ).first()
+        return Portfolio.query.filter_by(identifier=self.identifier).first()
 
     @property
     def unallocated(self):
         return self.get_portfolio().unallocated
 
-    def get_trading_currency(self) -> str:
+    def get_trading_symbol(self) -> str:
 
-        trading_currency = getattr(self, "trading_currency", None)
+        trading_symbol = getattr(self, "trading_symbol", None)
 
-        if trading_currency is None:
+        if trading_symbol is None:
             raise OperationalException(
-                "Trading currency is not set. Either override "
-                "'get_trading_currency' method or set "
-                "the 'trading_currency' attribute."
+                "Trading symbol is not set. Either override "
+                "'get_trading_symbol' method or set "
+                "the 'trading_symbol' attribute."
             )
 
-        return trading_currency
+        return trading_symbol
 
     def get_positions(
             self,
@@ -57,11 +58,11 @@ class PortfolioManager(ABC, Identifier):
     ):
 
         if symbol is None:
-            query_set = Position.query\
+            query_set = Position.query \
                 .filter_by(portfolio=self.get_portfolio())
         else:
-            query_set = Position.query\
-                .filter_by(portfolio=self.get_portfolio())\
+            query_set = Position.query \
+                .filter_by(portfolio=self.get_portfolio()) \
                 .filter_by(symbol=symbol)
 
         if lazy:
@@ -77,7 +78,7 @@ class PortfolioManager(ABC, Identifier):
 
         if symbol is None:
 
-            query_set = Order.query\
+            query_set = Order.query \
                 .filter(Order.position_id.in_(positions))
         else:
             query_set = Order.query \
@@ -94,7 +95,7 @@ class PortfolioManager(ABC, Identifier):
         if symbol is not None:
             positions = Position.query \
                 .filter_by(portfolio=self.get_portfolio()) \
-                .filter_by(symbol=symbol)\
+                .filter_by(symbol=symbol) \
                 .with_entities(Position.id)
         else:
             positions = Position.query \
@@ -103,33 +104,36 @@ class PortfolioManager(ABC, Identifier):
 
         query_set = Order.query \
             .filter(Order.position_id.in_(positions)) \
-            .filter_by(executed=False)\
+            .filter_by(executed=False)
 
         if lazy:
             return query_set
         else:
             return query_set.all()
 
-    def create_buy_order(
+    def create_order(
             self,
+            order_type,
             symbol,
-            amount,
-            price=0,
-            order_type=OrderType.LIMIT.value
+            amount=None,
+            price=None,
+            order_side=OrderSide.BUY.value,
+            validate_pair=True,
+            context=None
     ):
-        return self.get_portfolio().create_buy_order(
-            symbol, amount, price, order_type
-        )
 
-    def create_sell_order(
+        if context is None:
+            context = current_app.algorithm
+
+        return self.get_portfolio().create_buy_order(
             self,
+            context,
+            order_type,
             symbol,
             amount,
-            price=0,
-            order_type=OrderType.LIMIT.value
-    ):
-        return self.get_portfolio().create_sell_order(
-            symbol, amount, price, order_type
+            price,
+            order_side,
+            validate_pair,
         )
 
     def add_order(self, order):
