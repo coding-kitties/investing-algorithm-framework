@@ -79,7 +79,16 @@ class Position(db.Model, ModelExtension):
 @event.listens_for(Position.orders, 'append')
 def parent_child_relation_inserted(position, order, target):
 
-    if OrderSide.SELL.equals(order.order_side):
-        position.amount -= order.amount
-    else:
-        position.amount += order.amount
+    if OrderSide.BUY.equals(order.order_side):
+
+        # Check if order id reference not already exists (order split)
+        # If it exists, this would mean that the order is a split order
+        # and therefore it is not needed to update the portfolio or position
+        if order.order_reference and position.orders\
+                .filter_by(
+                    order_reference=order.order_reference
+                ).first() is not None:
+
+            return
+
+        position.portfolio.unallocated -= (order.amount * order.price)

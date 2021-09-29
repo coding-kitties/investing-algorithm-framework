@@ -1,4 +1,4 @@
-from tests.resources import TestBase
+from tests.resources import TestBase, random_string
 from investing_algorithm_framework.core.models import Order, Position, db, \
     OrderSide, Portfolio, OrderType
 from investing_algorithm_framework.core.exceptions import OperationalException
@@ -9,9 +9,10 @@ class Test(TestBase):
     def setUp(self) -> None:
         super(Test, self).setUp()
         self.portfolio = Portfolio(
-            trading_currency="USDT",
+            trading_symbol="USDT",
             identifier="BINANCE",
-            unallocated=1000
+            unallocated=1000,
+            market="BINANCE"
         )
         self.portfolio.save(db)
 
@@ -64,7 +65,7 @@ class Test(TestBase):
             float(self.portfolio.unallocated)
         )
 
-    def test_buy_order_creation_unallocated(self):
+    def test_buy_order_creation_larger_then_unallocated(self):
         self.assertEqual(
             float(1000),
             float(self.portfolio.unallocated)
@@ -105,6 +106,8 @@ class Test(TestBase):
             float(self.portfolio.unallocated)
         )
 
+        order.set_executed()
+
         order = Order(
             target_symbol="USDT",
             trading_symbol="BTC",
@@ -115,6 +118,8 @@ class Test(TestBase):
         )
         order.save(db)
         self.portfolio.add_order(order)
+
+        order.set_executed()
         self.assertEqual(float(1000), float(self.portfolio.unallocated))
 
     def test_get_positions(self):

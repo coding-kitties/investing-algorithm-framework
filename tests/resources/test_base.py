@@ -13,6 +13,11 @@ class TestBase(TestCase):
     )
     algo_app = None
 
+    SYMBOL_A = "SYMBOL_A"
+    SYMBOL_B = "SYMBOL_B"
+    SYMBOL_C = "SYMBOL_C"
+    SYMBOL_D = "SYMBOL_D"
+
     def create_app(self):
         self.algo_app = App(
             resources_directory=self.resources_dir, config=TestConfig

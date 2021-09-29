@@ -6,7 +6,6 @@ from investing_algorithm_framework.core.market_identifier import \
     MarketIdentifier
 from investing_algorithm_framework.core.models import Position, Order, \
     Portfolio, db, OrderSide
-from investing_algorithm_framework import current_app
 
 
 class PortfolioManager(ABC, Identifier, MarketIdentifier):
@@ -123,6 +122,7 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
     ):
 
         if context is None:
+            from investing_algorithm_framework import current_app
             context = current_app.algorithm
 
         return self.get_portfolio().create_buy_order(

@@ -1,10 +1,11 @@
-from investing_algorithm_framework.exchanges import BinanceExchangeClient
+from investing_algorithm_framework.core.market_services import \
+    BinanceMarketService
 from investing_algorithm_framework.core.models import Order, OrderType, \
     OrderSide, db
 from investing_algorithm_framework.core.exceptions import OperationalException
 
 
-class BinanceOrderExecutorMixin(BinanceExchangeClient):
+class BinanceOrderExecutorMixin(BinanceMarketService):
     identifier = "BINANCE"
 
     def execute_limit_order(self, order: Order, algorithm_context, **kwargs):

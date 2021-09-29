@@ -44,17 +44,11 @@ class Portfolio(db.Model, ModelExtension):
 
     id = db.Column(db.Integer, primary_key=True)
     market = db.Column(db.String, nullable=False)
+    identifier = db.Column(db.String, nullable=False)
     trading_symbol = db.Column(db.String, nullable=False)
     unallocated = db.Column(db.Float, nullable=False, default=0)
     realized = db.Column(db.Float, nullable=False, default=0)
-    algorithm_id = db.Column(db.Integer, nullable=False)
-    broker = db.Column(db.String, nullable=False)
-    profile = db.relationship(
-        "AlgorithmPortfolioProfile",
-        uselist=False,
-        cascade="all,delete",
-        back_populates="portfolio",
-    )
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow())
     updated_at = db.Column(
         db.DateTime,
@@ -64,7 +58,7 @@ class Portfolio(db.Model, ModelExtension):
 
     # Relationships
     positions = db.relationship(
-        "AlgorithmPosition",
+        "Position",
         back_populates="portfolio",
         lazy="dynamic",
         cascade="all,delete",
@@ -91,7 +85,7 @@ class Portfolio(db.Model, ModelExtension):
             self, trading_symbol, unallocated, identifier, market, **kwargs
     ):
         self.identifier = identifier
-        self.trading_currency = trading_symbol
+        self.trading_symbol = trading_symbol
         self.unallocated = unallocated
         self.market = market
         super(Portfolio, self).__init__(**kwargs)
@@ -148,7 +142,7 @@ class Portfolio(db.Model, ModelExtension):
         self._add_order_to_position(order)
 
     def _validate_order(self, order):
-        order_validator = OrderValidatorFactory.of(self.broker)
+        order_validator = OrderValidatorFactory.of(self.market)
         order_validator.validate(order, self)
 
     def _add_order_to_position(self, order):
@@ -165,9 +159,19 @@ class Portfolio(db.Model, ModelExtension):
                 position.save(db)
                 self.positions.append(position)
                 db.session.commit()
+        else:
+            position = Position.query \
+                .filter_by(symbol=order.trading_symbol) \
+                .filter_by(portfolio=self)\
+                .first()
 
-            position.orders.append(order)
-            db.session.commit()
+            if position is None:
+                raise OperationalException(
+                    "Sell order can 't be added to non existing position"
+                )
+
+        position.orders.append(order)
+        db.session.commit()
 
     def create_order(
             self,
@@ -213,17 +217,6 @@ class Portfolio(db.Model, ModelExtension):
                 order_type=order_type,
                 order_side=OrderSide.SELL.value
             )
-
-            position = self.positions\
-                .filter_by(symbol=order.trading_symbol)\
-                .first()
-
-            if position is None:
-                raise (
-                    "Can't add sell order to non-existing position"
-                )
-
-            position.orders.append(order)
 
         return order
 
