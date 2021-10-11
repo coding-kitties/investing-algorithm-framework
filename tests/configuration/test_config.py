@@ -30,7 +30,9 @@ class TestConfig(TestCase):
 
     def test_get_item(self):
         config = CustomConfig()
-        self.assertIsNotNone(config.get("TEST_ATTRIBUTE"))
+        self.assertIsNone(config.get("TEST_ATTRIBUTE"))
+        config[self.ATTRIBUTE_ONE] = self.ATTRIBUTE_ONE
+        self.assertIsNotNone(config.get(self.ATTRIBUTE_ONE))
 
     def test_set_item(self):
         config = CustomConfig()
