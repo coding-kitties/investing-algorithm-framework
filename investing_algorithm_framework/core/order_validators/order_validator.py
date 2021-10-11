@@ -31,12 +31,16 @@ class OrderValidator(ABC):
                 "Can't add sell order to non existing position"
             )
 
-        print(position.amount)
-        print(order.amount)
-        if position.amount < order.amount:
-            raise OperationalException(
-                "Order amount is larger then amount of open position"
-            )
+        if OrderType.LIMIT.equals(order.order_type):
+            if position.amount < order.amount:
+                raise OperationalException(
+                    "Order amount is larger then amount of open position"
+                )
+        else:
+            if position.amount < order.amount_trading_symbol:
+                raise OperationalException(
+                    "Order amount is larger then amount of open position"
+                )
 
         if not order.target_symbol == portfolio.trading_symbol:
             raise OperationalException(
@@ -70,8 +74,11 @@ class OrderValidator(ABC):
     @staticmethod
     def validate_market_order(order, _):
 
-        if order.amount is None:
-            raise OperationalException("Market order needs an amount")
+        if order.amount_trading_symbol is None:
+            raise OperationalException(
+                f"Market order needs an amount specified in the trading "
+                f"symbol {order.trading_symbol}"
+            )
 
     @abstractmethod
     def _validate_order(self, order, portfolio):

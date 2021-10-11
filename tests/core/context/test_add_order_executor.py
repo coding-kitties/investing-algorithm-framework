@@ -1,4 +1,4 @@
-from investing_algorithm_framework import OrderExecutor, Order
+from investing_algorithm_framework import OrderExecutor, OrderStatus, Order
 from investing_algorithm_framework.core.exceptions import OperationalException
 from tests.resources import TestBase
 
@@ -11,9 +11,9 @@ class MyOrderExecutorOne(OrderExecutor):
     ) -> bool:
         pass
 
-    def update_order_status(
+    def get_order_status(
             self, order: Order, algorithm_context, **kwargs
-    ) -> bool:
+    ) -> OrderStatus:
         pass
 
     def execute_market_order(
@@ -39,3 +39,13 @@ class Test(TestBase):
         )
         with self.assertRaises(OperationalException):
             self.algo_app.algorithm.add_order_executor(MyOrderExecutorOne())
+
+    def test_retrieve(self):
+        self.algo_app.algorithm.add_order_executor(MyOrderExecutorOne())
+
+        order_executor = self.algo_app.algorithm.get_order_executor()
+        self.assertIsNotNone(order_executor)
+
+        order_executor = self.algo_app.algorithm.get_order_executor("BINANCE")
+        self.assertIsNotNone(order_executor)
+        self.assertEqual(order_executor.identifier, "BINANCE")

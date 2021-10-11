@@ -1,9 +1,14 @@
 import logging
 
+import sqlalchemy
 from flask import Blueprint, request
 
 from investing_algorithm_framework import Order, Position, \
-    Portfolio, OrderSide
+    Portfolio, OrderSide, db
+from investing_algorithm_framework.configuration.constants import \
+    TARGET_SYMBOL_QUERY_PARAM, TRADING_SYMBOL_QUERY_PARAM, \
+    IDENTIFIER_QUERY_PARAM, ORDER_SIDE_QUERY_PARAM, STATUS_QUERY_PARAM, \
+    POSITION_SYMBOL_QUERY_PARAM
 from investing_algorithm_framework.schemas import OrderSerializer
 from investing_algorithm_framework.views.utils import normalize_query, \
     create_paginated_response
@@ -12,14 +17,27 @@ logger = logging.getLogger(__name__)
 
 blueprint = Blueprint("order-views", __name__)
 
-TARGET_SYMBOL_QUERY_PARAM = "target_symbol"
-TRADING_SYMBOL_QUERY_PARAM = "trading_symbol"
-ORDER_SIDE_QUERY_PARAM = "order_side"
-PENDING = "pending"
-
 
 def apply_order_query_parameters(query_set):
     query_params = normalize_query(request.args)
+
+    if IDENTIFIER_QUERY_PARAM in query_params:
+        portfolio = Portfolio.query\
+            .filter_by(identifier=query_params[IDENTIFIER_QUERY_PARAM])\
+            .first()
+
+        if portfolio is None:
+            return db.session.query(Order).filter(sqlalchemy.sql.false())
+
+        position_ids = portfolio.positions.with_entities(Position.id)
+        query_set = query_set.filter(Order.position_id.in_(position_ids))
+
+    if POSITION_SYMBOL_QUERY_PARAM in query_params:
+        position_ids = Position.query\
+            .filter_by(symbol=query_params[POSITION_SYMBOL_QUERY_PARAM])\
+            .with_entities(Position.id)
+
+        query_set = query_set.filter(Order.position_id.in_(position_ids))
 
     if TARGET_SYMBOL_QUERY_PARAM in query_params:
         query_set = query_set.filter_by(
@@ -38,8 +56,9 @@ def apply_order_query_parameters(query_set):
             ).value
         )
 
-    if PENDING in query_params:
-        query_set = query_set.filter_by(executed=query_params[PENDING])
+    if STATUS_QUERY_PARAM in query_params:
+        query_set = query_set\
+            .filter_by(status=query_params[STATUS_QUERY_PARAM])
 
     return query_set
 
@@ -63,39 +82,6 @@ def list_orders():
 
     # Create serializer
     serializer = OrderSerializer()
-
-    # Paginate query
-    return create_paginated_response(query_set, serializer), 200
-
-
-@blueprint.route("/api/orders/positions/<int:position_id>", methods=["GET"])
-def list_orders_of_position(position_id):
-    query_set = Order.query.filter_by(position_id=position_id)
-    query_set = apply_order_query_parameters(query_set)
-
-    # Create serializer
-    serializer = OrderSerializer(exclude=["position_id"])
-
-    # Paginate query
-    return create_paginated_response(query_set, serializer), 200
-
-
-@blueprint.route("/api/orders/identifiers/<string:identifier>", methods=["GET"])
-def list_orders_of_broker(identifier):
-    portfolio = Portfolio.query.filter_by(identifier=identifier).first_or_404(
-        f"Portfolio not found for given identifier {identifier}"
-    )
-
-    # Retrieve positions
-    positions = Position.query\
-        .filter_by(portfolio=portfolio)\
-        .with_entities(Position.id)
-
-    query_set = Order.query.filter(Order.position_id.in_(positions))
-    query_set = apply_order_query_parameters(query_set)
-
-    # Create serializer
-    serializer = OrderSerializer(exclude=["identifier"])
 
     # Paginate query
     return create_paginated_response(query_set, serializer), 200

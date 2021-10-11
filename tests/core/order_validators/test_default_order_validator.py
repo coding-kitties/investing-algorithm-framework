@@ -1,5 +1,6 @@
+from tests.resources import SYMBOL_A, SYMBOL_A_PRICE
 from investing_algorithm_framework.core.models import db, \
-    Portfolio
+    Portfolio, OrderSide
 from investing_algorithm_framework.core.order_validators \
     import OrderValidatorFactory
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
@@ -9,76 +10,90 @@ from investing_algorithm_framework.core.models import Order, OrderType
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
-    def setUp(self):
-        super(Test, self).setUp()
-        self.portfolio = Portfolio(
-            trading_currency="USDT",
-            identifier="BINANCE",
-            unallocated=1000
-        )
-        self.portfolio.save(db)
-
     def test_validate_limit_buy_order(self):
-        order = self.portfolio.create_buy_order(
-            "BTC", 20, 20,
+        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
+
+        order_a = portfolio_manager.create_order(
+            order_type=OrderType.LIMIT.value,
+            order_side=OrderSide.BUY.value,
+            amount=1,
+            symbol=SYMBOL_A,
+            price=SYMBOL_A_PRICE,
+            validate_pair=True,
+            context=None
         )
 
-        order_validator = OrderValidatorFactory.of("test")
-        order_validator.validate(order, self.portfolio)
+        portfolio_manager.add_order(order_a)
 
     def test_validate_limit_sell_order(self):
-        portfolio = Portfolio.query.first()
-        self.create_buy_orders(2, self.TICKERS, portfolio)
+        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 
-        order = portfolio.create_sell_order(
-            self.TICKERS[0], 2, 2,
+        order_a = portfolio_manager.create_order(
+            order_type=OrderType.LIMIT.value,
+            order_side=OrderSide.BUY.value,
+            amount=1,
+            symbol=SYMBOL_A,
+            price=SYMBOL_A_PRICE,
+            validate_pair=True,
+            context=None
         )
 
-        portfolio = Portfolio.query.first()
-        order_validator = OrderValidatorFactory.of("test")
-        order_validator.validate(order, portfolio)
+        portfolio_manager.add_order(order_a)
+
+        order_a.set_executed()
+        order_a_sell = portfolio_manager.create_order(
+            order_type=OrderType.LIMIT.value,
+            order_side=OrderSide.SELL.value,
+            amount=1,
+            symbol=SYMBOL_A,
+            price=SYMBOL_A_PRICE,
+            validate_pair=True,
+            context=None
+        )
+
+        portfolio_manager.add_order(order_a_sell)
 
     def test_validate_limit_sell_order_larger_then_position(self):
-        portfolio = Portfolio.query.first()
-        self.create_buy_orders(2, self.TICKERS, portfolio)
+        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 
-        order = portfolio.create_sell_order(
-            self.TICKERS[0], 200, 2,
+        order_a = portfolio_manager.create_order(
+            order_type=OrderType.LIMIT.value,
+            order_side=OrderSide.BUY.value,
+            amount=1,
+            symbol=SYMBOL_A,
+            price=SYMBOL_A_PRICE,
+            validate_pair=True,
+            context=None
         )
 
-        portfolio = Portfolio.query.first()
-        order_validator = OrderValidatorFactory.of("test")
+        portfolio_manager.add_order(order_a)
 
-        with self.assertRaises(OperationalException):
-            order_validator.validate(order, portfolio)
-
-    def test_validate_buy_order_with_wrong_trading_symbol(self):
-        order = Order(
-            "BUY", "LIMIT",
-            "BTC", "TEST", 20, 20,
+        order_a.set_executed()
+        order_a_sell = portfolio_manager.create_order(
+            order_type=OrderType.LIMIT.value,
+            order_side=OrderSide.SELL.value,
+            amount=2,
+            symbol=SYMBOL_A,
+            price=SYMBOL_A_PRICE,
+            validate_pair=True,
+            context=None
         )
-        order_validator = OrderValidatorFactory.of("test")
 
-        with self.assertRaises(OperationalException):
-            order_validator.validate(order, self.portfolio)
+        with self.assertRaises(OperationalException) as exc:
+            portfolio_manager.add_order(order_a_sell)
 
     def test_validate_limit_order_with_unallocated_error(self):
-        order = self.portfolio.create_buy_order(
-            "BTC", 200, 20,
-        )
+        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 
-        order_validator = OrderValidatorFactory.of("test")
+        order_a = portfolio_manager.create_order(
+            order_type=OrderType.LIMIT.value,
+            order_side=OrderSide.BUY.value,
+            amount=10000,
+            symbol=SYMBOL_A,
+            price=SYMBOL_A_PRICE,
+            validate_pair=True,
+            context=None
+        )
 
         with self.assertRaises(OperationalException):
-            order_validator.validate(order, self.portfolio)
-
-    def test_validate_market_order(self):
-        order = self.portfolio.create_buy_order(
-            "BTC", 200, 20, order_type=OrderType.MARKET.value
-        )
-
-        order_validator = OrderValidatorFactory.of("test")
-        order_validator.validate(order, self.portfolio)
-
-    def test_validate_market_order_with_order_amount_is_none(self):
-        pass
+            portfolio_manager.add_order(order_a)

@@ -9,6 +9,9 @@ class MarketService(ABC, MarketIdentifier):
     def pair_exists(self, target_symbol: str, trading_symbol: str):
         pass
 
+    def get_price(self, target_symbol: str, trading_symbol: str):
+        return self.get_ticker(target_symbol, trading_symbol)["price"]
+
     @abstractmethod
     def get_ticker(self, target_symbol: str, trading_symbol: str):
         pass

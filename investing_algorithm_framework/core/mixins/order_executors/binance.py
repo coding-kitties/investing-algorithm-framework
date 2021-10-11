@@ -1,7 +1,7 @@
 from investing_algorithm_framework.core.market_services import \
     BinanceMarketService
 from investing_algorithm_framework.core.models import Order, OrderType, \
-    OrderSide, db
+    OrderSide, db, OrderStatus
 from investing_algorithm_framework.core.exceptions import OperationalException
 
 
@@ -50,12 +50,23 @@ class BinanceOrderExecutorMixin(BinanceMarketService):
                 amount=order.amount,
             )
 
-    def update_order_status(self, order: Order, algorithm_context, **kwargs):
+    def get_order_status(self, order: Order, algorithm_context, **kwargs):
         order = self.get_order(
             order.exchange_id, order.target_symbol, order.trading_symbol
         )
 
-        if order is not None and order["info"]["status"] == "FILLED":
-            order.update(db, {"executed": True, "successful": True})
+        if order is not None:
 
-        return order
+            if order["info"]["status"] == "FILLED":
+                return OrderStatus.SUCCESS.value
+
+            if order["info"]["status"] == "REJECTED	":
+                return OrderStatus.FAILED.value
+
+            if order["info"]["status"] == "PENDING_CANCEL":
+                return OrderStatus.FAILED.value
+
+            if order["info"]["status"] == "EXPIRED":
+                return OrderStatus.FAILED.value
+
+            return OrderStatus.PENDING.value

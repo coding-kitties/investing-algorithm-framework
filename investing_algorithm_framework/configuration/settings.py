@@ -1,6 +1,8 @@
 import os
+
 from enum import Enum
 import logging
+
 from investing_algorithm_framework.core import OperationalException
 from investing_algorithm_framework.configuration.constants import \
     DATABASE_NAME, DATABASE_DIRECTORY_PATH, RESOURCES_DIRECTORY
@@ -83,31 +85,68 @@ class Config(dict):
         for attribute_key in dir(Config):
 
             if attribute_key.isupper():
-                self.__setitem__(attribute_key, getattr(self, attribute_key))
+                self[attribute_key] = getattr(self, attribute_key)
 
-    def __setitem__(self, key, value):
-        setattr(self, key, value)
-        super(Config, self).__setitem__(key, value)
+    def __setitem__(self, key, item):
+        self.__dict__[key] = item
+
+    def __getitem__(self, key):
+        return self.__dict__[key]
+
+    def __repr__(self):
+        return repr(self.__dict__)
+
+    def __len__(self):
+        return len(self.__dict__)
+
+    def __delitem__(self, key):
+        del self.__dict__[key]
+
+    def clear(self):
+        return self.__dict__.clear()
+
+    def copy(self):
+        return self.__dict__.copy()
+
+    def has_key(self, k):
+        return k in self.__dict__
+
+    def update(self, *args, **kwargs):
+        return self.__dict__.update(*args, **kwargs)
+
+    def keys(self):
+        return self.__dict__.keys()
+
+    def values(self):
+        return self.__dict__.values()
+
+    def items(self):
+        return self.__dict__.items()
+
+    def pop(self, *args):
+        return self.__dict__.pop(*args)
+
+    def __cmp__(self, dict_):
+        return self.__cmp__(self.__dict__, dict_)
+
+    def __contains__(self, item):
+        return item in self.__dict__
+
+    def __iter__(self):
+        return iter(self.__dict__)
 
     def __str__(self):
         field_strings = []
 
-        for attribute_key in dir(Config):
+        for attribute_key in self:
 
             if attribute_key.isupper():
                 field_strings.append(
                     f'{attribute_key}='
-                    f'{super(Config,self).__getitem__(attribute_key)!r}'
+                    f'{self[attribute_key]!r}'
                 )
 
         return f"<{self.__class__.__name__}({','.join(field_strings)})>"
-
-    def __contains__(self, item):
-        item = super(Config, self).__getitem__(item)
-        return item is not None
-
-    def __getitem__(self, item):
-        return getattr(self, item)
 
     def get(self, key: str, default=None):
         """
@@ -115,22 +154,15 @@ class Config(dict):
         """
 
         try:
-            return self.__getitem__(key)
+            return self[key]
         # Ignore exception
-        except OperationalException:
+        except Exception:
             pass
 
         return default
 
     def set(self, key: str, value) -> None:
-
-        if hasattr(self, key):
-            raise OperationalException(
-                "ContextConfig object already have the specific "
-                "attribute {} specified".format(key)
-            )
-
-        setattr(self, key, value)
+        self[key] = value
 
     @staticmethod
     def from_dict(dictionary):
@@ -140,7 +172,7 @@ class Config(dict):
 
             if attribute_key.isupper():
                 config.set(attribute_key, dictionary[attribute_key])
-
+                config[attribute_key] = dictionary[attribute_key]
         return config
 
 

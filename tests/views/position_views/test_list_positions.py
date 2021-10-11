@@ -1,82 +1,93 @@
 import json
-from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
-from investing_algorithm_framework import PortfolioManager, Position
-
-
-class PortfolioManagerOne(PortfolioManager):
-    trading_currency = "USDT"
-    identifier = "KRAKEN"
-
-    def get_initial_unallocated_size(self) -> float:
-        return 1000
-
-
-class PortfolioManagerTwo(PortfolioManager):
-    trading_currency = "BUSD"
-    identifier = "BINANCE"
-
-    def get_initial_unallocated_size(self) -> float:
-        return 2000
-
-
-SERIALIZATION_DICT = {
-    'symbol', 'amount', 'id', 'orders', 'identifier'
-}
+from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin, \
+    SYMBOL_A, SYMBOL_B, SYMBOL_B_PRICE, SYMBOL_A_PRICE
+from tests.resources.serialization_dicts import position_serialization_dict
+from investing_algorithm_framework import db, Position
 
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
-    TICKERS = [
-        "BTC",
-        "DOT",
-        "ADA",
-        "XRP",
-        "ETH"
-    ]
 
     def setUp(self):
         super(Test, self).setUp()
-        self.portfolio_manager_one = PortfolioManagerOne()
-        self.portfolio_manager_two = PortfolioManagerTwo()
-        self.algo_app.algorithm.add_portfolio_manager(
-            self.portfolio_manager_one
+        order = self.algo_app.algorithm.create_limit_buy_order(
+            "test",
+            SYMBOL_A,
+            SYMBOL_A_PRICE,
+            10,
+            True
         )
-        self.algo_app.algorithm.add_portfolio_manager(
-            self.portfolio_manager_two
+        order.save(db)
+
+        order = self.algo_app.algorithm.create_limit_buy_order(
+            "test",
+            SYMBOL_B,
+            SYMBOL_B_PRICE,
+            10,
+            True
         )
-        self.algo_app.algorithm.start()
+        order.save(db)
+        order.set_executed()
+
+        self.algo_app.algorithm.create_limit_sell_order(
+            "test",
+            SYMBOL_B,
+            SYMBOL_B_PRICE,
+            10,
+            True
+        )
+        order.save(db)
 
     def tearDown(self):
         self.algo_app.algorithm.stop()
         super(Test, self).tearDown()
 
     def test_list_orders(self):
-        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
-        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
-        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
-        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
 
         response = self.client.get("/api/positions")
         self.assert200(response)
         data = json.loads(response.data.decode())
 
         self.assertEqual(Position.query.count(), len(data["items"]))
-        self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
+        self.assertEqual(position_serialization_dict, set(data.get("items")[0]))
 
     def test_list_orders_with_target_symbol_query_params(self):
-        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
-        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_two)
-        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
-        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_two)
 
         query_params = {
-            'symbol': self.TICKERS[0]
+            'symbol': SYMBOL_B
         }
 
         response = self.client.get("/api/positions", query_string=query_params)
         self.assert200(response)
         data = json.loads(response.data.decode())
         self.assertEqual(
-            Position.query.filter_by(symbol=self.TICKERS[0]).count(),
+            Position.query.filter_by(symbol=SYMBOL_B).count(),
             len(data["items"])
         )
-        self.assertEqual(SERIALIZATION_DICT, set(data.get("items")[0]))
+        self.assertEqual(
+            position_serialization_dict, set(data.get("items")[0])
+        )
+
+    def test_list_orders_with_identifier_query_params(self):
+        query_params = {
+            'identifier': "test"
+        }
+
+        response = self.client.get("/api/positions", query_string=query_params)
+        self.assert200(response)
+        data = json.loads(response.data.decode())
+        self.assertEqual(
+            Position.query.count(),
+            len(data["items"])
+        )
+        self.assertEqual(
+            position_serialization_dict, set(data.get("items")[0])
+        )
+
+        query_params = {
+            'identifier': "random"
+        }
+
+        response = self.client.get("/api/positions", query_string=query_params)
+        self.assert200(response)
+        data = json.loads(response.data.decode())
+        self.assertEqual(0, len(data["items"]))

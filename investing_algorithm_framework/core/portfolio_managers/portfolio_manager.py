@@ -5,11 +5,12 @@ from investing_algorithm_framework.core.identifier import Identifier
 from investing_algorithm_framework.core.market_identifier import \
     MarketIdentifier
 from investing_algorithm_framework.core.models import Position, Order, \
-    Portfolio, db, OrderSide
+    Portfolio, db, OrderSide, OrderType, OrderStatus
 
 
 class PortfolioManager(ABC, Identifier, MarketIdentifier):
-    trading_currency = None
+    trading_symbol = None
+    market = "test"
 
     @abstractmethod
     def get_initial_unallocated_size(self):
@@ -19,19 +20,26 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
         self._initialize_portfolio()
 
     def _initialize_portfolio(self):
-        portfolio = self.get_portfolio()
+        portfolio = self.get_portfolio(False)
 
         if portfolio is None:
             portfolio = Portfolio(
                 identifier=self.identifier,
-                trading_symbol=self.trading_currency,
+                trading_symbol=self.trading_symbol,
                 unallocated=self.get_initial_unallocated_size(),
                 market=self.get_market()
             )
             portfolio.save(db)
 
-    def get_portfolio(self) -> Portfolio:
-        return Portfolio.query.filter_by(identifier=self.identifier).first()
+    def get_portfolio(self, throw_exception=True) -> Portfolio:
+        portfolio = Portfolio.query\
+            .filter_by(identifier=self.identifier)\
+            .first()
+
+        if portfolio is None and throw_exception:
+            raise OperationalException("No portfolio model implemented")
+
+        return portfolio
 
     @property
     def unallocated(self):
@@ -103,7 +111,7 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
 
         query_set = Order.query \
             .filter(Order.position_id.in_(positions)) \
-            .filter_by(executed=False)
+            .filter_by(status=OrderStatus.PENDING.value)
 
         if lazy:
             return query_set
@@ -112,28 +120,27 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
 
     def create_order(
             self,
-            order_type,
             symbol,
             amount=None,
             price=None,
+            order_type=OrderType.LIMIT.value,
             order_side=OrderSide.BUY.value,
+            context=None,
             validate_pair=True,
-            context=None
     ):
 
         if context is None:
             from investing_algorithm_framework import current_app
             context = current_app.algorithm
 
-        return self.get_portfolio().create_buy_order(
-            self,
+        return self.get_portfolio().create_order(
             context,
             order_type,
             symbol,
             amount,
             price,
             order_side,
-            validate_pair,
+            validate_pair
         )
 
     def add_order(self, order):

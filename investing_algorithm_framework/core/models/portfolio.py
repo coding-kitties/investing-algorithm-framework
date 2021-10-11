@@ -4,7 +4,8 @@ from sqlalchemy import UniqueConstraint
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import validates
 
-from investing_algorithm_framework.core.models import db, OrderSide, Order
+from investing_algorithm_framework.core.models import db, OrderSide, Order, \
+    OrderStatus, OrderType
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models.model_extension \
     import ModelExtension
@@ -87,6 +88,7 @@ class Portfolio(db.Model, ModelExtension):
         self.identifier = identifier
         self.trading_symbol = trading_symbol
         self.unallocated = unallocated
+        self.realized = unallocated
         self.market = market
         super(Portfolio, self).__init__(**kwargs)
 
@@ -97,9 +99,9 @@ class Portfolio(db.Model, ModelExtension):
         position_ids = self.positions.with_entities(Position.id)
 
         orders = Order.query \
-            .filter_by(open=True) \
             .filter_by(order_side=OrderSide.BUY.value) \
-            .filter_by(executed=True) \
+            .filter_by(status=OrderStatus.SUCCESS.value) \
+            .filter_by(closing_price=None)\
             .filter(Order.position_id.in_(position_ids)) \
             .all()
 
@@ -117,8 +119,8 @@ class Portfolio(db.Model, ModelExtension):
 
         orders = Order.query \
             .filter_by(order_side=OrderSide.BUY.value) \
-            .filter_by(open=True) \
-            .filter_by(executed=True) \
+            .filter_by(status=OrderStatus.SUCCESS.value) \
+            .filter_by(closing_price=None)\
             .filter(Order.position_id.in_(position_ids)) \
             .all()
 
@@ -174,22 +176,22 @@ class Portfolio(db.Model, ModelExtension):
         db.session.commit()
 
     def create_order(
-            self,
-            context,
-            order_type,
-            symbol,
-            amount=None,
-            price=None,
-            order_side=OrderSide.BUY.value,
-            validate_pair=True,
-
+        self,
+        context,
+        order_type,
+        symbol,
+        amount=None,
+        price=None,
+        order_side=OrderSide.BUY.value,
+        validate_pair=True,
     ):
+
         market_service = context.get_market_service(self.market)
 
         if validate_pair:
 
             # Check if pair exists
-            if not market_service.pair_exist(
+            if not market_service.pair_exists(
                 symbol, self.trading_symbol
             ):
                 raise OperationalException(
@@ -199,24 +201,47 @@ class Portfolio(db.Model, ModelExtension):
 
         from investing_algorithm_framework.core.models import Order
 
-        if OrderSide.BUY.equals(order_side):
-            order = Order(
-                target_symbol=symbol,
-                trading_symbol=self.trading_symbol,
-                amount=amount,
-                price=price,
-                order_type=order_type,
-                order_side=OrderSide.BUY.value
-            )
+        if OrderType.MARKET.equals(order_type):
+
+            if OrderSide.BUY.equals(order_side):
+                order = Order(
+                    target_symbol=symbol,
+                    trading_symbol=self.trading_symbol,
+                    amount_trading_symbol=amount,
+                    price=price,
+                    order_type=order_type,
+                    order_side=OrderSide.BUY.value
+                )
+            else:
+                order = Order(
+                    target_symbol=self.trading_symbol,
+                    trading_symbol=symbol,
+                    amount_trading_symbol=amount,
+                    price=price,
+                    order_type=order_type,
+                    order_side=OrderSide.SELL.value
+                )
         else:
-            order = Order(
-                target_symbol=self.trading_symbol,
-                trading_symbol=symbol,
-                amount=amount,
-                price=price,
-                order_type=order_type,
-                order_side=OrderSide.SELL.value
-            )
+            if OrderSide.BUY.equals(order_side):
+                order = Order(
+                    target_symbol=symbol,
+                    trading_symbol=self.trading_symbol,
+                    amount=amount,
+                    amount_trading_symbol=amount * price,
+                    price=price,
+                    order_type=order_type,
+                    order_side=OrderSide.BUY.value
+                )
+            else:
+                order = Order(
+                    target_symbol=self.trading_symbol,
+                    trading_symbol=symbol,
+                    amount=amount,
+                    amount_trading_symbol=amount * price,
+                    price=price,
+                    order_type=order_type,
+                    order_side=OrderSide.SELL.value
+                )
 
         return order
 

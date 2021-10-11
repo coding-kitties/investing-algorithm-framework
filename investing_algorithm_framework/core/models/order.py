@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from random import randint
 
@@ -7,10 +8,13 @@ from sqlalchemy.orm.base import NO_VALUE
 from sqlalchemy import event
 
 from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.models import db, OrderType
+from investing_algorithm_framework.core.models import db, OrderType, \
+    OrderStatus
 from investing_algorithm_framework.core.models.model_extension \
     import ModelExtension
 from .order_side import OrderSide
+
+logger = logging.getLogger(__name__)
 
 
 def random_id():
@@ -49,8 +53,6 @@ class Order(db.Model, ModelExtension):
 
         Updated post-execution:
 
-        - completed: Flag indicating whether a trade has finished
-        - successful: Flag indicating whether a trade was completed successfully
         for all child orders
         - completed_at: DateTime the order was marked as completed
 
@@ -88,6 +90,8 @@ class Order(db.Model, ModelExtension):
     price = db.Column(db.Float)
     closing_price = db.Column(db.Float)
     amount = db.Column(db.Float)
+    amount_trading_symbol = db.Column(db.Float)
+    status = db.Column(db.String)
 
     position_id = db.Column(
         db.Integer, db.ForeignKey('positions.id')
@@ -103,9 +107,6 @@ class Order(db.Model, ModelExtension):
     )
 
     # Post execution
-    open = db.Column(db.Boolean)
-    successful = db.Column(db.Boolean, default=False)
-    executed = db.Column(db.Boolean, default=False)
     executed_at = db.Column(db.DateTime)
 
     def __init__(
@@ -115,7 +116,8 @@ class Order(db.Model, ModelExtension):
             target_symbol,
             trading_symbol,
             price,
-            amount,
+            amount=None,
+            amount_trading_symbol=None,
             **kwargs
     ):
         self.order_side = OrderSide.from_string(order_side).value
@@ -124,7 +126,9 @@ class Order(db.Model, ModelExtension):
         self.trading_symbol = trading_symbol
         self.price = price
         self.amount = amount
+        self.amount_trading_symbol = amount_trading_symbol
         self.open = True
+        self.status = None
 
         super(Order, self).__init__(**kwargs)
 
@@ -147,8 +151,7 @@ class Order(db.Model, ModelExtension):
     @property
     def current_price(self):
         from investing_algorithm_framework import current_app
-
-        market_service = current_app.algorithm\
+        market_service = current_app.algorithm \
             .get_market_service(self.position.portfolio.market)
 
         current_price = self.price
@@ -162,10 +165,11 @@ class Order(db.Model, ModelExtension):
                 current_price = market_service.get_price(
                     self.target_symbol, self.trading_symbol
                 )
-        except Exception:
+        except Exception as e:
+            logger.error(e)
             return current_price
 
-        return current_price.price
+        return current_price
 
     @hybrid_property
     def delta(self):
@@ -174,13 +178,12 @@ class Order(db.Model, ModelExtension):
         if OrderSide.SELL.equals(self.order_side):
             return 0
 
-        # Current value is 0 when the buy order is not executed
-        if not self.executed:
-            return 0
+        if self.closing_price:
+            return (self.closing_price * self.amount) - \
+                   (self.price * self.amount)
 
-        # Orders that are closed have no delta cost
-        if not self.open:
-            return self.closing_price - self.price
+        if not OrderStatus.SUCCESS.equals(self.status):
+            return 0
 
         price = self.current_price
 
@@ -196,7 +199,7 @@ class Order(db.Model, ModelExtension):
         if OrderSide.SELL.equals(self.order_side):
             return 0
 
-        if not self.executed:
+        if not OrderStatus.SUCCESS.equals(self.status):
             return 0
 
         portfolio = self.position.portfolio
@@ -212,10 +215,7 @@ class Order(db.Model, ModelExtension):
         if OrderSide.SELL.equals(self.order_side):
             return 0
 
-        if not self.open:
-            return 0
-
-        if not self.executed:
+        if not OrderStatus.SUCCESS.equals(self.status):
             return 0
 
         return self.amount / self.position.amount * 100
@@ -226,12 +226,12 @@ class Order(db.Model, ModelExtension):
         if OrderSide.SELL.equals(self.order_side):
             return 0
 
-        if not self.executed:
+        if not OrderStatus.CLOSED.equals(self.status):
             return 0
 
         portfolio = self.position.portfolio
 
-        return (self.amount * self.price) / portfolio.realized * 100
+        return (self.amount * self.closing_price) / portfolio.realized * 100
 
     @hybrid_property
     def current_value(self):
@@ -240,39 +240,55 @@ class Order(db.Model, ModelExtension):
         if OrderSide.SELL.equals(self.order_side):
             return 0
 
-        # Current value is 0 when the buy order is not executed
-        if not self.executed:
+        if not OrderStatus.SUCCESS.equals(self.status):
             return 0
-
-        if not self.open:
-            return self.closing_price * self.amount
 
         price = self.current_price
         return price * self.amount
 
     def set_executed(self):
 
+        if not OrderStatus.PENDING.equals(self.status) \
+                and self.status is not None:
+            return
+
         if OrderSide.BUY.equals(self.order_side):
-            self.executed = True
+            self.status = OrderStatus.SUCCESS.value
             self.executed_at = datetime.utcnow()
-            self.open = True
+
+            self.position.cost += self.amount * self.price
             self.position.amount += self.amount
+
+            if OrderType.MARKET.equals(self.order_type):
+                self.position.portfolio.unallocated -= \
+                    self.amount_trading_symbol
+
         else:
-            self.executed = True
+            self.status = OrderStatus.SUCCESS.value
             self.executed_at = datetime.utcnow()
-            self.open = False
             self.position.amount -= self.amount
+
+        db.session.commit()
+
+    def set_closed(self, sell_order):
+        self.status = OrderStatus.CLOSED.value
+        self.closing_price = sell_order.price
+        db.session.commit()
+
+    def set_pending(self):
+        self.status = OrderStatus.PENDING.value
+        db.session.commit()
 
     def update(self, db, data, commit=True, **kwargs):
         self.updated_at = datetime.utcnow()
-        super(Order, self).update(db, commit, **kwargs)
+        super(Order, self).update(db, data, commit, **kwargs)
 
     def copy(self, amount=None):
 
         if amount is None:
             amount = self.amount
 
-        algorithm_order = Order(
+        order = Order(
             amount=amount,
             price=self.price,
             order_side=self.order_side,
@@ -281,23 +297,22 @@ class Order(db.Model, ModelExtension):
             trading_symbol=self.trading_symbol
         )
 
-        algorithm_order.order_reference = self.order_reference
-        algorithm_order.open = self.open
-        algorithm_order.executed = self.executed
-        algorithm_order.executed_at = self.executed_at
-        algorithm_order.updated_at = self.updated_at
-        algorithm_order.created_at = self.created_at
-        algorithm_order.closing_price = self.closing_price
-        algorithm_order.successful = self.successful
+        order.order_reference = self.order_reference
+        order.status = self.status
+        order.amount_trading_symbol = order.amount_trading_symbol
+        order.executed_at = self.executed_at
+        order.updated_at = self.updated_at
+        order.created_at = self.created_at
+        order.closing_price = self.closing_price
 
-        return algorithm_order
+        return order
 
     def split(self, amount):
 
         if not OrderSide.BUY.equals(self.order_side):
             raise OperationalException("Sell order can't be split")
 
-        if not self.executed or not self.open:
+        if not OrderStatus.SUCCESS.equals(self.status):
             raise OperationalException("Order can't be split")
 
         if amount <= 0 or amount >= self.amount:
@@ -310,34 +325,44 @@ class Order(db.Model, ModelExtension):
 
         return self, algorithm_order
 
+    def save(self, db, commit=True):
+
+        if self.position is None:
+            raise OperationalException(
+                "Can't save order that is not linked to an position"
+            )
+
+        super(Order, self).save(db, commit)
+
     def __repr__(self):
         return self.repr(
             id=self.id,
-            open=self.open,
+            status=self.status,
             order_side=self.order_side,
             target_symbol=self.target_symbol,
             trading_symbol=self.trading_symbol,
             amount=self.amount,
+            amount_trading_symbol=self.amount_trading_symbol,
             price=self.price,
             created_at=self.created_at,
         )
 
 
-@event.listens_for(Order.open, "set")
+@event.listens_for(Order.status, "set")
 def sync_portfolio_and_position(target, value, old_value, initiator):
     if old_value is NO_VALUE:
         return
 
     if OrderSide.SELL.equals(target.order_side):
 
-        if old_value and not value:
+        if (old_value is None or OrderStatus.PENDING.equals(old_value)) and \
+                OrderStatus.SUCCESS.equals(value):
             sell_amount = target.amount
 
             # Close open buy orders
             buy_orders = target.position.orders \
-                .filter_by(open=True) \
                 .filter_by(order_side=OrderSide.BUY.value) \
-                .filter_by(executed=True) \
+                .filter_by(status=OrderStatus.SUCCESS.value) \
                 .order_by(Order.created_at) \
                 .all()
 
@@ -349,28 +374,30 @@ def sync_portfolio_and_position(target, value, old_value, initiator):
 
                 if buy_order.amount <= sell_amount:
                     sell_amount -= buy_order.amount
-                    buy_order.closing_price = target.price
-                    buy_order.open = False
+                    buy_order.set_closed(target)
                     closed_orders.append(buy_order)
                 else:
                     remainder = buy_order.amount - sell_amount
                     og, split = buy_order.split(remainder)
-                    og.closing_price = target.price
-                    og.open = False
+                    og.set_closed(target)
                     closed_orders.append(og)
                     sell_amount = 0
 
                 index += 1
 
             portfolio = target.position.portfolio
+            position = target.position
 
             unallocated = 0
             realized = 0
+            cost = 0
 
             for closed_order in closed_orders:
                 unallocated += closed_order.current_value
                 realized += closed_order.delta * closed_order.amount
+                cost += closed_order.amount * closed_order.price
 
+            position.cost -= cost
             portfolio.unallocated += unallocated
             portfolio.realized += realized
             db.session.commit()

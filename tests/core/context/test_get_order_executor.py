@@ -9,7 +9,7 @@ class MyOrderExecutorOne(OrderExecutor):
                             **kwargs) -> bool:
         pass
 
-    def update_order_status(self, order: Order, algorithm_context,
+    def get_order_status(self, order: Order, algorithm_context,
                             **kwargs) -> bool:
         pass
 
@@ -26,7 +26,7 @@ class MyOrderExecutorTwo(OrderExecutor):
                             **kwargs) -> bool:
         pass
 
-    def update_order_status(self, order: Order, algorithm_context,
+    def get_order_status(self, order: Order, algorithm_context,
                             **kwargs) -> bool:
         pass
 
