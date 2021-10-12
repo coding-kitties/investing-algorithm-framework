@@ -17,3 +17,20 @@ order_serialization_dict = {
 position_serialization_dict = {
     'symbol', 'amount', 'id', 'orders', 'identifier'
 }
+
+portfolio_serialization_dict = {
+    'trading_symbol',
+    'updated_at',
+    'allocated',
+    'realized',
+    'unallocated_percentage',
+    'created_at',
+    'delta',
+    'unallocated',
+    'id',
+    'identifier',
+    'allocated_percentage',
+    'market',
+    'positions',
+    'orders',
+}

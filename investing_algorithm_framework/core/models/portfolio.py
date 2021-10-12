@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import UniqueConstraint, or_
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import validates
+
 
 from investing_algorithm_framework.core.models import db, OrderSide, Order, \
     OrderStatus, OrderType
@@ -109,6 +110,7 @@ class Portfolio(db.Model, ModelExtension):
 
         for order in orders:
             delta += order.delta
+
         return delta
 
     @hybrid_property
@@ -119,7 +121,7 @@ class Portfolio(db.Model, ModelExtension):
 
         orders = Order.query \
             .filter_by(order_side=OrderSide.BUY.value) \
-            .filter_by(status=OrderStatus.SUCCESS.value) \
+            .filter(or_(Order.status == OrderStatus.SUCCESS.value, Order.status == OrderStatus.PENDING.value, Order.status == None)) \
             .filter_by(closing_price=None)\
             .filter(Order.position_id.in_(position_ids)) \
             .all()
@@ -180,8 +182,8 @@ class Portfolio(db.Model, ModelExtension):
         context,
         order_type,
         symbol,
-        amount=None,
         price=None,
+        amount=None,
         order_side=OrderSide.BUY.value,
         validate_pair=True,
     ):

@@ -1,6 +1,6 @@
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import OrderSide, Portfolio, \
-    OrderType
+    OrderType, db
 from tests.resources import TestBase, SYMBOL_A, SYMBOL_A_PRICE, \
     TestOrderAndPositionsObjectsMixin, SYMBOL_B, SYMBOL_B_PRICE, \
     set_symbol_a_price, set_symbol_b_price
@@ -10,6 +10,90 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
     def test_creation(self):
         self.assertEqual(1, Portfolio.query.count())
+
+    def test_scenario(self):
+        portfolio = self.algo_app.algorithm.get_portfolio_manager()\
+            .get_portfolio()
+
+        initial_unallocated = portfolio.unallocated
+
+        self.assertEqual(1000, initial_unallocated)
+        self.assertEqual(0, portfolio.allocated)
+        self.assertEqual(0, portfolio.allocated_percentage)
+        self.assertEqual(100, portfolio.unallocated_percentage)
+        self.assertEqual(0, portfolio.delta)
+        self.assertEqual(0, portfolio.positions.count())
+
+        order = self.algo_app.algorithm.create_limit_buy_order(
+            "test",
+            SYMBOL_A,
+            SYMBOL_A_PRICE,
+            10,
+            True
+        )
+        order.save(db)
+
+        portfolio = self.algo_app.algorithm.get_portfolio_manager()\
+            .get_portfolio()
+
+        self.assertEqual(
+            initial_unallocated - (SYMBOL_A_PRICE * 10), portfolio.unallocated
+        )
+        self.assertEqual(100, portfolio.allocated)
+        self.assertEqual(10, portfolio.allocated_percentage)
+        self.assertNotEqual(100, portfolio.unallocated_percentage)
+        self.assertEqual(0, portfolio.delta)
+        self.assertEqual(1, portfolio.positions.count())
+
+        order = self.algo_app.algorithm.create_limit_buy_order(
+            "test",
+            SYMBOL_B,
+            SYMBOL_B_PRICE,
+            10,
+            True
+        )
+        order.save(db)
+        order.set_executed()
+
+        portfolio = self.algo_app.algorithm.get_portfolio_manager()\
+            .get_portfolio()
+
+        self.assertEqual(
+            initial_unallocated -
+            (SYMBOL_A_PRICE * 10) - (SYMBOL_B_PRICE * 10),
+            portfolio.unallocated
+        )
+
+        self.assertEqual((SYMBOL_B_PRICE * 10) + (SYMBOL_A_PRICE * 10), portfolio.allocated)
+        self.assertEqual(
+            (((SYMBOL_B_PRICE * 10) + (SYMBOL_A_PRICE * 10))/
+             (portfolio.unallocated + portfolio.allocated)) * 100,
+            portfolio.allocated_percentage
+        )
+        self.assertNotEqual(100, portfolio.unallocated_percentage)
+        self.assertEqual(0, portfolio.delta)
+        self.assertEqual(2, portfolio.positions.count())
+        self.assertEqual(1000, portfolio.realized)
+
+        set_symbol_b_price(SYMBOL_B_PRICE * 1.1)
+
+        order = self.algo_app.algorithm.create_limit_sell_order(
+            "test",
+            SYMBOL_B,
+            SYMBOL_B_PRICE * 1.1,
+            10,
+            True
+        )
+        order.save(db)
+
+        order.set_executed()
+        self.assertEqual(2, portfolio.positions.count())
+        self.assertEqual(
+            0, portfolio.positions.filter_by(symbol=SYMBOL_B).first().amount
+        )
+        self.assertEqual(0, portfolio.delta)
+        self.assertTrue(portfolio.realized > initial_unallocated)
+        self.assertEqual(1020, portfolio.realized)
 
     def test_sell_order_creation(self):
         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
@@ -273,11 +357,8 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager.add_order(order_a)
         portfolio_manager.add_order(order_b)
 
-        self.assertEqual(0, portfolio.allocated)
+        self.assertNotEqual(0, portfolio.allocated)
         self.assertEqual(len(portfolio_manager.get_positions()), 2)
-
-        # Before executed
-        self.assertEqual(0, portfolio.allocated)
 
         # After executed
         order_a.set_executed()
@@ -315,11 +396,11 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager.add_order(order_a)
         portfolio_manager.add_order(order_b)
 
-        self.assertEqual(0, portfolio.allocated_percentage)
+        self.assertNotEqual(0, portfolio.allocated_percentage)
         self.assertEqual(len(portfolio_manager.get_positions()), 2)
 
         # Before executed
-        self.assertEqual(0, portfolio.allocated)
+        self.assertNotEqual(0, portfolio.allocated)
 
         # After executed
         order_a.set_executed()
