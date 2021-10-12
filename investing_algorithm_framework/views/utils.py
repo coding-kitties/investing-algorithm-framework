@@ -41,7 +41,6 @@ def create_paginated_response(query_set, serializer):
     :param serializer: an instance of an marshmallow schema
     :return: a json of paginated query
     """
-
     paginated_query_set = query_set.paginate()
 
     return jsonify(

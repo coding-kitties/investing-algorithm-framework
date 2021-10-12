@@ -121,8 +121,8 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
     def create_order(
             self,
             symbol,
-            amount=None,
             price=None,
+            amount=None,
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.BUY.value,
             context=None,
@@ -134,13 +134,13 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
             context = current_app.algorithm
 
         return self.get_portfolio().create_order(
-            context,
-            order_type,
-            symbol,
-            amount,
-            price,
-            order_side,
-            validate_pair
+            context=context,
+            order_type=order_type,
+            symbol=symbol,
+            price=price,
+            amount=amount,
+            order_side=order_side,
+            validate_pair=validate_pair
         )
 
     def add_order(self, order):

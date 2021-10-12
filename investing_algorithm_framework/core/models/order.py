@@ -240,6 +240,12 @@ class Order(db.Model, ModelExtension):
         if OrderSide.SELL.equals(self.order_side):
             return 0
 
+        if self.status is None:
+            return self.price * self.amount
+
+        if OrderStatus.PENDING.equals(self.status):
+            return self.price * self.amount
+
         if not OrderStatus.SUCCESS.equals(self.status):
             return 0
 
@@ -248,8 +254,9 @@ class Order(db.Model, ModelExtension):
 
     def set_executed(self):
 
-        if not OrderStatus.PENDING.equals(self.status) \
-                and self.status is not None:
+        if not OrderStatus.PENDING.equals(self.status) and \
+                self.status is not None:
+
             return
 
         if OrderSide.BUY.equals(self.order_side):
@@ -357,6 +364,7 @@ def sync_portfolio_and_position(target, value, old_value, initiator):
 
         if (old_value is None or OrderStatus.PENDING.equals(old_value)) and \
                 OrderStatus.SUCCESS.equals(value):
+
             sell_amount = target.amount
 
             # Close open buy orders
@@ -394,7 +402,7 @@ def sync_portfolio_and_position(target, value, old_value, initiator):
 
             for closed_order in closed_orders:
                 unallocated += closed_order.current_value
-                realized += closed_order.delta * closed_order.amount
+                realized += closed_order.delta
                 cost += closed_order.amount * closed_order.price
 
             position.cost -= cost
