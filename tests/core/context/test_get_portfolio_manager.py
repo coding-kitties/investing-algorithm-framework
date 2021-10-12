@@ -41,3 +41,12 @@ class Test(TestBase):
             my_portfolio_manager_two.identifier,
             MyPortfolioManagerTwo.identifier
         )
+
+    def test_without_identification(self):
+        pass
+
+    def test_without_portfolio_manager_registered(self):
+        pass
+
+    def test_retrieve_multiple(self):
+        pass

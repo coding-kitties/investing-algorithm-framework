@@ -1,8 +1,9 @@
-from .portfolio_manager import PortfolioManager
-from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.configuration.constants import BINANCE
+from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.mixins import \
     BinancePortfolioManagerMixin
+from investing_algorithm_framework.core.portfolio_managers import \
+    PortfolioManager
 
 
 class BinancePortfolioManager(BinancePortfolioManagerMixin, PortfolioManager):

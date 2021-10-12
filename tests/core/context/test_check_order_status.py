@@ -1,52 +1,23 @@
-from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
-from investing_algorithm_framework import PortfolioManager, OrderExecutor, \
-    Order, db
-
-
-class PortfolioManagerOne(PortfolioManager):
-    trading_currency = "USDT"
-    identifier = "KRAKEN"
-
-    def get_initial_unallocated_size(self) -> float:
-        return 1000
-
-
-class OrderExecutorOne(OrderExecutor):
-    identifier = "KRAKEN"
-
-    def execute_limit_order(self, order: Order, algorithm_context,
-                            **kwargs) -> bool:
-        return order
-
-    def execute_market_order(self, order: Order, algorithm_context,
-                             **kwargs) -> bool:
-        return order
-
-    def update_order_status(self, order: Order, algorithm_context,
-                            **kwargs) -> bool:
-        order.executed = True
-        db.session.commit()
+from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin, \
+    SYMBOL_A, SYMBOL_A_PRICE
 
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
-    def setUp(self) -> None:
+    def setUp(self):
         super(Test, self).setUp()
-        self.portfolio_manager_one = PortfolioManagerOne()
-        self.order_executor = OrderExecutorOne()
-        self.algo_app.algorithm.add_portfolio_manager(
-            self.portfolio_manager_one
+
+        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
+
+        self.create_buy_order(
+            1,
+            SYMBOL_A,
+            SYMBOL_A_PRICE,
+            portfolio_manager
         )
-        self.algo_app.algorithm.add_order_executor(
-            self.order_executor
-        )
-        self.algo_app.algorithm.start()
-        self.create_buy_orders(5, self.TICKERS, self.portfolio_manager_one)
-        self.create_sell_orders(2, self.TICKERS, self.portfolio_manager_one)
-        self.algo_app.algorithm.start()
 
     def test(self) -> None:
-        self.algo_app.algorithm.check_order_status("KRAKEN")
+        self.algo_app.algorithm.check_order_status("test")
         self.assertEqual(
-            0, len(self.algo_app.algorithm.get_pending_orders("KRAKEN"))
+            0, len(self.algo_app.algorithm.get_pending_orders("test"))
         )

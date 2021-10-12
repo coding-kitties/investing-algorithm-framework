@@ -1,10 +1,11 @@
 from investing_algorithm_framework.configuration.constants import BINANCE
 from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.order_executors import OrderExecutor
 from investing_algorithm_framework.core.mixins import BinanceOrderExecutorMixin
+from investing_algorithm_framework.core.order_executors import OrderExecutor
 
 
 class BinanceOrderExecutor(BinanceOrderExecutorMixin, OrderExecutor):
+
     identifier = BINANCE
 
     def __init__(self, identifier: str = None):

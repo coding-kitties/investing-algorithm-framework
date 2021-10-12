@@ -1,18 +1,22 @@
 import ccxt
 import logging
-from investing_algorithm_framework.exchanges.exchange import ExchangeClient
+from investing_algorithm_framework.core.market_services.market_service \
+    import MarketService
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.mixins import \
     ApiSecretKeySpecifierMixin
+
 
 BINANCE_CCXT_ID = "binance"
 logger = logging.getLogger(__name__)
 
 
-class BinanceExchangeClient(ExchangeClient, ApiSecretKeySpecifierMixin):
+class BinanceMarketService(MarketService, ApiSecretKeySpecifierMixin):
+    market = "BINANCE"
     exchange = None
 
     def __init__(self, api_key: str = None, secret_key: str = None):
+        super().__init__()
 
         if api_key is not None:
             self.api_key = api_key
@@ -26,6 +30,9 @@ class BinanceExchangeClient(ExchangeClient, ApiSecretKeySpecifierMixin):
             'apiKey': self.get_api_key(),
             'secret': self.get_secret_key(),
         })
+
+    def pair_exists(self, target_symbol: str, trading_symbol: str):
+        pass
 
     def get_ticker(self, target_symbol: str, trading_symbol: str):
 

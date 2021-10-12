@@ -3,9 +3,9 @@ from sqlalchemy.orm.exc import DetachedInstanceError
 
 class ModelExtension:
 
-    def update(self, db, commit=True, **kwargs):
+    def update(self, db, data, commit=True, **kwargs):
 
-        for attr, value in kwargs.items():
+        for attr, value in data.items():
             setattr(self, attr, value)
 
         if commit:

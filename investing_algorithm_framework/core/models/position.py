@@ -2,8 +2,10 @@ from random import randint
 
 from sqlalchemy import UniqueConstraint, event
 from sqlalchemy.orm import relationship, validates
+from sqlalchemy.ext.hybrid import hybrid_property
 
-from investing_algorithm_framework.core.models import db, OrderSide
+from investing_algorithm_framework.core.models import db, OrderSide, \
+    OrderStatus, OrderType
 from investing_algorithm_framework.core.models.model_extension \
     import ModelExtension
 
@@ -47,6 +49,7 @@ class Position(db.Model, ModelExtension):
     )
 
     amount = db.Column(db.Float)
+    cost = db.Column(db.Float)
 
     # Relationships
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'))
@@ -60,6 +63,7 @@ class Position(db.Model, ModelExtension):
     def __init__(self, symbol):
         self.symbol = symbol
         self.amount = 0
+        self.cost = 0
 
     @validates('id', 'symbol')
     def _write_once(self, key, value):
@@ -67,6 +71,19 @@ class Position(db.Model, ModelExtension):
         if existing is not None:
             raise ValueError("{} is write-once".format(key))
         return value
+
+    @hybrid_property
+    def delta(self):
+        orders = self.orders\
+            .filter_by(order_side=OrderSide.BUY.value) \
+            .filter_by(status=OrderStatus.SUCCESS.value) \
+            .all()
+
+        delta = 0
+
+        for order in orders:
+            delta += order.delta
+        return delta
 
     def __repr__(self):
         return self.repr(
@@ -79,7 +96,17 @@ class Position(db.Model, ModelExtension):
 @event.listens_for(Position.orders, 'append')
 def parent_child_relation_inserted(position, order, target):
 
-    if OrderSide.SELL.equals(order.order_side):
-        position.amount -= order.amount
-    else:
-        position.amount += order.amount
+    if OrderSide.BUY.equals(order.order_side):
+
+        # Check if order id reference not already exists (order split)
+        # If it exists, this would mean that the order is a split order
+        # and therefore it is not needed to update the portfolio or position
+        if order.order_reference and position.orders\
+                .filter_by(
+                    order_reference=order.order_reference
+                ).first() is not None:
+
+            return
+
+        if not OrderType.MARKET.equals(order.order_type):
+            position.portfolio.unallocated -= (order.amount * order.price)

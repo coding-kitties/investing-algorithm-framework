@@ -69,6 +69,10 @@ class App(metaclass=Singleton):
             if self._resource_directory is not None:
                 self._config[RESOURCES_DIRECTORY] = self._resource_directory
 
+            if RESOURCES_DIRECTORY not in self._config \
+                    or self._config[RESOURCES_DIRECTORY] is None:
+                raise OperationalException("Resource directory not specified")
+
             self._configured = True
 
     def _initialize_flask_app(self):

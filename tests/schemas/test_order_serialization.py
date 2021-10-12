@@ -1,17 +1,19 @@
 from investing_algorithm_framework.schemas import OrderSerializer
 from investing_algorithm_framework import Order, OrderSide, db
-from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
+from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin, \
+    SYMBOL_A, SYMBOL_A_PRICE
 
 serialization_dict = {
     'id',
+    'order_reference',
     'price',
-    'broker',
+    'identifier',
     'position_id',
     'amount',
+    'amount_trading_symbol',
     'trading_symbol',
-    'executed',
-    'successful',
-    'executed',
+    'executed_at',
+    'status',
     'target_symbol',
     'order_type',
     'order_side'
@@ -23,16 +25,12 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
     def setUp(self):
         super(Test, self).setUp()
 
-        for i in range(0, 10):
-            order = Order(
-                target_symbol="DOT",
-                trading_symbol="USDT",
-                price=10,
-                amount=10 * i,
-                order_side=OrderSide.BUY.value
-            )
-
-            order.save(db)
+        self.create_buy_order(
+            10,
+            SYMBOL_A,
+            SYMBOL_A_PRICE,
+            self.algo_app.algorithm.get_portfolio_manager()
+        )
 
     def test(self):
         order = Order.query.first()

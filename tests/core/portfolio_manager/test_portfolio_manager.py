@@ -1,166 +1,104 @@
-from investing_algorithm_framework import PortfolioManager, Order, \
-    Position, OrderSide, Portfolio
-from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
-
-
-class MyPortfolioManagerOne(PortfolioManager):
-    identifier = "KRAKEN"
-    trading_currency = "USDT"
-
-    def get_initial_unallocated_size(self) -> float:
-        return 50000
-
-
-class MyPortfolioManagerTwo(PortfolioManager):
-    identifier = "BINANCE"
-    trading_currency = "BUSD"
-
-    def get_initial_unallocated_size(self) -> float:
-        return 50000
+from investing_algorithm_framework import OrderSide, OrderType
+from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin, \
+    SYMBOL_A, SYMBOL_A_PRICE
 
 
 class Test(TestOrderAndPositionsObjectsMixin, TestBase):
 
-    def setUp(self) -> None:
-        super(Test, self).setUp()
-        self.portfolio_manager_one = MyPortfolioManagerOne()
-        self.portfolio_manager_two = MyPortfolioManagerTwo()
-        self.algo_app.algorithm.add_portfolio_manager(
-            self.portfolio_manager_one
-        )
-        self.algo_app.algorithm.add_portfolio_manager(
-            self.portfolio_manager_two
-        )
-        self.algo_app.algorithm.start()
-        self.create_test_objects(self.portfolio_manager_one)
-        self.create_test_objects(self.portfolio_manager_two)
-
-    def tearDown(self):
-        super(Test, self).tearDown()
-
     def test_id(self):
-        self.assertIsNotNone(self.portfolio_manager_one.identifier)
-        self.assertIsNotNone(self.portfolio_manager_one.get_id())
-        self.portfolio_manager_one.identifier = None
-
-        with self.assertRaises(AssertionError):
-            self.portfolio_manager_one.get_id()
+        self.assertIsNotNone(self.algo_app.algorithm.get_portfolio_manager())
 
     def test_initialize(self):
-        pass
+        self.assertTrue(
+            self.algo_app.algorithm.get_portfolio_manager().initialize_has_run
+        )
 
     def test_create_buy_order(self):
-        order = self.portfolio_manager_one.create_buy_order(
-            symbol=self.TICKERS[0],
-            amount=10,
-            price=10
+        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
+
+        order = portfolio_manager.create_order(
+            order_type=OrderType.LIMIT.value,
+            order_side=OrderSide.BUY.value,
+            amount=1,
+            symbol=SYMBOL_A,
+            price=SYMBOL_A_PRICE,
+            validate_pair=True,
+            context=None
         )
 
-        self.assertEqual(order.target_symbol, self.TICKERS[0])
-        self.assertEqual(
-            order.trading_symbol, self.portfolio_manager_one.trading_currency
-        )
+        self.assertIsNotNone(order)
+
         self.assertTrue(OrderSide.BUY.equals(order.order_side))
-        self.assertEqual(order.amount, 10)
-        self.assertEqual(order.price, 10)
+        self.assertTrue(OrderType.LIMIT.equals(order.order_type))
+        self.assertIsNone(order.order_reference)
+        self.assertEqual(1, order.amount)
+        self.assertEqual(SYMBOL_A_PRICE, order.price)
+        self.assertIsNone(order.status)
+        self.assertIsNone(order.executed_at)
 
     def test_create_sell_order(self):
-        order = self.portfolio_manager_one.create_sell_order(
-            symbol=self.TICKERS[0],
-            amount=10,
-            price=10
+        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
+
+        order = portfolio_manager.create_order(
+            order_type=OrderType.LIMIT.value,
+            order_side=OrderSide.SELL.value,
+            amount=1,
+            symbol=SYMBOL_A,
+            price=SYMBOL_A_PRICE,
+            validate_pair=True,
+            context=None
         )
 
-        self.assertEqual(order.trading_symbol, self.TICKERS[0])
-        self.assertEqual(
-            order.target_symbol, self.portfolio_manager_one.trading_currency
-        )
+        self.assertIsNotNone(order)
+
         self.assertTrue(OrderSide.SELL.equals(order.order_side))
-        self.assertEqual(order.amount, 10)
-        self.assertEqual(order.price, 10)
+        self.assertTrue(OrderType.LIMIT.equals(order.order_type))
+        self.assertIsNone(order.order_reference)
+        self.assertEqual(1, order.amount)
+        self.assertEqual(SYMBOL_A_PRICE, order.price)
+        self.assertIsNone(order.status)
+        self.assertIsNone(order.executed_at)
 
     def test_get_portfolio(self):
-        portfolio = self.portfolio_manager_one.get_portfolio()
+        portfolio = self.algo_app.algorithm.get_portfolio_manager().get_portfolio()
         self.assertIsNotNone(portfolio)
-        self.assertEqual(
-            portfolio,
-            Portfolio.query\
-                .filter_by(identifier=self.portfolio_manager_one.identifier)
-                .first()
-        )
 
     def test_get_orders(self):
-        my_portfolio_manager_one = self.algo_app.algorithm \
-            .get_portfolio_manager(MyPortfolioManagerOne.identifier)
+        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 
-        orders = my_portfolio_manager_one.get_orders()
-        self.assertEqual(20, len(orders))
+        orders = portfolio_manager.get_orders()
+        self.assertEqual(0, len(orders))
 
-        my_portfolio_manager_two = self.algo_app.algorithm \
-            .get_portfolio_manager(MyPortfolioManagerTwo.identifier)
-
-        orders = my_portfolio_manager_two.get_orders()
-        self.assertEqual(20, len(orders))
-
-        self.assertEqual(40, Order.query.count())
+        orders = portfolio_manager.get_orders(lazy=True)
+        self.assertEqual(0, orders.count())
 
     def test_get_positions(self):
-        my_portfolio_manager_one = self.algo_app.algorithm \
-            .get_portfolio_manager(MyPortfolioManagerOne.identifier)
+        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 
-        positions = my_portfolio_manager_one.get_positions()
+        positions = portfolio_manager.get_positions()
+        self.assertEqual(0, len(positions))
 
-        self.assertEqual(
-            Position.query
-                .filter_by(
-                    portfolio=self.portfolio_manager_one.get_portfolio()
-                )
-                .count(),
-            len(positions)
-        )
-
-        my_portfolio_manager_two = self.algo_app.algorithm \
-            .get_portfolio_manager(MyPortfolioManagerTwo.identifier)
-
-        positions = my_portfolio_manager_two.get_positions()
-
-        self.assertEqual(
-            Position.query
-                .filter_by(
-                    portfolio=self.portfolio_manager_two.get_portfolio()
-                )
-                .count(),
-            len(positions)
-        )
+        positions = portfolio_manager.get_positions(lazy=True)
+        self.assertEqual(0, positions.count())
 
     def test_get_pending_orders(self):
-        my_portfolio_manager_one = self.algo_app.algorithm \
-            .get_portfolio_manager(MyPortfolioManagerOne.identifier)
+        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 
-        positions = my_portfolio_manager_one.get_positions(lazy=True)
-
-        pending_orders = my_portfolio_manager_one.get_pending_orders(lazy=True)
-
-        self.assertEqual(
-            Order.query
-                .filter_by(executed=False)
-                .filter(Order.position_id.in_(
-                    positions.with_entities(Position.id)
-                ))
-                .count(),
-            pending_orders.count()
+        order = portfolio_manager.create_order(
+            order_type=OrderType.LIMIT.value,
+            order_side=OrderSide.BUY.value,
+            amount=1,
+            symbol=SYMBOL_A,
+            price=SYMBOL_A_PRICE,
+            validate_pair=True,
+            context=None
         )
 
-        positions = my_portfolio_manager_one\
-            .get_positions(symbol=self.TICKERS[0], lazy=True)
-        pending_orders = my_portfolio_manager_one\
-            .get_pending_orders(symbol=self.TICKERS[0], lazy=True)
+        portfolio_manager.add_order(order)
+        order.set_pending()
+
+        self.assertEqual(1, len(portfolio_manager.get_pending_orders()))
 
         self.assertEqual(
-            Order.query
-                .filter(Order.position_id.in_(
-                    positions.with_entities(Position.id)
-                ))
-                .count(),
-            pending_orders.count()
+            1, portfolio_manager.get_pending_orders(lazy=True).count()
         )

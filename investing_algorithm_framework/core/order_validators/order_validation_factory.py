@@ -5,5 +5,5 @@ from .default_order_validator import DefaultOrderValidator
 class OrderValidatorFactory:
 
     @staticmethod
-    def of(broker) -> OrderValidator:
+    def of(market) -> OrderValidator:
         return DefaultOrderValidator()

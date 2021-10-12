@@ -3,7 +3,8 @@ from typing import List
 
 from investing_algorithm_framework.configuration import Config
 from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.models import TimeUnit, OrderType
+from investing_algorithm_framework.core.models import TimeUnit, OrderType, \
+    db, OrderSide, OrderStatus
 from investing_algorithm_framework.core.workers import Scheduler
 from investing_algorithm_framework.extensions import scheduler
 
@@ -22,6 +23,7 @@ class AlgorithmContext:
     _running_workers = []
     _order_executors = {}
     _portfolio_managers = {}
+    _market_services = {}
     _initializer = None
     _initialized = False
 
@@ -136,7 +138,7 @@ class AlgorithmContext:
             import OrderExecutor
 
         assert isinstance(order_executor, OrderExecutor), (
-            'Initializer must be an instance of the OrderExecutor class'
+            'Provided object must be an instance of the OrderExecutor class'
         )
 
         if order_executor.identifier in self._order_executors:
@@ -148,14 +150,25 @@ class AlgorithmContext:
     def order_executors(self) -> List:
         order_executors = []
 
-        for order_executor in self.order_executors:
+        for order_executor in self._order_executors:
             order_executors.append(order_executor)
 
         return order_executors
 
     def get_order_executor(
-            self, identifier, throw_exception: bool = True
+            self, identifier=None, throw_exception: bool = True
     ):
+        if identifier is None:
+
+            if len(self._order_executors.keys()) == 0:
+                raise OperationalException(
+                    "Algorithm has no order executors registered"
+                )
+
+            return self._order_executors[
+                list(self._order_executors.keys())[0]
+            ]
+
         if identifier not in self._order_executors:
 
             if throw_exception:
@@ -173,7 +186,7 @@ class AlgorithmContext:
             import AlgorithmContextInitializer
 
         assert isinstance(initializer, AlgorithmContextInitializer), (
-            'Initializer must be an instance of the '
+            'Provided object must be an instance of the '
             'AlgorithmContextInitializer class'
         )
 
@@ -185,7 +198,7 @@ class AlgorithmContext:
             import PortfolioManager
 
         assert isinstance(portfolio_manager, PortfolioManager), (
-            'portfolio manager must be an instance of the '
+            'Provided object must be an instance of the '
             'AbstractPortfolioManager class'
         )
 
@@ -208,8 +221,19 @@ class AlgorithmContext:
         return portfolio_managers
 
     def get_portfolio_manager(
-            self, identifier: str, throw_exception: bool = True
+        self, identifier: str = None, throw_exception: bool = True
     ):
+
+        if identifier is None:
+
+            if len(self._portfolio_managers.keys()) == 0:
+                raise OperationalException(
+                    "Algorithm has no portfolio managers registered"
+                )
+
+            return self._portfolio_managers[
+                list(self._portfolio_managers.keys())[0]
+            ]
 
         if identifier not in self._portfolio_managers:
 
@@ -222,6 +246,43 @@ class AlgorithmContext:
             return None
 
         return self._portfolio_managers[identifier]
+
+    def add_market_service(self, market_service):
+        from investing_algorithm_framework.core.market_services \
+            import MarketService
+
+        assert isinstance(market_service, MarketService), (
+            'Provided object must be an instance of the MarketService class'
+        )
+
+        if market_service.market in self._market_services:
+            raise OperationalException("Market service market already exists")
+
+        self._market_services[market_service.market] = market_service
+
+    @property
+    def market_services(self) -> List:
+        market_services = []
+
+        for market_service in self._market_services:
+            market_services.append(market_service)
+
+        return market_services
+
+    def get_market_service(
+            self, market: str, throw_exception: bool = True
+    ):
+        if market not in self._market_services:
+
+            if throw_exception:
+                raise OperationalException(
+                    f"No corresponding market service found for "
+                    f"market {market}"
+                )
+
+            return None
+
+        return self._market_services[market]
 
     def set_algorithm_context_initializer(
             self, algorithm_context_initializer
@@ -239,54 +300,71 @@ class AlgorithmContext:
         self._initializer = algorithm_context_initializer
 
     def create_limit_buy_order(
-            self, identifier, symbol, price, amount, execute=True
+            self,
+            identifier: str,
+            symbol: str,
+            price: float,
+            amount: float,
+            execute=False
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
-        order = portfolio_manager.create_buy_order(
+        order = portfolio_manager.create_order(
             symbol, price, amount, OrderType.LIMIT.value
         )
 
         if execute:
+            portfolio_manager.add_order(order)
             self.execute_limit_buy_order(identifier, order)
+            order.set_pending()
+            db.session.commit()
 
         return order
 
     def create_limit_sell_order(
-            self, identifier, symbol, price, amount, execute=True
+            self, identifier, symbol, price, amount, execute=False
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
-        order = portfolio_manager.create_sell_order(
-            symbol, price, amount, OrderType.LIMIT.value
+        order = portfolio_manager.create_order(
+            symbol, price, amount, OrderType.LIMIT.value, OrderSide.SELL.value
         )
 
         if execute:
+            portfolio_manager.add_order(order)
             self.execute_limit_sell_order(identifier, order)
+            order.set_pending()
 
         return order
 
     def create_market_buy_order(
-            self, identifier, symbol, amount, execute=True
+            self, identifier, symbol, amount, execute=False
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
-        order = portfolio_manager.create_buy_order(
+        order = portfolio_manager.create_order(
             symbol=symbol, amount=amount, order_type=OrderType.MARKET.value
         )
 
         if execute:
+            portfolio_manager.add_order(order)
             self.execute_market_buy_order(identifier, order)
+            order.set_pending()
 
         return order
 
     def create_market_sell_order(
-            self, identifier, symbol, amount, execute=True
+        self, identifier, symbol, amount, execute=False
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
-        order = portfolio_manager.create_sell_order(
-            symbol=symbol, amount=amount, order_type=OrderType.MARKET.value
+        order = portfolio_manager.create_order(
+            symbol=symbol,
+            amount=amount,
+            order_type=OrderType.MARKET.value,
+            order_side=OrderSide.SELL.value
         )
 
         if execute:
+            portfolio_manager.add_order(order)
             self.execute_market_sell_order(identifier, order)
+            order.set_pending()
 
         return order
 
@@ -300,25 +378,43 @@ class AlgorithmContext:
 
     def execute_market_sell_order(self, identifier, order):
         order_executor = self.get_order_executor(identifier)
-        order_executor.execute_limit_order(order, self)
+        order_executor.execute_market_order(order, self)
 
     def execute_market_buy_order(self, identifier, order):
         order_executor = self.get_order_executor(identifier)
-        order_executor.execute_limit_order(order, self)
+        order_executor.execute_market_order(order, self)
 
-    def check_order_status(self, identifier, symbol: str = None):
-
+    def check_order_status(self, identifier=None, symbol: str = None):
         portfolio_manager = self.get_portfolio_manager(identifier)
         orders = portfolio_manager.get_pending_orders(symbol)
-
         order_executor = self.get_order_executor(identifier)
 
         for order in orders:
-            order_executor.update_order_status(order, self)
+            status = order_executor.get_order_status(order, self)
+            order.update(db, {"status": status}, True)
 
-    def get_pending_orders(self, identifier, symbol: str = None, lazy=False):
+    def get_pending_orders(
+            self, identifier=None, symbol: str = None, lazy=False
+    ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         return portfolio_manager.get_pending_orders(symbol, lazy)
+
+    def check_pending_orders(self, identifier=None, symbol: str = None):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+
+        if portfolio_manager is not None:
+            order_executor = \
+                self.get_order_executor(portfolio_manager.identifier)
+
+            pending_orders = portfolio_manager.get_pending_orders(symbol)
+
+            for pending_order in pending_orders:
+                status = order_executor.get_order_status()
+
+                if OrderStatus.SUCCESS.equals(status):
+                    pending_order.set_executed()
+                else:
+                    pending_order.update(db, {status: status.value})
 
     def get_unallocated_size(self, identifier):
         portfolio_manager = self.get_portfolio_manager(identifier)
@@ -330,5 +426,6 @@ class AlgorithmContext:
         self._running_workers = []
         self._order_executors = {}
         self._portfolio_managers = {}
+        self._market_services = {}
         self._initializer = None
         self._initialized = False

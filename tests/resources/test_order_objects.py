@@ -1,82 +1,28 @@
-from investing_algorithm_framework import db
-from investing_algorithm_framework.core.portfolio_managers import \
-    PortfolioManager
+from investing_algorithm_framework import db, OrderSide
+from investing_algorithm_framework.core.models import OrderType
 
 
 class TestOrderAndPositionsObjectsMixin:
-    TICKERS = [
-        'BTC',
-        'ETH',
-        'BNB',
-        'ADA',
-        'XRP',
-    ]
-
-    def create_test_objects(self, portfolio_manager: PortfolioManager):
-        # Create buy orders
-        for ticker in self.TICKERS:
-            order = portfolio_manager.create_buy_order(
-                symbol=ticker,
-                amount=4,
-                price=9
-            )
-            order.save(db)
-            portfolio_manager.add_order(order)
-
-            order = portfolio_manager.create_buy_order(
-                symbol=ticker,
-                amount=5,
-                price=9.76
-            )
-            order.save(db)
-            portfolio_manager.add_order(order)
-
-        # Create sell orders
-        for ticker in self.TICKERS:
-            order = portfolio_manager.create_sell_order(
-                symbol=ticker,
-                amount=2,
-                price=10
-            )
-
-            order.save(db)
-            portfolio_manager.add_order(order)
-
-            order = portfolio_manager.create_sell_order(
-                symbol=ticker,
-                amount=3,
-                price=11
-            )
-
-            order.save(db)
-            portfolio_manager.add_order(order)
-
-        db.session.commit()
 
     @staticmethod
-    def create_buy_orders(amount, tickers, portfolio_manager):
-
-        for ticker in tickers:
-            order = portfolio_manager.create_buy_order(
-                amount=amount,
-                symbol=ticker,
-                price=5
-            )
-            order.save(db)
-            portfolio_manager.add_order(order)
-
-        db.session.commit()
+    def create_buy_order(amount, ticker, price, portfolio_manager):
+        order = portfolio_manager.create_order(
+            amount=amount,
+            symbol=ticker,
+            price=price,
+            order_type=OrderType.LIMIT.value
+        )
+        portfolio_manager.add_order(order)
+        order.set_pending()
 
     @staticmethod
-    def create_sell_orders(amount, tickers, portfolio_manager):
-
-        for ticker in tickers:
-            order = portfolio_manager.create_sell_order(
-                amount=amount,
-                symbol=ticker,
-                price=5
-            )
-            order.save(db)
-            portfolio_manager.add_order(order)
-
-        db.session.commit()
+    def create_sell_order(amount, ticker, price, portfolio_manager):
+        order = portfolio_manager.create_order(
+            amount=amount,
+            symbol=ticker,
+            price=price,
+            order_type=OrderType.LIMIT.value,
+            order_side=OrderSide.SELL.value
+        )
+        portfolio_manager.add_order(order)
+        order.set_pending()

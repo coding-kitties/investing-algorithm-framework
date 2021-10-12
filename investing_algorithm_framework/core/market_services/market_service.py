@@ -1,7 +1,16 @@
 from abc import ABC, abstractmethod
+from investing_algorithm_framework.core.market_identifier \
+    import MarketIdentifier
 
 
-class ExchangeClient(ABC):
+class MarketService(ABC, MarketIdentifier):
+
+    @abstractmethod
+    def pair_exists(self, target_symbol: str, trading_symbol: str):
+        pass
+
+    def get_price(self, target_symbol: str, trading_symbol: str):
+        return self.get_ticker(target_symbol, trading_symbol)["price"]
 
     @abstractmethod
     def get_ticker(self, target_symbol: str, trading_symbol: str):
