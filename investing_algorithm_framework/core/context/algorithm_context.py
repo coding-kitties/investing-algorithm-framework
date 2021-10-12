@@ -309,7 +309,10 @@ class AlgorithmContext:
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
-            symbol, price, amount, OrderType.LIMIT.value
+            symbol=symbol,
+            price=price,
+            amount=amount,
+            order_type=OrderType.LIMIT.value
         )
 
         if execute:
@@ -325,7 +328,11 @@ class AlgorithmContext:
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
-            symbol, price, amount, OrderType.LIMIT.value, OrderSide.SELL.value
+            symbol=symbol,
+            price=price,
+            amount=amount,
+            order_type=OrderType.LIMIT.value,
+            order_side=OrderSide.SELL.value
         )
 
         if execute:
