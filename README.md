@@ -4,10 +4,14 @@
 [![Current Version](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)
 
 # Investing Algorithm Framework
-The Investing Algorithm Framework is a python framework for building
-investment algorithms. 
-It encourages rapid development and clean, pragmatic code design.
 
+> :warning: **Documentation outdated**: We are working hard on releasing v1.0.0. After 
+> this release we will update the documentation at the website.
+
+The Investing Algorithm Framework is a python framework for building
+investment algorithms. It encourages rapid development and clean, pragmatic code design.
+
+Further information and the complete documentation can be found at the [webstie](https://investing-algorithm-framework.com)
 
 ```python
 import os
@@ -19,16 +23,15 @@ from investing_algorithm_framework import App, TimeUnit, AlgorithmContext, \
 dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
 
 # Create an algorithm application (manages your algorithm, rest api, etc...)
-app = App(resources_directory=dir_path)
-
+app = App(
+    resources_directory=dir_path, 
+    config={"api_key":"xxxxx", "secret_key":"xxxxx"}
+)
 
 # Create A portfolio manager connected to your market of
 # choice to keep track of your balances
 class MyBinancePortfolioManager(BinancePortfolioManager):
     trading_symbol = "USDT"
-    api_key = "xxxxx"
-    secret_key = "xxxxx"
-
 
 # Worker that runs every minute to check your pending orders
 # (success, failed, canceled)
@@ -57,17 +60,14 @@ if __name__ == "__main__":
     
     # Start your investing algorithm
     app.start()
-
 ```
 
-All the documentation can be found online at the [documentation webstie](https://investing-algorithm-framework.com)
+## Download
+You can download the framework with pypi.
 
-In most cases, you'll probably never have to change code on this repo directly 
-if you are building your algorithm/bot. But if you do, check out the 
-contributing page at the website.
-
-If you'd like to chat with investing-algorithm-framework users 
-and developers, [join us on Slack](https://inv-algo-framework.slack.com) or [join us on reddit](https://www.reddit.com/r/InvestingAlgorithms/)
+```bash
+    pip install investing-algorithm-framework
+```
 
 #### Disclaimer
 If you use this framework for your investments, do not risk money 
@@ -81,18 +81,24 @@ THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR INVESTMENT RESU
 Also, make sure that you read the source code of any plugin you use or 
 implementation of an algorithm made with this framework.
 
-For further information regarding usage and licensing we recommend to 
-go to the licensing page at the website.
+For further information regarding usage and licensing we recommend going 
+to the licensing page at the website.
+
+## Documentation
+
+All the documentation can be found online at the [documentation webstie](https://investing-algorithm-framework.com)
+
+In most cases, you'll probably never have to change code on this repo directly 
+if you are building your algorithm/bot. But if you do, check out the 
+contributing page at the website.
+
+If you'd like to chat with investing-algorithm-framework users 
+and developers, [join us on Slack](https://inv-algo-framework.slack.com) or [join us on reddit](https://www.reddit.com/r/InvestingAlgorithms/)
 
 ## Acknowledgements
 We want to thank all contributors to this project. A full list of all 
 the people that contributed to the project can be
 found [here](https://github.com/investing-algorithms/investing-algorithm-framework/blob/master/docs/AUTHORS.md)
-
-
-## Documentation
-All documentation can be found online at the official website here [here](https://investing-algorithm-framework.com).
-
 
 ### Help / Slack
 
