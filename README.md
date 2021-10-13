@@ -4,8 +4,14 @@
 [![Current Version](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)
 
 # Investing Algorithm Framework
+
+> :warning: **Documentation outdated**: We are working hard on releasing v1.0.0. After 
+> this release we will update the documentation at the website.
+
 The Investing Algorithm Framework is a python framework for building
 investment algorithms. It encourages rapid development and clean, pragmatic code design.
+
+Further information and the complete documentation can be found at the [webstie](https://investing-algorithm-framework.com)
 
 ```python
 import os
