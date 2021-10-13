@@ -7,21 +7,6 @@
 The Investing Algorithm Framework is a python framework for building
 investment algorithms. It encourages rapid development and clean, pragmatic code design.
 
-#### Disclaimer
-If you use this framework for your investments, do not risk money 
-which you are afraid to lose, until you have clear understanding how 
-the framework works. We can't stress this enough:
-
-BEFORE YOU START USING MONEY WITH THE FRAMEWORK, MAKE SURE THAT YOU TESTED 
-YOUR COMPONENTS THOROUGHLY. USE THE SOFTWARE AT YOUR OWN RISK. 
-THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR INVESTMENT RESULTS.
-
-Also, make sure that you read the source code of any plugin you use or 
-implementation of an algorithm made with this framework.
-
-For further information regarding usage and licensing we recommend going 
-to the licensing page at the website.
-
 ```python
 import os
 
@@ -69,7 +54,6 @@ if __name__ == "__main__":
     
     # Start your investing algorithm
     app.start()
-
 ```
 
 ## Download
@@ -78,6 +62,21 @@ You can download the framework with pypi.
 ```bash
     pip install investing-algorithm-framework
 ```
+
+#### Disclaimer
+If you use this framework for your investments, do not risk money 
+which you are afraid to lose, until you have clear understanding how 
+the framework works. We can't stress this enough:
+
+BEFORE YOU START USING MONEY WITH THE FRAMEWORK, MAKE SURE THAT YOU TESTED 
+YOUR COMPONENTS THOROUGHLY. USE THE SOFTWARE AT YOUR OWN RISK. 
+THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR INVESTMENT RESULTS.
+
+Also, make sure that you read the source code of any plugin you use or 
+implementation of an algorithm made with this framework.
+
+For further information regarding usage and licensing we recommend going 
+to the licensing page at the website.
 
 ## Documentation
 
