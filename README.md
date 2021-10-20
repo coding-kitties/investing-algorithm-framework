@@ -25,40 +25,38 @@ from investing_algorithm_framework import App, TimeUnit, AlgorithmContext, \
 from investing_algorithm_framework.configuration.constants import BINANCE, \
     BINANCE_API_KEY, BINANCE_SECRET_KEY, TRADING_SYMBOL
 
-BTC_SYMBOL = "BTC"
-
-# Our trading symbol (e.g. dot/usdt, sol/usdt)
-USDT_SYMBOL = "USDT"
-
 # Make the parent dir your resources directory (database, csv storage)
 dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
 
-# Create an application (setups your algorithm, database, rest api, etc...)
+# Create an application (manages your algorithm, rest api, etc...)
 app = App(
     resources_directory=dir_path,
     config={
-        BINANCE_API_KEY: "<BINANCE_API_KEY>",
-        BINANCE_SECRET_KEY: "<BINANCE_SECRET_KEY>",
-        TRADING_SYMBOL: USDT_SYMBOL,
+        BINANCE_API_KEY: "GxLUAcrGdubE7f3XvdkVerka2X62TgaVhU8CMIBJhh7YXLMfFdjDfhSq1pp3vejp",
+        BINANCE_SECRET_KEY: "cLyynA1rgQZgJhngJcbSRu9QCoRECsIIHrAVdm5kO1ighj5tI8DL31uCxg10fjH2",
+        TRADING_SYMBOL: "usdt",
     }
 )
 
 
-# Algorithm strategy that runs every 5 minutes
-@app.algorithm.schedule(time_unit=TimeUnit.MINUTE, interval=5)
-def perform_strategy(context: AlgorithmContext):
-    # Get ticker data from binance
-    ticker = context.get_data(
-        BINANCE,
-        trading_data_type=TradingDataTypes.TICKER,
-        target_symbol=BTC_SYMBOL,
-    )
+# Algorithm strategy that runs every 5 minutes and gets 
+# the ticker of BTC from BINANCE
+@app.algorithm.strategy(
+    time_unit=TimeUnit.SECONDS,
+    interval=5,
+    data_provider_identifier=BINANCE,
+    target_symbol="BTC",
+    trading_data_type=TradingDataTypes.TICKER,
+)
+def perform_strategy(context: AlgorithmContext, ticker):
+    # Retrieve unallocated USDT (trading symbol)
+    unallocated = context.get_unallocated_size(BINANCE)
 
-    if ticker.ask_price > 50000:
-        # Execute a market order on binance
-        context.create_market_buy_order(
-            BINANCE, BTC_SYMBOL, amount_trading_symbol=10, execute=True
-        )
+    if unallocated > 50000:
+        if ticker.ask_price == 50000:
+            context.create_limit_buy_order(
+                BINANCE, "BTC", price=50000, amount=1, execute=True
+            )
 
 
 if __name__ == "__main__":
