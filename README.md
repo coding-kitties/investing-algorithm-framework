@@ -34,7 +34,7 @@ app = App(
     config={
         BINANCE_API_KEY: "<BINANCE_API_KEY>",
         BINANCE_SECRET_KEY: "<BINANCE_SECRET_KEY>",
-        TRADING_SYMBOL: "usdt",
+        TRADING_SYMBOL: "USDT",
     }
 )
 
