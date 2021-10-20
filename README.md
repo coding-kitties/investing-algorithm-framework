@@ -25,7 +25,7 @@ from investing_algorithm_framework import App, TimeUnit, AlgorithmContext, \
 from investing_algorithm_framework.configuration.constants import BINANCE, \
     BINANCE_API_KEY, BINANCE_SECRET_KEY, TRADING_SYMBOL
 
-# Make the parent dir your resources directory (database, csv storage)
+# Make the parent dir your resources directory (database, csv storage, snapshots)
 dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
 
 # Create an application (manages your algorithm, rest api, etc...)
