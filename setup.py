@@ -12,7 +12,7 @@ with open('requirements.txt') as f:
 setuptools.setup(
     name="investing_algorithm_framework",
     version=get_version(),
-    license="BSL-1.1",
+    license='Apache License 2.0',
     author="coding kitties",
     description="A framework for creating an investment algorithm",
     long_description=long_description,
