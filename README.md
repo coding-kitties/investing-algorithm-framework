@@ -11,62 +11,83 @@
 The Investing Algorithm Framework is a python framework for building
 investment algorithms. It encourages rapid development and clean, pragmatic code design.
 
-Further information and the complete documentation can be found at the [webstie](https://investing-algorithm-framework.com)
+The framework provides you with an all the components you need to create an 
+investing algorithm (data providing, portfolio management, order execution, etc..). 
+Also, the algorithm can be controlled with a REST Api that will run in the background.
 
+## Example Algorithm for Binance
 ```python
 import os
 
 from investing_algorithm_framework import App, TimeUnit, AlgorithmContext, \
-    BinanceOrderExecutor, BinancePortfolioManager
+    TradingDataTypes
+from investing_algorithm_framework.configuration.constants import BINANCE, \
+    BINANCE_API_KEY, BINANCE_SECRET_KEY, TRADING_SYMBOL
+
+BTC_SYMBOL = "BTC"
+
+# Our trading symbol (e.g. dot/usdt, sol/usdt)
+USDT_SYMBOL = "USDT"
 
 # Make the parent dir your resources directory (database, csv storage)
 dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
 
-# Create an algorithm application (manages your algorithm, rest api, etc...)
+# Create an application (setups your algorithm, database, rest api, etc...)
 app = App(
-    resources_directory=dir_path, 
-    config={"api_key":"xxxxx", "secret_key":"xxxxx"}
+    resources_directory=dir_path,
+    config={
+        BINANCE_API_KEY: "<BINANCE_API_KEY>",
+        BINANCE_SECRET_KEY: "<BINANCE_SECRET_KEY>",
+        TRADING_SYMBOL: USDT_SYMBOL,
+    }
 )
-
-# Create A portfolio manager connected to your market of
-# choice to keep track of your balances
-class MyBinancePortfolioManager(BinancePortfolioManager):
-    trading_symbol = "USDT"
-
-# Worker that runs every minute to check your pending orders
-# (success, failed, canceled)
-@app.algorithm.schedule(time_unit=TimeUnit.MINUTE, interval=1)
-def check_order_status(context: AlgorithmContext):
-    context.check_pending_orders()
 
 
 # Algorithm strategy that runs every 5 minutes
 @app.algorithm.schedule(time_unit=TimeUnit.MINUTE, interval=5)
 def perform_strategy(context: AlgorithmContext):
-    # Apply strategy ....
-
-    # Execute order
-    context.create_market_buy_order(
-        "BINANCE", "BTC", amount=10, execute=True
+    # Get ticker data from binance
+    ticker = context.get_data(
+        BINANCE,
+        trading_data_type=TradingDataTypes.TICKER,
+        target_symbol=BTC_SYMBOL,
     )
+
+    if ticker.ask_price > 50000:
+        # Execute a market order on binance
+        context.create_market_buy_order(
+            BINANCE, BTC_SYMBOL, amount_trading_symbol=10, execute=True
+        )
 
 
 if __name__ == "__main__":
-    # Register your market portfolio manager
-    app.algorithm.add_portfolio_manager(MyBinancePortfolioManager())
-
-    # Register your market order executor
-    app.algorithm.add_order_executor(BinanceOrderExecutor())
-    
-    # Start your investing algorithm
     app.start()
 ```
+The goal of the framework is to provide you with a set of components for 
+your algorithm that takes care of a wide variety of operational processes 
+out of the box.
+
+* Data providing
+* Order execution
+* Portfolio management
+* Performance tracking
+* Strategy scheduling
+* Resource management
+* Model snapshots
+* Order status management
+* Clients (Rest API)
+
+However, we aim to also provide a modular framework where you can write your
+own components or use third party plugins for the framework.
+
+Further information and the complete documentation can be found at the [webstie](https://investing-algorithm-framework.com)
+
 
 ## Download
 You can download the framework with pypi.
 
 ```bash
-    pip install investing-algorithm-framework
+pip install investing-algorithm-framework
 ```
 
 #### Disclaimer

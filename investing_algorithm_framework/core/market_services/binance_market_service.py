@@ -4,25 +4,37 @@ from investing_algorithm_framework.core.market_services.market_service \
     import MarketService
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.mixins import \
-    ApiSecretKeySpecifierMixin
+    BinanceApiSecretKeySpecifierMixin
+from investing_algorithm_framework.configuration.constants import BINANCE, \
+    BINANCE_API_KEY, BINANCE_SECRET_KEY
 
 
 BINANCE_CCXT_ID = "binance"
 logger = logging.getLogger(__name__)
 
 
-class BinanceMarketService(MarketService, ApiSecretKeySpecifierMixin):
-    market = "BINANCE"
+class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
+    market = BINANCE
     exchange = None
 
     def __init__(self, api_key: str = None, secret_key: str = None):
         super().__init__()
 
         if api_key is not None:
-            self.api_key = api_key
+            self.binance_api_key = api_key
 
         if secret_key is not None:
-            self.secret_key = secret_key
+            self.binance_secret_key = secret_key
+
+    def initialize(self, algorithm_context):
+
+        if self.binance_api_key is None and self.binance_secret_key is None:
+            self.binance_api_key = algorithm_context.config\
+                .get(BINANCE_API_KEY, None)
+            self.binance_secret_key = \
+                algorithm_context.config.get(BINANCE_SECRET_KEY, None)
+
+        self.initialize_exchange()
 
     def initialize_exchange(self):
         exchange_class = getattr(ccxt, BINANCE_CCXT_ID)
@@ -32,16 +44,23 @@ class BinanceMarketService(MarketService, ApiSecretKeySpecifierMixin):
         })
 
     def pair_exists(self, target_symbol: str, trading_symbol: str):
-        pass
+        try:
+            data = self.get_ticker(target_symbol, trading_symbol)
+            return "symbol" in data
+        except OperationalException:
+            return False
 
     def get_ticker(self, target_symbol: str, trading_symbol: str):
 
         try:
-            symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
+            symbol = f"{target_symbol.upper()}{trading_symbol.upper()}"
             return self.exchange.fetchTicker(symbol)
         except Exception as e:
             logger.exception(e)
-            raise OperationalException("Could not retrieve ticker data")
+            raise OperationalException(
+                f"Could not retrieve ticker"
+                f"{target_symbol.upper()}{trading_symbol.upper()}"
+            )
 
     def get_order_book(self, target_symbol: str, trading_symbol: str):
 
@@ -50,7 +69,9 @@ class BinanceMarketService(MarketService, ApiSecretKeySpecifierMixin):
             return self.exchange.fetchOrderBook(symbol)
         except Exception as e:
             logger.exception(e)
-            raise OperationalException("Could not retrieve order book data")
+            raise OperationalException(
+                "Could not retrieve order book"
+            )
 
     def get_balance(self, symbol: str = None):
 
@@ -58,7 +79,9 @@ class BinanceMarketService(MarketService, ApiSecretKeySpecifierMixin):
             balances = self.exchange.fetch_balance()["info"]["balances"]
         except Exception as e:
             logger.exception(e)
-            raise OperationalException("Could not retrieve balance data")
+            raise OperationalException(
+                "Could not retrieve balance"
+            )
 
         if symbol is not None:
 

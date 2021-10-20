@@ -25,7 +25,7 @@ def normalize_query(params):
     Converts query parameters from only containing one value for each parameter,
     to include parameters with multiple values as lists.
 
-    :param params: a flask query parameters data structure
+    :param params: a flask query parameters data_provider structure
     :return: a dict of normalized query parameters
     """
     params_non_flat = params.to_dict(flat=False)

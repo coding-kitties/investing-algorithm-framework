@@ -72,13 +72,23 @@ class OrderValidator(ABC):
             )
 
     @staticmethod
-    def validate_market_order(order, _):
+    def validate_market_order(order, portfolio):
 
         if order.amount_trading_symbol is None:
             raise OperationalException(
                 f"Market order needs an amount specified in the trading "
                 f"symbol {order.trading_symbol}"
             )
+
+        if OrderSide.BUY.equals(order.order_side):
+
+            if order.amount_trading_symbol > portfolio.unallocated:
+                raise OperationalException(
+                    f"Market order amount {order.amount_trading_symbol} "
+                    f"{portfolio.trading_symbol.upper()} is larger then "
+                    f"unallocated {portfolio.unallocated} "
+                    f"{portfolio.trading_symbol.upper()}"
+                )
 
     @abstractmethod
     def _validate_order(self, order, portfolio):

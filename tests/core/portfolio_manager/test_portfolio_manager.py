@@ -5,6 +5,10 @@ from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin, \
 
 class Test(TestOrderAndPositionsObjectsMixin, TestBase):
 
+    def setUp(self):
+        super(Test, self).setUp()
+        self.start_algorithm()
+
     def test_id(self):
         self.assertIsNotNone(self.algo_app.algorithm.get_portfolio_manager())
 

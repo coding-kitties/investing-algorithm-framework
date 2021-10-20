@@ -7,7 +7,7 @@ class MyPortfolioManagerOne(PortfolioManager):
     identifier = "BINANCE"
     trading_currency = "USDT"
 
-    def get_initial_unallocated_size(self) -> float:
+    def get_initial_unallocated_size(self, algorithm_context) -> float:
         pass
 
 

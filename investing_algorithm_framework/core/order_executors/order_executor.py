@@ -6,7 +6,7 @@ from investing_algorithm_framework.core.identifier import Identifier
 
 class OrderExecutor(ABC, Identifier):
 
-    def initialize(self, algorithm_context):
+    def initialize(self, algorithm_context, throw_exception=True):
         pass
 
     @abstractmethod

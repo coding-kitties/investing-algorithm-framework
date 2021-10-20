@@ -1,11 +1,11 @@
 from investing_algorithm_framework.core.mixins \
-    import ApiSecretKeySpecifierMixin
+    import BinanceApiSecretKeySpecifierMixin
 from tests.resources import TestBase, random_string
 
 
-class MySpecifier(ApiSecretKeySpecifierMixin):
-    api_key = random_string(5)
-    secret_key = random_string(5)
+class MySpecifier(BinanceApiSecretKeySpecifierMixin):
+    binance_api_key = random_string(5)
+    binance_secret_key = random_string(5)
 
 
 class Test(TestBase):
