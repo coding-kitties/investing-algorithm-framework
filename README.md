@@ -15,6 +15,7 @@ The framework provides you with an all the components you need to create an
 investing algorithm (data providing, portfolio management, order execution, etc..). 
 Also, the algorithm can be controlled with a REST Api that will run in the background.
 
+
 ## Example Algorithm for Binance
 ```python
 import os
