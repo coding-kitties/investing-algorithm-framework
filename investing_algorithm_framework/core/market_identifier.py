@@ -9,16 +9,18 @@ class MarketIdentifier:
         if self.market is None:
             self.market = market
 
-        # If ID is none generate a new unique ID
         if self.market is None:
             raise OperationalException(
                 f"{self.__class__.__name__} has no market specified"
             )
 
-    def get_market(self) -> str:
-        assert getattr(self, 'market', None) is not None, (
-            "{} should either include an market attribute, or override "
-            "the `get_market()`, method.".format(self.__class__.__name__)
-        )
+    def get_market(self, throw_exception=True) -> str:
+        value = getattr(self, 'market', None)
 
-        return getattr(self, 'market')
+        if value is None and throw_exception:
+            raise OperationalException(
+                f"{self.__class__.__name__} should either include an market "
+                f"attribute, or override the `get_market()`, method."
+            )
+
+        return value

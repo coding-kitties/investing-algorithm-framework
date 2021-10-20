@@ -15,6 +15,7 @@ class Test(TestBase):
 
     def setUp(self) -> None:
         super(Test, self).setUp()
+        self.algo_app.algorithm._workers = []
         self.algo_app.algorithm.schedule(worker_one, None, TimeUnit.SECONDS, 1)
         self.algo_app.algorithm.schedule(worker_two, None, TimeUnit.SECONDS, 1)
 

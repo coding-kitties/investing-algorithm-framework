@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 class Environment(Enum):
     """
-    Class TimeUnit: Enum for data base type
+    Class TimeUnit: Enum for data_provider base type
     """
     DEV = 'DEV'
     PROD = 'PROD'
@@ -77,7 +77,8 @@ class Config(dict):
         DATABASE_NAME: os.getenv(DATABASE_NAME, "database"),
         DATABASE_DIRECTORY_PATH: os.getenv(DATABASE_DIRECTORY_PATH)
     }
-    SCHEDULER_API_ENABLED: True
+    SCHEDULER_API_ENABLED = True
+    CHECK_PENDING_ORDERS = True
 
     def __init__(self):
         super().__init__()
@@ -170,7 +171,7 @@ class Config(dict):
 
         for attribute_key in dictionary:
 
-            if attribute_key.isupper():
+            if attribute_key:
                 config.set(attribute_key, dictionary[attribute_key])
                 config[attribute_key] = dictionary[attribute_key]
         return config

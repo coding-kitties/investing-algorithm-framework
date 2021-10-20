@@ -41,7 +41,7 @@ def get_total_amount_of_rows(file_path: str):
     return rows_count
 
 
-# Function to convert a csv to a list of data
+# Function to convert a csv to a list of data_provider
 def csv_to_list(csv_path: str, strip_column_headers: bool = False) -> List:
     data = []
     with open(csv_path, "r") as csv_f:

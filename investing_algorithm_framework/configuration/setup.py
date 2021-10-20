@@ -24,17 +24,12 @@ def create_app(config_object=None) -> Flask:
     given configuration from the client.
     """
 
-    # Setup logging
     app = Flask(__name__.split('.')[0])
     CORS(app, supports_credentials=True)
     app.url_map.strict_slashes = False
 
     # Register error handler
     register_error_handlers(app)
-
-    setup_logging(app.config.get(LOG_LEVEL))
-
-    logger.info("Connecting to sqlite")
 
     return app
 
@@ -113,7 +108,7 @@ def setup_logging(log_level):
         'loggers': {
             '': {  # root logger
                 'handlers': ['console'],
-                'level': 'WARNING',
+                'level': log_level,
                 'propagate': False
             },
             'app': {
@@ -121,6 +116,16 @@ def setup_logging(log_level):
                 'level': log_level,
                 'propagate': False
             },
+            'investing-algorithm-framework': {
+                'handlers': ['console'],
+                'level': log_level,
+                'propagate': False
+            },
+            "apscheduler.executors.default": {
+                'handlers': ['console'],
+                'level': "ERROR",
+                'propagate': False
+            }
         }
     }
 

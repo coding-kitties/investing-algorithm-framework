@@ -1,3 +1,3 @@
-from investing_algorithm_framework.core.workers.scheduler import Scheduler
+from investing_algorithm_framework.core.workers.scheduler import Worker
 
-__all__ = ['Scheduler']
+__all__ = ['Worker']

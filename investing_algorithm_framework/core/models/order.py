@@ -187,7 +187,7 @@ class Order(db.Model, ModelExtension):
 
         price = self.current_price
 
-        # With no price data return 0
+        # With no price data_provider return 0
         if price == -1:
             return 0
 

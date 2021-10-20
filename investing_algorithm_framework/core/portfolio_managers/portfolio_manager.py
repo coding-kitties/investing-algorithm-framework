@@ -6,27 +6,32 @@ from investing_algorithm_framework.core.market_identifier import \
     MarketIdentifier
 from investing_algorithm_framework.core.models import Position, Order, \
     Portfolio, db, OrderSide, OrderType, OrderStatus
+from investing_algorithm_framework.configuration.constants import \
+    TRADING_SYMBOL
 
 
 class PortfolioManager(ABC, Identifier, MarketIdentifier):
     trading_symbol = None
-    market = "test"
 
     @abstractmethod
-    def get_initial_unallocated_size(self):
+    def get_initial_unallocated_size(self, algorithm_context):
         pass
 
     def initialize(self, algorithm_context):
-        self._initialize_portfolio()
+        self._initialize_portfolio(algorithm_context)
 
-    def _initialize_portfolio(self):
+    def _initialize_portfolio(self, algorithm_context):
         portfolio = self.get_portfolio(False)
+
+        self.trading_symbol = self.get_trading_symbol(algorithm_context)
 
         if portfolio is None:
             portfolio = Portfolio(
                 identifier=self.identifier,
                 trading_symbol=self.trading_symbol,
-                unallocated=self.get_initial_unallocated_size(),
+                unallocated=self.get_initial_unallocated_size(
+                    algorithm_context
+                ),
                 market=self.get_market()
             )
             portfolio.save(db)
@@ -45,15 +50,17 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
     def unallocated(self):
         return self.get_portfolio().unallocated
 
-    def get_trading_symbol(self) -> str:
-
+    def get_trading_symbol(self, algorithm_context) -> str:
         trading_symbol = getattr(self, "trading_symbol", None)
+
+        if trading_symbol is None:
+            trading_symbol = algorithm_context.config.get(TRADING_SYMBOL, None)
 
         if trading_symbol is None:
             raise OperationalException(
                 "Trading symbol is not set. Either override "
                 "'get_trading_symbol' method or set "
-                "the 'trading_symbol' attribute."
+                "the 'trading_symbol' attribute in the algorithm config."
             )
 
         return trading_symbol

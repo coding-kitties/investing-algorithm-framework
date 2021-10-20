@@ -3,7 +3,7 @@ import inspect
 from flask import Flask
 
 from investing_algorithm_framework.configuration import Config, create_app, \
-    setup_config, setup_database
+    setup_config, setup_database, setup_logging
 from investing_algorithm_framework.context import Singleton
 from investing_algorithm_framework.core.context import algorithm
 from investing_algorithm_framework.core.exceptions import OperationalException
@@ -12,7 +12,7 @@ from investing_algorithm_framework.core.models import create_all_tables, \
 from investing_algorithm_framework.extensions import scheduler
 from investing_algorithm_framework.configuration.constants import \
     RESOURCES_DIRECTORY, SQLALCHEMY_DATABASE_URI, DATABASE_DIRECTORY_PATH, \
-    DATABASE_NAME, DATABASE_CONFIG
+    DATABASE_NAME, DATABASE_CONFIG, LOG_LEVEL
 
 
 class App(metaclass=Singleton):
@@ -26,7 +26,7 @@ class App(metaclass=Singleton):
     _blueprints = []
 
     def __init__(
-            self, resources_directory: str = None, config=None, arg=None
+        self, resources_directory: str = None, config=None, arg=None
     ):
         if resources_directory is not None:
             self._resource_directory = resources_directory
@@ -74,6 +74,7 @@ class App(metaclass=Singleton):
                 raise OperationalException("Resource directory not specified")
 
             self._configured = True
+            setup_logging(self.config.get(LOG_LEVEL, "INFO"))
 
     def _initialize_flask_app(self):
 
@@ -184,7 +185,5 @@ class App(metaclass=Singleton):
         self._configured = False
         self._database_configured: bool = False
         self._started = False
-        self._config = None
-        self._resource_directory = None
         scheduler.remove_all_jobs()
         self.algorithm.reset()

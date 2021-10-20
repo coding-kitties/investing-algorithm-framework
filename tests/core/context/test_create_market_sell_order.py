@@ -5,6 +5,10 @@ from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin, \
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
+    def setUp(self):
+        super(Test, self).setUp()
+        self.start_algorithm()
+
     def test(self) -> None:
         order = self.algo_app.algorithm\
             .create_market_sell_order("test", SYMBOL_A, 10)
