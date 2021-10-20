@@ -32,8 +32,8 @@ dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
 app = App(
     resources_directory=dir_path,
     config={
-        BINANCE_API_KEY: "GxLUAcrGdubE7f3XvdkVerka2X62TgaVhU8CMIBJhh7YXLMfFdjDfhSq1pp3vejp",
-        BINANCE_SECRET_KEY: "cLyynA1rgQZgJhngJcbSRu9QCoRECsIIHrAVdm5kO1ighj5tI8DL31uCxg10fjH2",
+        BINANCE_API_KEY: "<BINANCE_API_KEY>",
+        BINANCE_SECRET_KEY: "<BINANCE_SECRET_KEY>",
         TRADING_SYMBOL: "usdt",
     }
 )
