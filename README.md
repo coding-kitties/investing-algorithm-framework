@@ -39,8 +39,7 @@ app = App(
 )
 
 
-# Algorithm strategy that runs every 5 minutes and gets 
-# the ticker of BTC from BINANCE
+# Algorithm strategy that runs every 5 minutes and gets the ticker of BTC from BINANCE
 @app.algorithm.strategy(
     time_unit=TimeUnit.SECONDS,
     interval=5,
@@ -49,9 +48,10 @@ app = App(
     trading_data_type=TradingDataTypes.TICKER,
 )
 def perform_strategy(context: AlgorithmContext, ticker):
-    # Retrieve unallocated USDT (trading symbol)
+    # Retrieve unallocated USDT (trading symbol) from the portfolio of the 
+    # algorithm
     unallocated = context.get_unallocated_size(BINANCE)
-
+    
     if unallocated > 50000:
         if ticker.ask_price == 50000:
             context.create_limit_buy_order(
@@ -62,6 +62,10 @@ def perform_strategy(context: AlgorithmContext, ticker):
 if __name__ == "__main__":
     app.start()
 ```
+The example algorithm makes use of the default data provider, order executor and 
+portfolio manager for BINANCE. However, your can also define your own 
+components.
+
 The goal of the framework is to provide you with a set of components for 
 your algorithm that takes care of a wide variety of operational processes 
 out of the box.
