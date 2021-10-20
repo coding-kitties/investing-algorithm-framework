@@ -1,14 +1,14 @@
-from investing_algorithm_framework.core.market_services import \
-    BinanceMarketService
-from investing_algorithm_framework.core.models import Order, OrderType, \
-    OrderSide, db, OrderStatus
 from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.core.models import Order, OrderType, \
+    OrderSide, OrderStatus
+from investing_algorithm_framework.configuration.constants import BINANCE
 
 
-class BinanceOrderExecutorMixin(BinanceMarketService):
-    identifier = "BINANCE"
+class BinanceOrderExecutorMixin:
+    identifier = BINANCE
 
     def execute_limit_order(self, order: Order, algorithm_context, **kwargs):
+        market_service = algorithm_context.get_market_service(BINANCE)
 
         if not OrderType.LIMIT.equals(order.order_type):
             raise OperationalException(
@@ -16,14 +16,14 @@ class BinanceOrderExecutorMixin(BinanceMarketService):
             )
 
         if OrderSide.BUY.equals(order.order_side):
-            self.create_limit_buy_order(
+            market_service.create_limit_buy_order(
                 target_symbol=order.target_symbol,
                 trading_symbol=order.trading_symbol,
                 amount=order.amount,
                 price=order.price
             )
         else:
-            self.create_limit_sell_order(
+            market_service.create_limit_sell_order(
                 target_symbol=order.target_symbol,
                 trading_symbol=order.trading_symbol,
                 amount=order.amount,
@@ -31,6 +31,7 @@ class BinanceOrderExecutorMixin(BinanceMarketService):
             )
 
     def execute_market_order(self, order: Order, algorithm_context, **kwargs):
+        market_service = algorithm_context.get_market_service(BINANCE)
 
         if not OrderType.MARKET.equals(order.order_type):
             raise OperationalException(
@@ -38,20 +39,22 @@ class BinanceOrderExecutorMixin(BinanceMarketService):
             )
 
         if OrderSide.BUY.equals(order.order_side):
-            self.create_market_buy_order(
+            market_service.create_market_buy_order(
                 target_symbol=order.target_symbol,
                 trading_symbol=order.trading_symbol,
                 amount=order.amount,
             )
         else:
-            self.create_market_sell_order(
+            market_service.create_market_sell_order(
                 target_symbol=order.target_symbol,
                 trading_symbol=order.trading_symbol,
                 amount=order.amount,
             )
 
     def get_order_status(self, order: Order, algorithm_context, **kwargs):
-        order = self.get_order(
+        market_service = algorithm_context.get_market_service(BINANCE)
+
+        order = market_service.get_order(
             order.exchange_id, order.target_symbol, order.trading_symbol
         )
 

@@ -1,14 +1,15 @@
-from tests.resources import SYMBOL_A, SYMBOL_A_PRICE
-from investing_algorithm_framework.core.models import db, \
-    Portfolio, OrderSide
-from investing_algorithm_framework.core.order_validators \
-    import OrderValidatorFactory
-from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.models import Order, OrderType
+from investing_algorithm_framework.core.models import OrderSide
+from investing_algorithm_framework.core.models import OrderType
+from tests.resources import SYMBOL_A, SYMBOL_A_PRICE
+from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
+
+    def setUp(self):
+        super(Test, self).setUp()
+        self.start_algorithm()
 
     def test_validate_limit_buy_order(self):
         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()

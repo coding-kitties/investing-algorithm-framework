@@ -25,6 +25,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
     def setUp(self):
         super(Test, self).setUp()
 
+        self.start_algorithm()
         self.create_buy_order(
             10,
             SYMBOL_A,

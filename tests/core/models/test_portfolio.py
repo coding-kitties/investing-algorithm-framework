@@ -8,6 +8,10 @@ from tests.resources import TestBase, SYMBOL_A, SYMBOL_A_PRICE, \
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
+    def setUp(self):
+        super(Test, self).setUp()
+        self.start_algorithm()
+
     def test_creation(self):
         self.assertEqual(1, Portfolio.query.count())
 

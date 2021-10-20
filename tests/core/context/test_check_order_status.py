@@ -7,6 +7,8 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
     def setUp(self):
         super(Test, self).setUp()
 
+        self.start_algorithm()
+
         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 
         self.create_buy_order(

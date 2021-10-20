@@ -5,6 +5,10 @@ from tests.resources import TestBase, SYMBOL_B, SYMBOL_A, SYMBOL_A_PRICE, \
 
 class TestPosition(TestBase):
 
+    def setUp(self):
+        super(TestPosition, self).setUp()
+        self.start_algorithm()
+
     def test_creation(self):
         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 

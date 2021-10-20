@@ -16,6 +16,7 @@ class TestAlgorithmStart(TestBase):
             test_func, time_unit=TimeUnit.SECONDS, interval=1
         )
         TestAlgorithmStart.test_func_has_run = False
+        self.start_algorithm()
 
     def test_start(self):
         self.algo_app.algorithm.stop()

@@ -5,7 +5,7 @@ from investing_algorithm_framework.utils import random_string
 from investing_algorithm_framework.core.models import db
 
 
-class Scheduler:
+class Worker:
 
     def __init__(self, decorated, worker_id, time_unit, interval):
         from investing_algorithm_framework.core.context import algorithm
@@ -42,7 +42,7 @@ class Scheduler:
                 name=self.worker_id,
                 func=self.__call__,
                 trigger="interval",
-                minute=self.interval
+                minutes=self.interval
             )
         elif TimeUnit.HOUR.equals(self.time_unit):
             app_scheduler.add_job(
@@ -50,7 +50,7 @@ class Scheduler:
                 name=self.worker_id,
                 func=self.__call__,
                 trigger="interval",
-                minute=(self.interval * 60)
+                minutes=(self.interval * 60)
             )
 
     def __call__(

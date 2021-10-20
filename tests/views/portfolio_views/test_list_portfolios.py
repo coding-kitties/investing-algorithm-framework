@@ -10,6 +10,8 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
     def setUp(self):
         super(Test, self).setUp()
+        self.start_algorithm()
+
         order = self.algo_app.algorithm.create_limit_buy_order(
             "test",
             SYMBOL_A,

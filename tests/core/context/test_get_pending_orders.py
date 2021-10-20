@@ -6,6 +6,10 @@ from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin, \
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
+    def setUp(self):
+        super(Test, self).setUp()
+        self.start_algorithm()
+
     def test(self) -> None:
         self.create_buy_order(
             10,

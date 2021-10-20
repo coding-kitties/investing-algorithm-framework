@@ -19,6 +19,7 @@ class Initializer(AlgorithmContextInitializer):
 
 
 class PortfolioManagerTest(PortfolioManager):
+    market = "test"
     identifier = "test"
     trading_symbol = "USDT"
     initialize_has_run = False
@@ -27,7 +28,7 @@ class PortfolioManagerTest(PortfolioManager):
         super(PortfolioManagerTest, self).initialize(algorithm_context)
         self.initialize_has_run = True
 
-    def get_initial_unallocated_size(self) -> float:
+    def get_initial_unallocated_size(self, algorithm_context) -> float:
         return 1000
 
 SYMBOL_A = "SYMBOL_A"
@@ -186,7 +187,11 @@ class TestBase(TestCase):
         self.algo_app._initialize_blueprints()
         return self.algo_app._flask_app
 
+    def start_algorithm(self):
+        self.algo_app.algorithm.start()
+
     def setUp(self):
+        self.algo_app.reset()
         self.algo_app._configured = False
         self.algo_app._config = TestConfig
         self.algo_app._initialize_config()
@@ -199,7 +204,6 @@ class TestBase(TestCase):
         self.algo_app.algorithm.add_order_executor(OrderExecutorTest())
         self.algo_app.algorithm.initialize()
         self.algo_app.start_scheduler()
-        self.algo_app.algorithm.start()
 
     def reset_prices(self):
         set_symbol_a_price(SYMBOL_A_BASE_PRICE)
