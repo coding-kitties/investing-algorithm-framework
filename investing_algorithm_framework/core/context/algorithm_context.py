@@ -9,7 +9,7 @@ from investing_algorithm_framework.core.models import TimeUnit, OrderType, \
     db, OrderSide, OrderStatus
 from investing_algorithm_framework.core.models.data_provider import \
     TradingDataTypes
-from investing_algorithm_framework.core.workers import Worker
+from investing_algorithm_framework.core.workers import Worker, StrategyWorker
 from investing_algorithm_framework.extensions import scheduler
 from investing_algorithm_framework.core.data_providers import\
     DefaultDataProviderFactory, DataProvider
@@ -42,7 +42,7 @@ class AlgorithmContext:
     _initializer = None
     _initialized = False
 
-    # wrap Scheduler to allow for deferred calling
+    # Decorator for worker to allow for deferred calling
     @staticmethod
     def schedule(
         function=None,
@@ -56,6 +56,51 @@ class AlgorithmContext:
         else:
             def wrapper(f):
                 return Worker(f, worker_id, time_unit, interval)
+            return wrapper
+
+    # Decorator for strategy worker to allow for deferred calling
+    @staticmethod
+    def strategy(
+        function=None,
+        worker_id: str = None,
+        time_unit: TimeUnit = TimeUnit.MINUTE,
+        interval=10,
+        data_provider_identifier=None,
+        trading_data_type=None,
+        trading_data_types=None,
+        target_symbol=None,
+        target_symbols=None,
+        trading_symbol=None
+    ):
+
+        if function:
+            return StrategyWorker(
+                function,
+                worker_id,
+                time_unit,
+                interval,
+                data_provider_identifier,
+                trading_data_type,
+                trading_data_types,
+                target_symbol,
+                target_symbols,
+                trading_symbol
+            )
+        else:
+            def wrapper(f):
+                return StrategyWorker(
+                    f,
+                    worker_id,
+                    time_unit,
+                    interval,
+                    data_provider_identifier,
+                    trading_data_type,
+                    trading_data_types,
+                    target_symbol,
+                    target_symbols,
+                    trading_symbol
+                )
+
             return wrapper
 
     def initialize(self, config=None):
@@ -102,6 +147,14 @@ class AlgorithmContext:
                 worker.add_to_scheduler(scheduler)
                 self._running_workers.append(worker)
 
+    def start_strategies(self):
+
+        if not self.running:
+            # Start functional workers
+            for worker in self._workers:
+                worker.add_to_scheduler(scheduler)
+                self._running_workers.append(worker)
+
     def stop_all_workers(self):
         scheduler.remove_all_jobs()
         self._running_workers = []
@@ -123,6 +176,20 @@ class AlgorithmContext:
 
         self._workers.append(worker)
 
+    def add_strategy(self, strategy_worker):
+
+        assert isinstance(strategy_worker, StrategyWorker), \
+            OperationalException(
+                "Strategy worker is not an instance of an StrategyWorker"
+            )
+
+        for installed_worker in self._workers:
+
+            if installed_worker.worker_id == strategy_worker.worker_id:
+                return
+
+        self._workers.append(strategy_worker)
+
     @property
     def running(self) -> bool:
         """
@@ -139,6 +206,16 @@ class AlgorithmContext:
     @property
     def running_workers(self) -> List:
         return self._running_workers
+
+    @property
+    def running_strategies(self) -> List:
+        strategies = []
+
+        for worker in self._workers:
+            if isinstance(worker, StrategyWorker):
+                strategies.append(worker)
+
+        return strategies
 
     @property
     def config(self) -> Config:
@@ -172,8 +249,9 @@ class AlgorithmContext:
         return order_executors
 
     def get_order_executor(
-            self, identifier=None, throw_exception: bool = True
+        self, identifier=None, throw_exception: bool = True
     ) -> OrderExecutor:
+
         if identifier is None:
 
             if len(self._order_executors.keys()) == 0:
@@ -653,7 +731,6 @@ class AlgorithmContext:
                 )
 
             return data_provider.provide_raw_data(self)
-
 
     def get_unallocated_size(self, identifier):
         portfolio_manager = self.get_portfolio_manager(identifier)
