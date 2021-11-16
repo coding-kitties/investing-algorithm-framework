@@ -57,7 +57,9 @@ class Position(db.Model, ModelExtension):
 
     # Constraints
     __table_args__ = (
-        UniqueConstraint('symbol', 'portfolio_id', name='_symbol_portfolio_uc'),
+        UniqueConstraint(
+            'symbol', 'portfolio_id', name='_symbol_portfolio_uc'
+        ),
     )
 
     def __init__(self, symbol):
@@ -105,8 +107,6 @@ def parent_child_relation_inserted(position, order, target):
                 .filter_by(
                     order_reference=order.order_reference
                 ).first() is not None:
-
             return
 
-        if not OrderType.MARKET.equals(order.order_type):
-            position.portfolio.unallocated -= (order.amount * order.price)
+        position.portfolio.unallocated -= order.amount_trading_symbol

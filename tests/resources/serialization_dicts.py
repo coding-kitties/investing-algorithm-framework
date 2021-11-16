@@ -1,7 +1,7 @@
 order_serialization_dict = {
     'id',
     'order_reference',
-    'price',
+    'initial_price',
     'identifier',
     'position_id',
     'amount',
