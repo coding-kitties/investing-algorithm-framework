@@ -1,6 +1,5 @@
 from investing_algorithm_framework import OrderSide, OrderType
-from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin, \
-    SYMBOL_A, SYMBOL_A_PRICE
+from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
 class Test(TestOrderAndPositionsObjectsMixin, TestBase):
@@ -17,51 +16,37 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
             self.algo_app.algorithm.get_portfolio_manager().initialize_has_run
         )
 
-    def test_create_buy_order(self):
+    def test_create_limit_buy_order(self):
         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 
         order = portfolio_manager.create_order(
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.BUY.value,
-            amount=1,
-            symbol=SYMBOL_A,
-            price=SYMBOL_A_PRICE,
+            amount_target_symbol=1,
+            symbol=self.TARGET_SYMBOL_A,
+            price=self.BASE_SYMBOL_A_PRICE,
             validate_pair=True,
             context=None
         )
 
         self.assertIsNotNone(order)
+        self.assert_is_limit_order(order)
 
-        self.assertTrue(OrderSide.BUY.equals(order.order_side))
-        self.assertTrue(OrderType.LIMIT.equals(order.order_type))
-        self.assertIsNone(order.order_reference)
-        self.assertEqual(1, order.amount)
-        self.assertEqual(SYMBOL_A_PRICE, order.price)
-        self.assertIsNone(order.status)
-        self.assertIsNone(order.executed_at)
-
-    def test_create_sell_order(self):
+    def test_create_limit_sell_order(self):
         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 
         order = portfolio_manager.create_order(
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.SELL.value,
-            amount=1,
-            symbol=SYMBOL_A,
-            price=SYMBOL_A_PRICE,
+            amount_target_symbol=1,
+            symbol=self.TARGET_SYMBOL_A,
+            price=self.BASE_SYMBOL_A_PRICE,
             validate_pair=True,
             context=None
         )
 
         self.assertIsNotNone(order)
-
-        self.assertTrue(OrderSide.SELL.equals(order.order_side))
-        self.assertTrue(OrderType.LIMIT.equals(order.order_type))
-        self.assertIsNone(order.order_reference)
-        self.assertEqual(1, order.amount)
-        self.assertEqual(SYMBOL_A_PRICE, order.price)
-        self.assertIsNone(order.status)
-        self.assertIsNone(order.executed_at)
+        self.assert_is_limit_order(order)
 
     def test_get_portfolio(self):
         portfolio = self.algo_app.algorithm.get_portfolio_manager().get_portfolio()
@@ -91,9 +76,9 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
         order = portfolio_manager.create_order(
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.BUY.value,
-            amount=1,
-            symbol=SYMBOL_A,
-            price=SYMBOL_A_PRICE,
+            amount_target_symbol=1,
+            symbol=self.TARGET_SYMBOL_A,
+            price=self.BASE_SYMBOL_A_PRICE,
             validate_pair=True,
             context=None
         )

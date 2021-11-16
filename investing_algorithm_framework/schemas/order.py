@@ -6,7 +6,7 @@ class OrderSerializer(Schema):
     order_reference = fields.String(dump_only=True)
     target_symbol = fields.String(dump_only=True)
     trading_symbol = fields.String(dump_only=True)
-    price = fields.Float(dump_only=True)
+    initial_price = fields.Float(dump_only=True)
     amount = fields.Float(dump_only=True)
     amount_trading_symbol = fields.Float(dump_only=True)
     status = fields.String(dump_only=True)

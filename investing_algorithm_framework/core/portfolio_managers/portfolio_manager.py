@@ -65,11 +65,7 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
 
         return trading_symbol
 
-    def get_positions(
-            self,
-            symbol: str = None,
-            lazy=False
-    ):
+    def get_positions(self, symbol: str = None, lazy=False):
 
         if symbol is None:
             query_set = Position.query \
@@ -129,7 +125,8 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
             self,
             symbol,
             price=None,
-            amount=None,
+            amount_trading_symbol=None,
+            amount_target_symbol=None,
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.BUY.value,
             context=None,
@@ -145,7 +142,8 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
             order_type=order_type,
             symbol=symbol,
             price=price,
-            amount=amount,
+            amount_trading_symbol=amount_trading_symbol,
+            amount_target_symbol=amount_target_symbol,
             order_side=order_side,
             validate_pair=validate_pair
         )

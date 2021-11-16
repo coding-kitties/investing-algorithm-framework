@@ -39,7 +39,7 @@ app = App(
 )
 
 
-# Algorithm strategy that runs every 5 minutes and gets the ticker of BTC from BINANCE
+# Algorithm strategy that runs every 5 seconds and gets the ticker of BTC from BINANCE
 @app.algorithm.strategy(
     time_unit=TimeUnit.SECONDS,
     interval=5,
@@ -63,7 +63,7 @@ if __name__ == "__main__":
 ```
 The example algorithm makes use of the default data provider, order executor and 
 portfolio manager for BINANCE. However, your can also define your own 
-components.
+components for your algorithm making it compatible to any broker of choice.
 
 The goal of the framework is to provide you with a set of components for 
 your algorithm that takes care of a wide variety of operational processes 

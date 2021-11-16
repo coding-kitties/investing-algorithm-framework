@@ -1,6 +1,5 @@
 import json
-from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin, \
-    SYMBOL_A, SYMBOL_B, SYMBOL_A_PRICE, SYMBOL_B_PRICE, SYMBOL_C
+from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 from tests.resources.serialization_dicts import order_serialization_dict
 from investing_algorithm_framework import Order, OrderSide, db, OrderStatus, \
     Portfolio, Position
@@ -14,31 +13,33 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
         order = self.algo_app.algorithm.create_limit_buy_order(
             "test",
-            SYMBOL_A,
-            SYMBOL_A_PRICE,
-            10,
-            True
-        )
-        order.save(db)
-
-        order = self.algo_app.algorithm.create_limit_buy_order(
-            "test",
-            SYMBOL_B,
-            SYMBOL_B_PRICE,
-            10,
+            self.TARGET_SYMBOL_A,
+            self.BASE_SYMBOL_A_PRICE,
+            1,
             True
         )
         order.save(db)
         order.set_executed()
 
-        self.algo_app.algorithm.create_limit_sell_order(
+        order = self.algo_app.algorithm.create_limit_buy_order(
             "test",
-            SYMBOL_B,
-            SYMBOL_B_PRICE,
-            10,
+            self.TARGET_SYMBOL_B,
+            self.BASE_SYMBOL_B_PRICE,
+            1,
             True
         )
         order.save(db)
+        order.set_executed()
+
+        order = self.algo_app.algorithm.create_limit_sell_order(
+            "test",
+            self.TARGET_SYMBOL_B,
+            self.BASE_SYMBOL_B_PRICE,
+            1,
+            True
+        )
+        order.save(db)
+        order.set_executed()
 
     def test_list_orders(self):
         response = self.client.get("/api/orders")
@@ -48,13 +49,13 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(order_serialization_dict, set(data.get("items")[0]))
 
     def test_list_orders_with_position(self):
-        query_params = {'position': SYMBOL_B}
+        query_params = {'position': self.TARGET_SYMBOL_B}
         response = self.client.get("/api/orders", query_string=query_params)
         self.assert200(response)
         data = json.loads(response.data.decode())
 
         position_ids = Position.query\
-            .filter_by(symbol=SYMBOL_B)\
+            .filter_by(symbol=self.TARGET_SYMBOL_B)\
             .with_entities(Position.id)
 
         self.assertEqual(
@@ -62,7 +63,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             len(data["items"])
         )
 
-        query_params = {'position': SYMBOL_C}
+        query_params = {'position': self.TARGET_SYMBOL_C}
         response = self.client.get("/api/orders", query_string=query_params)
         self.assert200(response)
         data = json.loads(response.data.decode())
@@ -98,22 +99,24 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         )
 
     def test_list_orders_with_target_symbol_query_params(self):
-        query_params = {'target_symbol': SYMBOL_A}
+        query_params = {'target_symbol': self.TARGET_SYMBOL_A}
         response = self.client.get("/api/orders", query_string=query_params)
         self.assert200(response)
         data = json.loads(response.data.decode())
+
         self.assertEqual(
-            Order.query.filter_by(target_symbol=SYMBOL_A).count(),
+            Order.query.filter_by(target_symbol=self.TARGET_SYMBOL_A).count(),
             len(data["items"])
         )
 
-        query_params = {'target_symbol': SYMBOL_B}
+        query_params = {'target_symbol': self.TARGET_SYMBOL_B}
         response = self.client.get("/api/orders", query_string=query_params)
         self.assert200(response)
+        data = json.loads(response.data)
 
         self.assertEqual(
-            Order.query.filter_by(target_symbol=SYMBOL_B).count(),
-            len(data["items"])
+            Order.query.filter_by(target_symbol=self.TARGET_SYMBOL_B).count(),
+            data["total"]
         )
 
     def test_list_orders_with_trading_symbol_query_params(self):
@@ -198,7 +201,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 
         query_params = {
-            'target_symbol': SYMBOL_A,
+            'target_symbol': self.TARGET_SYMBOL_A,
             'trading_symbol': portfolio_manager.trading_symbol,
             'order_side': OrderSide.BUY.value
         }
@@ -211,13 +214,13 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             Order.query.filter_by(
                 order_side=OrderSide.BUY.value,
                 trading_symbol=portfolio_manager.trading_symbol,
-                target_symbol=SYMBOL_A
+                target_symbol=self.TARGET_SYMBOL_A
             ).count(),
             len(data["items"])
         )
 
         query_params = {
-            'target_symbol': SYMBOL_A,
+            'target_symbol': self.TARGET_SYMBOL_A,
             'trading_symbol': portfolio_manager.trading_symbol,
             'order_side': OrderSide.SELL.value
         }
@@ -230,7 +233,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             Order.query.filter_by(
                 order_side=OrderSide.SELL.value,
                 trading_symbol=portfolio_manager.trading_symbol,
-                target_symbol=SYMBOL_A
+                target_symbol=self.TARGET_SYMBOL_A
             ).count(),
             len(data["items"])
         )

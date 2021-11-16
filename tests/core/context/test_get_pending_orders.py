@@ -1,7 +1,5 @@
-from investing_algorithm_framework import PortfolioManager, OrderExecutor, \
-    Order, OrderStatus
-from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin, \
-    SYMBOL_A_PRICE, SYMBOL_A
+from investing_algorithm_framework import Order, OrderStatus
+from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
@@ -13,8 +11,8 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
     def test(self) -> None:
         self.create_buy_order(
             10,
-            SYMBOL_A,
-            SYMBOL_A_PRICE,
+            self.TARGET_SYMBOL_A,
+            self.BASE_SYMBOL_A_PRICE,
             self.algo_app.algorithm.get_portfolio_manager()
         )
 

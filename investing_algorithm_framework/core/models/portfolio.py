@@ -1,9 +1,9 @@
 from datetime import datetime
+from random import randint
 
-from sqlalchemy import UniqueConstraint, or_
+from sqlalchemy import UniqueConstraint, or_, event
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import validates
-
 
 from investing_algorithm_framework.core.models import db, OrderSide, Order, \
     OrderStatus, OrderType
@@ -51,6 +51,9 @@ class Portfolio(db.Model, ModelExtension):
     unallocated = db.Column(db.Float, nullable=False, default=0)
     realized = db.Column(db.Float, nullable=False, default=0)
 
+    total_revenue = db.Column(db.Float, nullable=False, default=0)
+    total_cost = db.Column(db.Float, nullable=False, default=0)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow())
     updated_at = db.Column(
         db.DateTime,
@@ -86,11 +89,15 @@ class Portfolio(db.Model, ModelExtension):
     def __init__(
             self, trading_symbol, unallocated, identifier, market, **kwargs
     ):
+        self.id = randint(1, 10)
         self.identifier = identifier
         self.trading_symbol = trading_symbol
         self.unallocated = unallocated
-        self.realized = unallocated
+        self.realized = 0
+        self.total_revenue = 0
+        self.total_cost = 0
         self.market = market
+        self.created_at = datetime.utcnow()
         super(Portfolio, self).__init__(**kwargs)
 
     @hybrid_property
@@ -121,8 +128,7 @@ class Portfolio(db.Model, ModelExtension):
 
         orders = Order.query \
             .filter_by(order_side=OrderSide.BUY.value) \
-            .filter(or_(Order.status == OrderStatus.SUCCESS.value, Order.status == OrderStatus.PENDING.value, Order.status == None)) \
-            .filter_by(closing_price=None)\
+            .filter_by(status=OrderStatus.SUCCESS.value)\
             .filter(Order.position_id.in_(position_ids)) \
             .all()
 
@@ -139,11 +145,17 @@ class Portfolio(db.Model, ModelExtension):
 
     @hybrid_property
     def unallocated_percentage(self):
-        return (self.unallocated / self.realized) * 100
+        return (self.unallocated / self.unallocated + self.allocated) * 100
 
-    def add_order(self, order, user_ids=None):
+    def add_order(self, order):
         self._validate_order(order)
         self._add_order_to_position(order)
+
+        order.update(db, {"status": OrderStatus.TO_BE_SENT.value}, commit=True)
+
+        if OrderSide.BUY.equals(order.order_side):
+            # Create the snapshot at the time the order was created
+            self.snapshot(creation_datetime=order.created_at)
 
     def _validate_order(self, order):
         order_validator = OrderValidatorFactory.of(self.market)
@@ -152,11 +164,12 @@ class Portfolio(db.Model, ModelExtension):
     def _add_order_to_position(self, order):
         from investing_algorithm_framework.core.models import Position
 
+        position = Position.query \
+            .filter_by(symbol=order.target_symbol) \
+            .filter_by(portfolio=self) \
+            .first()
+
         if OrderSide.BUY.equals(order.order_side):
-            position = Position.query \
-                .filter_by(symbol=order.target_symbol) \
-                .filter_by(portfolio=self)\
-                .first()
 
             if position is None:
                 position = Position(symbol=order.target_symbol)
@@ -164,10 +177,6 @@ class Portfolio(db.Model, ModelExtension):
                 self.positions.append(position)
                 db.session.commit()
         else:
-            position = Position.query \
-                .filter_by(symbol=order.trading_symbol) \
-                .filter_by(portfolio=self)\
-                .first()
 
             if position is None:
                 raise OperationalException(
@@ -183,7 +192,8 @@ class Portfolio(db.Model, ModelExtension):
         order_type,
         symbol,
         price=None,
-        amount=None,
+        amount_trading_symbol=None,
+        amount_target_symbol=None,
         order_side=OrderSide.BUY.value,
         validate_pair=True,
     ):
@@ -209,17 +219,15 @@ class Portfolio(db.Model, ModelExtension):
                 order = Order(
                     target_symbol=symbol,
                     trading_symbol=self.trading_symbol,
-                    amount_trading_symbol=amount,
-                    price=price,
+                    amount_trading_symbol=amount_trading_symbol,
                     order_type=order_type,
                     order_side=OrderSide.BUY.value
                 )
             else:
                 order = Order(
-                    target_symbol=self.trading_symbol,
-                    trading_symbol=symbol,
-                    amount_trading_symbol=amount,
-                    price=price,
+                    target_symbol=symbol,
+                    trading_symbol=self.trading_symbol,
+                    amount_target_symbol=amount_target_symbol,
                     order_type=order_type,
                     order_side=OrderSide.SELL.value
                 )
@@ -228,18 +236,16 @@ class Portfolio(db.Model, ModelExtension):
                 order = Order(
                     target_symbol=symbol,
                     trading_symbol=self.trading_symbol,
-                    amount=amount,
-                    amount_trading_symbol=amount * price,
+                    amount_target_symbol=amount_target_symbol,
                     price=price,
                     order_type=order_type,
                     order_side=OrderSide.BUY.value
                 )
             else:
                 order = Order(
-                    target_symbol=self.trading_symbol,
-                    trading_symbol=symbol,
-                    amount=amount,
-                    amount_trading_symbol=amount * price,
+                    target_symbol=symbol,
+                    trading_symbol=self.trading_symbol,
+                    amount_target_symbol=amount_target_symbol,
                     price=price,
                     order_type=order_type,
                     order_side=OrderSide.SELL.value
@@ -253,16 +259,32 @@ class Portfolio(db.Model, ModelExtension):
 
         if unallocated is not None:
             self.unallocated += unallocated
-            self.realized += unallocated
+            self.snapshot()
 
         super(Portfolio, self).update(db, data, **kwargs)
+
+    def snapshot(self, commit=True, creation_datetime=None):
+        from investing_algorithm_framework.core.models.snapshots \
+            import PortfolioSnapshot
+
+        PortfolioSnapshot\
+            .from_portfolio(self, creation_datetime=creation_datetime)\
+            .save(db, commit=commit)
 
     def __repr__(self):
         return self.repr(
             id=self.id,
-            trading_currency=self.trading_currency,
-            unallocated=f"{self.unallocated} {self.trading_currency}",
+            trading_symbol=self.trading_symbol,
+            unallocated=f"{self.unallocated} {self.trading_symbol}",
+            realized=f"{self.realized}",
+            total_revenue=f"{self.total_revenue}",
             identifier=self.identifier,
             created_at=self.created_at,
             updated_at=self.updated_at
         )
+
+
+# first snapshot on creation of a portfolio
+@event.listens_for(Portfolio, 'before_insert')
+def snapshot_after_insert(mapper, connection, portfolio):
+    portfolio.snapshot(commit=False)
