@@ -1,5 +1,4 @@
-from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin, \
-    SYMBOL_A, SYMBOL_A_PRICE
+from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
@@ -13,8 +12,8 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
         self.create_buy_order(
             1,
-            SYMBOL_A,
-            SYMBOL_A_PRICE,
+            self.TARGET_SYMBOL_A,
+            self.BASE_SYMBOL_A_PRICE,
             portfolio_manager
         )
 

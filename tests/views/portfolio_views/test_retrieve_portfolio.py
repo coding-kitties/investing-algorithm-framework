@@ -1,8 +1,7 @@
 import json
 
 from investing_algorithm_framework import db
-from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin, \
-    SYMBOL_A, SYMBOL_B, SYMBOL_A_PRICE, SYMBOL_B_PRICE
+from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 from tests.resources.serialization_dicts import portfolio_serialization_dict
 
 
@@ -14,8 +13,8 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
         order = self.algo_app.algorithm.create_limit_buy_order(
             "test",
-            SYMBOL_A,
-            SYMBOL_A_PRICE,
+            self.TARGET_SYMBOL_A,
+            self.BASE_SYMBOL_A_PRICE,
             10,
             True
         )
@@ -23,8 +22,8 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
         order = self.algo_app.algorithm.create_limit_buy_order(
             "test",
-            SYMBOL_B,
-            SYMBOL_B_PRICE,
+            self.TARGET_SYMBOL_B,
+            self.BASE_SYMBOL_B_PRICE,
             10,
             True
         )
@@ -33,8 +32,8 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
         self.algo_app.algorithm.create_limit_sell_order(
             "test",
-            SYMBOL_B,
-            SYMBOL_B_PRICE,
+            self.TARGET_SYMBOL_B,
+            self.BASE_SYMBOL_B_PRICE,
             10,
             True
         )

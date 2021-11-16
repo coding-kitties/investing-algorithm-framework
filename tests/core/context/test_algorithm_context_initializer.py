@@ -8,5 +8,6 @@ class TestAlgorithmContextInitialization(TestBase):
         self.algo_app.algorithm.start()
 
     def test(self):
-        self.assertTrue(self.algo_app.algorithm._initializer.initialize_has_run)
-
+        self.assertTrue(
+            self.algo_app.algorithm._initializer.initialize_has_run
+        )

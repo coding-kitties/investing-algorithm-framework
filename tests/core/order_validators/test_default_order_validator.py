@@ -1,7 +1,6 @@
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import OrderSide
 from investing_algorithm_framework.core.models import OrderType
-from tests.resources import SYMBOL_A, SYMBOL_A_PRICE
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
@@ -17,9 +16,9 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         order_a = portfolio_manager.create_order(
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.BUY.value,
-            amount=1,
-            symbol=SYMBOL_A,
-            price=SYMBOL_A_PRICE,
+            amount_target_symbol=1,
+            symbol=self.TARGET_SYMBOL_A,
+            price=self.BASE_SYMBOL_A_PRICE,
             validate_pair=True,
             context=None
         )
@@ -32,22 +31,22 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         order_a = portfolio_manager.create_order(
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.BUY.value,
-            amount=1,
-            symbol=SYMBOL_A,
-            price=SYMBOL_A_PRICE,
+            amount_target_symbol=1,
+            symbol=self.TARGET_SYMBOL_A,
+            price=self.BASE_SYMBOL_A_PRICE,
             validate_pair=True,
             context=None
         )
 
         portfolio_manager.add_order(order_a)
-
+        order_a.set_pending()
         order_a.set_executed()
         order_a_sell = portfolio_manager.create_order(
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.SELL.value,
-            amount=1,
-            symbol=SYMBOL_A,
-            price=SYMBOL_A_PRICE,
+            amount_target_symbol=1,
+            symbol=self.TARGET_SYMBOL_A,
+            price=self.BASE_SYMBOL_A_PRICE,
             validate_pair=True,
             context=None
         )
@@ -60,22 +59,23 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         order_a = portfolio_manager.create_order(
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.BUY.value,
-            amount=1,
-            symbol=SYMBOL_A,
-            price=SYMBOL_A_PRICE,
+            amount_target_symbol=1,
+            symbol=self.TARGET_SYMBOL_A,
+            price=self.BASE_SYMBOL_A_PRICE,
             validate_pair=True,
             context=None
         )
 
         portfolio_manager.add_order(order_a)
 
+        order_a.set_pending()
         order_a.set_executed()
         order_a_sell = portfolio_manager.create_order(
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.SELL.value,
-            amount=2,
-            symbol=SYMBOL_A,
-            price=SYMBOL_A_PRICE,
+            amount_target_symbol=2,
+            symbol=self.TARGET_SYMBOL_A,
+            price=self.BASE_SYMBOL_A_PRICE,
             validate_pair=True,
             context=None
         )
@@ -89,9 +89,9 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         order_a = portfolio_manager.create_order(
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.BUY.value,
-            amount=10000,
-            symbol=SYMBOL_A,
-            price=SYMBOL_A_PRICE,
+            amount_target_symbol=10000,
+            symbol=self.TARGET_SYMBOL_A,
+            price=self.BASE_SYMBOL_A_PRICE,
             validate_pair=True,
             context=None
         )

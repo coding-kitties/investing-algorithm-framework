@@ -482,6 +482,14 @@ class AlgorithmContext:
         )
         self._initializer = algorithm_context_initializer
 
+    def update_unallocated(self, unallocated_amount_change, identifier: str = None):
+        portfolio = self.get_portfolio_manager(identifier).get_portfolio()
+        portfolio.update(db, {"unallocated": unallocated_amount_change})
+
+    def add_order(self, order, identifier: str = None):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        portfolio_manager.add_order(order)
+
     def create_limit_buy_order(
             self,
             identifier: str,
@@ -494,7 +502,7 @@ class AlgorithmContext:
         order = portfolio_manager.create_order(
             symbol=symbol,
             price=price,
-            amount=amount,
+            amount_target_symbol=amount,
             order_type=OrderType.LIMIT.value
         )
 
@@ -513,12 +521,13 @@ class AlgorithmContext:
         order = portfolio_manager.create_order(
             symbol=symbol,
             price=price,
-            amount=amount,
+            amount_target_symbol=amount,
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.SELL.value
         )
 
         if execute:
+            # Execute order and set to pending state
             portfolio_manager.add_order(order)
             self.execute_limit_sell_order(identifier, order)
             order.set_pending()
@@ -526,12 +535,12 @@ class AlgorithmContext:
         return order
 
     def create_market_buy_order(
-        self, identifier, symbol, amount_trading_symbol, execute=False
+        self,  symbol, amount_trading_symbol, identifier=None, execute=False
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
             symbol=symbol,
-            amount=amount_trading_symbol,
+            amount_trading_symbol=amount_trading_symbol,
             order_type=OrderType.MARKET.value
         )
 
@@ -543,12 +552,16 @@ class AlgorithmContext:
         return order
 
     def create_market_sell_order(
-        self, identifier, symbol, amount, execute=False
+        self,
+        symbol,
+        amount_target_symbol,
+        identifier: str = None,
+        execute=False
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
             symbol=symbol,
-            amount=amount,
+            amount_target_symbol=amount_target_symbol,
             order_type=OrderType.MARKET.value,
             order_side=OrderSide.SELL.value
         )

@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from investing_algorithm_framework.core.market_identifier \
     import MarketIdentifier
+from investing_algorithm_framework.core.models.snapshots import AssetPrice
 
 
 class MarketService(ABC, MarketIdentifier):
@@ -9,11 +10,11 @@ class MarketService(ABC, MarketIdentifier):
     def pair_exists(self, target_symbol: str, trading_symbol: str):
         pass
 
-    def get_price(self, target_symbol: str, trading_symbol: str):
-        return self.get_ticker(target_symbol, trading_symbol)["price"]
+    def get_price(self, target_symbol: str, trading_symbol: str) -> AssetPrice:
+        return self.get_ticker(target_symbol, trading_symbol)
 
     @abstractmethod
-    def get_ticker(self, target_symbol: str, trading_symbol: str):
+    def get_ticker(self, target_symbol: str, trading_symbol: str) -> AssetPrice:
         pass
 
     @abstractmethod

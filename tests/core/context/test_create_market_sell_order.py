@@ -1,6 +1,5 @@
-from investing_algorithm_framework import OrderSide, OrderType, OrderStatus
-from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin, \
-    SYMBOL_A, SYMBOL_A_PRICE
+from investing_algorithm_framework import OrderSide, OrderType
+from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
@@ -11,10 +10,14 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
     def test(self) -> None:
         order = self.algo_app.algorithm\
-            .create_market_sell_order("test", SYMBOL_A, 10)
+            .create_market_sell_order(
+                identifier="test",
+                symbol=self.TARGET_SYMBOL_A,
+                amount_target_symbol=10
+            )
 
-        self.assertIsNotNone(order.amount_trading_symbol)
-        self.assertEqual(order.trading_symbol, SYMBOL_A)
+        self.assertIsNone(order.amount_trading_symbol)
+        self.assertEqual(order.target_symbol, self.TARGET_SYMBOL_A)
         self.assertIsNotNone(order.target_symbol)
         self.assertIsNotNone(order.trading_symbol)
         self.assertIsNotNone(order.order_side)
@@ -24,36 +27,22 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
     def test_with_execution(self) -> None:
         order = self.algo_app.algorithm \
-            .create_market_buy_order("test", SYMBOL_A, 10, execute=True)
-
-        order.price = SYMBOL_A_PRICE
-        order.amount = 10
-        order.set_executed()
-
-        self.assertEqual(order.position.amount, 10)
-        self.assertEqual(order.position.cost, 10 * SYMBOL_A_PRICE)
-        self.assertEqual(order.amount_trading_symbol, 10)
-
-        order = self.algo_app.algorithm\
-            .create_market_sell_order(
-                "test", SYMBOL_A, 10, execute=True
+            .create_market_buy_order(
+                identifier="test",
+                symbol=self.TARGET_SYMBOL_A,
+                amount_trading_symbol=10
             )
 
-        self.assertIsNotNone(order.amount_trading_symbol)
-        self.assertEqual(order.trading_symbol, SYMBOL_A)
-        self.assertIsNotNone(order.target_symbol)
-        self.assertIsNotNone(order.trading_symbol)
-        self.assertIsNotNone(order.order_side)
-        self.assertIsNotNone(order.status)
-        self.assertTrue(OrderStatus.PENDING.equals(order.status))
-        self.assertTrue(OrderSide.SELL.equals(order.order_side))
-        self.assertTrue(OrderType.MARKET.equals(order.order_type))
+        portfolio = self.algo_app.algorithm\
+            .get_portfolio_manager()\
+            .get_portfolio()
 
-        self.assertEqual(order.position.amount, 10)
-        self.assertEqual(order.position.cost, 10 * SYMBOL_A_PRICE)
+        portfolio.add_order(order)
+        order.set_pending()
+        order.set_executed(amount=10, price=self.BASE_SYMBOL_A_PRICE)
+
+        self.assertEqual(order.amount_target_symbol, 10)
+        self.assertEqual(order.position.cost, 10 * self.BASE_SYMBOL_A_PRICE)
         self.assertEqual(order.amount_trading_symbol, 10)
 
-        order.price = SYMBOL_A_PRICE
-        order.amount = 10
-
-        order.set_executed()
+        self.assert_is_market_order(order, True)

@@ -4,6 +4,7 @@ from enum import Enum
 class OrderStatus(Enum):
     SUCCESS = 'SUCCESS'
     PENDING = 'PENDING'
+    TO_BE_SENT = "TO_BE_SENT"
     FAILED = "FAILED"
     CANCELED = "CANCELED"
     CLOSED = "CLOSED"
