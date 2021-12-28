@@ -7,7 +7,7 @@
 ###### Sponsors
 <p align="left">
 <a href="https://eltyer.com">
-  <img src="https://eltyer-production.s3.eu-central-1.amazonaws.com/logos/eltyer_logo_transparent.png" width="200px" />
+  <img src="https://eltyer-production.s3.eu-central-1.amazonaws.com/logos/eltyer-logo.svg" width="200px" />
 </a>
 </p>
 
