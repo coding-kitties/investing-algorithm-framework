@@ -2,7 +2,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-from investing_algorithm_framework import Portfolio
+from investing_algorithm_framework import Portfolio, current_app
 from investing_algorithm_framework.schemas import PortfolioSerializer
 from investing_algorithm_framework.views.utils import \
     create_paginated_response, get_query_param
@@ -30,13 +30,19 @@ def list_portfolios():
 
 
 @blueprint.route("/api/portfolios/<string:identifier>", methods=["GET"])
-def retrieve(identifier=None):
+def retrieve(identifier="default"):
     """
     View for retrieving of an portfolio of the algorithm.
     """
 
-    portfolio = Portfolio.query.filter_by(identifier=identifier)\
-        .first_or_404("Portfolio not found")
+    # Get the default portfolio
+    if identifier == "default":
+        portfolio = current_app.algorithm\
+            .get_portfolio_manager()\
+            .get_portfolio()
+    else:
+        portfolio = Portfolio.query.filter_by(identifier=identifier)\
+            .first_or_404("Portfolio not found")
 
     time_frame = get_query_param(
         TIME_FRAME_QUERY_PARAM, request.args, TimeFrame.ONE_DAY.value
