@@ -376,8 +376,8 @@ class Order(db.Model, ModelExtension):
             order_type=self.order_type,
             target_symbol=self.target_symbol,
             trading_symbol=self.trading_symbol,
-            amount_target_symbol=self.amount_target_symbol -
-                                 (self.amount_target_symbol - amount),
+            amount_target_symbol=
+            self.amount_target_symbol - (self.amount_target_symbol - amount)
         )
 
         order.amount_trading_symbol = order.initial_price \
