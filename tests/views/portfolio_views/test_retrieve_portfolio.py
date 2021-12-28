@@ -85,3 +85,14 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(
             portfolio_serialization_dict, set(data.keys())
         )
+
+    def test_retrieve_default(self):
+        response = self.client.get(
+            f"/api/portfolios/default"
+        )
+        self.assert200(response)
+        data = json.loads(response.data.decode())
+
+        self.assertEqual(
+            portfolio_serialization_dict, set(data.keys())
+        )
