@@ -398,7 +398,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         order_a.set_pending()
         order_a.set_executed()
 
-        self.assertNotEqual(0, portfolio.realized)
+        self.assertNotEqual(0.0, portfolio.realized)
 
     def test_unallocated_percentage(self):
         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
