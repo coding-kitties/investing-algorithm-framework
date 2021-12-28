@@ -25,6 +25,23 @@ class TimeFrame(Enum):
                 f"Could not convert {value} to TimeFrame"
             )
 
+    @staticmethod
+    def from_value(value):
+
+        if isinstance(value, str):
+            return TimeFrame.from_string(value)
+
+        if isinstance(value, TimeFrame):
+
+            for entry in TimeFrame:
+
+                if value == entry:
+                    return entry
+
+        raise ValueError(
+            f"Could not convert {value} to TimeFrame"
+        )
+
     def equals(self, other):
 
         if isinstance(other, Enum):
@@ -77,7 +94,7 @@ class TimeFrame(Enum):
 
     @property
     def time_interval(self):
-        from app.models.utils.time_interval import TimeInterval
+        from investing_algorithm_framework.core.models import TimeInterval
 
         if TimeFrame.CURRENT.equals(self):
             return TimeInterval.CURRENT

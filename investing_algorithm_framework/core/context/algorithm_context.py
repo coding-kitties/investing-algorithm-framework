@@ -482,9 +482,13 @@ class AlgorithmContext:
         )
         self._initializer = algorithm_context_initializer
 
-    def update_unallocated(self, unallocated_amount_change, identifier: str = None):
+    def deposit(self, amount, identifier: str = None):
         portfolio = self.get_portfolio_manager(identifier).get_portfolio()
-        portfolio.update(db, {"unallocated": unallocated_amount_change})
+        portfolio.deposit(amount)
+
+    def withdraw(self, amount, identifier: str = None):
+        portfolio = self.get_portfolio_manager(identifier).get_portfolio()
+        portfolio.withdraw(amount)
 
     def add_order(self, order, identifier: str = None):
         portfolio_manager = self.get_portfolio_manager(identifier)
@@ -530,23 +534,6 @@ class AlgorithmContext:
             # Execute order and set to pending state
             portfolio_manager.add_order(order)
             self.execute_limit_sell_order(identifier, order)
-            order.set_pending()
-
-        return order
-
-    def create_market_buy_order(
-        self,  symbol, amount_trading_symbol, identifier=None, execute=False
-    ):
-        portfolio_manager = self.get_portfolio_manager(identifier)
-        order = portfolio_manager.create_order(
-            symbol=symbol,
-            amount_trading_symbol=amount_trading_symbol,
-            order_type=OrderType.MARKET.value
-        )
-
-        if execute:
-            portfolio_manager.add_order(order)
-            self.execute_market_buy_order(identifier, order)
             order.set_pending()
 
         return order

@@ -49,7 +49,6 @@ class Position(db.Model, ModelExtension):
     )
 
     amount = db.Column(db.Float)
-    cost = db.Column(db.Float)
 
     # Relationships
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'))
@@ -65,7 +64,6 @@ class Position(db.Model, ModelExtension):
     def __init__(self, symbol):
         self.symbol = symbol
         self.amount = 0
-        self.cost = 0
 
     @validates('id', 'symbol')
     def _write_once(self, key, value):
@@ -93,20 +91,3 @@ class Position(db.Model, ModelExtension):
             symbol=self.symbol,
             amount=self.amount,
         )
-
-
-@event.listens_for(Position.orders, 'append')
-def parent_child_relation_inserted(position, order, target):
-
-    if OrderSide.BUY.equals(order.order_side):
-
-        # Check if order id reference not already exists (order split)
-        # If it exists, this would mean that the order is a split order
-        # and therefore it is not needed to update the portfolio or position
-        if order.order_reference and position.orders\
-                .filter_by(
-                    order_reference=order.order_reference
-                ).first() is not None:
-            return
-
-        position.portfolio.unallocated -= order.amount_trading_symbol

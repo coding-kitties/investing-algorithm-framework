@@ -1,16 +1,18 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+
 from dateutil.relativedelta import relativedelta
 from flask_testing import TestCase
-from investing_algorithm_framework.configuration.constants import \
-    DATABASE_CONFIG, DATABASE_NAME, RESOURCES_DIRECTORY
-from investing_algorithm_framework.core.models import db, OrderStatus
-from investing_algorithm_framework.core.models.snapshots import AssetPrice
+
 from investing_algorithm_framework import PortfolioManager, MarketService, \
     OrderExecutor, Order, OrderType, OrderSide, AlgorithmContextInitializer
-from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.app import App
+from investing_algorithm_framework.configuration.constants import \
+    DATABASE_CONFIG, DATABASE_NAME, RESOURCES_DIRECTORY
 from investing_algorithm_framework.configuration.settings import TestConfig
+from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.core.models import db, OrderStatus, \
+    TimeInterval
 
 
 class Initializer(AlgorithmContextInitializer):
@@ -94,7 +96,47 @@ class MarketServiceTest(MarketService):
         return True
 
     def get_ticker(self, target_symbol: str, trading_symbol: str):
-        return TestBase.get_price(target_symbol)
+        return TestBase.get_price(target_symbol=target_symbol, date=datetime.utcnow())
+
+    def get_prices(
+        self,
+        target_symbol: str,
+        trading_symbol: str,
+        time_interval: TimeInterval
+    ):
+        from investing_algorithm_framework.core.models.snapshots \
+            import AssetPrice
+        asset_prices = []
+
+        for i in range(0, time_interval.amount_of_data_points()):
+
+            if TimeInterval.MINUTES_ONE.equals(time_interval):
+                date = datetime.utcnow() - timedelta(minutes=i)
+
+            if TimeInterval.MINUTES_FIFTEEN.equals(time_interval):
+                date = datetime.utcnow() - timedelta(minutes=i * 15)
+
+            if TimeInterval.HOURS_ONE.equals(time_interval):
+                date = datetime.utcnow() - timedelta(hours=i)
+
+            if TimeInterval.HOURS_FOUR.equals(time_interval):
+                date = datetime.utcnow() - timedelta(hours=i * 4)
+
+            if TimeInterval.DAYS_ONE.equals(time_interval):
+                date = datetime.utcnow() - timedelta(days=i)
+
+            asset_price = TestBase.get_price(target_symbol, date)
+            asset_prices.insert(
+                0,
+                AssetPrice(
+                    target_symbol=target_symbol,
+                    trading_symbol=trading_symbol,
+                    price=asset_price.price,
+                    datetime=date
+                )
+            )
+
+        return asset_prices
 
     def get_order_book(self, target_symbol: str, trading_symbol: str):
         pass
@@ -153,21 +195,11 @@ class TestBase(TestCase):
     BASE_SYMBOL_D_PRICE = 80
     BASE_SYMBOL_E_PRICE = 90
 
-    prices_symbol_a = [
-        AssetPrice(target_symbol=TARGET_SYMBOL_A, trading_symbol="usdt", price=BASE_SYMBOL_A_PRICE, datetime=datetime.utcnow() - relativedelta(years=15))
-    ]
-    prices_symbol_b = [
-        AssetPrice(target_symbol=TARGET_SYMBOL_B, trading_symbol="usdt", price=BASE_SYMBOL_B_PRICE, datetime=datetime.utcnow() - relativedelta(years=15))
-    ]
-    prices_symbol_c = [
-        AssetPrice(target_symbol=TARGET_SYMBOL_C, trading_symbol="usdt", price=BASE_SYMBOL_C_PRICE, datetime=datetime.utcnow() - relativedelta(years=15))
-    ]
-    prices_symbol_d = [
-        AssetPrice(target_symbol=TARGET_SYMBOL_D, trading_symbol="usdt", price=BASE_SYMBOL_D_PRICE, datetime=datetime.utcnow() - relativedelta(years=15))
-    ]
-    prices_symbol_e = [
-        AssetPrice(target_symbol=TARGET_SYMBOL_E, trading_symbol="usdt", price=BASE_SYMBOL_E_PRICE, datetime=datetime.utcnow() - relativedelta(years=15))
-    ]
+    prices_symbol_a = []
+    prices_symbol_b = []
+    prices_symbol_c = []
+    prices_symbol_d = []
+    prices_symbol_e = []
 
     def create_app(self):
         self.algo_app = App(
@@ -195,6 +227,35 @@ class TestBase(TestCase):
         self.algo_app.algorithm.initialize()
         self.algo_app.start_scheduler()
 
+        from investing_algorithm_framework.core.models.snapshots import \
+            AssetPrice
+
+        TestBase.prices_symbol_a = [
+            AssetPrice(target_symbol=self.TARGET_SYMBOL_A, trading_symbol="usdt",
+                       price=self.BASE_SYMBOL_A_PRICE,
+                       datetime=datetime.utcnow() - relativedelta(years=15))
+        ]
+        TestBase.prices_symbol_b = [
+            AssetPrice(target_symbol=self.TARGET_SYMBOL_B, trading_symbol="usdt",
+                       price=self.BASE_SYMBOL_B_PRICE,
+                       datetime=datetime.utcnow() - relativedelta(years=15))
+        ]
+        TestBase.prices_symbol_c = [
+            AssetPrice(target_symbol=self.TARGET_SYMBOL_C, trading_symbol="usdt",
+                       price=self.BASE_SYMBOL_C_PRICE,
+                       datetime=datetime.utcnow() - relativedelta(years=15))
+        ]
+        TestBase.prices_symbol_d = [
+            AssetPrice(target_symbol=self.TARGET_SYMBOL_D, trading_symbol="usdt",
+                       price=self.BASE_SYMBOL_D_PRICE,
+                       datetime=datetime.utcnow() - relativedelta(years=15))
+        ]
+        TestBase.prices_symbol_e = [
+            AssetPrice(target_symbol=self.TARGET_SYMBOL_E, trading_symbol="usdt",
+                       price=self.BASE_SYMBOL_E_PRICE,
+                       datetime=datetime.utcnow() - relativedelta(years=15))
+        ]
+
     def tearDown(self) -> None:
         self.reset_prices()
         db.session.remove()
@@ -220,7 +281,7 @@ class TestBase(TestCase):
             raise self.failureException(msg)
 
     @staticmethod
-    def get_price(target_symbol, date=datetime.utcnow()):
+    def get_price(target_symbol, date=datetime.now()):
 
         if target_symbol == TestBase.TARGET_SYMBOL_A:
             prices = TestBase.prices_symbol_a
@@ -239,8 +300,9 @@ class TestBase(TestCase):
 
         return TestBase._get_price(prices, date)
 
-    @staticmethod
-    def update_price(target_symbol, price, date=datetime.utcnow()):
+    def update_price(self, target_symbol, price, date=datetime.utcnow()):
+        from investing_algorithm_framework.core.models.snapshots \
+            import AssetPrice
 
         if target_symbol == TestBase.TARGET_SYMBOL_A:
             prices = TestBase.prices_symbol_a
@@ -253,7 +315,6 @@ class TestBase(TestCase):
                     datetime=date
                 )
             )
-
         if target_symbol == TestBase.TARGET_SYMBOL_B:
             prices = TestBase.prices_symbol_b
             TestBase.prices_symbol_b = TestBase._append_price(
@@ -373,64 +434,17 @@ class TestBase(TestCase):
             msg = "Target symbol and trading symbol are the same"
             raise self.failureException(msg)
 
-        if order.amount_trading_symbol is None:
-            msg = "Amount trading symbol is not set"
-            raise self.failureException(msg)
-
-        if executed:
-            if order.amount <= 0:
-                msg = "Amount is too small"
-                raise self.failureException(msg)
-
-            if order.price <= 0:
-                msg = "Price is too small"
-                raise self.failureException(msg)
-
-            if order.position is None:
-                msg = "Position is not set"
-                raise self.failureException(msg)
-
-            if order.status is None:
-                msg = "Order status is None"
-                raise self.failureException(msg)
-
-            if order.status is OrderStatus.SUCCESS.value:
-                msg = "Order status is not value SUCCESS"
-                raise self.failureException(msg)
-
-    def assert_is_market_order(self, order, executed = False):
-
-        if order.trading_symbol is None:
-            msg = "Trading symbol is not set"
-            raise self.failureException(msg)
-
-        if order.target_symbol is None:
-            msg = "Target symbol is not set"
-            raise self.failureException(msg)
-
-        if order.trading_symbol == order.target_symbol:
-            msg = "Target symbol and trading symbol are the same"
-            raise self.failureException(msg)
-
         if OrderSide.SELL.equals(order.order_side):
             if order.amount_target_symbol is None:
-                msg = "Amount target symbol is not set"
-                raise self.failureException(msg)
-        else:
-            if order.amount_trading_symbol is None:
                 msg = "Amount trading symbol is not set"
                 raise self.failureException(msg)
 
         if executed:
             if order.amount_target_symbol <= 0:
-                msg = "Amount target symbol is too small"
+                msg = "Amount is too small"
                 raise self.failureException(msg)
 
-            if order.amount_trading_symbol <= 0:
-                msg = "Amount trading symbol is too small"
-                raise self.failureException(msg)
-
-            if order.initial_price <= 0:
+            if order.price <= 0:
                 msg = "Price is too small"
                 raise self.failureException(msg)
 
@@ -484,36 +498,12 @@ class TestBase(TestCase):
             msg = "Snapshot total_revenue is not set"
             raise self.failureException(msg)
 
-        if snapshot.total_cost is None:
-            msg = "Snapshot total_cost is not set"
-            raise self.failureException(msg)
-
         if snapshot.created_at is None:
             msg = "Snapshot created_at is not set"
             raise self.failureException(msg)
 
     def assert_is_position_snapshot(self, snapshot):
         pass
-
-    @staticmethod
-    def get_price(target_symbol, date=datetime.utcnow()):
-
-        if target_symbol == TestBase.TARGET_SYMBOL_A:
-            prices = TestBase.prices_symbol_a
-
-        if target_symbol == TestBase.TARGET_SYMBOL_B:
-            prices = TestBase.prices_symbol_b
-
-        if target_symbol == TestBase.TARGET_SYMBOL_C:
-            prices = TestBase.prices_symbol_c
-
-        if target_symbol == TestBase.TARGET_SYMBOL_D:
-            prices = TestBase.prices_symbol_d
-
-        if target_symbol == TestBase.TARGET_SYMBOL_E:
-            prices = TestBase.prices_symbol_e
-
-        return TestBase._get_price(prices, date)
 
     @staticmethod
     def _append_price(prices, asset_price):
@@ -541,6 +531,7 @@ class TestBase(TestCase):
 
     @staticmethod
     def _get_price(prices, target_date):
+
         if len(prices) == 1:
             return prices[0]
 
@@ -551,12 +542,20 @@ class TestBase(TestCase):
             current_price = price
 
             # In the future
-            if current_price.datetime > target_date:
+            if current_price.datetime >= target_date:
+
+                if current_price.datetime == target_date:
+                    return current_price
+
                 return previous_price
 
         return prices[-1]
 
     def reset_prices(self):
+
+        from investing_algorithm_framework.core.models.snapshots \
+            import AssetPrice
+
         TestBase.prices_symbol_a = [
             AssetPrice(
                 target_symbol=TestBase.TARGET_SYMBOL_A,
@@ -596,3 +595,39 @@ class TestBase(TestCase):
                 datetime=datetime.utcnow() - relativedelta(years=15)
             )
         ]
+
+    def create_limit_order(
+        self,
+        portfolio,
+        target_symbol,
+        amount,
+        price,
+        creation_datetime=datetime.utcnow(),
+        side=OrderSide.BUY.value,
+        execution_datetime=None,
+        executed=True,
+    ):
+        order = portfolio.create_order(
+            self.algo_app.algorithm,
+            order_side=side,
+            order_type=OrderType.LIMIT.value,
+            symbol=target_symbol,
+            amount_target_symbol=amount,
+            price=price,
+            validate_pair=False
+        )
+
+        order.created_at = creation_datetime
+        portfolio.add_order(order)
+
+        if not execution_datetime:
+            # Order is a minute later executed
+            executed_at = creation_datetime + timedelta(minutes=4)
+        else:
+            executed_at = execution_datetime
+
+        if executed:
+            order.set_pending()
+            order.set_executed(snapshot=True, executed_at=executed_at)
+
+        return order

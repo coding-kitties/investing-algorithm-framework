@@ -40,7 +40,7 @@ class PositionSnapshot(db.Model, ModelExtension):
 
         # Calculate the cost
         for order in orders:
-            cost += order.amount * order.price
+            cost += order.amount_target_symbol * order.initial_price
 
         # Create an algorithm position snapshot
         return PositionSnapshot(

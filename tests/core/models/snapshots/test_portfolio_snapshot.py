@@ -18,16 +18,22 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assert_is_portfolio_snapshot(snapshot)
 
     def test_snapshot_on_to_be_sent_order(self):
-        order = self.algo_app.algorithm\
-            .create_market_buy_order(
-                symbol=self.TARGET_SYMBOL_A, amount_trading_symbol=10
-            )
+        portfolio = self.algo_app.algorithm\
+            .get_portfolio_manager()\
+            .get_portfolio()
 
         self.assertEqual(1, PortfolioSnapshot.query.count())
 
-        self.algo_app.algorithm.add_order(order)
+        self.create_limit_order(
+            portfolio,
+            self.TARGET_SYMBOL_A,
+            amount=1,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            executed=False
+        )
 
         self.assertEqual(2, PortfolioSnapshot.query.count())
+
         latest_portfolio = PortfolioSnapshot.query.order_by(
             PortfolioSnapshot.created_at.desc()
         ).first()
@@ -35,14 +41,19 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assert_is_portfolio_snapshot(latest_portfolio)
 
     def test_snapshot_on_pending_order(self):
-        order = self.algo_app.algorithm \
-            .create_market_buy_order(
-                symbol=self.TARGET_SYMBOL_A, amount_trading_symbol=10
-            )
+        portfolio = self.algo_app.algorithm\
+            .get_portfolio_manager()\
+            .get_portfolio()
 
         self.assertEqual(1, PortfolioSnapshot.query.count())
 
-        self.algo_app.algorithm.add_order(order)
+        order = self.create_limit_order(
+            portfolio,
+            self.TARGET_SYMBOL_A,
+            amount=1,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            executed=False
+        )
 
         self.assertEqual(2, PortfolioSnapshot.query.count())
 
@@ -51,14 +62,19 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(2, PortfolioSnapshot.query.count())
 
     def test_snapshot_on_cancel_order(self):
-        order = self.algo_app.algorithm \
-            .create_market_buy_order(
-                symbol=self.TARGET_SYMBOL_A, amount_trading_symbol=10
-            )
+        portfolio = self.algo_app.algorithm \
+            .get_portfolio_manager() \
+            .get_portfolio()
 
         self.assertEqual(1, PortfolioSnapshot.query.count())
 
-        self.algo_app.algorithm.add_order(order)
+        order = self.create_limit_order(
+            portfolio,
+            self.TARGET_SYMBOL_A,
+            amount=1,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            executed=False
+        )
 
         self.assertEqual(2, PortfolioSnapshot.query.count())
 
@@ -71,14 +87,19 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(3, PortfolioSnapshot.query.count())
 
     def test_snapshot_on_execute_order(self):
-        order = self.algo_app.algorithm \
-            .create_market_buy_order(
-                symbol=self.TARGET_SYMBOL_A, amount_trading_symbol=10
-            )
+        portfolio = self.algo_app.algorithm \
+            .get_portfolio_manager() \
+            .get_portfolio()
 
         self.assertEqual(1, PortfolioSnapshot.query.count())
 
-        self.algo_app.algorithm.add_order(order)
+        order = self.create_limit_order(
+            portfolio,
+            self.TARGET_SYMBOL_A,
+            amount=1,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            executed=False
+        )
 
         self.assertEqual(2, PortfolioSnapshot.query.count())
 
@@ -91,14 +112,19 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(3, PortfolioSnapshot.query.count())
 
     def test_snapshot_on_close_order(self):
-        order = self.algo_app.algorithm \
-            .create_market_buy_order(
-                symbol=self.TARGET_SYMBOL_A, amount_trading_symbol=10
-            )
+        portfolio = self.algo_app.algorithm \
+            .get_portfolio_manager() \
+            .get_portfolio()
 
         self.assertEqual(1, PortfolioSnapshot.query.count())
 
-        self.algo_app.algorithm.add_order(order)
+        order = self.create_limit_order(
+            portfolio,
+            self.TARGET_SYMBOL_A,
+            amount=1,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            executed=False
+        )
 
         self.assertEqual(2, PortfolioSnapshot.query.count())
 
@@ -112,7 +138,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
 
         order = self.algo_app.algorithm \
             .create_market_sell_order(
-                symbol=self.TARGET_SYMBOL_A, amount_target_symbol=10
+                symbol=self.TARGET_SYMBOL_A, amount_target_symbol=1
             )
 
         self.assertEqual(3, PortfolioSnapshot.query.count())
@@ -127,7 +153,12 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
 
         self.assertEqual(4, PortfolioSnapshot.query.count())
 
-    def test_snapshot_on_portfolio_updating(self):
+    def test_snapshot_on_portfolio_deposit(self):
         self.assertEqual(1, PortfolioSnapshot.query.count())
-        self.algo_app.algorithm.update_unallocated(1000)
+        self.algo_app.algorithm.deposit(1000)
+        self.assertEqual(2, PortfolioSnapshot.query.count())
+
+    def test_snapshot_on_portfolio_withdraw(self):
+        self.assertEqual(1, PortfolioSnapshot.query.count())
+        self.algo_app.algorithm.withdraw(1000)
         self.assertEqual(2, PortfolioSnapshot.query.count())

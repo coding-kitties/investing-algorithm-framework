@@ -1,3 +1,4 @@
+from datetime import datetime
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import OrderSide, Portfolio, \
     OrderType
@@ -24,7 +25,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(0, portfolio.allocated)
         self.assertEqual(0, portfolio.allocated_percentage)
         self.assertEqual(100, portfolio.unallocated_percentage)
-        self.assertEqual(0, portfolio.delta)
         self.assertEqual(0, portfolio.positions.count())
 
         order_a = portfolio_manager.create_order(
@@ -32,7 +32,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             order_side=OrderSide.BUY.value,
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
-            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            price=self.get_price(self.TARGET_SYMBOL_A, date=datetime.utcnow()).price,
             validate_pair=True,
             context=None
         )
@@ -51,12 +51,11 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         order_a.set_executed()
 
         self.assertEqual(
-            self.get_price(self.TARGET_SYMBOL_A).price * 1,
+            self.get_price(self.TARGET_SYMBOL_A, date=datetime.utcnow()).price * 1,
             portfolio.allocated
         )
         self.assertNotEqual(0, portfolio.allocated_percentage)
         self.assertNotEqual(100, portfolio.unallocated_percentage)
-        self.assertEqual(0, portfolio.delta)
         self.assertEqual(1, portfolio.positions.count())
 
         order_b = portfolio_manager.create_order(
@@ -98,7 +97,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
         self.assertNotEqual(0, portfolio.allocated_percentage)
         self.assertNotEqual(100, portfolio.unallocated_percentage)
-        self.assertEqual(0, portfolio.delta)
         self.assertEqual(2, portfolio.positions.count())
 
         sell_order_a = portfolio_manager.create_order(
@@ -129,7 +127,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         sell_order_b.set_executed()
 
         self.assertEqual(0, portfolio.allocated)
-        self.assertEqual(0, portfolio.delta)
         self.assertEqual(2, portfolio.positions.count())
 
     def test_allocated_percentage(self):
@@ -143,7 +140,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(0, portfolio.allocated)
         self.assertEqual(0, portfolio.allocated_percentage)
         self.assertEqual(100, portfolio.unallocated_percentage)
-        self.assertEqual(0, portfolio.delta)
         self.assertEqual(0, portfolio.positions.count())
 
         order_a = portfolio_manager.create_order(
@@ -175,7 +171,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         )
         self.assertNotEqual(0, portfolio.allocated_percentage)
         self.assertNotEqual(100, portfolio.unallocated_percentage)
-        self.assertEqual(0, portfolio.delta)
         self.assertEqual(1, portfolio.positions.count())
 
         order_b = portfolio_manager.create_order(
@@ -217,7 +212,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
         self.assertNotEqual(0, portfolio.allocated_percentage)
         self.assertNotEqual(100, portfolio.unallocated_percentage)
-        self.assertEqual(0, portfolio.delta)
         self.assertEqual(2, portfolio.positions.count())
 
         sell_order_a = portfolio_manager.create_order(
@@ -248,7 +242,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         sell_order_b.set_executed()
 
         self.assertEqual(0, portfolio.allocated_percentage)
-        self.assertEqual(0, portfolio.delta)
         self.assertEqual(2, portfolio.positions.count())
 
     def test_limit_sell_order_creation(self):
@@ -361,54 +354,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertNotEqual(0, position_a.amount)
         self.assertNotEqual(0, position_b.amount)
 
-    def test_delta(self):
-        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
-        portfolio = self.algo_app.algorithm.get_portfolio_manager()\
-            .get_portfolio()
-
-        order_a = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.BUY.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_A,
-            price=self.get_price(self.TARGET_SYMBOL_A).price,
-            validate_pair=True,
-            context=None
-        )
-        portfolio.add_order(order_a)
-
-        order_b = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.BUY.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_B,
-            price=self.get_price(self.TARGET_SYMBOL_B).price,
-            validate_pair=True,
-            context=None
-        )
-        portfolio.add_order(order_b)
-
-        self.assertEqual(len(portfolio_manager.get_positions()), 2)
-        self.assertEqual(0, portfolio.delta)
-
-        self.update_price(
-            self.TARGET_SYMBOL_A, price=self.BASE_SYMBOL_A_PRICE * 1.1
-        )
-        self.update_price(
-            self.TARGET_SYMBOL_B, price=self.BASE_SYMBOL_B_PRICE * 1.1
-        )
-
-        self.assertEqual(len(portfolio_manager.get_positions()), 2)
-        self.assertEqual(0, portfolio.delta)
-
-        order_a.set_pending()
-        order_a.set_executed()
-        order_b.set_pending()
-        order_b.set_executed()
-
-        self.assertEqual(len(portfolio_manager.get_positions()), 2)
-        self.assertNotEqual(0, portfolio.delta)
-
     def test_realized(self):
         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
         portfolio = portfolio_manager.get_portfolio()
@@ -432,7 +377,11 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(0, portfolio.realized)
 
         self.update_price(
-            self.TARGET_SYMBOL_A, price=self.BASE_SYMBOL_A_PRICE * 1.2
+            self.TARGET_SYMBOL_A,
+            1.1 * self.get_price(
+                self.TARGET_SYMBOL_A, date=datetime.utcnow()
+            ).price,
+            date=datetime.utcnow()
         )
 
         order_a = portfolio_manager.create_order(
@@ -479,7 +428,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
         self.assertNotEqual(initial_unallocated, portfolio.unallocated)
 
-        order_a = portfolio_manager.create_order(
+        sell_order_a = portfolio_manager.create_order(
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.SELL.value,
             amount_target_symbol=1,
@@ -488,9 +437,9 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             validate_pair=True,
             context=None
         )
-        portfolio.add_order(order_a)
+        portfolio.add_order(sell_order_a)
 
-        order_a.set_pending()
-        order_a.set_executed()
+        sell_order_a.set_pending()
+        sell_order_a.set_executed()
 
         self.assertEqual(initial_unallocated, portfolio.unallocated)
