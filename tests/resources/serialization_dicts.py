@@ -33,4 +33,5 @@ portfolio_serialization_dict = {
     'market',
     'positions',
     'orders',
+    "performance"
 }

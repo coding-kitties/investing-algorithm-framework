@@ -12,6 +12,8 @@ def initialize_db(app: Flask):
     db.init_app(app)
     db.app = app
 
+from investing_algorithm_framework.core.models.performance_metric import \
+    PerformanceMetric
 from investing_algorithm_framework.core.models.order_status import OrderStatus
 from investing_algorithm_framework.core.models.order_type import OrderType
 from investing_algorithm_framework.core.models.order_side import OrderSide
@@ -37,5 +39,8 @@ __all__ = [
     "initialize_db",
     "OrderStatus",
     "TimeFrame",
-    "TimeInterval"
+    "TimeInterval",
+    "PortfolioSnapshot",
+    "PositionSnapshot",
+    "PerformanceMetric"
 ]

@@ -7,6 +7,7 @@ from investing_algorithm_framework.core.mixins import \
     BinanceApiSecretKeySpecifierMixin
 from investing_algorithm_framework.configuration.constants import BINANCE, \
     BINANCE_API_KEY, BINANCE_SECRET_KEY
+from investing_algorithm_framework.core.models import TimeInterval
 
 
 BINANCE_CCXT_ID = "binance"
@@ -178,7 +179,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             raise OperationalException("Could not retrieve order")
 
     def get_open_orders(
-            self, target_symbol: str = None, trading_symbol: str = None
+        self, target_symbol: str = None, trading_symbol: str = None
     ):
         try:
             if target_symbol is None or trading_symbol is None:
@@ -191,7 +192,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             raise OperationalException("Could not retrieve open orders")
 
     def get_closed_orders(
-            self, target_symbol: str = None, trading_symbol: str = None
+        self, target_symbol: str = None, trading_symbol: str = None
     ):
 
         try:
@@ -203,3 +204,11 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
         except Exception as e:
             logger.exception(e)
             raise OperationalException("Could not retrieve closed orders")
+
+    def get_prices(
+        self,
+        target_symbol: str,
+        trading_symbol: str,
+        time_interval: TimeInterval
+    ):
+        pass

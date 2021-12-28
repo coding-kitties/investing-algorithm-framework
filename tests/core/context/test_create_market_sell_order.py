@@ -26,23 +26,37 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertTrue(OrderType.MARKET.equals(order.order_type))
 
     def test_with_execution(self) -> None:
-        order = self.algo_app.algorithm \
-            .create_market_buy_order(
-                identifier="test",
-                symbol=self.TARGET_SYMBOL_A,
-                amount_trading_symbol=10
-            )
+        self.create_limit_order(
+            self.algo_app.algorithm.get_portfolio_manager().get_portfolio(),
+            self.TARGET_SYMBOL_A,
+            amount=1,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            side=OrderSide.BUY.value,
+            executed=True,
+        )
 
-        portfolio = self.algo_app.algorithm\
-            .get_portfolio_manager()\
-            .get_portfolio()
+        sell_order = self.algo_app.algorithm.create_market_sell_order(
+            symbol=self.TARGET_SYMBOL_A,
+            amount_target_symbol=1,
+            execute=True
+        )
 
-        portfolio.add_order(order)
-        order.set_pending()
-        order.set_executed(amount=10, price=self.BASE_SYMBOL_A_PRICE)
+        self.assertEqual(sell_order.amount_target_symbol, 1)
+        self.assertEqual(sell_order.position.amount, 1)
+        self.assertEqual(sell_order.amount_target_symbol, 1)
+        self.assertIsNone(sell_order.amount_trading_symbol)
 
-        self.assertEqual(order.amount_target_symbol, 10)
-        self.assertEqual(order.position.cost, 10 * self.BASE_SYMBOL_A_PRICE)
-        self.assertEqual(order.amount_trading_symbol, 10)
+        self.assert_is_market_order(sell_order)
 
-        self.assert_is_market_order(order, True)
+        sell_order.set_executed(
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            amount=self.get_price(self.TARGET_SYMBOL_A).price
+        )
+
+        self.assertEqual(sell_order.amount_target_symbol, 1)
+        self.assertEqual(sell_order.position.amount, 0)
+        self.assertEqual(sell_order.amount_target_symbol, 1)
+        self.assertEqual(
+            sell_order.amount_trading_symbol,
+            self.get_price(self.TARGET_SYMBOL_A).price
+        )

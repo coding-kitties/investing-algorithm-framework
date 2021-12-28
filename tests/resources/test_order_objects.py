@@ -28,7 +28,7 @@ class TestOrderAndPositionsObjectsMixin:
     @staticmethod
     def create_market_buy_order(amount, ticker, portfolio_manager):
         order = portfolio_manager.create_order(
-            amount_trading_symbol=amount,
+            amount_target_symbol=amount,
             symbol=ticker,
             order_type=OrderType.MARKET.value,
             order_side=OrderSide.BUY.value

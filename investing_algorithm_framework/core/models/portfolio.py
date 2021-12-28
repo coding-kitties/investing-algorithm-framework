@@ -1,7 +1,7 @@
 from datetime import datetime
 from random import randint
 
-from sqlalchemy import UniqueConstraint, or_, event
+from sqlalchemy import UniqueConstraint, event
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import validates
 
@@ -101,26 +101,6 @@ class Portfolio(db.Model, ModelExtension):
         super(Portfolio, self).__init__(**kwargs)
 
     @hybrid_property
-    def delta(self):
-        from investing_algorithm_framework.core.models import Position
-
-        position_ids = self.positions.with_entities(Position.id)
-
-        orders = Order.query \
-            .filter_by(order_side=OrderSide.BUY.value) \
-            .filter_by(status=OrderStatus.SUCCESS.value) \
-            .filter_by(closing_price=None)\
-            .filter(Order.position_id.in_(position_ids)) \
-            .all()
-
-        delta = 0
-
-        for order in orders:
-            delta += order.delta
-
-        return delta
-
-    @hybrid_property
     def allocated(self):
         from investing_algorithm_framework.core.models import Position
 
@@ -141,10 +121,20 @@ class Portfolio(db.Model, ModelExtension):
 
     @hybrid_property
     def allocated_percentage(self):
+
+        # Prevent zero division
+        if self.allocated == 0 and self.unallocated == 0:
+            return 0
+
         return (self.allocated / (self.allocated + self.unallocated)) * 100
 
     @hybrid_property
     def unallocated_percentage(self):
+
+        # Prevent zero division
+        if self.allocated == 0 and self.unallocated == 0:
+            return 0
+
         return (self.unallocated / self.unallocated + self.allocated) * 100
 
     def add_order(self, order):
@@ -154,8 +144,12 @@ class Portfolio(db.Model, ModelExtension):
         order.update(db, {"status": OrderStatus.TO_BE_SENT.value}, commit=True)
 
         if OrderSide.BUY.equals(order.order_side):
+            self.unallocated -= order.amount_trading_symbol
+
             # Create the snapshot at the time the order was created
             self.snapshot(creation_datetime=order.created_at)
+
+        db.session.commit()
 
     def _validate_order(self, order):
         order_validator = OrderValidatorFactory.of(self.market)
@@ -215,43 +209,45 @@ class Portfolio(db.Model, ModelExtension):
 
         if OrderType.MARKET.equals(order_type):
 
-            if OrderSide.BUY.equals(order_side):
-                order = Order(
-                    target_symbol=symbol,
-                    trading_symbol=self.trading_symbol,
-                    amount_trading_symbol=amount_trading_symbol,
-                    order_type=order_type,
-                    order_side=OrderSide.BUY.value
-                )
-            else:
+            if OrderSide.SELL.equals(order_side):
                 order = Order(
                     target_symbol=symbol,
                     trading_symbol=self.trading_symbol,
                     amount_target_symbol=amount_target_symbol,
-                    order_type=order_type,
-                    order_side=OrderSide.SELL.value
+                    order_type=OrderType.MARKET.value,
+                    order_side=OrderSide.SELL.value,
+                    price=price
                 )
+            else:
+                raise OperationalException("Buy market order is not supported")
         else:
-            if OrderSide.BUY.equals(order_side):
-                order = Order(
-                    target_symbol=symbol,
-                    trading_symbol=self.trading_symbol,
-                    amount_target_symbol=amount_target_symbol,
-                    price=price,
-                    order_type=order_type,
-                    order_side=OrderSide.BUY.value
-                )
-            else:
-                order = Order(
-                    target_symbol=symbol,
-                    trading_symbol=self.trading_symbol,
-                    amount_target_symbol=amount_target_symbol,
-                    price=price,
-                    order_type=order_type,
-                    order_side=OrderSide.SELL.value
-                )
+            order = Order(
+                target_symbol=symbol,
+                trading_symbol=self.trading_symbol,
+                amount_target_symbol=amount_target_symbol,
+                amount_trading_symbol=amount_trading_symbol,
+                order_type=order_type,
+                order_side=order_side,
+                price=price
+            )
 
         return order
+
+    def withdraw(self, amount, creation_datetime=datetime.utcnow()):
+
+        if amount > self.unallocated:
+            raise OperationalException(
+                "Withdrawal is larger then unallocated size"
+            )
+
+        self.unallocated -= amount
+        db.session.commit()
+        self.snapshot(creation_datetime=creation_datetime, withdrawel=amount)
+
+    def deposit(self, amount, creation_datetime=datetime.utcnow()):
+        self.unallocated += amount
+        db.session.commit()
+        self.snapshot(creation_datetime=creation_datetime, deposit=amount)
 
     def update(self, db, data, commit: bool = False, **kwargs):
         self.updated_at = datetime.utcnow()
@@ -263,13 +259,16 @@ class Portfolio(db.Model, ModelExtension):
 
         super(Portfolio, self).update(db, data, **kwargs)
 
-    def snapshot(self, commit=True, creation_datetime=None):
+    def snapshot(
+        self, withdrawel=0, deposit=0, commit=True, creation_datetime=None
+    ):
         from investing_algorithm_framework.core.models.snapshots \
             import PortfolioSnapshot
 
         PortfolioSnapshot\
-            .from_portfolio(self, creation_datetime=creation_datetime)\
-            .save(db, commit=commit)
+            .from_portfolio(
+                self, creation_datetime, withdrawel=withdrawel, deposit=deposit
+            ).save(db, commit=commit)
 
     def __repr__(self):
         return self.repr(
