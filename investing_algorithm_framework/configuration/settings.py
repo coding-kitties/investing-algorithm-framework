@@ -56,7 +56,7 @@ class Environment(Enum):
 
 class Config(dict):
     ENV = "DEV"
-    LOG_LEVEL = 'INFO'
+    LOG_LEVEL = 'DEBUG'
     APP_DIR = os.path.abspath(os.path.dirname(__file__))
     PROJECT_ROOT = os.path.abspath(os.path.join(APP_DIR, os.pardir))
     DEBUG_TB_INTERCEPT_REDIRECTS = False

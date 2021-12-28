@@ -1,3 +1,4 @@
+from datetime import datetime
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import Order, OrderSide, db, \
     OrderStatus, OrderType
@@ -15,7 +16,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.create_buy_order(
             1,
             self.TARGET_SYMBOL_A,
-            self.get_price(self.TARGET_SYMBOL_A).price,
+            self.get_price(self.TARGET_SYMBOL_A, date=datetime.utcnow()).price,
             self.portfolio_manager
         )
 
@@ -36,28 +37,15 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.status)
         self.assertTrue(OrderStatus.TO_BE_SENT.equals(order.status))
 
-    def test_creation_market_buy_order(self):
-        self.assertEqual(1, Order.query.count())
-
-        self.create_market_buy_order(
-            1, self.TARGET_SYMBOL_A, self.portfolio_manager
-        )
-
-        order = Order.query\
-            .filter_by(order_type=OrderType.MARKET.value)\
-            .first()
-
-        self.assert_is_market_order(order)
-
     def test_creation_market_sell_order(self):
-        self.create_market_buy_order(
-            1, self.TARGET_SYMBOL_A, self.portfolio_manager
+        self.create_limit_order(
+            self.portfolio_manager.get_portfolio(),
+            self.TARGET_SYMBOL_A,
+            amount=1,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            side=OrderSide.BUY.value,
+            executed=True,
         )
-        order = Order.query\
-            .filter_by(order_type=OrderType.MARKET.value)\
-            .first()
-        order.set_pending()
-        order.set_executed(price=1000, amount=1)
 
         self.create_market_sell_order(
             1, self.TARGET_SYMBOL_A, self.portfolio_manager
@@ -106,7 +94,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.create_sell_order(
             1,
             self.TARGET_SYMBOL_A,
-            self.get_price(self.TARGET_SYMBOL_A).price,
+            self.get_price(self.TARGET_SYMBOL_A, date=datetime.utcnow()).price,
             portfolio_manager
         )
 
@@ -138,7 +126,10 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
 
         self.update_price(
             self.TARGET_SYMBOL_A,
-            1.1 * self.get_price(self.TARGET_SYMBOL_A).price
+            1.1 * self.get_price(
+                self.TARGET_SYMBOL_A, date=datetime.utcnow()
+            ).price,
+            date=datetime.utcnow()
         )
         self.assertEqual(
             1.1 * self.BASE_SYMBOL_A_PRICE - self.BASE_SYMBOL_A_PRICE,
@@ -212,7 +203,10 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
 
         self.assertEqual(self.BASE_SYMBOL_A_PRICE, old_value)
 
-        self.update_price(self.TARGET_SYMBOL_A, 1.1 * self.BASE_SYMBOL_A_PRICE)
+        self.update_price(
+            self.TARGET_SYMBOL_A, 1.1 * self.BASE_SYMBOL_A_PRICE,
+            date=datetime.utcnow()
+        )
 
         new_value = order.current_value
 
@@ -240,3 +234,28 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
 
         with self.assertRaises(OperationalException) as e:
             _, _ = order.split(0.5)
+
+    def test_cancel(self):
+        portfolio = self.algo_app.algorithm \
+            .get_portfolio_manager() \
+            .get_portfolio()
+
+        initial_unallocated = portfolio.unallocated
+
+        order = self.create_limit_order(
+            portfolio,
+            self.TARGET_SYMBOL_A,
+            amount=1,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            executed=False
+        )
+
+        self.assertNotEqual(initial_unallocated, portfolio.unallocated)
+
+        order.set_pending()
+
+        self.assertNotEqual(initial_unallocated, portfolio.unallocated)
+
+        order.cancel()
+
+        self.assertEqual(initial_unallocated, portfolio.unallocated)

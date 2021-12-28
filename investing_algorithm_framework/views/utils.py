@@ -32,6 +32,21 @@ def normalize_query(params):
     return {k: normalize_query_param(v) for k, v in params_non_flat.items()}
 
 
+def has_query_param(key, params):
+    query_params = normalize_query(params)
+    return key in query_params
+
+
+def get_query_param(key, params, default=None, many=False):
+    query_params = normalize_query(params)
+    selection = query_params.get(key, default)
+
+    if isinstance(selection, list) and len(selection) > 1 and not many:
+        return selection[0]
+
+    return selection
+
+
 def create_paginated_response(query_set, serializer):
     """
     Creates a paginated response from a query set. The given query set

@@ -1,3 +1,5 @@
+from investing_algorithm_framework.core.models import TimeFrame
+
 class AssetPricesQueue:
     """
     Asset prices queue for logical order of asset prices based on
@@ -8,7 +10,7 @@ class AssetPricesQueue:
     def __init__(self, asset_prices_array, time_frame):
         self.asset_prices = []
 
-        self.intervals = time_frame.intervals
+        self.intervals = TimeFrame.from_value(time_frame).intervals
 
         for zipped_asset_prices in zip(*asset_prices_array):
             self.asset_prices.insert(0, zipped_asset_prices)
