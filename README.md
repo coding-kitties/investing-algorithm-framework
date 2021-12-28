@@ -1,7 +1,15 @@
+<a href=https://investing-algorithm-framework.com><img src="https://img.shields.io/badge/docs-website-brightgreen"></a>
 [![Build](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/build.yml/badge.svg)](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/build.yml)
 [![Tests](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml/badge.svg)](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml)
 [![Downloads](https://pepy.tech/badge/investing-algorithm-framework)](https://pepy.tech/badge/investing-algorithm-framework)
 [![Current Version](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)
+![Subreddit subscribers](https://img.shields.io/reddit/subreddit-subscribers/investingbots?style=social)
+###### Sponsors
+<p align="left">
+<a href="https://eltyer.com">
+  <img src="https://eltyer-production.s3.eu-central-1.amazonaws.com/logos/eltyer_logo_transparent.png" width="200px" />
+</a>
+</p>
 
 # Investing Algorithm Framework
 
@@ -61,6 +69,9 @@ def perform_strategy(context: AlgorithmContext, ticker):
 if __name__ == "__main__":
     app.start()
 ```
+
+> **NOTE:** The framework is in **alpha**.
+
 The example algorithm makes use of the default data provider, order executor and 
 portfolio manager for BINANCE. However, your can also define your own 
 components for your algorithm making it compatible to any broker of choice.
@@ -69,20 +80,24 @@ The goal of the framework is to provide you with a set of components for
 your algorithm that takes care of a wide variety of operational processes 
 out of the box.
 
-* Data providing
-* Order execution
-* Portfolio management
-* Performance tracking
-* Strategy scheduling
-* Resource management
-* Model snapshots
-* Order status management
-* Clients (Rest API)
+
+## Features
+
+- **Data Providing**  
+- **Order execution** 
+- **Portfolio management**
+- **Performance tracking**
+- **Strategy scheduling**
+- **Resource management**
+- **Historic portfolio snapshots**
+- **Order status management**
+- **Clients (Rest API)**
 
 However, we aim to also provide a modular framework where you can write your
 own components or use third party plugins for the framework.
 
-Further information and the complete documentation can be found at the [webstie](https://investing-algorithm-framework.com)
+Further information and the complete documentation can be found 
+at the [website](https://investing-algorithm-framework.com)
 
 
 ## Download
@@ -92,7 +107,7 @@ You can download the framework with pypi.
 pip install investing-algorithm-framework
 ```
 
-#### Disclaimer
+## Disclaimer
 If you use this framework for your investments, do not risk money 
 which you are afraid to lose, until you have clear understanding how 
 the framework works. We can't stress this enough:
@@ -109,26 +124,20 @@ to the licensing page at the website.
 
 ## Documentation
 
-All the documentation can be found online at the [documentation webstie](https://investing-algorithm-framework.com)
+All the documentation can be found online 
+at the [documentation webstie](https://investing-algorithm-framework.com)
 
 In most cases, you'll probably never have to change code on this repo directly 
 if you are building your algorithm/bot. But if you do, check out the 
 contributing page at the website.
 
 If you'd like to chat with investing-algorithm-framework users 
-and developers, [join us on Slack](https://inv-algo-framework.slack.com) or [join us on reddit](https://www.reddit.com/r/InvestingAlgorithms/)
+and developers, [join us on Slack](https://inv-algo-framework.slack.com) or [join us on reddit](https://www.reddit.com/r/InvestingBots/)
 
 ## Acknowledgements
 We want to thank all contributors to this project. A full list of all 
 the people that contributed to the project can be
-found [here](https://github.com/investing-algorithms/investing-algorithm-framework/blob/master/docs/AUTHORS.md)
-
-### Help / Slack
-
-For any questions not covered by the documentation or for further
-information about the framework, we encourage you to join our slack channel.
-
-[join us on Slack](https://inv-algo-framework.slack.com)
+found [here](https://github.com/investing-algorithms/investing-algorithm-framework/blob/master/AUTHORS.md)
 
 ### [Bugs / Issues](https://github.com/investing-algorithms/investing-algorithm-framework/issues?q=is%3Aissue)
 
@@ -137,10 +146,7 @@ first. If it hasn't been reported, please [create a new issue](https://github.co
 
 Feel like the framework is missing a feature? We welcome your pull requests!
 
-Please read our [Contributing document](https://github.com/investing-algorithms/investing-algorithm-framework/blob/master/docs/CONTRIBUTING.md)
-to understand the requirements before sending your pull-requests.
-
-**Note** before starting any major new feature work, *please open an issue describing what you are planning to do* or talk to us on [Slack](https://join.slack.com/t/investingbots/shared_invite/enQtODgwNTg3MzA2MjYyLTdiZjczZDRlNWJjNDdmYThiMGE0MzFhOTg4Y2E0NzQ2OTgxYjA1NzU3ZWJiY2JhOTE1ZGJlZGFiNDU3OTAzMDg).
+**Note** before starting any major new feature work, *please open an issue describing what you are planning to do*.
 This will ensure that interested parties can give valuable feedback on the feature, and let others know that you are working on it.
 
 **Important:** Always create your feature or hotfix against the `develop` branch, not `master`.
