@@ -199,7 +199,9 @@ class Order(db.Model, ModelExtension):
                 target_symbol=self.target_symbol,
                 trading_symbol=self.trading_symbol
             )
+            print(current_price)
         except Exception as e:
+            print(e)
             logger.error(e)
             return current_price
 
