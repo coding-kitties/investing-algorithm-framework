@@ -39,3 +39,4 @@ class TestConfig(TestCase):
         config.set(self.ATTRIBUTE_ONE, self.ATTRIBUTE_ONE)
         self.assertIsNotNone(config.get(self.ATTRIBUTE_ONE))
         self.assertIsNotNone(config.ATTRIBUTE_ONE)
+        self.assertIsNotNone(config[self.ATTRIBUTE_ONE])
