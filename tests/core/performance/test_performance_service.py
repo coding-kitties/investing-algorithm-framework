@@ -80,8 +80,6 @@ class TestClass(TestBase):
             time_frame=TimeFrame.ONE_HOUR
         )
 
-        print(data)
-
     def test_overall_performance_one_hour(self):
         portfolio = Portfolio.query.first()
 
