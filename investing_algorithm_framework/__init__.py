@@ -11,6 +11,8 @@ from investing_algorithm_framework.core.models.data_provider import \
     TradingDataTypes, OrderBook, Ticker
 from investing_algorithm_framework.core.models import OrderSide, Order, \
     Position, TimeUnit, db, Portfolio, OrderType, OrderStatus
+from investing_algorithm_framework.core.exceptions import \
+    OperationalException, ImproperlyConfigured
 from investing_algorithm_framework.app import App
 from investing_algorithm_framework.globals import current_app
 from investing_algorithm_framework.configuration import Config
@@ -41,5 +43,7 @@ __all__ = [
     "OrderStatus",
     "TradingDataTypes",
     "Ticker",
-    "OrderBook"
+    "OrderBook",
+    "OperationalException",
+    "ImproperlyConfigured"
 ]
