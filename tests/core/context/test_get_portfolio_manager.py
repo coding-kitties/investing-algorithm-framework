@@ -1,21 +1,28 @@
 from tests.resources import TestBase
-from investing_algorithm_framework import PortfolioManager
+from investing_algorithm_framework import SQLLitePortfolioManager
 
 
-class MyPortfolioManagerOne(PortfolioManager):
-    trading_currency = "USDT"
+class MyPortfolioManagerOne(SQLLitePortfolioManager):
+
+    def get_unallocated_synced(self, algorithm_context):
+        return 1000
+
+    def get_positions_synced(self, algorithm_context):
+        pass
+
+    trading_symbol = "USDT"
     identifier = "MyPortfolioManagerOne"
 
-    def get_initial_unallocated_size(self) -> float:
-        return 1000
 
-
-class MyPortfolioManagerTwo(PortfolioManager):
-    trading_currency = "USDT"
+class MyPortfolioManagerTwo(SQLLitePortfolioManager):
+    trading_symbol = "USDT"
     identifier = "MyPortfolioManagerTwo"
 
-    def get_initial_unallocated_size(self) -> float:
+    def get_unallocated_synced(self, algorithm_context):
         return 1000
+
+    def get_positions_synced(self, algorithm_context):
+        pass
 
 
 class Test(TestBase):
@@ -49,4 +56,7 @@ class Test(TestBase):
         pass
 
     def test_retrieve_multiple(self):
+        pass
+
+    def test_without_trading_symbol(self):
         pass

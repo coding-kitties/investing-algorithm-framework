@@ -14,41 +14,20 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
     trading_symbol = None
 
     @abstractmethod
-    def get_initial_unallocated_size(self, algorithm_context):
+    def get_unallocated(self, algorithm_context, sync=False):
         pass
 
+    @abstractmethod
+    def get_allocated(self, algorithm_context, sync=False):
+        pass
+
+    @abstractmethod
     def initialize(self, algorithm_context):
-        self._initialize_portfolio(algorithm_context)
+        pass
 
-    def _initialize_portfolio(self, algorithm_context):
-        portfolio = self.get_portfolio(False)
-
-        self.trading_symbol = self.get_trading_symbol(algorithm_context)
-
-        if portfolio is None:
-            portfolio = Portfolio(
-                identifier=self.identifier,
-                trading_symbol=self.trading_symbol,
-                unallocated=self.get_initial_unallocated_size(
-                    algorithm_context
-                ),
-                market=self.get_market()
-            )
-            portfolio.save(db)
-
-    def get_portfolio(self, throw_exception=True) -> Portfolio:
-        portfolio = Portfolio.query\
-            .filter_by(identifier=self.identifier)\
-            .first()
-
-        if portfolio is None and throw_exception:
-            raise OperationalException("No portfolio model implemented")
-
-        return portfolio
-
-    @property
-    def unallocated(self):
-        return self.get_portfolio().unallocated
+    @abstractmethod
+    def get_portfolio(self, algorithm_context):
+        pass
 
     def get_trading_symbol(self, algorithm_context) -> str:
         trading_symbol = getattr(self, "trading_symbol", None)
@@ -65,88 +44,28 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
 
         return trading_symbol
 
+    @abstractmethod
     def get_positions(self, symbol: str = None, lazy=False):
+        pass
 
-        if symbol is None:
-            query_set = Position.query \
-                .filter_by(portfolio=self.get_portfolio())
-        else:
-            query_set = Position.query \
-                .filter_by(portfolio=self.get_portfolio()) \
-                .filter_by(symbol=symbol)
+    @abstractmethod
+    def get_orders(self, symbol: str = None, status=None, lazy=False):
+        pass
 
-        if lazy:
-            return query_set
-        else:
-            return query_set.all()
-
-    def get_orders(self, symbol: str = None, lazy=False):
-
-        positions = Position.query \
-            .filter_by(portfolio=self.get_portfolio()) \
-            .with_entities(Position.id)
-
-        if symbol is None:
-
-            query_set = Order.query \
-                .filter(Order.position_id.in_(positions))
-        else:
-            query_set = Order.query \
-                .filter(Order.position_id.in_(positions)) \
-                .filter_by(symbol=symbol)
-
-        if lazy:
-            return query_set
-        else:
-            return query_set.all()
-
-    def get_pending_orders(self, symbol: str = None, lazy=False):
-
-        if symbol is not None:
-            positions = Position.query \
-                .filter_by(portfolio=self.get_portfolio()) \
-                .filter_by(symbol=symbol) \
-                .with_entities(Position.id)
-        else:
-            positions = Position.query \
-                .filter_by(portfolio=self.get_portfolio()) \
-                .with_entities(Position.id)
-
-        query_set = Order.query \
-            .filter(Order.position_id.in_(positions)) \
-            .filter_by(status=OrderStatus.PENDING.value)
-
-        if lazy:
-            return query_set
-        else:
-            return query_set.all()
-
+    @abstractmethod
     def create_order(
-            self,
-            symbol,
-            price=None,
-            amount_trading_symbol=None,
-            amount_target_symbol=None,
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.BUY.value,
-            context=None,
-            validate_pair=True,
+        self,
+        symbol,
+        price=None,
+        amount_trading_symbol=None,
+        amount_target_symbol=None,
+        order_type=OrderType.LIMIT.value,
+        order_side=OrderSide.BUY.value,
+        context=None,
+        validate_pair=True
     ):
+        pass
 
-        if context is None:
-            from investing_algorithm_framework import current_app
-            context = current_app.algorithm
-
-        return self.get_portfolio().create_order(
-            context=context,
-            order_type=order_type,
-            symbol=symbol,
-            price=price,
-            amount_trading_symbol=amount_trading_symbol,
-            amount_target_symbol=amount_target_symbol,
-            order_side=order_side,
-            validate_pair=validate_pair
-        )
-
+    @abstractmethod
     def add_order(self, order):
-        self.get_portfolio().add_order(order)
+        pass

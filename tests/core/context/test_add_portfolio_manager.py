@@ -1,13 +1,16 @@
-from investing_algorithm_framework import PortfolioManager
+from investing_algorithm_framework import SQLLitePortfolioManager
 from investing_algorithm_framework.core.exceptions import OperationalException
 from tests.resources import TestBase
 
 
-class MyPortfolioManagerOne(PortfolioManager):
+class MyPortfolioManagerOne(SQLLitePortfolioManager):
     identifier = "BINANCE"
     trading_currency = "USDT"
 
-    def get_initial_unallocated_size(self, algorithm_context) -> float:
+    def get_unallocated_synced(self, algorithm_context):
+        return 1000
+
+    def get_positions_synced(self, algorithm_context):
         pass
 
 
