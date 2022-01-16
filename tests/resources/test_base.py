@@ -13,6 +13,8 @@ from investing_algorithm_framework.configuration.settings import TestConfig
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import db, OrderStatus, \
     TimeInterval
+from investing_algorithm_framework.core.portfolio_managers \
+    import SQLLitePortfolioManager
 
 
 class Initializer(AlgorithmContextInitializer):
@@ -22,7 +24,14 @@ class Initializer(AlgorithmContextInitializer):
         self.initialize_has_run = True
 
 
-class PortfolioManagerTest(PortfolioManager):
+class PortfolioManagerTest(SQLLitePortfolioManager):
+
+    def get_unallocated_synced(self, algorithm_context):
+        return 1000
+
+    def get_positions_synced(self, algorithm_context):
+        pass
+
     market = "test"
     identifier = "test"
     trading_symbol = "USDT"
@@ -31,9 +40,6 @@ class PortfolioManagerTest(PortfolioManager):
     def initialize(self, algorithm_context):
         super(PortfolioManagerTest, self).initialize(algorithm_context)
         self.initialize_has_run = True
-
-    def get_initial_unallocated_size(self, algorithm_context) -> float:
-        return 1000
 
 
 class OrderExecutorTest(OrderExecutor):
@@ -96,7 +102,9 @@ class MarketServiceTest(MarketService):
         return True
 
     def get_ticker(self, target_symbol: str, trading_symbol: str):
-        return TestBase.get_price(target_symbol=target_symbol, date=datetime.utcnow())
+        return TestBase.get_price(
+            target_symbol=target_symbol, date=datetime.utcnow()
+        )
 
     def get_prices(
         self,

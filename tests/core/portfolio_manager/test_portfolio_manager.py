@@ -1,4 +1,4 @@
-from investing_algorithm_framework import OrderSide, OrderType
+from investing_algorithm_framework import OrderSide, OrderType, OrderStatus
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
@@ -86,8 +86,4 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
         portfolio_manager.add_order(order)
         order.set_pending()
 
-        self.assertEqual(1, len(portfolio_manager.get_pending_orders()))
-
-        self.assertEqual(
-            1, portfolio_manager.get_pending_orders(lazy=True).count()
-        )
+        self.assertEqual(1, len(portfolio_manager.get_orders(status=OrderStatus.PENDING)))

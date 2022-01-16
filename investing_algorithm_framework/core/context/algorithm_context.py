@@ -578,7 +578,8 @@ class AlgorithmContext:
 
     def check_order_status(self, identifier=None, symbol: str = None):
         portfolio_manager = self.get_portfolio_manager(identifier)
-        orders = portfolio_manager.get_pending_orders(symbol)
+        orders = portfolio_manager\
+            .get_orders(symbol, status=OrderStatus.PENDING)
         order_executor = self.get_order_executor(identifier)
 
         for order in orders:
@@ -589,7 +590,7 @@ class AlgorithmContext:
             self, identifier=None, symbol: str = None, lazy=False
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
-        return portfolio_manager.get_pending_orders(symbol, lazy)
+        return portfolio_manager.get_orders(symbol, OrderStatus.PENDING, lazy)
 
     def check_pending_orders(self, identifier=None, symbol: str = None):
 
