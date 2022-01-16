@@ -1,13 +1,12 @@
 from abc import abstractmethod, ABC
 
+from investing_algorithm_framework.configuration.constants import \
+    TRADING_SYMBOL
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.identifier import Identifier
 from investing_algorithm_framework.core.market_identifier import \
     MarketIdentifier
-from investing_algorithm_framework.core.models import Position, Order, \
-    Portfolio, db, OrderSide, OrderType, OrderStatus
-from investing_algorithm_framework.configuration.constants import \
-    TRADING_SYMBOL
+from investing_algorithm_framework.core.models import OrderSide, OrderType
 
 
 class PortfolioManager(ABC, Identifier, MarketIdentifier):
