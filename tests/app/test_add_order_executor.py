@@ -1,0 +1,48 @@
+from unittest import TestCase
+from investing_algorithm_framework import App, OrderExecutor, Order, \
+    OrderStatus, current_app
+from investing_algorithm_framework.configuration.constants import \
+    RESOURCES_DIRECTORY
+
+
+class OrderExecutorTest(OrderExecutor):
+
+    def execute_limit_order(self, order: Order, algorithm_context,
+                            **kwargs) -> bool:
+        pass
+
+    def execute_market_order(self, order: Order, algorithm_context,
+                             **kwargs) -> bool:
+        pass
+
+    def get_order_status(self, order: Order, algorithm_context,
+                         **kwargs) -> OrderStatus:
+        pass
+
+    identifier = "test"
+
+
+class Test(TestCase):
+
+    def tearDown(self) -> None:
+        current_app.reset()
+
+    def test_from_class(self):
+        app = App(
+            config={"ENVIRONMENT": "test", RESOURCES_DIRECTORY: "goaoge"}
+        )
+        app.add_order_executor(OrderExecutorTest)
+        self.assertEqual(1, len(app.algorithm._order_executors))
+        order_executor = app.algorithm.get_order_executor("test")
+        self.assertTrue(isinstance(order_executor, OrderExecutorTest))
+        self.assertTrue(isinstance(order_executor, OrderExecutorTest))
+
+    def test_from_object(self):
+        app = App(
+            config={"ENVIRONMENT": "test", RESOURCES_DIRECTORY: "goaoge"}
+        )
+        app.add_order_executor(OrderExecutorTest())
+        self.assertEqual(1, len(app.algorithm._order_executors))
+        order_executor = app.algorithm.get_order_executor("test")
+        self.assertTrue(isinstance(order_executor, OrderExecutorTest))
+        self.assertTrue(isinstance(order_executor, OrderExecutorTest))

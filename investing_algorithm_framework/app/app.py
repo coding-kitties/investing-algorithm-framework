@@ -187,3 +187,15 @@ class App(metaclass=Singleton):
         self._started = False
         scheduler.remove_all_jobs()
         self.algorithm.reset()
+
+    def add_initializer(self, initializer):
+        self.algorithm.add_initializer(initializer)
+
+    def add_order_executor(self, order_executor):
+        self.algorithm.add_order_executor(order_executor)
+
+    def add_data_provider(self, data_provider):
+        self.algorithm.add_data_provider(data_provider)
+
+    def add_portfolio_manager(self, portfolio_manager):
+        self.algorithm.add_portfolio_manager(portfolio_manager)
