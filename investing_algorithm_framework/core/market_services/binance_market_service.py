@@ -19,7 +19,9 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
     exchange = None
     config = None
 
-    def __init__(self, config, api_key: str = None, secret_key: str = None):
+    def __init__(
+        self, config=None, api_key: str = None, secret_key: str = None
+    ):
         super().__init__()
 
         if api_key is not None:
@@ -30,7 +32,10 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
 
         self.config = config
 
-    def initialize(self):
+    def initialize(self, config):
+        self.config = config
+
+    def initialize_exchange(self):
 
         if self.binance_api_key is None and self.binance_secret_key is None:
             self.binance_api_key = self.config\
@@ -38,9 +43,6 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             self.binance_secret_key = \
                 self.config.get(BINANCE_SECRET_KEY, None)
 
-        self.initialize_exchange()
-
-    def initialize_exchange(self):
         exchange_class = getattr(ccxt, BINANCE_CCXT_ID)
         self.exchange = exchange_class({
             'apiKey': self.get_api_key(),
