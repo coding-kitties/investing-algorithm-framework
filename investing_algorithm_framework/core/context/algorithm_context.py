@@ -469,6 +469,7 @@ class AlgorithmContext:
                     .of_market(market)
 
                 if market_service is not None:
+                    market_service.initialize(self.config)
                     self._market_services[market.upper()] = market_service
                     return market_service
 

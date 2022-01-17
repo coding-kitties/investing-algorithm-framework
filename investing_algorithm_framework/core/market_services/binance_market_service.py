@@ -19,7 +19,9 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
     exchange = None
     config = None
 
-    def __init__(self, config, api_key: str = None, secret_key: str = None):
+    def __init__(
+        self, config=None, api_key: str = None, secret_key: str = None
+    ):
         super().__init__()
 
         if api_key is not None:
@@ -30,7 +32,10 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
 
         self.config = config
 
-    def initialize(self):
+    def initialize(self, config):
+        self.config = config
+
+    def initialize_exchange(self):
 
         if self.binance_api_key is None and self.binance_secret_key is None:
             self.binance_api_key = self.config\
@@ -38,9 +43,6 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             self.binance_secret_key = \
                 self.config.get(BINANCE_SECRET_KEY, None)
 
-        self.initialize_exchange()
-
-    def initialize_exchange(self):
         exchange_class = getattr(ccxt, BINANCE_CCXT_ID)
         self.exchange = exchange_class({
             'apiKey': self.get_api_key(),
@@ -78,7 +80,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             )
 
     def get_balance(self, symbol: str = None):
-        self.initialize()
+        self.initialize_exchange()
 
         try:
             balances = self.exchange.fetch_balance()["info"]["balances"]
@@ -106,7 +108,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             amount: float,
             price: float
     ):
-        self.initialize()
+        self.initialize_exchange()
 
         symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
 
@@ -125,7 +127,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
         amount: float,
         price: float
     ):
-        self.initialize()
+        self.initialize_exchange()
 
         symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
 
@@ -143,7 +145,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
         trading_symbol: str,
         amount: float,
     ):
-        self.initialize()
+        self.initialize_exchange()
 
         symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
 
@@ -159,7 +161,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
         trading_symbol: str,
         amount: float,
     ):
-        self.initialize()
+        self.initialize_exchange()
 
         symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
 
@@ -173,7 +175,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
         pass
 
     def get_orders(self, target_symbol: str, trading_symbol: str):
-        self.initialize()
+        self.initialize_exchange()
 
         try:
             symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
@@ -183,7 +185,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             raise OperationalException("Could not retrieve orders")
 
     def get_order(self, order_id, target_symbol: str, trading_symbol: str):
-        self.initialize()
+        self.initialize_exchange()
 
         try:
             symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
@@ -195,7 +197,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
     def get_open_orders(
         self, target_symbol: str = None, trading_symbol: str = None
     ):
-        self.initialize()
+        self.initialize_exchange()
 
         try:
             if target_symbol is None or trading_symbol is None:
@@ -210,7 +212,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
     def get_closed_orders(
         self, target_symbol: str = None, trading_symbol: str = None
     ):
-        self.initialize()
+        self.initialize_exchange()
 
         try:
             if target_symbol is None or trading_symbol is None:
