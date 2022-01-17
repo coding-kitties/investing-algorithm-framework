@@ -451,7 +451,6 @@ class AlgorithmContext:
             if market in RESERVED_IDENTIFIERS:
                 market_service = DefaultMarketServiceFactory\
                     .of_market(market)
-                market_service.initialize(self)
 
                 if market_service is not None:
                     self._market_services[market.upper()] = market_service

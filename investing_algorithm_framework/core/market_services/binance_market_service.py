@@ -17,8 +17,9 @@ logger = logging.getLogger(__name__)
 class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
     market = BINANCE
     exchange = None
+    config = None
 
-    def __init__(self, api_key: str = None, secret_key: str = None):
+    def __init__(self, config, api_key: str = None, secret_key: str = None):
         super().__init__()
 
         if api_key is not None:
@@ -27,13 +28,15 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
         if secret_key is not None:
             self.binance_secret_key = secret_key
 
-    def initialize(self, algorithm_context):
+        self.config = config
+
+    def initialize(self):
 
         if self.binance_api_key is None and self.binance_secret_key is None:
-            self.binance_api_key = algorithm_context.config\
+            self.binance_api_key = self.config\
                 .get(BINANCE_API_KEY, None)
             self.binance_secret_key = \
-                algorithm_context.config.get(BINANCE_SECRET_KEY, None)
+                self.config.get(BINANCE_SECRET_KEY, None)
 
         self.initialize_exchange()
 
@@ -75,6 +78,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             )
 
     def get_balance(self, symbol: str = None):
+        self.initialize()
 
         try:
             balances = self.exchange.fetch_balance()["info"]["balances"]
@@ -102,6 +106,8 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             amount: float,
             price: float
     ):
+        self.initialize()
+
         symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
 
         try:
@@ -119,6 +125,8 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
         amount: float,
         price: float
     ):
+        self.initialize()
+
         symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
 
         try:
@@ -135,6 +143,8 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
         trading_symbol: str,
         amount: float,
     ):
+        self.initialize()
+
         symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
 
         try:
@@ -149,6 +159,8 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
         trading_symbol: str,
         amount: float,
     ):
+        self.initialize()
+
         symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
 
         try:
@@ -161,6 +173,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
         pass
 
     def get_orders(self, target_symbol: str, trading_symbol: str):
+        self.initialize()
 
         try:
             symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
@@ -170,6 +183,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             raise OperationalException("Could not retrieve orders")
 
     def get_order(self, order_id, target_symbol: str, trading_symbol: str):
+        self.initialize()
 
         try:
             symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
@@ -181,6 +195,8 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
     def get_open_orders(
         self, target_symbol: str = None, trading_symbol: str = None
     ):
+        self.initialize()
+
         try:
             if target_symbol is None or trading_symbol is None:
                 return self.exchange.fetchOpenOrders()
@@ -194,6 +210,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
     def get_closed_orders(
         self, target_symbol: str = None, trading_symbol: str = None
     ):
+        self.initialize()
 
         try:
             if target_symbol is None or trading_symbol is None:
