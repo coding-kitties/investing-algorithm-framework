@@ -1,5 +1,6 @@
 import logging
 from typing import List
+import inspect
 
 from investing_algorithm_framework.configuration import Config
 from investing_algorithm_framework.configuration.constants import \
@@ -225,6 +226,9 @@ class AlgorithmContext:
         from investing_algorithm_framework.core.order_executors \
             import OrderExecutor
 
+        if inspect.isclass(order_executor):
+            order_executor = order_executor()
+
         if order_executor in RESERVED_IDENTIFIERS:
             raise OperationalException(
                 "Identifier of order executor is reserved"
@@ -287,10 +291,13 @@ class AlgorithmContext:
         from investing_algorithm_framework.core.data_providers \
             import DataProvider
 
-        if data_provider in RESERVED_IDENTIFIERS:
+        if data_provider.identifier in RESERVED_IDENTIFIERS:
             raise OperationalException(
                 "Identifier of data provider is reserved"
             )
+
+        if inspect.isclass(data_provider):
+            data_provider = data_provider()
 
         assert isinstance(data_provider, DataProvider), (
             'Provided object must be an instance of the DataProvider class'
@@ -349,6 +356,9 @@ class AlgorithmContext:
         from investing_algorithm_framework.core.context \
             import AlgorithmContextInitializer
 
+        if inspect.isclass(initializer):
+            initializer = initializer()
+
         assert isinstance(initializer, AlgorithmContextInitializer), (
             'Provided object must be an instance of the '
             'AlgorithmContextInitializer class'
@@ -360,6 +370,9 @@ class AlgorithmContext:
         # Check if order executor is instance of AbstractPortfolioManager
         from investing_algorithm_framework.core.portfolio_managers \
             import PortfolioManager
+
+        if inspect.isclass(portfolio_manager):
+            portfolio_manager = portfolio_manager()
 
         assert isinstance(portfolio_manager, PortfolioManager), (
             'Provided object must be an instance of the '
@@ -425,6 +438,9 @@ class AlgorithmContext:
         from investing_algorithm_framework.core.market_services \
             import MarketService
 
+        if inspect.isclass(market_service):
+            market_service = market_service()
+
         assert isinstance(market_service, MarketService), (
             'Provided object must be an instance of the MarketService class'
         )
@@ -451,7 +467,6 @@ class AlgorithmContext:
             if market in RESERVED_IDENTIFIERS:
                 market_service = DefaultMarketServiceFactory\
                     .of_market(market)
-                market_service.initialize(self)
 
                 if market_service is not None:
                     self._market_services[market.upper()] = market_service

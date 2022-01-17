@@ -1,6 +1,7 @@
 from investing_algorithm_framework.utils.version import get_version
 from investing_algorithm_framework.core.context import \
     AlgorithmContextInitializer, AlgorithmContext
+from investing_algorithm_framework.core.data_providers import DataProvider
 from investing_algorithm_framework.core.portfolio_managers import \
     PortfolioManager, BinancePortfolioManager, SQLLitePortfolioManager
 from investing_algorithm_framework.core.order_executors import OrderExecutor, \
@@ -18,7 +19,7 @@ from investing_algorithm_framework.globals import current_app
 from investing_algorithm_framework.configuration import Config
 from investing_algorithm_framework.views import *
 
-VERSION = (0, 13, 1, 'alpha', 0)
+VERSION = (0, 14, 0, 'alpha', 0)
 
 __all__ = [
     "App",
@@ -46,5 +47,6 @@ __all__ = [
     "OrderBook",
     "OperationalException",
     "ImproperlyConfigured",
-    "SQLLitePortfolioManager"
+    "SQLLitePortfolioManager",
+    "DataProvider"
 ]
