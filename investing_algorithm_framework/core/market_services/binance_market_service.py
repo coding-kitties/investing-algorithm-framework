@@ -89,7 +89,7 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
 
     def get_balance(self, symbol: str = None):
         self.initialize_exchange(credentials=True)
-
+ 
         try:
             balances = self.exchange.fetch_balance()["info"]["balances"]
         except Exception as e:
