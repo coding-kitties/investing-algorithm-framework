@@ -613,12 +613,6 @@ class AlgorithmContext:
             status = order_executor.get_order_status(order, self)
             order.update(db, {"status": status}, True)
 
-    def get_pending_orders(
-            self, identifier=None, symbol: str = None, lazy=False
-    ):
-        portfolio_manager = self.get_portfolio_manager(identifier)
-        return portfolio_manager.get_orders(symbol, OrderStatus.PENDING, lazy)
-
     def check_pending_orders(self, identifier=None, symbol: str = None):
 
         if identifier is not None:
@@ -628,7 +622,8 @@ class AlgorithmContext:
             order_executor = \
                 self.get_order_executor(portfolio_manager.identifier)
 
-            pending_orders = portfolio_manager.get_pending_orders(symbol)
+            pending_orders = portfolio_manager\
+                .get_orders(symbol, status=OrderStatus.PENDING.value)
 
             for pending_order in pending_orders:
                 status = order_executor.get_order_status(
@@ -646,7 +641,9 @@ class AlgorithmContext:
                     portfolio_manager_key
                 ]
 
-                pending_orders = portfolio_manager.get_pending_orders(symbol)
+                pending_orders = portfolio_manager.get_orders(
+                    symbol, status=OrderStatus.PENDING.value
+                )
 
                 order_executor = self.get_order_executor(
                     portfolio_manager.identifier
@@ -773,3 +770,15 @@ class AlgorithmContext:
         self._market_services = {}
         self._initializer = None
         self._initialized = False
+
+    def get_orders(
+            self, identifier=None, symbol: str = None, status=None, lazy=False
+    ):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        return portfolio_manager.get_orders(symbol, status, lazy)
+
+    def get_positions(
+            self, identifier=None, symbol: str = None, status=None, lazy=False
+    ):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        return portfolio_manager.get_orders(symbol, status, lazy)

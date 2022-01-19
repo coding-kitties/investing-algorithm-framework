@@ -16,6 +16,17 @@ class OrderSide(Enum):
 
         raise ValueError("Could not convert value to OrderSide")
 
+    @staticmethod
+    def from_value(value):
+
+        if isinstance(value, OrderSide):
+            for order_side in OrderSide:
+
+                if value == order_side:
+                    return order_side
+
+        return OrderSide.from_string(value)
+
     def equals(self, other):
 
         if isinstance(other, Enum):

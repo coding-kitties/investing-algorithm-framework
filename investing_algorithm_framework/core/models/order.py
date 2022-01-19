@@ -120,8 +120,8 @@ class Order(db.Model, ModelExtension):
         amount_trading_symbol=None,
         **kwargs
     ):
-        self.order_side = OrderSide.from_string(order_side).value
-        self.order_type = OrderType.from_string(order_type).value
+        self.order_side = OrderSide.from_value(order_side).value
+        self.order_type = OrderType.from_value(order_type).value
         self.target_symbol = target_symbol
         self.trading_symbol = trading_symbol
         self.status = None
