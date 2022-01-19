@@ -512,11 +512,11 @@ class AlgorithmContext:
 
     def create_limit_buy_order(
             self,
-            identifier: str,
             symbol: str,
             price: float,
             amount: float,
-            execute=False
+            execute=False,
+            identifier: str = None
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
@@ -535,7 +535,7 @@ class AlgorithmContext:
         return order
 
     def create_limit_sell_order(
-            self, identifier, symbol, price, amount, execute=False
+            self, symbol, price, amount, execute=False, identifier: str = None
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
@@ -558,8 +558,8 @@ class AlgorithmContext:
         self,
         symbol,
         amount_target_symbol,
-        identifier: str = None,
-        execute=False
+        execute=False,
+        identifier: str = None
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
