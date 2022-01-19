@@ -1,4 +1,5 @@
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
+from investing_algorithm_framework.core.models import Portfolio, db
 
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
@@ -14,6 +15,11 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             )
 
         self.assert_is_limit_order(order)
+
+    def tearDown(self) -> None:
+        Portfolio.query.delete()
+        db.session.commit()
+        super(Test, self).tearDown()
 
     def test_with_execution(self) -> None:
         order = self.algo_app.algorithm \
