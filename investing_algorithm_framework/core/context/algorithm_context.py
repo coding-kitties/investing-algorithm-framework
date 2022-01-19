@@ -778,7 +778,7 @@ class AlgorithmContext:
         return portfolio_manager.get_orders(symbol, status, lazy)
 
     def get_positions(
-            self, identifier=None, symbol: str = None, status=None, lazy=False
+            self, identifier=None, symbol: str = None, lazy=False
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
-        return portfolio_manager.get_orders(symbol, status, lazy)
+        return portfolio_manager.get_positions(symbol, lazy)
