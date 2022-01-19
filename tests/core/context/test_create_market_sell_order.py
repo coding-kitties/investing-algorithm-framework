@@ -1,5 +1,6 @@
 from investing_algorithm_framework import OrderSide, OrderType
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
+from investing_algorithm_framework.core.models import db, Portfolio
 
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
@@ -7,6 +8,10 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
     def setUp(self):
         super(Test, self).setUp()
         self.start_algorithm()
+
+    def tearDown(self) -> None:
+        db.session.query(Portfolio).delete()
+        super(Test, self).tearDown()
 
     def test(self) -> None:
         order = self.algo_app.algorithm\
