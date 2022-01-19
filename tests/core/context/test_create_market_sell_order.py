@@ -10,8 +10,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.start_algorithm()
 
     def tearDown(self) -> None:
-        Portfolio.query.delete()
-        db.session.commit()
+        db.session.query(Portfolio).delete()
         super(Test, self).tearDown()
 
     def test(self) -> None:

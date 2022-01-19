@@ -17,7 +17,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assert_is_limit_order(order)
 
     def tearDown(self) -> None:
-        Portfolio.query.delete()
+        db.session.query(Portfolio).delete()
         db.session.commit()
         super(Test, self).tearDown()
 
