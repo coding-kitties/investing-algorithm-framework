@@ -18,7 +18,6 @@ class TestPosition(TestBase):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.get_price(self.TARGET_SYMBOL_A).price,
-            validate_pair=True,
             context=None
         )
 
@@ -28,7 +27,6 @@ class TestPosition(TestBase):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_B,
             price=self.get_price(self.TARGET_SYMBOL_B).price,
-            validate_pair=True,
             context=None
         )
 
@@ -48,7 +46,6 @@ class TestPosition(TestBase):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.get_price(self.TARGET_SYMBOL_A).price,
-            validate_pair=True,
             context=None
         )
 
@@ -74,7 +71,6 @@ class TestPosition(TestBase):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.get_price(self.TARGET_SYMBOL_A).price,
-            validate_pair=True,
             context=None
         )
 
@@ -101,7 +97,6 @@ class TestPosition(TestBase):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.get_price(self.TARGET_SYMBOL_A).price,
-            validate_pair=True,
             context=None
         )
 
@@ -125,7 +120,6 @@ class TestPosition(TestBase):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.get_price(self.TARGET_SYMBOL_A).price,
-            validate_pair=True,
             context=None
         )
 
@@ -155,7 +149,6 @@ class TestPosition(TestBase):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.get_price(self.TARGET_SYMBOL_A).price,
-            validate_pair=True,
             context=None
         )
 

@@ -33,7 +33,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.get_price(self.TARGET_SYMBOL_A, date=datetime.utcnow()).price,
-            validate_pair=True,
             context=None
         )
         portfolio.add_order(order_a)
@@ -64,7 +63,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_B,
             price=self.get_price(self.TARGET_SYMBOL_B).price,
-            validate_pair=True,
             context=None
         )
         portfolio.add_order(order_b)
@@ -105,7 +103,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.get_price(self.TARGET_SYMBOL_A).price,
-            validate_pair=True,
             context=None
         )
 
@@ -119,7 +116,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_B,
             price=self.get_price(self.TARGET_SYMBOL_B).price,
-            validate_pair=True,
             context=None
         )
         portfolio.add_order(sell_order_b)
@@ -148,7 +144,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.get_price(self.TARGET_SYMBOL_A).price,
-            validate_pair=True,
             context=None
         )
         portfolio.add_order(order_a)
@@ -179,7 +174,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_B,
             price=self.get_price(self.TARGET_SYMBOL_B).price,
-            validate_pair=True,
             context=None
         )
         portfolio.add_order(order_b)
@@ -220,7 +214,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.get_price(self.TARGET_SYMBOL_A).price,
-            validate_pair=True,
             context=None
         )
 
@@ -234,7 +227,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_B,
             price=self.get_price(self.TARGET_SYMBOL_B).price,
-            validate_pair=True,
             context=None
         )
         portfolio.add_order(sell_order_b)
@@ -253,7 +245,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_B,
             price=self.get_price(self.TARGET_SYMBOL_B).price,
-            validate_pair=True,
             context=None
         )
 
@@ -269,7 +260,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_B,
             price=self.get_price(self.TARGET_SYMBOL_B).price,
-            validate_pair=True,
             context=None
         )
 
@@ -291,7 +281,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
                 amount_target_symbol=1000,
                 symbol=self.TARGET_SYMBOL_B,
                 price=self.get_price(self.TARGET_SYMBOL_B).price,
-                validate_pair=True,
                 context=None
             )
 
@@ -310,7 +299,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.get_price(self.TARGET_SYMBOL_A).price,
-            validate_pair=True,
             context=None
         )
         portfolio.add_order(order_a)
@@ -321,7 +309,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_B,
             price=self.get_price(self.TARGET_SYMBOL_B).price,
-            validate_pair=True,
             context=None
         )
         portfolio.add_order(order_b)
@@ -413,7 +400,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.get_price(self.TARGET_SYMBOL_A).price,
-            validate_pair=True,
             context=None
         )
 
@@ -434,7 +420,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.get_price(self.TARGET_SYMBOL_A).price,
-            validate_pair=True,
             context=None
         )
         portfolio.add_order(sell_order_a)

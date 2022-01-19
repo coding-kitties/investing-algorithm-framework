@@ -19,7 +19,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.BASE_SYMBOL_A_PRICE,
-            validate_pair=True,
             context=None
         )
 
@@ -34,7 +33,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.BASE_SYMBOL_A_PRICE,
-            validate_pair=True,
             context=None
         )
 
@@ -47,7 +45,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.BASE_SYMBOL_A_PRICE,
-            validate_pair=True,
             context=None
         )
 
@@ -62,7 +59,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.BASE_SYMBOL_A_PRICE,
-            validate_pair=True,
             context=None
         )
 
@@ -76,7 +72,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=2,
             symbol=self.TARGET_SYMBOL_A,
             price=self.BASE_SYMBOL_A_PRICE,
-            validate_pair=True,
             context=None
         )
 
@@ -92,7 +87,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             amount_target_symbol=10000,
             symbol=self.TARGET_SYMBOL_A,
             price=self.BASE_SYMBOL_A_PRICE,
-            validate_pair=True,
             context=None
         )
 

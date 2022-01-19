@@ -37,6 +37,9 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
                 market=self.get_market()
             )
             portfolio.save(db)
+        else:
+            self.get_unallocated(algorithm_context, True)
+            self.get_allocated(algorithm_context, True)
 
     def get_unallocated(self, algorithm_context, sync=False):
         portfolio = self.get_portfolio()
@@ -57,21 +60,22 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
             synced_positions = self.get_positions_synced(algorithm_context)
             positions = Position.query.filter_by(portfolio=self.get_portfolio())
 
-            for synced_position in synced_positions:
+            if synced_positions is not None:
+                for synced_position in synced_positions:
 
-                position = positions\
-                    .filter_by(symbol=synced_position["symbol"])\
-                    .first()
+                    position = positions\
+                        .filter_by(symbol=synced_position["symbol"])\
+                        .first()
 
-                if position is None:
+                    if position is None:
 
-                    position = Position(symbol=synced_position["symbol"])
-                    position.amount = synced_position["amount"]
-                    position.portfolio = portfolio
-                    db.session.commit()
-                elif position.amount != synced_position["amount"]:
-                    position.amount = synced_position["amount"]
-                    db.session.commit()
+                        position = Position(symbol=synced_position["symbol"])
+                        position.amount = synced_position["amount"]
+                        position.portfolio = portfolio
+                        db.session.commit()
+                    elif position.amount != synced_position["amount"]:
+                        position.amount = synced_position["amount"]
+                        db.session.commit()
 
         return portfolio.unallocated
 
@@ -129,7 +133,6 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
         order_type=OrderType.LIMIT.value,
         order_side=OrderSide.BUY.value,
         context=None,
-        validate_pair=True,
     ):
 
         if context is None:
@@ -144,7 +147,6 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
             amount_trading_symbol=amount_trading_symbol,
             amount_target_symbol=amount_target_symbol,
             order_side=order_side,
-            validate_pair=validate_pair
         )
 
     def add_order(self, order):

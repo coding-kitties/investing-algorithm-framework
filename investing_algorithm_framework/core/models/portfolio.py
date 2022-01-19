@@ -189,22 +189,7 @@ class Portfolio(db.Model, ModelExtension):
         amount_trading_symbol=None,
         amount_target_symbol=None,
         order_side=OrderSide.BUY.value,
-        validate_pair=True,
     ):
-
-        market_service = context.get_market_service(self.market)
-
-        if validate_pair:
-
-            # Check if pair exists
-            if not market_service.pair_exists(
-                symbol, self.trading_symbol
-            ):
-                raise OperationalException(
-                    f"Can't receive price data for "
-                    f"pair {symbol} {self.trading_symbol}"
-                )
-
         from investing_algorithm_framework.core.models import Order
 
         if OrderType.MARKET.equals(order_type):

@@ -25,7 +25,6 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.BASE_SYMBOL_A_PRICE,
-            validate_pair=True,
             context=None
         )
 
@@ -41,7 +40,6 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.BASE_SYMBOL_A_PRICE,
-            validate_pair=True,
             context=None
         )
 
@@ -79,7 +77,6 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
             amount_target_symbol=1,
             symbol=self.TARGET_SYMBOL_A,
             price=self.BASE_SYMBOL_A_PRICE,
-            validate_pair=True,
             context=None
         )
 

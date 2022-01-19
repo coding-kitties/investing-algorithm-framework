@@ -61,7 +61,6 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
         order_type=OrderType.LIMIT.value,
         order_side=OrderSide.BUY.value,
         context=None,
-        validate_pair=True
     ):
         pass
 
