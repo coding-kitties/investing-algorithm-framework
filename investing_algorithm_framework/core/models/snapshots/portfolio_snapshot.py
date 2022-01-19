@@ -1,14 +1,15 @@
 from sqlalchemy import UniqueConstraint, or_
 from datetime import datetime
 from investing_algorithm_framework.core.models.model_extension import \
-    ModelExtension
-from investing_algorithm_framework.core.models import db, Order, OrderStatus, \
+    SQLAlchemyModelExtension
+from investing_algorithm_framework.core.models import db, \
+    SQLLiteOrder, OrderStatus, \
     OrderSide
 from investing_algorithm_framework.core.models.snapshots import \
     PositionSnapshot
 
 
-class PortfolioSnapshot(db.Model, ModelExtension):
+class PortfolioSnapshot(db.Model, SQLAlchemyModelExtension):
     __tablename__ = "portfolio_snapshots"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -75,11 +76,11 @@ class PortfolioSnapshot(db.Model, ModelExtension):
         if snapshot.created_at is None:
             snapshot.created_at = datetime.utcnow()
 
-        pending_orders = Order.query\
+        pending_orders = SQLLiteOrder.query\
             .filter(
                 or_(
-                    Order.status == OrderStatus.PENDING.value,
-                    Order.status == OrderStatus.TO_BE_SENT.value
+                    SQLLiteOrder.status == OrderStatus.PENDING.value,
+                    SQLLiteOrder.status == OrderStatus.TO_BE_SENT.value
                 )
             )\
             .filter_by(order_side=OrderSide.BUY.value)\

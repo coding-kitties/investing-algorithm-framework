@@ -38,6 +38,7 @@ class PortfolioManagerTest(SQLLitePortfolioManager):
     initialize_has_run = False
 
     def initialize(self, algorithm_context):
+        print("hello")
         super(PortfolioManagerTest, self).initialize(algorithm_context)
         self.initialize_has_run = True
 

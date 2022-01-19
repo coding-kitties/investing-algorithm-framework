@@ -11,12 +11,14 @@ from investing_algorithm_framework.core.market_services import \
 from investing_algorithm_framework.core.models.data_provider import \
     TradingDataTypes, OrderBook, Ticker
 from investing_algorithm_framework.core.models import OrderSide, Order, \
-    Position, TimeUnit, db, Portfolio, OrderType, OrderStatus
+    Position, TimeUnit, db, Portfolio, OrderType, OrderStatus, \
+    SQLLitePortfolio, SQLLiteOrder
 from investing_algorithm_framework.core.exceptions import \
     OperationalException, ImproperlyConfigured
 from investing_algorithm_framework.app import App
 from investing_algorithm_framework.globals import current_app
 from investing_algorithm_framework.configuration import Config
+from investing_algorithm_framework.exceptions import ApiException
 from investing_algorithm_framework.views import *
 
 VERSION = (0, 15, 1, 'alpha', 0)
@@ -48,5 +50,8 @@ __all__ = [
     "OperationalException",
     "ImproperlyConfigured",
     "SQLLitePortfolioManager",
-    "DataProvider"
+    "DataProvider",
+    "SQLLitePortfolio",
+    "SQLLiteOrder",
+    "ApiException"
 ]

@@ -3,10 +3,10 @@ from sqlalchemy.orm import relationship
 from investing_algorithm_framework.core.models import db, Order, OrderSide, \
     OrderStatus
 from investing_algorithm_framework.core.models.model_extension \
-    import ModelExtension
+    import SQLAlchemyModelExtension
 
 
-class PositionSnapshot(db.Model, ModelExtension):
+class PositionSnapshot(db.Model, SQLAlchemyModelExtension):
     __tablename__ = "position_snapshots"
 
     # Integer id for the Position as the primary key

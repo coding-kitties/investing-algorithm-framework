@@ -5,10 +5,10 @@ from flask import Blueprint, request
 
 from investing_algorithm_framework.configuration.constants import\
     SYMBOL_QUERY_PARAM, IDENTIFIER_QUERY_PARAM
-from investing_algorithm_framework import Position, Portfolio, db
+from investing_algorithm_framework import Position, Portfolio, db, current_app
 from investing_algorithm_framework.schemas import PositionSerializer
 from investing_algorithm_framework.views.utils import normalize_query, \
-    create_paginated_response
+    create_paginated_response, get_query_param
 
 logger = logging.getLogger(__name__)
 
@@ -47,12 +47,24 @@ def list_positions():
         position.
     The response in the view is paginated.
     """
+    identifier = get_query_param(IDENTIFIER_QUERY_PARAM, request.args, None)
 
-    # Query positions
-    query_set = apply_position_query_parameters(Position.query)
+    # Get the default portfolio
+    if identifier == "default":
+        portfolio = current_app.algorithm \
+            .get_portfolio_manager() \
+            .get_portfolio()
+    else:
+        portfolio = current_app.algorithm \
+            .get_portfolio_manager(identifier=identifier) \
+            .get_portfolio()
+
+    symbol = get_query_param(SYMBOL_QUERY_PARAM, request.args, None)
+
+    positions = portfolio.get_positions(symbol)
 
     # Create serializer
     serializer = PositionSerializer()
 
     # Paginate query
-    return create_paginated_response(query_set, serializer), 200
+    return create_paginated_response(positions, serializer), 200

@@ -4,8 +4,8 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.identifier import Identifier
 from investing_algorithm_framework.core.market_identifier import \
     MarketIdentifier
-from investing_algorithm_framework.core.models import db, Portfolio, \
-    Position, Order, OrderStatus, OrderType, OrderSide
+from investing_algorithm_framework.core.models import db, SQLLitePortfolio, \
+    Position, OrderStatus, OrderType, OrderSide, Portfolio, SQLLiteOrder
 from investing_algorithm_framework.core.portfolio_managers.portfolio_manager\
     import PortfolioManager
 
@@ -27,6 +27,8 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
     def _initialize_portfolio(self, algorithm_context):
         portfolio = self.get_portfolio(False)
 
+        print(portfolio)
+
         self.trading_symbol = self.get_trading_symbol(algorithm_context)
 
         if portfolio is None:
@@ -37,7 +39,8 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
             if synced_unallocated is not None:
                 unallocated = synced_unallocated
 
-            portfolio = Portfolio(
+            print("creating portfolio")
+            portfolio = SQLLitePortfolio(
                 identifier=self.identifier,
                 trading_symbol=self.trading_symbol,
                 unallocated=unallocated,
@@ -87,7 +90,9 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
         return portfolio.unallocated
 
     def get_portfolio(self, throw_exception=True) -> Portfolio:
-        portfolio = Portfolio.query\
+        print(self.identifier)
+        print(SQLLitePortfolio.query.count())
+        portfolio = SQLLitePortfolio.query\
             .filter_by(identifier=self.identifier)\
             .first()
 
@@ -116,8 +121,8 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
             .filter_by(portfolio=self.get_portfolio()) \
             .with_entities(Position.id)
 
-        query_set = Order.query \
-            .filter(Order.position_id.in_(positions))
+        query_set = SQLLiteOrder.query \
+            .filter(SQLLiteOrder.position_id.in_(positions))
 
         if symbol is not None:
             query_set = query_set.filter_by(symbol=symbol)

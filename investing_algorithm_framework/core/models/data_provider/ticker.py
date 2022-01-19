@@ -1,10 +1,10 @@
 from datetime import datetime
 
 from investing_algorithm_framework.core.models.model_extension import \
-    ModelExtension
+    SQLAlchemyModelExtension
 
 
-class Ticker(ModelExtension):
+class Ticker(SQLAlchemyModelExtension):
 
     def __init__(
             self,

@@ -782,3 +782,7 @@ class AlgorithmContext:
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         return portfolio_manager.get_positions(symbol, lazy)
+
+    def get_portfolio(self, identifier=None):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        return portfolio_manager.get_portfolio()

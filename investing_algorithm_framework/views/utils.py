@@ -47,7 +47,13 @@ def get_query_param(key, params, default=None, many=False):
     return selection
 
 
-def create_paginated_response(query_set, serializer):
+def split(list_a, chunk_size):
+
+    for i in range(0, len(list_a), chunk_size):
+        yield list_a[i:i + chunk_size]
+
+
+def create_paginated_response(query_set, serializer, page=1, per_page=20):
     """
     Creates a paginated response from a query set. The given query set
     is paginated the function.
@@ -56,7 +62,25 @@ def create_paginated_response(query_set, serializer):
     :param serializer: an instance of an marshmallow schema
     :return: a json of paginated query
     """
-    paginated_query_set = query_set.paginate()
+
+    if isinstance(query_set, list):
+        chunks = list(split(query_set, per_page))
+
+        if len(chunks) > 0:
+            items = chunks[page - 1]
+        else:
+            items = []
+
+        return jsonify(
+            {
+                'total': len(query_set),
+                'page': page,
+                'per_page': per_page,
+                'items': serializer.dump(items, many=True)
+            }
+        )
+    else:
+        paginated_query_set = query_set.paginate()
 
     return jsonify(
         {

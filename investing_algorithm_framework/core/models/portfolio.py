@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from datetime import datetime
 from random import randint
 
@@ -5,16 +6,130 @@ from sqlalchemy import UniqueConstraint, event
 from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import validates
 
-from investing_algorithm_framework.core.models import db, OrderSide, Order, \
-    OrderStatus, OrderType
 from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.core.models import db, OrderSide, Order, \
+    OrderStatus, OrderType, SQLLiteOrder
 from investing_algorithm_framework.core.models.model_extension \
-    import ModelExtension
+    import SQLAlchemyModelExtension
 from investing_algorithm_framework.core.order_validators import \
     OrderValidatorFactory
 
 
-class Portfolio(db.Model, ModelExtension):
+class Portfolio:
+
+    @abstractmethod
+    def get_id(self):
+        pass
+
+    @abstractmethod
+    def get_identifier(self):
+        pass
+
+    @abstractmethod
+    def get_trading_symbol(self):
+        pass
+
+    @abstractmethod
+    def get_positions(self, symbol: str = None):
+        pass
+
+    @abstractmethod
+    def get_number_of_positions(self):
+        pass
+
+    @abstractmethod
+    def get_orders(
+        self,
+        status: OrderStatus = None,
+        side: OrderSide = None,
+        target_symbol: str = None,
+        trading_symbol: str = None,
+        lazy: bool = False
+    ):
+        pass
+
+    @abstractmethod
+    def get_number_of_orders(self):
+        pass
+
+    def get_market(self) -> str:
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def from_dict(data):
+        pass
+
+    @abstractmethod
+    def to_dict(self):
+        pass
+
+    @abstractmethod
+    def get_unallocated(self):
+        pass
+
+    @abstractmethod
+    def get_allocated(self):
+        pass
+
+    @abstractmethod
+    def get_realized(self):
+        pass
+
+    @abstractmethod
+    def get_total_revenue(self):
+        pass
+
+    @abstractmethod
+    def snapshot(
+        self, withdrawel=0, deposit=0, commit=True, creation_datetime=None
+    ):
+        pass
+
+    @abstractmethod
+    def create_order(
+        self,
+        context,
+        order_type,
+        symbol,
+        price=None,
+        amount_trading_symbol=None,
+        amount_target_symbol=None,
+        order_side=OrderSide.BUY.value,
+    ):
+        pass
+
+    def repr(self, **fields) -> str:
+        """
+        Helper for __repr__
+        """
+
+        field_strings = []
+        at_least_one_attached_attribute = False
+
+        for key, field in fields.items():
+            field_strings.append(f'{key}={field!r}')
+            at_least_one_attached_attribute = True
+
+        if at_least_one_attached_attribute:
+            return f"<{self.__class__.__name__}({','.join(field_strings)})>"
+
+        return f"<{self.__class__.__name__} {id(self)}>"
+
+    def __repr__(self):
+        return self.repr(
+            id=self.get_id(),
+            identifier=self.get_identifier(),
+            trading_symbol=self.get_trading_symbol(),
+            unallocated=f"{self.get_unallocated()} {self.get_trading_symbol()}",
+            number_of_positions=self.get_number_of_positions(),
+            realized=f"{self.get_realized()}",
+            total_revenue=f"{self.get_total_revenue()}",
+        )
+
+
+class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
+
     """
     Class Portfolio: a database model for an
     AlgorithmPortfolio instance.
@@ -106,10 +221,10 @@ class Portfolio(db.Model, ModelExtension):
 
         position_ids = self.positions.with_entities(Position.id)
 
-        orders = Order.query \
+        orders = SQLLiteOrder.query \
             .filter_by(order_side=OrderSide.BUY.value) \
             .filter_by(status=OrderStatus.SUCCESS.value)\
-            .filter(Order.position_id.in_(position_ids)) \
+            .filter(SQLLiteOrder.position_id.in_(position_ids)) \
             .all()
 
         allocated = 0
@@ -190,12 +305,10 @@ class Portfolio(db.Model, ModelExtension):
         amount_target_symbol=None,
         order_side=OrderSide.BUY.value,
     ):
-        from investing_algorithm_framework.core.models import Order
-
         if OrderType.MARKET.equals(order_type):
 
             if OrderSide.SELL.equals(order_side):
-                order = Order(
+                order = SQLLiteOrder(
                     target_symbol=symbol,
                     trading_symbol=self.trading_symbol,
                     amount_target_symbol=amount_target_symbol,
@@ -206,7 +319,7 @@ class Portfolio(db.Model, ModelExtension):
             else:
                 raise OperationalException("Buy market order is not supported")
         else:
-            order = Order(
+            order = SQLLiteOrder(
                 target_symbol=symbol,
                 trading_symbol=self.trading_symbol,
                 amount_target_symbol=amount_target_symbol,
@@ -255,20 +368,86 @@ class Portfolio(db.Model, ModelExtension):
                 self, creation_datetime, withdrawel=withdrawel, deposit=deposit
             ).save(db, commit=commit)
 
-    def __repr__(self):
-        return self.repr(
-            id=self.id,
-            trading_symbol=self.trading_symbol,
-            unallocated=f"{self.unallocated} {self.trading_symbol}",
-            realized=f"{self.realized}",
-            total_revenue=f"{self.total_revenue}",
-            identifier=self.identifier,
-            created_at=self.created_at,
-            updated_at=self.updated_at
-        )
+    def get_id(self):
+        return self.id
+
+    def get_identifier(self):
+        return self.identifier
+
+    def get_trading_symbol(self):
+        return self.trading_symbol
+
+    def get_positions(self, symbol: str = None):
+        return self.positions
+
+    def get_number_of_positions(self):
+        return self.positions.count()
+
+    def get_number_of_orders(self):
+        from investing_algorithm_framework.core.models import Position
+
+        position_ids = self.positions.with_entities(Position.id)
+
+        return SQLLiteOrder.query \
+            .filter(SQLLiteOrder.position_id.in_(position_ids)) \
+            .count()
+
+    def get_orders(
+        self,
+        status: OrderStatus = None,
+        side: OrderSide = None,
+        target_symbol: str = None,
+        trading_symbol: str = None,
+        lazy: bool = False
+    ):
+        from investing_algorithm_framework.core.models import Position
+
+        position_ids = self.positions.with_entities(Position.id)
+
+        query_set = SQLLiteOrder.query \
+            .filter(SQLLiteOrder.position_id.in_(position_ids))
+
+        if status:
+            status = OrderStatus.from_value(status)
+            query_set = query_set.filter_by(status=status.value)
+
+        if target_symbol:
+            query_set = query_set.filter_by(target_symbol=target_symbol)
+
+        if trading_symbol:
+            query_set = query_set.filter_by(trading_symbol=trading_symbol)
+
+        if side:
+            query_set = query_set.filter_by(order_side=side)
+
+        if lazy:
+            return query_set
+
+        return query_set.all()
+
+    def get_unallocated(self):
+        return self.unallocated
+
+    def get_allocated(self):
+        return self.allocated
+
+    def get_realized(self):
+        return self.realized
+
+    def get_total_revenue(self):
+        return self.total_revenue
+
+    @staticmethod
+    def from_dict(data):
+        orders = data.get("orders")
+        positions = data.get("positions")
+
+    def to_dict(self):
+        orders = self.get_orders()
+        positions = self.get_positions()
 
 
 # first snapshot on creation of a portfolio
-@event.listens_for(Portfolio, 'before_insert')
+@event.listens_for(SQLLitePortfolio, 'before_insert')
 def snapshot_after_insert(mapper, connection, portfolio):
     portfolio.snapshot(commit=False)

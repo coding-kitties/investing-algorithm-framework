@@ -3,6 +3,7 @@ import logging
 import sqlalchemy
 from flask import Blueprint, request
 
+from investing_algorithm_framework import current_app
 from investing_algorithm_framework import Order, Position, \
     Portfolio, OrderSide, db
 from investing_algorithm_framework.configuration.constants import \
@@ -11,7 +12,8 @@ from investing_algorithm_framework.configuration.constants import \
     POSITION_SYMBOL_QUERY_PARAM
 from investing_algorithm_framework.schemas import OrderSerializer
 from investing_algorithm_framework.views.utils import normalize_query, \
-    create_paginated_response
+    create_paginated_response, get_query_param
+from investing_algorithm_framework import OperationalException, ApiException
 
 logger = logging.getLogger(__name__)
 
@@ -77,11 +79,29 @@ def list_orders():
     The response in the view is paginated.
     """
 
-    # Query orders
-    query_set = apply_order_query_parameters(Order.query)
+    try:
+        identifier = get_query_param(IDENTIFIER_QUERY_PARAM, request.args)
+        portfolio = current_app.algorithm.get_portfolio(identifier)
+        status = get_query_param(STATUS_QUERY_PARAM, request.args)
+        symbol = get_query_param(TARGET_SYMBOL_QUERY_PARAM, request.args)
+        side = get_query_param(ORDER_SIDE_QUERY_PARAM, request.args)
 
-    # Create serializer
-    serializer = OrderSerializer()
+        orders = portfolio\
+            .get_orders(
+                status=status,
+                side=side,
+                target_symbol=symbol
+            )
+
+        # Create serializer
+        serializer = OrderSerializer()
+    except OperationalException as e:
+        raise ApiException(e.error_message)
 
     # Paginate query
-    return create_paginated_response(query_set, serializer), 200
+    return create_paginated_response(
+        orders,
+        serializer,
+        get_query_param("page", request.args, 1),
+        get_query_param("per_page", request.args, 20)
+    ), 200

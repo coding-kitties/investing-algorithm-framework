@@ -2,10 +2,10 @@ from datetime import datetime as dt, timedelta as td
 from investing_algorithm_framework.core.models import db, TimeFrame, \
     TimeInterval
 from investing_algorithm_framework.core.models.model_extension \
-    import ModelExtension
+    import SQLAlchemyModelExtension
 
 
-class AssetPriceHistory(db.Model, ModelExtension):
+class AssetPriceHistory(db.Model, SQLAlchemyModelExtension):
     __tablename__ = "asset_price_histories"
 
     id = db.Column(db.Integer, primary_key=True)

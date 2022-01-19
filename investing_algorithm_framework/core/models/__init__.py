@@ -18,8 +18,9 @@ from investing_algorithm_framework.core.models.order_status import OrderStatus
 from investing_algorithm_framework.core.models.order_type import OrderType
 from investing_algorithm_framework.core.models.order_side import OrderSide
 from investing_algorithm_framework.core.models.time_unit import TimeUnit
-from investing_algorithm_framework.core.models.order import Order
-from investing_algorithm_framework.core.models.portfolio import Portfolio
+from investing_algorithm_framework.core.models.order import Order, SQLLiteOrder
+from investing_algorithm_framework.core.models.portfolio import Portfolio, \
+    SQLLitePortfolio
 from investing_algorithm_framework.core.models.position import Position
 from investing_algorithm_framework.core.models.time_frame import TimeFrame
 from investing_algorithm_framework.core.models.time_intervals import \
@@ -32,6 +33,7 @@ __all__ = [
     "Portfolio",
     "Position",
     'Order',
+    "SQLLiteOrder",
     "OrderType",
     'OrderSide',
     "TimeUnit",
@@ -42,5 +44,6 @@ __all__ = [
     "TimeInterval",
     "PortfolioSnapshot",
     "PositionSnapshot",
-    "PerformanceMetric"
+    "PerformanceMetric",
+    "SQLLitePortfolio"
 ]

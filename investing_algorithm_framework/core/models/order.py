@@ -1,4 +1,5 @@
 import logging
+from abc import abstractmethod
 from datetime import datetime
 from random import randint
 
@@ -9,7 +10,7 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import db, OrderType, \
     OrderStatus
 from investing_algorithm_framework.core.models.model_extension \
-    import ModelExtension
+    import SQLAlchemyModelExtension
 from .order_side import OrderSide
 
 logger = logging.getLogger(__name__)
@@ -25,13 +26,108 @@ def random_id():
     maximal = 1000000000000000000
     rand = randint(minimal, maximal)
 
-    while Order.query.filter_by(id=rand).first() is not None:
+    while SQLLiteOrder.query.filter_by(id=rand).first() is not None:
         rand = randint(minimal, maximal)
 
     return rand
 
 
-class Order(db.Model, ModelExtension):
+class Order:
+
+    @abstractmethod
+    def get_id(self):
+        pass
+
+    @abstractmethod
+    def get_order_reference(self):
+        pass
+
+    @abstractmethod
+    def get_target_symbol(self):
+        pass
+
+    @abstractmethod
+    def get_trading_symbol(self):
+        pass
+
+    @abstractmethod
+    def get_initial_price(self):
+        pass
+
+    @abstractmethod
+    def get_price(self):
+        pass
+
+    @abstractmethod
+    def get_closing_price(self):
+        pass
+
+    @abstractmethod
+    def get_side(self):
+        pass
+
+    @abstractmethod
+    def get_status(self):
+        pass
+
+    @abstractmethod
+    def get_type(self):
+        pass
+
+    @abstractmethod
+    def get_amount_target_symbol(self):
+        pass
+
+    @abstractmethod
+    def get_amount_trading_symbol(self):
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def from_dict(data):
+        pass
+
+    @abstractmethod
+    def to_dict(self):
+        pass
+
+    @abstractmethod
+    def split(self, amount):
+        pass
+
+    def repr(self, **fields) -> str:
+        """
+        Helper for __repr__
+        """
+
+        field_strings = []
+        at_least_one_attached_attribute = False
+
+        for key, field in fields.items():
+            field_strings.append(f'{key}={field!r}')
+            at_least_one_attached_attribute = True
+
+        if at_least_one_attached_attribute:
+            return f"<{self.__class__.__name__}({','.join(field_strings)})>"
+
+        return f"<{self.__class__.__name__} {id(self)}>"
+
+    def __repr__(self):
+        self.repr(
+            id=self.get_id(),
+            order_reference=self.get_order_reference(),
+            status=self.get_status(),
+            initial_price=self.get_initial_price(),
+            price=self.get_price(),
+            closing_price=self.get_closing_price(),
+            side=self.get_side(),
+            type=self.get_type(),
+            amount_target_symbol=self.get_amount_target_symbol(),
+            amount_trading_symbol=self.get_amount_trading_symbol()
+        )
+
+
+class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
     """
         Class AlgorithmOrder: a database model for an AlgorithmOrder instance.
 
@@ -115,7 +211,6 @@ class Order(db.Model, ModelExtension):
         target_symbol,
         trading_symbol,
         price=None,
-        amount=None,
         amount_target_symbol=None,
         amount_trading_symbol=None,
         **kwargs
@@ -126,7 +221,6 @@ class Order(db.Model, ModelExtension):
         self.trading_symbol = trading_symbol
         self.status = None
         self.initial_price = price
-        self.amount = amount
 
         if OrderType.MARKET.equals(self.order_type):
 
@@ -369,15 +463,15 @@ class Order(db.Model, ModelExtension):
         if amount > self.amount_target_symbol:
             raise OperationalException("Amount is larger then original order")
 
-        order = Order(
-            amount=amount,
+        order = SQLLiteOrder(
+            amount_trading_symbol=self.get_amount_trading_symbol(),
             price=self.initial_price,
             order_side=self.order_side,
             order_type=self.order_type,
             target_symbol=self.target_symbol,
             trading_symbol=self.trading_symbol,
-            amount_target_symbol=
-            self.amount_target_symbol - (self.amount_target_symbol - amount)
+            amount_target_symbol=self.amount_target_symbol - (
+                    self.amount_target_symbol - amount)
         )
 
         order.amount_trading_symbol = order.initial_price \
@@ -466,7 +560,7 @@ class Order(db.Model, ModelExtension):
                 buy_orders = self.position.orders \
                     .filter_by(status=OrderStatus.SUCCESS.value) \
                     .filter_by(order_side=OrderSide.BUY.value) \
-                    .order_by(Order.created_at.desc()) \
+                    .order_by(SQLLiteOrder.created_at.desc()) \
                     .all()
 
                 index = 0
@@ -486,15 +580,45 @@ class Order(db.Model, ModelExtension):
 
                     index += 1
 
-    def __repr__(self):
-        return self.repr(
-            id=self.id,
-            status=self.status,
-            order_side=self.order_side,
-            target_symbol=self.target_symbol,
-            trading_symbol=self.trading_symbol,
-            amount_target_symbol=self.amount_target_symbol,
-            amount_trading_symbol=self.amount_trading_symbol,
-            initial_price=self.initial_price,
-            created_at=self.created_at,
-        )
+    def get_id(self):
+        return self.id
+
+    def get_order_reference(self):
+        return self.order_reference
+
+    def get_target_symbol(self):
+        return self.target_symbol
+
+    def get_trading_symbol(self):
+        return self.trading_symbol
+
+    def get_initial_price(self):
+        return self.initial_price
+
+    def get_price(self):
+        return self.current_price
+
+    def get_closing_price(self):
+        return self.closing_price
+
+    def get_side(self):
+        return self.order_side
+
+    def get_status(self):
+        return self.status
+
+    def get_type(self):
+        return self.order_type
+
+    def get_amount_trading_symbol(self):
+        return self.amount_trading_symbol
+
+    def get_amount_target_symbol(self):
+        return self.amount_target_symbol
+
+    @staticmethod
+    def from_dict(data):
+        pass
+
+    def to_dict(self):
+        pass

@@ -1,7 +1,7 @@
 from datetime import datetime
 from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.models import OrderSide, Portfolio, \
-    OrderType
+from investing_algorithm_framework.core.models import OrderSide, OrderType, \
+    SQLLitePortfolio
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
@@ -12,7 +12,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.start_algorithm()
 
     def test_creation(self):
-        self.assertEqual(1, Portfolio.query.count())
+        self.assertEqual(1, SQLLitePortfolio.query.count())
 
     def test_allocated(self):
         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()

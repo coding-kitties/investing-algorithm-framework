@@ -1,11 +1,11 @@
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.core.models.model_extension import \
-    ModelExtension
+    SQLAlchemyModelExtension
 from investing_algorithm_framework.core.models import db
 
 
-class AssetPrice(db.Model, ModelExtension):
+class AssetPrice(db.Model, SQLAlchemyModelExtension):
     __tablename__ = "asset_prices"
 
     id = db.Column(db.Integer, primary_key=True)

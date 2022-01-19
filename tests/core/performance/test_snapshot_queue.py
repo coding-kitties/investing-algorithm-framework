@@ -1,5 +1,5 @@
 from investing_algorithm_framework.core.models import \
-    Portfolio, TimeFrame
+    Portfolio, TimeFrame, SQLLitePortfolio
 from investing_algorithm_framework.core.performance import SnapShotQueue, \
     SnapshotAssetPriceCollection
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
@@ -15,7 +15,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         super(TestOrderModel, self).tearDown()
 
     def test(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
         snapshots_asset_price_collection = SnapshotAssetPriceCollection(
             portfolio,

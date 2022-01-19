@@ -1,13 +1,13 @@
 from random import randint
 
-from sqlalchemy import UniqueConstraint, event
-from sqlalchemy.orm import relationship, validates
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy.orm import relationship, validates
 
 from investing_algorithm_framework.core.models import db, OrderSide, \
-    OrderStatus, OrderType
+    OrderStatus
 from investing_algorithm_framework.core.models.model_extension \
-    import ModelExtension
+    import SQLAlchemyModelExtension
 
 
 def random_id():
@@ -26,7 +26,7 @@ def random_id():
     return rand
 
 
-class Position(db.Model, ModelExtension):
+class Position(db.Model, SQLAlchemyModelExtension):
     __tablename__ = "positions"
 
     # Integer id for the Position as the primary key
@@ -42,7 +42,7 @@ class Position(db.Model, ModelExtension):
 
     # The price of the asset
     orders = db.relationship(
-        "Order",
+        "SQLLiteOrder",
         back_populates="position",
         lazy="dynamic",
         cascade="all, delete-orphan"
@@ -52,7 +52,7 @@ class Position(db.Model, ModelExtension):
 
     # Relationships
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'))
-    portfolio = relationship("Portfolio", back_populates="positions")
+    portfolio = relationship("SQLLitePortfolio", back_populates="positions")
 
     # Constraints
     __table_args__ = (
