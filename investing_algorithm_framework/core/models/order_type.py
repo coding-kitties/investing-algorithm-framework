@@ -16,6 +16,17 @@ class OrderType(Enum):
 
         raise ValueError("Could not convert value to OrderType")
 
+    @staticmethod
+    def from_value(value):
+
+        if isinstance(value, OrderType):
+            for order_type in OrderType:
+
+                if value == order_type:
+                    return order_type
+
+        return OrderType.from_string(value)
+
     def equals(self, other):
 
         if isinstance(other, Enum):
