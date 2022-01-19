@@ -30,10 +30,17 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
         self.trading_symbol = self.get_trading_symbol(algorithm_context)
 
         if portfolio is None:
+
+            unallocated = 0
+            synced_unallocated = self.get_unallocated_synced(algorithm_context)
+
+            if synced_unallocated is not None:
+                unallocated = synced_unallocated
+
             portfolio = Portfolio(
                 identifier=self.identifier,
                 trading_symbol=self.trading_symbol,
-                unallocated=self.get_unallocated_synced(algorithm_context),
+                unallocated=unallocated,
                 market=self.get_market()
             )
             portfolio.save(db)
@@ -133,11 +140,20 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
         order_type=OrderType.LIMIT.value,
         order_side=OrderSide.BUY.value,
         context=None,
+        validate_pair=True
     ):
 
         if context is None:
             from investing_algorithm_framework import current_app
             context = current_app.algorithm
+
+        if validate_pair:
+            market_service = context.get_market_service(self.market)
+            if not market_service.pair_exists(symbol, self.trading_symbol):
+                raise OperationalException(
+                    f"Pair {symbol} {self.trading_symbol} does not exist "
+                    f"on market {self.market}"
+                )
 
         return self.get_portfolio().create_order(
             context=context,

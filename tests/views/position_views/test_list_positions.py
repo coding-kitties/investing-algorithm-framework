@@ -11,7 +11,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.start_algorithm()
 
         order = self.algo_app.algorithm.create_limit_buy_order(
-            "test",
             self.TARGET_SYMBOL_A,
             self.get_price(self.TARGET_SYMBOL_A).price,
             10,
@@ -20,7 +19,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         order.save(db)
 
         order = self.algo_app.algorithm.create_limit_buy_order(
-            "test",
             self.TARGET_SYMBOL_B,
             self.get_price(self.TARGET_SYMBOL_B).price,
             10,
@@ -30,7 +28,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         order.set_executed()
 
         self.algo_app.algorithm.create_limit_sell_order(
-            "test",
             self.TARGET_SYMBOL_B,
             self.get_price(self.TARGET_SYMBOL_B).price,
             10,

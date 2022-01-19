@@ -516,14 +516,16 @@ class AlgorithmContext:
             price: float,
             amount: float,
             execute=False,
-            identifier: str = None
+            identifier: str = None,
+            validate_pair=True
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
             symbol=symbol,
             price=price,
             amount_target_symbol=amount,
-            order_type=OrderType.LIMIT.value
+            order_type=OrderType.LIMIT.value,
+            validate_pair=validate_pair
         )
 
         if execute:
@@ -535,7 +537,13 @@ class AlgorithmContext:
         return order
 
     def create_limit_sell_order(
-            self, symbol, price, amount, execute=False, identifier: str = None
+            self,
+            symbol,
+            price,
+            amount,
+            execute=False,
+            identifier: str = None,
+            validate_pair=True
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
@@ -543,7 +551,8 @@ class AlgorithmContext:
             price=price,
             amount_target_symbol=amount,
             order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.SELL.value
+            order_side=OrderSide.SELL.value,
+            validate_pair=validate_pair
         )
 
         if execute:
@@ -559,14 +568,16 @@ class AlgorithmContext:
         symbol,
         amount_target_symbol,
         execute=False,
-        identifier: str = None
+        identifier: str = None,
+        validate_pair=True
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
             symbol=symbol,
             amount_target_symbol=amount_target_symbol,
             order_type=OrderType.MARKET.value,
-            order_side=OrderSide.SELL.value
+            order_side=OrderSide.SELL.value,
+            validate_pair=validate_pair
         )
 
         if execute:
