@@ -10,7 +10,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
     def test(self) -> None:
         order = self.algo_app.algorithm\
             .create_limit_sell_order(
-                "test", self.TARGET_SYMBOL_A, self.BASE_SYMBOL_A_PRICE, 10
+                self.TARGET_SYMBOL_A, self.BASE_SYMBOL_A_PRICE, 10
             )
 
         self.assert_is_limit_order(order)
@@ -18,7 +18,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
     def test_with_execution(self) -> None:
         order = self.algo_app.algorithm \
             .create_limit_buy_order(
-                "test",
                 self.TARGET_SYMBOL_A,
                 self.BASE_SYMBOL_A_PRICE,
                 10,
@@ -28,7 +27,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
         order = self.algo_app.algorithm\
             .create_limit_sell_order(
-                "test",
                 self.TARGET_SYMBOL_A,
                 self.BASE_SYMBOL_A_PRICE,
                 10,

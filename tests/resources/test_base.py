@@ -622,7 +622,6 @@ class TestBase(TestCase):
             symbol=target_symbol,
             amount_target_symbol=amount,
             price=price,
-            validate_pair=False
         )
 
         order.created_at = creation_datetime

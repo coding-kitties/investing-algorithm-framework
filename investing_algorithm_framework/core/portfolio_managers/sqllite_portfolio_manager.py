@@ -30,13 +30,23 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
         self.trading_symbol = self.get_trading_symbol(algorithm_context)
 
         if portfolio is None:
+
+            unallocated = 0
+            synced_unallocated = self.get_unallocated_synced(algorithm_context)
+
+            if synced_unallocated is not None:
+                unallocated = synced_unallocated
+
             portfolio = Portfolio(
                 identifier=self.identifier,
                 trading_symbol=self.trading_symbol,
-                unallocated=self.get_unallocated_synced(algorithm_context),
+                unallocated=unallocated,
                 market=self.get_market()
             )
             portfolio.save(db)
+        else:
+            self.get_unallocated(algorithm_context, True)
+            self.get_allocated(algorithm_context, True)
 
     def get_unallocated(self, algorithm_context, sync=False):
         portfolio = self.get_portfolio()
@@ -57,21 +67,22 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
             synced_positions = self.get_positions_synced(algorithm_context)
             positions = Position.query.filter_by(portfolio=self.get_portfolio())
 
-            for synced_position in synced_positions:
+            if synced_positions is not None:
+                for synced_position in synced_positions:
 
-                position = positions\
-                    .filter_by(symbol=synced_position["symbol"])\
-                    .first()
+                    position = positions\
+                        .filter_by(symbol=synced_position["symbol"])\
+                        .first()
 
-                if position is None:
+                    if position is None:
 
-                    position = Position(symbol=synced_position["symbol"])
-                    position.amount = synced_position["amount"]
-                    position.portfolio = portfolio
-                    db.session.commit()
-                elif position.amount != synced_position["amount"]:
-                    position.amount = synced_position["amount"]
-                    db.session.commit()
+                        position = Position(symbol=synced_position["symbol"])
+                        position.amount = synced_position["amount"]
+                        position.portfolio = portfolio
+                        db.session.commit()
+                    elif position.amount != synced_position["amount"]:
+                        position.amount = synced_position["amount"]
+                        db.session.commit()
 
         return portfolio.unallocated
 
@@ -129,12 +140,20 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
         order_type=OrderType.LIMIT.value,
         order_side=OrderSide.BUY.value,
         context=None,
-        validate_pair=True,
+        validate_pair=True
     ):
 
         if context is None:
             from investing_algorithm_framework import current_app
             context = current_app.algorithm
+
+        if validate_pair:
+            market_service = context.get_market_service(self.market)
+            if not market_service.pair_exists(symbol, self.trading_symbol):
+                raise OperationalException(
+                    f"Pair {symbol} {self.trading_symbol} does not exist "
+                    f"on market {self.market}"
+                )
 
         return self.get_portfolio().create_order(
             context=context,
@@ -144,7 +163,6 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
             amount_trading_symbol=amount_trading_symbol,
             amount_target_symbol=amount_target_symbol,
             order_side=order_side,
-            validate_pair=validate_pair
         )
 
     def add_order(self, order):
