@@ -355,6 +355,9 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
         orders = self.get_orders()
         positions = self.get_positions()
 
+    def __repr__(self):
+        return self.to_string()
+
 
 # first snapshot on creation of a portfolio
 @event.listens_for(SQLLitePortfolio, 'before_insert')

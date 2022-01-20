@@ -525,3 +525,6 @@ class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
 
     def to_dict(self):
         pass
+
+    def __repr__(self):
+        return self.to_string()
