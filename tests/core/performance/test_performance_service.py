@@ -1,7 +1,8 @@
 from datetime import timedelta, datetime
 
 from investing_algorithm_framework.core.models import Portfolio, \
-    PortfolioSnapshot, PerformanceMetric, OrderSide, TimeFrame
+    PortfolioSnapshot, PerformanceMetric, OrderSide, TimeFrame, \
+    SQLLitePortfolio, SQLLitePortfolioSnapshot
 from investing_algorithm_framework.core.performance import \
     PerformanceService
 from tests.resources import TestBase
@@ -14,8 +15,8 @@ class TestClass(TestBase):
         self.start_algorithm()
 
     def test_delta(self):
-        portfolio = Portfolio.query.first()
-        first_snapshot = PortfolioSnapshot.query.first()
+        portfolio = SQLLitePortfolio.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range
@@ -81,9 +82,9 @@ class TestClass(TestBase):
         )
 
     def test_overall_performance_one_hour(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
-        first_snapshot = PortfolioSnapshot.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range
@@ -133,8 +134,8 @@ class TestClass(TestBase):
             self.assertEqual(0, point["value"])
 
     def test_profit_realized_unrealized_one_hour_updated(self):
-        portfolio = Portfolio.query.first()
-        first_snapshot = PortfolioSnapshot.query.first()
+        portfolio = SQLLitePortfolio.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range
@@ -210,8 +211,8 @@ class TestClass(TestBase):
                 )
 
     def test_profit_realized_unrealized_one_hour_withdrawel(self):
-        portfolio = Portfolio.query.first()
-        first_snapshot = PortfolioSnapshot.query.first()
+        portfolio = SQLLitePortfolio.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range
@@ -266,8 +267,8 @@ class TestClass(TestBase):
             self.assertEqual(0, data_point["value"])
 
     def test_profit_realized_unrealized_one_hour_withdrawel_updated(self):
-        portfolio = Portfolio.query.first()
-        first_snapshot = PortfolioSnapshot.query.first()
+        portfolio = SQLLitePortfolio.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range
@@ -347,8 +348,8 @@ class TestClass(TestBase):
                 )
 
     def test_profit_realized_unrealized_one_hour_deposit(self):
-        portfolio = Portfolio.query.first()
-        first_snapshot = PortfolioSnapshot.query.first()
+        portfolio = SQLLitePortfolio.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range
@@ -403,8 +404,8 @@ class TestClass(TestBase):
             self.assertEqual(0, data_point["value"])
 
     def test_profit_realized_unrealized_one_hour_deposit_updated(self):
-        portfolio = Portfolio.query.first()
-        first_snapshot = PortfolioSnapshot.query.first()
+        portfolio = SQLLitePortfolio.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range
@@ -484,9 +485,9 @@ class TestClass(TestBase):
                 )
 
     def test_overall_performance_one_day(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
-        first_snapshot = PortfolioSnapshot.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range
@@ -542,8 +543,8 @@ class TestClass(TestBase):
             self.assertEqual(0, point["value"])
 
     def test_profit_realized_unrealized_one_day_updated(self):
-        portfolio = Portfolio.query.first()
-        first_snapshot = PortfolioSnapshot.query.first()
+        portfolio = SQLLitePortfolio.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range
@@ -625,8 +626,8 @@ class TestClass(TestBase):
                 )
 
     def test_profit_realized_unrealized_one_day_withdrawel(self):
-        portfolio = Portfolio.query.first()
-        first_snapshot = PortfolioSnapshot.query.first()
+        portfolio = SQLLitePortfolio.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range
@@ -687,8 +688,8 @@ class TestClass(TestBase):
             self.assertEqual(0, data_point["value"])
 
     def test_profit_realized_unrealized_one_day_withdrawel_updated(self):
-        portfolio = Portfolio.query.first()
-        first_snapshot = PortfolioSnapshot.query.first()
+        portfolio = SQLLitePortfolio.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range
@@ -776,8 +777,8 @@ class TestClass(TestBase):
                 )
 
     def test_profit_realized_unrealized_one_day_deposit(self):
-        portfolio = Portfolio.query.first()
-        first_snapshot = PortfolioSnapshot.query.first()
+        portfolio = SQLLitePortfolio.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range
@@ -860,8 +861,8 @@ class TestClass(TestBase):
             self.assertEqual(0, data_point["value"])
 
     def test_profit_realized_unrealized_one_day_deposit_updated(self):
-        portfolio = Portfolio.query.first()
-        first_snapshot = PortfolioSnapshot.query.first()
+        portfolio = SQLLitePortfolio.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range

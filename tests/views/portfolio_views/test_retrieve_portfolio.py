@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta
 
 from investing_algorithm_framework.core.models import OrderSide, \
-    SQLLitePortfolio, PortfolioSnapshot
+    SQLLitePortfolio, PortfolioSnapshot, SQLLitePosition, SQLLitePortfolioSnapshot
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 from tests.resources.serialization_dicts import portfolio_serialization_dict
 
@@ -14,7 +14,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.start_algorithm()
 
         portfolio = SQLLitePortfolio.query.first()
-        first_snapshot = PortfolioSnapshot.query.first()
+        first_snapshot = SQLLitePortfolioSnapshot.query.first()
 
         # Update datetime of creation of snapshot before range
         # Then we have at least one snapshot before the range

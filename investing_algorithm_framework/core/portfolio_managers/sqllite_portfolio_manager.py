@@ -5,7 +5,7 @@ from investing_algorithm_framework.core.identifier import Identifier
 from investing_algorithm_framework.core.market_identifier import \
     MarketIdentifier
 from investing_algorithm_framework.core.models import db, SQLLitePortfolio, \
-    Position, OrderStatus, OrderType, OrderSide, Portfolio, SQLLiteOrder
+    OrderStatus, OrderType, OrderSide, Portfolio, SQLLiteOrder, SQLLitePosition
 from investing_algorithm_framework.core.portfolio_managers.portfolio_manager\
     import PortfolioManager
 
@@ -27,8 +27,6 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
     def _initialize_portfolio(self, algorithm_context):
         portfolio = self.get_portfolio(False)
 
-        print(portfolio)
-
         self.trading_symbol = self.get_trading_symbol(algorithm_context)
 
         if portfolio is None:
@@ -39,7 +37,6 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
             if synced_unallocated is not None:
                 unallocated = synced_unallocated
 
-            print("creating portfolio")
             portfolio = SQLLitePortfolio(
                 identifier=self.identifier,
                 trading_symbol=self.trading_symbol,
@@ -68,7 +65,8 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
 
         if sync:
             synced_positions = self.get_positions_synced(algorithm_context)
-            positions = Position.query.filter_by(portfolio=self.get_portfolio())
+            positions = SQLLitePosition\
+                .query.filter_by(portfolio=self.get_portfolio())
 
             if synced_positions is not None:
                 for synced_position in synced_positions:
@@ -79,7 +77,9 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
 
                     if position is None:
 
-                        position = Position(symbol=synced_position["symbol"])
+                        position = SQLLitePosition(
+                            symbol=synced_position["symbol"]
+                        )
                         position.amount = synced_position["amount"]
                         position.portfolio = portfolio
                         db.session.commit()
@@ -90,8 +90,6 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
         return portfolio.unallocated
 
     def get_portfolio(self, throw_exception=True) -> Portfolio:
-        print(self.identifier)
-        print(SQLLitePortfolio.query.count())
         portfolio = SQLLitePortfolio.query\
             .filter_by(identifier=self.identifier)\
             .first()
@@ -104,10 +102,10 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
     def get_positions(self, symbol: str = None, lazy=False):
 
         if symbol is None:
-            query_set = Position.query \
+            query_set = SQLLitePosition.query \
                 .filter_by(portfolio=self.get_portfolio())
         else:
-            query_set = Position.query \
+            query_set = SQLLitePosition.query \
                 .filter_by(portfolio=self.get_portfolio()) \
                 .filter_by(symbol=symbol)
 
@@ -117,9 +115,9 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
             return query_set.all()
 
     def get_orders(self, symbol: str = None, status=None, lazy=False):
-        positions = Position.query \
+        positions = SQLLitePosition.query \
             .filter_by(portfolio=self.get_portfolio()) \
-            .with_entities(Position.id)
+            .with_entities(SQLLitePosition.id)
 
         query_set = SQLLiteOrder.query \
             .filter(SQLLiteOrder.position_id.in_(positions))

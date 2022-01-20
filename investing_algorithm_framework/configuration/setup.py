@@ -130,7 +130,7 @@ def register_error_handlers(app) -> None:
     def create_error_response(error_message, status_code: int = 400):
 
         # Remove the default 404 not found message if it exists
-        if not isinstance(error_message, Dict):
+        if isinstance(error_message, str):
             error_message = error_message.replace("404 Not Found: ", '')
 
         response = jsonify({"error_message": error_message})

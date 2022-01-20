@@ -1,5 +1,5 @@
-from investing_algorithm_framework.core.models import \
-    Portfolio, TimeFrame, SQLLitePortfolio
+from investing_algorithm_framework.core.models import TimeFrame, \
+    SQLLitePortfolio
 from investing_algorithm_framework.core.performance import SnapShotQueue, \
     SnapshotAssetPriceCollection
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin

@@ -18,20 +18,24 @@ from investing_algorithm_framework.core.models.order_status import OrderStatus
 from investing_algorithm_framework.core.models.order_type import OrderType
 from investing_algorithm_framework.core.models.order_side import OrderSide
 from investing_algorithm_framework.core.models.time_unit import TimeUnit
-from investing_algorithm_framework.core.models.order import Order, SQLLiteOrder
-from investing_algorithm_framework.core.models.portfolio import Portfolio, \
-    SQLLitePortfolio
+from investing_algorithm_framework.core.models.order import Order
+from investing_algorithm_framework.core.models.portfolio import Portfolio
 from investing_algorithm_framework.core.models.position import Position
 from investing_algorithm_framework.core.models.time_frame import TimeFrame
 from investing_algorithm_framework.core.models.time_intervals import \
     TimeInterval
+from investing_algorithm_framework.core.models.sql_lite import \
+    SQLLitePosition, SQLLiteOrder, SQLLitePortfolio
 from investing_algorithm_framework.core.models.snapshots import \
-    PositionSnapshot, PortfolioSnapshot
+    PositionSnapshot, PortfolioSnapshot, SQLLitePortfolioSnapshot, \
+    SQLLiteAssetPrice, SQLLitePositionSnapshot, SQLLiteAssetPriceHistory, \
+    AssetPrice, AssetPriceHistory
 
 __all__ = [
     "db",
     "Portfolio",
     "Position",
+    "SQLLitePosition",
     'Order',
     "SQLLiteOrder",
     "OrderType",
@@ -45,5 +49,11 @@ __all__ = [
     "PortfolioSnapshot",
     "PositionSnapshot",
     "PerformanceMetric",
-    "SQLLitePortfolio"
+    "SQLLitePortfolio",
+    "SQLLitePortfolioSnapshot",
+    "SQLLitePositionSnapshot",
+    "AssetPrice",
+    "AssetPriceHistory",
+    "SQLLiteAssetPrice",
+    "SQLLiteAssetPriceHistory"
 ]

@@ -12,7 +12,7 @@ from investing_algorithm_framework.core.models.data_provider import \
     TradingDataTypes, OrderBook, Ticker
 from investing_algorithm_framework.core.models import OrderSide, Order, \
     Position, TimeUnit, db, Portfolio, OrderType, OrderStatus, \
-    SQLLitePortfolio, SQLLiteOrder
+    SQLLitePortfolio, SQLLiteOrder, SQLLitePosition
 from investing_algorithm_framework.core.exceptions import \
     OperationalException, ImproperlyConfigured
 from investing_algorithm_framework.app import App
@@ -53,5 +53,6 @@ __all__ = [
     "DataProvider",
     "SQLLitePortfolio",
     "SQLLiteOrder",
+    "SQLLitePosition",
     "ApiException"
 ]

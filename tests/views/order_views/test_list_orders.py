@@ -1,7 +1,7 @@
 import json
 
 from investing_algorithm_framework import OrderSide, db, OrderStatus, \
-    Position, SQLLitePortfolio, SQLLiteOrder
+    Position, SQLLitePortfolio, SQLLiteOrder, SQLLitePosition
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 from tests.resources.serialization_dicts import order_serialization_dict
 
@@ -52,9 +52,9 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assert200(response)
         data = json.loads(response.data.decode())
 
-        position_ids = Position.query\
+        position_ids = SQLLitePosition.query\
             .filter_by(symbol=self.TARGET_SYMBOL_B)\
-            .with_entities(Position.id)
+            .with_entities(SQLLitePosition.id)
 
         self.assertEqual(
             SQLLiteOrder.query.filter(SQLLiteOrder.position_id.in_(position_ids)).count(),
@@ -79,7 +79,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
         portfolio = SQLLitePortfolio.query.filter_by(identifier="test").first()
 
-        position_ids = portfolio.positions.with_entities(Position.id)
+        position_ids = portfolio.positions.with_entities(SQLLitePosition.id)
 
         self.assertEqual(
             SQLLiteOrder.query.filter(SQLLiteOrder.position_id.in_(position_ids)).count(),

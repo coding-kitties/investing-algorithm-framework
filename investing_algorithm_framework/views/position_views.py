@@ -5,7 +5,8 @@ from flask import Blueprint, request
 
 from investing_algorithm_framework.configuration.constants import\
     SYMBOL_QUERY_PARAM, IDENTIFIER_QUERY_PARAM
-from investing_algorithm_framework import Position, Portfolio, db, current_app
+from investing_algorithm_framework import Position, Portfolio, db, \
+    current_app, OperationalException, ApiException
 from investing_algorithm_framework.schemas import PositionSerializer
 from investing_algorithm_framework.views.utils import normalize_query, \
     create_paginated_response, get_query_param
@@ -47,17 +48,21 @@ def list_positions():
         position.
     The response in the view is paginated.
     """
-    identifier = get_query_param(IDENTIFIER_QUERY_PARAM, request.args, None)
+    try:
 
-    # Get the default portfolio
-    if identifier == "default":
-        portfolio = current_app.algorithm \
-            .get_portfolio_manager() \
-            .get_portfolio()
-    else:
-        portfolio = current_app.algorithm \
-            .get_portfolio_manager(identifier=identifier) \
-            .get_portfolio()
+        identifier = get_query_param(IDENTIFIER_QUERY_PARAM, request.args, None)
+
+        # Get the default portfolio
+        if identifier == "default":
+            portfolio = current_app.algorithm \
+                .get_portfolio_manager() \
+                .get_portfolio()
+        else:
+            portfolio = current_app.algorithm \
+                .get_portfolio_manager(identifier=identifier) \
+                .get_portfolio()
+    except OperationalException as e:
+        raise ApiException(e.error_message, status_code=404)
 
     symbol = get_query_param(SYMBOL_QUERY_PARAM, request.args, None)
 

@@ -2,13 +2,13 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-from investing_algorithm_framework import Portfolio, current_app
-from investing_algorithm_framework.schemas import PortfolioSerializer
-from investing_algorithm_framework.views.utils import \
-    create_paginated_response, get_query_param
-from investing_algorithm_framework.core.models import TimeFrame
+from investing_algorithm_framework import current_app
 from investing_algorithm_framework.configuration.constants \
     import TIME_FRAME_QUERY_PARAM
+from investing_algorithm_framework.core.models import TimeFrame
+from investing_algorithm_framework.schemas import PortfolioSerializer
+from investing_algorithm_framework.views.utils import \
+    get_query_param
 
 logger = logging.getLogger(__name__)
 

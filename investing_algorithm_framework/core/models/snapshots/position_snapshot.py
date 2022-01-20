@@ -1,12 +1,36 @@
+from abc import abstractmethod
+
 from sqlalchemy.orm import relationship
 
-from investing_algorithm_framework.core.models import db, Order, OrderSide, \
+from investing_algorithm_framework.core.models import db, OrderSide, \
     OrderStatus
 from investing_algorithm_framework.core.models.model_extension \
     import SQLAlchemyModelExtension
 
 
-class PositionSnapshot(db.Model, SQLAlchemyModelExtension):
+class PositionSnapshot:
+
+    @abstractmethod
+    def get_amount(self):
+        pass
+
+    @abstractmethod
+    def get_cost(self):
+        pass
+
+    @abstractmethod
+    def get_symbol(self):
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def from_position(position):
+        pass
+
+
+class SQLLitePositionSnapshot(
+    PositionSnapshot, db.Model, SQLAlchemyModelExtension
+):
     __tablename__ = "position_snapshots"
 
     # Integer id for the Position as the primary key
@@ -20,7 +44,7 @@ class PositionSnapshot(db.Model, SQLAlchemyModelExtension):
 
     # Relationships
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolio_snapshots.id'))
-    portfolio = relationship("PortfolioSnapshot", back_populates="positions")
+    portfolio = relationship("SQLLitePortfolioSnapshot", back_populates="positions")
 
     def __init__(self, symbol, amount, cost):
         self.symbol = symbol
@@ -43,11 +67,20 @@ class PositionSnapshot(db.Model, SQLAlchemyModelExtension):
             cost += order.amount_target_symbol * order.initial_price
 
         # Create an algorithm position snapshot
-        return PositionSnapshot(
+        return SQLLitePositionSnapshot(
             symbol=position.symbol,
             amount=position.amount,
             cost=cost
         )
+
+    def get_amount(self):
+        return self.amount
+
+    def get_cost(self):
+        return self.cost
+
+    def get_symbol(self):
+        return self.symbol
 
     def __repr__(self):
         return self.repr(

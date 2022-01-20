@@ -79,7 +79,6 @@ class PerformanceService:
         previous_point = 1.0
 
         for date, snapshot, asset_prices in snapshot_asset_price_collection:
-
             hp_value = 1 + self.get_hp(
                 snapshot,
                 previous_snapshot,
