@@ -39,7 +39,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.algo_app.add_order_executor(OrderExecutorTestTwo)
         self.algo_app.add_portfolio_manager(PortfolioManagerTestTwo)
         self.start_algorithm()
-
+        
     def test(self) -> None:
         order = self.algo_app.algorithm\
             .create_limit_buy_order(
