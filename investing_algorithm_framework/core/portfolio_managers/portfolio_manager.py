@@ -6,7 +6,8 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.identifier import Identifier
 from investing_algorithm_framework.core.market_identifier import \
     MarketIdentifier
-from investing_algorithm_framework.core.models import OrderSide, OrderType
+from investing_algorithm_framework.core.models import OrderSide, OrderType, \
+    Portfolio
 
 
 class PortfolioManager(ABC, Identifier, MarketIdentifier):
@@ -25,7 +26,7 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
         pass
 
     @abstractmethod
-    def get_portfolio(self, algorithm_context):
+    def get_portfolio(self, algorithm_context) -> Portfolio:
         pass
 
     def get_trading_symbol(self, algorithm_context) -> str:

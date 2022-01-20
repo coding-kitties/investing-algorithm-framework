@@ -1,5 +1,5 @@
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
-from investing_algorithm_framework.core.models import Portfolio, db
+from investing_algorithm_framework.core.models import SQLLitePortfolio, db
 
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
@@ -17,7 +17,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assert_is_limit_order(order)
 
     def tearDown(self) -> None:
-        db.session.query(Portfolio).delete()
+        db.session.query(SQLLitePortfolio).delete()
         db.session.commit()
         super(Test, self).tearDown()
 

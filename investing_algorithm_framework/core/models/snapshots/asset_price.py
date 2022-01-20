@@ -1,11 +1,49 @@
+from abc import abstractmethod
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.core.models.model_extension import \
-    ModelExtension
+    SQLAlchemyModelExtension
 from investing_algorithm_framework.core.models import db
 
 
-class AssetPrice(db.Model, ModelExtension):
+class AssetPrice:
+
+    @abstractmethod
+    def get_target_symbol(self):
+        pass
+
+    @abstractmethod
+    def get_trading_symbol(self):
+        pass
+
+    @abstractmethod
+    def get_price(self):
+        pass
+
+    @abstractmethod
+    def get_datetime(self):
+        pass
+
+    def repr(self, **fields) -> str:
+        """
+        Helper for __repr__
+        """
+
+        field_strings = []
+        at_least_one_attached_attribute = False
+
+        for key, field in fields.items():
+            field_strings.append(f'{key}={field!r}')
+            at_least_one_attached_attribute = True
+
+        if at_least_one_attached_attribute:
+            return f"<{self.__class__.__name__}({','.join(field_strings)})>"
+
+        return f"<{self.__class__.__name__} {id(self)}>"
+
+
+class SQLLiteAssetPrice(AssetPrice, db.Model, SQLAlchemyModelExtension):
+
     __tablename__ = "asset_prices"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -19,7 +57,7 @@ class AssetPrice(db.Model, ModelExtension):
         db.Integer, db.ForeignKey('asset_price_histories.id')
     )
     asset_price_history = relationship(
-        "AssetPriceHistory", back_populates="prices"
+        "SQLLiteAssetPriceHistory", back_populates="prices"
     )
 
     def __init__(self, target_symbol, trading_symbol, price, datetime):
@@ -27,6 +65,18 @@ class AssetPrice(db.Model, ModelExtension):
         self.trading_symbol = trading_symbol
         self.price = price
         self.datetime = datetime
+
+    def get_target_symbol(self):
+        return self.target_symbol
+
+    def get_trading_symbol(self):
+        return self.trading_symbol
+
+    def get_price(self):
+        return self.price
+
+    def get_datetime(self):
+        return self.datetime
 
     def __repr__(self):
         return self.repr(

@@ -23,17 +23,11 @@ class PortfolioSerializer(Schema):
 
     @staticmethod
     def get_orders(obj):
-        positions = obj.positions.with_entities(Position.id)
-
-        # Retrieve orders
-        query_set = Order.query \
-            .filter(Order.position_id.in_(positions))
-
-        return query_set.count()
+        return obj.get_number_of_orders()
 
     @staticmethod
     def get_positions(obj):
-        return obj.positions.count()
+        return obj.get_number_of_positions()
 
     def get_performance(self, obj):
         return PerformanceService\

@@ -1,7 +1,8 @@
 from datetime import timedelta, datetime
 
 from investing_algorithm_framework.core.models import Portfolio, TimeFrame, \
-    TimeInterval, PortfolioSnapshot, OrderSide, db
+    TimeInterval, PortfolioSnapshot, OrderSide, db, SQLLitePortfolio, \
+    SQLLitePortfolioSnapshot
 from investing_algorithm_framework.core.performance import \
     SnapshotAssetPriceCollection
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
@@ -14,7 +15,7 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
         self.start_algorithm()
 
     def test_unique_symbols(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
         self.create_limit_order(
             portfolio,
@@ -77,7 +78,7 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
         )
 
     def test_asset_prices_collection_one_minute(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
         self.create_limit_order(
             portfolio,
@@ -125,7 +126,7 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
             )
 
     def test_asset_prices_collection_fifteen_minute(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
         self.create_limit_order(
             portfolio,
@@ -173,7 +174,7 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
             )
 
     def test_asset_prices_collection_one_hour(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
         self.create_limit_order(
             portfolio,
@@ -221,7 +222,7 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
             )
 
     def test_asset_prices_collection_four_hour(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
         self.create_limit_order(
             portfolio,
@@ -269,7 +270,7 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
             )
 
     def test_asset_prices_collection_days(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
         self.create_limit_order(
             portfolio,
@@ -317,11 +318,11 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
             )
 
     def test_iteration_operation_with_pre_range_snapshot(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
-        self.assertEqual(1, PortfolioSnapshot.query.count())
+        self.assertEqual(1, SQLLitePortfolioSnapshot.query.count())
 
-        first_snapshot = PortfolioSnapshot.query.filter_by(
+        first_snapshot = SQLLitePortfolioSnapshot.query.filter_by(
             portfolio_id=portfolio.id
         ).first()
 
@@ -363,9 +364,11 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
             portfolio, TimeFrame.ONE_HOUR
         )
 
+        self.assertEqual(7, SQLLitePortfolioSnapshot.query.count())
         self.assertEqual(7, len(asset_price_collection.snapshots))
 
         index = 0
+
         for interval_date, snapshot, asset_prices in asset_price_collection:
 
             if index == 0:
@@ -387,14 +390,14 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
                 self.assertTrue(snapshot.created_at < peek_snapshot.created_at)
 
     def test_iterate_operation_one_hour(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
         self.assertEqual(
             1,
-            PortfolioSnapshot.query.filter_by(portfolio_id=portfolio.id).count()
+            SQLLitePortfolioSnapshot.query.filter_by(portfolio_id=portfolio.id).count()
         )
 
-        first_snapshot = PortfolioSnapshot.query.filter_by(
+        first_snapshot = SQLLitePortfolioSnapshot.query.filter_by(
             portfolio_id=portfolio.id
         ).first()
 
@@ -477,15 +480,15 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(7, total_amount_of_snapshots_visited)
 
     def test_iterate_operation_one_day(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
         self.assertEqual(
             1,
-            PortfolioSnapshot.query.filter_by(
+            SQLLitePortfolioSnapshot.query.filter_by(
                 portfolio_id=portfolio.id).count()
         )
 
-        first_snapshot = PortfolioSnapshot.query.filter_by(
+        first_snapshot = SQLLitePortfolioSnapshot.query.filter_by(
             portfolio_id=portfolio.id
         ).first()
 
@@ -570,15 +573,15 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(7, total_amount_of_snapshots_visited)
 
     def test_iterate_operation_one_week(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
         self.assertEqual(
             1,
-            PortfolioSnapshot.query.filter_by(
+            SQLLitePortfolioSnapshot.query.filter_by(
                 portfolio_id=portfolio.id).count()
         )
 
-        first_snapshot = PortfolioSnapshot.query.filter_by(
+        first_snapshot = SQLLitePortfolioSnapshot.query.filter_by(
             portfolio_id=portfolio.id
         ).first()
 
@@ -663,15 +666,15 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(7, total_amount_of_snapshots_visited)
 
     def test_iterate_operation_one_month(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
         self.assertEqual(
             1,
-            PortfolioSnapshot.query.filter_by(
+            SQLLitePortfolioSnapshot.query.filter_by(
                 portfolio_id=portfolio.id).count()
         )
 
-        first_snapshot = PortfolioSnapshot.query.filter_by(
+        first_snapshot = SQLLitePortfolioSnapshot.query.filter_by(
             portfolio_id=portfolio.id
         ).first()
 
@@ -756,15 +759,15 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(7, total_amount_of_snapshots_visited)
 
     def test_iterate_operation_one_year(self):
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
         self.assertEqual(
             1,
-            PortfolioSnapshot.query.filter_by(
+            SQLLitePortfolioSnapshot.query.filter_by(
                 portfolio_id=portfolio.id).count()
         )
 
-        first_snapshot = PortfolioSnapshot.query.filter_by(
+        first_snapshot = SQLLitePortfolioSnapshot.query.filter_by(
             portfolio_id=portfolio.id
         ).first()
 
@@ -851,11 +854,11 @@ class TestClass(TestBase, TestOrderAndPositionsObjectsMixin):
     def test_iteration_operation_with_inner_snapshots(self):
         amount_of_snapshots_visited = 0
 
-        portfolio = Portfolio.query.first()
+        portfolio = SQLLitePortfolio.query.first()
 
-        self.assertEqual(1, PortfolioSnapshot.query.count())
+        self.assertEqual(1, SQLLitePortfolioSnapshot.query.count())
 
-        first_snapshot = PortfolioSnapshot.query.filter_by(
+        first_snapshot = SQLLitePortfolioSnapshot.query.filter_by(
             portfolio_id=portfolio.id
         ).first()
 

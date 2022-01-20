@@ -1,7 +1,7 @@
 import json
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 from tests.resources.serialization_dicts import position_serialization_dict
-from investing_algorithm_framework import db, Position
+from investing_algorithm_framework import db, SQLLitePosition
 
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
@@ -45,7 +45,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assert200(response)
         data = json.loads(response.data.decode())
 
-        self.assertEqual(Position.query.count(), len(data["items"]))
+        self.assertEqual(SQLLitePosition.query.count(), len(data["items"]))
         self.assertEqual(position_serialization_dict, set(data.get("items")[0]))
 
     def test_list_orders_with_target_symbol_query_params(self):
@@ -58,7 +58,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assert200(response)
         data = json.loads(response.data.decode())
         self.assertEqual(
-            Position.query.filter_by(symbol=self.TARGET_SYMBOL_B).count(),
+            SQLLitePosition.query.filter_by(symbol=self.TARGET_SYMBOL_B).count(),
             len(data["items"])
         )
         self.assertEqual(
@@ -74,7 +74,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assert200(response)
         data = json.loads(response.data.decode())
         self.assertEqual(
-            Position.query.count(),
+            SQLLitePosition.query.count(),
             len(data["items"])
         )
         self.assertEqual(
@@ -86,6 +86,4 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         }
 
         response = self.client.get("/api/positions", query_string=query_params)
-        self.assert200(response)
-        data = json.loads(response.data.decode())
-        self.assertEqual(0, len(data["items"]))
+        self.assert404(response)

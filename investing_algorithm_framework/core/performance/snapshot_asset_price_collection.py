@@ -1,12 +1,13 @@
 from investing_algorithm_framework.core.models import TimeFrame
 from investing_algorithm_framework.core.models.snapshots \
-    import AssetPriceHistory, PortfolioSnapshot
+    import SQLLitePortfolioSnapshot, \
+    SQLLiteAssetPriceHistory
 from investing_algorithm_framework.core.performance.asset_price_queue \
     import AssetPricesQueue
-from investing_algorithm_framework.core.performance.snapshot_queue \
-    import SnapShotQueue
 from investing_algorithm_framework.core.performance.intervals_queue \
     import IntervalsQueue
+from investing_algorithm_framework.core.performance.snapshot_queue \
+    import SnapShotQueue
 
 
 class SnapshotAssetPriceCollection:
@@ -35,6 +36,7 @@ class SnapshotAssetPriceCollection:
 
     def __iter__(self):
         self.snapshot_queue = SnapShotQueue(self.snapshots)
+
         self.intervals = IntervalsQueue(self.time_frame)
         self.asset_prices_queue = AssetPricesQueue(
             self.asset_prices, self.time_frame
@@ -97,7 +99,7 @@ class SnapshotAssetPriceCollection:
                 snapshot = self.current_snapshot
 
                 # Make known to the snapshot that it is an inner snapshot
-                snapshot.inner_snapshot = True
+                snapshot.set_inner_snapshot(True)
 
                 # Pop snapshot from queue
                 self.current_snapshot = self.snapshot_queue.pop()
@@ -125,7 +127,7 @@ class SnapshotAssetPriceCollection:
 
         # Retrieve and save the price histories
         for symbol in symbols:
-            asset_price_history = AssetPriceHistory.of(
+            asset_price_history = SQLLiteAssetPriceHistory.of(
                 market=self.portfolio.market,
                 target_symbol=symbol,
                 trading_symbol=self.portfolio.trading_symbol,
@@ -139,20 +141,20 @@ class SnapshotAssetPriceCollection:
 
         start_datetime, end_datetime = time_frame.create_time_frame()
 
-        snapshots = PortfolioSnapshot.query\
-            .filter(PortfolioSnapshot.created_at >= start_datetime)\
-            .filter(PortfolioSnapshot.created_at <= end_datetime)\
-            .order_by(PortfolioSnapshot.created_at.desc())\
+        snapshots = SQLLitePortfolioSnapshot.query\
+            .filter(SQLLitePortfolioSnapshot.created_at >= start_datetime)\
+            .filter(SQLLitePortfolioSnapshot.created_at <= end_datetime)\
+            .order_by(SQLLitePortfolioSnapshot.created_at.desc())\
             .all()
 
-        if(PortfolioSnapshot.query
+        if(SQLLitePortfolioSnapshot.query
                 .filter_by(portfolio_id=portfolio.id)
-                .filter(PortfolioSnapshot.created_at < start_datetime)
+                .filter(SQLLitePortfolioSnapshot.created_at < start_datetime)
                 .count() > 0):
-            additional_snapshot = PortfolioSnapshot.query \
+            additional_snapshot = SQLLitePortfolioSnapshot.query \
                 .filter_by(portfolio_id=portfolio.id)\
-                .filter(PortfolioSnapshot.created_at < start_datetime) \
-                .order_by(PortfolioSnapshot.created_at.asc())\
+                .filter(SQLLitePortfolioSnapshot.created_at < start_datetime) \
+                .order_by(SQLLitePortfolioSnapshot.created_at.asc())\
                 .first()
 
             snapshots.append(additional_snapshot)

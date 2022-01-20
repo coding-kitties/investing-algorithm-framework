@@ -1,17 +1,17 @@
 order_serialization_dict = {
-    'id',
-    'order_reference',
-    'initial_price',
-    'identifier',
-    'position_id',
-    'amount',
-    'amount_trading_symbol',
+    'amount_target_symbol',
     'trading_symbol',
+    'initial_price',
     'executed_at',
-    'status',
+    'id',
     'target_symbol',
+    'order_side',
+    'amount_trading_symbol',
+    'status',
+    'identifier',
     'order_type',
-    'order_side'
+    'position_id',
+    'order_reference'
 }
 
 position_serialization_dict = {
