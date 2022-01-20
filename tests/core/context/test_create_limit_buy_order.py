@@ -39,12 +39,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.algo_app.add_order_executor(OrderExecutorTestTwo)
         self.algo_app.add_portfolio_manager(PortfolioManagerTestTwo)
         self.start_algorithm()
-
-    def tearDown(self) -> None:
-        db.session.query(SQLLitePortfolio).delete()
-        db.session.commit()
-        super(Test, self).tearDown()
-
+        
     def test(self) -> None:
         order = self.algo_app.algorithm\
             .create_limit_buy_order(
