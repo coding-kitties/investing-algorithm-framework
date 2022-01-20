@@ -2,10 +2,10 @@ from datetime import datetime
 from typing import List
 
 from investing_algorithm_framework.core.models.model_extension import \
-    ModelExtension
+    SQLAlchemyModelExtension
 
 
-class OrderBook(ModelExtension):
+class OrderBook(SQLAlchemyModelExtension):
 
     def __init__(self, symbol, bids: List, asks: List, creation_date=None):
         self.symbol = symbol

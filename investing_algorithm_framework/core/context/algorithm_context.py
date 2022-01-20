@@ -7,7 +7,7 @@ from investing_algorithm_framework.configuration.constants import \
     TRADING_SYMBOL
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import TimeUnit, OrderType, \
-    db, OrderSide, OrderStatus
+    db, OrderSide, OrderStatus, Portfolio, Order, Position
 from investing_algorithm_framework.core.models.data_provider import \
     TradingDataTypes
 from investing_algorithm_framework.core.workers import Worker, StrategyWorker
@@ -773,12 +773,16 @@ class AlgorithmContext:
 
     def get_orders(
             self, identifier=None, symbol: str = None, status=None, lazy=False
-    ):
+    ) -> List[Order]:
         portfolio_manager = self.get_portfolio_manager(identifier)
         return portfolio_manager.get_orders(symbol, status, lazy)
 
     def get_positions(
             self, identifier=None, symbol: str = None, lazy=False
-    ):
+    ) -> List[Position]:
         portfolio_manager = self.get_portfolio_manager(identifier)
         return portfolio_manager.get_positions(symbol, lazy)
+
+    def get_portfolio(self, identifier=None) -> Portfolio:
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        return portfolio_manager.get_portfolio()

@@ -1,5 +1,5 @@
 from investing_algorithm_framework import OrderExecutor, Order, OrderStatus, \
-    SQLLitePortfolioManager, Portfolio
+    SQLLitePortfolioManager, SQLLitePortfolio
 from investing_algorithm_framework.core.models import db
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
@@ -29,7 +29,7 @@ class PortfolioManagerTestTwo(SQLLitePortfolioManager):
         return 10000
 
     def get_positions_synced(self, algorithm_context):
-        return 10000
+        return [{"symbol": "SYMBOL_A", "amount": 2000}]
 
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
@@ -41,7 +41,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.start_algorithm()
 
     def tearDown(self) -> None:
-        db.session.query(Portfolio).delete()
+        db.session.query(SQLLitePortfolio).delete()
         db.session.commit()
         super(Test, self).tearDown()
 

@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
 from flask_testing import TestCase
 
-from investing_algorithm_framework import PortfolioManager, MarketService, \
+from investing_algorithm_framework import MarketService, \
     OrderExecutor, Order, OrderType, OrderSide, AlgorithmContextInitializer
 from investing_algorithm_framework.app import App
 from investing_algorithm_framework.configuration.constants import \
@@ -12,7 +12,7 @@ from investing_algorithm_framework.configuration.constants import \
 from investing_algorithm_framework.configuration.settings import TestConfig
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import db, OrderStatus, \
-    TimeInterval
+    TimeInterval, SQLLiteAssetPrice, SQLLiteAssetPriceHistory
 from investing_algorithm_framework.core.portfolio_managers \
     import SQLLitePortfolioManager
 
@@ -136,7 +136,7 @@ class MarketServiceTest(MarketService):
             asset_price = TestBase.get_price(target_symbol, date)
             asset_prices.insert(
                 0,
-                AssetPrice(
+                SQLLiteAssetPrice(
                     target_symbol=target_symbol,
                     trading_symbol=trading_symbol,
                     price=asset_price.price,
@@ -239,27 +239,27 @@ class TestBase(TestCase):
             AssetPrice
 
         TestBase.prices_symbol_a = [
-            AssetPrice(target_symbol=self.TARGET_SYMBOL_A, trading_symbol="usdt",
+            SQLLiteAssetPrice(target_symbol=self.TARGET_SYMBOL_A, trading_symbol="usdt",
                        price=self.BASE_SYMBOL_A_PRICE,
                        datetime=datetime.utcnow() - relativedelta(years=15))
         ]
         TestBase.prices_symbol_b = [
-            AssetPrice(target_symbol=self.TARGET_SYMBOL_B, trading_symbol="usdt",
+            SQLLiteAssetPrice(target_symbol=self.TARGET_SYMBOL_B, trading_symbol="usdt",
                        price=self.BASE_SYMBOL_B_PRICE,
                        datetime=datetime.utcnow() - relativedelta(years=15))
         ]
         TestBase.prices_symbol_c = [
-            AssetPrice(target_symbol=self.TARGET_SYMBOL_C, trading_symbol="usdt",
+            SQLLiteAssetPrice(target_symbol=self.TARGET_SYMBOL_C, trading_symbol="usdt",
                        price=self.BASE_SYMBOL_C_PRICE,
                        datetime=datetime.utcnow() - relativedelta(years=15))
         ]
         TestBase.prices_symbol_d = [
-            AssetPrice(target_symbol=self.TARGET_SYMBOL_D, trading_symbol="usdt",
+            SQLLiteAssetPrice(target_symbol=self.TARGET_SYMBOL_D, trading_symbol="usdt",
                        price=self.BASE_SYMBOL_D_PRICE,
                        datetime=datetime.utcnow() - relativedelta(years=15))
         ]
         TestBase.prices_symbol_e = [
-            AssetPrice(target_symbol=self.TARGET_SYMBOL_E, trading_symbol="usdt",
+            SQLLiteAssetPrice(target_symbol=self.TARGET_SYMBOL_E, trading_symbol="usdt",
                        price=self.BASE_SYMBOL_E_PRICE,
                        datetime=datetime.utcnow() - relativedelta(years=15))
         ]
@@ -316,7 +316,7 @@ class TestBase(TestCase):
             prices = TestBase.prices_symbol_a
             TestBase.prices_symbol_a = TestBase._append_price(
                 prices,
-                AssetPrice(
+                SQLLiteAssetPrice(
                     target_symbol=target_symbol,
                     trading_symbol="USDT",
                     price=price,
@@ -327,7 +327,7 @@ class TestBase(TestCase):
             prices = TestBase.prices_symbol_b
             TestBase.prices_symbol_b = TestBase._append_price(
                 prices,
-                AssetPrice(
+                SQLLiteAssetPrice(
                     target_symbol=target_symbol,
                     trading_symbol="USDT",
                     price=price,
@@ -339,7 +339,7 @@ class TestBase(TestCase):
             prices = TestBase.prices_symbol_c
             TestBase.prices_symbol_c = TestBase._append_price(
                 prices,
-                AssetPrice(
+                SQLLiteAssetPrice(
                     target_symbol=target_symbol,
                     trading_symbol="USDT",
                     price=price,
@@ -351,7 +351,7 @@ class TestBase(TestCase):
             prices = TestBase.prices_symbol_d
             TestBase.prices_symbol_d = TestBase._append_price(
                 prices,
-                AssetPrice(
+                SQLLiteAssetPrice(
                     target_symbol=target_symbol,
                     trading_symbol="USDT",
                     price=price,
@@ -363,7 +363,7 @@ class TestBase(TestCase):
             prices = TestBase.prices_symbol_e
             TestBase.prices_symbol_e = TestBase._append_price(
                 prices,
-                AssetPrice(
+                SQLLiteAssetPrice(
                     target_symbol=target_symbol,
                     trading_symbol="USDT",
                     price=price,
@@ -486,8 +486,8 @@ class TestBase(TestCase):
             msg = "Snapshot has no portfolio id set"
             raise self.failureException(msg)
 
-        if snapshot.broker is None:
-            msg = "Snapshot broker is not set"
+        if snapshot.market is None:
+            msg = "Snapshot market is not set"
             raise self.failureException(msg)
 
         if snapshot.trading_symbol is None:
@@ -565,7 +565,7 @@ class TestBase(TestCase):
             import AssetPrice
 
         TestBase.prices_symbol_a = [
-            AssetPrice(
+            SQLLiteAssetPrice(
                 target_symbol=TestBase.TARGET_SYMBOL_A,
                 trading_symbol="USDT",
                 price=TestBase.BASE_SYMBOL_A_PRICE,
@@ -573,14 +573,14 @@ class TestBase(TestCase):
             )
         ]
         TestBase.prices_symbol_b = [
-            AssetPrice(
+            SQLLiteAssetPrice(
                 target_symbol=TestBase.TARGET_SYMBOL_B,
                 trading_symbol="USDT",
                 price=TestBase.BASE_SYMBOL_B_PRICE,
                 datetime=datetime.utcnow() - relativedelta(years=15))
         ]
         TestBase.prices_symbol_c = [
-            AssetPrice(
+            SQLLiteAssetPrice(
                 target_symbol=TestBase.TARGET_SYMBOL_C,
                 trading_symbol="USDT",
                 price=TestBase.BASE_SYMBOL_C_PRICE,
@@ -588,7 +588,7 @@ class TestBase(TestCase):
             )
         ]
         TestBase.prices_symbol_d = [
-            AssetPrice(
+            SQLLiteAssetPrice(
                 target_symbol=TestBase.TARGET_SYMBOL_D,
                 trading_symbol="TestBase",
                 price=TestBase.BASE_SYMBOL_D_PRICE,
@@ -596,7 +596,7 @@ class TestBase(TestCase):
             )
         ]
         TestBase.prices_symbol_e = [
-            AssetPrice(
+            SQLLiteAssetPrice(
                 target_symbol=TestBase.TARGET_SYMBOL_E,
                 trading_symbol="USDT",
                 price=TestBase.BASE_SYMBOL_E_PRICE,

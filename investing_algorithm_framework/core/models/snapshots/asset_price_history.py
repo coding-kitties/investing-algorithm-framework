@@ -1,11 +1,39 @@
+from abc import abstractmethod
 from datetime import datetime as dt, timedelta as td
 from investing_algorithm_framework.core.models import db, TimeFrame, \
     TimeInterval
 from investing_algorithm_framework.core.models.model_extension \
-    import ModelExtension
+    import SQLAlchemyModelExtension
 
 
-class AssetPriceHistory(db.Model, ModelExtension):
+class AssetPriceHistory:
+
+    @abstractmethod
+    def get_prices(self):
+        pass
+
+    @abstractmethod
+    def get_market(self):
+        pass
+
+    @abstractmethod
+    def get_trading_symbol(self):
+        pass
+
+    @abstractmethod
+    def get_target_symbol(self):
+        pass
+
+    @abstractmethod
+    def get_time_frame(self):
+        pass
+
+    @abstractmethod
+    def get_updated_at(self):
+        pass
+
+
+class SQLLiteAssetPriceHistory(db.Model, SQLAlchemyModelExtension):
     __tablename__ = "asset_price_histories"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -17,7 +45,7 @@ class AssetPriceHistory(db.Model, ModelExtension):
 
     # Relationships
     prices = db.relationship(
-        "AssetPrice",
+        "SQLLiteAssetPrice",
         back_populates="asset_price_history",
         lazy="dynamic",
         cascade="all,delete",
@@ -31,7 +59,7 @@ class AssetPriceHistory(db.Model, ModelExtension):
 
     @staticmethod
     def of(market: str, target_symbol: str, trading_symbol: str, time_frame):
-        asset_price_history = AssetPriceHistory.query.filter_by(
+        asset_price_history = SQLLiteAssetPriceHistory.query.filter_by(
             market=market,
             target_symbol=target_symbol,
             trading_symbol=trading_symbol,
@@ -39,7 +67,7 @@ class AssetPriceHistory(db.Model, ModelExtension):
         ).first()
 
         if not asset_price_history:
-            asset_price_history = AssetPriceHistory(
+            asset_price_history = SQLLiteAssetPriceHistory(
                 market=market,
                 target_symbol=target_symbol,
                 trading_symbol=trading_symbol,
@@ -212,8 +240,8 @@ class AssetPriceHistory(db.Model, ModelExtension):
 
     def remove_prices(self):
         from investing_algorithm_framework.core.models.snapshots import \
-            AssetPrice
+            SQLLiteAssetPrice
 
-        db.session.query(AssetPrice).filter(
-            AssetPrice.asset_price_history_id == self.id
+        db.session.query(SQLLiteAssetPrice).filter(
+            SQLLiteAssetPrice.asset_price_history_id == self.id
         ).delete()

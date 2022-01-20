@@ -1,19 +1,128 @@
+from abc import abstractmethod
 from sqlalchemy import UniqueConstraint, or_
 from datetime import datetime
 from investing_algorithm_framework.core.models.model_extension import \
-    ModelExtension
-from investing_algorithm_framework.core.models import db, Order, OrderStatus, \
+    SQLAlchemyModelExtension
+from investing_algorithm_framework.core.models import db, \
+    SQLLiteOrder, OrderStatus, \
     OrderSide
 from investing_algorithm_framework.core.models.snapshots import \
     PositionSnapshot
 
 
-class PortfolioSnapshot(db.Model, ModelExtension):
+class PortfolioSnapshot:
+
+    @abstractmethod
+    def get_portfolio_id(self):
+        pass
+
+    @abstractmethod
+    def get_market(self):
+        pass
+
+    @abstractmethod
+    def get_realized(self):
+        pass
+
+    @abstractmethod
+    def get_pending_value(self):
+        pass
+
+    @abstractmethod
+    def get_unallocated(self):
+        pass
+
+    @abstractmethod
+    def get_allocated(self, asset_prices=None):
+        pass
+
+    @abstractmethod
+    def get_total_revenue(self):
+        pass
+
+    @abstractmethod
+    def get_created_at(self):
+        pass
+
+    @abstractmethod
+    def get_withdrawel(self):
+        pass
+
+    @abstractmethod
+    def get_deposit(self):
+        pass
+
+    @abstractmethod
+    def set_inner_snapshot(self, flas):
+        pass
+
+    @abstractmethod
+    def is_inner_snapshot(self):
+        pass
+
+    @abstractmethod
+    def get_positions(self):
+        pass
+
+    @staticmethod
+    @abstractmethod
+    def from_portfolio(portfolio, creation_datetime=None, withdrawel=0, deposit=0):
+        pass
+
+    def get_total_value(self, asset_prices):
+        if self.is_inner_snapshot():
+            return self.get_pending_value() + self.get_unallocated() + self.get_allocated()
+
+        total_value = 0
+
+        total_value += self.get_allocated(asset_prices)
+        total_value += self.get_pending_value()
+        total_value += self.get_unallocated()
+        return total_value
+
+    @property
+    def cashflow(self):
+
+        if self.get_deposit() != 0:
+            return self.get_deposit()
+
+        if self.get_withdrawel() != 0:
+            return -self.get_withdrawel()
+
+        return 0
+
+    def repr(self, **fields) -> str:
+        """
+        Helper for __repr__
+        """
+
+        field_strings = []
+        at_least_one_attached_attribute = False
+
+        for key, field in fields.items():
+            field_strings.append(f'{key}={field!r}')
+            at_least_one_attached_attribute = True
+
+        if at_least_one_attached_attribute:
+            return f"<{self.__class__.__name__}({','.join(field_strings)})>"
+
+        return f"<{self.__class__.__name__} {id(self)}>"
+
+    def __repr__(self):
+        return self.repr(
+            portfolio_id=self.get_portfolio_id(),
+            created_at=self.get_created_at(),
+            market=self.get_market(),
+        )
+
+
+class SQLLitePortfolioSnapshot(PortfolioSnapshot, db.Model, SQLAlchemyModelExtension):
+
     __tablename__ = "portfolio_snapshots"
 
     id = db.Column(db.Integer, primary_key=True)
     portfolio_id = db.Column(db.Integer, nullable=False)
-    broker = db.Column(db.String, nullable=False)
+    market = db.Column(db.String, nullable=False)
     trading_symbol = db.Column(db.String, nullable=True)
     realized = db.Column(db.Float, default=0)
     allocated = db.Column(db.Float, default=0)
@@ -30,7 +139,7 @@ class PortfolioSnapshot(db.Model, ModelExtension):
 
     # Relationships
     positions = db.relationship(
-        "PositionSnapshot",
+        "SQLLitePositionSnapshot",
         back_populates="portfolio",
         lazy="dynamic",
         cascade="all,delete",
@@ -48,13 +157,16 @@ class PortfolioSnapshot(db.Model, ModelExtension):
     def from_portfolio(
         portfolio, creation_datetime=None, withdrawel=0, deposit=0
     ):
-        snapshot = PortfolioSnapshot()
+        snapshot = SQLLitePortfolioSnapshot()
 
-        from investing_algorithm_framework.core.models import Position
+        from investing_algorithm_framework.core.models import SQLLitePosition, \
+            SQLLitePositionSnapshot
 
-        positions = Position.query.filter_by(portfolio_id=portfolio.id).all()
+        positions = SQLLitePosition.query\
+            .filter_by(portfolio_id=portfolio.id).all()
+
         position_snapshots = [
-            PositionSnapshot.from_position(position)
+            SQLLitePositionSnapshot.from_position(position)
             for position in positions
         ]
 
@@ -68,18 +180,18 @@ class PortfolioSnapshot(db.Model, ModelExtension):
         snapshot.unallocated = portfolio.unallocated
         snapshot.created_at = creation_datetime
         snapshot.portfolio_id = portfolio.id
-        snapshot.broker = portfolio.market
+        snapshot.market = portfolio.market
         snapshot.withdrawel = withdrawel
         snapshot.deposit = deposit
 
         if snapshot.created_at is None:
             snapshot.created_at = datetime.utcnow()
 
-        pending_orders = Order.query\
+        pending_orders = SQLLiteOrder.query\
             .filter(
                 or_(
-                    Order.status == OrderStatus.PENDING.value,
-                    Order.status == OrderStatus.TO_BE_SENT.value
+                    SQLLiteOrder.status == OrderStatus.PENDING.value,
+                    SQLLiteOrder.status == OrderStatus.TO_BE_SENT.value
                 )
             )\
             .filter_by(order_side=OrderSide.BUY.value)\
@@ -110,39 +222,54 @@ class PortfolioSnapshot(db.Model, ModelExtension):
 
         return 0
 
-    def get_total_value(self, asset_prices):
-
-        if self.inner_snapshot:
-            return self.total_value
-
-        total_value = 0
-
-        for asset_price in asset_prices:
-            position = self.positions\
-                .filter_by(symbol=asset_price.target_symbol).first()
-
-            if position is not None:
-                total_value += position.amount * asset_price.price
-
-        total_value += self.pending_value
-        total_value += self.unallocated
-        return total_value
-
-    @property
-    def inner_snapshot(self):
+    def is_inner_snapshot(self):
         return self._inner_snapshot
 
-    @inner_snapshot.setter
-    def inner_snapshot(self, flag):
+    def set_inner_snapshot(self, flag):
         self._inner_snapshot = flag
 
-    def __repr__(self):
-        return self.repr(
-            created_at=self.created_at,
-            portfolio_id=self.portfolio_id,
-            trading_symbol=self.trading_symbol,
-            total_cost=f"{self.total_cost}",
-            unallocated=f"{self.unallocated} {self.trading_symbol}",
-            realized=f"{self.realized}",
-            total_revenue=f"{self.total_revenue}",
-        )
+    def get_portfolio_id(self):
+        return self.portfolio_id
+
+    def get_market(self):
+        return self.market
+
+    def get_realized(self):
+        return self.realized
+
+    def get_pending_value(self):
+        return self.pending_value
+
+    def get_unallocated(self):
+        return self.unallocated
+
+    def get_allocated(self, asset_prices=None):
+
+        if asset_prices is not None:
+            allocated = 0
+
+            for asset_price in asset_prices:
+                position = self.positions \
+                    .filter_by(symbol=asset_price.target_symbol).first()
+
+                if position is not None:
+                    allocated += position.amount * asset_price.price
+
+            return allocated
+
+        return self.allocated
+
+    def get_total_revenue(self):
+        return self.total_revenue
+
+    def get_created_at(self):
+        return self.created_at
+
+    def get_withdrawel(self):
+        return self.withdrawel
+
+    def get_deposit(self):
+        return self.deposit
+
+    def get_positions(self):
+        return self.positions

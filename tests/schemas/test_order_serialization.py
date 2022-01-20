@@ -1,4 +1,4 @@
-from investing_algorithm_framework import Order
+from investing_algorithm_framework import SQLLiteOrder
 from investing_algorithm_framework.schemas import OrderSerializer
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 from tests.resources.serialization_dicts import order_serialization_dict
@@ -18,7 +18,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         )
 
     def test(self):
-        order = Order.query.first()
+        order = SQLLiteOrder.query.first()
         serializer = OrderSerializer()
         data = serializer.dump(order)
         self.assertEqual(set(data), order_serialization_dict)

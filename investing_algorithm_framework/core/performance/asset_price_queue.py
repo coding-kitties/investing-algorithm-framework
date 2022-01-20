@@ -1,5 +1,6 @@
 from investing_algorithm_framework.core.models import TimeFrame
 
+
 class AssetPricesQueue:
     """
     Asset prices queue for logical order of asset prices based on

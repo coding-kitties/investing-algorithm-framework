@@ -1,6 +1,6 @@
 from investing_algorithm_framework import OrderSide, OrderType
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
-from investing_algorithm_framework.core.models import db, Portfolio
+from investing_algorithm_framework.core.models import db, SQLLitePortfolio
 
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
@@ -10,7 +10,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.start_algorithm()
 
     def tearDown(self) -> None:
-        db.session.query(Portfolio).delete()
+        db.session.query(SQLLitePortfolio).delete()
         super(Test, self).tearDown()
 
     def test(self) -> None:

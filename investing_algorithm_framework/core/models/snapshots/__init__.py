@@ -1,16 +1,20 @@
 from investing_algorithm_framework.core.models.snapshots.position_snapshot \
-    import PositionSnapshot
+    import PositionSnapshot, SQLLitePositionSnapshot
 from investing_algorithm_framework.core.models.snapshots.portfolio_snapshot \
-    import PortfolioSnapshot
+    import PortfolioSnapshot, SQLLitePortfolioSnapshot
 from investing_algorithm_framework.core.models.snapshots.asset_price import \
-    AssetPrice
+    AssetPrice, SQLLiteAssetPrice
 from investing_algorithm_framework.core.models.snapshots.asset_price_history \
-    import AssetPriceHistory
+    import AssetPriceHistory, SQLLiteAssetPriceHistory
 
 
 __all__ = [
+    "SQLLiteAssetPrice",
+    "SQLLiteAssetPriceHistory",
     "PositionSnapshot",
     "PortfolioSnapshot",
     "AssetPrice",
     "AssetPriceHistory",
+    "SQLLitePortfolioSnapshot",
+    "SQLLitePositionSnapshot"
 ]

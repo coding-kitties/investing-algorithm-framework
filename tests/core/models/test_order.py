@@ -1,7 +1,7 @@
 from datetime import datetime
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import Order, OrderSide, db, \
-    OrderStatus, OrderType
+    OrderStatus, OrderType, SQLLiteOrder
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
@@ -24,9 +24,9 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         super(TestOrderModel, self).tearDown()
 
     def test_creation_limit_order(self):
-        self.assertEqual(1, Order.query.count())
+        self.assertEqual(1, SQLLiteOrder.query.count())
 
-        order = Order.query.first()
+        order = SQLLiteOrder.query.first()
 
         self.assertIsNotNone(order.amount_trading_symbol)
         self.assertIsNotNone(order.amount_target_symbol)
@@ -51,7 +51,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
             1, self.TARGET_SYMBOL_A, self.portfolio_manager
         )
 
-        order = Order.query\
+        order = SQLLiteOrder.query\
             .filter_by(order_type=OrderType.MARKET.value)\
             .filter_by(order_side=OrderSide.SELL.value)\
             .first()
@@ -61,7 +61,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         order.set_pending()
         order.set_executed(price=10, amount=1)
 
-        order = Order.query\
+        order = SQLLiteOrder.query\
             .filter_by(order_type=OrderType.MARKET.value) \
             .filter_by(order_side=OrderSide.SELL.value) \
             .first()
@@ -69,7 +69,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assert_is_market_order(order)
 
     def test_buy_set_executed(self):
-        order = Order.query.filter_by(order_side=OrderSide.BUY.value).first()
+        order = SQLLiteOrder.query.filter_by(order_side=OrderSide.BUY.value).first()
         order.set_pending()
 
         self.assertTrue(OrderStatus.PENDING.equals(order.status))
@@ -82,7 +82,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
 
         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 
-        buy_orders = Order.query\
+        buy_orders = SQLLiteOrder.query\
             .filter_by(order_side=OrderSide.BUY.value)\
             .filter_by(target_symbol=self.TARGET_SYMBOL_A)\
             .all()
@@ -98,7 +98,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
             portfolio_manager
         )
 
-        order = Order.query.filter_by(order_side=OrderSide.SELL.value).first()
+        order = SQLLiteOrder.query.filter_by(order_side=OrderSide.SELL.value).first()
 
         order.set_pending()
 
@@ -109,13 +109,13 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertTrue(OrderStatus.SUCCESS.equals(order.status))
 
     def test_deleting(self):
-        for order in Order.query.all():
+        for order in SQLLiteOrder.query.all():
             order.delete(db)
 
-        self.assertEqual(0, Order.query.count())
+        self.assertEqual(0, SQLLiteOrder.query.count())
 
     def test_delta(self):
-        order = Order.query.filter_by(order_side=OrderSide.BUY.value).first()
+        order = SQLLiteOrder.query.filter_by(order_side=OrderSide.BUY.value).first()
         order.set_pending()
 
         self.assertEqual(0, order.delta)
@@ -137,7 +137,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         )
 
     def test_percentage_realized(self):
-        order = Order.query.filter_by(order_side=OrderSide.BUY.value).first()
+        order = SQLLiteOrder.query.filter_by(order_side=OrderSide.BUY.value).first()
         order.set_pending()
         self.assertEqual(0, order.percentage_realized)
 
@@ -154,17 +154,17 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
             portfolio_manager
         )
 
-        order = Order.query.filter_by(order_side=OrderSide.SELL.value).first()
+        order = SQLLiteOrder.query.filter_by(order_side=OrderSide.SELL.value).first()
 
         order.set_pending()
         order.set_executed()
 
-        order = Order.query.filter_by(order_side=OrderSide.BUY.value).first()
+        order = SQLLiteOrder.query.filter_by(order_side=OrderSide.BUY.value).first()
 
         self.assertNotEqual(0, order.percentage_realized)
 
     def test_percentage_position(self):
-        order = Order.query.filter_by(order_side=OrderSide.BUY.value).first()
+        order = SQLLiteOrder.query.filter_by(order_side=OrderSide.BUY.value).first()
 
         self.assertEqual(0, order.percentage_position)
 
@@ -182,17 +182,17 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
             portfolio_manager
         )
 
-        order = Order.query.filter_by(order_side=OrderSide.SELL.value).first()
+        order = SQLLiteOrder.query.filter_by(order_side=OrderSide.SELL.value).first()
 
         order.set_pending()
         order.set_executed()
 
-        order = Order.query.filter_by(order_side=OrderSide.BUY.value).first()
+        order = SQLLiteOrder.query.filter_by(order_side=OrderSide.BUY.value).first()
 
         self.assertEqual(0, order.percentage_position)
 
     def test_current_value(self):
-        order = Order.query.filter_by(order_side=OrderSide.BUY.value).first()
+        order = SQLLiteOrder.query.filter_by(order_side=OrderSide.BUY.value).first()
 
         self.assertEqual(0, order.delta)
 
@@ -214,7 +214,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertNotEqual(old_value, new_value)
 
     def test_split(self):
-        order = Order.query.filter_by(order_side=OrderSide.BUY.value).first()
+        order = SQLLiteOrder.query.filter_by(order_side=OrderSide.BUY.value).first()
 
         order.set_pending()
         order.set_executed()
@@ -230,7 +230,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(og.status, split_order.status)
 
     def test_split_without_executed(self):
-        order = Order.query.filter_by(order_side=OrderSide.BUY.value).first()
+        order = SQLLiteOrder.query.filter_by(order_side=OrderSide.BUY.value).first()
 
         with self.assertRaises(OperationalException) as e:
             _, _ = order.split(0.5)
