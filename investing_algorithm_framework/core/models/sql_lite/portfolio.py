@@ -15,6 +15,22 @@ from investing_algorithm_framework.core.order_validators import \
     OrderValidatorFactory
 
 
+def random_id():
+    """
+    Function to create a random ID. This function checks first if
+    the generated ID is not already taken.
+    Returns: random integer that can be used as an ID
+    """
+    minimal = 100
+    maximal = 1000000000000000000
+    rand = randint(minimal, maximal)
+
+    while SQLLitePortfolio.query.filter_by(id=rand).first() is not None:
+        rand = randint(minimal, maximal)
+
+    return rand
+
+
 class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
 
     """
@@ -91,7 +107,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
     def __init__(
             self, trading_symbol, unallocated, identifier, market, **kwargs
     ):
-        self.id = randint(1, 10)
+        self.id = random_id()
         self.identifier = identifier
         self.trading_symbol = trading_symbol
         self.unallocated = unallocated
