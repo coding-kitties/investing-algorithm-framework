@@ -108,13 +108,18 @@ class Portfolio:
 
         return f"<{self.__class__.__name__} {id(self)}>"
 
-    def __repr__(self):
+    def to_string(self):
         return self.repr(
             id=self.get_id(),
             identifier=self.get_identifier(),
             trading_symbol=self.get_trading_symbol(),
-            unallocated=f"{self.get_unallocated()} {self.get_trading_symbol()}",
             number_of_positions=self.get_number_of_positions(),
+            number_of_orders=self.get_number_of_orders(),
+            unallocated=f"{self.get_unallocated()} {self.get_trading_symbol()}",
+            allocated=self.get_allocated(),
             realized=f"{self.get_realized()}",
             total_revenue=f"{self.get_total_revenue()}",
         )
+
+    def __repr__(self):
+        return self.to_string()
