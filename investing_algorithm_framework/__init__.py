@@ -21,7 +21,7 @@ from investing_algorithm_framework.configuration import Config
 from investing_algorithm_framework.exceptions import ApiException
 from investing_algorithm_framework.views import *
 
-VERSION = (0, 15, 1, 'alpha', 0)
+VERSION = (0, 16, 0, 'alpha', 0)
 
 __all__ = [
     "App",
