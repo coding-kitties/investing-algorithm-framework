@@ -489,6 +489,9 @@ class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
     def get_order_reference(self):
         return self.order_reference
 
+    def set_order_reference(self, order_reference):
+        self.order_reference = order_reference
+
     def get_target_symbol(self):
         return self.target_symbol
 
@@ -498,17 +501,26 @@ class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
     def get_initial_price(self):
         return self.initial_price
 
+    def set_initial_price(self, price):
+        self.initial_price = price
+
     def get_price(self):
         return self.current_price
 
     def get_closing_price(self):
         return self.closing_price
 
+    def set_closing_price(self, price):
+        self.closing_price = price
+
     def get_side(self):
         return self.order_side
 
     def get_status(self):
         return self.status
+
+    def set_status(self, status: OrderStatus):
+        self.status = OrderStatus.from_value(status).value
 
     def get_type(self):
         return self.order_type
