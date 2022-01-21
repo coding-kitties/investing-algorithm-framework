@@ -1,6 +1,8 @@
 import logging
 from abc import abstractmethod
 
+from investing_algorithm_framework.core.models import OrderStatus
+
 logger = logging.getLogger(__name__)
 
 
@@ -12,6 +14,10 @@ class Order:
 
     @abstractmethod
     def get_order_reference(self):
+        pass
+
+    @abstractmethod
+    def set_order_reference(self, order_reference):
         pass
 
     @abstractmethod
@@ -27,6 +33,10 @@ class Order:
         pass
 
     @abstractmethod
+    def set_initial_price(self, price):
+        pass
+
+    @abstractmethod
     def get_price(self):
         pass
 
@@ -35,11 +45,19 @@ class Order:
         pass
 
     @abstractmethod
+    def set_closing_price(self, price):
+        pass
+
+    @abstractmethod
     def get_side(self):
         pass
 
     @abstractmethod
-    def get_status(self):
+    def get_status(self) -> OrderStatus:
+        pass
+
+    @abstractmethod
+    def set_status(self, status: OrderStatus):
         pass
 
     @abstractmethod
@@ -66,23 +84,6 @@ class Order:
     @abstractmethod
     def split(self, amount):
         pass
-
-    def repr(self, **fields) -> str:
-        """
-        Helper for __repr__
-        """
-
-        field_strings = []
-        at_least_one_attached_attribute = False
-
-        for key, field in fields.items():
-            field_strings.append(f'{key}={field!r}')
-            at_least_one_attached_attribute = True
-
-        if at_least_one_attached_attribute:
-            return f"<{self.__class__.__name__}({','.join(field_strings)})>"
-
-        return f"<{self.__class__.__name__} {id(self)}>"
 
     def repr(self, **fields) -> str:
         """
