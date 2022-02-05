@@ -51,6 +51,37 @@ class Ticker(SQLAlchemyModelExtension):
             "low_price": self.low_price
         }
 
+    @staticmethod
+    def from_dict(data):
+        return Ticker(
+            symbol=data.get("symbol"),
+            price=data.get("price"),
+            ask_price=data.get("ask_price"),
+            ask_volume=data.get("ask_volume"),
+            bid_price=data.get("bid_price"),
+            bid_volume=data.get("bid_volume"),
+            high_price=data.get("high_price"),
+            low_price=data.get("low_price"),
+            creation_date=data.get("creation_date")
+        )
+
+    def repr(self, **fields) -> str:
+        """
+        Helper for __repr__
+        """
+
+        field_strings = []
+        at_least_one_attached_attribute = False
+
+        for key, field in fields.items():
+            field_strings.append(f'{key}={field!r}')
+            at_least_one_attached_attribute = True
+
+        if at_least_one_attached_attribute:
+            return f"<{self.__class__.__name__}({','.join(field_strings)})>"
+
+        return f"<{self.__class__.__name__} {id(self)}>"
+
     def __repr__(self):
         return self.repr(
             symbol=self.symbol,
