@@ -10,7 +10,7 @@ from investing_algorithm_framework.core.models import TimeUnit, OrderType, \
     db, OrderSide, OrderStatus, Portfolio, Order, Position
 from investing_algorithm_framework.core.models.data_provider import \
     TradingDataTypes
-from investing_algorithm_framework.core.workers import Worker, StrategyWorker
+from investing_algorithm_framework.core.workers import Worker, Strategy
 from investing_algorithm_framework.extensions import scheduler
 from investing_algorithm_framework.core.data_providers import\
     DefaultDataProviderFactory, DataProvider
@@ -75,7 +75,7 @@ class AlgorithmContext:
     ):
 
         if function:
-            return StrategyWorker(
+            return Strategy(
                 function,
                 worker_id,
                 time_unit,
@@ -89,7 +89,7 @@ class AlgorithmContext:
             )
         else:
             def wrapper(f):
-                return StrategyWorker(
+                return Strategy(
                     f,
                     worker_id,
                     time_unit,
@@ -177,19 +177,22 @@ class AlgorithmContext:
 
         self._workers.append(worker)
 
-    def add_strategy(self, strategy_worker):
+    def add_strategy(self, strategy):
 
-        assert isinstance(strategy_worker, StrategyWorker), \
+        if inspect.isclass(strategy):
+            strategy = strategy()
+
+        assert isinstance(strategy, Strategy), \
             OperationalException(
-                "Strategy worker is not an instance of an StrategyWorker"
+                "Strategy is not an instance of a Strategy"
             )
 
         for installed_worker in self._workers:
 
-            if installed_worker.worker_id == strategy_worker.worker_id:
+            if installed_worker.worker_id == strategy.worker_id:
                 return
 
-        self._workers.append(strategy_worker)
+        self._workers.append(strategy)
 
     @property
     def running(self) -> bool:
@@ -213,7 +216,7 @@ class AlgorithmContext:
         strategies = []
 
         for worker in self._workers:
-            if isinstance(worker, StrategyWorker):
+            if isinstance(worker, Strategy):
                 strategies.append(worker)
 
         return strategies
@@ -291,13 +294,13 @@ class AlgorithmContext:
         from investing_algorithm_framework.core.data_providers \
             import DataProvider
 
+        if inspect.isclass(data_provider):
+            data_provider = data_provider()
+
         if data_provider.identifier in RESERVED_IDENTIFIERS:
             raise OperationalException(
                 "Identifier of data provider is reserved"
             )
-
-        if inspect.isclass(data_provider):
-            data_provider = data_provider()
 
         assert isinstance(data_provider, DataProvider), (
             'Provided object must be an instance of the DataProvider class'
@@ -660,14 +663,16 @@ class AlgorithmContext:
                         pending_order.update(db, {status: status.value})
 
     def get_data(
-            self,
-            identifier,
-            trading_data_type=None,
-            target_symbol=None,
-            trading_symbol=None,
-            target_symbols: List = None
+        self,
+        data_provider_identifier,
+        trading_data_type=None,
+        trading_data_types=None,
+        target_symbol=None,
+        trading_symbol=None,
+        target_symbols: List = None
     ):
-        data_provider = self.get_data_provider(identifier)
+        data_provider = self.get_data_provider(data_provider_identifier)
+        data = {}
 
         # Check if trading symbol is specified
         if trading_symbol is None:
@@ -682,80 +687,142 @@ class AlgorithmContext:
                 )
 
         if target_symbols is None and target_symbol is None \
-                and trading_data_type is not None:
+                and (trading_data_types is not None
+                     or trading_data_type is not None):
             raise OperationalException(
                 "You must either set the target symbol param or "
                 "target symbols param for this trading data type"
             )
 
-        if TradingDataTypes.TICKER.equals(trading_data_type):
+        if trading_data_type is not None:
 
-            if target_symbols is not None:
-                tickers = []
+            if TradingDataTypes.TICKER.equals(trading_data_type):
 
-                for target_symbol in target_symbols:
-                    tickers.append(
-                        data_provider.provide_ticker(
-                            target_symbol=target_symbol,
-                            trading_symbol=trading_symbol,
-                            algorithm_context=self
+                if target_symbols is not None:
+                    tickers = []
+
+                    for target_symbol in target_symbols:
+                        tickers.append(
+                            data_provider.provide_ticker(
+                                target_symbol=target_symbol,
+                                trading_symbol=trading_symbol,
+                                algorithm_context=self
+                            )
                         )
+                    data["tickers"] = tickers
+                else:
+                    data["ticker"] = data_provider.provide_ticker(
+                        target_symbol=target_symbol,
+                        trading_symbol=trading_symbol,
+                        algorithm_context=self
                     )
 
-                return tickers
+            elif TradingDataTypes.ORDER_BOOK.equals(trading_data_type):
 
-            return data_provider.provide_ticker(
-                target_symbol=target_symbol,
-                trading_symbol=trading_symbol,
-                algorithm_context=self
-            )
+                if target_symbols is not None:
+                    order_books = []
 
-        if TradingDataTypes.ORDER_BOOK.equals(trading_data_type):
-
-            if target_symbols is not None:
-                tickers = []
-
-                for target_symbol in target_symbols:
-                    tickers.append(
-                        data_provider.provide_order_book(
-                            target_symbol=target_symbol,
-                            trading_symbol=trading_symbol,
-                            algorithm_context=self
+                    for target_symbol in target_symbols:
+                        order_books.append(
+                            data_provider.provide_order_book(
+                                target_symbol=target_symbol,
+                                trading_symbol=trading_symbol,
+                                algorithm_context=self
+                            )
                         )
+
+                    data["order_books"] = order_books
+                else:
+                    data["order_book"] = data_provider.provide_order_book(
+                        target_symbol=target_symbol,
+                        trading_symbol=trading_symbol,
+                        algorithm_context=self
                     )
-
-                return tickers
-
-            return data_provider.provide_order_book(
-                target_symbol=target_symbol,
-                trading_symbol=trading_symbol,
-                algorithm_context=self
-            )
-
-        if trading_data_type is None:
-
-            if target_symbols is not None:
-                raw_data = []
-
-                for target_symbol in target_symbols:
-                    raw_data.append(
-                        data_provider.provide_raw_data(
-                            target_symbol=target_symbol,
-                            trading_symbol=trading_symbol,
-                            algorithm_context=self
-                        )
-                    )
-
-                return raw_data
-
-            if target_symbol is not None:
-                return data_provider.provide_raw_data(
+            elif TradingDataTypes.RAW.equals(trading_data_type):
+                data["raw_data"] = data_provider.provide_raw_data(
                     target_symbol=target_symbol,
                     trading_symbol=trading_symbol,
                     algorithm_context=self
                 )
 
-            return data_provider.provide_raw_data(self)
+        if trading_data_types is not None:
+            if [trading_data_type for trading_data_type in trading_data_types
+                    if TradingDataTypes.TICKER.equals(trading_data_type)]:
+
+                if target_symbols is not None:
+                    tickers = []
+
+                    for target_symbol in target_symbols:
+                        tickers.append(
+                            data_provider.provide_ticker(
+                                target_symbol=target_symbol,
+                                trading_symbol=trading_symbol,
+                                algorithm_context=self
+                            )
+                        )
+
+                    data["tickers"] = tickers
+
+                data["ticker"] = data_provider.provide_ticker(
+                    target_symbol=target_symbol,
+                    trading_symbol=trading_symbol,
+                    algorithm_context=self
+                )
+
+            if [trading_data_type for trading_data_type in trading_data_types
+                    if TradingDataTypes.ORDER_BOOK.equals(trading_data_type)]:
+
+                if target_symbols is not None:
+                    order_books = []
+
+                    for target_symbol in target_symbols:
+                        order_books.append(
+                            data_provider.provide_order_book(
+                                target_symbol=target_symbol,
+                                trading_symbol=trading_symbol,
+                                algorithm_context=self
+                            )
+                        )
+
+                    data["order_books"] = order_books
+
+                data["order_book"] = data_provider.provide_order_book(
+                    target_symbol=target_symbol,
+                    trading_symbol=trading_symbol,
+                    algorithm_context=self
+                )
+
+            if [trading_data_type for trading_data_type in trading_data_types
+                    if TradingDataTypes.RAW.equals(trading_data_type)]:
+
+                if target_symbols is not None:
+                    raw_data = []
+
+                    for target_symbol in target_symbols:
+                        raw_data.append(
+                            data_provider.provide_raw_data(
+                                target_symbol=target_symbol,
+                                trading_symbol=trading_symbol,
+                                algorithm_context=self
+                            )
+                        )
+
+                    data["raw_data"] = raw_data
+
+                if target_symbol is not None:
+                    data["raw_data"] = data_provider.provide_raw_data(
+                        target_symbol=target_symbol,
+                        trading_symbol=trading_symbol,
+                        algorithm_context=self
+                    )
+
+                else:
+                    data["raw_data"] = data_provider.provide_raw_data(
+                        trading_symbol=trading_symbol,
+                        algorithm_context=self
+                    )
+
+        return data
 
     def get_unallocated_size(self, identifier):
         portfolio_manager = self.get_portfolio_manager(identifier)
