@@ -1,4 +1,8 @@
 import inspect
+import os
+import shutil
+import pathlib
+from distutils.sysconfig import get_python_lib
 
 from flask import Flask
 
@@ -114,6 +118,19 @@ class App(metaclass=Singleton):
 
             self._database_configured = True
 
+    def _initialize_management_commands(self):
+        # Copy the template manage.py file to the resource directory of the
+        # algorithm
+        management_commands_template = os.path.join(
+            get_python_lib(),
+            "investing-algorithm-framework/templates/manage.py-template"
+        )
+
+        destination = os.path.join(self._resource_directory, "manage.py")
+
+        if not os.path.exists(destination):
+            shutil.copy(management_commands_template, destination)
+
     def register_blueprint(self, blueprint):
         self._blueprints.append(blueprint)
 
@@ -135,6 +152,7 @@ class App(metaclass=Singleton):
         self._initialize_flask_config()
         self._initialize_flask_sql_alchemy()
         self._initialize_algorithm()
+        self._initialize_management_commands()
 
         self.start_scheduler()
         self.start_algorithm()

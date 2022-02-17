@@ -179,8 +179,10 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             logger.exception(e)
             raise OperationalException("Could not create market sell order")
 
-    def cancel_order(self, order_id):
-        pass
+    def cancel_order(self, order):
+        self.exchange.cancelOrder(
+            order.get_order_reference(),
+            f"{order.get_target_symbol()}/{order.get_trading_symbol()}")
 
     def get_orders(self, target_symbol: str, trading_symbol: str):
         self.initialize_exchange(credentials=True)
