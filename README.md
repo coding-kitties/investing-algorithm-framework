@@ -52,7 +52,7 @@ app = App(
     trading_data_type=TradingDataTypes.TICKER,
 )
 def perform_strategy(context: AlgorithmContext, ticker):
-    # Get unnalocated trading symbol (USDT) from portfolio
+    # Get unalocated trading symbol (USDT) from portfolio
     position = context.get_unallocated_size(BINANCE)
     
     if position.get_amount() > 50000 and ticker.get_price() < 50000:
