@@ -123,7 +123,7 @@ class App(metaclass=Singleton):
         # algorithm
         management_commands_template = os.path.join(
             get_python_lib(),
-            "investing-algorithm-framework/templates/manage.py"
+            "investing_algorithm_framework/templates/manage.py"
         )
 
         destination = os.path.join(self._resource_directory, "manage.py")

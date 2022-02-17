@@ -29,7 +29,7 @@ from investing_algorithm_framework import App, TimeUnit, AlgorithmContext, \
 from investing_algorithm_framework.configuration.constants import BINANCE, \
     BINANCE_API_KEY, BINANCE_SECRET_KEY, TRADING_SYMBOL
 
-# Make the parent dir your resources directory (database, csv storage, snapshots)
+# Set parent dir as resources' directory (database, manage.py)
 dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
 
 # Create an application (manages your algorithm, rest api, etc...)
@@ -52,7 +52,7 @@ app = App(
     trading_data_type=TradingDataTypes.TICKER,
 )
 def perform_strategy(context: AlgorithmContext, ticker):
-    # Get unalocated trading symbol (USDT) from portfolio
+    # Get unallocated trading symbol (USDT) from portfolio
     position = context.get_unallocated_size(BINANCE)
     
     if position.get_amount() > 50000 and ticker.get_price() < 50000:
