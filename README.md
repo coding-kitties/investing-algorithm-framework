@@ -12,10 +12,6 @@
 </p>
 
 # Investing Algorithm Framework
-
-> :warning: **Documentation outdated**: We are working hard on releasing v1.0.0. After 
-> this release we will update the documentation at the website.
-
 The Investing Algorithm Framework is a python framework for building
 investment algorithms. It encourages rapid development and clean, pragmatic code design.
 
@@ -56,14 +52,13 @@ app = App(
     trading_data_type=TradingDataTypes.TICKER,
 )
 def perform_strategy(context: AlgorithmContext, ticker):
-    # Retrieve unallocated USDT (trading symbol) from the portfolio of the algorithm
-    unallocated = context.get_unallocated_size(BINANCE)
+    # Get unalocated trading symbol (USDT) from portfolio
+    position = context.get_unallocated_size(BINANCE)
     
-    if unallocated > 50000:
-        if ticker.ask_price == 50000:
-            context.create_limit_buy_order(
-                BINANCE, "BTC", price=50000, amount=1, execute=True
-            )
+    if position.get_amount() > 50000 and ticker.get_price() < 50000:
+        context.create_limit_buy_order(
+            BINANCE, "BTC", price=50000, amount=1, execute=True
+        )
 
 
 if __name__ == "__main__":
