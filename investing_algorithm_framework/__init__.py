@@ -22,6 +22,7 @@ from investing_algorithm_framework.exceptions import ApiException
 from investing_algorithm_framework.views import *
 
 VERSION = (0, 16, 5, 'alpha', 0)
+ 
 
 __all__ = [
     "App",

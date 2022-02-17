@@ -32,6 +32,32 @@ class OrderBook(SQLAlchemyModelExtension):
             "asks": self.asks
         }
 
+    @staticmethod
+    def from_dict(data):
+        return OrderBook(
+            data.get("symbol"),
+            data.get("bids"),
+            data.get("asks"),
+            data.get("creation_date")
+        )
+
+    def repr(self, **fields) -> str:
+        """
+        Helper for __repr__
+        """
+
+        field_strings = []
+        at_least_one_attached_attribute = False
+
+        for key, field in fields.items():
+            field_strings.append(f'{key}={field!r}')
+            at_least_one_attached_attribute = True
+
+        if at_least_one_attached_attribute:
+            return f"<{self.__class__.__name__}({','.join(field_strings)})>"
+
+        return f"<{self.__class__.__name__} {id(self)}>"
+
     def __repr__(self):
         return self.repr(
             symbol=self.symbol,
