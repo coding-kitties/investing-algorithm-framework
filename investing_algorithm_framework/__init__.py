@@ -23,6 +23,7 @@ from investing_algorithm_framework.views import *
 
 VERSION = (0, 16, 6, 'alpha', 0)
  
+ 
 __all__ = [
     "App",
     'get_version',
