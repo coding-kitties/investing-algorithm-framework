@@ -1,4 +1,4 @@
-# import json
+import json
 import click
 import requests
 
@@ -31,27 +31,30 @@ def stop():
 def orders():
     response = requests.get("http://localhost:5000/api/orders")
 
-    # if response.status_code == 200:
-    #     print(json.dumps(response.json(), indent=4, sort_keys=True))
-    # else:
-    #     print("Could not retrieve algorithm orders")
+    if response.status_code == 200:
+        print(json.dumps(response.json(), indent=4, sort_keys=True))
+    else:
+        print("Could not retrieve algorithm orders")
+
 
 
 @manager.command()
 def positions():
     response = requests.get("http://localhost:5000/api/positions")
 
-    # if response.status_code == 200:
-    #     print(json.dumps(response.json(), indent=4, sort_keys=True))
-    # else:
-    #     print("Could not retrieve algorithm positions")
+    if response.status_code == 200:
+        print(json.dumps(response.json(), indent=4, sort_keys=True))
+    else:
+        print("Could not retrieve algorithm positions")
+
 
 
 @manager.command()
 def portfolio():
     response = requests.get("http://localhost:5000/api/portfolios/default")
 
-    # if response.status_code == 200:
-    #     print(json.dumps(response.json(), indent=4, sort_keys=True))
-    # else:
-    #     print("Could not retrieve portfolio")
+    if response.status_code == 200:
+        print(json.dumps(response.json(), indent=4, sort_keys=True))
+    else:
+        print("Could not retrieve portfolio")
+
