@@ -14,9 +14,6 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
     def test_creation(self):
         self.assertEqual(1, SQLLitePortfolio.query.count())
 
-        portfolio = SQLLitePortfolio.query.first()
-        print(portfolio)
-
     def test_allocated(self):
         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
         portfolio = self.algo_app.algorithm.get_portfolio_manager()\

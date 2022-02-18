@@ -126,7 +126,6 @@ class DataProviderTest(DataProvider):
         self, target_symbol, trading_symbol, algorithm_context, **kwargs
     ) -> Ticker:
 
-        print(target_symbol)
         return Ticker.from_dict(
             {
                 "symbol": f"{target_symbol.upper()}{trading_symbol.upper()}",
