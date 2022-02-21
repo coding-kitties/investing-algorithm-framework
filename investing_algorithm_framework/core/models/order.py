@@ -1,79 +1,102 @@
 import logging
 from abc import abstractmethod
 
-from investing_algorithm_framework.core.models import OrderStatus
-
+from investing_algorithm_framework.core.models import OrderStatus, \
+    OrderType, OrderSide
+from investing_algorithm_framework.core.exceptions import OperationalException
 logger = logging.getLogger(__name__)
 
 
 class Order:
 
-    @abstractmethod
+    def __init__(
+        self,
+        target_symbol,
+        trading_symbol,
+        order_type,
+        order_side,
+        status,
+        amount_trading_symbol=None,
+        amount_target_symbol=None,
+        price=None,
+        initial_price=None,
+        closing_price=None,
+        id=None,
+        reference_id=None
+    ):
+        self.id = id
+        self.reference_id = reference_id
+        self.target_symbol = target_symbol
+        self.trading_symbol = trading_symbol
+        self.price = price
+        self.amount_trading_symbol = amount_trading_symbol
+        self.amount_target_symbol = amount_target_symbol
+        self.order_side = order_side
+        self.order_type = order_type
+        self.status = status
+        self.initial_price = initial_price
+        self.closing_price = closing_price
+
+        if OrderType.MARKET.equals(self.order_type):
+
+            if self.amount_target_symbol is None:
+                raise OperationalException(
+                    "Amount target symbol is not specified"
+                )
+
+        else:
+
+            if self.amount_target_symbol is None \
+                    and self.amount_trading_symbol is None:
+                raise OperationalException(
+                    "Amount trading symbol and amount target "
+                    "symbol are not specified"
+                )
+
+            if self.amount_trading_symbol is not None:
+                self.amount_target_symbol = \
+                    self.price / self.amount_trading_symbol
+            else:
+                self.amount_trading_symbol = \
+                    self.price * self.amount_target_symbol
+
     def get_id(self):
-        pass
+        return self.id
 
-    @abstractmethod
-    def get_order_reference(self):
-        pass
+    def get_reference_id(self):
+        return self.reference_id
 
-    @abstractmethod
-    def set_order_reference(self, order_reference):
-        pass
-
-    @abstractmethod
     def get_target_symbol(self):
-        pass
+        return self.target_symbol
 
-    @abstractmethod
     def get_trading_symbol(self):
-        pass
+        return self.trading_symbol
 
-    @abstractmethod
     def get_initial_price(self):
-        pass
+        return self.initial_price
 
-    @abstractmethod
-    def set_initial_price(self, price):
-        pass
-
-    @abstractmethod
     def get_price(self):
-        pass
+        return self.price
 
-    @abstractmethod
     def get_closing_price(self):
-        pass
+        return self.closing_price
 
-    @abstractmethod
-    def set_closing_price(self, price):
-        pass
-
-    @abstractmethod
     def get_side(self):
-        pass
+        return self.order_side
 
-    @abstractmethod
     def get_status(self) -> OrderStatus:
-        pass
+        return self.status
 
-    @abstractmethod
-    def set_status(self, status: OrderStatus):
-        pass
-
-    @abstractmethod
     def get_type(self):
-        pass
+        return self.order_type
 
-    @abstractmethod
     def get_amount_target_symbol(self):
-        pass
+        return self.amount_target_symbol
 
-    @abstractmethod
     def get_amount_trading_symbol(self):
-        pass
+        return self.amount_trading_symbol
 
     @staticmethod
-    @abstractmethod
     def from_dict(data):
         pass
 
@@ -105,7 +128,7 @@ class Order:
     def to_string(self):
         return self.repr(
             id=self.get_id(),
-            order_reference=self.get_order_reference(),
+            reference_id=self.get_reference_id(),
             status=self.get_status(),
             initial_price=self.get_initial_price(),
             price=self.get_price(),

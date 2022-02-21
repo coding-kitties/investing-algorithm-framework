@@ -203,7 +203,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
         self,
         context,
         order_type,
-        symbol,
+        target_symbol,
         price=None,
         amount_trading_symbol=None,
         amount_target_symbol=None,
@@ -213,7 +213,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
 
             if OrderSide.SELL.equals(order_side):
                 order = SQLLiteOrder(
-                    target_symbol=symbol,
+                    target_symbol=target_symbol,
                     trading_symbol=self.trading_symbol,
                     amount_target_symbol=amount_target_symbol,
                     order_type=OrderType.MARKET.value,
@@ -224,7 +224,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
                 raise OperationalException("Buy market order is not supported")
         else:
             order = SQLLiteOrder(
-                target_symbol=symbol,
+                target_symbol=target_symbol,
                 trading_symbol=self.trading_symbol,
                 amount_target_symbol=amount_target_symbol,
                 amount_trading_symbol=amount_trading_symbol,

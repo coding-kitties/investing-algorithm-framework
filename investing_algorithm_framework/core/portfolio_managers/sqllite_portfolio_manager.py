@@ -13,14 +13,6 @@ from investing_algorithm_framework.core.portfolio_managers.portfolio_manager\
 class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
     trading_symbol = None
 
-    @abstractmethod
-    def get_unallocated_synced(self, algorithm_context):
-        pass
-
-    @abstractmethod
-    def get_positions_synced(self, algorithm_context):
-        pass
-
     def initialize(self, algorithm_context):
         self._initialize_portfolio(algorithm_context)
 
@@ -136,7 +128,7 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
 
     def create_order(
         self,
-        symbol,
+        target_symbol,
         price=None,
         amount_trading_symbol=None,
         amount_target_symbol=None,
@@ -150,18 +142,10 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
             from investing_algorithm_framework import current_app
             context = current_app.algorithm
 
-        if validate_pair:
-            market_service = context.get_market_service(self.market)
-            if not market_service.pair_exists(symbol, self.trading_symbol):
-                raise OperationalException(
-                    f"Pair {symbol} {self.trading_symbol} does not exist "
-                    f"on market {self.market}"
-                )
-
         return self.get_portfolio().create_order(
             context=context,
             order_type=order_type,
-            symbol=symbol,
+            target_symbol=target_symbol,
             price=price,
             amount_trading_symbol=amount_trading_symbol,
             amount_target_symbol=amount_target_symbol,

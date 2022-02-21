@@ -5,31 +5,46 @@ from investing_algorithm_framework.core.models import OrderSide, \
     OrderStatus
 from investing_algorithm_framework.core.models.position import Position
 from investing_algorithm_framework.core.models.order import Order
+from investing_algorithm_framework.core.exceptions import OperationalException
 
 
 class Portfolio:
 
-    @abstractmethod
-    def get_id(self):
-        pass
+    def __init__(
+        self,
+        identifier,
+        unallocated_position,
+        trading_symbol,
+        positions=None,
+        market=None,
+        orders=None
+    ):
+        self.unallocated_position = unallocated_position
+        self.positions = positions
+        self.trading_symbol = trading_symbol
+        self.identifier = identifier
+        self.orders = orders
+        self.market = market
 
-    @abstractmethod
+        if positions is None:
+            self.positions = []
+
+        if orders is None:
+            self.orders = []
+
     def get_identifier(self):
-        pass
+        return self.identifier
 
-    @abstractmethod
     def get_trading_symbol(self):
-        pass
+        return self.trading_symbol
 
-    @abstractmethod
     def get_positions(self, symbol: str = None) -> List[Position]:
-        pass
+        return self.positions
 
     @abstractmethod
     def get_number_of_positions(self):
-        pass
+        return len(self.positions)
 
-    @abstractmethod
     def get_orders(
         self,
         status: OrderStatus = None,
@@ -38,39 +53,60 @@ class Portfolio:
         trading_symbol: str = None,
         lazy: bool = False
     ) -> List[Order]:
-        pass
+        return self.orders
 
-    @abstractmethod
     def get_number_of_orders(self):
-        pass
+        return len(self.orders)
 
     def get_market(self) -> str:
-        pass
+        return self.market
 
     @staticmethod
-    @abstractmethod
     def from_dict(data):
         pass
 
-    @abstractmethod
     def to_dict(self):
         pass
 
-    @abstractmethod
-    def get_unallocated(self):
-        pass
+    def get_unallocated(self) -> Position:
 
-    @abstractmethod
+        if self.unallocated_position is None:
+            raise OperationalException(
+                "Trading symbol position is not specified"
+            )
+
+        return self.unallocated_position
+
     def get_allocated(self):
-        pass
+        allocated = 0
 
-    @abstractmethod
+        for position in self.positions:
+            price = position.get_price()
+
+            if price is not None:
+                allocated += position.get_amount() * price
+
+        return allocated
+
     def get_realized(self):
-        pass
+        realized = 0
+
+        for order in self.orders:
+            if OrderStatus.CLOSED.equals(order.get_status()):
+
+                realized += order.get_closing_price() \
+                           * order.get_amount_target_symbol()
+        return realized
 
     @abstractmethod
     def get_total_revenue(self):
-        pass
+        revenue = 0
+
+        for order in self.orders:
+            if OrderStatus.CLOSED.equals(order.get_status()):
+                revenue += order.get_closing_price() \
+                            * order.get_amount_target_symbol()
+        return revenue
 
     @abstractmethod
     def snapshot(
@@ -78,18 +114,27 @@ class Portfolio:
     ):
         pass
 
-    @abstractmethod
     def create_order(
         self,
         context,
         order_type,
-        symbol,
+        target_symbol,
         price=None,
         amount_trading_symbol=None,
         amount_target_symbol=None,
         order_side=OrderSide.BUY.value,
-    ):
-        pass
+    ) -> Order:
+        return Order(
+            id=None,
+            order_type=order_type,
+            order_side=order_side,
+            initial_price=price,
+            amount_trading_symbol=amount_trading_symbol,
+            amount_target_symbol=amount_target_symbol,
+            status=OrderStatus.TO_BE_SENT,
+            target_symbol=target_symbol,
+            trading_symbol=self.get_trading_symbol()
+        )
 
     def repr(self, **fields) -> str:
         """
@@ -110,12 +155,11 @@ class Portfolio:
 
     def to_string(self):
         return self.repr(
-            id=self.get_id(),
             identifier=self.get_identifier(),
             trading_symbol=self.get_trading_symbol(),
             number_of_positions=self.get_number_of_positions(),
             number_of_orders=self.get_number_of_orders(),
-            unallocated=f"{self.get_unallocated()} {self.get_trading_symbol()}",
+            unallocated=f"{self.get_unallocated()}",
             allocated=self.get_allocated(),
             realized=f"{self.get_realized()}",
             total_revenue=f"{self.get_total_revenue()}",

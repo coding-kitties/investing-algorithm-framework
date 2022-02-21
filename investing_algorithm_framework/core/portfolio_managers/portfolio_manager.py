@@ -1,4 +1,6 @@
+from random import randrange
 from abc import abstractmethod, ABC
+from typing import List
 
 from investing_algorithm_framework.configuration.constants import \
     TRADING_SYMBOL
@@ -8,26 +10,34 @@ from investing_algorithm_framework.core.market_identifier import \
     MarketIdentifier
 from investing_algorithm_framework.core.models import OrderSide, OrderType, \
     Portfolio
+from investing_algorithm_framework.core.models.position import Position
+from investing_algorithm_framework.core.models.order import Order
 
 
 class PortfolioManager(ABC, Identifier, MarketIdentifier):
     trading_symbol = None
 
     @abstractmethod
-    def get_unallocated(self, algorithm_context, sync=False):
+    def get_unallocated(self, algorithm_context, sync=False) -> Position:
         pass
 
     @abstractmethod
-    def get_allocated(self, algorithm_context, sync=False):
+    def get_positions(self, algorithm_context) -> List[Position]:
         pass
 
     @abstractmethod
+    def get_orders(self, algorithm_context) -> List[Order]:
+        pass
+
     def initialize(self, algorithm_context):
         pass
 
-    @abstractmethod
     def get_portfolio(self, algorithm_context) -> Portfolio:
-        pass
+        return Portfolio.of(
+            positions=self.get_positions(algorithm_context),
+            unallocated=self.get_unallocated(algorithm_context),
+            orders=self.get_orders(algorithm_context)
+        )
 
     def get_trading_symbol(self, algorithm_context) -> str:
         trading_symbol = getattr(self, "trading_symbol", None)
@@ -44,27 +54,27 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
 
         return trading_symbol
 
-    @abstractmethod
-    def get_positions(self, symbol: str = None, lazy=False):
-        pass
-
-    @abstractmethod
-    def get_orders(self, symbol: str = None, status=None, lazy=False):
-        pass
-
-    @abstractmethod
     def create_order(
         self,
-        symbol,
+        target_symbol,
         price=None,
         amount_trading_symbol=None,
         amount_target_symbol=None,
         order_type=OrderType.LIMIT.value,
         order_side=OrderSide.BUY.value,
-        context=None,
-        validate_pair=True,
-    ):
-        pass
+        algorithm_context=None
+    ) -> Order:
+
+        return Order(
+            id=randrange(100000),
+            target_symbol=target_symbol,
+            trading_symbol=self.get_trading_symbol(algorithm_context),
+            price=price,
+            amount_trading_symbol=amount_trading_symbol,
+            amount_target_symbol=amount_target_symbol,
+            order_type=order_type,
+            order_side=order_side,
+        )
 
     @abstractmethod
     def add_order(self, order):

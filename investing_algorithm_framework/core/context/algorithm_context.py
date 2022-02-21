@@ -513,80 +513,111 @@ class AlgorithmContext:
         portfolio_manager = self.get_portfolio_manager(identifier)
         portfolio_manager.add_order(order)
 
+    def create_order(
+        self,
+        target_symbol,
+        price,
+        order_type,
+        order_side,
+        amount_target_symbol=None,
+        amount_trading_symbol=None,
+        identifier: str = None
+    ):
+        if OrderType.LIMIT.equals(order_type):
+
+            if OrderSide.SELL.equals(order_side):
+                return self.create_limit_sell_order(
+                    target_symbol=target_symbol,
+                    price=price,
+                    amount_target_symbol=amount_target_symbol,
+                    amount_trading_symbol=amount_trading_symbol,
+                    identifier=identifier
+                )
+            else:
+                return self.create_limit_buy_order(
+                    target_symbol=target_symbol,
+                    price=price,
+                    amount_target_symbol=amount_target_symbol,
+                    amount_trading_symbol=amount_trading_symbol,
+                    identifier=identifier
+                )
+
+        else:
+            if OrderSide.SELL.equals(order_side):
+                return self.create_market_sell_order(
+                    target_symbol=target_symbol,
+                    amount_target_symbol=amount_target_symbol,
+                    identifier=identifier
+                )
+            else:
+                raise OperationalException(
+                    "Market buy orders are not supported"
+                )
+
     def create_limit_buy_order(
-            self,
-            symbol: str,
-            price: float,
-            amount: float,
-            execute=False,
-            identifier: str = None,
-            validate_pair=True
+        self,
+        target_symbol: str,
+        price: float,
+        amount_trading_symbol: float,
+        amount_target_symbol: float,
+        identifier: str = None,
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
-            symbol=symbol,
+            target_symbol=target_symbol,
             price=price,
-            amount_target_symbol=amount,
+            amount_target_symbol=amount_target_symbol,
+            amount_trading_symbol=amount_trading_symbol,
             order_type=OrderType.LIMIT.value,
-            validate_pair=validate_pair
         )
 
-        if execute:
-            portfolio_manager.add_order(order)
-            self.execute_limit_buy_order(identifier, order)
-            order.set_pending()
-            db.session.commit()
-
+        portfolio_manager.add_order(order)
+        self.execute_limit_buy_order(identifier, order)
+        order.set_pending()
+        db.session.commit()
         return order
 
     def create_limit_sell_order(
-            self,
-            symbol,
-            price,
-            amount,
-            execute=False,
-            identifier: str = None,
-            validate_pair=True
+        self,
+        price,
+        target_symbol: str,
+        amount_trading_symbol: float,
+        amount_target_symbol: float,
+        identifier: str = None,
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
-            symbol=symbol,
+            target_symbol=target_symbol,
             price=price,
-            amount_target_symbol=amount,
+            amount_target_symbol=amount_target_symbol,
+            amount_trading_symbol=amount_trading_symbol,
             order_type=OrderType.LIMIT.value,
             order_side=OrderSide.SELL.value,
-            validate_pair=validate_pair
         )
 
-        if execute:
-            # Execute order and set to pending state
-            portfolio_manager.add_order(order)
-            self.execute_limit_sell_order(identifier, order)
-            order.set_pending()
-
+        # Execute order and set to pending state
+        portfolio_manager.add_order(order)
+        self.execute_limit_sell_order(identifier, order)
+        order.set_pending()
         return order
 
     def create_market_sell_order(
         self,
-        symbol,
+        target_symbol,
         amount_target_symbol,
-        execute=False,
         identifier: str = None,
-        validate_pair=True
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
-            symbol=symbol,
+            target_symbol=target_symbol,
             amount_target_symbol=amount_target_symbol,
             order_type=OrderType.MARKET.value,
             order_side=OrderSide.SELL.value,
-            validate_pair=validate_pair
         )
 
-        if execute:
-            portfolio_manager.add_order(order)
-            self.execute_market_sell_order(identifier, order)
-            order.set_pending()
+        portfolio_manager.add_order(order)
+        self.execute_market_sell_order(identifier, order)
+        order.set_pending()
 
         return order
 
@@ -824,9 +855,13 @@ class AlgorithmContext:
 
         return data
 
-    def get_unallocated_size(self, identifier):
+    def get_portfolio(self, identifier=None):
         portfolio_manager = self.get_portfolio_manager(identifier)
-        return portfolio_manager.unallocated
+        return portfolio_manager.get_portfolio()
+
+    def get_unallocated(self, identifier):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        return portfolio_manager.get_unallocated(self)
 
     def reset(self):
         self._workers = []
