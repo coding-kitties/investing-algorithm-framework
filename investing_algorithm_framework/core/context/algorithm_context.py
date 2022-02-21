@@ -104,6 +104,9 @@ class AlgorithmContext:
 
             return wrapper
 
+    def get_strategy(self, identifier):
+        pass
+
     def initialize(self, config=None):
 
         if config is not None:
