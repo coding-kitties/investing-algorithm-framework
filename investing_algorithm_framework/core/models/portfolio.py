@@ -63,16 +63,31 @@ class Portfolio:
 
     @staticmethod
     def from_dict(data):
-        pass
+        if data is None:
+            return None
 
-    def to_dict(self):
-        pass
+        unallocated_position = None
+
+        if "unallocated" in data:
+            unallocated_position = Position(
+                amount=data.get("unallocated"),
+                symbol=data.get("trading_symbol")
+            )
+
+        return Portfolio(
+            identifier=data.get("identifier", None),
+            trading_symbol=data.get("trading_symbol", None),
+            unallocated_position=unallocated_position,
+            market=data.get("market", None),
+            positions=data.get("positions"),
+            orders=data.get("orders")
+        )
 
     def get_unallocated(self) -> Position:
 
         if self.unallocated_position is None:
             raise OperationalException(
-                "Trading symbol position is not specified"
+                "Unallocated position is not specified"
             )
 
         return self.unallocated_position
@@ -116,7 +131,7 @@ class Portfolio:
 
     def create_order(
         self,
-        context,
+        algorithm_context,
         order_type,
         target_symbol,
         price=None,
@@ -125,9 +140,8 @@ class Portfolio:
         order_side=OrderSide.BUY.value,
     ) -> Order:
         return Order(
-            id=None,
-            order_type=order_type,
-            order_side=order_side,
+            type=order_type,
+            side=order_side,
             initial_price=price,
             amount_trading_symbol=amount_trading_symbol,
             amount_target_symbol=amount_target_symbol,
@@ -152,6 +166,20 @@ class Portfolio:
             return f"<{self.__class__.__name__}({','.join(field_strings)})>"
 
         return f"<{self.__class__.__name__} {id(self)}>"
+
+    def to_dict(self):
+        data = {
+            "identifier": self.get_identifier(),
+            "trading_symbol": self.get_trading_symbol(),
+            "market": self.get_market(),
+            "positions": self.get_positions(),
+            "orders": self.get_orders()
+        }
+
+        if self.get_unallocated() is not None:
+            data["unallocated"] = self.get_unallocated().get_amount()
+
+        return data
 
     def to_string(self):
         return self.repr(

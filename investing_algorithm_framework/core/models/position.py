@@ -56,11 +56,28 @@ class Position:
 
     def to_string(self):
         return self.repr(
-            symbol=f"{self.symbol()}",
+            symbol=f"{self.get_symbol()}",
             amount=self.get_amount(),
             price=self.price,
             cost=self.get_cost()
         )
 
+    @staticmethod
+    def from_dict(data):
+        return Position(
+            symbol=data.get("symbol"),
+            price=data.get("price", None),
+            amount=data.get("amount", None),
+            orders=data.get("orders", None)
+        )
+
     def __repr__(self):
         return self.to_string()
+
+    def to_dict(self):
+        return {
+            "symbol": self.get_symbol(),
+            "price": self.get_price(),
+            "amount": self.get_amount(),
+            "orders": self.get_orders()
+        }

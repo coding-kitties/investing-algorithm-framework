@@ -11,33 +11,27 @@ from investing_algorithm_framework.core.market_identifier import \
 from investing_algorithm_framework.core.models import OrderSide, OrderType, \
     Portfolio
 from investing_algorithm_framework.core.models.position import Position
-from investing_algorithm_framework.core.models.order import Order
+from investing_algorithm_framework.core.models.order import Order, OrderStatus
 
 
 class PortfolioManager(ABC, Identifier, MarketIdentifier):
     trading_symbol = None
+    portfolio = None
 
     @abstractmethod
-    def get_unallocated(self, algorithm_context, sync=False) -> Position:
+    def get_unallocated(self, algorithm_context, **kwargs) -> Position:
         pass
 
     @abstractmethod
-    def get_positions(self, algorithm_context) -> List[Position]:
+    def get_positions(self, algorithm_context, **kwargs) -> List[Position]:
         pass
 
     @abstractmethod
-    def get_orders(self, algorithm_context) -> List[Order]:
+    def get_orders(self, algorithm_context, **kwargs) -> List[Order]:
         pass
 
     def initialize(self, algorithm_context):
-        pass
-
-    def get_portfolio(self, algorithm_context) -> Portfolio:
-        return Portfolio.of(
-            positions=self.get_positions(algorithm_context),
-            unallocated=self.get_unallocated(algorithm_context),
-            orders=self.get_orders(algorithm_context)
-        )
+        self.portfolio = self.get_portfolio(algorithm_context)
 
     def get_trading_symbol(self, algorithm_context) -> str:
         trading_symbol = getattr(self, "trading_symbol", None)
@@ -54,6 +48,15 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
 
         return trading_symbol
 
+    def get_portfolio(self, algorithm_context, **kwargs) -> Portfolio:
+        return Portfolio(
+            identifier=self.get_identifier(),
+            trading_symbol=self.get_trading_symbol(algorithm_context),
+            positions=self.get_positions(algorithm_context),
+            unallocated_position=self.get_unallocated(algorithm_context),
+            orders=self.get_orders(algorithm_context)
+        )
+
     def create_order(
         self,
         target_symbol,
@@ -66,16 +69,16 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
     ) -> Order:
 
         return Order(
-            id=randrange(100000),
             target_symbol=target_symbol,
             trading_symbol=self.get_trading_symbol(algorithm_context),
             price=price,
             amount_trading_symbol=amount_trading_symbol,
             amount_target_symbol=amount_target_symbol,
-            order_type=order_type,
-            order_side=order_side,
+            type=order_type,
+            side=order_side,
+            status=OrderStatus.TO_BE_SENT.value
         )
 
     @abstractmethod
-    def add_order(self, order):
+    def add_order(self, order, algorithm_context):
         pass

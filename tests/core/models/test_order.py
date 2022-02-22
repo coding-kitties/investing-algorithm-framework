@@ -157,3 +157,151 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
                     "side": "BUY"
                 }
             )
+
+    def test_from_dict_pending_limit_order_sell(self):
+        order = Order.from_dict(
+            {
+                "reference_id": 10493,
+                "target_symbol": "DOT",
+                "trading_symbol": "USDT",
+                "amount_target_symbol": 40,
+                "status": "PENDING",
+                "price": 10,
+                "type": "LIMIT",
+                "side": "SELL"
+            }
+        )
+
+        self.assertIsNotNone(order.get_reference_id())
+        self.assertIsNotNone(order.get_target_symbol())
+        self.assertIsNotNone(order.get_trading_symbol())
+        self.assertIsNotNone(order.get_amount_target_symbol())
+        self.assertIsNotNone(order.get_amount_trading_symbol())
+        self.assertIsNotNone(order.get_status())
+        self.assertIsNotNone(order.get_side())
+        self.assertIsNotNone(order.get_type())
+        self.assertIsNotNone(order.get_price())
+
+    def test_from_dict_success_limit_order_sell(self):
+        order = Order.from_dict(
+            {
+                "reference_id": 10493,
+                "target_symbol": "DOT",
+                "trading_symbol": "USDT",
+                "amount_target_symbol": 40,
+                "status": "SUCCESS",
+                "price": 10,
+                "initial_price": 9,
+                "type": "LIMIT",
+                "side": "SELL"
+            }
+        )
+
+        self.assertIsNotNone(order.get_reference_id())
+        self.assertIsNotNone(order.get_target_symbol())
+        self.assertIsNotNone(order.get_trading_symbol())
+        self.assertIsNotNone(order.get_amount_target_symbol())
+        self.assertIsNotNone(order.get_amount_trading_symbol())
+        self.assertIsNotNone(order.get_status())
+        self.assertIsNotNone(order.get_side())
+        self.assertIsNotNone(order.get_type())
+        self.assertIsNotNone(order.get_price())
+
+    def test_from_dict_closed_limit_order_sell(self):
+        order = Order.from_dict(
+            {
+                "reference_id": 10493,
+                "target_symbol": "DOT",
+                "trading_symbol": "USDT",
+                "amount_target_symbol": 40,
+                "status": "CLOSED",
+                "closing_price": 10,
+                "initial_price": 9,
+                "type": "LIMIT",
+                "side": "SELL"
+            }
+        )
+
+        self.assertIsNotNone(order.get_reference_id())
+        self.assertIsNotNone(order.get_target_symbol())
+        self.assertIsNotNone(order.get_trading_symbol())
+        self.assertIsNotNone(order.get_amount_target_symbol())
+        self.assertIsNotNone(order.get_amount_trading_symbol())
+        self.assertIsNotNone(order.get_status())
+        self.assertIsNotNone(order.get_side())
+        self.assertIsNotNone(order.get_type())
+        self.assertIsNotNone(order.get_price())
+
+    def test_from_dict_pending_market_order_sell(self):
+        order = Order.from_dict(
+            {
+                "reference_id": 10493,
+                "target_symbol": "DOT",
+                "trading_symbol": "USDT",
+                "amount_target_symbol": 40,
+                "status": "PENDING",
+                "price": 10,
+                "type": "MARKET",
+                "side": "SELL"
+            }
+        )
+
+        self.assertIsNotNone(order.get_reference_id())
+        self.assertIsNotNone(order.get_target_symbol())
+        self.assertIsNotNone(order.get_trading_symbol())
+        self.assertIsNotNone(order.get_amount_target_symbol())
+        self.assertIsNone(order.get_amount_trading_symbol())
+        self.assertIsNotNone(order.get_status())
+        self.assertIsNotNone(order.get_side())
+        self.assertIsNotNone(order.get_type())
+        self.assertIsNotNone(order.get_price())
+
+    def test_from_dict_success_market_order_sell(self):
+        order = Order.from_dict(
+            {
+                "reference_id": 10493,
+                "target_symbol": "DOT",
+                "trading_symbol": "USDT",
+                "amount_target_symbol": 40,
+                "status": "SUCCESS",
+                "price": 10,
+                "initial_price": 9,
+                "type": "LIMIT",
+                "side": "SELL"
+            }
+        )
+
+        self.assertIsNotNone(order.get_reference_id())
+        self.assertIsNotNone(order.get_target_symbol())
+        self.assertIsNotNone(order.get_trading_symbol())
+        self.assertIsNotNone(order.get_amount_target_symbol())
+        self.assertIsNotNone(order.get_amount_trading_symbol())
+        self.assertIsNotNone(order.get_status())
+        self.assertIsNotNone(order.get_side())
+        self.assertIsNotNone(order.get_type())
+        self.assertIsNotNone(order.get_price())
+
+    def test_from_dict_closed_market_order_sell(self):
+        order = Order.from_dict(
+            {
+                "reference_id": 10493,
+                "target_symbol": "DOT",
+                "trading_symbol": "USDT",
+                "amount_target_symbol": 40,
+                "status": "CLOSED",
+                "closing_price": 10,
+                "initial_price": 9,
+                "type": "MARKET",
+                "side": "SELL"
+            }
+        )
+
+        self.assertIsNotNone(order.get_reference_id())
+        self.assertIsNotNone(order.get_target_symbol())
+        self.assertIsNotNone(order.get_trading_symbol())
+        self.assertIsNotNone(order.get_amount_target_symbol())
+        self.assertIsNotNone(order.get_amount_trading_symbol())
+        self.assertIsNotNone(order.get_status())
+        self.assertIsNotNone(order.get_side())
+        self.assertIsNotNone(order.get_type())
+        self.assertIsNotNone(order.get_price())

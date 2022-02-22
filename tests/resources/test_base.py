@@ -1,12 +1,13 @@
 import os
 from datetime import datetime, timedelta
+from typing import List
 
 from dateutil.relativedelta import relativedelta
 from flask_testing import TestCase
 
 from investing_algorithm_framework import MarketService, \
     OrderExecutor, Order, OrderType, OrderSide, AlgorithmContextInitializer, \
-    DataProvider, OrderBook, Ticker
+    DataProvider, OrderBook, Ticker, PortfolioManager, Position
 from investing_algorithm_framework.app import App
 from investing_algorithm_framework.configuration.constants import \
     DATABASE_CONFIG, DATABASE_NAME, RESOURCES_DIRECTORY
@@ -26,13 +27,6 @@ class Initializer(AlgorithmContextInitializer):
 
 
 class PortfolioManagerTest(SQLLitePortfolioManager):
-
-    def get_unallocated_synced(self, algorithm_context):
-        return 1000
-
-    def get_positions_synced(self, algorithm_context):
-        pass
-
     market = "test"
     identifier = "test"
     trading_symbol = "USDT"
@@ -41,6 +35,40 @@ class PortfolioManagerTest(SQLLitePortfolioManager):
     def initialize(self, algorithm_context):
         super(PortfolioManagerTest, self).initialize(algorithm_context)
         self.initialize_has_run = True
+
+    def get_positions_from_broker(self, algorithm_context) -> List[Position]:
+        return [Position(amount=1000, symbol=self.get_trading_symbol(algorithm_context))]
+
+
+class DefaultPortfolioManager(PortfolioManager):
+    identifier = "default"
+    trading_symbol = "USDT"
+
+    def get_unallocated(self, algorithm_context, **kwargs) -> Position:
+        return Position(
+            amount=10000, symbol=self.get_trading_symbol(algorithm_context)
+        )
+
+    def get_positions(self, algorithm_context, **kwargs) -> List[Position]:
+        return [Position(
+            amount=10, symbol=TestBase.TARGET_SYMBOL_A
+        )]
+
+    def get_orders(self, algorithm_context, **kwargs) -> List[Order]:
+        return [
+            Order(
+                amount_target_symbol=10,
+                target_symbol=TestBase.TARGET_SYMBOL_A,
+                trading_symbol=self.trading_symbol,
+                side=OrderSide.BUY,
+                status=OrderStatus.PENDING,
+                price=10,
+                type=OrderType.LIMIT
+            )
+        ]
+
+    def add_order(self, order, algorithm_context, **kwargs):
+        pass
 
 
 class OrderExecutorTest(OrderExecutor):
@@ -279,6 +307,7 @@ class TestBase(TestCase):
         self.algo_app._initialize_flask_sql_alchemy()
         self.algo_app.algorithm.add_initializer(Initializer())
         self.algo_app.algorithm.add_portfolio_manager(PortfolioManagerTest())
+        self.algo_app.algorithm.add_portfolio_manager(DefaultPortfolioManager)
         self.algo_app.algorithm.add_market_service(MarketServiceTest())
         self.algo_app.algorithm.add_order_executor(OrderExecutorTest())
         self.algo_app.algorithm.add_data_provider(DataProviderTest)
@@ -289,29 +318,44 @@ class TestBase(TestCase):
             AssetPrice
 
         TestBase.prices_symbol_a = [
-            SQLLiteAssetPrice(target_symbol=self.TARGET_SYMBOL_A, trading_symbol="usdt",
-                       price=self.BASE_SYMBOL_A_PRICE,
-                       datetime=datetime.utcnow() - relativedelta(years=15))
+            SQLLiteAssetPrice(
+                target_symbol=self.TARGET_SYMBOL_A,
+                trading_symbol="usdt",
+                price=self.BASE_SYMBOL_A_PRICE,
+                datetime=datetime.utcnow() - relativedelta(years=15)
+            )
         ]
         TestBase.prices_symbol_b = [
-            SQLLiteAssetPrice(target_symbol=self.TARGET_SYMBOL_B, trading_symbol="usdt",
-                       price=self.BASE_SYMBOL_B_PRICE,
-                       datetime=datetime.utcnow() - relativedelta(years=15))
+            SQLLiteAssetPrice(
+                target_symbol=self.TARGET_SYMBOL_B,
+                trading_symbol="usdt",
+                price=self.BASE_SYMBOL_B_PRICE,
+                datetime=datetime.utcnow() - relativedelta(years=15)
+            )
         ]
         TestBase.prices_symbol_c = [
-            SQLLiteAssetPrice(target_symbol=self.TARGET_SYMBOL_C, trading_symbol="usdt",
-                       price=self.BASE_SYMBOL_C_PRICE,
-                       datetime=datetime.utcnow() - relativedelta(years=15))
+            SQLLiteAssetPrice(
+                target_symbol=self.TARGET_SYMBOL_C,
+                trading_symbol="usdt",
+                price=self.BASE_SYMBOL_C_PRICE,
+                datetime=datetime.utcnow() - relativedelta(years=15)
+            )
         ]
         TestBase.prices_symbol_d = [
-            SQLLiteAssetPrice(target_symbol=self.TARGET_SYMBOL_D, trading_symbol="usdt",
-                       price=self.BASE_SYMBOL_D_PRICE,
-                       datetime=datetime.utcnow() - relativedelta(years=15))
+            SQLLiteAssetPrice(
+                target_symbol=self.TARGET_SYMBOL_D,
+                trading_symbol="usdt",
+                price=self.BASE_SYMBOL_D_PRICE,
+                datetime=datetime.utcnow() - relativedelta(years=15)
+            )
         ]
         TestBase.prices_symbol_e = [
-            SQLLiteAssetPrice(target_symbol=self.TARGET_SYMBOL_E, trading_symbol="usdt",
-                       price=self.BASE_SYMBOL_E_PRICE,
-                       datetime=datetime.utcnow() - relativedelta(years=15))
+            SQLLiteAssetPrice(
+                target_symbol=self.TARGET_SYMBOL_E,
+                trading_symbol="usdt",
+                price=self.BASE_SYMBOL_E_PRICE,
+                datetime=datetime.utcnow() - relativedelta(years=15)
+            )
         ]
 
     def tearDown(self) -> None:

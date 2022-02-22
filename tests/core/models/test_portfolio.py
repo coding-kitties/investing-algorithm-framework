@@ -15,8 +15,8 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
                     status=OrderStatus.PENDING,
                     price=10,
                     amount_target_symbol=10,
-                    order_side=OrderSide.BUY,
-                    order_type=OrderType.LIMIT
+                    side=OrderSide.BUY,
+                    type=OrderType.LIMIT
                 )
             ],
             identifier="BINANCE",
@@ -31,7 +31,7 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
 
     def test_get_unallocated(self):
         self.assertIsNotNone(self.portfolio.get_unallocated())
-        self.assertIsNotNone(self.portfolio.get_unallocated().amount)
+        self.assertIsNotNone(self.portfolio.get_unallocated())
         self.assertTrue(
             isinstance(self.portfolio.get_unallocated(), Position)
         )
@@ -58,3 +58,28 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
     def test_get_market(self):
         self.assertIsNotNone(self.portfolio.get_market())
         self.assertEqual("BINANCE", self.portfolio.get_market())
+
+    def test_from_dict(self):
+        portfolio = Portfolio.from_dict(
+            {
+                "identifier": "BINANCE",
+                "trading_symbol": "USDT",
+                "unallocated": 10000,
+                "market": "BINANCE",
+                "positions": [
+                    {"symbol": "DOT", "amount": 40},
+                    {"symbol": "BTC", "amount": 0.04},
+                ]
+            }
+        )
+        self.assertIsNotNone(portfolio.get_identifier())
+        self.assertIsNotNone(portfolio.get_trading_symbol())
+        self.assertIsNotNone(portfolio.get_unallocated())
+        self.assertIsNotNone(portfolio.get_positions())
+        self.assertIsNotNone(portfolio.get_market())
+        self.assertNotEqual(0, len(portfolio.get_positions()))
+        self.assertEqual(0, len(portfolio.get_orders()))
+
+    def test_to_dict(self):
+        data = self.portfolio.to_dict()
+        self.assertIsNotNone(data)

@@ -1,4 +1,5 @@
-from investing_algorithm_framework import OrderSide, OrderType, OrderStatus
+from investing_algorithm_framework import OrderSide, OrderType, OrderStatus, \
+    Position
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
@@ -8,16 +9,37 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
         super(Test, self).setUp()
         self.start_algorithm()
 
-    def test_id(self):
-        self.assertIsNotNone(self.algo_app.algorithm.get_portfolio_manager())
+    def test_identifier(self):
+        print(self.algo_app.algorithm.get_portfolio_manager('default'))
+        self.assertIsNotNone(
+            self.algo_app.algorithm.get_portfolio_manager('default')
+        )
+        portfolio_manager = self.algo_app.algorithm\
+            .get_portfolio_manager('default')
+        print(portfolio_manager.get_identifier())
+        self.assertIsNotNone(portfolio_manager.get_identifier())
 
     def test_initialize(self):
         self.assertTrue(
             self.algo_app.algorithm.get_portfolio_manager().initialize_has_run
         )
 
+    def test_get_unallocated(self):
+        portfolio_manager = self.algo_app.algorithm\
+            .get_portfolio_manager('default')
+        self.assertIsNotNone(
+            portfolio_manager.get_unallocated(self.algo_app.algorithm)
+        )
+        self.assertTrue(
+            isinstance(
+                portfolio_manager.get_unallocated(self.algo_app.algorithm),
+                Position
+            )
+        )
+
     def test_create_limit_buy_order(self):
-        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
+        portfolio_manager = self.algo_app.algorithm\
+            .get_portfolio_manager('default')
 
         order = portfolio_manager.create_order(
             order_type=OrderType.LIMIT.value,
@@ -32,7 +54,7 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
         self.assert_is_limit_order(order)
 
     def test_create_limit_sell_order(self):
-        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
+        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager('default')
 
         order = portfolio_manager.create_order(
             order_type=OrderType.LIMIT.value,
@@ -47,7 +69,8 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
         self.assert_is_limit_order(order)
 
     def test_get_portfolio(self):
-        portfolio = self.algo_app.algorithm.get_portfolio_manager().get_portfolio()
+        portfolio = self.algo_app.algorithm.get_portfolio_manager()\
+            .get_portfolio()
         self.assertIsNotNone(portfolio)
 
     def test_get_orders(self):

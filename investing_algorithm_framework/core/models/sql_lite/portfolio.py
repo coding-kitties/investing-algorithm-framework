@@ -7,7 +7,7 @@ from sqlalchemy.orm import validates
 
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import db, OrderSide, \
-    OrderStatus, OrderType, Portfolio
+    OrderStatus, OrderType, Portfolio, Position
 from investing_algorithm_framework.core.models.model_extension \
     import SQLAlchemyModelExtension
 from investing_algorithm_framework.core.models.sql_lite import SQLLiteOrder
@@ -105,18 +105,27 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
         return value
 
     def __init__(
-            self, trading_symbol, unallocated, identifier, market, **kwargs
+        self,
+        identifier,
+        unallocated_position,
+        trading_symbol,
+        positions=None,
+        market=None,
+        orders=None,
+        **kwargs
     ):
-        self.id = random_id()
-        self.identifier = identifier
-        self.trading_symbol = trading_symbol
-        self.unallocated = unallocated
-        self.realized = 0
-        self.total_revenue = 0
-        self.total_cost = 0
-        self.market = market
-        self.created_at = datetime.utcnow()
-        super(Portfolio, self).__init__(**kwargs)
+        super(SQLLitePortfolio, self).__init__(
+            identifier=identifier,
+            unallocated_position=unallocated_position
+        )
+
+        # self.id = random_id()
+        # self.identifier = identifier
+        # self.trading_symbol = trading_symbol
+        # self.realized = 0
+        # self.total_revenue = 0
+        # self.total_cost = 0
+        # self.created_at = datetime.utcnow()
 
     @hybrid_property
     def allocated(self):
@@ -335,7 +344,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
         return query_set.all()
 
     def get_unallocated(self):
-        return self.unallocated
+        return Position(amount=self.unallocated, symbo=self.trading_symbol)
 
     def get_allocated(self):
         return self.allocated

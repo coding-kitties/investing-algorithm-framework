@@ -417,16 +417,6 @@ class AlgorithmContext:
 
         if identifier not in self._portfolio_managers:
 
-            if identifier in RESERVED_IDENTIFIERS:
-                portfolio_manager = DefaultPortfolioManagerFactory\
-                    .of_market(identifier)
-
-                portfolio_manager.initialize(self)
-                self._portfolio_managers[portfolio_manager.identifier] \
-                    = portfolio_manager
-
-                return portfolio_manager
-
             if throw_exception:
                 raise OperationalException(
                     f"No corresponding portfolio manager found for "
