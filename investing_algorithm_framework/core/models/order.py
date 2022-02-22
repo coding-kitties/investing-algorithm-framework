@@ -13,31 +13,29 @@ class Order:
         self,
         target_symbol,
         trading_symbol,
-        order_type,
-        order_side,
+        type,
+        side,
         status,
         amount_trading_symbol=None,
         amount_target_symbol=None,
         price=None,
         initial_price=None,
         closing_price=None,
-        id=None,
         reference_id=None
     ):
-        self.id = id
         self.reference_id = reference_id
         self.target_symbol = target_symbol
         self.trading_symbol = trading_symbol
         self.price = price
         self.amount_trading_symbol = amount_trading_symbol
         self.amount_target_symbol = amount_target_symbol
-        self.order_side = order_side
-        self.order_type = order_type
+        self.side = OrderSide.from_value(side)
+        self.type = type
         self.status = status
         self.initial_price = initial_price
         self.closing_price = closing_price
 
-        if OrderType.MARKET.equals(self.order_type):
+        if OrderType.MARKET.equals(self.type):
 
             if self.amount_target_symbol is None:
                 raise OperationalException(
@@ -46,22 +44,43 @@ class Order:
 
         else:
 
-            if self.amount_target_symbol is None \
-                    and self.amount_trading_symbol is None:
+            if OrderStatus.SUCCESS.equals(self.status) or \
+                    OrderStatus.CLOSED.equals(self.status):
+
+                if self.initial_price is None:
+                    raise OperationalException(
+                        "Initial price attribute is not set for "
+                        "successful order"
+                    )
+
+                if self.price is None:
+                    raise OperationalException(
+                        "Price attribute is not set for order"
+                    )
+
+                if self.amount_target_symbol is None \
+                        and self.amount_trading_symbol is None:
+                    raise OperationalException(
+                        "Amount trading symbol and amount target "
+                        "symbol are not specified"
+                    )
+
+                if self.amount_trading_symbol is not None:
+                    self.amount_target_symbol = \
+                        self.price / self.amount_trading_symbol
+                else:
+                    self.amount_trading_symbol = \
+                        self.price * self.amount_target_symbol
+
+    def _validate_price_attribute(self):
+
+        if OrderStatus.SUCCESS.equals(self.status) \
+                or OrderStatus.PENDING.equals(self.status):
+
+            if self.price is None:
                 raise OperationalException(
-                    "Amount trading symbol and amount target "
-                    "symbol are not specified"
+                    "Price attribute is not set for order"
                 )
-
-            if self.amount_trading_symbol is not None:
-                self.amount_target_symbol = \
-                    self.price / self.amount_trading_symbol
-            else:
-                self.amount_trading_symbol = \
-                    self.price * self.amount_target_symbol
-
-    def get_id(self):
-        return self.id
 
     def get_reference_id(self):
         return self.reference_id
@@ -82,13 +101,13 @@ class Order:
         return self.closing_price
 
     def get_side(self):
-        return self.order_side
+        return self.side
 
     def get_status(self) -> OrderStatus:
         return self.status
 
     def get_type(self):
-        return self.order_type
+        return self.type
 
     def get_amount_target_symbol(self):
         return self.amount_target_symbol
@@ -97,14 +116,37 @@ class Order:
         return self.amount_trading_symbol
 
     @staticmethod
-    def from_dict(data):
-        pass
+    def from_dict(data: dict):
+        return Order(
+            reference_id=data.get("reference_id", None),
+            target_symbol=data.get("target_symbol", None),
+            trading_symbol=data.get("trading_symbol", None),
+            price=data.get("price", None),
+            initial_price=data.get("initial_price", None),
+            closing_price=data.get("closing_price", None),
+            amount_trading_symbol=data.get("amount_trading_symbol", None),
+            amount_target_symbol=data.get("amount_target_symbol", None),
+            status=data.get("status", None),
+            type=data.get("type", None),
+            side=data.get("side", None)
+        )
 
     @abstractmethod
     def to_dict(self):
-        pass
+        return {
+            "reference_id": self.get_reference_id(),
+            "target_symbol": self.get_target_symbol(),
+            "trading_symbol": self.get_trading_symbol(),
+            "amount_trading_symbol": self.get_amount_trading_symbol(),
+            "amount_target_symbol": self.get_amount_target_symbol(),
+            "price": self.get_price(),
+            "initial_price": self.get_initial_price(),
+            "closing_price": self.get_closing_price(),
+            "status": self.get_status(),
+            "order_type": self.get_type(),
+            "order_side": self.get_side()
+        }
 
-    @abstractmethod
     def split(self, amount):
         pass
 
@@ -127,14 +169,13 @@ class Order:
 
     def to_string(self):
         return self.repr(
-            id=self.get_id(),
             reference_id=self.get_reference_id(),
             status=self.get_status(),
             initial_price=self.get_initial_price(),
             price=self.get_price(),
             closing_price=self.get_closing_price(),
-            side=self.get_side(),
-            type=self.get_type(),
+            order_side=self.get_side(),
+            order_type=self.get_type(),
             amount_target_symbol=self.get_amount_target_symbol(),
             amount_trading_symbol=self.get_amount_trading_symbol()
         )

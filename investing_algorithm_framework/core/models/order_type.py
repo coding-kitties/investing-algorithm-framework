@@ -28,9 +28,4 @@ class OrderType(Enum):
         return OrderType.from_string(value)
 
     def equals(self, other):
-
-        if isinstance(other, Enum):
-            return self.value == other.value
-
-        else:
-            return OrderType.from_string(other) == self
+        return OrderType.from_value(other) == self
