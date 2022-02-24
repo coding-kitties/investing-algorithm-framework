@@ -2,7 +2,7 @@ from abc import abstractmethod
 from typing import List
 
 from investing_algorithm_framework.core.models import OrderSide, \
-    OrderStatus
+    OrderStatus, OrderType
 from investing_algorithm_framework.core.models.position import Position
 from investing_algorithm_framework.core.models.order import Order
 from investing_algorithm_framework.core.exceptions import OperationalException
@@ -13,24 +13,52 @@ class Portfolio:
     def __init__(
         self,
         identifier,
-        unallocated_position,
         trading_symbol,
-        positions=None,
+        positions,
         market=None,
         orders=None
     ):
-        self.unallocated_position = unallocated_position
         self.positions = positions
         self.trading_symbol = trading_symbol
         self.identifier = identifier
-        self.orders = orders
         self.market = market
 
         if positions is None:
             self.positions = []
 
-        if orders is None:
-            self.orders = []
+        self.trading_symbol = self.trading_symbol.upper()
+        self.initialize_positions()
+
+    def initialize_positions(self):
+        trading_symbol_position_found = False
+
+        if self.positions is None:
+            raise OperationalException(
+                "Trading symbol position is not defined"
+            )
+
+        new_positions = []
+
+        for position in self.positions:
+
+            if isinstance(position, dict):
+                position = Position.from_dict(position)
+            elif not isinstance(position, Position):
+                raise OperationalException("Wrong position data")
+
+            new_positions.append(position)
+
+        self.positions = new_positions
+
+        for position in self.positions:
+
+            if self.trading_symbol == position.get_symbol():
+                trading_symbol_position_found = True
+
+        if not trading_symbol_position_found:
+            raise OperationalException(
+                "No position provided with trading symbol amount"
+            )
 
     def get_identifier(self):
         return self.identifier
@@ -38,7 +66,16 @@ class Portfolio:
     def get_trading_symbol(self):
         return self.trading_symbol
 
-    def get_positions(self, symbol: str = None) -> List[Position]:
+    def get_position(self, symbol) -> Position:
+
+        for position in self.positions:
+
+            if position.get_symbol() == symbol:
+                return position
+
+        return None
+
+    def get_positions(self) -> List[Position]:
         return self.positions
 
     @abstractmethod
@@ -53,7 +90,14 @@ class Portfolio:
         trading_symbol: str = None,
         lazy: bool = False
     ) -> List[Order]:
-        return self.orders
+        positions = self.positions
+
+        orders = []
+
+        for position in positions:
+            orders.append(position.get_orders())
+
+        return orders
 
     def get_number_of_orders(self):
         return len(self.orders)
@@ -63,34 +107,33 @@ class Portfolio:
 
     @staticmethod
     def from_dict(data):
+
         if data is None:
             return None
-
-        unallocated_position = None
-
-        if "unallocated" in data:
-            unallocated_position = Position(
-                amount=data.get("unallocated"),
-                symbol=data.get("trading_symbol")
-            )
 
         return Portfolio(
             identifier=data.get("identifier", None),
             trading_symbol=data.get("trading_symbol", None),
-            unallocated_position=unallocated_position,
             market=data.get("market", None),
-            positions=data.get("positions"),
-            orders=data.get("orders")
+            positions=data.get("positions", None),
+            orders=data.get("orders", None)
         )
 
     def get_unallocated(self) -> Position:
 
-        if self.unallocated_position is None:
+        if self.positions is None:
             raise OperationalException(
-                "Unallocated position is not specified"
+                "Trading symbol position is not specified"
             )
 
-        return self.unallocated_position
+        for position in self.positions:
+
+            if position.get_symbol() == self.get_trading_symbol():
+                return position
+
+        raise OperationalException(
+            "Trading symbol position is not specified"
+        )
 
     def get_allocated(self):
         allocated = 0
@@ -123,25 +166,20 @@ class Portfolio:
                             * order.get_amount_target_symbol()
         return revenue
 
-    @abstractmethod
-    def snapshot(
-        self, withdrawel=0, deposit=0, commit=True, creation_datetime=None
-    ):
-        pass
-
     def create_order(
         self,
         algorithm_context,
-        order_type,
+        type,
+        status,
         target_symbol,
         price=None,
         amount_trading_symbol=None,
         amount_target_symbol=None,
-        order_side=OrderSide.BUY.value,
+        side=OrderSide.BUY,
     ) -> Order:
         return Order(
-            type=order_type,
-            side=order_side,
+            type=OrderType.LIMIT,
+            side=OrderSide.BUY,
             initial_price=price,
             amount_trading_symbol=amount_trading_symbol,
             amount_target_symbol=amount_target_symbol,
@@ -149,6 +187,34 @@ class Portfolio:
             target_symbol=target_symbol,
             trading_symbol=self.get_trading_symbol()
         )
+
+    def add_position(self, position):
+
+        if not isinstance(position, Position):
+            raise OperationalException("Object is not a position")
+
+        self.positions.append(position)
+
+    def add_positions(self, positions):
+        self.positions = positions
+
+    def add_order(self, order):
+        pass
+
+    def add_orders(self, orders):
+
+        for order in orders:
+            position = next(
+                (position for position in self.positions
+                 if position.get_symbol() == order.get_target_symbol()), None
+            )
+
+            if position is None:
+                position = Position(symbol=order.get_target_symbol())
+                position.add_order(order)
+            else:
+                position = self.get_position(order.get_target_symbol())
+                position.add_order(order)
 
     def repr(self, **fields) -> str:
         """

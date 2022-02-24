@@ -49,6 +49,10 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(self.portfolio.get_orders())
         self.assertNotEqual(0, len(self.portfolio.get_orders()))
 
+    def test_get_positions(self):
+        self.assertIsNotNone(self.portfolio.get_positions())
+        self.assertNotEqual(0, len(self.portfolio.get_positions()))
+
     def test_get_total_revenue(self):
         self.assertIsNotNone(self.portfolio.get_total_revenue())
         self.assertEqual(0, self.portfolio.get_total_revenue())
@@ -56,25 +60,6 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
     def test_get_market(self):
         self.assertIsNotNone(self.portfolio.get_market())
         self.assertEqual("BINANCE", self.portfolio.get_market())
-
-    def test_add_order(self):
-        pass
-
-    def test_add_orders(self):
-        pass
-
-    def test_add_position(self):
-        pass
-
-    def test_add_positions(self):
-        pass
-
-    def test_get_position(self):
-        pass
-
-    def test_get_positions(self):
-        self.assertIsNotNone(self.portfolio.get_positions())
-        self.assertNotEqual(0, len(self.portfolio.get_positions()))
 
     def test_from_dict(self):
         portfolio = Portfolio.from_dict(
@@ -96,6 +81,21 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(portfolio.get_market())
         self.assertNotEqual(0, len(portfolio.get_positions()))
         self.assertEqual(0, len(portfolio.get_orders()))
+
+    def test_add_order(self):
+        pass
+
+    def test_add_orders(self):
+        pass
+
+    def test_add_position(self):
+        pass
+
+    def test_add_positions(self):
+        pass
+
+    def test_get_position(self):
+        pass
 
     def test_to_dict(self):
         data = self.portfolio.to_dict()

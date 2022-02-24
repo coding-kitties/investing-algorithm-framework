@@ -6,7 +6,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, validates
 
 from investing_algorithm_framework.core.models import db, OrderSide, \
-    OrderStatus, Position
+    OrderStatus, Position, Order
 from investing_algorithm_framework.core.models.model_extension \
     import SQLAlchemyModelExtension
 
@@ -32,21 +32,19 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
 
     # Integer id for the Position as the primary key
     id = db.Column(
-        db.Integer, primary_key=True, unique=True, default=random_id
+        db.Integer, primary_key=True, unique=True
     )
 
-    # Asset Symbol (e.g. BTC)
     symbol = db.Column(db.String)
+    amount = db.Column(db.Float)
+    price = db.Column(db.Float)
 
-    # The price of the asset
     orders = db.relationship(
         "SQLLiteOrder",
         back_populates="position",
         lazy="dynamic",
         cascade="all, delete-orphan"
     )
-
-    amount = db.Column(db.Float)
 
     # Relationships
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'))
@@ -59,9 +57,34 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
         ),
     )
 
-    def __init__(self, symbol):
-        self.symbol = symbol
-        self.amount = 0
+    def __init__(self, symbol, amount, price=None, orders=None):
+        super().__init__(symbol, amount, price)
+        self.id = random_id()
+        self.initialize_orders(orders)
+
+    def initialize_orders(self, orders):
+        from investing_algorithm_framework.core.models.sqlite.order \
+            import SQLLiteOrder
+
+        if orders is not None:
+            for order in orders:
+
+                if isinstance(order, dict):
+                    order = Order.from_dict(order)
+
+                old_order = SQLLiteOrder.query\
+                    .filter_by(position=self)\
+                    .filter_by(status=OrderStatus.SUCCESS.value)\
+                    .filter_by(reference_id=order.get_reference_id())\
+                    .first()
+
+                if old_order is None:
+                    sqlite_order = SQLLiteOrder.from_order(order)
+                    self.orders.append(sqlite_order)
+                else:
+                    old_order.update_with_order(order)
+
+            db.session.commit()
 
     @validates('id', 'symbol')
     def _write_once(self, key, value):
@@ -70,28 +93,39 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
             raise ValueError("{} is write-once".format(key))
         return value
 
-    @hybrid_property
-    def delta(self):
-        orders = self.orders\
-            .filter_by(order_side=OrderSide.BUY.value) \
-            .filter_by(status=OrderStatus.SUCCESS.value) \
-            .all()
-
-        delta = 0
-
-        for order in orders:
-            delta += order.delta
-        return delta
-
     def get_symbol(self):
         return self.symbol
 
     def get_orders(self):
         return self.orders.all()
 
-    @abstractmethod
-    def get_amount(self):
-        return self.amount
+    @staticmethod
+    def from_position(position):
+        sql_lite_position = SQLLitePosition(
+            symbol=position.get_symbol(),
+            amount=position.get_amount()
+        )
+
+        orders = position.get_orders()
+
+        if orders is not None:
+
+            from investing_algorithm_framework.core.models.sqlite \
+                import SQLLiteOrder
+
+            for order in orders:
+                sql_lite_position.orders.append(SQLLiteOrder.from_order(order))
+
+        return sql_lite_position
+
+    @staticmethod
+    def from_dict(data):
+        return SQLLitePosition(
+            symbol=data.get("symbol"),
+            price=data.get("price", None),
+            amount=data.get("amount", None),
+            orders=data.get("orders", None)
+        )
 
     def __repr__(self):
         return self.repr(

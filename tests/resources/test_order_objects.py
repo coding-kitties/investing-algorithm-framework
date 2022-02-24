@@ -8,11 +8,12 @@ class TestOrderAndPositionsObjectsMixin:
     def create_buy_order(amount, ticker, price, portfolio_manager):
         order = portfolio_manager.create_order(
             amount_target_symbol=amount,
-            symbol=ticker,
+            target_symbol=ticker,
             price=price,
-            order_type=OrderType.LIMIT.value
+            type=OrderType.LIMIT.value
         )
-        portfolio_manager.add_order(order)
+        portfolio_manager.add_order(order, algorithm_context=None)
+        return order
 
     @staticmethod
     def create_sell_order(amount, ticker, price, portfolio_manager):

@@ -1,4 +1,3 @@
-from random import randrange
 from abc import abstractmethod, ABC
 from typing import List
 
@@ -17,10 +16,6 @@ from investing_algorithm_framework.core.models.order import Order, OrderStatus
 class PortfolioManager(ABC, Identifier, MarketIdentifier):
     trading_symbol = None
     portfolio = None
-
-    @abstractmethod
-    def get_unallocated(self, algorithm_context, **kwargs) -> Position:
-        pass
 
     @abstractmethod
     def get_positions(self, algorithm_context, **kwargs) -> List[Position]:
@@ -49,13 +44,16 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
         return trading_symbol
 
     def get_portfolio(self, algorithm_context, **kwargs) -> Portfolio:
-        return Portfolio(
-            identifier=self.get_identifier(),
-            trading_symbol=self.get_trading_symbol(algorithm_context),
-            positions=self.get_positions(algorithm_context),
-            unallocated_position=self.get_unallocated(algorithm_context),
-            orders=self.get_orders(algorithm_context)
-        )
+
+        if self.portfolio is None:
+            self.portfolio = Portfolio(
+                identifier=self.get_identifier(),
+                trading_symbol=self.get_trading_symbol(algorithm_context),
+                positions=self.get_positions(algorithm_context),
+                orders=self.get_orders(algorithm_context)
+            )
+
+        return self.portfolio
 
     def create_order(
         self,
@@ -67,7 +65,6 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
         order_side=OrderSide.BUY.value,
         algorithm_context=None
     ) -> Order:
-
         return Order(
             target_symbol=target_symbol,
             trading_symbol=self.get_trading_symbol(algorithm_context),
@@ -82,3 +79,22 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
     @abstractmethod
     def add_order(self, order, algorithm_context):
         pass
+
+    def sync_portfolio(self, algorithm_context):
+        portfolio = self.get_portfolio(algorithm_context)
+        positions = self.get_positions(algorithm_context)
+        orders = self.get_orders(algorithm_context)
+        portfolio.sync_positions(positions)
+        portfolio.sync_orders(orders)
+
+    def update_order_status(self, order, status, algorithm_context):
+        order.set_status(OrderStatus.from_value(status))
+        portfolio = self.get_portfolio(algorithm_context)
+        # self.snapshot_portfolio(portfolio)
+
+    # def snapshot_portfolio(
+    #     self, portfolio, creation_datetime=None, withdrawel=0, deposit=0
+    # ):
+    #     PortfolioSnapshot.from_portfolio(
+    #         portfolio, creation_datetime, withdrawel, deposit
+    #     )

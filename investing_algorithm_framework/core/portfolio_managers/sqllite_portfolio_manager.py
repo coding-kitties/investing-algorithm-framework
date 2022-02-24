@@ -5,7 +5,7 @@ from investing_algorithm_framework.core.identifier import Identifier
 from investing_algorithm_framework.core.market_identifier import \
     MarketIdentifier
 from investing_algorithm_framework.core.models import db, SQLLitePortfolio, \
-    OrderType, OrderSide, Portfolio, SQLLiteOrder, \
+    OrderType, OrderSide, Portfolio, SQLLiteOrder, OrderStatus, \
     SQLLitePosition, Position
 from investing_algorithm_framework.core.portfolio_managers.portfolio_manager \
     import PortfolioManager
@@ -35,16 +35,11 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
                     "Could not retrieve positions from broker"
                 )
 
-            unallocated_position = next(
-                (x for x in positions if x.get_symbol()
-                 == self.get_trading_symbol(algorithm_context)), None
-            )
-
             portfolio = SQLLitePortfolio(
                 identifier=self.identifier,
                 trading_symbol=self.trading_symbol,
-                unallocated_position=unallocated_position,
-                market=self.get_market()
+                market=self.get_market(),
+                positions=positions
             )
             portfolio.save(db)
 
@@ -111,28 +106,29 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
         self,
         target_symbol,
         price=None,
+        type=OrderType.LIMIT,
+        side=OrderSide.BUY,
+        status=OrderStatus.TO_BE_SENT,
         amount_trading_symbol=None,
         amount_target_symbol=None,
-        order_type=OrderType.LIMIT.value,
-        order_side=OrderSide.BUY.value,
         algorithm_context=None,
         validate_pair=True
     ):
-
         if algorithm_context is None:
             from investing_algorithm_framework import current_app
             algorithm_context = current_app.algorithm
 
         return self.get_portfolio(algorithm_context).create_order(
             algorithm_context=algorithm_context,
-            order_type=order_type,
+            type=type,
+            status=status,
+            side=side,
             target_symbol=target_symbol,
             price=price,
             amount_trading_symbol=amount_trading_symbol,
             amount_target_symbol=amount_target_symbol,
-            order_side=order_side,
         )
 
     def add_order(self, order, algorithm_context):
-        self.get_portfolio(algorithm_context).orders.append(order)
+        self.get_portfolio(algorithm_context).add_order(order)
         db.session.commit()

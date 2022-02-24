@@ -29,7 +29,7 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
             target_symbol=self.TARGET_SYMBOL_A,
             trading_symbol="USDT"
         )]
-        self.position.orders = orders
+        self.position.set_orders(orders)
         self.assertIsNotNone(self.position.get_orders())
 
     def test_from_dict(self):
@@ -45,5 +45,41 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(position.get_symbol())
         self.assertIsNotNone(position.get_amount())
 
+    def test_from_dict_with_orders(self):
+        position = Position.from_dict(
+            {
+                "symbol": "DOT",
+                "amount": 40,
+                "price": 10,
+                "orders": [
+                    {
+                        "target_symbol": "DOT",
+                        "trading_symbol": "USDT",
+                        "amount_target_symbol": 40,
+                        "status": "PENDING",
+                        "price": 10,
+                        "side": "BUY",
+                        "type": "LIMIT"
+                    }
+                ]
+            }
+        )
+
+        self.assertIsNotNone(position.get_price())
+        self.assertIsNotNone(position.get_symbol())
+        self.assertIsNotNone(position.get_amount())
+        self.assertIsNotNone(position.get_orders())
+
+        orders = position.get_orders()
+        print(position.get_orders())
+        for order in orders:
+            self.assertTrue(isinstance(order, Order))
+
     def test_to_dict(self):
         self.assertIsNotNone(self.position.to_dict())
+
+    def test_add_orders(self):
+        pass
+
+    def test_add_order(self):
+        pass

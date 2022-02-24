@@ -103,7 +103,6 @@ class Order:
             price = self.price
 
         if OrderType.LIMIT.equals(self.type):
-
             if self.amount_trading_symbol is not None:
                 self.amount_target_symbol = \
                     price / self.amount_trading_symbol
@@ -146,6 +145,9 @@ class Order:
     def get_status(self) -> OrderStatus:
         return self.status
 
+    def set_status(self, status):
+        self.status = OrderStatus.from_value(status)
+
     def get_type(self):
         return self.type
 
@@ -182,9 +184,9 @@ class Order:
             "price": self.get_price(),
             "initial_price": self.get_initial_price(),
             "closing_price": self.get_closing_price(),
-            "status": self.get_status(),
-            "order_type": self.get_type(),
-            "order_side": self.get_side()
+            "status": self.get_status().value,
+            "order_type": self.get_type().value,
+            "order_side": self.get_side().value
         }
 
     def split(self, amount):

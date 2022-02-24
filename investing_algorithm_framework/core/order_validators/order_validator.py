@@ -7,12 +7,12 @@ class OrderValidator(ABC):
 
     def validate(self, order, portfolio):
 
-        if OrderSide.BUY.equals(order.order_side):
+        if OrderSide.BUY.equals(order.side):
             self.validate_buy_order(order, portfolio)
         else:
             self.validate_sell_order(order, portfolio)
 
-        if OrderType.LIMIT.equals(order.order_type):
+        if OrderType.LIMIT.equals(order.type):
             self.validate_limit_order(order, portfolio)
         else:
             self.validate_market_order(order, portfolio)
@@ -31,7 +31,7 @@ class OrderValidator(ABC):
                 "Can't add sell order to non existing position"
             )
 
-        if OrderType.LIMIT.equals(order.order_type):
+        if OrderType.LIMIT.equals(order.type):
             if position.amount < order.amount_target_symbol:
                 raise OperationalException(
                     "Order amount is larger then amount of open position"
@@ -62,9 +62,11 @@ class OrderValidator(ABC):
     @staticmethod
     def validate_limit_order(order, portfolio):
 
-        total_price = order.amount_target_symbol * order.initial_price
+        total_price = order.get_amount_target_symbol() \
+                      * order.get_initial_price()
+        print(portfolio.get_unallocated())
 
-        if float(portfolio.unallocated) < total_price:
+        if portfolio.get_unallocated().get_amount() < total_price:
             raise OperationalException(
                 f"Order total: {total_price} {portfolio.trading_symbol}, is "
                 f"larger then unallocated size: {portfolio.unallocated} "
@@ -74,7 +76,7 @@ class OrderValidator(ABC):
     @staticmethod
     def validate_market_order(order, portfolio):
 
-        if OrderSide.BUY.equals(order.order_side):
+        if OrderSide.BUY.equals(order.side):
 
             if order.amount_trading_symbol is None:
                 raise OperationalException(

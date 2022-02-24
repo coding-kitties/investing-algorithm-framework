@@ -10,7 +10,7 @@ from investing_algorithm_framework.core.models import db, OrderSide, \
     OrderStatus, OrderType, Portfolio, Position
 from investing_algorithm_framework.core.models.model_extension \
     import SQLAlchemyModelExtension
-from investing_algorithm_framework.core.models.sql_lite import SQLLiteOrder
+from investing_algorithm_framework.core.models.sqlite import SQLLiteOrder
 from investing_algorithm_framework.core.order_validators import \
     OrderValidatorFactory
 
@@ -74,9 +74,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow())
     updated_at = db.Column(
-        db.DateTime,
-        default=datetime.utcnow(),
-        onupdate=datetime.utcnow()
+        db.DateTime, default=datetime.utcnow(), onupdate=datetime.utcnow()
     )
 
     # Relationships
@@ -107,76 +105,34 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
     def __init__(
         self,
         identifier,
-        unallocated_position,
         trading_symbol,
-        positions=None,
+        positions,
         market=None,
         orders=None,
         **kwargs
     ):
         super(SQLLitePortfolio, self).__init__(
             identifier=identifier,
-            unallocated_position=unallocated_position
+            trading_symbol=trading_symbol,
+            market=market,
         )
 
-        # self.id = random_id()
-        # self.identifier = identifier
-        # self.trading_symbol = trading_symbol
-        # self.realized = 0
-        # self.total_revenue = 0
-        # self.total_cost = 0
-        # self.created_at = datetime.utcnow()
+        self.id = random_id()
+        self.realized = 0
+        self.total_revenue = 0
+        self.total_cost = 0
+        self.created_at = datetime.utcnow()
 
-    @hybrid_property
-    def allocated(self):
-        from investing_algorithm_framework.core.models import SQLLitePosition
+        from investing_algorithm_framework.core.models.sqlite \
+            import SQLLitePosition
 
-        position_ids = self.positions.with_entities(SQLLitePosition.id)
-
-        orders = SQLLiteOrder.query \
-            .filter_by(order_side=OrderSide.BUY.value) \
-            .filter_by(status=OrderStatus.SUCCESS.value)\
-            .filter(SQLLiteOrder.position_id.in_(position_ids)) \
-            .all()
-
-        allocated = 0
-
-        for order in orders:
-            allocated += order.current_value
-
-        return allocated
-
-    @hybrid_property
-    def allocated_percentage(self):
-
-        # Prevent zero division
-        if self.allocated == 0 and self.unallocated == 0:
-            return 0
-
-        return (self.allocated / (self.allocated + self.unallocated)) * 100
-
-    @hybrid_property
-    def unallocated_percentage(self):
-
-        # Prevent zero division
-        if self.allocated == 0 and self.unallocated == 0:
-            return 0
-
-        return (self.unallocated / self.unallocated + self.allocated) * 100
+        if positions is not None:
+            for position in positions:
+                self.positions.append(SQLLitePosition.from_position(position))
 
     def add_order(self, order):
         self._validate_order(order)
-
         self._add_order_to_position(order)
-
-        order.update(db, {"status": OrderStatus.TO_BE_SENT.value}, commit=True)
-
-        if OrderSide.BUY.equals(order.order_side):
-            self.unallocated -= order.amount_trading_symbol
-
-            # Create the snapshot at the time the order was created
-            self.snapshot(creation_datetime=order.created_at)
-
         db.session.commit()
 
     def _validate_order(self, order):
@@ -191,10 +147,12 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
             .filter_by(portfolio=self) \
             .first()
 
-        if OrderSide.BUY.equals(order.order_side):
+        if OrderSide.BUY.equals(order.side):
 
             if position is None:
-                position = SQLLitePosition(symbol=order.target_symbol)
+                position = SQLLitePosition(
+                    symbol=order.target_symbol, amount=0
+                )
                 position.save(db)
                 self.positions.append(position)
                 db.session.commit()
@@ -210,76 +168,27 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
 
     def create_order(
         self,
-        context,
-        order_type,
+        algorithm_context,
         target_symbol,
         price=None,
         amount_trading_symbol=None,
         amount_target_symbol=None,
-        order_side=OrderSide.BUY.value,
+        type=OrderType.LIMIT,
+        status=OrderStatus.TO_BE_SENT,
+        side=OrderSide.BUY.value
     ):
-        if OrderType.MARKET.equals(order_type):
-
-            if OrderSide.SELL.equals(order_side):
-                order = SQLLiteOrder(
-                    target_symbol=target_symbol,
-                    trading_symbol=self.trading_symbol,
-                    amount_target_symbol=amount_target_symbol,
-                    order_type=OrderType.MARKET.value,
-                    order_side=OrderSide.SELL.value,
-                    price=price
-                )
-            else:
-                raise OperationalException("Buy market order is not supported")
-        else:
-            order = SQLLiteOrder(
-                target_symbol=target_symbol,
-                trading_symbol=self.trading_symbol,
-                amount_target_symbol=amount_target_symbol,
-                amount_trading_symbol=amount_trading_symbol,
-                order_type=order_type,
-                order_side=order_side,
-                price=price
-            )
-
-        return order
-
-    def withdraw(self, amount, creation_datetime=datetime.utcnow()):
-
-        if amount > self.unallocated:
-            raise OperationalException(
-                "Withdrawal is larger then unallocated size"
-            )
-
-        self.unallocated -= amount
-        db.session.commit()
-        self.snapshot(creation_datetime=creation_datetime, withdrawel=amount)
-
-    def deposit(self, amount, creation_datetime=datetime.utcnow()):
-        self.unallocated += amount
-        db.session.commit()
-        self.snapshot(creation_datetime=creation_datetime, deposit=amount)
-
-    def update(self, db, data, commit: bool = False, **kwargs):
-        self.updated_at = datetime.utcnow()
-        unallocated = data.pop("unallocated", None)
-
-        if unallocated is not None:
-            self.unallocated += unallocated
-            self.snapshot()
-
-        super(Portfolio, self).update(db, data, **kwargs)
-
-    def snapshot(
-        self, withdrawel=0, deposit=0, commit=True, creation_datetime=None
-    ):
-        from investing_algorithm_framework.core.models.snapshots \
-            import SQLLitePortfolioSnapshot
-
-        SQLLitePortfolioSnapshot\
-            .from_portfolio(
-                self, creation_datetime, withdrawel=withdrawel, deposit=deposit
-            ).save(db, commit=commit)
+        return SQLLiteOrder(
+            reference_id=None,
+            type=type,
+            status=status,
+            side=side,
+            initial_price=price,
+            amount_trading_symbol=amount_trading_symbol,
+            amount_target_symbol=amount_target_symbol,
+            target_symbol=target_symbol,
+            trading_symbol=self.get_trading_symbol(),
+            price=price
+        )
 
     def get_id(self):
         return self.id
@@ -299,7 +208,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
         return query_set.all()
 
     def get_number_of_positions(self):
-        return self.positions.count()
+        return self._positions.count()
 
     def get_number_of_orders(self):
         from investing_algorithm_framework import SQLLitePosition
@@ -343,11 +252,21 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
 
         return query_set.all()
 
-    def get_unallocated(self):
-        return Position(amount=self.unallocated, symbo=self.trading_symbol)
+    def get_unallocated(self) -> Position:
+        return self.positions.filter_by(symbol=self.trading_symbol).first()
 
     def get_allocated(self):
-        return self.allocated
+        allocated = 0
+
+        for position in self.positions.all():
+            allocated += position.get_allocated()
+        return allocated
+
+    def set_positions(self, positions):
+        pass
+
+    def set_orders(self, orders):
+        pass
 
     def get_realized(self):
         return self.realized
@@ -355,20 +274,5 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
     def get_total_revenue(self):
         return self.total_revenue
 
-    @staticmethod
-    def from_dict(data):
-        orders = data.get("orders")
-        positions = data.get("positions")
-
-    def to_dict(self):
-        orders = self.get_orders()
-        positions = self.get_positions()
-
     def __repr__(self):
         return self.to_string()
-
-
-# first snapshot on creation of a portfolio
-@event.listens_for(SQLLitePortfolio, 'before_insert')
-def snapshot_after_insert(mapper, connection, portfolio):
-    portfolio.snapshot(commit=False)

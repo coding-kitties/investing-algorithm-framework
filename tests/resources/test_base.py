@@ -28,7 +28,7 @@ class Initializer(AlgorithmContextInitializer):
 
 class PortfolioManagerTest(SQLLitePortfolioManager):
     market = "test"
-    identifier = "test"
+    identifier = "sqlite"
     trading_symbol = "USDT"
     initialize_has_run = False
 
@@ -37,22 +37,26 @@ class PortfolioManagerTest(SQLLitePortfolioManager):
         self.initialize_has_run = True
 
     def get_positions_from_broker(self, algorithm_context) -> List[Position]:
-        return [Position(amount=1000, symbol=self.get_trading_symbol(algorithm_context))]
+        return [
+            Position(
+                amount=1000,
+                symbol=self.get_trading_symbol(algorithm_context)
+            )
+        ]
 
 
 class DefaultPortfolioManager(PortfolioManager):
     identifier = "default"
     trading_symbol = "USDT"
 
-    def get_unallocated(self, algorithm_context, **kwargs) -> Position:
-        return Position(
-            amount=10000, symbol=self.get_trading_symbol(algorithm_context)
-        )
-
     def get_positions(self, algorithm_context, **kwargs) -> List[Position]:
-        return [Position(
-            amount=10, symbol=TestBase.TARGET_SYMBOL_A
-        )]
+        return [
+            Position(amount=10, symbol=TestBase.TARGET_SYMBOL_A),
+            Position(
+                amount=10000,
+                symbol=self.get_trading_symbol(algorithm_context)
+            )
+        ]
 
     def get_orders(self, algorithm_context, **kwargs) -> List[Order]:
         return [
@@ -505,8 +509,10 @@ class TestBase(TestCase):
             msg = "Amount trading symbol is too small"
             raise self.failureException(msg)
 
-        if order.initial_price <= 0:
-            msg = "Price is too small"
+        if not OrderStatus.PENDING.equals(order.status) \
+                and not OrderStatus.TO_BE_SENT.equals(order.status) \
+                and order.initial_price is None:
+            msg = "Initial price is not set"
             raise self.failureException(msg)
 
         if executed:
@@ -536,7 +542,7 @@ class TestBase(TestCase):
             msg = "Target symbol and trading symbol are the same"
             raise self.failureException(msg)
 
-        if OrderSide.SELL.equals(order.order_side):
+        if OrderSide.SELL.equals(order.side):
             if order.amount_target_symbol is None:
                 msg = "Amount trading symbol is not set"
                 raise self.failureException(msg)

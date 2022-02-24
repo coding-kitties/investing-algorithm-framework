@@ -1,7 +1,7 @@
 from marshmallow import Schema, fields
 from investing_algorithm_framework.core.models import Position, Order, \
     PerformanceMetric, TimeFrame
-from investing_algorithm_framework.core.performance import PerformanceService
+# from investing_algorithm_framework.core.performance import PerformanceService
 
 
 class PortfolioSerializer(Schema):
@@ -18,8 +18,8 @@ class PortfolioSerializer(Schema):
     updated_at = fields.DateTime(dump_only=True)
     orders = fields.Method("get_orders")
     positions = fields.Method("get_positions")
-    performance = fields.Method("get_performance")
-    delta = fields.Method("get_delta")
+    # performance = fields.Method("get_performance")
+    # delta = fields.Method("get_delta")
 
     @staticmethod
     def get_orders(obj):
@@ -29,22 +29,22 @@ class PortfolioSerializer(Schema):
     def get_positions(obj):
         return obj.get_number_of_positions()
 
-    def get_performance(self, obj):
-        return PerformanceService\
-            .of_metric(
-                obj,
-                PerformanceMetric.OVERALL_PERFORMANCE,
-                TimeFrame.from_value(
-                    self.context.get("time_frame", TimeFrame.ONE_DAY.value)
-                )
-            )
+    # def get_performance(self, obj):
+    #     return PerformanceService\
+    #         .of_metric(
+    #             obj,
+    #             PerformanceMetric.OVERALL_PERFORMANCE,
+    #             TimeFrame.from_value(
+    #                 self.context.get("time_frame", TimeFrame.ONE_DAY.value)
+    #             )
+    #         )
 
-    def get_delta(self, obj):
-        return PerformanceService \
-            .of_metric(
-                obj,
-                PerformanceMetric.DELTA,
-                TimeFrame.from_value(
-                    self.context.get("time_frame", TimeFrame.ONE_DAY.value)
-                )
-            )
+    # def get_delta(self, obj):
+    #     return PerformanceService \
+    #         .of_metric(
+    #             obj,
+    #             PerformanceMetric.DELTA,
+    #             TimeFrame.from_value(
+    #                 self.context.get("time_frame", TimeFrame.ONE_DAY.value)
+    #             )
+    #         )

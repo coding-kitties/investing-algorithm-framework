@@ -12,14 +12,14 @@ from investing_algorithm_framework.core.models.data_provider import \
     TradingDataTypes
 from investing_algorithm_framework.core.workers import Worker, Strategy
 from investing_algorithm_framework.extensions import scheduler
+from investing_algorithm_framework.core.portfolio_managers \
+    import PortfolioManager
 from investing_algorithm_framework.core.data_providers import\
     DefaultDataProviderFactory, DataProvider
 from investing_algorithm_framework.configuration.constants import \
     RESERVED_IDENTIFIERS
 from investing_algorithm_framework.core.market_services import \
     DefaultMarketServiceFactory
-from investing_algorithm_framework.core.portfolio_managers import \
-    DefaultPortfolioManagerFactory
 from investing_algorithm_framework.core.order_executors import \
     DefaultOrderExecutorFactory, OrderExecutor
 
@@ -402,7 +402,7 @@ class AlgorithmContext:
 
     def get_portfolio_manager(
         self, identifier: str = None, throw_exception: bool = True
-    ):
+    ) -> PortfolioManager:
 
         if identifier is None:
 
