@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from investing_algorithm_framework.core.models import SQLLitePosition, \
-    SQLLiteOrder
+    SQLLiteOrder, Order, OrderStatus, OrderType, OrderSide
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
@@ -38,14 +38,36 @@ class TestPosition(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
 
-        positions = portfolio_manager.get_positions(algorithm_context=None)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        position = portfolio.get_position(self.TARGET_SYMBOL_A)
 
-        print(positions)
         self.assertEqual(
-            1, len(positions[0].get_orders())
+            1, len(position.get_orders())
         )
-        orders = positions[0].get_orders()
+        orders = position.get_orders()
         self.assertTrue(isinstance(orders[0], SQLLiteOrder))
+
+    def test_get_order(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        self.create_buy_order(
+            1,
+            self.TARGET_SYMBOL_A,
+            self.get_price(self.TARGET_SYMBOL_A, date=datetime.utcnow()).price,
+            portfolio_manager,
+            reference_id=1
+        )
+
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        position = portfolio.get_position(self.TARGET_SYMBOL_A)
+
+        self.assertEqual(1, len(position.get_orders()))
+        order = position.get_order(reference_id=1)
+        self.assertTrue(isinstance(order, SQLLiteOrder))
 
     def test_from_dict(self):
         position = SQLLitePosition.from_dict(
@@ -100,7 +122,116 @@ class TestPosition(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertTrue(isinstance(data, dict))
 
     def test_add_orders(self):
-        pass
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        positions = portfolio_manager.get_positions(algorithm_context=None)
+        position = positions[0]
+
+        orders = [
+            Order(
+                reference_id=1,
+                status=OrderStatus.PENDING.value,
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_trading_symbol=10,
+                price=10,
+                target_symbol=self.TARGET_SYMBOL_A,
+                trading_symbol="USDT"
+            ),
+            Order(
+                reference_id=2,
+                status=OrderStatus.PENDING.value,
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_trading_symbol=10,
+                price=10,
+                target_symbol=self.TARGET_SYMBOL_B,
+                trading_symbol="USDT"
+            )
+        ]
+        position.add_orders(orders)
+        self.assertEqual(2, len(position.get_orders()))
+
+        orders = [
+            Order(
+                reference_id=1,
+                status=OrderStatus.PENDING.value,
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_trading_symbol=10,
+                price=10,
+                target_symbol=self.TARGET_SYMBOL_A,
+                trading_symbol="USDT"
+            ),
+            Order(
+                reference_id=2,
+                status=OrderStatus.PENDING.value,
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_trading_symbol=10,
+                price=10,
+                target_symbol=self.TARGET_SYMBOL_B,
+                trading_symbol="USDT"
+            )
+        ]
+        position.add_orders(orders)
+        self.assertEqual(2, len(position.get_orders()))
+
+        orders = [
+            Order(
+                reference_id=3,
+                status=OrderStatus.PENDING.value,
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_trading_symbol=10,
+                price=10,
+                target_symbol=self.TARGET_SYMBOL_A,
+                trading_symbol="USDT"
+            ),
+            Order(
+                reference_id=4,
+                status=OrderStatus.PENDING.value,
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_trading_symbol=10,
+                price=10,
+                target_symbol=self.TARGET_SYMBOL_B,
+                trading_symbol="USDT"
+            )
+        ]
+        position.add_orders(orders)
+        self.assertEqual(4, len(position.get_orders()))
 
     def test_add_order(self):
-        pass
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        positions = portfolio_manager.get_positions(algorithm_context=None)
+        position = positions[0]
+
+        order = Order(
+            reference_id=1,
+            status=OrderStatus.PENDING.value,
+            type=OrderType.LIMIT.value,
+            side=OrderSide.SELL.value,
+            amount_trading_symbol=10,
+            price=10,
+            target_symbol=self.TARGET_SYMBOL_A,
+            trading_symbol="USDT"
+        )
+        position.add_order(order)
+        self.assertEqual(1, len(position.get_orders()))
+
+        order = Order(
+            reference_id=2,
+            status=OrderStatus.PENDING.value,
+            type=OrderType.LIMIT.value,
+            side=OrderSide.SELL.value,
+            amount_trading_symbol=10,
+            price=10,
+            target_symbol=self.TARGET_SYMBOL_B,
+            trading_symbol="USDT"
+        )
+        position.add_order(order)
+        self.assertEqual(2, len(position.get_orders()))

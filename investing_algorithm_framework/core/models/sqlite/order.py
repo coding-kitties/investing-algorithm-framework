@@ -248,7 +248,7 @@ class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
         current_status = OrderStatus.from_value(self.status)
 
         if current_status.equals(order.get_status()):
-            self.status = OrderStatus.from_value(order.get_status())
+            self.status = OrderStatus.from_value(order.get_status()).value
 
         if self.get_price() != order.get_price():
             self.price = order.get_price()

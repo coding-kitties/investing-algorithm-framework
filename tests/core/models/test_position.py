@@ -18,18 +18,23 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
     def test_get_amount(self):
         self.assertIsNotNone(self.position.get_amount())
 
+    def test_get_order(self):
+        pass
+
     def test_get_orders(self):
-        orders = [Order(
-            reference_id=1,
-            status=OrderStatus.PENDING.value,
-            type=OrderType.LIMIT.value,
-            side=OrderSide.SELL.value,
-            amount_trading_symbol=10,
-            price=10,
-            target_symbol=self.TARGET_SYMBOL_A,
-            trading_symbol="USDT"
-        )]
-        self.position.set_orders(orders)
+        orders = [
+            Order(
+                reference_id=1,
+                status=OrderStatus.PENDING.value,
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_trading_symbol=10,
+                price=10,
+                target_symbol=self.TARGET_SYMBOL_A,
+                trading_symbol="USDT"
+            )
+        ]
+        self.position.add_orders(orders)
         self.assertIsNotNone(self.position.get_orders())
 
     def test_from_dict(self):
@@ -71,7 +76,8 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(position.get_orders())
 
         orders = position.get_orders()
-        print(position.get_orders())
+        self.assertNotEqual(0, len(orders))
+
         for order in orders:
             self.assertTrue(isinstance(order, Order))
 
@@ -79,7 +85,104 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(self.position.to_dict())
 
     def test_add_orders(self):
-        pass
+        orders = [
+            Order(
+                reference_id=1,
+                status=OrderStatus.PENDING.value,
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_trading_symbol=10,
+                price=10,
+                target_symbol=self.TARGET_SYMBOL_A,
+                trading_symbol="USDT"
+            ),
+            Order(
+                reference_id=2,
+                status=OrderStatus.PENDING.value,
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_trading_symbol=10,
+                price=10,
+                target_symbol=self.TARGET_SYMBOL_A,
+                trading_symbol="USDT"
+            )
+        ]
+        self.position.add_orders(orders)
+        self.assertEqual(2, len(self.position.get_orders()))
+
+        orders = [
+            Order(
+                reference_id=1,
+                status=OrderStatus.PENDING.value,
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_trading_symbol=10,
+                price=10,
+                target_symbol=self.TARGET_SYMBOL_A,
+                trading_symbol="USDT"
+            ),
+            Order(
+                reference_id=2,
+                status=OrderStatus.PENDING.value,
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_trading_symbol=10,
+                price=10,
+                target_symbol=self.TARGET_SYMBOL_A,
+                trading_symbol="USDT"
+            )
+        ]
+        self.position.add_orders(orders)
+        self.assertEqual(2, len(self.position.get_orders()))
+
+        orders = [
+            Order(
+                reference_id=3,
+                status=OrderStatus.PENDING.value,
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_trading_symbol=10,
+                price=10,
+                target_symbol=self.TARGET_SYMBOL_A,
+                trading_symbol="USDT"
+            ),
+            Order(
+                reference_id=4,
+                status=OrderStatus.PENDING.value,
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_trading_symbol=10,
+                price=10,
+                target_symbol=self.TARGET_SYMBOL_A,
+                trading_symbol="USDT"
+            )
+        ]
+        self.position.add_orders(orders)
+        self.assertEqual(4, len(self.position.get_orders()))
 
     def test_add_order(self):
-        pass
+        order = Order(
+            reference_id=1,
+            status=OrderStatus.PENDING.value,
+            type=OrderType.LIMIT.value,
+            side=OrderSide.SELL.value,
+            amount_trading_symbol=10,
+            price=10,
+            target_symbol=self.TARGET_SYMBOL_A,
+            trading_symbol="USDT"
+        )
+        self.position.add_order(order)
+        self.assertEqual(1, len(self.position.get_orders()))
+
+        order = Order(
+            reference_id=2,
+            status=OrderStatus.PENDING.value,
+            type=OrderType.LIMIT.value,
+            side=OrderSide.SELL.value,
+            amount_trading_symbol=10,
+            price=10,
+            target_symbol=self.TARGET_SYMBOL_A,
+            trading_symbol="USDT"
+        )
+        self.position.add_order(order)
+        self.assertEqual(2, len(self.position.get_orders()))

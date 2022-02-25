@@ -5,13 +5,17 @@ from investing_algorithm_framework.core.models import OrderType
 class TestOrderAndPositionsObjectsMixin:
 
     @staticmethod
-    def create_buy_order(amount, ticker, price, portfolio_manager):
+    def create_buy_order(amount, ticker, price, portfolio_manager, reference_id=None):
         order = portfolio_manager.create_order(
             amount_target_symbol=amount,
             target_symbol=ticker,
             price=price,
             type=OrderType.LIMIT.value
         )
+
+        if reference_id is not None:
+            order.reference_id = reference_id
+
         portfolio_manager.add_order(order, algorithm_context=None)
         return order
 

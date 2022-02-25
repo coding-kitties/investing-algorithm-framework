@@ -1,12 +1,10 @@
-from abc import abstractmethod
 from random import randint
 
 from sqlalchemy import UniqueConstraint
-from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.orm import relationship, validates
 
-from investing_algorithm_framework.core.models import db, OrderSide, \
-    OrderStatus, Position, Order
+from investing_algorithm_framework.core.models import db, OrderStatus, \
+    Position, Order, OrderType, OrderSide
 from investing_algorithm_framework.core.models.model_extension \
     import SQLAlchemyModelExtension
 
@@ -31,21 +29,16 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
     __tablename__ = "positions"
 
     # Integer id for the Position as the primary key
-    id = db.Column(
-        db.Integer, primary_key=True, unique=True
-    )
-
+    id = db.Column(db.Integer, primary_key=True, unique=True)
     symbol = db.Column(db.String)
     amount = db.Column(db.Float)
     price = db.Column(db.Float)
-
     orders = db.relationship(
         "SQLLiteOrder",
         back_populates="position",
         lazy="dynamic",
         cascade="all, delete-orphan"
     )
-
     # Relationships
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'))
     portfolio = relationship("SQLLitePortfolio", back_populates="positions")
@@ -60,31 +53,7 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
     def __init__(self, symbol, amount, price=None, orders=None):
         super().__init__(symbol, amount, price)
         self.id = random_id()
-        self.initialize_orders(orders)
-
-    def initialize_orders(self, orders):
-        from investing_algorithm_framework.core.models.sqlite.order \
-            import SQLLiteOrder
-
-        if orders is not None:
-            for order in orders:
-
-                if isinstance(order, dict):
-                    order = Order.from_dict(order)
-
-                old_order = SQLLiteOrder.query\
-                    .filter_by(position=self)\
-                    .filter_by(status=OrderStatus.SUCCESS.value)\
-                    .filter_by(reference_id=order.get_reference_id())\
-                    .first()
-
-                if old_order is None:
-                    sqlite_order = SQLLiteOrder.from_order(order)
-                    self.orders.append(sqlite_order)
-                else:
-                    old_order.update_with_order(order)
-
-            db.session.commit()
+        self.add_orders(orders)
 
     @validates('id', 'symbol')
     def _write_once(self, key, value):
@@ -96,8 +65,70 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
     def get_symbol(self):
         return self.symbol
 
-    def get_orders(self):
-        return self.orders.all()
+    def get_order(self, reference_id):
+        return self.orders \
+            .filter_by(reference_id=reference_id) \
+            .first()
+
+    def get_orders(self, status=None, type=None, side=None):
+        query_set = self.orders
+
+        if status is not None:
+            query_set.filter_by(status=OrderStatus.from_value(status).value)
+
+        if type is not None:
+            query_set.filter_by(type=OrderType.from_value(type).value)
+
+        if side is not None:
+            query_set.filter_by(side=OrderSide.from_value(side).value)
+
+        return query_set.all()
+
+    def add_order(self, order):
+        from investing_algorithm_framework.core.models.sqlite.order \
+            import SQLLiteOrder
+
+        if order is not None:
+
+            if isinstance(order, dict):
+                order = Order.from_dict(order)
+
+            old_order = SQLLiteOrder.query \
+                .filter_by(position=self) \
+                .filter_by(status=OrderStatus.SUCCESS.value) \
+                .filter_by(reference_id=order.get_reference_id()) \
+                .first()
+
+            if old_order is None:
+                sqlite_order = SQLLiteOrder.from_order(order)
+                self.orders.append(sqlite_order)
+            else:
+                old_order.update_with_order(order)
+
+            db.session.commit()
+
+    def add_orders(self, orders):
+        from investing_algorithm_framework.core.models.sqlite.order \
+            import SQLLiteOrder
+
+        if orders is not None:
+            for order in orders:
+
+                if isinstance(order, dict):
+                    order = Order.from_dict(order)
+
+                old_order = SQLLiteOrder.query \
+                    .filter_by(reference_id=order.get_reference_id()) \
+                    .first()
+
+                if old_order is None:
+                    sqlite_order = SQLLiteOrder.from_order(order)
+                    self.orders.append(sqlite_order)
+                    sqlite_order.save(db)
+                else:
+                    old_order.update_with_order(order)
+
+            db.session.commit()
 
     @staticmethod
     def from_position(position):

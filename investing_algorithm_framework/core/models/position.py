@@ -1,3 +1,4 @@
+from typing import List
 from investing_algorithm_framework.core.models import OrderStatus, OrderSide, \
     Order, OrderType
 from investing_algorithm_framework.core.exceptions import OperationalException
@@ -28,7 +29,63 @@ class Position:
 
             self.orders.append(order)
 
-    def add_order(self, order):
+    def get_symbol(self):
+        return self.symbol
+
+    def get_order(self, reference_id) -> Order:
+        for order in self.orders:
+
+            if order.get_reference_id() == reference_id:
+                return order
+
+        return None
+
+    def get_orders(self, status=None, type=None, side=None) -> List[Order]:
+
+        if hasattr(self, "orders"):
+            selected_orders = self.orders
+
+            if status is not None:
+                new = []
+
+                for order in selected_orders:
+                    if not OrderStatus.from_value(
+                            order.get_status()).equals(status):
+                        new = selected_orders.remove(order)
+
+                selected_orders = new
+
+            if type is not None:
+                new = []
+
+                for order in selected_orders:
+                    if not OrderType.from_value(
+                            order.get_type()).equals(type):
+                        new = selected_orders.remove(order)
+
+                selected_orders = new
+
+            if side is not None:
+                new = []
+
+                for order in selected_orders:
+                    if not OrderSide.from_value(
+                            order.get_side()).equals(side):
+                        new = selected_orders.remove(order)
+
+                selected_orders = new
+
+            return selected_orders
+
+        return []
+
+    def add_order(self, order: Order):
+
+        if order.get_target_symbol() != self.get_symbol():
+            raise OperationalException(
+                "Order does not belong to this position"
+            )
+
         matching_order = next(
             (old_order for old_order in self.orders
              if old_order.get_reference_id() == order.get_reference_id()),
@@ -40,50 +97,23 @@ class Position:
 
         self.orders.append(order)
 
-    def get_symbol(self):
-        return self.symbol
+    def add_orders(self, orders: List):
 
-    def get_orders(self, status=None, type=None, side=None):
+        for order in orders:
 
-        if hasattr(self, "orders"):
-            selected_orders = self.orders
+            if order.get_target_symbol() != self.get_symbol():
+                raise OperationalException(
+                    "Order does not belong to this position"
+                )
 
-            if status is not None:
-                new = []
+            matching_order = next(
+                (old_order for old_order in self.orders
+                 if old_order.get_reference_id() == order.get_reference_id()),
+                None
+            )
 
-                for order in self.orders:
-                    if not OrderStatus.from_value(
-                            order.get_status()).equals(status):
-                        new = selected_orders.remove(order)
-
-                selected_orders = new
-
-            if type is not None:
-                new = []
-
-                for order in self.orders:
-                    if not OrderType.from_value(
-                            order.get_type()).equals(type):
-                        new = selected_orders.remove(order)
-
-                selected_orders = new
-
-            if side is not None:
-                new = []
-
-                for order in self.orders:
-                    if not OrderSide.from_value(
-                            order.get_side()).equals(side):
-                        new = selected_orders.remove(order)
-
-                selected_orders = new
-
-            return selected_orders
-
-        return []
-
-    def set_orders(self, orders):
-        self.orders = orders
+            if not matching_order:
+                self.orders.append(order)
 
     def get_amount(self):
         return self.amount
