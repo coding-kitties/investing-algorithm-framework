@@ -1,81 +1,119 @@
-from datetime import datetime
-
-from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.models import db, \
-    SQLLiteOrder
+from investing_algorithm_framework.core.models import Order, OrderSide, \
+    OrderType, OrderStatus
+from investing_algorithm_framework import OperationalException
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
 class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
 
-    def setUp(self) -> None:
+    def setUp(self):
         super(TestOrderModel, self).setUp()
+        self.algo_app.algorithm.start()
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
 
-        self.start_algorithm()
-        self.portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
-
-        order = self.create_buy_order(
-            1,
-            self.TARGET_SYMBOL_A,
-            self.get_price(self.TARGET_SYMBOL_A, date=datetime.utcnow()).price,
-            self.portfolio_manager
+        self.create_buy_order(
+            amount=10,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            portfolio_manager=portfolio_manager,
+            target_symbol=self.TARGET_SYMBOL_A,
+            reference_id=10
         )
 
-        order.reference_id = 10
-        order.save(db)
-        db.session.commit()
-
-    def tearDown(self) -> None:
-        super(TestOrderModel, self).tearDown()
-
     def test_get_reference_id(self):
-        order = SQLLiteOrder.query.first()
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_reference_id())
+        self.assertEqual(10, order.get_reference_id())
 
     def test_get_target_symbol(self):
-        order = SQLLiteOrder.query.first()
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_target_symbol())
 
     def test_get_trading_symbol(self):
-        order = SQLLiteOrder.query.first()
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_trading_symbol())
 
     def test_get_amount_of_trading_symbol(self):
-        order = SQLLiteOrder.query.first()
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_amount_trading_symbol())
 
     def test_get_amount_of_target_symbol(self):
-        order = SQLLiteOrder.query.first()
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_amount_target_symbol())
 
     def test_get_initial_price(self):
-        order = SQLLiteOrder.query.first()
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        order = portfolio.get_order(10)
+        order.initial_price = 10
         self.assertIsNotNone(order.get_initial_price())
 
     def test_get_price(self):
-        order = SQLLiteOrder.query.first()
-        order.price = 10
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        order = portfolio.get_order(10)
+
         self.assertIsNotNone(order.get_price())
 
     def test_get_closing_price(self):
-        order = SQLLiteOrder.query.first()
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        order = portfolio.get_order(10)
         order.closing_price = 10
         self.assertIsNotNone(order.get_closing_price())
 
+    def test_get_side(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        order = portfolio.get_order(10)
+        self.assertIsNotNone(order.get_side())
+
     def test_get_status(self):
-        order = SQLLiteOrder.query.first()
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_status())
 
     def test_get_type(self):
-        order = SQLLiteOrder.query.first()
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_type())
 
-    def test_get_side(self):
-        order = SQLLiteOrder.query.first()
-        self.assertIsNotNone(order.get_side())
-
     def test_from_dict_pending_limit_order_buy(self):
-        order = SQLLiteOrder.from_dict(
+        order = Order.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
@@ -99,7 +137,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
     def test_from_dict_successful_limit_order_buy(self):
-        order = SQLLiteOrder.from_dict(
+        order = Order.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
@@ -124,7 +162,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
         with self.assertRaises(OperationalException):
-            SQLLiteOrder.from_dict(
+            Order.from_dict(
                 {
                     "reference_id": 10493,
                     "target_symbol": "DOT",
@@ -138,7 +176,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
             )
 
     def test_from_dict_closed_limit_order_buy(self):
-        order = SQLLiteOrder.from_dict(
+        order = Order.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
@@ -164,7 +202,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_initial_price())
 
         with self.assertRaises(OperationalException):
-            SQLLiteOrder.from_dict(
+            Order.from_dict(
                 {
                     "reference_id": 10493,
                     "target_symbol": "DOT",
@@ -179,7 +217,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
             )
 
     def test_from_dict_pending_limit_order_sell(self):
-        order = SQLLiteOrder.from_dict(
+        order = Order.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
@@ -203,7 +241,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
     def test_from_dict_success_limit_order_sell(self):
-        order = SQLLiteOrder.from_dict(
+        order = Order.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
@@ -228,7 +266,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
     def test_from_dict_closed_limit_order_sell(self):
-        order = SQLLiteOrder.from_dict(
+        order = Order.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
@@ -253,7 +291,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
     def test_from_dict_pending_market_order_sell(self):
-        order = SQLLiteOrder.from_dict(
+        order = Order.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
@@ -277,7 +315,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
     def test_from_dict_success_market_order_sell(self):
-        order = SQLLiteOrder.from_dict(
+        order = Order.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
@@ -302,7 +340,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
     def test_from_dict_closed_market_order_sell(self):
-        order = SQLLiteOrder.from_dict(
+        order = Order.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",

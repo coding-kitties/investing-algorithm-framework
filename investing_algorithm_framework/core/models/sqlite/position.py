@@ -74,13 +74,16 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
         query_set = self.orders
 
         if status is not None:
-            query_set.filter_by(status=OrderStatus.from_value(status).value)
+            query_set = query_set\
+                .filter_by(status=OrderStatus.from_value(status).value)
 
         if type is not None:
-            query_set.filter_by(type=OrderType.from_value(type).value)
+            query_set = query_set\
+                .filter_by(type=OrderType.from_value(type).value)
 
         if side is not None:
-            query_set.filter_by(side=OrderSide.from_value(side).value)
+            query_set = query_set\
+                .filter_by(side=OrderSide.from_value(side).value)
 
         return query_set.all()
 

@@ -7,7 +7,7 @@ from investing_algorithm_framework.configuration.constants import BINANCE
 class BinanceOrderExecutorMixin:
     identifier = BINANCE
 
-    def execute_limit_order(self, order: Order, algorithm_context, **kwargs):
+    def execute_order(self, order: Order, algorithm_context, **kwargs):
         market_service = algorithm_context.get_market_service(BINANCE)
 
         if not OrderType.LIMIT.equals(order.order_type):
@@ -51,7 +51,7 @@ class BinanceOrderExecutorMixin:
                 amount=order.amount,
             )
 
-    def get_order_status(self, order: Order, algorithm_context, **kwargs):
+    def check_order_status(self, order: Order, algorithm_context, **kwargs):
         market_service = algorithm_context.get_market_service(BINANCE)
 
         order = market_service.get_order(

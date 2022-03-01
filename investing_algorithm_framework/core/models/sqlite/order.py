@@ -107,10 +107,21 @@ class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
     # Post execution
     executed_at = db.Column(db.DateTime)
 
-    def __init__(self, reference_id, side, type, target_symbol, trading_symbol,
-                 status, initial_price=None, closing_price=None, price=None,
-                 amount_target_symbol=None, amount_trading_symbol=None,
-                 **kwargs):
+    def __init__(
+            self,
+            side,
+            type,
+            target_symbol,
+            trading_symbol,
+            status,
+            reference_id=None,
+            initial_price=None,
+            closing_price=None,
+            price=None,
+            amount_target_symbol=None,
+            amount_trading_symbol=None,
+            **kwargs
+    ):
 
         super().__init__(target_symbol, trading_symbol, type, side, status,
                          amount_trading_symbol, amount_target_symbol, price,

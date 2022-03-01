@@ -43,44 +43,31 @@ class Position:
     def get_orders(self, status=None, type=None, side=None) -> List[Order]:
 
         if hasattr(self, "orders"):
-            selected_orders = self.orders
+            selected_orders = self.orders.copy()
 
             if status is not None:
-                new = []
 
                 for order in selected_orders:
                     if not OrderStatus.from_value(
                             order.get_status()).equals(status):
-                        new = selected_orders.remove(order)
-
-                selected_orders = new
+                        selected_orders.remove(order)
 
             if type is not None:
-                new = []
 
                 for order in selected_orders:
                     if not OrderType.from_value(
                             order.get_type()).equals(type):
-                        new = selected_orders.remove(order)
-
-                selected_orders = new
+                        selected_orders.remove(order)
 
             if side is not None:
-                new = []
-
                 for order in selected_orders:
                     if not OrderSide.from_value(
                             order.get_side()).equals(side):
-                        new = selected_orders.remove(order)
+                        selected_orders.remove(order)
 
-                selected_orders = new
-
-            return selected_orders
-
-        return []
+        return selected_orders
 
     def add_order(self, order: Order):
-
         if order.get_target_symbol() != self.get_symbol():
             raise OperationalException(
                 "Order does not belong to this position"
@@ -94,8 +81,12 @@ class Position:
 
         if matching_order:
             raise OperationalException("Order already exists")
-
-        self.orders.append(order)
+        else:
+            if OrderStatus.SUCCESS.equals(order.status) \
+                    and OrderSide.BUY.equals(order.side):
+                self.amount += order.get_amount_target_symbol() \
+                               * order.get_price()
+            self.orders.append(order)
 
     def add_orders(self, orders: List):
 
@@ -113,6 +104,11 @@ class Position:
             )
 
             if not matching_order:
+
+                if OrderStatus.SUCCESS.equals(order.status) \
+                        and OrderSide.BUY.equals(order.side):
+                    self.amount += order.get_amount_target_symbol() \
+                                   * order.get_price()
                 self.orders.append(order)
 
     def get_amount(self):
@@ -141,23 +137,7 @@ class Position:
         return cost
 
     def get_allocated(self):
-
-        if not hasattr(self, "orders"):
-            return 0
-
-        if self.orders is None:
-            return 0
-
-        allocated = 0
-
-        for order in self.get_orders():
-
-            if OrderSide.BUY.equals(order.side) and \
-                    OrderStatus.SUCCESS.equals(order.status):
-                allocated += order.get_price() \
-                             * order.get_amount_target_symbol()
-
-        return allocated
+        return self.get_amount() * self.get_price()
 
     def get_pending_value(self):
 

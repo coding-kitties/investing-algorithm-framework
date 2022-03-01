@@ -12,9 +12,8 @@ from investing_algorithm_framework.app import App
 from investing_algorithm_framework.configuration.constants import \
     DATABASE_CONFIG, DATABASE_NAME, RESOURCES_DIRECTORY
 from investing_algorithm_framework.configuration.settings import TestConfig
-from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import db, OrderStatus, \
-    TimeInterval, SQLLiteAssetPrice, SQLLiteAssetPriceHistory
+    TimeInterval, SQLLiteAssetPrice
 from investing_algorithm_framework.core.portfolio_managers \
     import SQLLitePortfolioManager
 
@@ -27,7 +26,6 @@ class Initializer(AlgorithmContextInitializer):
 
 
 class PortfolioManagerTest(SQLLitePortfolioManager):
-    market = "test"
     identifier = "sqlite"
     trading_symbol = "USDT"
     initialize_has_run = False
@@ -36,18 +34,15 @@ class PortfolioManagerTest(SQLLitePortfolioManager):
         super(PortfolioManagerTest, self).initialize(algorithm_context)
         self.initialize_has_run = True
 
-    def get_positions_from_broker(self, algorithm_context) -> List[Position]:
-        return [
-            Position(
-                amount=1000,
-                symbol=self.get_trading_symbol(algorithm_context)
-            )
-        ]
+    def get_price(
+        self, target_symbol, trading_symbol, algorithm_context, **kwargs
+    ) -> float:
+        asset_price = TestBase.get_price(target_symbol)
 
+        if asset_price is None:
+            return 0
 
-class DefaultPortfolioManager(PortfolioManager):
-    identifier = "default"
-    trading_symbol = "USDT"
+        return asset_price.price
 
     def get_positions(self, algorithm_context, **kwargs) -> List[Position]:
         return [
@@ -71,61 +66,58 @@ class DefaultPortfolioManager(PortfolioManager):
             )
         ]
 
-    def add_order(self, order, algorithm_context, **kwargs):
-        pass
+
+class DefaultPortfolioManager(PortfolioManager):
+    identifier = "default"
+    trading_symbol = "USDT"
+
+    def initialize(self, algorithm_context):
+        super(DefaultPortfolioManager, self).initialize(algorithm_context)
+        print("initializationg")
+
+    def get_price(
+        self, target_symbol, trading_symbol, algorithm_context, **kwargs
+    ) -> float:
+        asset_price = TestBase.get_price(target_symbol)
+
+        if asset_price is None:
+            return 0
+
+        return asset_price.price
+
+    def get_positions(self, algorithm_context, **kwargs) -> List[Position]:
+        return [
+            Position(amount=10, symbol=TestBase.TARGET_SYMBOL_A),
+            Position(
+                amount=10000,
+                symbol=self.get_trading_symbol(algorithm_context)
+            )
+        ]
+
+    def get_orders(self, algorithm_context, **kwargs) -> List[Order]:
+        return [
+            Order(
+                amount_target_symbol=10,
+                target_symbol=TestBase.TARGET_SYMBOL_A,
+                trading_symbol=self.trading_symbol,
+                side=OrderSide.BUY,
+                status=OrderStatus.PENDING,
+                price=10,
+                type=OrderType.LIMIT
+            )
+        ]
 
 
 class OrderExecutorTest(OrderExecutor):
     identifier = "test"
 
-    def execute_limit_order(self, order: Order, algorithm_context, **kwargs):
-        portfolio = order.position.portfolio
-        market_service = algorithm_context.get_market_service(portfolio.market)
+    def execute_order(self, order: Order, algorithm_context,
+                      **kwargs) -> Order:
+        return order
 
-        if not OrderType.LIMIT.equals(order.order_type):
-            raise OperationalException(
-                "Provided order is not a limit order type"
-            )
-
-        if OrderSide.BUY.equals(order.order_side):
-            market_service.create_limit_buy_order(
-                target_symbol=order.target_symbol,
-                trading_symbol=order.trading_symbol,
-                amount=order.amount,
-                price=order.initial_price
-            )
-        else:
-            market_service.create_limit_sell_order(
-                target_symbol=order.target_symbol,
-                trading_symbol=order.trading_symbol,
-                amount=order.amount,
-                price=order.initial_price
-            )
-
-    def execute_market_order(self, order: Order, algorithm_context, **kwargs):
-        portfolio = order.position.portfolio
-        market_service = algorithm_context.get_market_service(portfolio.market)
-
-        if not OrderType.MARKET.equals(order.order_type):
-            raise OperationalException(
-                "Provided order is not a market order type"
-            )
-
-        if OrderSide.BUY.equals(order.order_side):
-            market_service.create_market_buy_order(
-                target_symbol=order.target_symbol,
-                trading_symbol=order.trading_symbol,
-                amount=order.amount,
-            )
-        else:
-            market_service.create_market_sell_order(
-                target_symbol=order.target_symbol,
-                trading_symbol=order.trading_symbol,
-                amount=order.amount,
-            )
-
-    def get_order_status(self, order: Order, algorithm_context, **kwargs):
-        return OrderStatus.SUCCESS.value
+    def get_order_status(self, order: Order, algorithm_context,
+                         **kwargs) -> OrderStatus:
+        return OrderStatus.SUCCESS
 
 
 class DataProviderTest(DataProvider):
@@ -148,7 +140,8 @@ class DataProviderTest(DataProvider):
                     [37988.73, 0.0368],
                     [37988.58, 0.22146],
                     [37988.57, 0.23476],
-                    [37988.56, 0.5868], [37988.15, 0.01316], [37987.24, 0.10265], [37987.23, 0.39688], [37987.22, 0.31862], [37987.21, 0.11557], [37987.18, 0.00133], [37987.03, 0.142], [37986.87, 0.0586], [37986.55, 0.00052], [37986.46, 0.05456], [37986.29, 0.23999], [37986.28, 0.14999], [37986.06, 0.15], [37985.97, 0.31666], [37985.96, 0.025], [37985.95, 0.355], [37985.31, 0.00133], [37985.25, 0.20833], [37985.11, 0.06577], [37984.96, 0.09212], [37984.61, 0.18221], [37984.05, 0.16], [37984.01, 0.00035], [37983.44, 0.00133], [37983.08, 0.10266], [37982.81, 0.17104], [37982.8, 0.71987], [37982.79, 0.13155], [37982.62, 0.15], [37982.19, 0.747], [37981.85, 1.60446], [37981.84, 1.9], [37981.83, 0.1685], [37981.57, 0.00133], [37981.36, 0.2], [37980.75, 0.09213], [37980.13, 0.1], [37980.12, 0.15093], [37979.7, 0.00133], [37979.34, 0.21341], [37979.33, 0.18842], [37979.32, 0.13154], [37978.12, 0.05], [37978.1, 0.143], [37977.83, 0.00133], [37977.45, 1.62834], [37977.44, 0.02063], [37977.19, 2.30552], [37976.3, 0.3004], [37976.26, 0.53158], [37976.25, 0.40925], [37976.08, 0.152], [37975.96, 0.00133], [37975.73, 0.26725], [37975.2, 0.19732], [37975.09, 0.00263], [37974.53, 0.04221], [37974.26, 0.00288], [37974.09, 0.00133], [37974.05, 0.14254], [37974.01, 0.1], [37973.79, 1.17033], [37973.75, 0.881], [37973.71, 0.26323], [37973.41, 0.26725], [37973.06, 0.18865], [37972.58, 0.05325], [37972.5, 0.03972], [37972.22, 0.00133], [37972.13, 0.05345], [37972.12, 0.00263], [37972.11, 0.34424], [37972.03, 0.001], [37972.02, 0.15165], [37971.97, 0.03585], [37971.82, 0.02927], [37971.14, 0.09215], [37971.11, 0.00036], [37971.02, 0.14698], [37970.35, 0.00133], [37970.01, 0.00344], [37970.0, 0.05251], [37969.98, 0.15099], [37969.69, 0.15], [37968.99, 0.01], [37968.76, 0.01], [37968.71, 0.44813], [37968.48, 0.00133], [37968.41, 0.07782]],
+                    [37988.56, 0.5868],
+                    [37988.15, 0.01316], [37987.24, 0.10265], [37987.23, 0.39688], [37987.22, 0.31862], [37987.21, 0.11557], [37987.18, 0.00133], [37987.03, 0.142], [37986.87, 0.0586], [37986.55, 0.00052], [37986.46, 0.05456], [37986.29, 0.23999], [37986.28, 0.14999], [37986.06, 0.15], [37985.97, 0.31666], [37985.96, 0.025], [37985.95, 0.355], [37985.31, 0.00133], [37985.25, 0.20833], [37985.11, 0.06577], [37984.96, 0.09212], [37984.61, 0.18221], [37984.05, 0.16], [37984.01, 0.00035], [37983.44, 0.00133], [37983.08, 0.10266], [37982.81, 0.17104], [37982.8, 0.71987], [37982.79, 0.13155], [37982.62, 0.15], [37982.19, 0.747], [37981.85, 1.60446], [37981.84, 1.9], [37981.83, 0.1685], [37981.57, 0.00133], [37981.36, 0.2], [37980.75, 0.09213], [37980.13, 0.1], [37980.12, 0.15093], [37979.7, 0.00133], [37979.34, 0.21341], [37979.33, 0.18842], [37979.32, 0.13154], [37978.12, 0.05], [37978.1, 0.143], [37977.83, 0.00133], [37977.45, 1.62834], [37977.44, 0.02063], [37977.19, 2.30552], [37976.3, 0.3004], [37976.26, 0.53158], [37976.25, 0.40925], [37976.08, 0.152], [37975.96, 0.00133], [37975.73, 0.26725], [37975.2, 0.19732], [37975.09, 0.00263], [37974.53, 0.04221], [37974.26, 0.00288], [37974.09, 0.00133], [37974.05, 0.14254], [37974.01, 0.1], [37973.79, 1.17033], [37973.75, 0.881], [37973.71, 0.26323], [37973.41, 0.26725], [37973.06, 0.18865], [37972.58, 0.05325], [37972.5, 0.03972], [37972.22, 0.00133], [37972.13, 0.05345], [37972.12, 0.00263], [37972.11, 0.34424], [37972.03, 0.001], [37972.02, 0.15165], [37971.97, 0.03585], [37971.82, 0.02927], [37971.14, 0.09215], [37971.11, 0.00036], [37971.02, 0.14698], [37970.35, 0.00133], [37970.01, 0.00344], [37970.0, 0.05251], [37969.98, 0.15099], [37969.69, 0.15], [37968.99, 0.01], [37968.76, 0.01], [37968.71, 0.44813], [37968.48, 0.00133], [37968.41, 0.07782]],
                 "asks": [[37994.55, 0.18691], [37994.57, 0.01316], [37994.89, 0.00052], [37996.39, 0.00081], [37996.51, 0.0253], [37996.62, 0.01205], [37996.96, 0.13156], [37997.0, 0.09], [37997.92, 0.13154], [37998.62, 0.00031], [37999.89, 0.143], [38000.0, 0.09299], [38000.27, 0.00133], [38000.3, 0.05683], [38000.31, 0.142], [38002.14, 0.13293], [38002.5, 0.001], [38003.29, 0.19209], [38003.3, 0.26929], [38003.31, 0.19732], [38003.95, 0.0121], [38004.01, 0.00133], [38004.09, 0.63278], [38004.1, 0.26323], [38004.11, 0.749], [38004.55, 0.05], [38004.83, 0.242], [38005.87, 0.165], [38005.88, 0.00133], [38006.28, 0.00615], [38007.0, 0.00036], [38007.15, 0.06191], [38007.16, 0.9349], [38007.17, 0.02491], [38007.2, 0.881], [38007.29, 0.15073], [38007.51, 0.19714], [38007.53, 0.19956], [38007.72, 0.00674], [38007.75, 0.00133], [38008.85, 0.82575], [38008.87, 0.20609], [38008.89, 0.2], [38009.05, 0.21677], [38009.17, 0.2], [38009.23, 0.18926], [38009.31, 0.14506], [38009.49, 0.10135], [38009.57, 0.142], [38009.62, 0.00133], [38009.67, 0.1], [38009.87, 0.0039], [38009.99, 0.001], [38010.0, 0.00265], [38010.52, 0.00055], [38010.61, 1.80645], [38010.62, 0.2], [38010.65, 0.03314], [38011.0, 0.00498], [38011.27, 2.19641], [38011.32, 0.14599], [38011.4, 0.05096], [38011.49, 0.00133], [38012.0, 0.03056], [38012.11, 0.00232], [38012.42, 0.18239], [38012.65, 0.06475], [38013.36, 0.00133], [38013.37, 0.14544], [38013.77, 0.00347], [38014.59, 0.00999], [38014.77, 0.10949], [38014.89, 0.05], [38015.03, 0.06592], [38015.11, 0.10942], [38015.23, 0.00133], [38015.41, 0.14752], [38016.04, 0.66], [38016.46, 0.14409], [38017.1, 0.00133], [38017.45, 0.1476], [38017.5, 0.03314], [38018.56, 0.02043], [38018.97, 0.00133], [38019.0, 0.07391], [38020.16, 0.14679], [38020.17, 0.54877], [38020.29, 0.14662], [38020.84, 0.00133], [38021.0, 0.00249], [38021.06, 0.13495], [38021.89, 0.05853], [38022.38, 0.24808], [38022.71, 0.00133], [38022.78, 0.21811], [38022.79, 0.16478], [38023.0, 0.00396], [38023.06, 0.04021], [38023.18, 0.14546], [38023.52, 0.00039]],
                 "creation_date": "2022-02-04 13:33:48.945664"
             }
@@ -193,8 +186,6 @@ class MarketServiceTest(MarketService):
         trading_symbol: str,
         time_interval: TimeInterval
     ):
-        from investing_algorithm_framework.core.models.snapshots \
-            import AssetPrice
         asset_prices = []
 
         for i in range(0, time_interval.amount_of_data_points()):
@@ -318,9 +309,6 @@ class TestBase(TestCase):
         self.algo_app.algorithm.initialize()
         self.algo_app.start_scheduler()
 
-        from investing_algorithm_framework.core.models.snapshots import \
-            AssetPrice
-
         TestBase.prices_symbol_a = [
             SQLLiteAssetPrice(
                 target_symbol=self.TARGET_SYMBOL_A,
@@ -389,6 +377,14 @@ class TestBase(TestCase):
     @staticmethod
     def get_price(target_symbol, date=datetime.now()):
 
+        if target_symbol == "USDT":
+            return SQLLiteAssetPrice(
+                price=1,
+                datetime=datetime.utcnow(),
+                target_symbol="USDT",
+                trading_symbol="USDT"
+            )
+
         if target_symbol == TestBase.TARGET_SYMBOL_A:
             prices = TestBase.prices_symbol_a
 
@@ -407,8 +403,6 @@ class TestBase(TestCase):
         return TestBase._get_price(prices, date)
 
     def update_price(self, target_symbol, price, date=datetime.utcnow()):
-        from investing_algorithm_framework.core.models.snapshots \
-            import AssetPrice
 
         if target_symbol == TestBase.TARGET_SYMBOL_A:
             prices = TestBase.prices_symbol_a
@@ -660,9 +654,6 @@ class TestBase(TestCase):
         return prices[-1]
 
     def reset_prices(self):
-
-        from investing_algorithm_framework.core.models.snapshots \
-            import AssetPrice
 
         TestBase.prices_symbol_a = [
             SQLLiteAssetPrice(

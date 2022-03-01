@@ -13,7 +13,7 @@ from investing_algorithm_framework.core.models.position import Position
 from investing_algorithm_framework.core.models.order import Order, OrderStatus
 
 
-class PortfolioManager(ABC, Identifier, MarketIdentifier):
+class PortfolioManager(ABC, Identifier):
     trading_symbol = None
     portfolio = None
 
@@ -23,6 +23,12 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
 
     @abstractmethod
     def get_orders(self, algorithm_context, **kwargs) -> List[Order]:
+        pass
+
+    @abstractmethod
+    def get_price(
+        self, target_symbol, trading_symbol, algorithm_context, **kwargs
+    ) -> float:
         pass
 
     def initialize(self, algorithm_context):
@@ -61,8 +67,8 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
         price=None,
         amount_trading_symbol=None,
         amount_target_symbol=None,
-        order_type=OrderType.LIMIT.value,
-        order_side=OrderSide.BUY.value,
+        type=OrderType.LIMIT.value,
+        side=OrderSide.BUY.value,
         algorithm_context=None
     ) -> Order:
         return Order(
@@ -71,21 +77,26 @@ class PortfolioManager(ABC, Identifier, MarketIdentifier):
             price=price,
             amount_trading_symbol=amount_trading_symbol,
             amount_target_symbol=amount_target_symbol,
-            type=order_type,
-            side=order_side,
+            type=type,
+            side=side,
             status=OrderStatus.TO_BE_SENT.value
         )
 
-    @abstractmethod
     def add_order(self, order, algorithm_context):
-        pass
-
-    def sync_portfolio(self, algorithm_context):
         portfolio = self.get_portfolio(algorithm_context)
-        positions = self.get_positions(algorithm_context)
-        orders = self.get_orders(algorithm_context)
-        portfolio.sync_positions(positions)
-        portfolio.sync_orders(orders)
+        portfolio.add_order(order)
+
+    def add_orders(self, orders, algorithm_context):
+        portfolio = self.get_portfolio(algorithm_context)
+        portfolio.add_orders(orders)
+
+    def add_position(self, position, algorithm_context):
+        portfolio = self.get_portfolio(algorithm_context)
+        portfolio.add_position(position)
+
+    def add_positions(self, positions, algorithm_context):
+        portfolio = self.get_portfolio(algorithm_context)
+        portfolio.add_positions(positions)
 
     def update_order_status(self, order, status, algorithm_context):
         order.set_status(OrderStatus.from_value(status))

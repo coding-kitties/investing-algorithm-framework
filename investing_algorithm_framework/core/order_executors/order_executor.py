@@ -10,15 +10,9 @@ class OrderExecutor(ABC, Identifier):
         pass
 
     @abstractmethod
-    def execute_limit_order(
+    def execute_order(
         self, order: Order, algorithm_context, **kwargs
-    ) -> bool:
-        raise NotImplementedError()
-
-    @abstractmethod
-    def execute_market_order(
-        self, order: Order, algorithm_context, **kwargs
-    ) -> bool:
+    ) -> Order:
         raise NotImplementedError()
 
     @abstractmethod

@@ -1,5 +1,5 @@
 from typing import List
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 
 from investing_algorithm_framework.core.identifier import Identifier
 from investing_algorithm_framework.core.market_identifier import \
@@ -12,14 +12,11 @@ from investing_algorithm_framework.core.portfolio_managers.portfolio_manager \
 from investing_algorithm_framework.core.exceptions import OperationalException
 
 
-class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
+class SQLLitePortfolioManager(PortfolioManager, Identifier):
     trading_symbol = None
 
-    @abstractmethod
-    def get_positions_from_broker(self, algorithm_context) -> List[Position]:
-        pass
-
     def initialize(self, algorithm_context):
+        print("initialize")
         self._initialize_portfolio(algorithm_context)
 
     def _initialize_portfolio(self, algorithm_context):
@@ -28,20 +25,21 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
         self.trading_symbol = self.get_trading_symbol(algorithm_context)
 
         if portfolio is None:
-            positions = self.get_positions_from_broker(algorithm_context)
+            positions = self.get_positions(algorithm_context)
+            orders = self.get_orders(algorithm_context)
 
             if positions is None:
                 raise OperationalException(
                     "Could not retrieve positions from broker"
                 )
 
-            portfolio = SQLLitePortfolio(
+            self.portfolio = SQLLitePortfolio(
                 identifier=self.identifier,
                 trading_symbol=self.trading_symbol,
-                market=self.get_market(),
                 positions=positions
             )
-            portfolio.save(db)
+            self.portfolio.save(db)
+            self.portfolio.add_orders(orders)
 
     def get_unallocated(
         self, algorithm_context, sync=False, **kwargs
@@ -78,30 +76,6 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
 
         return portfolio
 
-    def get_positions(
-        self, algorithm_context, sync=False, lazy=False, **kwargs
-    ):
-        query_set = SQLLitePosition.query \
-            .filter_by(portfolio=self.get_portfolio(algorithm_context)) \
-
-        if lazy:
-            return query_set
-        else:
-            return query_set.all()
-
-    def get_orders(self, algorithm_context, sync=False, lazy=False, **kwargs):
-        positions = SQLLitePosition.query \
-            .filter_by(portfolio=self.get_portfolio(algorithm_context)) \
-            .with_entities(SQLLitePosition.id)
-
-        query_set = SQLLiteOrder.query \
-            .filter(SQLLiteOrder.position_id.in_(positions))
-
-        if lazy:
-            return query_set
-        else:
-            return query_set.all()
-
     def create_order(
         self,
         target_symbol,
@@ -118,12 +92,13 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier, MarketIdentifier):
             from investing_algorithm_framework import current_app
             algorithm_context = current_app.algorithm
 
-        return self.get_portfolio(algorithm_context).create_order(
-            algorithm_context=algorithm_context,
+        return SQLLiteOrder(
+            reference_id=None,
             type=type,
             status=status,
             side=side,
             target_symbol=target_symbol,
+            trading_symbol=self.get_trading_symbol(algorithm_context),
             price=price,
             amount_trading_symbol=amount_trading_symbol,
             amount_target_symbol=amount_target_symbol,

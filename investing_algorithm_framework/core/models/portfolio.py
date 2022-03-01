@@ -22,33 +22,19 @@ class Portfolio:
         self.trading_symbol = trading_symbol
         self.identifier = identifier
         self.market = market
-
-        if positions is None:
-            self.positions = []
-
+        self.positions = []
         self.trading_symbol = self.trading_symbol.upper()
-        self.initialize_positions()
+        self.add_positions(positions)
+        self.validate_trading_symbol_position()
+        self.add_orders(orders)
 
-    def initialize_positions(self):
+    def validate_trading_symbol_position(self):
         trading_symbol_position_found = False
 
         if self.positions is None:
             raise OperationalException(
-                "Trading symbol position is not defined"
+                "No position provided with trading symbol amount"
             )
-
-        new_positions = []
-
-        for position in self.positions:
-
-            if isinstance(position, dict):
-                position = Position.from_dict(position)
-            elif not isinstance(position, Position):
-                raise OperationalException("Wrong position data")
-
-            new_positions.append(position)
-
-        self.positions = new_positions
 
         for position in self.positions:
 
@@ -67,8 +53,9 @@ class Portfolio:
         return self.trading_symbol
 
     def get_position(self, symbol) -> Position:
+        symbol = symbol.upper()
 
-        for position in self.positions:
+        for position in self.get_positions():
 
             if position.get_symbol() == symbol:
                 return position
@@ -82,28 +69,74 @@ class Portfolio:
     def get_number_of_positions(self):
         return len(self.positions)
 
-    def get_orders(
-        self,
-        status: OrderStatus = None,
-        side: OrderSide = None,
-        target_symbol: str = None,
-        trading_symbol: str = None,
-        lazy: bool = False
-    ) -> List[Order]:
-        positions = self.positions
-
-        orders = []
+    def get_order(self, reference_id):
+        all_orders = []
+        positions = self.get_positions()
 
         for position in positions:
-            orders.append(position.get_orders())
+            orders = position.get_orders()
 
-        return orders
+            if len(orders) != 0:
+                all_orders += orders
+
+        for order in all_orders:
+
+            if order.get_reference_id() == reference_id:
+                return order
+
+        return None
+
+    def get_orders(
+        self,
+        type=None,
+        status=None,
+        side=None,
+        target_symbol=None,
+        trading_symbol=None,
+    ) -> List[Order]:
+        positions = self.get_positions()
+
+        all_orders = []
+
+        for position in positions:
+            orders = position.get_orders()
+
+            if len(orders) != 0:
+                all_orders += orders
+
+        if status is not None:
+            copy = all_orders.copy()
+            for order in all_orders:
+                if not OrderStatus.from_value(
+                        order.get_status()).equals(status):
+                    copy.remove(order)
+
+            all_orders = copy
+
+        if type is not None:
+            copy = all_orders.copy()
+
+            for order in all_orders:
+                if not OrderType.from_value(
+                        order.get_type()).equals(type):
+                    copy.remove(order)
+
+            all_orders = copy
+
+        if side is not None:
+            copy = all_orders.copy()
+
+            for order in all_orders:
+                if not OrderSide.from_value(
+                        order.get_side()).equals(side):
+                    copy.remove(order)
+
+            all_orders = copy
+
+        return all_orders
 
     def get_number_of_orders(self):
-        return len(self.orders)
-
-    def get_market(self) -> str:
-        return self.market
+        return len(self.get_orders())
 
     @staticmethod
     def from_dict(data):
@@ -121,12 +154,12 @@ class Portfolio:
 
     def get_unallocated(self) -> Position:
 
-        if self.positions is None:
+        if self.get_positions() is None:
             raise OperationalException(
                 "Trading symbol position is not specified"
             )
 
-        for position in self.positions:
+        for position in self.get_positions():
 
             if position.get_symbol() == self.get_trading_symbol():
                 return position
@@ -138,57 +171,34 @@ class Portfolio:
     def get_allocated(self):
         allocated = 0
 
-        for position in self.positions:
-            price = position.get_price()
-
-            if price is not None:
-                allocated += position.get_amount() * price
+        for position in self.get_positions():
+            allocated += position.get_allocated()
 
         return allocated
 
     def get_realized(self):
         realized = 0
 
-        for order in self.orders:
+        for order in self.get_orders():
             if OrderStatus.CLOSED.equals(order.get_status()):
 
                 realized += order.get_closing_price() \
                            * order.get_amount_target_symbol()
         return realized
 
-    @abstractmethod
     def get_total_revenue(self):
         revenue = 0
 
-        for order in self.orders:
+        for order in self.get_orders():
             if OrderStatus.CLOSED.equals(order.get_status()):
                 revenue += order.get_closing_price() \
                             * order.get_amount_target_symbol()
         return revenue
 
-    def create_order(
-        self,
-        algorithm_context,
-        type,
-        status,
-        target_symbol,
-        price=None,
-        amount_trading_symbol=None,
-        amount_target_symbol=None,
-        side=OrderSide.BUY,
-    ) -> Order:
-        return Order(
-            type=OrderType.LIMIT,
-            side=OrderSide.BUY,
-            initial_price=price,
-            amount_trading_symbol=amount_trading_symbol,
-            amount_target_symbol=amount_target_symbol,
-            status=OrderStatus.TO_BE_SENT,
-            target_symbol=target_symbol,
-            trading_symbol=self.get_trading_symbol()
-        )
-
     def add_position(self, position):
+
+        if not isinstance(position, Position):
+            raise OperationalException("Object is not a position")
 
         if not isinstance(position, Position):
             raise OperationalException("Object is not a position")
@@ -196,25 +206,57 @@ class Portfolio:
         self.positions.append(position)
 
     def add_positions(self, positions):
-        self.positions = positions
+        new_positions = []
+
+        for position in positions:
+
+            if isinstance(position, dict):
+                position = Position.from_dict(position)
+            elif not isinstance(position, Position):
+                raise OperationalException("Wrong position data")
+
+            matching = next(
+                (existing_position for existing_position in self.positions
+                 if position.get_symbol() == existing_position.get_symbol()),
+                None
+            )
+
+            if matching is None:
+                new_positions.append(position)
+
+        self.positions += new_positions
 
     def add_order(self, order):
-        pass
+        position = next(
+            (position for position in self.positions
+             if position.get_symbol() == order.get_target_symbol()), None
+        )
+
+        if position is None:
+            position = Position(symbol=order.get_target_symbol())
+            position.add_order(order)
+        else:
+            position = self.get_position(order.get_target_symbol())
+            position.add_order(order)
 
     def add_orders(self, orders):
 
-        for order in orders:
-            position = next(
-                (position for position in self.positions
-                 if position.get_symbol() == order.get_target_symbol()), None
-            )
+        if orders is not None:
 
-            if position is None:
-                position = Position(symbol=order.get_target_symbol())
-                position.add_order(order)
-            else:
-                position = self.get_position(order.get_target_symbol())
-                position.add_order(order)
+            for order in orders:
+
+                if isinstance(order, Order):
+                    position = next(
+                        (position for position in self.positions
+                         if position.get_symbol() == order.get_target_symbol()), None
+                    )
+
+                    if position is None:
+                        position = Position(symbol=order.get_target_symbol())
+                        position.add_order(order)
+                    else:
+                        position = self.get_position(order.get_target_symbol())
+                        position.add_order(order)
 
     def repr(self, **fields) -> str:
         """
@@ -237,7 +279,6 @@ class Portfolio:
         data = {
             "identifier": self.get_identifier(),
             "trading_symbol": self.get_trading_symbol(),
-            "market": self.get_market(),
             "positions": self.get_positions(),
             "orders": self.get_orders()
         }

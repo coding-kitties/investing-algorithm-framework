@@ -61,10 +61,7 @@ class OrderValidator(ABC):
 
     @staticmethod
     def validate_limit_order(order, portfolio):
-
-        total_price = order.get_amount_target_symbol() \
-                      * order.get_initial_price()
-        print(portfolio.get_unallocated())
+        total_price = order.get_amount_target_symbol() * order.get_price()
 
         if portfolio.get_unallocated().get_amount() < total_price:
             raise OperationalException(

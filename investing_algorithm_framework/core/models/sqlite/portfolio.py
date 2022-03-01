@@ -1,3 +1,4 @@
+from typing import List
 from datetime import datetime
 from random import randint
 
@@ -7,7 +8,7 @@ from sqlalchemy.orm import validates
 
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import db, OrderSide, \
-    OrderStatus, OrderType, Portfolio, Position
+    OrderStatus, OrderType, Portfolio, Position, Order
 from investing_algorithm_framework.core.models.model_extension \
     import SQLAlchemyModelExtension
 from investing_algorithm_framework.core.models.sqlite import SQLLiteOrder
@@ -63,7 +64,6 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
     __tablename__ = "portfolios"
 
     id = db.Column(db.Integer, primary_key=True)
-    market = db.Column(db.String, nullable=False)
     identifier = db.Column(db.String, nullable=False)
     trading_symbol = db.Column(db.String, nullable=False)
     unallocated = db.Column(db.Float, nullable=False, default=0)
@@ -107,14 +107,12 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
         identifier,
         trading_symbol,
         positions,
-        market=None,
         orders=None,
         **kwargs
     ):
         super(SQLLitePortfolio, self).__init__(
             identifier=identifier,
             trading_symbol=trading_symbol,
-            market=market,
         )
 
         self.id = random_id()
@@ -123,20 +121,102 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
         self.total_cost = 0
         self.created_at = datetime.utcnow()
 
-        from investing_algorithm_framework.core.models.sqlite \
-            import SQLLitePosition
-
         if positions is not None:
-            for position in positions:
-                self.positions.append(SQLLitePosition.from_position(position))
+            self.add_positions(positions)
+
+        if orders is not None:
+            self.add_orders(orders)
 
     def add_order(self, order):
-        self._validate_order(order)
+
+        if isinstance(order, dict):
+            order = SQLLiteOrder.from_dict(order)
+
+        if isinstance(order, Order):
+            order = SQLLiteOrder.from_order(order)
+
+        if not isinstance(order, SQLLiteOrder):
+            raise OperationalException("Order is not a SQLite order object")
+
+        if OrderStatus.TO_BE_SENT.equals(order.get_status()):
+            self._validate_order(order)
+
         self._add_order_to_position(order)
         db.session.commit()
 
+    def add_orders(self, orders):
+
+        for order in orders:
+
+            if isinstance(order, dict):
+                order = SQLLiteOrder.from_dict(order)
+
+            if isinstance(order, Order):
+                order = SQLLiteOrder.from_order(order)
+
+            if not isinstance(order, SQLLiteOrder):
+                raise OperationalException(
+                    "Order is not a SQLite order object")
+
+            if OrderStatus.TO_BE_SENT.equals(order.get_status()):
+                self._validate_order(order)
+
+            self._add_order_to_position(order)
+
+        db.session.commit()
+
+    def add_position(self, position):
+        from investing_algorithm_framework.core.models import SQLLitePosition
+
+        if isinstance(position, Position):
+            position = SQLLitePosition.from_position(position)
+
+        if isinstance(position, dict):
+            position = SQLLitePosition.from_dict(position)
+
+        if not isinstance(position, SQLLitePosition):
+            raise OperationalException("The object is not a Position")
+
+        matching_position = SQLLitePosition.query\
+            .filter_by(portfolio=self)\
+            .filter_by(symbol=position.get_symbol())\
+            .first()
+
+        if matching_position is not None:
+            raise OperationalException("Position already exists")
+
+        self.positions.append(position)
+        db.session.commit()
+
+    def add_positions(self, positions):
+
+        for position in positions:
+            from investing_algorithm_framework.core.models import \
+                SQLLitePosition
+
+            if isinstance(position, Position):
+                position = SQLLitePosition.from_position(position)
+
+            if isinstance(position, dict):
+                position = SQLLitePosition.from_dict(position)
+
+            if not isinstance(position, SQLLitePosition):
+                raise OperationalException("The object is not a Position")
+
+            matching_position = SQLLitePosition.query \
+                .filter_by(portfolio=self) \
+                .filter_by(symbol=position.get_symbol()) \
+                .first()
+
+            if matching_position is not None:
+                raise OperationalException("Position already exists")
+
+            self.positions.append(position)
+
+        db.session.commit()
+
     def _validate_order(self, order):
-        order_validator = OrderValidatorFactory.of(self.market)
+        order_validator = OrderValidatorFactory.of(self.identifier)
         order_validator.validate(order, self)
 
     def _add_order_to_position(self, order):
@@ -163,12 +243,11 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
                     "Sell order can 't be added to non existing position"
                 )
 
-        position.orders.append(order)
+        position.add_order(order)
         db.session.commit()
 
     def create_order(
         self,
-        algorithm_context,
         target_symbol,
         price=None,
         amount_trading_symbol=None,
@@ -199,14 +278,6 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
     def get_trading_symbol(self):
         return self.trading_symbol
 
-    def get_positions(self, symbol: str = None):
-        query_set = self.positions
-
-        if symbol is not None:
-            query_set = query_set.filter_by(symbol=symbol)
-
-        return query_set.all()
-
     def get_number_of_positions(self):
         return self._positions.count()
 
@@ -219,8 +290,20 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
             .filter(SQLLiteOrder.position_id.in_(position_ids)) \
             .count()
 
+    def get_order(self, reference_id):
+        from investing_algorithm_framework.core.models import SQLLitePosition
+        position_ids = SQLLitePosition.query\
+            .filter_by(portfolio=self)\
+            .with_entities(SQLLitePosition.id)
+
+        return SQLLiteOrder.query\
+            .filter(SQLLiteOrder.position_id.in_(position_ids))\
+            .filter_by(reference_id=reference_id)\
+            .first()
+
     def get_orders(
         self,
+        type=None,
         status: OrderStatus = None,
         side: OrderSide = None,
         target_symbol: str = None,
@@ -245,12 +328,29 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
             query_set = query_set.filter_by(trading_symbol=trading_symbol)
 
         if side:
-            query_set = query_set.filter_by(order_side=side)
+            side = OrderSide.from_value(side)
+            query_set = query_set.filter_by(side=side.value)
+
+        if type:
+            type = OrderType.from_value(type)
+            query_set = query_set.filter_by(type=type.value)
 
         if lazy:
             return query_set
 
         return query_set.all()
+
+    def get_position(self, symbol) -> Position:
+
+        if symbol is not None:
+            symbol = symbol.upper()
+            query_set = self.positions
+            return query_set.filter_by(symbol=symbol).first()
+        else:
+            return None
+
+    def get_positions(self) -> List[Position]:
+        return self.positions.all()
 
     def get_unallocated(self) -> Position:
         return self.positions.filter_by(symbol=self.trading_symbol).first()
