@@ -23,6 +23,18 @@ class Order:
         closing_price=None,
         reference_id=None
     ):
+        target_symbol = target_symbol.upper()
+        trading_symbol = trading_symbol.upper()
+
+        if side is None:
+            raise OperationalException("Order side is not set")
+
+        if type is None:
+            raise OperationalException("Order type is not set")
+
+        if status is None:
+            raise OperationalException("Status is not set")
+
         self.reference_id = reference_id
         self.target_symbol = target_symbol
         self.trading_symbol = trading_symbol
@@ -129,6 +141,9 @@ class Order:
     def get_initial_price(self):
         return self.initial_price
 
+    def set_initial_price(self, initial_price):
+        self.initial_price = initial_price
+
     def get_price(self):
 
         if OrderStatus.CLOSED.equals(self.status):
@@ -136,8 +151,14 @@ class Order:
 
         return self.price
 
+    def set_price(self, price):
+        self.price = price
+
     def get_closing_price(self):
         return self.closing_price
+
+    def set_closing_price(self, closing_price):
+        self.closing_price = closing_price
 
     def get_side(self):
         return self.side
@@ -154,8 +175,37 @@ class Order:
     def get_amount_target_symbol(self):
         return self.amount_target_symbol
 
+    def set_reference_id(self, reference_id):
+        self.reference_id = reference_id
+
+    def set_amount_target_symbol(self, amount_target_symbol):
+        self.amount_target_symbol = amount_target_symbol
+
     def get_amount_trading_symbol(self):
         return self.amount_trading_symbol
+
+    def set_amount_trading_symbol(self, amount_trading_symbol):
+        self.amount_trading_symbol = amount_trading_symbol
+
+    def update(self, status=None, price=None, initial_price=None, closing_price=None, amount_target_symbol=None, amount_trading_symbol=None):
+
+        if status is not None:
+            self.set_status(status)
+
+        if price is not None:
+            self.set_price(price)
+
+        if initial_price is not None:
+            self.set_initial_price(initial_price)
+
+        if closing_price is not None:
+            self.set_closing_price(closing_price)
+
+        if amount_target_symbol is not None:
+            self.set_amount_target_symbol(amount_target_symbol)
+
+        if amount_trading_symbol is not None:
+            self.set_amount_trading_symbol(amount_trading_symbol)
 
     @staticmethod
     def from_dict(data: dict):
@@ -212,6 +262,7 @@ class Order:
     def to_string(self):
         return self.repr(
             reference_id=self.get_reference_id(),
+            symbol=f"{self.get_target_symbol()}/{self.get_trading_symbol()}",
             status=self.get_status(),
             initial_price=self.get_initial_price(),
             price=self.get_price(),

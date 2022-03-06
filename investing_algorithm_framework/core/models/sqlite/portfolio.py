@@ -1,9 +1,8 @@
-from typing import List
 from datetime import datetime
 from random import randint
+from typing import List
 
-from sqlalchemy import UniqueConstraint, event
-from sqlalchemy.ext.hybrid import hybrid_property
+from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import validates
 
 from investing_algorithm_framework.core.exceptions import OperationalException
@@ -33,34 +32,6 @@ def random_id():
 
 
 class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
-
-    """
-    Class Portfolio: a database model for an
-    AlgorithmPortfolio instance.
-
-    Attributes:
-    A AlgorithmPortfolio instance consists out of the following attributes:
-
-    - id: unique identification
-    - algorithm_id: reference to the Algorithm instance (Algorithm Service)
-    - free_fraction: fraction of the AlgorithmPortfolio that can be
-    freely invested
-    - invested_fraction: fraction of the AlgorithmPortfolio that is
-    already invested
-    - net_profit_percentage: lifetime return of the AlgorithmPortfolio
-    - created_at: The datetime the portfolio was created
-    - updated_at: The datetime the portfolio was updated
-
-    Relationships:
-    - algorithm_orders: all the AlgorithmOrders which belong to the
-    AlgorithmPortfolio
-    - algorithm_positions: all the AlgorithmPositions which belong to the
-    AlgorithmPortfolio
-
-    During creation of a AlgorithmPortfolio, you need to provide an
-    Algorithm Id.
-    """
-
     __tablename__ = "portfolios"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -125,6 +96,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
             self.add_positions(positions)
 
         if orders is not None:
+            print("adding sqlite orders")
             self.add_orders(orders)
 
     def add_order(self, order):
@@ -189,7 +161,6 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
         db.session.commit()
 
     def add_positions(self, positions):
-
         for position in positions:
             from investing_algorithm_framework.core.models import \
                 SQLLitePosition
@@ -209,11 +180,13 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
                 .first()
 
             if matching_position is not None:
-                raise OperationalException("Position already exists")
-
-            self.positions.append(position)
-
-        db.session.commit()
+                matching_position.set_amount(position.get_amount())
+                matching_position.set_price(position.get_price())
+                db.session.commit()
+            else:
+                print(position.get_symbol())
+                self.positions.append(position)
+                db.session.commit()
 
     def _validate_order(self, order):
         order_validator = OrderValidatorFactory.of(self.identifier)
@@ -223,7 +196,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
         from investing_algorithm_framework.core.models import SQLLitePosition
 
         position = SQLLitePosition.query \
-            .filter_by(symbol=order.target_symbol) \
+            .filter_by(symbol=order.get_target_symbol()) \
             .filter_by(portfolio=self) \
             .first()
 
@@ -240,7 +213,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
 
             if position is None:
                 raise OperationalException(
-                    "Sell order can 't be added to non existing position"
+                    "Sell order can't be added to non existing position"
                 )
 
         position.add_order(order)
@@ -341,11 +314,16 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
         return query_set.all()
 
     def get_position(self, symbol) -> Position:
+        from investing_algorithm_framework.core.models.sqlite \
+            import SQLLitePosition
 
         if symbol is not None:
             symbol = symbol.upper()
             query_set = self.positions
-            return query_set.filter_by(symbol=symbol).first()
+            return query_set.filter()\
+                .filter(SQLLitePosition.amount > 0)\
+                .filter_by(symbol=symbol)\
+                .first()
         else:
             return None
 
@@ -376,3 +354,24 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
 
     def __repr__(self):
         return self.to_string()
+
+    @staticmethod
+    def from_dict(data):
+        if data is None:
+            return None
+
+        portfolio = SQLLitePortfolio.query\
+            .filter_by(identifier=data.get("identifier", None))\
+            .first()
+
+        if portfolio is None:
+            return SQLLitePortfolio(
+                identifier=data.get("identifier", None),
+                trading_symbol=data.get("trading_symbol", None),
+                positions=data.get("positions", None),
+                orders=data.get("orders", None)
+            )
+
+        portfolio.add_positions(data.get("orders", None))
+        # portfolio.add_orders(data.get("orders", None))
+        return portfolio

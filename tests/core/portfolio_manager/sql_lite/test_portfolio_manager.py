@@ -1,5 +1,5 @@
 from investing_algorithm_framework import OrderSide, OrderType, OrderStatus, \
-    Position, Portfolio, Order
+    Position, Portfolio, OperationalException
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
@@ -30,16 +30,6 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
             portfolio_manager.get_positions(self.algo_app.algorithm)
         )
 
-        order = portfolio_manager.create_order(
-            type=OrderType.LIMIT,
-            side=OrderSide.BUY,
-            price=self.get_price(self.TARGET_SYMBOL_A).price,
-            amount_target_symbol=1,
-            target_symbol=self.TARGET_SYMBOL_A,
-            algorithm_context=None,
-        )
-
-        portfolio_manager.add_order(order, algorithm_context=None)
         positions = portfolio_manager.get_positions(self.algo_app.algorithm)
         self.assertTrue(isinstance(positions[0], Position))
 
@@ -58,19 +48,9 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager('sqlite')
 
-        order = portfolio_manager.create_order(
-            type=OrderType.LIMIT,
-            side=OrderSide.BUY,
-            price=self.get_price(self.TARGET_SYMBOL_A).price,
-            amount_target_symbol=1,
-            target_symbol=self.TARGET_SYMBOL_A,
-            algorithm_context=None,
+        self.assertIsNotNone(
+            portfolio_manager.get_orders(self.algo_app.algorithm)
         )
-
-        portfolio_manager.add_order(order, algorithm_context=None)
-        orders = portfolio_manager.get_orders(algorithm_context=None)
-        self.assertIsNotNone(orders)
-        self.assertTrue(isinstance(orders[0], Order))
 
     def test_initialize(self):
         self.assertTrue(
@@ -86,16 +66,64 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
             side=OrderSide.BUY.value,
             amount_target_symbol=1,
             target_symbol=self.TARGET_SYMBOL_A,
-            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            price=self.BASE_SYMBOL_A_PRICE,
             algorithm_context=None
         )
 
         self.assertIsNotNone(order)
         self.assert_is_limit_order(order)
 
-    def test_create_limit_sell_order(self):
-        portfolio_manager = self.algo_app.algorithm\
+    def test_add_order(self):
+        portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager('sqlite')
+
+        order = portfolio_manager.create_order(
+            type=OrderType.LIMIT.value,
+            side=OrderSide.BUY.value,
+            amount_target_symbol=1,
+            target_symbol=self.TARGET_SYMBOL_A,
+            price=self.BASE_SYMBOL_A_PRICE,
+            algorithm_context=None
+        )
+        order.set_status(OrderStatus.SUCCESS)
+        order.set_reference_id(2)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        position = portfolio.get_position(self.TARGET_SYMBOL_A)
+        self.assertIsNone(position)
+        self.assertEqual(0, len(portfolio.get_orders()))
+        self.assertEqual(1, len(portfolio.get_positions()))
+        portfolio_manager.add_order(order, algorithm_context=None)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        position = portfolio.get_position(self.TARGET_SYMBOL_A)
+        self.assertEqual(1, len(portfolio.get_orders()))
+        self.assertEqual(2, len(portfolio.get_positions()))
+        self.assertEqual(1, position.get_amount())
+
+    def test_add_sell_order(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager('sqlite')
+
+        order = portfolio_manager.create_order(
+            type=OrderType.LIMIT.value,
+            side=OrderSide.BUY.value,
+            amount_target_symbol=1,
+            target_symbol=self.TARGET_SYMBOL_A,
+            price=self.BASE_SYMBOL_A_PRICE,
+            algorithm_context=None
+        )
+        order.set_status(OrderStatus.SUCCESS)
+        order.set_reference_id(2)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        position = portfolio.get_position(self.TARGET_SYMBOL_A)
+        self.assertIsNone(position)
+        self.assertEqual(0, len(portfolio.get_orders()))
+        self.assertEqual(1, len(portfolio.get_positions()))
+        portfolio_manager.add_order(order, algorithm_context=None)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        position = portfolio.get_position(self.TARGET_SYMBOL_A)
+        self.assertEqual(1, len(portfolio.get_orders()))
+        self.assertEqual(2, len(portfolio.get_positions()))
+        self.assertEqual(1, position.get_amount())
 
         order = portfolio_manager.create_order(
             type=OrderType.LIMIT.value,
@@ -105,32 +133,71 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
             price=self.BASE_SYMBOL_A_PRICE,
             algorithm_context=None
         )
+        order.set_reference_id(3)
+        order.set_status(OrderStatus.SUCCESS)
+        portfolio_manager.add_order(order, algorithm_context=None)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        position = portfolio.get_position(self.TARGET_SYMBOL_A)
+        self.assertEqual(2, len(portfolio.get_orders()))
+        self.assertEqual(2, len(portfolio.get_positions()))
+        self.assertEqual(0, position.get_amount())
 
-        self.assertIsNotNone(order)
-        self.assertTrue(OrderStatus.TO_BE_SENT.equals(order.status))
-        self.assert_is_limit_order(order)
+    def test_add_buy_order_larger_then_unallocated(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager('sqlite')
 
-    def test_create_market_sell_order(self):
-        portfolio_manager = self.algo_app.algorithm\
+        with self.assertRaises(OperationalException) as exc:
+            portfolio_manager.create_order(
+                type=OrderType.LIMIT.value,
+                side=OrderSide.BUY.value,
+                amount_target_symbol=10000,
+                target_symbol=self.TARGET_SYMBOL_A,
+                price=self.BASE_SYMBOL_A_PRICE,
+                algorithm_context=None
+            )
+
+        self.assertEqual(
+            "Order amount 500000 USDT is larger then unallocated "
+            "position 10000 USDT",
+            exc.exception.error_message
+        )
+
+    def test_add_sell_order_without_position(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager('sqlite')
+
+        with self.assertRaises(OperationalException):
+            portfolio_manager.create_order(
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_target_symbol=10000,
+                target_symbol=self.TARGET_SYMBOL_A,
+                price=self.BASE_SYMBOL_A_PRICE,
+                algorithm_context=None
+            )
+
+    def test_add_sell_order_larger_then_position(self):
+        portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager('sqlite')
 
         order = portfolio_manager.create_order(
-            type=OrderType.MARKET,
-            side=OrderSide.SELL,
+            type=OrderType.LIMIT.value,
+            side=OrderSide.BUY.value,
             amount_target_symbol=1,
             target_symbol=self.TARGET_SYMBOL_A,
-            algorithm_context=None,
+            price=self.BASE_SYMBOL_A_PRICE,
+            algorithm_context=None
         )
+        order.set_status(OrderStatus.SUCCESS)
+        order.set_reference_id(2)
+        portfolio_manager.add_order(order, algorithm_context=None)
 
-        self.assertIsNotNone(order)
-        self.assertTrue(OrderStatus.TO_BE_SENT.equals(order.status))
-        self.assert_is_market_order(order)
-
-    def test_order_set_executed(self):
-        pass
-
-    def test_order_set_pending(self):
-        pass
-
-    def test_order_set_canceled(self):
-        pass
+        with self.assertRaises(OperationalException):
+            portfolio_manager.create_order(
+                type=OrderType.LIMIT.value,
+                side=OrderSide.SELL.value,
+                amount_target_symbol=10000,
+                target_symbol=self.TARGET_SYMBOL_A,
+                price=self.BASE_SYMBOL_A_PRICE,
+                algorithm_context=None
+            )

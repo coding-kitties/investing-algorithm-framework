@@ -1,6 +1,5 @@
-from datetime import datetime
 from investing_algorithm_framework.core.models import Position, Portfolio, \
-    Order, OrderStatus, OrderType, OrderSide, db
+    Order, OrderStatus, OrderType, OrderSide, db, SQLLitePortfolio
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
@@ -172,24 +171,48 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
 
-        self.create_buy_order(
-            1,
-            self.TARGET_SYMBOL_A,
-            self.get_price(self.TARGET_SYMBOL_A, date=datetime.utcnow()).price,
-            portfolio_manager,
-            10
-        )
+        orders = [
+            Order.from_dict(
+                {
+                    "reference_id": 2,
+                    "target_symbol": self.TARGET_SYMBOL_A,
+                    "trading_symbol": "usdt",
+                    "amount_target_symbol": 4,
+                    "price": self.get_price(self.TARGET_SYMBOL_A).price,
+                    "status": OrderStatus.PENDING.value,
+                    "side": OrderSide.BUY.value,
+                    "type": OrderType.LIMIT.value
+                }
+            ),
+            Order.from_dict(
+                {
+                    "reference_id": 3,
+                    "target_symbol": self.TARGET_SYMBOL_A,
+                    "trading_symbol": "usdt",
+                    "amount_target_symbol": 4,
+                    "price": self.get_price(self.TARGET_SYMBOL_A).price,
+                    "status": OrderStatus.SUCCESS.value,
+                    "initial_price": self.get_price(
+                        self.TARGET_SYMBOL_A).price,
+                    "side": OrderSide.BUY.value,
+                    "type": OrderType.LIMIT.value
+                }
+            )
+        ]
 
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
-        self.assertEqual(2, len(portfolio.get_orders()))
+        portfolio.add_orders(orders)
+
+        self.assertEqual(3, len(portfolio.get_orders()))
         self.assertEqual(
-            0, len(portfolio.get_orders(status=OrderStatus.SUCCESS))
+            1, len(portfolio.get_orders(status=OrderStatus.SUCCESS))
         )
         self.assertEqual(
-            1, len(portfolio.get_orders(status=OrderStatus.PENDING))
+            2, len(portfolio.get_orders(status=OrderStatus.PENDING))
         )
+
         self.assertEqual(
-            1, len(portfolio.get_orders(status=OrderStatus.TO_BE_SENT))
+            0, len(portfolio.get_orders(status=OrderStatus.TO_BE_SENT))
         )
         self.assertEqual(
             0, len(portfolio.get_orders(side=OrderSide.SELL))
@@ -198,15 +221,22 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
             0, len(portfolio.get_orders(type=OrderType.MARKET))
         )
         self.assertEqual(
+            2, len(portfolio.get_orders(
+                status=OrderStatus.PENDING,
+                type=OrderType.LIMIT,
+                side=OrderSide.BUY
+            ))
+        )
+        self.assertEqual(
             1, len(portfolio.get_orders(
-                status=OrderStatus.TO_BE_SENT,
+                status=OrderStatus.SUCCESS,
                 type=OrderType.LIMIT,
                 side=OrderSide.BUY
             ))
         )
 
     def test_from_dict(self):
-        portfolio = Portfolio.from_dict(
+        portfolio = SQLLitePortfolio.from_dict(
             {
                 "identifier": "BINANCE",
                 "trading_symbol": "USDT",
@@ -226,32 +256,47 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(0, len(portfolio.get_orders()))
 
     def test_from_dict_with_orders(self):
-        portfolio = Portfolio(
-            orders=[
-                Order(
-                    trading_symbol="USDT",
-                    target_symbol=self.TARGET_SYMBOL_A,
-                    status=OrderStatus.PENDING,
-                    price=10,
-                    amount_target_symbol=10,
-                    side=OrderSide.BUY,
-                    type=OrderType.LIMIT
-                )
-            ],
-            identifier="BINANCE",
-            trading_symbol="USDT",
-            positions=[
-                Position(amount=10, symbol=self.TARGET_SYMBOL_A, price=10),
-                Position(amount=10, symbol="USDT")
-            ],
-            market="BINANCE"
+        portfolio = SQLLitePortfolio.from_dict(
+            {
+                "identifier": "BINANCE",
+                "trading_symbol": "USDT",
+                "market": "BINANCE",
+                "positions": [
+                    {"symbol": "USDT", "amount": 10000},
+                    {"symbol": "DOT", "amount": 40},
+                    {"symbol": "BTC", "amount": 0.04},
+                ],
+                "orders": [
+                    {
+                        "reference_id": 1,
+                        "target_symbol": "DOT",
+                        "trading_symbol": "USDT",
+                        "amount_target_symbol": 40,
+                        "status": "PENDING",
+                        "price": 10,
+                        "type": "MARKET",
+                        "side": "BUY"
+                    },
+                    {
+                        "reference_id": 2,
+                        "target_symbol": "DOT",
+                        "trading_symbol": "USDT",
+                        "amount_target_symbol": 40,
+                        "status": "PENDING",
+                        "price": 10,
+                        "type": "MARKET",
+                        "side": "BUY"
+                    }
+                ]
+            }
         )
+
         self.assertIsNotNone(portfolio.get_identifier())
         self.assertIsNotNone(portfolio.get_trading_symbol())
         self.assertIsNotNone(portfolio.get_unallocated())
         self.assertIsNotNone(portfolio.get_positions())
-        self.assertEqual(2, len(portfolio.get_positions()))
-        self.assertEqual(1, len(portfolio.get_orders()))
+        self.assertEqual(3, len(portfolio.get_positions()))
+        self.assertEqual(2, len(portfolio.get_orders()))
 
     def test_to_dict(self):
         portfolio_manager = self.algo_app.algorithm \

@@ -46,7 +46,6 @@ class PortfolioManagerTest(SQLLitePortfolioManager):
 
     def get_positions(self, algorithm_context, **kwargs) -> List[Position]:
         return [
-            Position(amount=10, symbol=TestBase.TARGET_SYMBOL_A),
             Position(
                 amount=10000,
                 symbol=self.get_trading_symbol(algorithm_context)
@@ -54,17 +53,7 @@ class PortfolioManagerTest(SQLLitePortfolioManager):
         ]
 
     def get_orders(self, algorithm_context, **kwargs) -> List[Order]:
-        return [
-            Order(
-                amount_target_symbol=10,
-                target_symbol=TestBase.TARGET_SYMBOL_A,
-                trading_symbol=self.trading_symbol,
-                side=OrderSide.BUY,
-                status=OrderStatus.PENDING,
-                price=10,
-                type=OrderType.LIMIT
-            )
-        ]
+        return []
 
 
 class DefaultPortfolioManager(PortfolioManager):
@@ -73,7 +62,6 @@ class DefaultPortfolioManager(PortfolioManager):
 
     def initialize(self, algorithm_context):
         super(DefaultPortfolioManager, self).initialize(algorithm_context)
-        print("initializationg")
 
     def get_price(
         self, target_symbol, trading_symbol, algorithm_context, **kwargs
@@ -87,7 +75,6 @@ class DefaultPortfolioManager(PortfolioManager):
 
     def get_positions(self, algorithm_context, **kwargs) -> List[Position]:
         return [
-            Position(amount=10, symbol=TestBase.TARGET_SYMBOL_A),
             Position(
                 amount=10000,
                 symbol=self.get_trading_symbol(algorithm_context)
@@ -95,17 +82,7 @@ class DefaultPortfolioManager(PortfolioManager):
         ]
 
     def get_orders(self, algorithm_context, **kwargs) -> List[Order]:
-        return [
-            Order(
-                amount_target_symbol=10,
-                target_symbol=TestBase.TARGET_SYMBOL_A,
-                trading_symbol=self.trading_symbol,
-                side=OrderSide.BUY,
-                status=OrderStatus.PENDING,
-                price=10,
-                type=OrderType.LIMIT
-            )
-        ]
+        return []
 
 
 class OrderExecutorTest(OrderExecutor):

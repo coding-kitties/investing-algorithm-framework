@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 from abc import abstractmethod, ABC
 from typing import List
 
@@ -5,17 +6,19 @@ from investing_algorithm_framework.configuration.constants import \
     TRADING_SYMBOL
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.identifier import Identifier
-from investing_algorithm_framework.core.market_identifier import \
-    MarketIdentifier
 from investing_algorithm_framework.core.models import OrderSide, OrderType, \
     Portfolio
-from investing_algorithm_framework.core.models.position import Position
 from investing_algorithm_framework.core.models.order import Order, OrderStatus
+from investing_algorithm_framework.core.models.position import Position
+from investing_algorithm_framework.core.order_validators import \
+    OrderValidatorFactory
 
 
 class PortfolioManager(ABC, Identifier):
     trading_symbol = None
     portfolio = None
+    last_updated = None
+    update_minutes = 5
 
     @abstractmethod
     def get_positions(self, algorithm_context, **kwargs) -> List[Position]:
@@ -59,7 +62,27 @@ class PortfolioManager(ABC, Identifier):
                 orders=self.get_orders(algorithm_context)
             )
 
+        if self._requires_update():
+            orders = self.get_orders(algorithm_context)
+            positions = self.get_positions(algorithm_context)
+            self.portfolio.add_positions(positions)
+            self.portfolio.add_orders(orders)
+
+            for position in self.portfolio.get_positions():
+                position.set_price(
+                    self.get_price(
+                        position.get_symbol(),
+                        self.get_trading_symbol(algorithm_context),
+                        algorithm_context
+                    )
+                )
+
         return self.portfolio
+
+    def _requires_update(self):
+        update_time = datetime.utcnow() \
+                      + timedelta(minutes=-self.update_minutes)
+        return self.last_updated is None or update_time > self.last_updated
 
     def create_order(
         self,
@@ -71,7 +94,10 @@ class PortfolioManager(ABC, Identifier):
         side=OrderSide.BUY.value,
         algorithm_context=None
     ) -> Order:
-        return Order(
+        portfolio = self.get_portfolio(algorithm_context=algorithm_context)
+        unallocated = portfolio.get_unallocated()
+
+        order = Order(
             target_symbol=target_symbol,
             trading_symbol=self.get_trading_symbol(algorithm_context),
             price=price,
@@ -81,6 +107,39 @@ class PortfolioManager(ABC, Identifier):
             side=side,
             status=OrderStatus.TO_BE_SENT.value
         )
+
+        if OrderSide.BUY.equals(order.get_side()) and OrderType.LIMIT.equals(order.type):
+            total = order.get_amount_target_symbol() * order.get_price()
+
+            if total > unallocated.get_amount():
+                raise OperationalException(
+                    f"Order amount {total} {unallocated.get_symbol()} is "
+                    f"larger then unallocated "
+                    f"position {unallocated.get_amount()} "
+                    f"{unallocated.get_symbol()}"
+                )
+        elif OrderSide.SELL.equals(order.get_side()):
+            portfolio = self.get_portfolio(algorithm_context)
+            position = portfolio.get_position(order.get_target_symbol())
+
+            if position is None:
+                raise OperationalException(
+                    f"Can't create sell order for non existing position"
+                )
+
+            if position.get_amount() < order.get_amount_target_symbol():
+                raise OperationalException(
+                    f"Sell amount {order.get_amount_target_symbol()} "
+                    f"{order.get_target_symbol()} is "
+                    f"larger then position {position.get_amount()} "
+                    f"{position.get_symbol()}"
+                )
+
+        # Validate the order
+        order_validator = OrderValidatorFactory.of(self.identifier)
+        order_validator.validate(order, self)
+
+        return order
 
     def add_order(self, order, algorithm_context):
         portfolio = self.get_portfolio(algorithm_context)

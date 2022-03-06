@@ -1,6 +1,5 @@
-from investing_algorithm_framework.core.models import Order, OrderSide, \
-    OrderType, OrderStatus
 from investing_algorithm_framework import OperationalException
+from investing_algorithm_framework.core.models import Order
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 

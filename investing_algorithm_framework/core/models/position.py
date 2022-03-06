@@ -7,27 +7,12 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 class Position:
 
     def __init__(self, symbol, amount=0, price=None, orders=None):
-        self.symbol = symbol
+        self.symbol = symbol.upper()
         self.amount = amount
         self.price = price
         self.cost = 0
-
-        self.initialize_orders(orders)
-
-    def initialize_orders(self, orders):
         self.orders = []
-
-        if orders is not None:
-            for order in orders:
-
-                if isinstance(order, dict):
-                    order = Order.from_dict(order)
-                elif not isinstance(order, Order):
-                    raise OperationalException(
-                        "Order data model not supported"
-                    )
-
-            self.orders.append(order)
+        self.add_orders(orders)
 
     def get_symbol(self):
         return self.symbol
@@ -44,30 +29,42 @@ class Position:
 
         if hasattr(self, "orders"):
             selected_orders = self.orders.copy()
+            loop_list = selected_orders.copy()
 
             if status is not None:
 
-                for order in selected_orders:
-                    if not OrderStatus.from_value(
-                            order.get_status()).equals(status):
+                for order in loop_list:
+                    if not order.get_status().equals(status):
                         selected_orders.remove(order)
+
+            loop_list = selected_orders.copy()
 
             if type is not None:
 
-                for order in selected_orders:
-                    if not OrderType.from_value(
-                            order.get_type()).equals(type):
+                for order in loop_list:
+                    if not OrderType.from_value(order.get_type()).equals(type):
                         selected_orders.remove(order)
+
+            loop_list = selected_orders.copy()
 
             if side is not None:
-                for order in selected_orders:
-                    if not OrderSide.from_value(
-                            order.get_side()).equals(side):
+                for order in loop_list:
+                    if not OrderSide.from_value(order.get_side()).equals(side):
                         selected_orders.remove(order)
 
-        return selected_orders
+            return selected_orders
+        else:
+            return []
 
     def add_order(self, order: Order):
+
+        # Check if the reference id is set
+        if order.get_reference_id() is None:
+            raise OperationalException(
+                "Can't add order to position with no reference id defined"
+            )
+
+        # Check if the order belongs to this position
         if order.get_target_symbol() != self.get_symbol():
             raise OperationalException(
                 "Order does not belong to this position"
@@ -79,43 +76,83 @@ class Position:
             None
         )
 
-        if matching_order:
-            raise OperationalException("Order already exists")
+        if matching_order is not None:
+            matching_order.update(
+                status=order.get_status(),
+                price=order.get_price(),
+                initial_price=order.get_initial_price(),
+                closing_price=order.get_closing_price(),
+                amount_trading_symbol=order.get_amount_trading_symbol(),
+                amount_target_symbol=order.get_amount_target_symbol()
+            )
         else:
-            if OrderStatus.SUCCESS.equals(order.status) \
-                    and OrderSide.BUY.equals(order.side):
-                self.amount += order.get_amount_target_symbol() \
-                               * order.get_price()
+            if OrderStatus.SUCCESS.equals(order.status):
+
+                if OrderSide.BUY.equals(order.side):
+                    self.amount += order.get_amount_target_symbol()
+                else:
+                    self.amount -= order.get_amount_target_symbol()
+
             self.orders.append(order)
 
     def add_orders(self, orders: List):
 
-        for order in orders:
+        if orders is not None:
 
-            if order.get_target_symbol() != self.get_symbol():
-                raise OperationalException(
-                    "Order does not belong to this position"
+            for order in orders:
+
+                if isinstance(order, dict):
+                    order = Order.from_dict(order)
+
+                # Check if the reference id is set
+                if order.get_reference_id() is None:
+                    raise OperationalException(
+                        "Can't add order to position with no reference "
+                        "id defined"
+                    )
+
+                if order.get_target_symbol() != self.get_symbol():
+                    raise OperationalException(
+                        "Order does not belong to this position"
+                    )
+
+                matching = next(
+                    (old_order for old_order in self.orders
+                     if old_order.get_reference_id() == order.get_reference_id()),
+                    None
                 )
 
-            matching_order = next(
-                (old_order for old_order in self.orders
-                 if old_order.get_reference_id() == order.get_reference_id()),
-                None
-            )
+                if not matching:
 
-            if not matching_order:
+                    if OrderStatus.SUCCESS.equals(order.status):
+                        if OrderSide.BUY.equals(order.side):
+                            self.amount += order.get_amount_target_symbol()
+                        else:
+                            self.amount -= order.get_amount_target_symbol()
 
-                if OrderStatus.SUCCESS.equals(order.status) \
-                        and OrderSide.BUY.equals(order.side):
-                    self.amount += order.get_amount_target_symbol() \
-                                   * order.get_price()
-                self.orders.append(order)
+                    self.orders.append(order)
+
+                else:
+                    matching.update(
+                        status=order.get_status(),
+                        price=order.get_price(),
+                        initial_price=order.get_initial_price(),
+                        closing_price=order.get_closing_price(),
+                        amount_trading_symbol=order.get_amount_trading_symbol(),
+                        amount_target_symbol=order.get_amount_target_symbol()
+                    )
 
     def get_amount(self):
         return self.amount
 
+    def set_amount(self, amount):
+        self.amount = amount
+
     def get_price(self):
         return self.price
+
+    def set_price(self, price):
+        self.price = price
 
     def get_cost(self):
 

@@ -1,22 +1,20 @@
 from typing import List
-from abc import abstractmethod, ABC
 
+from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.identifier import Identifier
-from investing_algorithm_framework.core.market_identifier import \
-    MarketIdentifier
 from investing_algorithm_framework.core.models import db, SQLLitePortfolio, \
     OrderType, OrderSide, Portfolio, SQLLiteOrder, OrderStatus, \
     SQLLitePosition, Position
 from investing_algorithm_framework.core.portfolio_managers.portfolio_manager \
     import PortfolioManager
-from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.core.order_validators import \
+    OrderValidatorFactory
 
 
 class SQLLitePortfolioManager(PortfolioManager, Identifier):
     trading_symbol = None
 
     def initialize(self, algorithm_context):
-        print("initialize")
         self._initialize_portfolio(algorithm_context)
 
     def _initialize_portfolio(self, algorithm_context):
@@ -52,7 +50,7 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier):
         portfolio = self.get_portfolio(algorithm_context)
 
         if sync:
-            positions = self.get_positions_from_broker(algorithm_context)
+            positions = self.get_positions(algorithm_context)
             old_positions = portfolio.get_positions()
 
             for position in positions:
@@ -92,7 +90,7 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier):
             from investing_algorithm_framework import current_app
             algorithm_context = current_app.algorithm
 
-        return SQLLiteOrder(
+        order = SQLLiteOrder(
             reference_id=None,
             type=type,
             status=status,
@@ -103,6 +101,11 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier):
             amount_trading_symbol=amount_trading_symbol,
             amount_target_symbol=amount_target_symbol,
         )
+
+        # Validate the order
+        order_validator = OrderValidatorFactory.of(self.identifier)
+        order_validator.validate(order, self)
+        return order
 
     def add_order(self, order, algorithm_context):
         self.get_portfolio(algorithm_context).add_order(order)

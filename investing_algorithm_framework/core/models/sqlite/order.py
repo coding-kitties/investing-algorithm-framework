@@ -2,8 +2,6 @@ import logging
 from datetime import datetime
 from random import randint
 
-from sqlalchemy.orm import validates
-
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import db, OrderType, \
     OrderStatus, OrderSide, Order
@@ -31,10 +29,10 @@ def random_id():
 
 class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
     """
-        Class AlgorithmOrder: a database model for an AlgorithmOrder instance.
+        Class SQLLiteOrder: a sqlite database model for an Order instance.
 
         Attributes:
-        An AlgorithmOrder instance consists out of the following attributes:
+        An SQLLiteOrder instance consists out of the following attributes:
 
         - id: unique identification also used externally
         - target_symbol: the target asset symbol of the order
@@ -45,12 +43,9 @@ class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
         The following attributes are OPTIONAL:
 
         - price: the price of the target symbol (in trading symbol currency)
-        - amount: the amount of the target symbol
-
-        Updated post-execution:
-
-        for all child orders
-        - completed_at: DateTime the order was marked as completed
+        - initial_price: the initial price when the order was executed
+        - closing_price: the closing price when the order was closed
+        (BUY order only)
 
         Relations:
 
@@ -60,29 +55,14 @@ class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
 
     __tablename__ = "orders"
 
-    # Integer id for the Order as the primary key
     id = db.Column(
-        db.Integer,
-        primary_key=True,
-        unique=True,
-        default=random_id
+        db.Integer, primary_key=True, unique=True, default=random_id
     )
     reference_id = db.Column(db.Integer)
     target_symbol = db.Column(db.String)
     trading_symbol = db.Column(db.String)
-
-    side = db.Column(
-        db.String,
-        nullable=False,
-        default=OrderSide.BUY.value
-    )
-    type = db.Column(
-        db.String,
-        nullable=False,
-        default=OrderType.LIMIT.value
-    )
-
-    # The price and amount of the asset
+    side = db.Column(db.String, nullable=False, default=OrderSide.BUY.value)
+    type = db.Column(db.String, nullable=False, default=OrderType.LIMIT.value)
     initial_price = db.Column(db.Float)
     closing_price = db.Column(db.Float)
     price = db.Column(db.Float)
@@ -90,39 +70,27 @@ class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
     amount_trading_symbol = db.Column(db.Float)
     amount_target_symbol = db.Column(db.Float)
     status = db.Column(db.String)
-
-    position_id = db.Column(
-        db.Integer, db.ForeignKey('positions.id')
-    )
+    position_id = db.Column(db.Integer, db.ForeignKey('positions.id'))
     position = db.relationship("SQLLitePosition", back_populates="orders")
-
-    # Standard date time attributes
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(
-        db.DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
-    )
-
-    # Post execution
-    executed_at = db.Column(db.DateTime)
 
     def __init__(
-            self,
-            side,
-            type,
-            target_symbol,
-            trading_symbol,
-            status,
-            reference_id=None,
-            initial_price=None,
-            closing_price=None,
-            price=None,
-            amount_target_symbol=None,
-            amount_trading_symbol=None,
-            **kwargs
+        self,
+        side,
+        type,
+        target_symbol,
+        trading_symbol,
+        status,
+        reference_id=None,
+        initial_price=None,
+        closing_price=None,
+        price=None,
+        amount_target_symbol=None,
+        amount_trading_symbol=None,
+        **kwargs
     ):
-
+        target_symbol = target_symbol.upper()
+        trading_symbol = trading_symbol.upper()
         super().__init__(target_symbol, trading_symbol, type, side, status,
                          amount_trading_symbol, amount_target_symbol, price,
                          initial_price, closing_price, reference_id)
@@ -135,32 +103,29 @@ class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
     def set_amount_target_symbol(self, amount):
         self.amount_target_symbol = amount
 
-        if OrderType.LIMIT.equals(self.order_type):
-            self.amount_trading_symbol = \
-                self.initial_price * self.amount_target_symbol
+        if OrderType.LIMIT.equals(self.type):
+
+            if OrderStatus.SUCCESS.equals(self.get_status()):
+                self.amount_trading_symbol = \
+                    self.get_initial_price() * self.get_amount_target_symbol()
+            else:
+                self.amount_trading_symbol = \
+                    self.get_price() * self.get_amount_target_symbol()
 
     def set_amount_trading_symbol(self, amount):
         self.amount_trading_symbol = amount
 
-        if OrderType.LIMIT.equals(self.order_type):
-            self.amount_target_symbol = \
-                self.amount_trading_symbol / self.initial_price
+        if OrderType.LIMIT.equals(self.type):
 
-    @validates('id', 'target_symbol', 'trading_symbol')
-    def _write_once(self, key, value):
-        existing = getattr(self, key)
-
-        if existing is not None:
-            raise ValueError("{} is write-once".format(key))
-
-        return value
+            if OrderStatus.SUCCESS.equals(self.get_status()):
+                self.amount_target_symbol = \
+                    self.get_amount_trading_symbol() / self.get_initial_price()
+            else:
+                self.amount_target_symbol = \
+                    self.get_amount_trading_symbol() / self.get_price()
 
     def set_status(self, status):
         self.status = OrderStatus.from_value(status).value
-
-    def update(self, db, data, commit=True, **kwargs):
-        self.updated_at = datetime.utcnow()
-        super(Order, self).update(db, data, commit, **kwargs)
 
     def copy(self, amount=None):
 
@@ -253,28 +218,3 @@ class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
             "order_type": self.get_type(),
             "order_side": self.get_side()
         }
-
-    def update_with_order(self, order):
-
-        current_status = OrderStatus.from_value(self.status)
-
-        if current_status.equals(order.get_status()):
-            self.status = OrderStatus.from_value(order.get_status()).value
-
-        if self.get_price() != order.get_price():
-            self.price = order.get_price()
-
-        if self.get_initial_price() != order.get_initial_price():
-            self.initial_price = order.get_initial_price()
-
-        if self.get_closing_price() != order.get_closing_price():
-            self.closing_price = order.get_closing_price()
-
-        if self.get_amount_trading_symbol() \
-                != order.get_amount_trading_symbol():
-            self.amount_trading_symbol = order.get_amount_trading_symbol()
-
-        if self.get_amount_target_symbol() != order.get_amount_target_symbol():
-            self.amount_target_symbol = order.get_amount_target_symbol()
-
-        db.session.commit()

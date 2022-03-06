@@ -1,4 +1,3 @@
-from datetime import datetime
 from investing_algorithm_framework.core.models import Order, OrderSide, \
     OrderType, OrderStatus, Position
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
@@ -31,25 +30,48 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
 
-        self.create_buy_order(
-            1,
-            self.TARGET_SYMBOL_A,
-            self.get_price(self.TARGET_SYMBOL_A, date=datetime.utcnow()).price,
-            portfolio_manager,
-            10
-        )
-
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         position = portfolio.get_position(self.TARGET_SYMBOL_A)
-        self.assertEqual(2, len(position.get_orders()))
+
+        orders = [
+            Order.from_dict(
+                {
+                    "reference_id": 2,
+                    "target_symbol": self.TARGET_SYMBOL_A,
+                    "trading_symbol": "usdt",
+                    "amount_target_symbol": 4,
+                    "price": self.get_price(self.TARGET_SYMBOL_A).price,
+                    "status": OrderStatus.PENDING.value,
+                    "side": OrderSide.BUY.value,
+                    "type": OrderType.LIMIT.value
+                }
+            ),
+            Order.from_dict(
+                {
+                    "reference_id": 3,
+                    "target_symbol": self.TARGET_SYMBOL_A,
+                    "trading_symbol": "usdt",
+                    "amount_target_symbol": 4,
+                    "price": self.get_price(self.TARGET_SYMBOL_A).price,
+                    "status": OrderStatus.SUCCESS.value,
+                    "initial_price": self.get_price(
+                        self.TARGET_SYMBOL_A).price,
+                    "side": OrderSide.BUY.value,
+                    "type": OrderType.LIMIT.value
+                }
+            )
+        ]
+
+        position.add_orders(orders)
+        self.assertEqual(3, len(position.get_orders()))
         self.assertEqual(
-            0, len(position.get_orders(status=OrderStatus.SUCCESS))
+            1, len(position.get_orders(status=OrderStatus.SUCCESS))
         )
         self.assertEqual(
-            1, len(position.get_orders(status=OrderStatus.PENDING))
+            2, len(position.get_orders(status=OrderStatus.PENDING))
         )
         self.assertEqual(
-            1, len(position.get_orders(status=OrderStatus.TO_BE_SENT))
+            0, len(position.get_orders(status=OrderStatus.TO_BE_SENT))
         )
         self.assertEqual(
             0, len(position.get_orders(side=OrderSide.SELL))
@@ -58,8 +80,15 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
             0, len(position.get_orders(type=OrderType.MARKET))
         )
         self.assertEqual(
+            2, len(position.get_orders(
+                status=OrderStatus.PENDING,
+                type=OrderType.LIMIT,
+                side=OrderSide.BUY
+            ))
+        )
+        self.assertEqual(
             1, len(position.get_orders(
-                status=OrderStatus.TO_BE_SENT,
+                status=OrderStatus.SUCCESS,
                 type=OrderType.LIMIT,
                 side=OrderSide.BUY
             ))
@@ -86,6 +115,7 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
                 "price": 10,
                 "orders": [
                     {
+                        'reference_id': 2,
                         "target_symbol": "DOT",
                         "trading_symbol": "USDT",
                         "amount_target_symbol": 40,
@@ -145,7 +175,7 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
             )
         ]
         position.add_orders(orders)
-        self.assertEqual(3, len(position.get_orders()))
+        self.assertEqual(2, len(position.get_orders()))
 
         orders = [
             Order(
@@ -170,7 +200,7 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
             )
         ]
         position.add_orders(orders)
-        self.assertEqual(3, len(position.get_orders()))
+        self.assertEqual(2, len(position.get_orders()))
 
         orders = [
             Order(
@@ -195,26 +225,13 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
             )
         ]
         position.add_orders(orders)
-        self.assertEqual(5, len(position.get_orders()))
+        self.assertEqual(4, len(position.get_orders()))
 
     def test_add_order(self):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         position = portfolio.get_position(self.TARGET_SYMBOL_A)
-
-        order = Order(
-            reference_id=1,
-            status=OrderStatus.PENDING.value,
-            type=OrderType.LIMIT.value,
-            side=OrderSide.SELL.value,
-            amount_trading_symbol=10,
-            price=10,
-            target_symbol=self.TARGET_SYMBOL_A,
-            trading_symbol="USDT"
-        )
-        position.add_order(order)
-        self.assertEqual(2, len(position.get_orders()))
 
         order = Order(
             reference_id=2,
@@ -227,4 +244,39 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
             trading_symbol="USDT"
         )
         position.add_order(order)
+        self.assertEqual(2, len(position.get_orders()))
+
+        order = Order(
+            reference_id=3,
+            status=OrderStatus.PENDING.value,
+            type=OrderType.LIMIT.value,
+            side=OrderSide.SELL.value,
+            amount_trading_symbol=10,
+            price=10,
+            target_symbol=self.TARGET_SYMBOL_A,
+            trading_symbol="USDT"
+        )
+        position.add_order(order)
         self.assertEqual(3, len(position.get_orders()))
+
+    def test_add_matching_order(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("sqlite")
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        position = portfolio.get_position(self.TARGET_SYMBOL_A)
+
+        order = Order(
+            reference_id=1,
+            status=OrderStatus.SUCCESS.value,
+            type=OrderType.LIMIT.value,
+            side=OrderSide.SELL.value,
+            amount_trading_symbol=10,
+            price=10,
+            initial_price=10,
+            target_symbol=self.TARGET_SYMBOL_A,
+            trading_symbol="USDT"
+        )
+        position.add_order(order)
+        self.assertTrue(
+            OrderStatus.SUCCESS.equals(position.get_order(1).status)
+        )

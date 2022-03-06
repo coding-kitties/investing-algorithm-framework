@@ -3,6 +3,7 @@ from random import randint
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import relationship, validates
 
+from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import db, OrderStatus, \
     Position, Order, OrderType, OrderSide
 from investing_algorithm_framework.core.models.model_extension \
@@ -51,6 +52,7 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
     )
 
     def __init__(self, symbol, amount, price=None, orders=None):
+        symbol = symbol.upper()
         super().__init__(symbol, amount, price)
         self.id = random_id()
         self.add_orders(orders)
@@ -96,9 +98,20 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
             if isinstance(order, dict):
                 order = Order.from_dict(order)
 
+            # Check if the reference id is set
+            if order.get_reference_id() is None:
+                raise OperationalException(
+                    "Can't add order to position with no reference id defined"
+                )
+
+            # Check if the order belongs to this position
+            if order.get_target_symbol() != self.get_symbol():
+                raise OperationalException(
+                    "Order does not belong to this position"
+                )
+
             old_order = SQLLiteOrder.query \
                 .filter_by(position=self) \
-                .filter_by(status=OrderStatus.SUCCESS.value) \
                 .filter_by(reference_id=order.get_reference_id()) \
                 .first()
 
@@ -106,7 +119,14 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
                 sqlite_order = SQLLiteOrder.from_order(order)
                 self.orders.append(sqlite_order)
             else:
-                old_order.update_with_order(order)
+                old_order.update(
+                    status=order.get_status(),
+                    price=order.get_price(),
+                    initial_price=order.get_initial_price(),
+                    closing_price=order.get_closing_price(),
+                    amount_trading_symbol=order.get_amount_trading_symbol(),
+                    amount_target_symbol=order.get_amount_target_symbol()
+                )
 
             db.session.commit()
 
@@ -129,7 +149,14 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
                     self.orders.append(sqlite_order)
                     sqlite_order.save(db)
                 else:
-                    old_order.update_with_order(order)
+                    old_order.update(
+                        status=order.get_status(),
+                        price=order.get_price(),
+                        initial_price=order.get_initial_price(),
+                        closing_price=order.get_closing_price(),
+                        amount_trading_symbol=order.get_amount_trading_symbol(),
+                        amount_target_symbol=order.get_amount_target_symbol()
+                    )
 
             db.session.commit()
 

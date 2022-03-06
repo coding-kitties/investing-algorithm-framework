@@ -1,11 +1,12 @@
 from abc import abstractmethod
 from typing import List
 
-from investing_algorithm_framework.core.models import OrderSide, \
-    OrderStatus, OrderType
-from investing_algorithm_framework.core.models.position import Position
-from investing_algorithm_framework.core.models.order import Order
 from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.core.models import OrderStatus
+from investing_algorithm_framework.core.models.order import Order
+from investing_algorithm_framework.core.models.position import Position
+from investing_algorithm_framework.core.order_validators import \
+    OrderValidatorFactory
 
 
 class Portfolio:
@@ -98,40 +99,15 @@ class Portfolio:
 
         all_orders = []
 
+        if target_symbol is not None:
+            position = self.get_position(target_symbol)
+            return position.get_orders(status=status, type=type, side=side)
+
         for position in positions:
-            orders = position.get_orders()
+            orders = position.get_orders(status=status, type=type, side=side)
 
             if len(orders) != 0:
                 all_orders += orders
-
-        if status is not None:
-            copy = all_orders.copy()
-            for order in all_orders:
-                if not OrderStatus.from_value(
-                        order.get_status()).equals(status):
-                    copy.remove(order)
-
-            all_orders = copy
-
-        if type is not None:
-            copy = all_orders.copy()
-
-            for order in all_orders:
-                if not OrderType.from_value(
-                        order.get_type()).equals(type):
-                    copy.remove(order)
-
-            all_orders = copy
-
-        if side is not None:
-            copy = all_orders.copy()
-
-            for order in all_orders:
-                if not OrderSide.from_value(
-                        order.get_side()).equals(side):
-                    copy.remove(order)
-
-            all_orders = copy
 
         return all_orders
 
@@ -223,10 +199,14 @@ class Portfolio:
 
             if matching is None:
                 new_positions.append(position)
+            else:
+                matching.set_amount(position.amount)
+                matching.set_price(position.get_price())
 
         self.positions += new_positions
 
     def add_order(self, order):
+
         position = next(
             (position for position in self.positions
              if position.get_symbol() == order.get_target_symbol()), None
@@ -235,6 +215,7 @@ class Portfolio:
         if position is None:
             position = Position(symbol=order.get_target_symbol())
             position.add_order(order)
+            self.positions.append(position)
         else:
             position = self.get_position(order.get_target_symbol())
             position.add_order(order)
