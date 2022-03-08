@@ -96,55 +96,60 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
             self.add_positions(positions)
 
         if orders is not None:
-            print("adding sqlite orders")
             self.add_orders(orders)
 
     def add_order(self, order):
+        position = self.positions \
+            .filter_by(symbol=order.get_target_symbol()) \
+            .first()
 
-        if isinstance(order, dict):
-            order = SQLLiteOrder.from_dict(order)
+        if position is None:
+            from investing_algorithm_framework.core.models.sqlite \
+                .position import SQLLitePosition
 
-        if isinstance(order, Order):
-            order = SQLLiteOrder.from_order(order)
+            position = SQLLitePosition(
+                symbol=order.get_target_symbol(), amount=0
+            )
+            self.positions.append(position)
+            position.add_order(order)
+        else:
+            position.add_order(order)
 
-        if not isinstance(order, SQLLiteOrder):
-            raise OperationalException("Order is not a SQLite order object")
-
-        if OrderStatus.TO_BE_SENT.equals(order.get_status()):
-            self._validate_order(order)
-
-        self._add_order_to_position(order)
         db.session.commit()
 
     def add_orders(self, orders):
 
         for order in orders:
+            position = self.positions\
+                .filter_by(symbol=order.get_target_symbol())\
+                .first()
 
-            if isinstance(order, dict):
-                order = SQLLiteOrder.from_dict(order)
+            if position is None:
+                from investing_algorithm_framework.core.models.sqlite\
+                    .position import SQLLitePosition
 
-            if isinstance(order, Order):
-                order = SQLLiteOrder.from_order(order)
+                position = SQLLitePosition(
+                    symbol=order.get_target_symbol(), amount=0
+                )
+                position.add_order(order)
+                self.positions.append(position)
+            else:
+                position.add_order(order)
 
-            if not isinstance(order, SQLLiteOrder):
-                raise OperationalException(
-                    "Order is not a SQLite order object")
-
-            if OrderStatus.TO_BE_SENT.equals(order.get_status()):
-                self._validate_order(order)
-
-            self._add_order_to_position(order)
-
-        db.session.commit()
+            db.session.commit()
 
     def add_position(self, position):
         from investing_algorithm_framework.core.models import SQLLitePosition
 
-        if isinstance(position, Position):
-            position = SQLLitePosition.from_position(position)
-
         if isinstance(position, dict):
             position = SQLLitePosition.from_dict(position)
+        elif isinstance(position, Position):
+            position = SQLLitePosition.from_position(position);
+        elif not isinstance(position, Position):
+            raise OperationalException(
+                "Can't add position that is not an instance "
+                "of a Position object"
+            )
 
         if not isinstance(position, SQLLitePosition):
             raise OperationalException("The object is not a Position")
@@ -165,11 +170,15 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
             from investing_algorithm_framework.core.models import \
                 SQLLitePosition
 
-            if isinstance(position, Position):
-                position = SQLLitePosition.from_position(position)
-
             if isinstance(position, dict):
                 position = SQLLitePosition.from_dict(position)
+            elif isinstance(position, Position):
+                position = SQLLitePosition.from_position(position);
+            elif not isinstance(position, Position):
+                raise OperationalException(
+                    "Can't add position that is not an instance "
+                    "of a Position object"
+                )
 
             if not isinstance(position, SQLLitePosition):
                 raise OperationalException("The object is not a Position")
@@ -184,40 +193,8 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
                 matching_position.set_price(position.get_price())
                 db.session.commit()
             else:
-                print(position.get_symbol())
                 self.positions.append(position)
                 db.session.commit()
-
-    def _validate_order(self, order):
-        order_validator = OrderValidatorFactory.of(self.identifier)
-        order_validator.validate(order, self)
-
-    def _add_order_to_position(self, order):
-        from investing_algorithm_framework.core.models import SQLLitePosition
-
-        position = SQLLitePosition.query \
-            .filter_by(symbol=order.get_target_symbol()) \
-            .filter_by(portfolio=self) \
-            .first()
-
-        if OrderSide.BUY.equals(order.side):
-
-            if position is None:
-                position = SQLLitePosition(
-                    symbol=order.target_symbol, amount=0
-                )
-                position.save(db)
-                self.positions.append(position)
-                db.session.commit()
-        else:
-
-            if position is None:
-                raise OperationalException(
-                    "Sell order can't be added to non existing position"
-                )
-
-        position.add_order(order)
-        db.session.commit()
 
     def create_order(
         self,

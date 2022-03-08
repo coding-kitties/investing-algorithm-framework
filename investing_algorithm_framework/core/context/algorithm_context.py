@@ -13,7 +13,7 @@ from investing_algorithm_framework.core.models.data_provider import \
 from investing_algorithm_framework.core.workers import Worker, Strategy
 from investing_algorithm_framework.extensions import scheduler
 from investing_algorithm_framework.core.portfolio_managers \
-    import PortfolioManager
+    import PortfolioManager, DefaultPortfolioManagerFactory
 from investing_algorithm_framework.core.data_providers import\
     DefaultDataProviderFactory, DataProvider
 from investing_algorithm_framework.configuration.constants import \
@@ -417,6 +417,16 @@ class AlgorithmContext:
 
         if identifier not in self._portfolio_managers:
 
+            if identifier in RESERVED_IDENTIFIERS:
+                portfolio_manager = DefaultPortfolioManagerFactory \
+                    .of_market(identifier)
+
+                portfolio_manager.initialize(self)
+                self._portfolio_managers[portfolio_manager.identifier] \
+                    = portfolio_manager
+
+                return portfolio_manager
+
             if throw_exception:
                 raise OperationalException(
                     f"No corresponding portfolio manager found for "
@@ -477,7 +487,7 @@ class AlgorithmContext:
         return self._market_services[market]
 
     def set_algorithm_context_initializer(
-            self, algorithm_context_initializer
+        self, algorithm_context_initializer
     ) -> None:
 
         # Check if initializer is an instance of AlgorithmContextInitializer
@@ -491,65 +501,33 @@ class AlgorithmContext:
         )
         self._initializer = algorithm_context_initializer
 
-    def deposit(self, amount, identifier: str = None):
-        portfolio = self.get_portfolio_manager(identifier).get_portfolio()
-        portfolio.deposit(amount)
-
-    def withdraw(self, amount, identifier: str = None):
-        portfolio = self.get_portfolio_manager(identifier).get_portfolio()
-        portfolio.withdraw(amount)
-
     def add_order(self, order, identifier: str = None):
         portfolio_manager = self.get_portfolio_manager(identifier)
-        portfolio_manager.add_order(order)
+        portfolio_manager.add_order(order, algorithm_context=self)
+        print(portfolio_manager.get_orders(algorithm_context=self))
+        print(portfolio_manager.get_positions(algorithm_context=self))
+
+    def add_orders(self, orders, identifier: str = None):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        portfolio_manager.add_orders(orders, algorithm_context=self)
+
+    def add_position(self, position, identifier: str = None):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        portfolio_manager.add_position(position, algorithm_context=self)
+
+    def add_positions(self, positions, identifier: str = None):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        portfolio_manager.add_positions(positions, algorithm_context=self)
 
     def create_order(
         self,
         target_symbol,
         price,
-        order_type,
-        order_side,
+        type,
+        side,
         amount_target_symbol=None,
         amount_trading_symbol=None,
-        identifier: str = None
-    ):
-        if OrderType.LIMIT.equals(order_type):
-
-            if OrderSide.SELL.equals(order_side):
-                return self.create_limit_sell_order(
-                    target_symbol=target_symbol,
-                    price=price,
-                    amount_target_symbol=amount_target_symbol,
-                    amount_trading_symbol=amount_trading_symbol,
-                    identifier=identifier
-                )
-            else:
-                return self.create_limit_buy_order(
-                    target_symbol=target_symbol,
-                    price=price,
-                    amount_target_symbol=amount_target_symbol,
-                    amount_trading_symbol=amount_trading_symbol,
-                    identifier=identifier
-                )
-
-        else:
-            if OrderSide.SELL.equals(order_side):
-                return self.create_market_sell_order(
-                    target_symbol=target_symbol,
-                    amount_target_symbol=amount_target_symbol,
-                    identifier=identifier
-                )
-            else:
-                raise OperationalException(
-                    "Market buy orders are not supported"
-                )
-
-    def create_limit_buy_order(
-        self,
-        target_symbol: str,
-        price: float,
-        amount_trading_symbol: float,
-        amount_target_symbol: float,
+        execute=False,
         identifier: str = None,
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
@@ -558,21 +536,47 @@ class AlgorithmContext:
             price=price,
             amount_target_symbol=amount_target_symbol,
             amount_trading_symbol=amount_trading_symbol,
-            order_type=OrderType.LIMIT.value,
+            type=type,
+            side=side
         )
 
-        portfolio_manager.add_order(order)
-        self.execute_limit_buy_order(identifier, order)
-        order.set_pending()
-        db.session.commit()
+        if execute:
+            order = self.execute_order(identifier, order)
+            portfolio_manager.add_order(order, algorithm_context=self)
+
+        return order
+
+    def create_limit_buy_order(
+        self,
+        target_symbol: str,
+        price: float,
+        amount_trading_symbol: float = None,
+        amount_target_symbol: float = None,
+        execute=False,
+        identifier: str = None,
+    ):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        order = portfolio_manager.create_order(
+            target_symbol=target_symbol,
+            price=price,
+            amount_target_symbol=amount_target_symbol,
+            amount_trading_symbol=amount_trading_symbol,
+            type=OrderType.LIMIT.value,
+        )
+
+        if execute:
+            order = self.execute_order(identifier, order)
+            portfolio_manager.add_order(order, algorithm_context=self)
+
         return order
 
     def create_limit_sell_order(
         self,
         price,
         target_symbol: str,
-        amount_trading_symbol: float,
-        amount_target_symbol: float,
+        amount_trading_symbol: float = None,
+        amount_target_symbol: float = None,
+        execute=False,
         identifier: str = None,
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
@@ -581,66 +585,56 @@ class AlgorithmContext:
             price=price,
             amount_target_symbol=amount_target_symbol,
             amount_trading_symbol=amount_trading_symbol,
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.SELL.value,
+            type=OrderType.LIMIT.value,
+            side=OrderSide.SELL.value,
         )
 
-        # Execute order and set to pending state
-        portfolio_manager.add_order(order)
-        self.execute_limit_sell_order(identifier, order)
-        order.set_pending()
+        if execute:
+            order = self.execute_order(identifier, order)
+            portfolio_manager.add_order(order, algorithm_context=self)
+
         return order
 
     def create_market_sell_order(
         self,
         target_symbol,
         amount_target_symbol,
+        execute=False,
         identifier: str = None,
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
             target_symbol=target_symbol,
             amount_target_symbol=amount_target_symbol,
-            order_type=OrderType.MARKET.value,
-            order_side=OrderSide.SELL.value,
+            type=OrderType.MARKET.value,
+            side=OrderSide.SELL.value,
         )
 
-        portfolio_manager.add_order(order)
-        self.execute_market_sell_order(identifier, order)
-        order.set_pending()
+        if execute:
+            order = self.execute_order(identifier, order)
+            portfolio_manager.add_order(order, algorithm_context=self)
 
         return order
 
-    def execute_limit_sell_order(self, identifier, order):
+    def execute_order(self, identifier, order):
         order_executor = self.get_order_executor(identifier)
-        order_executor.execute_limit_order(order, self)
-
-    def execute_limit_buy_order(self, identifier, order):
-        order_executor = self.get_order_executor(identifier)
-        order_executor.execute_limit_order(order, self)
-
-    def execute_market_sell_order(self, identifier, order):
-        order_executor = self.get_order_executor(identifier)
-        order_executor.execute_market_order(order, self)
-
-    def execute_market_buy_order(self, identifier, order):
-        order_executor = self.get_order_executor(identifier)
-        order_executor.execute_market_order(order, self)
+        return order_executor.execute_order(order, self)
 
     def check_order_status(self, identifier=None, symbol: str = None):
         portfolio_manager = self.get_portfolio_manager(identifier)
-        orders = portfolio_manager\
-            .get_orders(symbol, status=OrderStatus.PENDING)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
+        orders = portfolio.get_orders(
+            target_symbol=symbol, status=OrderStatus.PENDING
+        )
         order_executor = self.get_order_executor(identifier)
 
         for order in orders:
-            status = order_executor.get_order_status(order, self)
-            order.update(db, {"status": status}, True)
+            order = order_executor.check_order_status(order, self)
+            portfolio_manager.add_order(algorithm_context=self, order=order)
 
     def check_pending_orders(self, identifier=None, symbol: str = None):
 
         if identifier is not None:
-
             portfolio_manager = self.get_portfolio_manager(identifier)
 
             order_executor = \
@@ -650,14 +644,9 @@ class AlgorithmContext:
                 .get_orders(symbol, status=OrderStatus.PENDING.value)
 
             for pending_order in pending_orders:
-                status = order_executor.get_order_status(
-                    pending_order, self
-                )
-
-                if OrderStatus.SUCCESS.equals(status):
-                    pending_order.set_executed()
-                else:
-                    pending_order.update(db, {status: status.value})
+                order = order_executor.check_order_status(pending_order, self)
+                portfolio_manager\
+                    .add_order(algorithm_context=self, order=order)
         else:
 
             for portfolio_manager_key in self._portfolio_managers:
@@ -674,7 +663,7 @@ class AlgorithmContext:
                 )
 
                 for pending_order in pending_orders:
-                    status = order_executor.get_order_status(
+                    status = order_executor.check_order_status(
                         pending_order, self
                     )
 
@@ -845,13 +834,14 @@ class AlgorithmContext:
 
         return data
 
-    def get_portfolio(self, identifier=None):
+    def get_portfolio(self, identifier=None) -> Portfolio:
         portfolio_manager = self.get_portfolio_manager(identifier)
-        return portfolio_manager.get_portfolio()
+        return portfolio_manager.get_portfolio(algorithm_context=self)
 
-    def get_unallocated(self, identifier):
+    def get_unallocated(self, identifier=None) -> Position:
         portfolio_manager = self.get_portfolio_manager(identifier)
-        return portfolio_manager.get_unallocated(self)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
+        return portfolio.get_unallocated()
 
     def reset(self):
         self._workers = []
@@ -863,18 +853,22 @@ class AlgorithmContext:
         self._initializer = None
         self._initialized = False
 
-    def get_orders(
-            self, identifier=None, symbol: str = None, status=None, lazy=False
-    ) -> List[Order]:
+    def get_order(self, reference_id, identifier=None) -> Order:
         portfolio_manager = self.get_portfolio_manager(identifier)
-        return portfolio_manager.get_orders(symbol, status, lazy)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
+        return portfolio.get_order(reference_id)
 
-    def get_positions(
-            self, identifier=None, symbol: str = None, lazy=False
-    ) -> List[Position]:
+    def get_orders(self, identifier=None, **kwargs) -> List[Order]:
         portfolio_manager = self.get_portfolio_manager(identifier)
-        return portfolio_manager.get_positions(symbol, lazy)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
+        return portfolio.get_orders(**kwargs)
 
-    def get_portfolio(self, identifier=None) -> Portfolio:
+    def get_positions(self, identifier=None, **kwargs) -> List[Position]:
         portfolio_manager = self.get_portfolio_manager(identifier)
-        return portfolio_manager.get_portfolio()
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
+        return portfolio.get_positions(**kwargs)
+
+    def get_position(self, symbol, identifier=None):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
+        return portfolio.get_position(symbol)

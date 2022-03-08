@@ -21,11 +21,8 @@ class OrderValidator(ABC):
 
     def validate_sell_order(self, order, portfolio):
 
-        position = portfolio.positions\
-            .filter_by(portfolio=portfolio)\
-            .filter_by(symbol=order.target_symbol)\
-            .first()
-
+        position = portfolio.get_position(order.get_target_symbol())
+    
         if position is None:
             raise OperationalException(
                 "Can't add sell order to non existing position"
@@ -62,11 +59,12 @@ class OrderValidator(ABC):
     @staticmethod
     def validate_limit_order(order, portfolio):
         total_price = order.get_amount_target_symbol() * order.get_price()
+        unallocated = portfolio.get_unallocated()
 
-        if portfolio.get_unallocated().get_amount() < total_price:
+        if unallocated.get_amount() < total_price:
             raise OperationalException(
                 f"Order total: {total_price} {portfolio.trading_symbol}, is "
-                f"larger then unallocated size: {portfolio.unallocated} "
+                f"larger then unallocated size: {unallocated.get_amount()} "
                 f"{portfolio.trading_symbol} of the portfolio"
             )
 

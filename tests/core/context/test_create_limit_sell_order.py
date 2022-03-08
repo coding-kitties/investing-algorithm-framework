@@ -1,5 +1,5 @@
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
-from investing_algorithm_framework.core.models import SQLLitePortfolio, db
+from investing_algorithm_framework import Position
 
 
 class Test(TestBase, TestOrderAndPositionsObjectsMixin):
@@ -9,38 +9,28 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.start_algorithm()
 
     def test(self) -> None:
+        self.algo_app.algorithm.add_position(
+            Position(symbol=self.TARGET_SYMBOL_A, amount=10)
+        )
         order = self.algo_app.algorithm\
             .create_limit_sell_order(
-                self.TARGET_SYMBOL_A, self.BASE_SYMBOL_A_PRICE, 10
+                target_symbol=self.TARGET_SYMBOL_A,
+                price=self.BASE_SYMBOL_A_PRICE,
+                amount_target_symbol=10
             )
 
         self.assert_is_limit_order(order)
-
-    def tearDown(self) -> None:
-        db.session.query(SQLLitePortfolio).delete()
-        db.session.commit()
-        super(Test, self).tearDown()
 
     def test_with_execution(self) -> None:
+        self.algo_app.algorithm.add_position(
+            Position(symbol=self.TARGET_SYMBOL_A, amount=10)
+        )
         order = self.algo_app.algorithm \
-            .create_limit_buy_order(
-                self.TARGET_SYMBOL_A,
-                self.BASE_SYMBOL_A_PRICE,
-                10,
+            .create_limit_sell_order(
+                target_symbol=self.TARGET_SYMBOL_A,
+                price=self.BASE_SYMBOL_A_PRICE,
+                amount_target_symbol=10,
                 execute=True
         )
-        order.set_executed()
-
-        order = self.algo_app.algorithm\
-            .create_limit_sell_order(
-                self.TARGET_SYMBOL_A,
-                self.BASE_SYMBOL_A_PRICE,
-                10,
-                execute=True
-            )
-
-        self.assert_is_limit_order(order)
-
-        order.set_executed()
 
         self.assert_is_limit_order(order, executed=True)

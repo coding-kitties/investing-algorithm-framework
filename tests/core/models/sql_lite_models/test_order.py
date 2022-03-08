@@ -200,20 +200,23 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_closing_price())
         self.assertIsNotNone(order.get_initial_price())
 
-        with self.assertRaises(OperationalException):
-            Order.from_dict(
-                {
-                    "reference_id": 10493,
-                    "target_symbol": "DOT",
-                    "trading_symbol": "USDT",
-                    "amount_target_symbol": 40,
-                    "status": "CLOSED",
-                    "price": 10,
-                    "initial_price": 10,
-                    "type": "LIMIT",
-                    "side": "BUY"
-                }
-            )
+        Order.from_dict(
+            {
+                "reference_id": 10493,
+                "target_symbol": "DOT",
+                "trading_symbol": "USDT",
+                "amount_target_symbol": 40,
+                "status": "CLOSED",
+                "price": 10,
+                "initial_price": 10,
+                "type": "LIMIT",
+                "side": "BUY"
+            }
+        )
+
+        portfolio_manager = self.algo_app.algorithm\
+            .get_portfolio_manager("default")
+        portfolio_manager.add_order(order, algorithm_context=None)
 
     def test_from_dict_pending_limit_order_sell(self):
         order = Order.from_dict(
@@ -302,6 +305,8 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
                 "side": "SELL"
             }
         )
+
+        print(order)
 
         self.assertIsNotNone(order.get_reference_id())
         self.assertIsNotNone(order.get_target_symbol())

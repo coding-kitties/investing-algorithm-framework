@@ -100,30 +100,6 @@ class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
         self.type = OrderType.from_value(type).value
         self.status = OrderStatus.from_value(status).value
 
-    def set_amount_target_symbol(self, amount):
-        self.amount_target_symbol = amount
-
-        if OrderType.LIMIT.equals(self.type):
-
-            if OrderStatus.SUCCESS.equals(self.get_status()):
-                self.amount_trading_symbol = \
-                    self.get_initial_price() * self.get_amount_target_symbol()
-            else:
-                self.amount_trading_symbol = \
-                    self.get_price() * self.get_amount_target_symbol()
-
-    def set_amount_trading_symbol(self, amount):
-        self.amount_trading_symbol = amount
-
-        if OrderType.LIMIT.equals(self.type):
-
-            if OrderStatus.SUCCESS.equals(self.get_status()):
-                self.amount_target_symbol = \
-                    self.get_amount_trading_symbol() / self.get_initial_price()
-            else:
-                self.amount_target_symbol = \
-                    self.get_amount_trading_symbol() / self.get_price()
-
     def set_status(self, status):
         self.status = OrderStatus.from_value(status).value
 

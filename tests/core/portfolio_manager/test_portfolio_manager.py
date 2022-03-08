@@ -18,7 +18,8 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
     def test_get_trading_symbol(self):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager('default')
-        self.assertIsNotNone(portfolio_manager.get_trading_symbol(self.algo_app.algorithm))
+        self.assertIsNotNone(portfolio_manager
+                             .get_trading_symbol(self.algo_app.algorithm))
         self.assertEqual("USDT", portfolio_manager
                          .get_trading_symbol(self.algo_app.algorithm))
 
@@ -82,19 +83,19 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
             side=OrderSide.BUY.value,
             amount_target_symbol=1,
             target_symbol=self.TARGET_SYMBOL_A,
-            price=self.BASE_SYMBOL_A_PRICE,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
             algorithm_context=None
         )
         order.set_status(OrderStatus.SUCCESS)
         order.set_reference_id(2)
-        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
-        position = portfolio.get_position(self.TARGET_SYMBOL_A)
-        self.assertIsNone(position)
-        self.assertEqual(0, len(portfolio.get_orders()))
-        self.assertEqual(1, len(portfolio.get_positions()))
+        order.set_initial_price(self.get_price(self.TARGET_SYMBOL_A).price)
         portfolio_manager.add_order(order, algorithm_context=None)
+
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager('default')
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         position = portfolio.get_position(self.TARGET_SYMBOL_A)
+        self.assertIsNotNone(position)
         self.assertEqual(1, len(portfolio.get_orders()))
         self.assertEqual(2, len(portfolio.get_positions()))
         self.assertEqual(1, position.get_amount())
@@ -113,17 +114,14 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
         )
         order.set_status(OrderStatus.SUCCESS)
         order.set_reference_id(2)
-        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
-        position = portfolio.get_position(self.TARGET_SYMBOL_A)
-        self.assertIsNone(position)
-        self.assertEqual(0, len(portfolio.get_orders()))
-        self.assertEqual(1, len(portfolio.get_positions()))
+        order.set_initial_price(self.get_price(self.TARGET_SYMBOL_A).price)
         portfolio_manager.add_order(order, algorithm_context=None)
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
-        position = portfolio.get_position(self.TARGET_SYMBOL_A)
         self.assertEqual(1, len(portfolio.get_orders()))
         self.assertEqual(2, len(portfolio.get_positions()))
-        self.assertEqual(1, position.get_amount())
+        position = portfolio.get_position(self.TARGET_SYMBOL_A)
+        self.assertIsNotNone(position)
+        self.assertNotEqual(0, position.get_amount())
 
         order = portfolio_manager.create_order(
             type=OrderType.LIMIT.value,
@@ -135,12 +133,11 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
         )
         order.set_reference_id(3)
         order.set_status(OrderStatus.SUCCESS)
+        order.set_initial_price(self.get_price(self.TARGET_SYMBOL_A).price)
         portfolio_manager.add_order(order, algorithm_context=None)
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         position = portfolio.get_position(self.TARGET_SYMBOL_A)
-        self.assertEqual(2, len(portfolio.get_orders()))
-        self.assertEqual(2, len(portfolio.get_positions()))
-        self.assertEqual(0, position.get_amount())
+        self.assertIsNone(position)
 
     def test_add_buy_order_larger_then_unallocated(self):
         portfolio_manager = self.algo_app.algorithm \
@@ -155,12 +152,6 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
                 price=self.BASE_SYMBOL_A_PRICE,
                 algorithm_context=None
             )
-
-        self.assertEqual(
-            "Order amount 500000 USDT is larger then unallocated "
-            "position 10000 USDT",
-            exc.exception.error_message
-        )
 
     def test_add_sell_order_without_position(self):
         portfolio_manager = self.algo_app.algorithm \
@@ -190,6 +181,7 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
         )
         order.set_status(OrderStatus.SUCCESS)
         order.set_reference_id(2)
+        order.set_initial_price(self.get_price(self.TARGET_SYMBOL_A).price)
         portfolio_manager.add_order(order, algorithm_context=None)
 
         with self.assertRaises(OperationalException):

@@ -1,4 +1,5 @@
 from typing import List
+from datetime import datetime, timedelta
 
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.identifier import Identifier
@@ -72,6 +73,34 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier):
             .filter_by(identifier=self.identifier)\
             .first()
 
+        if portfolio is None:
+            orders = self.get_orders(algorithm_context)
+            positions = self.get_positions(algorithm_context)
+
+            portfolio = SQLLitePortfolio(
+                identifier=self.identifier,
+                trading_symbol=self.trading_symbol,
+                orders=orders,
+                positions=positions
+            )
+            portfolio.save(db)
+            return portfolio
+
+        if self._requires_update():
+            orders = self.get_orders(algorithm_context)
+            positions = self.get_positions(algorithm_context)
+            portfolio.add_positions(positions)
+            portfolio.add_orders(orders)
+
+            for position in portfolio.get_positions():
+                position.set_price(
+                    self.get_price(
+                        position.get_symbol(),
+                        self.get_trading_symbol(algorithm_context),
+                        algorithm_context
+                    )
+                )
+
         return portfolio
 
     def create_order(
@@ -104,9 +133,16 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier):
 
         # Validate the order
         order_validator = OrderValidatorFactory.of(self.identifier)
-        order_validator.validate(order, self)
+        order_validator.validate(
+            order, self.get_portfolio(algorithm_context=algorithm_context)
+        )
         return order
 
     def add_order(self, order, algorithm_context):
         self.get_portfolio(algorithm_context).add_order(order)
         db.session.commit()
+
+    def _requires_update(self):
+        update_time = datetime.utcnow() \
+                      + timedelta(minutes=-self.update_minutes)
+        return self.last_updated is None or update_time > self.last_updated

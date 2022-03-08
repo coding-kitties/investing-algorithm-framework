@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 
-from investing_algorithm_framework.core.models import Order, OrderStatus
 from investing_algorithm_framework.core.identifier import Identifier
+from investing_algorithm_framework.core.models import Order
 
 
 class OrderExecutor(ABC, Identifier):
@@ -16,7 +16,7 @@ class OrderExecutor(ABC, Identifier):
         raise NotImplementedError()
 
     @abstractmethod
-    def get_order_status(
+    def check_order_status(
         self, order: Order, algorithm_context, **kwargs
-    ) -> OrderStatus:
+    ) -> Order:
         raise NotImplementedError()

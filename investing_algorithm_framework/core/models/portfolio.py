@@ -3,7 +3,7 @@ from typing import List
 
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import OrderStatus
-from investing_algorithm_framework.core.models.order import Order
+from investing_algorithm_framework.core.models.order import Order, OrderSide
 from investing_algorithm_framework.core.models.position import Position
 from investing_algorithm_framework.core.order_validators import \
     OrderValidatorFactory
@@ -63,7 +63,7 @@ class Portfolio:
 
         return None
 
-    def get_positions(self) -> List[Position]:
+    def get_positions(self, **kwargs) -> List[Position]:
         return self.positions
 
     @abstractmethod
@@ -156,8 +156,8 @@ class Portfolio:
         realized = 0
 
         for order in self.get_orders():
-            if OrderStatus.CLOSED.equals(order.get_status()):
-
+            if OrderSide.BUY.equals(order.get_side()) and\
+                    OrderStatus.CLOSED.equals(order.get_status()):
                 realized += order.get_closing_price() \
                            * order.get_amount_target_symbol()
         return realized
@@ -166,18 +166,21 @@ class Portfolio:
         revenue = 0
 
         for order in self.get_orders():
-            if OrderStatus.CLOSED.equals(order.get_status()):
+            if OrderSide.BUY.equals(order.get_side()) and \
+                    OrderStatus.CLOSED.equals(order.get_status()):
                 revenue += order.get_closing_price() \
                             * order.get_amount_target_symbol()
         return revenue
 
     def add_position(self, position):
 
-        if not isinstance(position, Position):
-            raise OperationalException("Object is not a position")
-
-        if not isinstance(position, Position):
-            raise OperationalException("Object is not a position")
+        if isinstance(position, dict):
+            position = Position.from_dict(position)
+        elif not isinstance(position, Position):
+            raise OperationalException(
+                "Can't add position that is not an instance "
+                "of a Position object"
+            )
 
         self.positions.append(position)
 
@@ -189,7 +192,10 @@ class Portfolio:
             if isinstance(position, dict):
                 position = Position.from_dict(position)
             elif not isinstance(position, Position):
-                raise OperationalException("Wrong position data")
+                raise OperationalException(
+                    "Can't add position that is not an instance "
+                    "of a Position object"
+                )
 
             matching = next(
                 (existing_position for existing_position in self.positions
@@ -206,7 +212,6 @@ class Portfolio:
         self.positions += new_positions
 
     def add_order(self, order):
-
         position = next(
             (position for position in self.positions
              if position.get_symbol() == order.get_target_symbol()), None
@@ -217,7 +222,6 @@ class Portfolio:
             position.add_order(order)
             self.positions.append(position)
         else:
-            position = self.get_position(order.get_target_symbol())
             position.add_order(order)
 
     def add_orders(self, orders):
@@ -235,6 +239,7 @@ class Portfolio:
                     if position is None:
                         position = Position(symbol=order.get_target_symbol())
                         position.add_order(order)
+                        self.positions.append(position)
                     else:
                         position = self.get_position(order.get_target_symbol())
                         position.add_order(order)

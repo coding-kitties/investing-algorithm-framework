@@ -58,6 +58,14 @@ class Position:
 
     def add_order(self, order: Order):
 
+        if isinstance(order, dict):
+            order = Order.from_dict(order)
+        elif not isinstance(order, Order):
+            raise OperationalException(
+                "Can't add order that is not an instance "
+                "of a Order object"
+            )
+
         # Check if the reference id is set
         if order.get_reference_id() is None:
             raise OperationalException(
@@ -95,6 +103,8 @@ class Position:
 
             self.orders.append(order)
 
+        self.update_amount()
+
     def add_orders(self, orders: List):
 
         if orders is not None:
@@ -103,6 +113,11 @@ class Position:
 
                 if isinstance(order, dict):
                     order = Order.from_dict(order)
+                elif not isinstance(order, Order):
+                    raise OperationalException(
+                        "Can't add order that is not an instance "
+                        "of a Order object"
+                    )
 
                 # Check if the reference id is set
                 if order.get_reference_id() is None:
@@ -194,6 +209,25 @@ class Position:
                        order.get_amount_target_symbol()
 
         return pending_value
+
+    def update_amount(self):
+        buy_orders = self.get_orders(
+            status=OrderStatus.SUCCESS, side=OrderSide.BUY
+        )
+
+        sell_orders = self.get_orders(
+            status=OrderStatus.SUCCESS, side=OrderSide.SELL
+        )
+
+        amount = 0
+
+        for order in buy_orders:
+            amount += order.get_amount_target_symbol()
+
+        for order in sell_orders:
+            amount -= order.get_amount_target_symbol()
+
+        self.amount = amount
 
     def repr(self, **fields) -> str:
         """

@@ -97,6 +97,13 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
 
             if isinstance(order, dict):
                 order = Order.from_dict(order)
+            elif isinstance(order, Order):
+                order = SQLLiteOrder.from_order(order)
+            elif not isinstance(order, SQLLiteOrder):
+                raise OperationalException(
+                    "Can't add order that is not an instance "
+                    "of an Order object"
+                )
 
             # Check if the reference id is set
             if order.get_reference_id() is None:
@@ -128,6 +135,7 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
                     amount_target_symbol=order.get_amount_target_symbol()
                 )
 
+            self.update_amount()
             db.session.commit()
 
     def add_orders(self, orders):
@@ -139,6 +147,26 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
 
                 if isinstance(order, dict):
                     order = Order.from_dict(order)
+                elif isinstance(order, Order):
+                    order = SQLLiteOrder.from_order(order)
+                elif not isinstance(order, SQLLiteOrder):
+                    raise OperationalException(
+                        "Can't add order that is not an instance "
+                        "of an Order object"
+                    )
+
+                # Check if the reference id is set
+                if order.get_reference_id() is None:
+                    raise OperationalException(
+                        "Can't add order to position with no reference "
+                        "id defined"
+                    )
+
+                # Check if the order belongs to this position
+                if order.get_target_symbol() != self.get_symbol():
+                    raise OperationalException(
+                        "Order does not belong to this position"
+                    )
 
                 old_order = SQLLiteOrder.query \
                     .filter_by(reference_id=order.get_reference_id()) \
@@ -158,7 +186,31 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
                         amount_target_symbol=order.get_amount_target_symbol()
                     )
 
+            self.update_amount()
             db.session.commit()
+
+    def update_amount(self):
+        from investing_algorithm_framework.core.models import SQLLiteOrder
+
+        buy_orders = SQLLiteOrder.query \
+            .filter_by(position=self) \
+            .filter_by(status=OrderStatus.SUCCESS.value) \
+            .filter_by(side=OrderSide.BUY.value).all()
+
+        sell_orders = SQLLiteOrder.query \
+            .filter_by(position=self) \
+            .filter_by(status=OrderStatus.SUCCESS.value) \
+            .filter_by(side=OrderSide.SELL.value).all()
+
+        amount = 0
+
+        for order in buy_orders:
+            amount += order.get_amount_target_symbol()
+
+        for order in sell_orders:
+            amount -= order.get_amount_target_symbol()
+
+        self.amount = amount
 
     @staticmethod
     def from_position(position):

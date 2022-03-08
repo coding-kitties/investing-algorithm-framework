@@ -94,9 +94,6 @@ class PortfolioManager(ABC, Identifier):
         side=OrderSide.BUY.value,
         algorithm_context=None
     ) -> Order:
-        portfolio = self.get_portfolio(algorithm_context=algorithm_context)
-        unallocated = portfolio.get_unallocated()
-
         order = Order(
             target_symbol=target_symbol,
             trading_symbol=self.get_trading_symbol(algorithm_context),
@@ -108,36 +105,11 @@ class PortfolioManager(ABC, Identifier):
             status=OrderStatus.TO_BE_SENT.value
         )
 
-        if OrderSide.BUY.equals(order.get_side()) and OrderType.LIMIT.equals(order.type):
-            total = order.get_amount_target_symbol() * order.get_price()
-
-            if total > unallocated.get_amount():
-                raise OperationalException(
-                    f"Order amount {total} {unallocated.get_symbol()} is "
-                    f"larger then unallocated "
-                    f"position {unallocated.get_amount()} "
-                    f"{unallocated.get_symbol()}"
-                )
-        elif OrderSide.SELL.equals(order.get_side()):
-            portfolio = self.get_portfolio(algorithm_context)
-            position = portfolio.get_position(order.get_target_symbol())
-
-            if position is None:
-                raise OperationalException(
-                    f"Can't create sell order for non existing position"
-                )
-
-            if position.get_amount() < order.get_amount_target_symbol():
-                raise OperationalException(
-                    f"Sell amount {order.get_amount_target_symbol()} "
-                    f"{order.get_target_symbol()} is "
-                    f"larger then position {position.get_amount()} "
-                    f"{position.get_symbol()}"
-                )
-
         # Validate the order
         order_validator = OrderValidatorFactory.of(self.identifier)
-        order_validator.validate(order, self)
+        order_validator.validate(
+            order, self.get_portfolio(algorithm_context=algorithm_context)
+        )
 
         return order
 
@@ -156,15 +128,3 @@ class PortfolioManager(ABC, Identifier):
     def add_positions(self, positions, algorithm_context):
         portfolio = self.get_portfolio(algorithm_context)
         portfolio.add_positions(positions)
-
-    def update_order_status(self, order, status, algorithm_context):
-        order.set_status(OrderStatus.from_value(status))
-        portfolio = self.get_portfolio(algorithm_context)
-        # self.snapshot_portfolio(portfolio)
-
-    # def snapshot_portfolio(
-    #     self, portfolio, creation_datetime=None, withdrawel=0, deposit=0
-    # ):
-    #     PortfolioSnapshot.from_portfolio(
-    #         portfolio, creation_datetime, withdrawel, deposit
-    #     )

@@ -22,6 +22,10 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
             .get_portfolio_manager("default")
 
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        portfolio_manager.add_position(
+            Position(symbol=self.TARGET_SYMBOL_A, amount=10),
+            algorithm_context=None
+        )
         position = portfolio.get_position(self.TARGET_SYMBOL_A)
         self.assertIsNotNone(position.get_amount())
         self.assertNotEqual(0, position.get_amount())
@@ -31,6 +35,10 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
             .get_portfolio_manager("default")
 
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        portfolio_manager.add_position(
+            Position(symbol=self.TARGET_SYMBOL_A, amount=10),
+            algorithm_context=None
+        )
         position = portfolio.get_position(self.TARGET_SYMBOL_A)
 
         orders = [
@@ -63,12 +71,12 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
         ]
 
         position.add_orders(orders)
-        self.assertEqual(3, len(position.get_orders()))
+        self.assertEqual(2, len(position.get_orders()))
         self.assertEqual(
             1, len(position.get_orders(status=OrderStatus.SUCCESS))
         )
         self.assertEqual(
-            2, len(position.get_orders(status=OrderStatus.PENDING))
+            1, len(position.get_orders(status=OrderStatus.PENDING))
         )
         self.assertEqual(
             0, len(position.get_orders(status=OrderStatus.TO_BE_SENT))
@@ -80,7 +88,7 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
             0, len(position.get_orders(type=OrderType.MARKET))
         )
         self.assertEqual(
-            2, len(position.get_orders(
+            1, len(position.get_orders(
                 status=OrderStatus.PENDING,
                 type=OrderType.LIMIT,
                 side=OrderSide.BUY
@@ -143,6 +151,10 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("default")
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        portfolio_manager.add_position(
+            Position(symbol=self.TARGET_SYMBOL_A, amount=10),
+            algorithm_context=None
+        )
         position = portfolio.get_position(self.TARGET_SYMBOL_A)
         self.assertIsNotNone(position.to_dict())
 
@@ -150,6 +162,10 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("default")
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        portfolio_manager.add_position(
+            Position(symbol=self.TARGET_SYMBOL_A, amount=10),
+            algorithm_context=None
+        )
         position = portfolio.get_position(self.TARGET_SYMBOL_A)
 
         orders = [
@@ -231,6 +247,10 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("default")
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        portfolio_manager.add_position(
+            Position(symbol=self.TARGET_SYMBOL_A, amount=10),
+            algorithm_context=None
+        )
         position = portfolio.get_position(self.TARGET_SYMBOL_A)
 
         order = Order(
@@ -244,7 +264,7 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
             trading_symbol="USDT"
         )
         position.add_order(order)
-        self.assertEqual(2, len(position.get_orders()))
+        self.assertEqual(1, len(position.get_orders()))
 
         order = Order(
             reference_id=3,
@@ -257,12 +277,16 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
             trading_symbol="USDT"
         )
         position.add_order(order)
-        self.assertEqual(3, len(position.get_orders()))
+        self.assertEqual(2, len(position.get_orders()))
 
     def test_add_matching_order(self):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("default")
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        portfolio_manager.add_position(
+            Position(symbol=self.TARGET_SYMBOL_A, amount=10),
+            algorithm_context=None
+        )
         position = portfolio.get_position(self.TARGET_SYMBOL_A)
 
         order = Order(

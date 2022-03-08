@@ -39,95 +39,69 @@ class Order:
         self.target_symbol = target_symbol
         self.trading_symbol = trading_symbol
         self.price = price
-        self.amount_trading_symbol = amount_trading_symbol
-        self.amount_target_symbol = amount_target_symbol
         self.side = OrderSide.from_value(side)
         self.type = OrderType.from_value(type)
         self.status = OrderStatus.from_value(status)
         self.initial_price = initial_price
         self.closing_price = closing_price
 
-        self._initialize_order_amount()
-        self._validate_initial_price_attribute()
-        self._validate_amount()
-        self._validate_price_attribute()
-        self._validate_closing_price_attribute()
-
-    def _validate_price_attribute(self):
-
-        if OrderStatus.SUCCESS.equals(self.status) \
-                or OrderStatus.PENDING.equals(self.status):
-
-            if self.price is None:
-                raise OperationalException(
-                    "Price attribute is not set for order"
-                )
-
-    def _validate_initial_price_attribute(self):
-
-        if OrderStatus.SUCCESS.equals(self.status) \
-                or OrderStatus.CLOSED.equals(self.status):
-
-            if self.initial_price is None:
-                raise OperationalException(
-                    "Initial price attribute is not set for order"
-                )
-
-    def _validate_closing_price_attribute(self):
-
-        if OrderStatus.CLOSED.equals(self.status):
-
-            if self.closing_price is None:
-                raise OperationalException(
-                    "Closing price attribute is not set for order"
-                )
-
-    def _validate_amount(self):
-
-        if OrderType.MARKET.equals(self.type):
-
-            if self.amount_target_symbol is None:
-                raise OperationalException(
-                    "Amount target symbol attribute is "
-                    "not set for market sell order"
-                )
-        else:
-            if self.amount_target_symbol is None:
-                raise OperationalException(
-                    "Amount target symbol attribute is "
-                    "not set for limit order"
-                )
-
-            if self.amount_trading_symbol is None:
-                raise OperationalException(
-                    "Amount trading symbol attribute is "
-                    "not set for limit order"
-                )
-
-    def _initialize_order_amount(self):
-        price = 0
-
-        if (OrderStatus.SUCCESS.equals(self.status)
-            or OrderStatus.CLOSED.equals(self.status)) \
-                and self.initial_price is not None:
-            price = self.initial_price
-        elif self.price is not None:
-            price = self.price
+        if amount_target_symbol is None and amount_trading_symbol is None:
+            raise OperationalException(
+                "Amount target symbol or amount trading symbol is "
+                "not specified"
+            )
 
         if OrderType.LIMIT.equals(self.type):
-            if self.amount_trading_symbol is not None:
+
+            if amount_target_symbol is not None:
+
+                if OrderStatus.PENDING.equals(self.status) \
+                        or OrderStatus.TO_BE_SENT.equals(self.status):
+                    self.amount_target_symbol = amount_target_symbol
+                    self.amount_trading_symbol = amount_target_symbol * price
+                elif not (OrderStatus.CANCELED.equals(self.status)
+                          or OrderStatus.FAILED.equals(self.status)):
+                    self.amount_target_symbol = amount_target_symbol
+                    self.amount_trading_symbol = \
+                        amount_target_symbol * initial_price
+            else:
+                if OrderStatus.PENDING.equals(self.status) \
+                        or OrderStatus.TO_BE_SENT.equals(self.status):
+                    self.amount_trading_symbol = amount_trading_symbol
+                    self.amount_target_symbol = amount_trading_symbol / price
+                elif not (OrderStatus.CANCELED.equals(self.status)
+                          or OrderStatus.FAILED.equals(self.status)):
+                    self.amount_trading_symbol = amount_trading_symbol
+                    self.amount_target_symbol = \
+                        amount_trading_symbol / initial_price
+        else:
+            # Only expect sell orders
+            self.amount_target_symbol = amount_target_symbol
+            self.amount_trading_symbol = 0
+
+    def set_amount_target_symbol(self, amount):
+        self.amount_target_symbol = amount
+
+        if OrderType.LIMIT.equals(self.type):
+
+            if OrderStatus.SUCCESS.equals(self.get_status()):
+                self.amount_trading_symbol = \
+                    self.get_initial_price() * self.get_amount_target_symbol()
+            else:
+                self.amount_trading_symbol = \
+                    self.get_price() * self.get_amount_target_symbol()
+
+    def set_amount_trading_symbol(self, amount):
+        self.amount_trading_symbol = amount
+
+        if OrderType.LIMIT.equals(self.type):
+
+            if OrderStatus.SUCCESS.equals(self.get_status()):
                 self.amount_target_symbol = \
-                    price / self.amount_trading_symbol
-            elif self.amount_target_symbol is not None:
-                self.amount_trading_symbol = \
-                    price * self.amount_target_symbol
-
-        if OrderType.MARKET.equals(self.type):
-
-            if OrderStatus.SUCCESS.equals(self.status) \
-                    or OrderStatus.CLOSED.equals(self.status):
-                self.amount_trading_symbol = \
-                    price * self.amount_target_symbol
+                    self.get_amount_trading_symbol() / self.get_initial_price()
+            else:
+                self.amount_target_symbol = \
+                    self.get_amount_trading_symbol() / self.get_price()
 
     def get_reference_id(self):
         return self.reference_id
@@ -178,16 +152,18 @@ class Order:
     def set_reference_id(self, reference_id):
         self.reference_id = reference_id
 
-    def set_amount_target_symbol(self, amount_target_symbol):
-        self.amount_target_symbol = amount_target_symbol
-
     def get_amount_trading_symbol(self):
         return self.amount_trading_symbol
 
-    def set_amount_trading_symbol(self, amount_trading_symbol):
-        self.amount_trading_symbol = amount_trading_symbol
-
-    def update(self, status=None, price=None, initial_price=None, closing_price=None, amount_target_symbol=None, amount_trading_symbol=None):
+    def update(
+        self,
+        status=None,
+        price=None,
+        initial_price=None,
+        closing_price=None,
+        amount_target_symbol=None,
+        amount_trading_symbol=None
+    ):
 
         if status is not None:
             self.set_status(status)
