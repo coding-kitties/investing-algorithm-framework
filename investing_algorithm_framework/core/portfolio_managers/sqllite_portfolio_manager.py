@@ -68,38 +68,55 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier):
 
         return portfolio.get_allocated()
 
-    def get_portfolio(self, algorithm_context, **kwargs) -> Portfolio:
-        portfolio = SQLLitePortfolio.query\
-            .filter_by(identifier=self.identifier)\
+    def sync_portfolio(self, algorithm_context):
+        portfolio = SQLLitePortfolio.query \
+            .filter_by(identifier=self.identifier) \
             .first()
 
         if portfolio is None:
-            orders = self.get_orders(algorithm_context)
-            positions = self.get_positions(algorithm_context)
-
             portfolio = SQLLitePortfolio(
                 identifier=self.identifier,
-                trading_symbol=self.trading_symbol,
-                orders=orders,
-                positions=positions
+                trading_symbol=self.get_trading_symbol(algorithm_context),
+                positions=[],
+                orders=[]
             )
             portfolio.save(db)
-            return portfolio
 
-        if self._requires_update():
-            orders = self.get_orders(algorithm_context)
-            positions = self.get_positions(algorithm_context)
-            portfolio.add_positions(positions)
+        positions = self.get_positions(algorithm_context)
+        portfolio.add_positions(positions)
+        positions = portfolio.get_positions()
+
+        for position in positions:
+            price = self.get_price(
+                position.get_symbol(),
+                self.get_trading_symbol(algorithm_context),
+                algorithm_context
+            )
+            position.set_price(price)
+            orders = self.get_orders(
+                target_symbol=position.get_symbol(),
+                trading_symbol=self.get_trading_symbol(algorithm_context),
+                algorithm_context=algorithm_context
+            )
             portfolio.add_orders(orders)
 
-            for position in portfolio.get_positions():
-                position.set_price(
-                    self.get_price(
-                        position.get_symbol(),
-                        self.get_trading_symbol(algorithm_context),
-                        algorithm_context
-                    )
-                )
+    def get_portfolio(
+        self,
+        algorithm_context,
+        update=False,
+        execute_update=True,
+        **kwargs
+    ) -> Portfolio:
+
+        portfolio = SQLLitePortfolio.query \
+            .filter_by(identifier=self.identifier) \
+            .first()
+
+        if execute_update and (self._requires_update() or update):
+            self.sync_portfolio(algorithm_context)
+            portfolio = SQLLitePortfolio.query \
+                .filter_by(identifier=self.identifier) \
+                .first()
 
         return portfolio
 

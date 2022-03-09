@@ -137,7 +137,6 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
         portfolio_manager.add_order(order, algorithm_context=None)
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         position = portfolio.get_position(self.TARGET_SYMBOL_A)
-        self.assertIsNone(position)
 
     def test_add_buy_order_larger_then_unallocated(self):
         portfolio_manager = self.algo_app.algorithm \

@@ -16,8 +16,7 @@ class MarketService(ABC, MarketIdentifier):
     @abstractmethod
     def get_prices(
         self,
-        target_symbol: str,
-        trading_symbol: str,
+        symbols,
         interval: TimeInterval
     ):
         pass
@@ -31,7 +30,11 @@ class MarketService(ABC, MarketIdentifier):
         pass
 
     @abstractmethod
-    def get_balance(self, symbol: str = None):
+    def get_balance(self, symbol):
+        pass
+
+    @abstractmethod
+    def get_balances(self):
         pass
 
     @abstractmethod
@@ -73,17 +76,11 @@ class MarketService(ABC, MarketIdentifier):
         pass
 
     @abstractmethod
-    def get_orders(self, target_symbol: str, trading_symbol: str):
+    def get_orders(self, symbol: str):
         pass
 
     @abstractmethod
-    def get_order(self, order_id, target_symbol: str, trading_symbol: str):
-        pass
-
-    @abstractmethod
-    def get_open_orders(
-        self, target_symbol: str = None, trading_symbol: str = None
-    ):
+    def get_order(self, order_id):
         pass
 
     @abstractmethod

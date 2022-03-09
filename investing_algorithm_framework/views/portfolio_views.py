@@ -23,13 +23,9 @@ def retrieve(identifier="default"):
 
     # Get the default portfolio
     if identifier == "default":
-        portfolio = current_app.algorithm\
-            .get_portfolio_manager()\
-            .get_portfolio()
+        portfolio = current_app.algorithm.get_portfolio()
     else:
-        portfolio = current_app.algorithm \
-            .get_portfolio_manager(identifier=identifier) \
-            .get_portfolio()
+        portfolio = current_app.algorithm.get_portfolio(identifier)
 
     time_frame = get_query_param(
         TIME_FRAME_QUERY_PARAM, request.args, TimeFrame.ONE_DAY.value

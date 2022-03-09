@@ -1,13 +1,13 @@
 import os
-from random import randint
 from datetime import datetime, timedelta
+from random import randint
 from typing import List
 
 from dateutil.relativedelta import relativedelta
 from flask_testing import TestCase
 
 from investing_algorithm_framework import MarketService, \
-    OrderExecutor, Order, OrderType, OrderSide, AlgorithmContextInitializer, \
+    OrderExecutor, Order, OrderSide, AlgorithmContextInitializer, \
     DataProvider, OrderBook, Ticker, PortfolioManager, Position
 from investing_algorithm_framework.app import App
 from investing_algorithm_framework.configuration.constants import \
@@ -97,7 +97,6 @@ class OrderExecutorTest(OrderExecutor):
     def check_order_status(
         self, order: Order, algorithm_context, **kwargs
     ) -> Order:
-        print("hoghhoihoiehioeg")
         order.set_status(OrderStatus.SUCCESS)
         return order
 
@@ -239,6 +238,9 @@ class MarketServiceTest(MarketService):
     def get_balance(self, symbol: str = None):
         pass
 
+    def get_balances(self):
+        pass
+
     def create_limit_buy_order(self, target_symbol: str, trading_symbol: str,
                                amount: float, price: float):
         return True
@@ -255,10 +257,10 @@ class MarketServiceTest(MarketService):
                                  amount: float):
         return True
 
-    def get_orders(self, target_symbol: str, trading_symbol: str):
+    def get_orders(self):
         pass
 
-    def get_order(self, order_id, target_symbol: str, trading_symbol: str):
+    def get_order(self, order_id):
         pass
 
     def get_open_orders(self, target_symbol: str = None,
@@ -702,36 +704,3 @@ class TestBase(TestCase):
                 datetime=datetime.utcnow() - relativedelta(years=15)
             )
         ]
-
-    def create_limit_order(
-        self,
-        portfolio,
-        target_symbol,
-        amount,
-        price,
-        creation_datetime=datetime.utcnow(),
-        side=OrderSide.BUY.value,
-        execution_datetime=None,
-        executed=True,
-    ):
-        order = portfolio_manager.create_order(
-            amount_target_symbol=10,
-            target_symbol=self.TARGET_SYMBOL_A,
-            price=self.get_price(self.TARGET_SYMBOL_A).price,
-            type=OrderType.LIMIT.value
-        )
-
-        order.created_at = creation_datetime
-        portfolio.add_order(order)
-
-        if not execution_datetime:
-            # Order is a minute later executed
-            executed_at = creation_datetime + timedelta(minutes=4)
-        else:
-            executed_at = execution_datetime
-
-        if executed:
-            order.set_pending()
-            order.set_executed(snapshot=True, executed_at=executed_at)
-
-        return order

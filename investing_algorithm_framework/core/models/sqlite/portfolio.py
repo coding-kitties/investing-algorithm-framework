@@ -229,7 +229,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
         return self.trading_symbol
 
     def get_number_of_positions(self):
-        return self._positions.count()
+        return len(self.get_positions())
 
     def get_number_of_orders(self):
         from investing_algorithm_framework import SQLLitePosition

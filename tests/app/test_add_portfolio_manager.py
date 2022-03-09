@@ -1,41 +1,24 @@
 from unittest import TestCase
-from investing_algorithm_framework import App, PortfolioManager, OrderType, \
-    OrderSide
+
+from investing_algorithm_framework import App, PortfolioManager
+from investing_algorithm_framework import current_app
 from investing_algorithm_framework.configuration.constants import \
     RESOURCES_DIRECTORY
-from investing_algorithm_framework import current_app
 
 
 class PortfolioManagerTest(PortfolioManager):
     identifier = "testTwo"
 
-    def get_unallocated(self, algorithm_context, sync=False):
-        pass
-
-    def get_allocated(self, algorithm_context, sync=False):
-        pass
-
-    def initialize(self, algorithm_context):
-        pass
-
-    def get_portfolio(self, algorithm_context):
-        pass
-
     def get_positions(self, symbol: str = None, lazy=False):
-        pass
+        return []
 
     def get_orders(self, symbol: str = None, status=None, lazy=False):
-        pass
+        return []
 
-    def create_order(self, symbol, price=None, amount_trading_symbol=None,
-                     amount_target_symbol=None,
-                     order_type=OrderType.LIMIT.value,
-                     order_side=OrderSide.BUY.value, context=None,
-                     validate_pair=True):
-        pass
-
-    def add_order(self, order):
-        pass
+    def get_price(
+        self, target_symbol, trading_symbol, algorithm_context, **kwargs
+    ) -> float:
+        return 0.0
 
 
 class Test(TestCase):

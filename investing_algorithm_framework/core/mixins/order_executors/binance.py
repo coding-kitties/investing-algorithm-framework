@@ -45,12 +45,7 @@ class BinanceOrderExecutorMixin:
             self, order: Order, algorithm_context, **kwargs
     ) -> Order:
         market_service = algorithm_context.get_market_service(BINANCE)
-
-        ref_order = market_service.get_order(
-            order.get_reference_id(),
-            order.get_target_symbol(),
-            order.get_trading_symbol()
-        )
+        ref_order = market_service.get_order(order.get_reference_id())
 
         if ref_order is not None:
 

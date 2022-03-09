@@ -5,8 +5,6 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import OrderStatus
 from investing_algorithm_framework.core.models.order import Order, OrderSide
 from investing_algorithm_framework.core.models.position import Position
-from investing_algorithm_framework.core.order_validators import \
-    OrderValidatorFactory
 
 
 class Portfolio:
@@ -89,11 +87,11 @@ class Portfolio:
 
     def get_orders(
         self,
+        target_symbol,
+        trading_symbol,
         type=None,
         status=None,
         side=None,
-        target_symbol=None,
-        trading_symbol=None,
     ) -> List[Order]:
         positions = self.get_positions()
 

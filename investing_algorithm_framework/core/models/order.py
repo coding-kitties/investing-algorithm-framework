@@ -57,27 +57,62 @@ class Order:
 
                 if OrderStatus.PENDING.equals(self.status) \
                         or OrderStatus.TO_BE_SENT.equals(self.status):
+
+                    if price is None:
+                        raise OperationalException("Price is not specified")
+
                     self.amount_target_symbol = amount_target_symbol
                     self.amount_trading_symbol = amount_target_symbol * price
+
                 elif not (OrderStatus.CANCELED.equals(self.status)
                           or OrderStatus.FAILED.equals(self.status)):
+
+                    if initial_price is None:
+                        raise OperationalException(
+                            "Initial price is not specified"
+                        )
+
                     self.amount_target_symbol = amount_target_symbol
                     self.amount_trading_symbol = \
                         amount_target_symbol * initial_price
             else:
                 if OrderStatus.PENDING.equals(self.status) \
                         or OrderStatus.TO_BE_SENT.equals(self.status):
+
+                    if price is None:
+                        raise OperationalException("Price is not specified")
+
                     self.amount_trading_symbol = amount_trading_symbol
                     self.amount_target_symbol = amount_trading_symbol / price
                 elif not (OrderStatus.CANCELED.equals(self.status)
                           or OrderStatus.FAILED.equals(self.status)):
+
+                    if initial_price is None:
+                        raise OperationalException(
+                            "Initial price is not specified"
+                        )
+
                     self.amount_trading_symbol = amount_trading_symbol
                     self.amount_target_symbol = \
                         amount_trading_symbol / initial_price
         else:
-            # Only expect sell orders
-            self.amount_target_symbol = amount_target_symbol
-            self.amount_trading_symbol = 0
+            if OrderStatus.PENDING.equals(self.status) \
+                    or OrderStatus.TO_BE_SENT.equals(self.status):
+                # Only expect sell orders
+                self.amount_target_symbol = amount_target_symbol
+                self.amount_trading_symbol = None
+            elif not (OrderStatus.CANCELED.equals(self.status)
+                      or OrderStatus.FAILED.equals(self.status)):
+
+                if initial_price is None:
+                    raise OperationalException(
+                        "Initial price is not specified"
+                    )
+
+                # Only expect sell orders
+                self.amount_target_symbol = amount_target_symbol
+                self.amount_trading_symbol = \
+                    amount_target_symbol * initial_price
 
     def set_amount_target_symbol(self, amount):
         self.amount_target_symbol = amount

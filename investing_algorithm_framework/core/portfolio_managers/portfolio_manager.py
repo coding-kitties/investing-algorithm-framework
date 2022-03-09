@@ -25,12 +25,14 @@ class PortfolioManager(ABC, Identifier):
         pass
 
     @abstractmethod
-    def get_orders(self, algorithm_context, **kwargs) -> List[Order]:
+    def get_orders(
+        self, symbol, algorithm_context, **kwargs
+    ) -> List[Order]:
         pass
 
     @abstractmethod
-    def get_price(
-        self, target_symbol, trading_symbol, algorithm_context, **kwargs
+    def get_prices(
+        self, symbols, algorithm_context, **kwargs
     ) -> float:
         pass
 
@@ -52,30 +54,33 @@ class PortfolioManager(ABC, Identifier):
 
         return trading_symbol
 
-    def get_portfolio(self, algorithm_context, **kwargs) -> Portfolio:
+    def sync_portfolio(self, algorithm_context):
+        positions = self.get_positions(algorithm_context)
+        self.portfolio.add_positions(positions)
+        positions = self.portfolio.get_positions()
 
-        if self.portfolio is None:
-            self.portfolio = Portfolio(
-                identifier=self.get_identifier(),
-                trading_symbol=self.get_trading_symbol(algorithm_context),
-                positions=self.get_positions(algorithm_context),
-                orders=self.get_orders(algorithm_context)
+        for position in positions:
+            price = self.get_prices(
+                position.get_symbol(),
+                algorithm_context
             )
-
-        if self._requires_update():
-            orders = self.get_orders(algorithm_context)
-            positions = self.get_positions(algorithm_context)
-            self.portfolio.add_positions(positions)
+            position.set_price(price)
+            orders = self.get_orders(
+                symbol=f"f{position.get_symbol()}/{self.get_trading_symbol(algorithm_context)}",
+                algorithm_context=algorithm_context
+            )
             self.portfolio.add_orders(orders)
 
-            for position in self.portfolio.get_positions():
-                position.set_price(
-                    self.get_price(
-                        position.get_symbol(),
-                        self.get_trading_symbol(algorithm_context),
-                        algorithm_context
-                    )
-                )
+    def get_portfolio(
+        self,
+        algorithm_context,
+        update=False,
+        execute_update=True,
+        **kwargs
+    ) -> Portfolio:
+
+        if execute_update and (self._requires_update() or update):
+            self.sync_portfolio(algorithm_context)
 
         return self.portfolio
 

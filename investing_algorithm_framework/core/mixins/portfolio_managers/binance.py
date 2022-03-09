@@ -1,16 +1,77 @@
+from typing import List
 from investing_algorithm_framework.configuration.constants import BINANCE
+from investing_algorithm_framework.core.models.position import Position
+from investing_algorithm_framework.core.models.order import Order
+from investing_algorithm_framework.core.models.order_status import OrderStatus
+from investing_algorithm_framework.core.models.snapshots import AssetPrice
 
 
 class BinancePortfolioManagerMixin:
 
-    def get_orders(self, algorithm_context):
+    def get_orders(
+            self, symbol, algorithm_context
+    ) -> List[Order]:
         market_service = algorithm_context.get_market_service(BINANCE)
-        return market_service.get_balance(self.trading_symbol)
+        binance_orders = market_service.get_orders(symbol)
+        orders = []
 
-    def get_positions(self, algorithm_context):
-        market_service = algorithm_context.get_market_service(BINANCE)
-        return market_service.get_balance()
+        for binance_order in binance_orders:
+            status = OrderStatus.PENDING.value
 
-    def get_price(self, target_symbol, trading_symbol, algorithm_context):
+            if binance_order["status"] == "open":
+                status = OrderStatus.SUCCESS.value
+            if binance_order["status"] == "closed":
+                status = OrderStatus.SUCCESS.value
+            if binance_order["status"] == "canceled":
+                status = OrderStatus.SUCCESS.value
+            if binance_order["status"] == "expired":
+                status = OrderStatus.SUCCESS.value
+            if binance_order["status"] == "rejected":
+                status = OrderStatus.SUCCESS.value
+
+            order = Order.from_dict(
+                {
+                    "reference_id": binance_order["id"],
+                    "target_symbol": binance_order["symbol"].split("/")[0],
+                    "trading_symbol": binance_order["symbol"].split("/")[1],
+                    "amount_target_symbol": binance_order["amount"],
+                    "status": status,
+                    "price":  binance_order["price"],
+                    "initial_price": binance_order["price"],
+                    "closing_price": binance_order["price"],
+                    "type": binance_order["type"],
+                    "side": binance_order["side"]
+                }
+            )
+            orders.append(order)
+        return orders
+
+    def get_positions(self, algorithm_context) -> List[Position]:
         market_service = algorithm_context.get_market_service(BINANCE)
-        return market_service.get_ticker(target_symbol, trading_symbol)
+        binance_balances = market_service.get_balances()
+        positions = []
+
+        for binance_balance in binance_balances["free"]:
+
+            if binance_balances[binance_balance]["free"] > 0:
+                position = Position.from_dict(
+                    {
+                        "symbol": binance_balance,
+                        "amount": binance_balances[binance_balance]["free"]
+                    }
+                )
+                positions.append(position)
+        return positions
+
+    def get_prices(self, symbols, algorithm_context) -> List[AssetPrice]:
+        market_service = algorithm_context.get_market_service(BINANCE)
+        tickers = market_service.get_tickers(symbols)
+
+        asset_prices = []
+
+        for ticker in tickers:
+            asset_prices.append(
+                AssetPrice(ticker["symbol"], ticker["ask"], ticker["datetime"])
+            )
+
+        return asset_prices

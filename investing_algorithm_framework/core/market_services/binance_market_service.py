@@ -87,27 +87,48 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
                 "Could not retrieve order book"
             )
 
-    def get_balance(self, symbol: str = None):
+    def get_order(self, order_id):
         self.initialize_exchange(credentials=True)
- 
+
+        try:
+            return self.exchange.fetch_order(order_id)
+        except Exception as e:
+            logger.exception(e)
+            raise OperationalException("Could not retrieve order")
+
+    def get_orders(self, symbol: str):
+        self.initialize_exchange(credentials=True)
+
+        try:
+            return self.exchange.fetch_orders(symbol)
+        except Exception as e:
+            logger.exception(e)
+            raise OperationalException("Could not retrieve orders")
+
+    def get_balance(self, symbol):
+        self.initialize_exchange(credentials=True)
+
         try:
             balances = self.exchange.fetch_balance()["info"]["balances"]
         except Exception as e:
             logger.exception(e)
-            raise OperationalException(
-                "Could not retrieve balance"
-            )
+            raise OperationalException("Could not retrieve balances")
 
-        if symbol is not None:
+        for balance in balances:
 
-            for balance in balances:
+            if balance["asset"] == symbol.upper():
+                return balance
 
-                if balance["asset"] == symbol.upper():
-                    return balance['free']
+        return None
 
-            return None
-        else:
-            return balances
+    def get_balances(self):
+        self.initialize_exchange(credentials=True)
+
+        try:
+            return self.exchange.fetch_balance()
+        except Exception as e:
+            logger.exception(e)
+            raise OperationalException("Could not retrieve balances")
 
     def create_limit_buy_order(
             self,
@@ -184,26 +205,6 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             order.get_order_reference(),
             f"{order.get_target_symbol()}/{order.get_trading_symbol()}")
 
-    def get_orders(self, target_symbol: str, trading_symbol: str):
-        self.initialize_exchange(credentials=True)
-
-        try:
-            symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
-            return self.exchange.fetchOrders(symbol)
-        except Exception as e:
-            logger.exception(e)
-            raise OperationalException("Could not retrieve orders")
-
-    def get_order(self, order_id, target_symbol: str, trading_symbol: str):
-        self.initialize_exchange(credentials=True)
-
-        try:
-            symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
-            return self.exchange.fetchOrder(order_id, symbol)
-        except Exception as e:
-            logger.exception(e)
-            raise OperationalException("Could not retrieve order")
-
     def get_open_orders(
         self, target_symbol: str = None, trading_symbol: str = None
     ):
@@ -236,8 +237,18 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
 
     def get_prices(
         self,
-        target_symbol: str,
-        trading_symbol: str,
+        symbols,
         time_interval: TimeInterval
     ):
-        pass
+        self.initialize_exchange()
+
+        try:
+            symbol = f"{target_symbol.upper()}{trading_symbol.upper()}"
+            return self.exchange.fetchTicker(symbol)
+        except Exception as e:
+            logger.exception(e)
+            raise OperationalException(
+                f"Could not retrieve ticker"
+                f"{target_symbol.upper()}{trading_symbol.upper()}"
+            )
+

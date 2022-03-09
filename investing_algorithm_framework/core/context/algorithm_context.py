@@ -22,6 +22,8 @@ from investing_algorithm_framework.core.market_services import \
     DefaultMarketServiceFactory
 from investing_algorithm_framework.core.order_executors import \
     DefaultOrderExecutorFactory, OrderExecutor
+from investing_algorithm_framework.core.market_services.market_service \
+    import MarketService
 
 logger = logging.getLogger(__name__)
 
@@ -463,8 +465,8 @@ class AlgorithmContext:
         return market_services
 
     def get_market_service(
-            self, market: str, throw_exception: bool = True
-    ):
+        self, market: str, throw_exception: bool = True
+    ) -> MarketService:
         if market not in self._market_services:
 
             if market in RESERVED_IDENTIFIERS:

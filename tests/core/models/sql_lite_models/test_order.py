@@ -8,6 +8,8 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
     def setUp(self):
         super(TestOrderModel, self).setUp()
         self.algo_app.algorithm.start()
+
+    def test_get_reference_id(self):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
 
@@ -19,10 +21,6 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
             reference_id=10
         )
 
-    def test_get_reference_id(self):
-        portfolio_manager = self.algo_app.algorithm \
-            .get_portfolio_manager("sqlite")
-
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_reference_id())
@@ -32,6 +30,14 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
 
+        self.create_buy_order(
+            amount=10,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            portfolio_manager=portfolio_manager,
+            target_symbol=self.TARGET_SYMBOL_A,
+            reference_id=10
+        )
+
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_target_symbol())
@@ -39,6 +45,14 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
     def test_get_trading_symbol(self):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
+
+        self.create_buy_order(
+            amount=10,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            portfolio_manager=portfolio_manager,
+            target_symbol=self.TARGET_SYMBOL_A,
+            reference_id=10
+        )
 
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         order = portfolio.get_order(10)
@@ -48,6 +62,14 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
 
+        self.create_buy_order(
+            amount=10,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            portfolio_manager=portfolio_manager,
+            target_symbol=self.TARGET_SYMBOL_A,
+            reference_id=10
+        )
+
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_amount_trading_symbol())
@@ -56,6 +78,14 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
 
+        self.create_buy_order(
+            amount=10,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            portfolio_manager=portfolio_manager,
+            target_symbol=self.TARGET_SYMBOL_A,
+            reference_id=10
+        )
+
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_amount_target_symbol())
@@ -63,6 +93,14 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
     def test_get_initial_price(self):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
+
+        self.create_buy_order(
+            amount=10,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            portfolio_manager=portfolio_manager,
+            target_symbol=self.TARGET_SYMBOL_A,
+            reference_id=10
+        )
 
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         order = portfolio.get_order(10)
@@ -73,6 +111,14 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
 
+        self.create_buy_order(
+            amount=10,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            portfolio_manager=portfolio_manager,
+            target_symbol=self.TARGET_SYMBOL_A,
+            reference_id=10
+        )
+
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         order = portfolio.get_order(10)
 
@@ -81,6 +127,14 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
     def test_get_closing_price(self):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
+
+        self.create_buy_order(
+            amount=10,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            portfolio_manager=portfolio_manager,
+            target_symbol=self.TARGET_SYMBOL_A,
+            reference_id=10
+        )
 
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         order = portfolio.get_order(10)
@@ -91,6 +145,14 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
 
+        self.create_buy_order(
+            amount=10,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            portfolio_manager=portfolio_manager,
+            target_symbol=self.TARGET_SYMBOL_A,
+            reference_id=10
+        )
+
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_side())
@@ -99,6 +161,14 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
 
+        self.create_buy_order(
+            amount=10,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            portfolio_manager=portfolio_manager,
+            target_symbol=self.TARGET_SYMBOL_A,
+            reference_id=10
+        )
+
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_status())
@@ -106,6 +176,14 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
     def test_get_type(self):
         portfolio_manager = self.algo_app.algorithm \
             .get_portfolio_manager("sqlite")
+
+        self.create_buy_order(
+            amount=10,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            portfolio_manager=portfolio_manager,
+            target_symbol=self.TARGET_SYMBOL_A,
+            reference_id=10
+        )
 
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
         order = portfolio.get_order(10)
@@ -200,23 +278,19 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_closing_price())
         self.assertIsNotNone(order.get_initial_price())
 
-        Order.from_dict(
-            {
-                "reference_id": 10493,
-                "target_symbol": "DOT",
-                "trading_symbol": "USDT",
-                "amount_target_symbol": 40,
-                "status": "CLOSED",
-                "price": 10,
-                "initial_price": 10,
-                "type": "LIMIT",
-                "side": "BUY"
-            }
-        )
-
-        portfolio_manager = self.algo_app.algorithm\
-            .get_portfolio_manager("default")
-        portfolio_manager.add_order(order, algorithm_context=None)
+        with self.assertRaises(OperationalException):
+            Order.from_dict(
+                {
+                    "reference_id": 10493,
+                    "target_symbol": "DOT",
+                    "trading_symbol": "USDT",
+                    "amount_target_symbol": 40,
+                    "status": "CLOSED",
+                    "price": 10,
+                    "type": "LIMIT",
+                    "side": "BUY"
+                }
+            )
 
     def test_from_dict_pending_limit_order_sell(self):
         order = Order.from_dict(
@@ -305,8 +379,6 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
                 "side": "SELL"
             }
         )
-
-        print(order)
 
         self.assertIsNotNone(order.get_reference_id())
         self.assertIsNotNone(order.get_target_symbol())
