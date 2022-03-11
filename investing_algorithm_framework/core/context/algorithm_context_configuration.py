@@ -1,8 +1,9 @@
+import os
 from importlib import import_module
 from typing import Any
 
 from investing_algorithm_framework.configuration.constants import \
-    CCXT_ENABLED, API_KEY, SECRET_KEY
+    CCXT_ENABLED, API_KEY, SECRET_KEY, MARKET, RESOURCES_DIRECTORY
 from investing_algorithm_framework.core.exceptions \
     import ImproperlyConfigured, OperationalException
 
@@ -18,13 +19,32 @@ class AlgorithmContextConfiguration:
         self.settings_module = None
 
     def ccxt_enabled(self):
-        return self.get(CCXT_ENABLED, False)
+        return self.get(CCXT_ENABLED, False) \
+               and self.get(MARKET, None) is not None
 
     def ccxt_authentication_configured(self):
         api_key = self.get(API_KEY, None)
         secret_key = self.get(SECRET_KEY, None)
         return self.ccxt_enabled() and api_key is not None \
             and secret_key is not None
+
+    def resource_directory_configured(self):
+        resource_directory = self.get(RESOURCES_DIRECTORY, None)
+
+        if resource_directory is None:
+            return False
+
+    def can_write_to_resource_directory(self):
+
+        if not self.resource_directory_configured():
+            return False
+
+        resource_directory = self.get(RESOURCES_DIRECTORY, None)
+
+        if not os.path.isdir(resource_directory):
+            return False
+
+        return os.access(resource_directory, os.W_OK)
 
     def load(self, config):
 
@@ -69,11 +89,10 @@ class AlgorithmContextConfiguration:
         """
         Mimics the dict get() functionality
         """
-
         try:
             return self.__getitem__(key)
         # Ignore exception
-        except OperationalException:
+        except Exception:
             pass
 
         return default

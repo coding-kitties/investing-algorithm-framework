@@ -35,21 +35,21 @@ class PortfolioManagerTest(SQLLitePortfolioManager):
         super(PortfolioManagerTest, self).initialize(algorithm_context)
         self.initialize_has_run = True
 
-    def get_price(
-        self, target_symbol, trading_symbol, algorithm_context, **kwargs
-    ) -> float:
-        asset_price = TestBase.get_price(target_symbol)
+    def get_prices(
+        self, symbols, algorithm_context, **kwargs
+    ):
+        asset_prices = []
 
-        if asset_price is None:
-            return 0
+        for symbol in symbols:
+            asset_prices.append(TestBase.get_price(symbol))
 
-        return asset_price.price
+        return asset_prices
 
-    def get_positions(self, algorithm_context, **kwargs) -> List[Position]:
+    def get_positions(self, algorithm_context=None, **kwargs) -> List[Position]:
         return [
             Position(
                 amount=10000,
-                symbol=self.get_trading_symbol(algorithm_context)
+                target_symbol=self.get_trading_symbol(algorithm_context)
             )
         ]
 
@@ -64,21 +64,21 @@ class DefaultPortfolioManager(PortfolioManager):
     def initialize(self, algorithm_context):
         super(DefaultPortfolioManager, self).initialize(algorithm_context)
 
-    def get_price(
-        self, target_symbol, trading_symbol, algorithm_context, **kwargs
-    ) -> float:
-        asset_price = TestBase.get_price(target_symbol)
+    def get_prices(
+        self, symbols, algorithm_context, **kwargs
+    ):
+        asset_prices = []
 
-        if asset_price is None:
-            return 0
+        for symbol in symbols:
+            asset_prices.append(TestBase.get_price(symbol))
 
-        return asset_price.price
+        return asset_prices
 
-    def get_positions(self, algorithm_context, **kwargs) -> List[Position]:
+    def get_positions(self, algorithm_context=None, **kwargs) -> List[Position]:
         return [
             Position(
                 amount=10000,
-                symbol=self.get_trading_symbol(algorithm_context)
+                target_symbol=self.get_trading_symbol(algorithm_context)
             )
         ]
 
@@ -189,45 +189,21 @@ class MarketServiceTest(MarketService):
     def pair_exists(self, target_symbol: str, trading_symbol: str):
         return True
 
-    def get_ticker(self, target_symbol: str, trading_symbol: str):
+    def get_ticker(self, symbol):
         return TestBase.get_price(
-            target_symbol=target_symbol, date=datetime.utcnow()
+            symbol=symbol, date=datetime.utcnow()
         )
 
-    def get_prices(
-        self,
-        target_symbol: str,
-        trading_symbol: str,
-        time_interval: TimeInterval
-    ):
+    def get_tickers(self, symbols):
+        return []
+
+    def get_prices(self, symbols):
+
         asset_prices = []
 
-        for i in range(0, time_interval.amount_of_data_points()):
-
-            if TimeInterval.MINUTES_ONE.equals(time_interval):
-                date = datetime.utcnow() - timedelta(minutes=i)
-
-            if TimeInterval.MINUTES_FIFTEEN.equals(time_interval):
-                date = datetime.utcnow() - timedelta(minutes=i * 15)
-
-            if TimeInterval.HOURS_ONE.equals(time_interval):
-                date = datetime.utcnow() - timedelta(hours=i)
-
-            if TimeInterval.HOURS_FOUR.equals(time_interval):
-                date = datetime.utcnow() - timedelta(hours=i * 4)
-
-            if TimeInterval.DAYS_ONE.equals(time_interval):
-                date = datetime.utcnow() - timedelta(days=i)
-
-            asset_price = TestBase.get_price(target_symbol, date)
-            asset_prices.insert(
-                0,
-                SQLLiteAssetPrice(
-                    target_symbol=target_symbol,
-                    trading_symbol=trading_symbol,
-                    price=asset_price.price,
-                    datetime=date
-                )
+        for symbol in symbols:
+            asset_prices.append(
+                TestBase.get_price(symbol=symbol, date=datetime.utcnow())
             )
 
         return asset_prices
@@ -312,8 +288,7 @@ class TestBase(TestCase):
     def setUp(self):
         self.algo_app.reset()
         self.algo_app._configured = False
-        self.algo_app._config = TestConfig
-        self.algo_app._initialize_config()
+        self.algo_app.initialize(resources_directory="/tmp", config=TestConfig)
         self.algo_app._initialize_database()
         self.algo_app._initialize_flask_config()
         self.algo_app._initialize_flask_sql_alchemy()
@@ -323,45 +298,39 @@ class TestBase(TestCase):
         self.algo_app.algorithm.add_market_service(MarketServiceTest())
         self.algo_app.algorithm.add_order_executor(OrderExecutorTest())
         self.algo_app.algorithm.add_data_provider(DataProviderTest)
-        self.algo_app.algorithm.initialize()
         self.algo_app.start_scheduler()
 
         TestBase.prices_symbol_a = [
             SQLLiteAssetPrice(
-                target_symbol=self.TARGET_SYMBOL_A,
-                trading_symbol="usdt",
+                symbol=f"{self.TARGET_SYMBOL_A}/USDT",
                 price=self.BASE_SYMBOL_A_PRICE,
                 datetime=datetime.utcnow() - relativedelta(years=15)
             )
         ]
         TestBase.prices_symbol_b = [
             SQLLiteAssetPrice(
-                target_symbol=self.TARGET_SYMBOL_B,
-                trading_symbol="usdt",
+                symbol=f"{self.TARGET_SYMBOL_B}/USDT",
                 price=self.BASE_SYMBOL_B_PRICE,
                 datetime=datetime.utcnow() - relativedelta(years=15)
             )
         ]
         TestBase.prices_symbol_c = [
             SQLLiteAssetPrice(
-                target_symbol=self.TARGET_SYMBOL_C,
-                trading_symbol="usdt",
+                symbol=f"{self.TARGET_SYMBOL_C}/USDT",
                 price=self.BASE_SYMBOL_C_PRICE,
                 datetime=datetime.utcnow() - relativedelta(years=15)
             )
         ]
         TestBase.prices_symbol_d = [
             SQLLiteAssetPrice(
-                target_symbol=self.TARGET_SYMBOL_D,
-                trading_symbol="usdt",
+                symbol=f"{self.TARGET_SYMBOL_D}/USDT",
                 price=self.BASE_SYMBOL_D_PRICE,
                 datetime=datetime.utcnow() - relativedelta(years=15)
             )
         ]
         TestBase.prices_symbol_e = [
             SQLLiteAssetPrice(
-                target_symbol=self.TARGET_SYMBOL_E,
-                trading_symbol="usdt",
+                symbol=f"{self.TARGET_SYMBOL_E}/USDT",
                 price=self.BASE_SYMBOL_E_PRICE,
                 datetime=datetime.utcnow() - relativedelta(years=15)
             )
@@ -392,15 +361,16 @@ class TestBase(TestCase):
             raise self.failureException(msg)
 
     @staticmethod
-    def get_price(target_symbol, date=datetime.now()):
+    def get_price(symbol, date=datetime.now()):
 
-        if target_symbol == "USDT":
+        if symbol.split("/")[0] == "USDT":
             return SQLLiteAssetPrice(
                 price=1,
                 datetime=datetime.utcnow(),
-                target_symbol="USDT",
-                trading_symbol="USDT"
+                symbol="USDT"
             )
+
+        target_symbol = symbol.split("/")
 
         if target_symbol == TestBase.TARGET_SYMBOL_A:
             prices = TestBase.prices_symbol_a
@@ -532,8 +502,8 @@ class TestBase(TestCase):
                 msg = "Order status is None"
                 raise self.failureException(msg)
 
-            if order.status is OrderStatus.SUCCESS.value:
-                msg = "Order status is not value SUCCESS"
+            if order.status is OrderStatus.CLOSED.value:
+                msg = "Order status is not closed"
                 raise self.failureException(msg)
 
     def assert_is_market_order(self, order, executed = False):
@@ -667,39 +637,34 @@ class TestBase(TestCase):
 
         TestBase.prices_symbol_a = [
             SQLLiteAssetPrice(
-                target_symbol=TestBase.TARGET_SYMBOL_A,
-                trading_symbol="USDT",
+                symbol=f"{TestBase.TARGET_SYMBOL_A}/USDT",
                 price=TestBase.BASE_SYMBOL_A_PRICE,
                 datetime=datetime.utcnow() - relativedelta(years=15)
             )
         ]
         TestBase.prices_symbol_b = [
             SQLLiteAssetPrice(
-                target_symbol=TestBase.TARGET_SYMBOL_B,
-                trading_symbol="USDT",
+                symbol=f"{TestBase.TARGET_SYMBOL_B}/USDT",
                 price=TestBase.BASE_SYMBOL_B_PRICE,
                 datetime=datetime.utcnow() - relativedelta(years=15))
         ]
         TestBase.prices_symbol_c = [
             SQLLiteAssetPrice(
-                target_symbol=TestBase.TARGET_SYMBOL_C,
-                trading_symbol="USDT",
+                symbol=f"{TestBase.TARGET_SYMBOL_C}/USDT",
                 price=TestBase.BASE_SYMBOL_C_PRICE,
                 datetime=datetime.utcnow() - relativedelta(years=15)
             )
         ]
         TestBase.prices_symbol_d = [
             SQLLiteAssetPrice(
-                target_symbol=TestBase.TARGET_SYMBOL_D,
-                trading_symbol="TestBase",
+                symbol=f"{TestBase.TARGET_SYMBOL_D}/USDT",
                 price=TestBase.BASE_SYMBOL_D_PRICE,
                 datetime=datetime.utcnow() - relativedelta(years=15)
             )
         ]
         TestBase.prices_symbol_e = [
             SQLLiteAssetPrice(
-                target_symbol=TestBase.TARGET_SYMBOL_E,
-                trading_symbol="USDT",
+                symbol=f"{TestBase.TARGET_SYMBOL_E}/USDT",
                 price=TestBase.BASE_SYMBOL_E_PRICE,
                 datetime=datetime.utcnow() - relativedelta(years=15)
             )

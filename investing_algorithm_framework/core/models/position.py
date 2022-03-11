@@ -204,7 +204,7 @@ class Position:
         for order in self.get_orders():
 
             if OrderSide.BUY.equals(order.side) and \
-                    OrderStatus.SUCCESS.equals(order.status):
+                    OrderStatus.CLOSED.equals(order.status):
                 cost += order.get_initial_price() * \
                        order.get_amount_target_symbol()
 

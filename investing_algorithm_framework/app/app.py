@@ -40,6 +40,10 @@ class App(metaclass=Singleton):
             self._resource_directory = resources_directory
 
         if config is not None:
+
+            if inspect.isclass(config):
+                config = config()
+
             self._config = config
 
     def initialize(
@@ -51,7 +55,12 @@ class App(metaclass=Singleton):
                 self._resource_directory = resources_directory
 
             if config is not None:
-                self._config = AlgorithmContextConfiguration(config)
+
+                if inspect.isclass(config):
+                    config = Config()
+
+                self._config = AlgorithmContextConfiguration()
+                self._config.load(config)
 
     def _initialize_algorithm(self):
         self._algorithm.initialize(config=self.config)
@@ -61,25 +70,22 @@ class App(metaclass=Singleton):
         if not self._configured:
 
             if config is not None:
-                self._config = config
+                if inspect.isclass(config):
+                    config = config()
+
+                self._config = AlgorithmContextConfiguration()
+                self._config.load(config)
 
             if self._config is None:
                 raise OperationalException("No config object set")
 
-            if inspect.isclass(self._config) \
-                    and issubclass(self._config, Config):
-                self._config = self._config()
-            elif type(self._config) is dict:
-                self._config = Config.from_dict(self._config)
-            else:
-                raise OperationalException("Config object not supported")
+            if not self._config.resource_directory_configured():
+                raise OperationalException(
+                    "Resource directory is not configured"
+                )
 
-            if self._resource_directory is not None:
-                self._config[RESOURCES_DIRECTORY] = self._resource_directory
-
-            if RESOURCES_DIRECTORY not in self._config \
-                    or self._config[RESOURCES_DIRECTORY] is None:
-                raise OperationalException("Resource directory not specified")
+            if not self._config.can_write_to_resource_directory():
+                raise OperationalException("Can't write to resource directory")
 
             self._configured = True
             setup_logging(self.config.get(LOG_LEVEL, "INFO"))

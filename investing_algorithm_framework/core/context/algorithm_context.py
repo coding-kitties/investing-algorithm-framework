@@ -2,9 +2,8 @@ import logging
 from typing import List
 import inspect
 
-from investing_algorithm_framework.configuration import Config
 from investing_algorithm_framework.configuration.constants import \
-    TRADING_SYMBOL
+    TRADING_SYMBOL, MARKET, SECRET_KEY, API_KEY
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import TimeUnit, OrderType, \
     db, OrderSide, OrderStatus, Portfolio, Order, Position
@@ -19,11 +18,13 @@ from investing_algorithm_framework.core.data_providers import\
 from investing_algorithm_framework.configuration.constants import \
     RESERVED_IDENTIFIERS
 from investing_algorithm_framework.core.market_services import \
-    DefaultMarketServiceFactory
+    DefaultMarketServiceFactory, CCXTMarketService
 from investing_algorithm_framework.core.order_executors import \
     DefaultOrderExecutorFactory, OrderExecutor
 from investing_algorithm_framework.core.market_services.market_service \
     import MarketService
+from investing_algorithm_framework.core.context\
+    .algorithm_context_configuration import AlgorithmContextConfiguration
 
 logger = logging.getLogger(__name__)
 
@@ -106,26 +107,24 @@ class AlgorithmContext:
 
             return wrapper
 
-    def initialize(self, config=None):
-
-        if config is not None:
-            assert isinstance(config, Config), (
-                "Config is not an instance of config"
-            )
-            self._config = config
-        else:
-            self._config = Config()
-
     def initialize_portfolio_managers(self):
-
-        # Initialize the portfolio managers
         for portfolio_manager_key in self._portfolio_managers:
             portfolio_manager = self._portfolio_managers[portfolio_manager_key]
             portfolio_manager.initialize(self)
 
-    def initialize_market_services(self):
+    def initialize_order_executors(self):
+        for order_executor_key in self._order_executors:
+            order_executor = self._order_executors[order_executor_key]
+            order_executor.initialize(self)
 
-        self.config.ccxt_enabled()
+    def initialize_market_services(self):
+        if self.config.ccxt_enabled():
+            ccxt_market_service = CCXTMarketService(
+                market=self.config.get(MARKET),
+                api_key=self._config.get(API_KEY, None),
+                secret_key=self.config.get(SECRET_KEY, None)
+            )
+            self.add_market_service(ccxt_market_service)
 
     def start(self):
         logger.info("starting algorithm")
@@ -137,11 +136,9 @@ class AlgorithmContext:
             if self._initializer is not None:
                 self._initializer.initialize(self)
 
-        for order_executor_key in self._order_executors:
-            order_executor = self._order_executors[order_executor_key]
-            order_executor.initialize(self)
-
-        self._initialized = True
+            self.initialize_market_services()
+            self.initialize_portfolio_managers()
+            self._initialized = True
 
         # Start the workers
         self.start_workers()
@@ -229,10 +226,6 @@ class AlgorithmContext:
                 strategies.append(worker)
 
         return strategies
-
-    @property
-    def config(self) -> Config:
-        return self._config
 
     def add_order_executor(self, order_executor):
         from investing_algorithm_framework.core.order_executors \
@@ -892,3 +885,11 @@ class AlgorithmContext:
         portfolio_manager = self.get_portfolio_manager(identifier)
         portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
         return portfolio.get_position(symbol)
+
+    @property
+    def config(self) -> AlgorithmContextConfiguration:
+        return self._config
+
+    @config.setter
+    def config(self, config: AlgorithmContextConfiguration):
+        self._config = config
