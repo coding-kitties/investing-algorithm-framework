@@ -189,7 +189,6 @@ class Position:
         return self.price
 
     def set_price(self, price):
-        print(price)
         self.price = price
 
     def get_cost(self):

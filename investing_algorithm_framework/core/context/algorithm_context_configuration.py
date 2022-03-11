@@ -1,6 +1,8 @@
 from importlib import import_module
 from typing import Any
 
+from investing_algorithm_framework.configuration.constants import \
+    CCXT_ENABLED, API_KEY, SECRET_KEY
 from investing_algorithm_framework.core.exceptions \
     import ImproperlyConfigured, OperationalException
 
@@ -14,6 +16,22 @@ class AlgorithmContextConfiguration:
 
     def __init__(self) -> None:
         self.settings_module = None
+
+    def ccxt_enabled(self):
+        return self.get(CCXT_ENABLED, False)
+
+    def ccxt_authentication_configured(self):
+        api_key = self.get(API_KEY, None)
+        secret_key = self.get(SECRET_KEY, None)
+        return self.ccxt_enabled() and api_key is not None \
+            and secret_key is not None
+
+    def load(self, config):
+
+        for attribute_key in config:
+
+            if attribute_key:
+                self.set(attribute_key, config[attribute_key])
 
     def load_settings_module(self, settings_module) -> None:
         self.settings_module = settings_module

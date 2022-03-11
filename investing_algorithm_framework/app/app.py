@@ -11,6 +11,8 @@ from investing_algorithm_framework.configuration import Config, create_app, \
 from investing_algorithm_framework.configuration.constants import \
     RESOURCES_DIRECTORY, SQLALCHEMY_DATABASE_URI, DATABASE_DIRECTORY_PATH, \
     DATABASE_NAME, DATABASE_CONFIG, LOG_LEVEL
+from investing_algorithm_framework.core.context \
+    import AlgorithmContextConfiguration
 from investing_algorithm_framework.context import Singleton
 from investing_algorithm_framework.core.context import algorithm
 from investing_algorithm_framework.core.exceptions import OperationalException
@@ -49,7 +51,7 @@ class App(metaclass=Singleton):
                 self._resource_directory = resources_directory
 
             if config is not None:
-                self._config = config
+                self._config = AlgorithmContextConfiguration(config)
 
     def _initialize_algorithm(self):
         self._algorithm.initialize(config=self.config)

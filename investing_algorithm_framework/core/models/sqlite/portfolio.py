@@ -96,7 +96,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
 
     def add_order(self, order):
         position = self.positions \
-            .filter_by(symbol=order.get_target_symbol()) \
+            .filter_by(target_symbol=order.get_target_symbol()) \
             .first()
 
         if position is None:
@@ -104,7 +104,9 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
                 .position import SQLLitePosition
 
             position = SQLLitePosition(
-                symbol=order.get_target_symbol(), amount=0
+                target_symbol=order.get_target_symbol(),
+                trading_symbol=self.get_trading_symbol(),
+                amount=0
             )
             self.positions.append(position)
             position.add_order(order)
@@ -117,7 +119,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
 
         for order in orders:
             position = self.positions\
-                .filter_by(symbol=order.get_target_symbol())\
+                .filter_by(target_symbol=order.get_target_symbol())\
                 .first()
 
             if position is None:
@@ -125,7 +127,9 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
                     .position import SQLLitePosition
 
                 position = SQLLitePosition(
-                    symbol=order.get_target_symbol(), amount=0
+                    target_symbol=order.get_target_symbol(),
+                    trading_symbol=self.get_trading_symbol(),
+                    amount=0
                 )
                 position.add_order(order)
                 self.positions.append(position)
@@ -152,14 +156,17 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
 
         matching_position = SQLLitePosition.query\
             .filter_by(portfolio=self)\
-            .filter_by(symbol=position.get_symbol())\
+            .filter_by(target_symbol=position.get_target_symbol())\
             .first()
 
         if matching_position is not None:
-            raise OperationalException("Position already exists")
-
-        self.positions.append(position)
-        db.session.commit()
+            matching_position.set_amount(position.get_amount())
+            matching_position.set_price(position.get_price())
+            db.session.commit()
+        else:
+            position.set_trading_symbol(self.get_trading_symbol())
+            self.positions.append(position)
+            db.session.commit()
 
     def add_positions(self, positions):
         for position in positions:
@@ -181,7 +188,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
 
             matching_position = SQLLitePosition.query \
                 .filter_by(portfolio=self) \
-                .filter_by(symbol=position.get_symbol()) \
+                .filter_by(target_symbol=position.get_target_symbol()) \
                 .first()
 
             if matching_position is not None:
@@ -189,6 +196,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
                 matching_position.set_price(position.get_price())
                 db.session.commit()
             else:
+                position.set_trading_symbol(self.get_trading_symbol())
                 self.positions.append(position)
                 db.session.commit()
 
@@ -295,7 +303,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
             query_set = self.positions
             return query_set.filter()\
                 .filter(SQLLitePosition.amount > 0)\
-                .filter_by(symbol=symbol)\
+                .filter_by(target_symbol=symbol)\
                 .first()
         else:
             return None
@@ -304,7 +312,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
         return self.positions.all()
 
     def get_unallocated(self) -> Position:
-        return self.positions.filter_by(symbol=self.trading_symbol).first()
+        return self.positions.filter_by(target_symbol=self.trading_symbol).first()
 
     def get_allocated(self):
         allocated = 0

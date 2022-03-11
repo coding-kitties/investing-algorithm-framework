@@ -7,48 +7,48 @@ from investing_algorithm_framework.core.models.order_status import OrderStatus
 from investing_algorithm_framework.core.models.snapshots import AssetPrice
 
 
-class BinancePortfolioManagerMixin:
+class CCXTPortfolioManagerMixin:
 
     def get_orders(
             self, symbol, since: datetime = None, algorithm_context=None
     ) -> List[Order]:
-        market_service = algorithm_context.get_market_service(BINANCE)
-        binance_orders = market_service.get_orders(symbol)
+        market_service = algorithm_context.get_market_service(self.identifier)
+        ccxt_orders = market_service.get_orders(symbol, since)
         orders = []
 
-        for binance_order in binance_orders:
+        for ccxt_order in ccxt_orders:
             status = OrderStatus.PENDING.value
 
-            if binance_order["status"] == "open":
+            if ccxt_order["status"] == "open":
                 status = OrderStatus.PENDING.value
-            if binance_order["status"] == "closed":
+            if ccxt_order["status"] == "closed":
                 status = OrderStatus.CLOSED.value
-            if binance_order["status"] == "canceled":
+            if ccxt_order["status"] == "canceled":
                 status = OrderStatus.CANCELED.value
-            if binance_order["status"] == "expired":
+            if ccxt_order["status"] == "expired":
                 status = OrderStatus.FAILED.value
-            if binance_order["status"] == "rejected":
+            if ccxt_order["status"] == "rejected":
                 status = OrderStatus.FAILED.value
 
             order = Order.from_dict(
                 {
-                    "reference_id": binance_order["id"],
-                    "target_symbol": binance_order["symbol"].split("/")[0],
-                    "trading_symbol": binance_order["symbol"].split("/")[1],
-                    "amount_target_symbol": binance_order["amount"],
+                    "reference_id": ccxt_order["id"],
+                    "target_symbol": ccxt_order["symbol"].split("/")[0],
+                    "trading_symbol": ccxt_order["symbol"].split("/")[1],
+                    "amount_target_symbol": ccxt_order["amount"],
                     "status": status,
-                    "price":  binance_order["price"],
-                    "initial_price": binance_order["price"],
-                    "closing_price": binance_order["price"],
-                    "type": binance_order["type"],
-                    "side": binance_order["side"]
+                    "price":  ccxt_order["price"],
+                    "initial_price": ccxt_order["price"],
+                    "closing_price": ccxt_order["price"],
+                    "type": ccxt_order["type"],
+                    "side": ccxt_order["side"]
                 }
             )
             orders.append(order)
         return orders
 
     def get_positions(self, algorithm_context) -> List[Position]:
-        market_service = algorithm_context.get_market_service(BINANCE)
+        market_service = algorithm_context.get_market_service(self.identifier)
         binance_balances = market_service.get_balances()
         positions = []
 

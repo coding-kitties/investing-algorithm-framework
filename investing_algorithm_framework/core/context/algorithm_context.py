@@ -123,6 +123,10 @@ class AlgorithmContext:
             portfolio_manager = self._portfolio_managers[portfolio_manager_key]
             portfolio_manager.initialize(self)
 
+    def initialize_market_services(self):
+
+        self.config.ccxt_enabled()
+
     def start(self):
         logger.info("starting algorithm")
 
@@ -861,10 +865,23 @@ class AlgorithmContext:
         portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
         return portfolio.get_order(reference_id)
 
-    def get_orders(self, identifier=None, **kwargs) -> List[Order]:
+    def get_orders(
+            self,
+            identifier=None,
+            target_symbol=None,
+            status=None,
+            type=None,
+            side=None,
+            **kwargs
+    ) -> List[Order]:
         portfolio_manager = self.get_portfolio_manager(identifier)
         portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
-        return portfolio.get_orders(**kwargs)
+        return portfolio.get_orders(
+            target_symbol=target_symbol,
+            status=status,
+            type=type,
+            side=side
+        )
 
     def get_positions(self, identifier=None, **kwargs) -> List[Position]:
         portfolio_manager = self.get_portfolio_manager(identifier)

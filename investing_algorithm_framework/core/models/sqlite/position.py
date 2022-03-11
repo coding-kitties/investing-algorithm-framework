@@ -29,9 +29,9 @@ def random_id():
 class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
     __tablename__ = "positions"
 
-    # Integer id for the Position as the primary key
     id = db.Column(db.Integer, primary_key=True, unique=True)
-    symbol = db.Column(db.String)
+    target_symbol = db.Column(db.String)
+    trading_symbol = db.Column(db.String)
     amount = db.Column(db.Float)
     price = db.Column(db.Float)
     orders = db.relationship(
@@ -47,17 +47,28 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
     # Constraints
     __table_args__ = (
         UniqueConstraint(
-            'symbol', 'portfolio_id', name='_symbol_portfolio_uc'
+            'target_symbol', 'portfolio_id', name='_symbol_portfolio_uc'
         ),
     )
 
-    def __init__(self, symbol, amount, price=None, orders=None):
-        symbol = symbol.upper()
-        super().__init__(symbol, amount, price)
+    def __init__(
+        self,
+        target_symbol,
+        trading_symbol=None,
+        amount=0,
+        price=None,
+        orders=None
+    ):
+        super(SQLLitePosition, self).__init__(
+            target_symbol=target_symbol,
+            trading_symbol=trading_symbol,
+            amount=amount,
+            price=price,
+            orders=orders
+        )
         self.id = random_id()
-        self.add_orders(orders)
 
-    @validates('id', 'symbol')
+    @validates('id', 'target_symbol')
     def _write_once(self, key, value):
         existing = getattr(self, key)
         if existing is not None:
@@ -65,7 +76,8 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
         return value
 
     def get_symbol(self):
-        return self.symbol
+        return f"{self.get_target_symbol().upper()}" \
+               f"/{self.get_trading_symbol()}"
 
     def get_order(self, reference_id):
         return self.orders \
@@ -112,7 +124,7 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
                 )
 
             # Check if the order belongs to this position
-            if order.get_target_symbol() != self.get_symbol():
+            if order.get_target_symbol() != self.get_target_symbol():
                 raise OperationalException(
                     "Order does not belong to this position"
                 )
@@ -163,7 +175,7 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
                     )
 
                 # Check if the order belongs to this position
-                if order.get_target_symbol() != self.get_symbol():
+                if order.get_target_symbol() != self.get_target_symbol():
                     raise OperationalException(
                         "Order does not belong to this position"
                     )
@@ -215,8 +227,10 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
     @staticmethod
     def from_position(position):
         sql_lite_position = SQLLitePosition(
-            symbol=position.get_symbol(),
-            amount=position.get_amount()
+            target_symbol=position.get_target_symbol(),
+            trading_symbol=position.get_trading_symbol(),
+            amount=position.get_amount(),
+            price=position.get_price()
         )
 
         orders = position.get_orders()
@@ -234,15 +248,12 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
     @staticmethod
     def from_dict(data):
         return SQLLitePosition(
-            symbol=data.get("symbol"),
+            target_symbol=data.get("target_symbol"),
+            trading_symbol=data.get("trading_symbol"),
             price=data.get("price", None),
             amount=data.get("amount", None),
             orders=data.get("orders", None)
         )
 
     def __repr__(self):
-        return self.repr(
-            id=self.id,
-            symbol=self.symbol,
-            amount=self.amount,
-        )
+        return self.to_string()

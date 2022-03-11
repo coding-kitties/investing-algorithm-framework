@@ -13,21 +13,22 @@ class Portfolio:
         self,
         identifier,
         trading_symbol,
-        positions,
-        market=None,
+        positions=None,
         orders=None
     ):
         self.positions = positions
         self.trading_symbol = trading_symbol
         self.identifier = identifier
-        self.market = market
-        self.positions = []
+
+        if positions is not None:
+            self.add_positions(positions)
+        else:
+            self.positions = []
+
         self.trading_symbol = self.trading_symbol.upper()
-        self.add_positions(positions)
-        self.validate_trading_symbol_position()
         self.add_orders(orders)
 
-    def validate_trading_symbol_position(self):
+    def validate_portfolio(self):
         trading_symbol_position_found = False
 
         if self.positions is None:
