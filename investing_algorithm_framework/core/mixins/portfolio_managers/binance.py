@@ -19,15 +19,15 @@ class BinancePortfolioManagerMixin:
             status = OrderStatus.PENDING.value
 
             if binance_order["status"] == "open":
-                status = OrderStatus.SUCCESS.value
+                status = OrderStatus.PENDING.value
             if binance_order["status"] == "closed":
-                status = OrderStatus.SUCCESS.value
+                status = OrderStatus.CLOSED.value
             if binance_order["status"] == "canceled":
-                status = OrderStatus.SUCCESS.value
+                status = OrderStatus.CANCELED.value
             if binance_order["status"] == "expired":
-                status = OrderStatus.SUCCESS.value
+                status = OrderStatus.FAILED.value
             if binance_order["status"] == "rejected":
-                status = OrderStatus.SUCCESS.value
+                status = OrderStatus.FAILED.value
 
             order = Order.from_dict(
                 {
@@ -56,22 +56,15 @@ class BinancePortfolioManagerMixin:
             if binance_balances[binance_balance]["free"] > 0:
                 position = Position.from_dict(
                     {
-                        "symbol": binance_balance,
+                        "target_symbol": binance_balance,
                         "amount": binance_balances[binance_balance]["free"]
                     }
                 )
                 positions.append(position)
         return positions
 
-    def get_prices(self, symbols, algorithm_context) -> List[AssetPrice]:
+    def get_prices(
+        self, symbols, algorithm_context, **kwargs
+    ) -> List[AssetPrice]:
         market_service = algorithm_context.get_market_service(BINANCE)
-        tickers = market_service.get_tickers(symbols)
-
-        asset_prices = []
-
-        for ticker in tickers:
-            asset_prices.append(
-                AssetPrice(ticker["symbol"], ticker["ask"], ticker["datetime"])
-            )
-
-        return asset_prices
+        return market_service.get_prices(symbols)

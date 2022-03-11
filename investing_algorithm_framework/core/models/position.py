@@ -6,16 +6,34 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 
 class Position:
 
-    def __init__(self, symbol, amount=0, price=None, orders=None):
-        self.symbol = symbol.upper()
+    def __init__(
+        self,
+        target_symbol,
+        trading_symbol=None,
+        amount=0,
+        price=None,
+        orders=None
+    ):
+        self.target_symbol = target_symbol.upper()
+        self.trading_symbol = trading_symbol
         self.amount = amount
         self.price = price
         self.cost = 0
         self.orders = []
         self.add_orders(orders)
 
+    def set_trading_symbol(self, trading_symbol):
+        self.trading_symbol = trading_symbol
+
+    def get_trading_symbol(self):
+        return self.trading_symbol
+
+    def get_target_symbol(self):
+        return self.target_symbol
+
     def get_symbol(self):
-        return self.symbol
+        return f"{self.get_target_symbol().upper()}" \
+               f"/{self.get_trading_symbol()}"
 
     def get_order(self, reference_id) -> Order:
         for order in self.orders:
@@ -73,13 +91,13 @@ class Position:
             )
 
         # Check if the order belongs to this position
-        if order.get_target_symbol() != self.get_symbol():
+        if order.get_target_symbol() != self.get_target_symbol():
             raise OperationalException(
                 "Order does not belong to this position"
             )
 
         matching_order = next(
-            (old_order for old_order in self.orders
+            (old_order for old_order in self.get_orders()
              if old_order.get_reference_id() == order.get_reference_id()),
             None
         )
@@ -132,7 +150,7 @@ class Position:
                     )
 
                 matching = next(
-                    (old_order for old_order in self.orders
+                    (old_order for old_order in self.get_orders()
                      if old_order.get_reference_id() == order.get_reference_id()),
                     None
                 )
@@ -164,9 +182,14 @@ class Position:
         self.amount = amount
 
     def get_price(self):
+
+        if self.price is None:
+            return 0
+
         return self.price
 
     def set_price(self, price):
+        print(price)
         self.price = price
 
     def get_cost(self):
@@ -257,10 +280,10 @@ class Position:
     @staticmethod
     def from_dict(data):
         return Position(
-            symbol=data.get("symbol"),
+            target_symbol=data.get("target_symbol"),
             price=data.get("price", None),
             amount=data.get("amount", None),
-            orders=data.get("orders", None)
+            orders=data.get("orders", None),
         )
 
     def __repr__(self):
@@ -268,7 +291,7 @@ class Position:
 
     def to_dict(self):
         return {
-            "symbol": self.get_symbol(),
+            "target_symbol": self.get_target_symbol(),
             "price": self.get_price(),
             "amount": self.get_amount(),
             "orders": self.get_orders()

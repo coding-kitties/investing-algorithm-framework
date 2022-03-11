@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from abc import abstractmethod, ABC
 from typing import List
+from logging import getLogger
 
 from investing_algorithm_framework.configuration.constants import \
     TRADING_SYMBOL
@@ -8,36 +9,104 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.identifier import Identifier
 from investing_algorithm_framework.core.models import OrderSide, OrderType, \
     Portfolio
+from investing_algorithm_framework.core.models.snapshots.asset_price import \
+    AssetPrice
 from investing_algorithm_framework.core.models.order import Order, OrderStatus
 from investing_algorithm_framework.core.models.position import Position
 from investing_algorithm_framework.core.order_validators import \
     OrderValidatorFactory
+
+logger = getLogger(__name__)
 
 
 class PortfolioManager(ABC, Identifier):
     trading_symbol = None
     portfolio = None
     last_updated = None
+    synced = False
     update_minutes = 5
+    next_update = None
 
     @abstractmethod
-    def get_positions(self, algorithm_context, **kwargs) -> List[Position]:
+    def get_positions(
+            self, since: datetime = None, algorithm_context=None, **kwargs
+    ) -> List[Position]:
         pass
 
     @abstractmethod
     def get_orders(
-        self, symbol, algorithm_context, **kwargs
+        self, symbol, algorithm_context=None, **kwargs
     ) -> List[Order]:
         pass
 
     @abstractmethod
     def get_prices(
         self, symbols, algorithm_context, **kwargs
-    ) -> float:
+    ) -> List[AssetPrice]:
         pass
 
     def initialize(self, algorithm_context):
-        self.portfolio = self.get_portfolio(algorithm_context)
+        self.create_portfolio(algorithm_context)
+        positions = self.get_positions(algorithm_context)
+        self.portfolio.add_positions(positions)
+
+    def create_portfolio(self, algorithm_context):
+        logger.info(f"initializing portfolio {self.get_identifier()}")
+
+        logger.info(
+            f"Retrieving all positions for {self.get_identifier()} portfolio"
+        )
+        positions = self.get_positions(algorithm_context=algorithm_context)
+
+        self.portfolio = Portfolio(
+            identifier=self.identifier,
+            trading_symbol=self.get_trading_symbol(algorithm_context),
+            positions=positions,
+            orders=[]
+        )
+
+        symbols = []
+
+        # Extract all symbols of the positions
+        # (target symbol and trading symbol)
+        for position in positions:
+            symbols.append(position.get_symbol())
+
+        logger.info(
+            f"Retrieving all orders for {self.get_identifier()} portfolio"
+        )
+
+        prices = self.get_prices(
+            symbols=symbols, algorithm_context=algorithm_context
+        )
+
+        print(prices)
+
+        for position in positions:
+
+            if position.get_target_symbol() != \
+                    self.get_trading_symbol(algorithm_context):
+                orders = self.get_orders(
+                    symbol=position.get_symbol(),
+                    algorithm_context=algorithm_context
+                )
+                self.portfolio.add_orders(orders)
+
+                matching_asset_price = next(
+                    (asset_price for asset_price in prices
+                     if asset_price.get_symbol() == position.get_symbol()),
+                    None
+                )
+
+                # Add asset price
+                if matching_asset_price is not None:
+                    print("match")
+                    position.set_price(matching_asset_price.get_price())
+                    print(position)
+
+        self.next_update = datetime.utcnow() \
+            + timedelta(minutes=self.update_minutes)
+        logger.info(f"Portfolio {self.get_identifier()} initialized")
 
     def get_trading_symbol(self, algorithm_context) -> str:
         trading_symbol = getattr(self, "trading_symbol", None)
@@ -55,21 +124,45 @@ class PortfolioManager(ABC, Identifier):
         return trading_symbol
 
     def sync_portfolio(self, algorithm_context):
-        positions = self.get_positions(algorithm_context)
+        logger.info(f"Syncing portfolio {self.identifier}")
+
+        # Create a portfolio object if it not exists
+        positions = self.get_positions(algorithm_context=algorithm_context)
         self.portfolio.add_positions(positions)
-        positions = self.portfolio.get_positions()
+
+        symbols = []
+
+        # Extract all symbols of the positions
+        # (target symbol and trading symbol)
+        for position in positions:
+            symbols.append(position.get_symbol())
+
+        prices = self.get_prices(
+            symbols=symbols, algorithm_context=algorithm_context
+        )
 
         for position in positions:
-            price = self.get_prices(
-                position.get_symbol(),
-                algorithm_context
-            )
-            position.set_price(price)
-            orders = self.get_orders(
-                symbol=f"f{position.get_symbol()}/{self.get_trading_symbol(algorithm_context)}",
-                algorithm_context=algorithm_context
-            )
-            self.portfolio.add_orders(orders)
+
+            if position.get_target_symbol() != \
+                    self.get_trading_symbol(algorithm_context):
+                matching_asset_price = next(
+                    (asset_price for asset_price in prices
+                     if asset_price.get_symbol() == position.get_symbol()),
+                    None
+                )
+
+                if matching_asset_price is not None:
+                    position.set_price(matching_asset_price.get_price())
+
+                orders = self.get_orders(
+                    symbol=position.get_symbol(),
+                    since=datetime.utcnow() - timedelta(days=1),
+                    algorithm_context=algorithm_context
+                )
+                self.portfolio.add_orders(orders)
+
+        self.next_update = datetime.utcnow() \
+            + timedelta(minutes=self.update_minutes)
 
     def get_portfolio(
         self,
@@ -85,19 +178,20 @@ class PortfolioManager(ABC, Identifier):
         return self.portfolio
 
     def _requires_update(self):
-        update_time = datetime.utcnow() \
-                      + timedelta(minutes=-self.update_minutes)
-        return self.last_updated is None or update_time > self.last_updated
+        if self.next_update is None:
+            return True
+
+        return self.next_update < datetime.utcnow()
 
     def create_order(
-        self,
-        target_symbol,
-        price=None,
-        amount_trading_symbol=None,
-        amount_target_symbol=None,
-        type=OrderType.LIMIT.value,
-        side=OrderSide.BUY.value,
-        algorithm_context=None
+            self,
+            target_symbol,
+            price=None,
+            amount_trading_symbol=None,
+            amount_target_symbol=None,
+            type=OrderType.LIMIT.value,
+            side=OrderSide.BUY.value,
+            algorithm_context=None
     ) -> Order:
         order = Order(
             target_symbol=target_symbol,

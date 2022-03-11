@@ -1,13 +1,11 @@
 from investing_algorithm_framework.configuration.constants import BINANCE
 from investing_algorithm_framework.core.mixins import \
     BinancePortfolioManagerMixin
-from investing_algorithm_framework.core.portfolio_managers\
-    .sqllite_portfolio_manager import SQLLitePortfolioManager
+from investing_algorithm_framework.core.portfolio_managers \
+    import PortfolioManager
 
 
-class BinancePortfolioManager(
-    BinancePortfolioManagerMixin, SQLLitePortfolioManager
-):
+class BinancePortfolioManager(BinancePortfolioManagerMixin, PortfolioManager):
     identifier = BINANCE
     market = BINANCE
 

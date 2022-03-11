@@ -116,7 +116,15 @@ class AlgorithmContext:
         else:
             self._config = Config()
 
+    def initialize_portfolio_managers(self):
+
+        # Initialize the portfolio managers
+        for portfolio_manager_key in self._portfolio_managers:
+            portfolio_manager = self._portfolio_managers[portfolio_manager_key]
+            portfolio_manager.initialize(self)
+
     def start(self):
+        logger.info("starting algorithm")
 
         # Initialize the algorithm context
         if not self._initialized:
@@ -124,11 +132,6 @@ class AlgorithmContext:
             # Run the initializer
             if self._initializer is not None:
                 self._initializer.initialize(self)
-
-        # Initialize the portfolio managers
-        for portfolio_manager_key in self._portfolio_managers:
-            portfolio_manager = self._portfolio_managers[portfolio_manager_key]
-            portfolio_manager.initialize(self)
 
         for order_executor_key in self._order_executors:
             order_executor = self._order_executors[order_executor_key]
@@ -506,8 +509,6 @@ class AlgorithmContext:
     def add_order(self, order, identifier: str = None):
         portfolio_manager = self.get_portfolio_manager(identifier)
         portfolio_manager.add_order(order, algorithm_context=self)
-        print(portfolio_manager.get_orders(algorithm_context=self))
-        print(portfolio_manager.get_positions(algorithm_context=self))
 
     def add_orders(self, orders, identifier: str = None):
         portfolio_manager = self.get_portfolio_manager(identifier)

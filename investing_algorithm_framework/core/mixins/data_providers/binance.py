@@ -12,7 +12,8 @@ class BinanceDataProviderMixin(BinanceMarketService):
             self, target_symbol, trading_symbol, algorithm_context, **kwargs
     ) -> Ticker:
         market_service = algorithm_context.get_market_service(BINANCE)
-        data = market_service.get_ticker(target_symbol, trading_symbol)
+        symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
+        data = market_service.get_ticker(symbol)
 
         return Ticker(
             symbol=f"{target_symbol.upper()}{trading_symbol.upper()}",
@@ -29,7 +30,8 @@ class BinanceDataProviderMixin(BinanceMarketService):
             self, target_symbol, trading_symbol, algorithm_context, **kwargs
     ) -> OrderBook:
         market_service = algorithm_context.get_market_service(BINANCE)
-        data = market_service.get_order_book(target_symbol, trading_symbol)
+        symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
+        data = market_service.get_order_book(symbol)
         return OrderBook(
             symbol=f"{target_symbol.upper()}{trading_symbol.upper()}",
             bids=data["bids"],

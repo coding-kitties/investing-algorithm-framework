@@ -7,12 +7,10 @@ from sqlalchemy.orm import validates
 
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import db, OrderSide, \
-    OrderStatus, OrderType, Portfolio, Position, Order
+    OrderStatus, OrderType, Portfolio, Position
 from investing_algorithm_framework.core.models.model_extension \
     import SQLAlchemyModelExtension
 from investing_algorithm_framework.core.models.sqlite import SQLLiteOrder
-from investing_algorithm_framework.core.order_validators import \
-    OrderValidatorFactory
 
 
 def random_id():
@@ -39,10 +37,8 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
     trading_symbol = db.Column(db.String, nullable=False)
     unallocated = db.Column(db.Float, nullable=False, default=0)
     realized = db.Column(db.Float, nullable=False, default=0)
-
     total_revenue = db.Column(db.Float, nullable=False, default=0)
     total_cost = db.Column(db.Float, nullable=False, default=0)
-
     created_at = db.Column(db.DateTime, default=datetime.utcnow())
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow(), onupdate=datetime.utcnow()

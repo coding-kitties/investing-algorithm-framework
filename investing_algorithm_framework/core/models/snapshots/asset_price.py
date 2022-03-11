@@ -9,18 +9,12 @@ from investing_algorithm_framework.core.models import db
 class AssetPrice:
 
     def __init__(self, symbol, price, datetime):
-        self.target_symbol = symbol.split("/")[0]
-        self.trading_symbol = symbol.split("/")[1]
+        self.symbol = symbol
         self.price = price
         self.datetime = datetime
 
-    @abstractmethod
-    def get_target_symbol(self):
-        pass
-
-    @abstractmethod
-    def get_trading_symbol(self):
-        pass
+    def get_symbol(self):
+        return self.symbol
 
     @abstractmethod
     def get_price(self):
@@ -46,6 +40,13 @@ class AssetPrice:
             return f"<{self.__class__.__name__}({','.join(field_strings)})>"
 
         return f"<{self.__class__.__name__} {id(self)}>"
+
+    def __repr__(self):
+        return self.repr(
+            symbol=self.get_symbol(),
+            price=self.price,
+            datetime=self.datetime
+        )
 
 
 class SQLLiteAssetPrice(AssetPrice, db.Model, SQLAlchemyModelExtension):

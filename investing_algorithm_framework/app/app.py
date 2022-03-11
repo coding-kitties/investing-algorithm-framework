@@ -1,3 +1,4 @@
+import logging
 import inspect
 import os
 import shutil
@@ -16,6 +17,8 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import create_all_tables, \
     initialize_db
 from investing_algorithm_framework.extensions import scheduler
+
+logger = logging.getLogger(__name__)
 
 
 class App(metaclass=Singleton):
@@ -139,7 +142,6 @@ class App(metaclass=Singleton):
             self._flask_app.register_blueprint(blueprint)
 
     def start(self):
-
         # Setup config if it is not set
         if self._config is None:
             self._config = Config
@@ -152,16 +154,23 @@ class App(metaclass=Singleton):
         self._initialize_flask_sql_alchemy()
         self._initialize_algorithm()
         self._initialize_management_commands()
-
+        self._algorithm.initialize_portfolio_managers()
         self.start_scheduler()
+
         self.start_algorithm()
 
         # Start the app
         self._flask_app.run(
-            debug=True,
+            debug=False,
             threaded=True,
             use_reloader=False
         )
+
+        if not scheduler.running:
+            raise OperationalException(
+                "Could not start algorithm because the scheduler "
+                "is not running"
+            )
 
     def start_scheduler(self):
 
@@ -171,12 +180,6 @@ class App(metaclass=Singleton):
             scheduler.start()
 
     def start_algorithm(self):
-
-        if not scheduler.running:
-            raise OperationalException(
-                "Could not start algorithm because the scheduler "
-                "is not running"
-            )
 
         # Start the algorithm
         self._algorithm.start()

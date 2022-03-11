@@ -1,5 +1,6 @@
 import ccxt
 import logging
+from datetime import datetime
 from investing_algorithm_framework.core.market_services.market_service \
     import MarketService
 from investing_algorithm_framework.core.exceptions import OperationalException
@@ -7,7 +8,7 @@ from investing_algorithm_framework.core.mixins import \
     BinanceApiSecretKeySpecifierMixin
 from investing_algorithm_framework.configuration.constants import BINANCE, \
     BINANCE_API_KEY, BINANCE_SECRET_KEY
-from investing_algorithm_framework.core.models import TimeInterval
+from investing_algorithm_framework.core.models import TimeInterval, AssetPrice
 
 
 BINANCE_CCXT_ID = "binance"
@@ -57,22 +58,30 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
         self.initialize_exchange()
 
         try:
-            data = self.get_ticker(target_symbol, trading_symbol)
+            data = self.get_ticker(f"{target_symbol}/{trading_symbol}")
             return "symbol" in data
         except OperationalException:
             return False
 
-    def get_ticker(self, target_symbol: str, trading_symbol: str):
+    def get_ticker(self, symbol):
         self.initialize_exchange()
 
         try:
-            symbol = f"{target_symbol.upper()}{trading_symbol.upper()}"
             return self.exchange.fetchTicker(symbol)
         except Exception as e:
             logger.exception(e)
             raise OperationalException(
-                f"Could not retrieve ticker"
-                f"{target_symbol.upper()}{trading_symbol.upper()}"
+                f"Could not retrieve ticker for symbol {symbol}"
+            )
+
+    def get_tickers(self, symbols):
+
+        try:
+            return self.exchange.fetchTickers(symbols)
+        except Exception as e:
+            logger.exception(e)
+            raise OperationalException(
+                "Could not retrieve selection of tickers"
             )
 
     def get_order_book(self, target_symbol: str, trading_symbol: str):
@@ -96,11 +105,14 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             logger.exception(e)
             raise OperationalException("Could not retrieve order")
 
-    def get_orders(self, symbol: str):
+    def get_orders(self, symbol: str, since: datetime = None):
         self.initialize_exchange(credentials=True)
 
+        if since is not None:
+            since = self.exchange.parse8601(since.strftime("YYYY-MM-DD:HH:MM"))
+
         try:
-            return self.exchange.fetch_orders(symbol)
+            return self.exchange.fetch_orders(symbol, since)
         except Exception as e:
             logger.exception(e)
             raise OperationalException("Could not retrieve orders")
@@ -235,20 +247,22 @@ class BinanceMarketService(MarketService, BinanceApiSecretKeySpecifierMixin):
             logger.exception(e)
             raise OperationalException("Could not retrieve closed orders")
 
-    def get_prices(
-        self,
-        symbols,
-        time_interval: TimeInterval
-    ):
+    def get_prices(self, symbols):
         self.initialize_exchange()
+        asset_prices = []
 
         try:
-            symbol = f"{target_symbol.upper()}{trading_symbol.upper()}"
-            return self.exchange.fetchTicker(symbol)
+            tickers = self.exchange.fetchTickers(symbols)
+            for ticker in tickers:
+                asset_prices.append(
+                    AssetPrice(
+                        tickers[ticker]["symbol"],
+                        tickers[ticker]["ask"],
+                        tickers[ticker]["datetime"]
+                    )
+                )
+
+            return asset_prices
         except Exception as e:
             logger.exception(e)
-            raise OperationalException(
-                f"Could not retrieve ticker"
-                f"{target_symbol.upper()}{trading_symbol.upper()}"
-            )
-
+            raise OperationalException("Could not retrieve prices")

@@ -3,7 +3,7 @@ from investing_algorithm_framework.core.context import \
     AlgorithmContextInitializer, AlgorithmContext
 from investing_algorithm_framework.core.data_providers import DataProvider
 from investing_algorithm_framework.core.portfolio_managers import \
-    PortfolioManager, BinancePortfolioManager, SQLLitePortfolioManager
+    PortfolioManager, BinancePortfolioManager
 from investing_algorithm_framework.core.order_executors import OrderExecutor, \
     BinanceOrderExecutor
 from investing_algorithm_framework.core.market_services import \
@@ -48,7 +48,6 @@ __all__ = [
     "OrderBook",
     "OperationalException",
     "ImproperlyConfigured",
-    "SQLLitePortfolioManager",
     "DataProvider",
     "SQLLitePortfolio",
     "SQLLiteOrder",
