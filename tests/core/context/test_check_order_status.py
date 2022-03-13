@@ -34,7 +34,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(1, len(portfolio.get_orders()))
         self.assertEqual(2, len(portfolio.get_positions()))
         self.assertEqual(0, position.get_amount())
-        self.assertEqual(self.TARGET_SYMBOL_A, position.get_symbol())
+        self.assertEqual(self.TARGET_SYMBOL_A, position.get_target_symbol())
 
         self.algo_app.algorithm.check_order_status(identifier="default")
         position = portfolio.get_position(self.TARGET_SYMBOL_A)
@@ -42,4 +42,4 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertEqual(1, len(portfolio.get_orders()))
         self.assertEqual(2, len(portfolio.get_positions()))
         self.assertEqual(1, position.get_amount())
-        self.assertEqual(self.TARGET_SYMBOL_A, position.get_symbol())
+        self.assertEqual(self.TARGET_SYMBOL_A, position.get_target_symbol())

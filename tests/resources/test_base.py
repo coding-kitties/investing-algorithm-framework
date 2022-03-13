@@ -97,7 +97,7 @@ class OrderExecutorTest(OrderExecutor):
     def check_order_status(
         self, order: Order, algorithm_context, **kwargs
     ) -> Order:
-        order.set_status(OrderStatus.SUCCESS)
+        order.set_status(OrderStatus.CLOSED)
         return order
 
 
@@ -289,6 +289,7 @@ class TestBase(TestCase):
         self.algo_app.reset()
         self.algo_app._configured = False
         self.algo_app.initialize(resources_directory="/tmp", config=TestConfig)
+        self.algo_app._initialize_config()
         self.algo_app._initialize_database()
         self.algo_app._initialize_flask_config()
         self.algo_app._initialize_flask_sql_alchemy()
@@ -370,7 +371,7 @@ class TestBase(TestCase):
                 symbol="USDT"
             )
 
-        target_symbol = symbol.split("/")
+        target_symbol = symbol.split("/")[0]
 
         if target_symbol == TestBase.TARGET_SYMBOL_A:
             prices = TestBase.prices_symbol_a

@@ -119,7 +119,7 @@ class Order:
 
         if OrderType.LIMIT.equals(self.type):
 
-            if OrderStatus.SUCCESS.equals(self.get_status()):
+            if OrderStatus.CLOSED.equals(self.get_status()):
                 self.amount_trading_symbol = \
                     self.get_initial_price() * self.get_amount_target_symbol()
             else:
@@ -131,7 +131,7 @@ class Order:
 
         if OrderType.LIMIT.equals(self.type):
 
-            if OrderStatus.SUCCESS.equals(self.get_status()):
+            if OrderStatus.CLOSED.equals(self.get_status()):
                 self.amount_target_symbol = \
                     self.get_amount_trading_symbol() / self.get_initial_price()
             else:

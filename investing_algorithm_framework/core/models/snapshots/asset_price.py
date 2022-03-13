@@ -60,8 +60,7 @@ class SQLLiteAssetPrice(AssetPrice, db.Model, SQLAlchemyModelExtension):
     __tablename__ = "asset_prices"
 
     id = db.Column(db.Integer, primary_key=True)
-    target_symbol = db.Column(db.String, nullable=False)
-    trading_symbol = db.Column(db.String, nullable=False)
+    symbol = db.Column(db.String, nullable=False)
     price = db.Column(db.Float, nullable=False)
     datetime = db.Column(db.DateTime, nullable=False)
 

@@ -12,7 +12,7 @@ class MyPortfolioManagerOne(SQLLitePortfolioManager):
 
     def get_positions(self, algorithm_context, **kwargs) -> List[Position]:
         return [
-            Position(symbol="USDT", amount=1000)
+            Position(target_symbol="USDT", amount=1000)
         ]
 
     def get_orders(self, algorithm_context, **kwargs) -> List[Order]:

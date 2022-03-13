@@ -1,5 +1,5 @@
-import logging
 import inspect
+import logging
 import os
 import shutil
 from distutils.sysconfig import get_python_lib
@@ -9,11 +9,11 @@ from flask import Flask
 from investing_algorithm_framework.configuration import Config, create_app, \
     setup_config, setup_database, setup_logging
 from investing_algorithm_framework.configuration.constants import \
-    RESOURCES_DIRECTORY, SQLALCHEMY_DATABASE_URI, DATABASE_DIRECTORY_PATH, \
-    DATABASE_NAME, DATABASE_CONFIG, LOG_LEVEL
+    SQLALCHEMY_DATABASE_URI, DATABASE_DIRECTORY_PATH, \
+    DATABASE_NAME, DATABASE_CONFIG, LOG_LEVEL, RESOURCES_DIRECTORY
+from investing_algorithm_framework.context import Singleton
 from investing_algorithm_framework.core.context \
     import AlgorithmContextConfiguration
-from investing_algorithm_framework.context import Singleton
 from investing_algorithm_framework.core.context import algorithm
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import create_all_tables, \
@@ -47,7 +47,7 @@ class App(metaclass=Singleton):
             self._config = config
 
     def initialize(
-            self, resources_directory: str = None, config=None, arg=None
+        self, resources_directory: str = None, config=None, arg=None
     ):
         if not self.started:
 
@@ -59,6 +59,7 @@ class App(metaclass=Singleton):
                 if inspect.isclass(config):
                     config = Config()
 
+                config.set(RESOURCES_DIRECTORY, resources_directory)
                 self._config = AlgorithmContextConfiguration()
                 self._config.load(config)
 
@@ -87,6 +88,7 @@ class App(metaclass=Singleton):
             if not self._config.can_write_to_resource_directory():
                 raise OperationalException("Can't write to resource directory")
 
+            self._algorithm.config = self._config
             self._configured = True
             setup_logging(self.config.get(LOG_LEVEL, "INFO"))
 
@@ -98,6 +100,7 @@ class App(metaclass=Singleton):
     def _initialize_flask_sql_alchemy(self):
 
         if self._configured and self._database_configured:
+            print("configuring db")
             initialize_db(self._flask_app)
             create_all_tables()
 
@@ -108,20 +111,27 @@ class App(metaclass=Singleton):
 
     def _initialize_database(self):
 
+        print("initializing db")
         if self._configured and not self._database_configured:
             setup_database(self.config)
 
-            if self.config[DATABASE_CONFIG][DATABASE_DIRECTORY_PATH] is None:
+            print(self.config.get(DATABASE_CONFIG))
+            database_config = self.config.get(DATABASE_CONFIG)
+            database_directory = database_config.get(DATABASE_DIRECTORY_PATH)
+            database_name = database_config.get(DATABASE_NAME)
+            sqlalchemy_uri = self.config.get(SQLALCHEMY_DATABASE_URI)
+
+            if database_directory is None:
                 raise OperationalException(
                     f"{DATABASE_DIRECTORY_PATH} is not set in config"
                 )
 
-            if self.config[DATABASE_CONFIG][DATABASE_NAME] is None:
+            if database_name is None:
                 raise OperationalException(
                     f"{DATABASE_NAME} is not set in config"
                 )
 
-            if self.config[SQLALCHEMY_DATABASE_URI] is None:
+            if sqlalchemy_uri is None:
                 raise OperationalException(
                     f"{SQLALCHEMY_DATABASE_URI} is not set in config"
                 )

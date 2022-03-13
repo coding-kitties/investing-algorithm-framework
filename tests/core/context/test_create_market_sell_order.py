@@ -10,7 +10,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
     def test(self) -> None:
         self.algo_app.algorithm.add_position(
-            Position(symbol=self.TARGET_SYMBOL_A, amount=10)
+            Position(target_symbol=self.TARGET_SYMBOL_A, amount=10)
         )
         order = self.algo_app.algorithm\
             .create_market_sell_order(
@@ -22,7 +22,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
 
     def test_with_execution(self) -> None:
         self.algo_app.algorithm.add_position(
-            Position(symbol=self.TARGET_SYMBOL_A, amount=10)
+            Position(target_symbol=self.TARGET_SYMBOL_A, amount=10)
         )
         order = self.algo_app.algorithm \
             .create_market_sell_order(

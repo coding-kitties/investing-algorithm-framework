@@ -12,7 +12,7 @@ class Test(TestBase):
         position = self.algo_app.algorithm.get_unallocated()
         self.assertIsNotNone(position)
         self.assertTrue(isinstance(position, Position))
-        self.assertEqual("USDT", position.get_symbol())
+        self.assertEqual("USDT", position.get_target_symbol())
 
     def test_get_default(self):
         self.algo_app.start_algorithm()
@@ -20,7 +20,7 @@ class Test(TestBase):
             .get_unallocated(identifier="default")
         self.assertIsNotNone(position)
         self.assertTrue(isinstance(position, Position))
-        self.assertEqual("USDT", position.get_symbol())
+        self.assertEqual("USDT", position.get_target_symbol())
 
     def test_get_sqlite(self):
         self.algo_app.start_algorithm()
@@ -28,4 +28,4 @@ class Test(TestBase):
             .get_unallocated(identifier="sqlite")
         self.assertIsNotNone(position)
         self.assertTrue(isinstance(position, Position))
-        self.assertEqual("USDT", position.get_symbol())
+        self.assertEqual("USDT", position.get_target_symbol())

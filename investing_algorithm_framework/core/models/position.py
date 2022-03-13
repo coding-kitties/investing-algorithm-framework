@@ -10,6 +10,7 @@ class Position:
         self,
         target_symbol,
         trading_symbol=None,
+        symbol=None,
         amount=0,
         price=None,
         orders=None
@@ -21,6 +22,10 @@ class Position:
         self.cost = 0
         self.orders = []
         self.add_orders(orders)
+
+        if symbol is not None:
+            self.target_symbol = symbol.split("/")[0]
+            self.trading_symbol = symbol.split("/")[1]
 
     def set_trading_symbol(self, trading_symbol):
         self.trading_symbol = trading_symbol
@@ -112,7 +117,7 @@ class Position:
                 amount_target_symbol=order.get_amount_target_symbol()
             )
         else:
-            if OrderStatus.SUCCESS.equals(order.status):
+            if OrderStatus.CLOSED.equals(order.status):
 
                 if OrderSide.BUY.equals(order.side):
                     self.amount += order.get_amount_target_symbol()
@@ -234,11 +239,11 @@ class Position:
 
     def update_amount(self):
         buy_orders = self.get_orders(
-            status=OrderStatus.SUCCESS, side=OrderSide.BUY
+            status=OrderStatus.CLOSED, side=OrderSide.BUY
         )
 
         sell_orders = self.get_orders(
-            status=OrderStatus.SUCCESS, side=OrderSide.SELL
+            status=OrderStatus.CLOSED, side=OrderSide.SELL
         )
 
         amount = 0

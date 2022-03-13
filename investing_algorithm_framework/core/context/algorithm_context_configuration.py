@@ -1,45 +1,52 @@
 import os
-from importlib import import_module
-from typing import Any
 
 from investing_algorithm_framework.configuration.constants import \
-    CCXT_ENABLED, API_KEY, SECRET_KEY, MARKET, RESOURCES_DIRECTORY
-from investing_algorithm_framework.core.exceptions \
-    import ImproperlyConfigured, OperationalException
+    CCXT_ENABLED, API_KEY, SECRET_KEY, MARKET, RESOURCES_DIRECTORY, \
+    DATABASE_DIRECTORY_PATH, DATABASE_NAME, DATABASE_CONFIG, \
+    SQLALCHEMY_DATABASE_URI
 
 
 class AlgorithmContextConfiguration:
     """
-    Base wrapper for ContextConfiguration module. It will load all the
+    Base wrapper for Config module. It will load all the
     default settings for a given settings module and will allow for run time
     specification
     """
-
-    def __init__(self) -> None:
-        self.settings_module = None
+    config = None
 
     def ccxt_enabled(self):
-        return self.get(CCXT_ENABLED, False) \
-               and self.get(MARKET, None) is not None
+        return self.config.get(CCXT_ENABLED, False) \
+               and self.config.get(MARKET, None) is not None
 
     def ccxt_authentication_configured(self):
-        api_key = self.get(API_KEY, None)
-        secret_key = self.get(SECRET_KEY, None)
+        api_key = self.config.get(API_KEY, None)
+        secret_key = self.config.get(SECRET_KEY, None)
         return self.ccxt_enabled() and api_key is not None \
             and secret_key is not None
 
     def resource_directory_configured(self):
-        resource_directory = self.get(RESOURCES_DIRECTORY, None)
+        resource_directory = self.config.get(RESOURCES_DIRECTORY, None)
+        return resource_directory is not None
 
-        if resource_directory is None:
-            return False
+    def set_resource_directory(self, resource_directory):
+        self.config[RESOURCES_DIRECTORY] = resource_directory
+
+    def set_database_name(self, name):
+        self.config[DATABASE_CONFIG][DATABASE_NAME] = name
+
+    def set_database_directory(self, database_directory):
+        self.config[DATABASE_CONFIG][DATABASE_DIRECTORY_PATH] \
+            = database_directory
+
+    def set_sql_alchemy_uri(self, sqlalchemy_uri):
+        self.config[SQLALCHEMY_DATABASE_URI] = sqlalchemy_uri
 
     def can_write_to_resource_directory(self):
 
         if not self.resource_directory_configured():
             return False
 
-        resource_directory = self.get(RESOURCES_DIRECTORY, None)
+        resource_directory = self.config.get(RESOURCES_DIRECTORY, None)
 
         if not os.path.isdir(resource_directory):
             return False
@@ -47,62 +54,7 @@ class AlgorithmContextConfiguration:
         return os.access(resource_directory, os.W_OK)
 
     def load(self, config):
+        self.config = config
 
-        for attribute_key in config:
-
-            if attribute_key:
-                self.set(attribute_key, config[attribute_key])
-
-    def load_settings_module(self, settings_module) -> None:
-        self.settings_module = settings_module
-
-        if self.settings_module is None:
-            raise ImproperlyConfigured("There is no settings module defined")
-
-        # Load the settings module
-        module = import_module(self.settings_module)
-
-        # Set all the attributes of the settings wrapper
-        for setting in dir(module):
-
-            if setting.isupper():
-                setting_value = getattr(module, setting)
-                setattr(self, setting, setting_value)
-
-    def __getitem__(self, item) -> Any:
-
-        if isinstance(item, str):
-
-            if not hasattr(self, item):
-                raise OperationalException(
-                    "ContextConfig object doesn't have the specific "
-                    "attribute {}".format(item)
-                )
-
-            return self.__getattribute__(item)
-        else:
-            raise OperationalException(
-                "ContextConfig attributes can only be referenced by string"
-            )
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """
-        Mimics the dict get() functionality
-        """
-        try:
-            return self.__getitem__(key)
-        # Ignore exception
-        except Exception:
-            pass
-
-        return default
-
-    def set(self, key: str, value: Any) -> None:
-
-        if hasattr(self, key):
-            raise OperationalException(
-                "ContextConfig object already have the specific "
-                "attribute {} specified".format(key)
-            )
-
-        setattr(self, key, value)
+    def get(self, key, default=None):
+        return self.config.get(key, default)

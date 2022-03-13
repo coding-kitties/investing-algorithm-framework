@@ -17,8 +17,7 @@ class TestOrderModel(TestBase):
 
     def test_creation(self):
         asset_price = SQLLiteAssetPrice(
-            target_symbol=self.TARGET_SYMBOL_A,
-            trading_symbol="USDT",
+            symbol=f"{self.TARGET_SYMBOL_A}/USDT",
             price=self.get_price(self.TARGET_SYMBOL_A).price,
             datetime=datetime.utcnow()
         )
