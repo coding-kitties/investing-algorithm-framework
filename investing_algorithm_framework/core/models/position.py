@@ -8,24 +8,30 @@ class Position:
 
     def __init__(
         self,
-        target_symbol,
+        target_symbol=None,
         trading_symbol=None,
         symbol=None,
         amount=0,
         price=None,
         orders=None
     ):
-        self.target_symbol = target_symbol.upper()
-        self.trading_symbol = trading_symbol
+        self.trading_symbol = None
+        self.target_symbol = None
+
+        if target_symbol is not None:
+            self.target_symbol = target_symbol.upper()
+
+        if trading_symbol is not None:
+            self.trading_symbol = trading_symbol
+
+        if symbol is not None:
+            self.target_symbol = symbol.upper()
+
         self.amount = amount
         self.price = price
         self.cost = 0
         self.orders = []
         self.add_orders(orders)
-
-        if symbol is not None:
-            self.target_symbol = symbol.split("/")[0]
-            self.trading_symbol = symbol.split("/")[1]
 
     def set_trading_symbol(self, trading_symbol):
         self.trading_symbol = trading_symbol
@@ -149,7 +155,7 @@ class Position:
                         "id defined"
                     )
 
-                if order.get_target_symbol() != self.get_symbol():
+                if order.get_target_symbol() != self.get_target_symbol():
                     raise OperationalException(
                         "Order does not belong to this position"
                     )
@@ -162,7 +168,7 @@ class Position:
 
                 if not matching:
 
-                    if OrderStatus.SUCCESS.equals(order.status):
+                    if OrderStatus.CLOSED.equals(order.status):
                         if OrderSide.BUY.equals(order.side):
                             self.amount += order.get_amount_target_symbol()
                         else:
@@ -284,6 +290,7 @@ class Position:
     @staticmethod
     def from_dict(data):
         return Position(
+            symbol=data.get("symbol"),
             target_symbol=data.get("target_symbol"),
             price=data.get("price", None),
             amount=data.get("amount", None),

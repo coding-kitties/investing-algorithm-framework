@@ -14,14 +14,14 @@ class Strategy:
         worker_id=None,
         time_unit=None,
         interval=None,
-        data_provider_identifier=None,
+        market=None,
         trading_data_type=None,
         trading_data_types=None,
         target_symbol=None,
         target_symbols=None,
         trading_symbol=None,
     ):
-        self.data_provider_identifier = data_provider_identifier
+        self.market = market
         self.trading_data_types = trading_data_types
         self.target_symbol = target_symbol
         self.target_symbols = target_symbols
@@ -132,9 +132,9 @@ class Strategy:
         from investing_algorithm_framework import current_app as app
         data = {}
 
-        if self.data_provider_identifier is not None:
+        if self.market is not None:
             data = app.algorithm.get_data(
-                data_provider_identifier=self.data_provider_identifier,
+                market=self.market,
                 trading_data_type=self.trading_data_type,
                 trading_data_types=self.trading_data_types,
                 target_symbols=self.target_symbols,

@@ -160,8 +160,8 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(position_b)
         self.assertIsNotNone(position_c)
 
-        self.assertEqual(self.TARGET_SYMBOL_B, position_b.get_symbol())
-        self.assertEqual(self.TARGET_SYMBOL_C, position_c.get_symbol())
+        self.assertEqual(self.TARGET_SYMBOL_B, position_b.get_target_symbol())
+        self.assertEqual(self.TARGET_SYMBOL_C, position_c.get_target_symbol())
 
     def test_get_positions(self):
         portfolio_manager = self.algo_app.algorithm \
@@ -196,7 +196,7 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
                     "trading_symbol": "usdt",
                     "amount_target_symbol": 4,
                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
-                    "status": OrderStatus.SUCCESS.value,
+                    "status": OrderStatus.CLOSED.value,
                     "initial_price": self.get_price(
                         self.TARGET_SYMBOL_A).price,
                     "side": OrderSide.BUY.value,
@@ -210,7 +210,7 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
 
         self.assertEqual(2, len(portfolio.get_orders()))
         self.assertEqual(
-            1, len(portfolio.get_orders(status=OrderStatus.SUCCESS))
+            1, len(portfolio.get_orders(status=OrderStatus.CLOSED))
         )
         self.assertEqual(
             1, len(portfolio.get_orders(status=OrderStatus.PENDING))
@@ -234,7 +234,7 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
         )
         self.assertEqual(
             1, len(portfolio.get_orders(
-                status=OrderStatus.SUCCESS,
+                status=OrderStatus.CLOSED,
                 type=OrderType.LIMIT,
                 side=OrderSide.BUY
             ))
@@ -280,7 +280,6 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
                 Position(amount=10, symbol=self.TARGET_SYMBOL_A, price=10),
                 Position(amount=10, symbol="USDT")
             ],
-            market="BINANCE"
         )
         self.assertIsNotNone(portfolio.get_identifier())
         self.assertIsNotNone(portfolio.get_trading_symbol())
@@ -339,7 +338,7 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
                     "amount_target_symbol": 4,
                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
                     "initial_price": self.get_price(self.TARGET_SYMBOL_A).price,
-                    "status": OrderStatus.SUCCESS.value,
+                    "status": OrderStatus.CLOSED.value,
                     "side": OrderSide.BUY.value,
                     "type": OrderType.LIMIT.value
                 }
@@ -363,7 +362,7 @@ class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
                     "trading_symbol": "usdt",
                     "amount_target_symbol": 4,
                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
-                    "status": OrderStatus.SUCCESS.value,
+                    "status": OrderStatus.CLOSED.value,
                     "initial_price": self.get_price(self.TARGET_SYMBOL_A).price,
                     "side": OrderSide.BUY.value,
                     "type": OrderType.LIMIT.value

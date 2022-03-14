@@ -20,4 +20,8 @@ def get_complete_version(version=None):
     argument is non-empty,
     check for correctness of the tuple provided.
     """
+
+    if version is not None:
+        return version
+
     return VERSION

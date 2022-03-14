@@ -32,7 +32,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
                     "trading_symbol": "usdt",
                     "amount_target_symbol": 4,
                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
-                    "status": OrderStatus.SUCCESS.value,
+                    "status": OrderStatus.CLOSED.value,
                     "initial_price": self.get_price(
                         self.TARGET_SYMBOL_A).price,
                     "side": OrderSide.BUY.value,

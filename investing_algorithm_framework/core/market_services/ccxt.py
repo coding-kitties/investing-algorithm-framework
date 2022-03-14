@@ -3,30 +3,28 @@ from datetime import datetime
 
 import ccxt
 
-from investing_algorithm_framework.configuration.constants import SECRET_KEY, \
-    API_KEY
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.market_services.market_service \
     import MarketService
 from investing_algorithm_framework.core.models import AssetPrice
 
-BINANCE_CCXT_ID = "binance"
 logger = logging.getLogger(__name__)
 
 
 class CCXTMarketService(MarketService):
     exchange = None
     config = None
-    market_id = None
+    market = None
     api_key = None,
     secret_key = None
+    exchange_class = None
 
     def __init__(
         self, market, config=None, api_key: str = None, secret_key: str = None
     ):
         super().__init__()
 
-        self.market_id = market
+        self.market = market.lower()
 
         if api_key is not None:
             self.binance_api_key = api_key
@@ -36,29 +34,31 @@ class CCXTMarketService(MarketService):
 
         self.config = config
 
-    def initialize(self, config):
-        self.config = config
+    def initialize(self, api_key=None, secret_key=None):
+        self.api_key = api_key
+        self.secret_key = secret_key
+        self.exchange_class = getattr(ccxt, self.market)
 
-    def initialize_exchange(self, credentials = False):
+        if self.exchange_class is None:
+            raise OperationalException(
+                f"No market service found for market id {self.market}"
+            )
 
-        if credentials:
-            if self.api_key is None and self.secret_key is None:
-                self.api_key = self.config\
-                    .get(API_KEY, None)
-                self.secret_key = \
-                    self.config.get(SECRET_KEY, None)
-
-            exchange_class = getattr(ccxt, self.market_id)
-            self.exchange = exchange_class({
+        if self.api_key is not None or self.secret_key is not None:
+            self.exchange = self.exchange_class({
                 'apiKey': self.api_key,
                 'secret': self.secret_key,
             })
         else:
-            exchange_class = getattr(ccxt, self.market_id)
-            self.exchange = exchange_class({})
+            self.exchange = self.exchange_class({})
 
     def pair_exists(self, target_symbol: str, trading_symbol: str):
-        self.initialize_exchange()
+
+        if not self.exchange.has['fetchTicker']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality pair_exists"
+            )
 
         try:
             data = self.get_ticker(f"{target_symbol}/{trading_symbol}")
@@ -67,7 +67,12 @@ class CCXTMarketService(MarketService):
             return False
 
     def get_ticker(self, symbol):
-        self.initialize_exchange()
+
+        if not self.exchange.has['fetchTicker']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality get_ticker"
+            )
 
         try:
             return self.exchange.fetchTicker(symbol)
@@ -79,6 +84,12 @@ class CCXTMarketService(MarketService):
 
     def get_tickers(self, symbols):
 
+        if not self.exchange.has['fetchTickers']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality get_tickers"
+            )
+
         try:
             return self.exchange.fetchTickers(symbols)
         except Exception as e:
@@ -88,62 +99,64 @@ class CCXTMarketService(MarketService):
             )
 
     def get_order_book(self, target_symbol: str, trading_symbol: str):
-        self.initialize_exchange()
+
+        if not self.exchange.has['fetchOrderBook']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality get_order_book"
+            )
 
         try:
             symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
             return self.exchange.fetchOrderBook(symbol)
         except Exception as e:
             logger.exception(e)
-            raise OperationalException(
-                "Could not retrieve order book"
-            )
+            raise OperationalException("Could not retrieve order book")
 
     def get_order(self, order_id):
-        self.initialize_exchange(credentials=True)
+
+        if not self.exchange.has['fetchOrder']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality get_order"
+            )
 
         try:
-            return self.exchange.fetch_order(order_id)
+            return self.exchange.fetchOrder(order_id)
         except Exception as e:
             logger.exception(e)
             raise OperationalException("Could not retrieve order")
 
     def get_orders(self, symbol: str, since: datetime = None):
-        self.initialize_exchange(credentials=True)
+
+        if not self.exchange.has['fetchOrders']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality get_orders"
+            )
 
         if since is not None:
             since = self.exchange.parse8601(since.strftime("YYYY-MM-DD:HH:MM"))
 
         try:
-            return self.exchange.fetch_orders(symbol, since)
+            return self.exchange.fetchOrders(symbol, since)
         except Exception as e:
             logger.exception(e)
             raise OperationalException("Could not retrieve orders")
 
-    def get_balance(self, symbol):
-        self.initialize_exchange(credentials=True)
+    def get_balance(self):
+
+        if not self.exchange.has['fetchBalance']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality get_balance"
+            )
 
         try:
-            balances = self.exchange.fetch_balance()["info"]["balances"]
+            return self.exchange.fetchBalance()
         except Exception as e:
             logger.exception(e)
-            raise OperationalException("Could not retrieve balances")
-
-        for balance in balances:
-
-            if balance["asset"] == symbol.upper():
-                return balance
-
-        return None
-
-    def get_balances(self):
-        self.initialize_exchange(credentials=True)
-
-        try:
-            return self.exchange.fetch_balance()
-        except Exception as e:
-            logger.exception(e)
-            raise OperationalException("Could not retrieve balances")
+            raise OperationalException("Could not retrieve balance")
 
     def create_limit_buy_order(
             self,
@@ -152,12 +165,17 @@ class CCXTMarketService(MarketService):
             amount: float,
             price: float
     ):
-        self.initialize_exchange(credentials=True)
+
+        if not self.exchange.has['createLimitBuyOrder']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality create_limit_buy_order"
+            )
 
         symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
 
         try:
-            self.exchange.create_limit_buy_order(
+            self.exchange.createLimitBuyOrder(
                 symbol, amount, price
             )
         except Exception as e:
@@ -171,33 +189,22 @@ class CCXTMarketService(MarketService):
         amount: float,
         price: float
     ):
-        self.initialize_exchange(credentials=True)
+
+        if not self.exchange.has['createLimitSellOrder']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality create_limit_sell_order"
+            )
 
         symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
 
         try:
-            self.exchange.create_limit_sell_order(
+            self.exchange.createLimitSellOrder(
                 symbol, amount, price
             )
         except Exception as e:
             logger.exception(e)
             raise OperationalException("Could not create limit sell order")
-
-    def create_market_buy_order(
-        self,
-        target_symbol: str,
-        trading_symbol: str,
-        amount: float,
-    ):
-        self.initialize_exchange(credentials=True)
-
-        symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
-
-        try:
-            self.exchange.create_market_buy_order(symbol, amount)
-        except Exception as e:
-            logger.exception(e)
-            raise OperationalException("Could not create market buy order")
 
     def create_market_sell_order(
         self,
@@ -205,17 +212,29 @@ class CCXTMarketService(MarketService):
         trading_symbol: str,
         amount: float,
     ):
-        self.initialize_exchange(credentials=True)
+
+        if not self.exchange.has['createMarketSellOrder']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality create_market_sell_order"
+            )
 
         symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
 
         try:
-            self.exchange.create_market_buy_order(symbol, amount)
+            self.exchange.createMarketSellOrder(symbol, amount)
         except Exception as e:
             logger.exception(e)
             raise OperationalException("Could not create market sell order")
 
     def cancel_order(self, order):
+
+        if not self.exchange.has['cancelOrder']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality cancel_order"
+            )
+
         self.exchange.cancelOrder(
             order.get_order_reference(),
             f"{order.get_target_symbol()}/{order.get_trading_symbol()}")
@@ -223,7 +242,12 @@ class CCXTMarketService(MarketService):
     def get_open_orders(
         self, target_symbol: str = None, trading_symbol: str = None
     ):
-        self.initialize_exchange(credentials=True)
+
+        if not self.exchange.has['fetchOpenOrders']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality get_open_orders"
+            )
 
         try:
             if target_symbol is None or trading_symbol is None:
@@ -238,7 +262,12 @@ class CCXTMarketService(MarketService):
     def get_closed_orders(
         self, target_symbol: str = None, trading_symbol: str = None
     ):
-        self.initialize_exchange(credentials=True)
+
+        if not self.exchange.has['fetchClosedOrders']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality get_closed_orders"
+            )
 
         try:
             if target_symbol is None or trading_symbol is None:
@@ -251,7 +280,6 @@ class CCXTMarketService(MarketService):
             raise OperationalException("Could not retrieve closed orders")
 
     def get_prices(self, symbols):
-        self.initialize_exchange()
         asset_prices = []
 
         try:

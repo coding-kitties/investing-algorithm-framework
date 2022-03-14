@@ -294,16 +294,16 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
 
         return query_set.all()
 
-    def get_position(self, symbol) -> Position:
+    def get_position(self, target_symbol) -> Position:
         from investing_algorithm_framework.core.models.sqlite \
             import SQLLitePosition
 
-        if symbol is not None:
-            symbol = symbol.upper()
+        if target_symbol is not None:
+            target_symbol = target_symbol.upper()
             query_set = self.positions
             return query_set.filter()\
                 .filter(SQLLitePosition.amount > 0)\
-                .filter_by(target_symbol=symbol)\
+                .filter_by(target_symbol=target_symbol)\
                 .first()
         else:
             return None
@@ -356,3 +356,7 @@ class SQLLitePortfolio(db.Model, Portfolio, SQLAlchemyModelExtension):
         portfolio.add_positions(data.get("orders", None))
         # portfolio.add_orders(data.get("orders", None))
         return portfolio
+
+    def updated(self):
+        self.updated_at = datetime.utcnow()
+        db.session.commit()

@@ -1,18 +1,18 @@
-import os
 import logging
 import logging.config
-import marshmallow.exceptions as marshmallow_exceptions
+import os
 from typing import Dict, List
+
+import marshmallow.exceptions as marshmallow_exceptions
 from flask import Flask, jsonify
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
 from investing_algorithm_framework.configuration import ConfigValidator
 from investing_algorithm_framework.configuration.constants import \
-    DATABASE_CONFIG, DATABASE_DIRECTORY_PATH, DATABASE_NAME, LOG_LEVEL, \
-    SQLALCHEMY_DATABASE_URI, RESOURCES_DIRECTORY
+    DATABASE_CONFIG, DATABASE_DIRECTORY_PATH, DATABASE_NAME, \
+    RESOURCES_DIRECTORY
 from investing_algorithm_framework.exceptions import ApiException
-from investing_algorithm_framework.core.exceptions import OperationalException
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,6 @@ def create_app(config_object=None) -> Flask:
 
 
 def setup_config(flask_app, config_object):
-
     # Validate the configuration
     ConfigValidator.validate(config_object)
 
@@ -54,9 +53,15 @@ def setup_database(config_object):
             config_object.get(RESOURCES_DIRECTORY),
             '{}.sqlite3'.format(DEFAULT_DATABASE_NAME)
         )
-        config_object.set(SQLALCHEMY_DATABASE_URI, database_path)
+        config_object.set_database_name(DEFAULT_DATABASE_NAME)
+        config_object.set_database_directory(
+            config_object.get(RESOURCES_DIRECTORY)
+        )
+        config_object.set_sql_alchemy_uri(database_path)
     else:
-        database_directory_path = database_config.get(DATABASE_DIRECTORY_PATH, None)
+        database_directory_path = database_config.get(
+            DATABASE_DIRECTORY_PATH, None
+        )
         database_name = database_config.get(DATABASE_NAME, None)
 
         if database_name is None:

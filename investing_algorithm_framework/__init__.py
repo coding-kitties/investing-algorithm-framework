@@ -3,11 +3,9 @@ from investing_algorithm_framework.core.context import \
     AlgorithmContextInitializer, AlgorithmContext
 from investing_algorithm_framework.core.data_providers import DataProvider
 from investing_algorithm_framework.core.portfolio_managers import \
-    PortfolioManager, BinancePortfolioManager
-from investing_algorithm_framework.core.order_executors import OrderExecutor, \
-    BinanceOrderExecutor
-from investing_algorithm_framework.core.market_services import \
-    MarketService, BinanceMarketService
+    PortfolioManager, SQLLitePortfolioManager
+from investing_algorithm_framework.core.order_executors import OrderExecutor
+from investing_algorithm_framework.core.market_services import MarketService
 from investing_algorithm_framework.core.models.data_provider import \
     TradingDataTypes, OrderBook, Ticker
 from investing_algorithm_framework.core.models import OrderSide, Order, \
@@ -26,7 +24,6 @@ __all__ = [
     "App",
     'get_version',
     'PortfolioManager',
-    'BinancePortfolioManager',
     "AlgorithmContextInitializer",
     "Portfolio",
     "OrderSide",
@@ -38,10 +35,8 @@ __all__ = [
     "current_app",
     "AlgorithmContext",
     "OrderExecutor",
-    'BinanceOrderExecutor',
     "Config",
     "MarketService",
-    "BinanceMarketService",
     "OrderStatus",
     "TradingDataTypes",
     "Ticker",
@@ -52,5 +47,6 @@ __all__ = [
     "SQLLitePortfolio",
     "SQLLiteOrder",
     "SQLLitePosition",
-    "ApiException"
+    "ApiException",
+    "SQLLitePortfolioManager"
 ]

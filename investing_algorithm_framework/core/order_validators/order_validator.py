@@ -49,7 +49,7 @@ class OrderValidator(ABC):
     @staticmethod
     def validate_buy_order(order, portfolio):
 
-        if not order.trading_symbol == portfolio.trading_symbol:
+        if not order.get_trading_symbol() == portfolio.get_trading_symbol():
             raise OperationalException(
                 f"Can't add buy order with trading "
                 f"symbol {order.trading_symbol} to "
@@ -87,9 +87,7 @@ class OrderValidator(ABC):
                     f"{portfolio.trading_symbol.upper()}"
                 )
         else:
-            position = portfolio.positions\
-                .filter_by(symbol=order.target_symbol)\
-                .first()
+            position = portfolio.get_position(order.get_target_symbol())
 
             if position is None:
                 raise OperationalException(

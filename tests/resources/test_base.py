@@ -463,7 +463,7 @@ class TestBase(TestCase):
 
     def assert_is_limit_order(self, order, executed = False):
 
-        if order.trading_symbol is None:
+        if order.get_trading_symbol() is None:
             msg = "Trading symbol is not set"
             raise self.failureException(msg)
 
@@ -539,7 +539,7 @@ class TestBase(TestCase):
                 msg = "Order status is None"
                 raise self.failureException(msg)
 
-            if order.status is OrderStatus.SUCCESS.value:
+            if order.status is OrderStatus.CLOSED.value:
                 msg = "Order status is not value SUCCESS"
                 raise self.failureException(msg)
 

@@ -11,11 +11,12 @@ class Order:
 
     def __init__(
         self,
-        target_symbol,
-        trading_symbol,
         type,
         side,
         status,
+        symbol=None,
+        target_symbol=None,
+        trading_symbol=None,
         amount_trading_symbol=None,
         amount_target_symbol=None,
         price=None,
@@ -23,8 +24,26 @@ class Order:
         closing_price=None,
         reference_id=None
     ):
-        target_symbol = target_symbol.upper()
-        trading_symbol = trading_symbol.upper()
+
+        if symbol is not None:
+
+            if "/" in symbol:
+                self.target_symbol = symbol.split("/")[0].upper()
+                self.trading_symbol = symbol.split("/")[1].upper()
+            else:
+                raise OperationalException(
+                    "Symbol does not contain '/' delimiter "
+                )
+        else:
+
+            if target_symbol is None:
+                raise OperationalException("Target symbol is not specified")
+
+            if trading_symbol is None:
+                raise OperationalException("Trading symbol is not specified")
+
+            self.target_symbol = target_symbol.upper()
+            self.trading_symbol = trading_symbol.upper()
 
         if side is None:
             raise OperationalException("Order side is not set")
@@ -36,8 +55,6 @@ class Order:
             raise OperationalException("Status is not set")
 
         self.reference_id = reference_id
-        self.target_symbol = target_symbol
-        self.trading_symbol = trading_symbol
         self.price = price
         self.side = OrderSide.from_value(side)
         self.type = OrderType.from_value(type)
@@ -154,11 +171,10 @@ class Order:
         self.initial_price = initial_price
 
     def get_price(self):
+        if self.price is not None:
+            return self.price
 
-        if OrderStatus.CLOSED.equals(self.status):
-            return self.closing_price
-
-        return self.price
+        return 0
 
     def set_price(self, price):
         self.price = price
@@ -224,6 +240,7 @@ class Order:
             reference_id=data.get("reference_id", None),
             target_symbol=data.get("target_symbol", None),
             trading_symbol=data.get("trading_symbol", None),
+            symbol=data.get("symbol", None),
             price=data.get("price", None),
             initial_price=data.get("initial_price", None),
             closing_price=data.get("closing_price", None),

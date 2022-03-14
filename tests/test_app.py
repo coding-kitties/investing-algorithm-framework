@@ -16,4 +16,3 @@ class Test(TestCase):
         )
         app._initialize_config()
         self.assertIsNotNone(app.config.get("ENVIRONMENT"))
-        self.assertIsNotNone(app.config["ENVIRONMENT"])

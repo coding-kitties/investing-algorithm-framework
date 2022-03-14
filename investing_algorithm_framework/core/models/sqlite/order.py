@@ -78,9 +78,10 @@ class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
         self,
         side,
         type,
-        target_symbol,
-        trading_symbol,
         status,
+        symbol=None,
+        target_symbol=None,
+        trading_symbol=None,
         reference_id=None,
         initial_price=None,
         closing_price=None,
@@ -91,9 +92,20 @@ class SQLLiteOrder(Order, db.Model, SQLAlchemyModelExtension):
     ):
         target_symbol = target_symbol.upper()
         trading_symbol = trading_symbol.upper()
-        super().__init__(target_symbol, trading_symbol, type, side, status,
-                         amount_trading_symbol, amount_target_symbol, price,
-                         initial_price, closing_price, reference_id)
+        super().__init__(
+            symbol=symbol,
+            target_symbol=target_symbol,
+            trading_symbol=trading_symbol,
+            type=type,
+            side=side,
+            status=status,
+            amount_trading_symbol=amount_trading_symbol,
+            amount_target_symbol=amount_target_symbol,
+            price=price,
+            initial_price=initial_price,
+            closing_price=closing_price,
+            reference_id=reference_id
+        )
 
         # Convert enums to string
         self.side = OrderSide.from_value(side).value

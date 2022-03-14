@@ -206,12 +206,12 @@ class SQLLitePosition(Position, db.Model, SQLAlchemyModelExtension):
 
         buy_orders = SQLLiteOrder.query \
             .filter_by(position=self) \
-            .filter_by(status=OrderStatus.SUCCESS.value) \
+            .filter_by(status=OrderStatus.CLOSED.value) \
             .filter_by(side=OrderSide.BUY.value).all()
 
         sell_orders = SQLLiteOrder.query \
             .filter_by(position=self) \
-            .filter_by(status=OrderStatus.SUCCESS.value) \
+            .filter_by(status=OrderStatus.CLOSED.value) \
             .filter_by(side=OrderSide.SELL.value).all()
 
         amount = 0

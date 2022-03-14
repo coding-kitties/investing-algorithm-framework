@@ -1,30 +1,29 @@
+import inspect
 import logging
 from typing import List
-import inspect
 
 from investing_algorithm_framework.configuration.constants import \
-    TRADING_SYMBOL, MARKET, SECRET_KEY, API_KEY
+    TRADING_SYMBOL
+from investing_algorithm_framework.core.context \
+    .algorithm_context_configuration import AlgorithmContextConfiguration
+from investing_algorithm_framework.core.data_providers import \
+    DataProvider, CCXTDataProvider
 from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.core.market_services import \
+    CCXTMarketService
+from investing_algorithm_framework.core.market_services.market_service \
+    import MarketService
 from investing_algorithm_framework.core.models import TimeUnit, OrderType, \
     db, OrderSide, OrderStatus, Portfolio, Order, Position
 from investing_algorithm_framework.core.models.data_provider import \
     TradingDataTypes
+from investing_algorithm_framework.core.order_executors import \
+    CCXTOrderExecutor, OrderExecutor
+from investing_algorithm_framework.core.portfolio_managers \
+    import PortfolioManager, CCXTPortfolioManager, \
+    CCXTSQLitePortfolioManager
 from investing_algorithm_framework.core.workers import Worker, Strategy
 from investing_algorithm_framework.extensions import scheduler
-from investing_algorithm_framework.core.portfolio_managers \
-    import PortfolioManager, DefaultPortfolioManagerFactory
-from investing_algorithm_framework.core.data_providers import\
-    DefaultDataProviderFactory, DataProvider
-from investing_algorithm_framework.configuration.constants import \
-    RESERVED_IDENTIFIERS
-from investing_algorithm_framework.core.market_services import \
-    DefaultMarketServiceFactory, CCXTMarketService
-from investing_algorithm_framework.core.order_executors import \
-    DefaultOrderExecutorFactory, OrderExecutor
-from investing_algorithm_framework.core.market_services.market_service \
-    import MarketService
-from investing_algorithm_framework.core.context\
-    .algorithm_context_configuration import AlgorithmContextConfiguration
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +68,7 @@ class AlgorithmContext:
         worker_id: str = None,
         time_unit: TimeUnit = TimeUnit.MINUTE,
         interval=10,
-        data_provider_identifier=None,
+        market=None,
         trading_data_type=None,
         trading_data_types=None,
         target_symbol=None,
@@ -83,7 +82,7 @@ class AlgorithmContext:
                 worker_id,
                 time_unit,
                 interval,
-                data_provider_identifier,
+                market,
                 trading_data_type,
                 trading_data_types,
                 target_symbol,
@@ -97,7 +96,7 @@ class AlgorithmContext:
                     worker_id,
                     time_unit,
                     interval,
-                    data_provider_identifier,
+                    market,
                     trading_data_type,
                     trading_data_types,
                     target_symbol,
@@ -108,23 +107,61 @@ class AlgorithmContext:
             return wrapper
 
     def initialize_portfolio_managers(self):
+
         for portfolio_manager_key in self._portfolio_managers:
             portfolio_manager = self._portfolio_managers[portfolio_manager_key]
             portfolio_manager.initialize(self)
+
+        portfolio_configurations = self.config.get_portfolios()
+
+        for portfolio_configuration in portfolio_configurations:
+
+            if portfolio_configuration.get_ccxt_enabled():
+
+                if portfolio_configuration.get_sqlite():
+                    self._portfolio_managers[
+                        portfolio_configuration.get_identifier()
+                    ] = CCXTSQLitePortfolioManager(
+                        identifier=portfolio_configuration.get_identifier(),
+                        market=portfolio_configuration.get_market(),
+                        api_key=portfolio_configuration.get_api_key(),
+                        secret_key=portfolio_configuration.get_secret_key(),
+                        trading_symbol=portfolio_configuration
+                        .get_trading_symbol(),
+                        track_from=portfolio_configuration.get_track_from()
+                    )
+                else:
+                    self._portfolio_managers[
+                        portfolio_configuration.get_identifier()
+                    ] = CCXTPortfolioManager(
+                        identifier=portfolio_configuration.get_identifier(),
+                        market=portfolio_configuration.get_market(),
+                        api_key=portfolio_configuration.get_api_key(),
+                        secret_key=portfolio_configuration.get_secret_key(),
+                        trading_symbol=portfolio_configuration
+                        .get_trading_symbol(),
+                        track_from=portfolio_configuration.get_track_from()
+                    )
 
     def initialize_order_executors(self):
         for order_executor_key in self._order_executors:
             order_executor = self._order_executors[order_executor_key]
             order_executor.initialize(self)
 
-    def initialize_market_services(self):
-        if self.config.ccxt_enabled():
-            ccxt_market_service = CCXTMarketService(
-                market=self.config.get(MARKET),
-                api_key=self._config.get(API_KEY, None),
-                secret_key=self.config.get(SECRET_KEY, None)
-            )
-            self.add_market_service(ccxt_market_service)
+        portfolio_configurations = self.config.get_portfolios()
+
+        for portfolio_configuration in portfolio_configurations:
+
+            if portfolio_configuration.get_ccxt_enabled():
+                self._order_executors[
+                    portfolio_configuration.get_identifier()
+                ] = CCXTOrderExecutor(
+                    identifier=portfolio_configuration.get_identifier(),
+                    market=portfolio_configuration.get_market(),
+                    api_key=portfolio_configuration.get_api_key(),
+                    secret_key=portfolio_configuration.get_secret_key(),
+                    trading_symbol=portfolio_configuration.get_trading_symbol()
+                )
 
     def start(self):
         logger.info("starting algorithm")
@@ -136,7 +173,6 @@ class AlgorithmContext:
             if self._initializer is not None:
                 self._initializer.initialize(self)
 
-            self.initialize_market_services()
             self.initialize_portfolio_managers()
             self._initialized = True
 
@@ -234,11 +270,6 @@ class AlgorithmContext:
         if inspect.isclass(order_executor):
             order_executor = order_executor()
 
-        if order_executor in RESERVED_IDENTIFIERS:
-            raise OperationalException(
-                "Identifier of order executor is reserved"
-            )
-
         assert isinstance(order_executor, OrderExecutor), (
             'Provided object must be an instance of the OrderExecutor class'
         )
@@ -274,14 +305,6 @@ class AlgorithmContext:
 
         if identifier not in self._order_executors:
 
-            if identifier in RESERVED_IDENTIFIERS:
-                order_executor = DefaultOrderExecutorFactory\
-                    .of_market(identifier)
-                order_executor.initialize(self)
-                self._order_executors[order_executor.identifier] = \
-                    order_executor
-                return order_executor
-
             if throw_exception:
                 raise OperationalException(
                     f"No corresponding order executor found for "
@@ -299,19 +322,16 @@ class AlgorithmContext:
         if inspect.isclass(data_provider):
             data_provider = data_provider()
 
-        if data_provider.identifier in RESERVED_IDENTIFIERS:
-            raise OperationalException(
-                "Identifier of data provider is reserved"
-            )
-
         assert isinstance(data_provider, DataProvider), (
             'Provided object must be an instance of the DataProvider class'
         )
 
-        if data_provider.identifier in self._data_providers:
-            raise OperationalException("DataProvider id already exists")
+        if data_provider.market in self._data_providers:
+            raise OperationalException(
+                "DataProvider for this market already exists"
+            )
 
-        self._data_providers[data_provider.identifier] = data_provider
+        self._data_providers[data_provider.market] = data_provider
 
     @property
     def data_providers(self) -> List:
@@ -323,10 +343,10 @@ class AlgorithmContext:
         return data_providers
 
     def get_data_provider(
-            self, identifier=None, throw_exception: bool = True
+        self, market=None, throw_exception: bool = True
     ) -> DataProvider:
 
-        if identifier is None:
+        if market is None:
 
             if len(self._data_providers.keys()) == 0:
                 raise OperationalException(
@@ -337,25 +357,12 @@ class AlgorithmContext:
                 list(self._data_providers.keys())[0]
             ]
 
-        if identifier not in self._data_providers:
+        if market in self._data_providers:
+            return self._data_providers[market]
 
-            if identifier in RESERVED_IDENTIFIERS:
-                data_provider = DefaultDataProviderFactory\
-                    .of_identifier(identifier)
-
-                if data_provider is not None:
-                    self._data_providers[identifier.upper()] = data_provider
-                    return data_provider
-
-            if throw_exception:
-                raise OperationalException(
-                    f"No corresponding data provider found for "
-                    f"identifier {identifier}"
-                )
-
-            return None
-
-        return self._data_providers[identifier]
+        if market not in self._data_providers:
+            data_provider = CCXTDataProvider(market)
+            return data_provider
 
     def add_initializer(self, initializer):
         from investing_algorithm_framework.core.context \
@@ -416,28 +423,17 @@ class AlgorithmContext:
             return self._portfolio_managers[
                 list(self._portfolio_managers.keys())[0]
             ]
+        else:
+            if identifier not in self._portfolio_managers:
 
-        if identifier not in self._portfolio_managers:
+                if throw_exception:
+                    raise OperationalException(
+                        f"Algorithm has no portfolio managers for {identifier}"
+                    )
 
-            if identifier in RESERVED_IDENTIFIERS:
-                portfolio_manager = DefaultPortfolioManagerFactory \
-                    .of_market(identifier)
+                return None
 
-                portfolio_manager.initialize(self)
-                self._portfolio_managers[portfolio_manager.identifier] \
-                    = portfolio_manager
-
-                return portfolio_manager
-
-            if throw_exception:
-                raise OperationalException(
-                    f"No corresponding portfolio manager found for "
-                    f"identifier {identifier}"
-                )
-
-            return None
-
-        return self._portfolio_managers[identifier]
+            return self._portfolio_managers[identifier]
 
     def add_market_service(self, market_service):
         from investing_algorithm_framework.core.market_services \
@@ -465,28 +461,23 @@ class AlgorithmContext:
         return market_services
 
     def get_market_service(
-        self, market: str, throw_exception: bool = True
+        self, market: str, api_key=None, secret_key=None, throw_exception=True
     ) -> MarketService:
-        if market not in self._market_services:
 
-            if market in RESERVED_IDENTIFIERS:
-                market_service = DefaultMarketServiceFactory\
-                    .of_market(market)
+        if market in self._market_services:
+            market_service = self._market_services[market]
+        else:
+            market_service = CCXTMarketService(market)
+            market_service.initialize(api_key=api_key, secret_key=secret_key)
+            return market_service
 
-                if market_service is not None:
-                    market_service.initialize(self.config)
-                    self._market_services[market.upper()] = market_service
-                    return market_service
+        if throw_exception:
+            raise OperationalException(
+                f"No corresponding market service found for "
+                f"market {market}"
+            )
 
-            if throw_exception:
-                raise OperationalException(
-                    f"No corresponding market service found for "
-                    f"market {market}"
-                )
-
-            return None
-
-        return self._market_services[market]
+        return market_service
 
     def set_algorithm_context_initializer(
         self, algorithm_context_initializer
@@ -667,21 +658,21 @@ class AlgorithmContext:
                         pending_order, self
                     )
 
-                    if OrderStatus.SUCCESS.equals(status):
+                    if OrderStatus.CLOSED.equals(status):
                         pending_order.set_executed()
                     else:
                         pending_order.update(db, {status: status.value})
 
     def get_data(
         self,
-        data_provider_identifier,
+        market,
         trading_data_type=None,
         trading_data_types=None,
         target_symbol=None,
         trading_symbol=None,
         target_symbols: List = None
     ):
-        data_provider = self.get_data_provider(data_provider_identifier)
+        data_provider = self.get_data_provider(market=market)
         data = {}
 
         # Check if trading symbol is specified

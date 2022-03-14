@@ -1,17 +1,19 @@
-from investing_algorithm_framework.core.market_services import \
-    BinanceMarketService
-from investing_algorithm_framework.core.models.data_provider import Ticker, \
-    OrderBook
-from investing_algorithm_framework.configuration.constants import BINANCE
+from investing_algorithm_framework.core.models.data_provider import \
+    Ticker, OrderBook
+from investing_algorithm_framework.core.data_providers.data_provider import \
+    DataProvider
 
 
-class BinanceDataProviderMixin(BinanceMarketService):
-    identifier = BINANCE
+class CCXTDataProvider(DataProvider):
+
+    def __init__(self, market):
+        super().__init__(market)
+        self.market = self.market.lower()
 
     def provide_ticker(
-            self, target_symbol, trading_symbol, algorithm_context, **kwargs
+        self, target_symbol, trading_symbol, algorithm_context, **kwargs
     ) -> Ticker:
-        market_service = algorithm_context.get_market_service(BINANCE)
+        market_service = algorithm_context.get_market_service(self.market)
         symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
         data = market_service.get_ticker(symbol)
 
@@ -27,9 +29,9 @@ class BinanceDataProviderMixin(BinanceMarketService):
         )
 
     def provide_order_book(
-            self, target_symbol, trading_symbol, algorithm_context, **kwargs
+        self, target_symbol, trading_symbol, algorithm_context, **kwargs
     ) -> OrderBook:
-        market_service = algorithm_context.get_market_service(BINANCE)
+        market_service = algorithm_context.get_market_service(self.market)
         symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
         data = market_service.get_order_book(symbol)
         return OrderBook(

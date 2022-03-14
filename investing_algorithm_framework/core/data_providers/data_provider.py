@@ -1,10 +1,12 @@
+from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models.data_provider import \
     OrderBook, Ticker
-from investing_algorithm_framework.core.identifier import Identifier
-from investing_algorithm_framework.core.exceptions import OperationalException
 
 
-class DataProvider(Identifier):
+class DataProvider:
+
+    def __init__(self, market):
+        self.market = market
 
     def provide_raw_data(self, algorithm_context, **kwargs) -> dict:
         raise OperationalException(

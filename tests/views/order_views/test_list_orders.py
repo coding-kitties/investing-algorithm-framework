@@ -35,7 +35,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
                     "trading_symbol": "usdt",
                     "amount_target_symbol": 4,
                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
-                    "status": OrderStatus.SUCCESS.value,
+                    "status": OrderStatus.CLOSED.value,
                     "initial_price": self.get_price(
                         self.TARGET_SYMBOL_A).price,
                     "side": OrderSide.BUY.value,
@@ -91,7 +91,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
     def test_list_orders_with_status_query_params(self):
         query_params = {
             'identifier': "default",
-            'status': OrderStatus.SUCCESS.value
+            'status': OrderStatus.CLOSED.value
         }
 
         response = self.client.get("/api/orders", query_string=query_params)
@@ -117,7 +117,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         response = self.client.get("/api/orders", query_string=query_params)
         self.assert200(response)
         data = json.loads(response.data.decode())
-        self.assertEqual(0, len(data["items"]))
+        self.assertEqual(1, len(data["items"]))
 
     def test_list_orders_with_order_side_query_params(self):
         query_params = {

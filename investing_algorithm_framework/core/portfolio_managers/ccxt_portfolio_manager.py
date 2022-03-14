@@ -1,31 +1,47 @@
-from investing_algorithm_framework.configuration.constants import BINANCE
-from investing_algorithm_framework.core.mixins import \
-    BinancePortfolioManagerMixin
+from investing_algorithm_framework.core.mixins import CCXTPortfolioManagerMixin
 from investing_algorithm_framework.core.portfolio_managers \
     import SQLLitePortfolioManager, PortfolioManager
 
 
-class CCXTPortfolioManager(
-    BinancePortfolioManagerMixin, PortfolioManager
-):
-    def __init__(self, identifier: str = None, trading_symbol: str = None):
-        super(CCXTPortfolioManager, self).__init__(identifier)
+class CCXTPortfolioManager(CCXTPortfolioManagerMixin, PortfolioManager):
 
-        if identifier is not None:
-            self.identifier = identifier
-
-        if trading_symbol is not None:
-            self.trading_symbol = trading_symbol
+    def __init__(
+        self,
+        identifier,
+        market,
+        trading_symbol,
+        api_key,
+        secret_key,
+        track_from
+    ):
+        super(CCXTPortfolioManager, self).__init__(
+            identifier=identifier,
+            track_from=track_from,
+            trading_symbol=trading_symbol
+        )
+        self.market = market.lower()
+        self.api_key = api_key
+        self.secret_key = secret_key
 
 
 class CCXTSQLitePortfolioManager(
-    BinancePortfolioManagerMixin, SQLLitePortfolioManager
+    CCXTPortfolioManagerMixin, SQLLitePortfolioManager
 ):
-    def __init__(self, identifier: str = None, trading_symbol: str = None):
-        super(CCXTSQLitePortfolioManager, self).__init__(identifier)
 
-        if identifier is not None:
-            self.identifier = identifier
-
-        if trading_symbol is not None:
-            self.trading_symbol = trading_symbol
+    def __init__(
+        self,
+        identifier,
+        market,
+        trading_symbol,
+        api_key,
+        secret_key,
+        track_from
+    ):
+        super(CCXTSQLitePortfolioManager, self).__init__(
+            identifier=identifier,
+            track_from=track_from,
+            trading_symbol=trading_symbol
+        )
+        self.market = market.lower()
+        self.api_key = api_key
+        self.secret_key = secret_key

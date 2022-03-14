@@ -183,6 +183,7 @@ class TestConfig(Config):
     DATABASE_CONFIG = {
         'DATABASE_NAME': "test",
     }
+    LOG_LEVEL = "INFO"
 
 
 class DevConfig(Config):
@@ -190,3 +191,4 @@ class DevConfig(Config):
     DATABASE_CONFIG = {
         'DATABASE_NAME': "dev",
     }
+    LOG_LEVEL = "INFO"

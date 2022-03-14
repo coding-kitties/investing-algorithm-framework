@@ -1,4 +1,5 @@
 from typing import List
+from datetime import datetime, timedelta
 
 from investing_algorithm_framework.core.identifier import Identifier
 from investing_algorithm_framework.core.models import db, SQLLitePortfolio, \
@@ -11,7 +12,6 @@ from investing_algorithm_framework.core.portfolio_managers.portfolio_manager \
 
 
 class SQLLitePortfolioManager(PortfolioManager, Identifier):
-    trading_symbol = None
 
     def create_portfolio(self, algorithm_context):
 
@@ -68,12 +68,6 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier):
             .filter_by(identifier=self.identifier) \
             .first()
 
-        if execute_update and (self._requires_update() or update):
-            self.sync_portfolio(algorithm_context)
-            portfolio = SQLLitePortfolio.query \
-                .filter_by(identifier=self.identifier) \
-                .first()
-
         return portfolio
 
     def create_order(
@@ -115,3 +109,11 @@ class SQLLitePortfolioManager(PortfolioManager, Identifier):
         self.get_portfolio(algorithm_context).add_order(order)
         db.session.commit()
 
+    def requires_update(self, algorithm_context):
+
+        portfolio = self.get_portfolio(algorithm_context)
+
+        if portfolio.updated_at is None:
+            return True
+
+        return portfolio.updated_at < datetime.utcnow()

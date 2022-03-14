@@ -1,24 +1,26 @@
+from datetime import datetime
+from typing import List
 from unittest import TestCase
 
-from investing_algorithm_framework import App, PortfolioManager
+from investing_algorithm_framework import App, PortfolioManager, Order
 from investing_algorithm_framework import current_app
 from investing_algorithm_framework.configuration.constants import \
     RESOURCES_DIRECTORY
+from investing_algorithm_framework.core.models import AssetPrice
 
 
 class PortfolioManagerTest(PortfolioManager):
+    def get_orders(self, symbol, since: datetime = None,
+                   algorithm_context=None, **kwargs) -> List[Order]:
+        return []
+
+    def get_prices(self, symbols, algorithm_context, **kwargs) -> List[AssetPrice]:
+        return []
+
     identifier = "testTwo"
 
     def get_positions(self, symbol: str = None, lazy=False):
         return []
-
-    def get_orders(self, symbol: str = None, status=None, lazy=False):
-        return []
-
-    def get_price(
-        self, target_symbol, trading_symbol, algorithm_context, **kwargs
-    ) -> float:
-        return 0.0
 
 
 class Test(TestCase):

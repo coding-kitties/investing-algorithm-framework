@@ -1,19 +1,22 @@
-from datetime import datetime
 from typing import List
-from investing_algorithm_framework.configuration.constants import BINANCE
-from investing_algorithm_framework.core.models.position import Position
+
 from investing_algorithm_framework.core.models.order import Order
 from investing_algorithm_framework.core.models.order_status import OrderStatus
+from investing_algorithm_framework.core.models.position import Position
 from investing_algorithm_framework.core.models.snapshots import AssetPrice
 
 
 class CCXTPortfolioManagerMixin:
 
     def get_orders(
-            self, symbol, since: datetime = None, algorithm_context=None
+        self, symbol, since=None, algorithm_context=None, **kwargs
     ) -> List[Order]:
-        market_service = algorithm_context.get_market_service(self.identifier)
-        ccxt_orders = market_service.get_orders(symbol, since)
+        market_service = algorithm_context.get_market_service(
+            market=self.market,
+            api_key=self.api_key,
+            secret_key=self.secret_key
+        )
+        ccxt_orders = market_service.get_orders(symbol=symbol, since=since)
         orders = []
 
         for ccxt_order in ccxt_orders:
@@ -37,7 +40,7 @@ class CCXTPortfolioManagerMixin:
                     "trading_symbol": ccxt_order["symbol"].split("/")[1],
                     "amount_target_symbol": ccxt_order["amount"],
                     "status": status,
-                    "price":  ccxt_order["price"],
+                    "price": ccxt_order["price"],
                     "initial_price": ccxt_order["price"],
                     "closing_price": ccxt_order["price"],
                     "type": ccxt_order["type"],
@@ -47,9 +50,15 @@ class CCXTPortfolioManagerMixin:
             orders.append(order)
         return orders
 
-    def get_positions(self, algorithm_context) -> List[Position]:
-        market_service = algorithm_context.get_market_service(self.identifier)
-        binance_balances = market_service.get_balances()
+    def get_positions(
+        self, algorithm_context=None, **kwargs
+    ) -> List[Position]:
+        market_service = algorithm_context.get_market_service(
+            market=self.market,
+            api_key=self.api_key,
+            secret_key=self.secret_key
+        )
+        binance_balances = market_service.get_balance()
         positions = []
 
         for binance_balance in binance_balances["free"]:
@@ -67,5 +76,9 @@ class CCXTPortfolioManagerMixin:
     def get_prices(
         self, symbols, algorithm_context, **kwargs
     ) -> List[AssetPrice]:
-        market_service = algorithm_context.get_market_service(BINANCE)
+        market_service = algorithm_context.get_market_service(
+            market=self.market,
+            api_key=self.api_key,
+            secret_key=self.secret_key
+        )
         return market_service.get_prices(symbols)

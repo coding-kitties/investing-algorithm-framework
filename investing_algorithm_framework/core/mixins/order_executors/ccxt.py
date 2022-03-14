@@ -1,16 +1,18 @@
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import Order, OrderType, \
     OrderSide, OrderStatus
-from investing_algorithm_framework.configuration.constants import BINANCE
 
 
-class BinanceOrderExecutorMixin:
-    identifier = BINANCE
+class CCXTOrderExecutorMixin:
 
     def execute_order(
-            self, order: Order, algorithm_context, **kwargs
+        self, order: Order, algorithm_context, **kwargs
     ) -> Order:
-        market_service = algorithm_context.get_market_service(BINANCE)
+        market_service = algorithm_context.get_market_service(
+            market=self.market,
+            api_key=self.api_key,
+            secret_key=self.secret_key
+        )
 
         if OrderType.LIMIT.equals(order.get_type()):
 
@@ -44,18 +46,28 @@ class BinanceOrderExecutorMixin:
     def check_order_status(
             self, order: Order, algorithm_context, **kwargs
     ) -> Order:
-        market_service = algorithm_context.get_market_service(BINANCE)
+        market_service = algorithm_context.get_market_service(
+            market=self.market,
+            api_key=self.api_key,
+            secret_key=self.secret_key
+        )
         ref_order = market_service.get_order(order.get_reference_id())
 
         if ref_order is not None:
 
-            if ref_order["info"]["status"] == "FILLED":
-                order.set_status(OrderStatus.SUCCESS)
-            if ref_order["info"]["status"] == "REJECTED	":
-                order.set_status(OrderStatus.FAILED)
-            if ref_order["info"]["status"] == "PENDING_CANCEL":
-                order.set_status(OrderStatus.FAILED)
-            if ref_order["info"]["status"] == "EXPIRED":
-                order.set_status(OrderStatus.FAILED)
+            status = OrderStatus.PENDING.value
+
+            if ref_order["status"] == "open":
+                status = OrderStatus.PENDING.value
+            if ref_order["status"] == "closed":
+                status = OrderStatus.CLOSED.value
+            if ref_order["status"] == "canceled":
+                status = OrderStatus.CANCELED.value
+            if ref_order["status"] == "expired":
+                status = OrderStatus.FAILED.value
+            if ref_order["status"] == "rejected":
+                status = OrderStatus.FAILED.value
+
+            order.set_status(status)
 
         return order

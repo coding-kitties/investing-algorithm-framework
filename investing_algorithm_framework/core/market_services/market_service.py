@@ -1,10 +1,7 @@
 from abc import ABC, abstractmethod
-from investing_algorithm_framework.core.market_identifier \
-    import MarketIdentifier
-from investing_algorithm_framework.core.models import TimeInterval
 
 
-class MarketService(ABC, MarketIdentifier):
+class MarketService(ABC):
 
     @abstractmethod
     def pair_exists(self, target_symbol: str, trading_symbol: str):
@@ -27,11 +24,7 @@ class MarketService(ABC, MarketIdentifier):
         pass
 
     @abstractmethod
-    def get_balance(self, symbol):
-        pass
-
-    @abstractmethod
-    def get_balances(self):
+    def get_balance(self):
         pass
 
     @abstractmethod
@@ -55,15 +48,6 @@ class MarketService(ABC, MarketIdentifier):
         pass
 
     @abstractmethod
-    def create_market_buy_order(
-        self,
-        target_symbol: str,
-        trading_symbol: str,
-        amount: float,
-    ):
-        pass
-
-    @abstractmethod
     def create_market_sell_order(
         self,
         target_symbol: str,
@@ -73,7 +57,7 @@ class MarketService(ABC, MarketIdentifier):
         pass
 
     @abstractmethod
-    def get_orders(self, symbol: str):
+    def get_orders(self, symbol: str, since=None):
         pass
 
     @abstractmethod

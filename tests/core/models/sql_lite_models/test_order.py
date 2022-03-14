@@ -1,5 +1,5 @@
 from investing_algorithm_framework import OperationalException
-from investing_algorithm_framework.core.models import Order
+from investing_algorithm_framework.core.models import SQLLiteOrder
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
@@ -189,8 +189,23 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_type())
 
+    def test_from_dict_with_symbol(self):
+        order = SQLLiteOrder.from_dict(
+            {
+                "reference_id": 10493,
+                "symbol": "DOT/USDT",
+                "amount_target_symbol": 40,
+                "status": "PENDING",
+                "price": 10,
+                "type": "LIMIT",
+                "side": "BUY"
+            }
+        )
+
+        self.assert_is_limit_order(order)
+
     def test_from_dict_pending_limit_order_buy(self):
-        order = Order.from_dict(
+        order = SQLLiteOrder.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
@@ -214,13 +229,13 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
     def test_from_dict_successful_limit_order_buy(self):
-        order = Order.from_dict(
+        order = SQLLiteOrder.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
                 "trading_symbol": "USDT",
                 "amount_target_symbol": 40,
-                "status": "SUCCESS",
+                "status": "CLOSED",
                 "price": 10,
                 "initial_price": 10,
                 "type": "LIMIT",
@@ -239,13 +254,13 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
         with self.assertRaises(OperationalException):
-            Order.from_dict(
+            SQLLiteOrder.from_dict(
                 {
                     "reference_id": 10493,
                     "target_symbol": "DOT",
                     "trading_symbol": "USDT",
                     "amount_target_symbol": 40,
-                    "status": "SUCCESS",
+                    "status": "CLOSED",
                     "price": 10,
                     "type": "LIMIT",
                     "side": "BUY"
@@ -253,7 +268,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
             )
 
     def test_from_dict_closed_limit_order_buy(self):
-        order = Order.from_dict(
+        order = SQLLiteOrder.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
@@ -279,7 +294,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_initial_price())
 
         with self.assertRaises(OperationalException):
-            Order.from_dict(
+            SQLLiteOrder.from_dict(
                 {
                     "reference_id": 10493,
                     "target_symbol": "DOT",
@@ -293,7 +308,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
             )
 
     def test_from_dict_pending_limit_order_sell(self):
-        order = Order.from_dict(
+        order = SQLLiteOrder.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
@@ -317,13 +332,13 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
     def test_from_dict_success_limit_order_sell(self):
-        order = Order.from_dict(
+        order = SQLLiteOrder.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
                 "trading_symbol": "USDT",
                 "amount_target_symbol": 40,
-                "status": "SUCCESS",
+                "status": "CLOSED",
                 "price": 10,
                 "initial_price": 9,
                 "type": "LIMIT",
@@ -342,7 +357,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
     def test_from_dict_closed_limit_order_sell(self):
-        order = Order.from_dict(
+        order = SQLLiteOrder.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
@@ -367,7 +382,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
     def test_from_dict_pending_market_order_sell(self):
-        order = Order.from_dict(
+        order = SQLLiteOrder.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
@@ -391,13 +406,13 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
     def test_from_dict_success_market_order_sell(self):
-        order = Order.from_dict(
+        order = SQLLiteOrder.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",
                 "trading_symbol": "USDT",
                 "amount_target_symbol": 40,
-                "status": "SUCCESS",
+                "status": "CLOSED",
                 "price": 10,
                 "initial_price": 9,
                 "type": "LIMIT",
@@ -416,7 +431,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         self.assertIsNotNone(order.get_price())
 
     def test_from_dict_closed_market_order_sell(self):
-        order = Order.from_dict(
+        order = SQLLiteOrder.from_dict(
             {
                 "reference_id": 10493,
                 "target_symbol": "DOT",

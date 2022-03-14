@@ -86,7 +86,7 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
             price=self.get_price(self.TARGET_SYMBOL_A).price,
             algorithm_context=None
         )
-        order.set_status(OrderStatus.SUCCESS)
+        order.set_status(OrderStatus.CLOSED)
         order.set_reference_id(2)
         order.set_initial_price(self.get_price(self.TARGET_SYMBOL_A).price)
         portfolio_manager.add_order(order, algorithm_context=None)
@@ -112,7 +112,7 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
             price=self.BASE_SYMBOL_A_PRICE,
             algorithm_context=None
         )
-        order.set_status(OrderStatus.SUCCESS)
+        order.set_status(OrderStatus.CLOSED)
         order.set_reference_id(2)
         order.set_initial_price(self.get_price(self.TARGET_SYMBOL_A).price)
         portfolio_manager.add_order(order, algorithm_context=None)
@@ -132,7 +132,7 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
             algorithm_context=None
         )
         order.set_reference_id(3)
-        order.set_status(OrderStatus.SUCCESS)
+        order.set_status(OrderStatus.CLOSED)
         order.set_initial_price(self.get_price(self.TARGET_SYMBOL_A).price)
         portfolio_manager.add_order(order, algorithm_context=None)
         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
@@ -178,7 +178,7 @@ class Test(TestOrderAndPositionsObjectsMixin, TestBase):
             price=self.BASE_SYMBOL_A_PRICE,
             algorithm_context=None
         )
-        order.set_status(OrderStatus.SUCCESS)
+        order.set_status(OrderStatus.CLOSED)
         order.set_reference_id(2)
         order.set_initial_price(self.get_price(self.TARGET_SYMBOL_A).price)
         portfolio_manager.add_order(order, algorithm_context=None)

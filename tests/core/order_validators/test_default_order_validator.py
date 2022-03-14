@@ -37,7 +37,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
         )
         order_a.set_initial_price(self.get_price(self.TARGET_SYMBOL_A).price)
         order_a.set_reference_id(10)
-        order_a.set_status(OrderStatus.SUCCESS)
+        order_a.set_status(OrderStatus.CLOSED)
         portfolio_manager.add_order(order_a, algorithm_context=None)
         order_a.set_status(OrderStatus.PENDING)
         order_a_sell = portfolio_manager.create_order(
@@ -49,7 +49,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             algorithm_context=None
         )
         order_a_sell.set_reference_id(11)
-        order_a_sell.set_status(OrderStatus.SUCCESS)
+        order_a_sell.set_status(OrderStatus.CLOSED)
         order_a_sell.set_initial_price(
             self.get_price(self.TARGET_SYMBOL_A).price
         )
@@ -67,7 +67,7 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             algorithm_context=None
         )
         order_a.set_reference_id(10)
-        order_a.set_status(OrderStatus.SUCCESS)
+        order_a.set_status(OrderStatus.CLOSED)
         order_a.set_initial_price(self.get_price(self.TARGET_SYMBOL_A).price)
         portfolio_manager.add_order(order_a, algorithm_context=None)
 

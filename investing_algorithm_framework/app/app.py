@@ -40,31 +40,19 @@ class App(metaclass=Singleton):
             self._resource_directory = resources_directory
 
         if config is not None:
-
-            if inspect.isclass(config):
-                config = config()
-
-            self._config = config
+            self._initialize_config(config)
 
     def initialize(
         self, resources_directory: str = None, config=None, arg=None
     ):
-        if not self.started:
+        if not self._configured:
 
             if resources_directory is not None:
                 self._resource_directory = resources_directory
 
             if config is not None:
-
-                if inspect.isclass(config):
-                    config = Config()
-
-                config.set(RESOURCES_DIRECTORY, resources_directory)
-                self._config = AlgorithmContextConfiguration()
-                self._config.load(config)
-
-    def _initialize_algorithm(self):
-        self._algorithm.initialize(config=self.config)
+                self._initialize_config(config)
+                self._config.set_resource_directory(self._resource_directory)
 
     def _initialize_config(self, config=None):
 
@@ -80,17 +68,9 @@ class App(metaclass=Singleton):
             if self._config is None:
                 raise OperationalException("No config object set")
 
-            if not self._config.resource_directory_configured():
-                raise OperationalException(
-                    "Resource directory is not configured"
-                )
-
-            if not self._config.can_write_to_resource_directory():
-                raise OperationalException("Can't write to resource directory")
-
             self._algorithm.config = self._config
-            self._configured = True
             setup_logging(self.config.get(LOG_LEVEL, "INFO"))
+            self._configured = True
 
     def _initialize_flask_app(self):
 
@@ -100,7 +80,6 @@ class App(metaclass=Singleton):
     def _initialize_flask_sql_alchemy(self):
 
         if self._configured and self._database_configured:
-            print("configuring db")
             initialize_db(self._flask_app)
             create_all_tables()
 
@@ -111,31 +90,9 @@ class App(metaclass=Singleton):
 
     def _initialize_database(self):
 
-        print("initializing db")
         if self._configured and not self._database_configured:
-            setup_database(self.config)
-
-            print(self.config.get(DATABASE_CONFIG))
-            database_config = self.config.get(DATABASE_CONFIG)
-            database_directory = database_config.get(DATABASE_DIRECTORY_PATH)
-            database_name = database_config.get(DATABASE_NAME)
-            sqlalchemy_uri = self.config.get(SQLALCHEMY_DATABASE_URI)
-
-            if database_directory is None:
-                raise OperationalException(
-                    f"{DATABASE_DIRECTORY_PATH} is not set in config"
-                )
-
-            if database_name is None:
-                raise OperationalException(
-                    f"{DATABASE_NAME} is not set in config"
-                )
-
-            if sqlalchemy_uri is None:
-                raise OperationalException(
-                    f"{SQLALCHEMY_DATABASE_URI} is not set in config"
-                )
-
+            setup_database(self._config)
+            self._config.validate_database_configuration()
             self._database_configured = True
 
     def _initialize_management_commands(self):
@@ -160,21 +117,24 @@ class App(metaclass=Singleton):
             self._flask_app.register_blueprint(blueprint)
 
     def start(self):
-        # Setup config if it is not set
-        if self._config is None:
-            self._config = Config
+        self._initialize_config()
+
+        if not self._config.resource_directory_configured():
+            raise OperationalException(
+                "Resource directory is not configured"
+            )
+
+        if not self._config.can_write_to_resource_directory():
+            raise OperationalException("Can't write to resource directory")
 
         self._initialize_flask_app()
         self._initialize_blueprints()
-        self._initialize_config()
         self._initialize_database()
         self._initialize_flask_config()
         self._initialize_flask_sql_alchemy()
-        self._initialize_algorithm()
         self._initialize_management_commands()
         self._algorithm.initialize_portfolio_managers()
         self.start_scheduler()
-
         self.start_algorithm()
 
         # Start the app

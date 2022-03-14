@@ -61,7 +61,7 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
                     "trading_symbol": "usdt",
                     "amount_target_symbol": 4,
                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
-                    "status": OrderStatus.SUCCESS.value,
+                    "status": OrderStatus.CLOSED.value,
                     "initial_price": self.get_price(
                         self.TARGET_SYMBOL_A).price,
                     "side": OrderSide.BUY.value,
@@ -73,7 +73,7 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
         position.add_orders(orders)
         self.assertEqual(2, len(position.get_orders()))
         self.assertEqual(
-            1, len(position.get_orders(status=OrderStatus.SUCCESS))
+            1, len(position.get_orders(status=OrderStatus.CLOSED))
         )
         self.assertEqual(
             1, len(position.get_orders(status=OrderStatus.PENDING))
@@ -96,7 +96,7 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
         )
         self.assertEqual(
             1, len(position.get_orders(
-                status=OrderStatus.SUCCESS,
+                status=OrderStatus.CLOSED,
                 type=OrderType.LIMIT,
                 side=OrderSide.BUY
             ))
@@ -291,7 +291,7 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
 
         order = Order(
             reference_id=1,
-            status=OrderStatus.SUCCESS.value,
+            status=OrderStatus.CLOSED.value,
             type=OrderType.LIMIT.value,
             side=OrderSide.SELL.value,
             amount_trading_symbol=10,
@@ -302,5 +302,5 @@ class TestPositionModel(TestBase, TestOrderAndPositionsObjectsMixin):
         )
         position.add_order(order)
         self.assertTrue(
-            OrderStatus.SUCCESS.equals(position.get_order(1).status)
+            OrderStatus.CLOSED.equals(position.get_order(1).status)
         )

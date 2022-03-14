@@ -189,6 +189,21 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
         order = portfolio.get_order(10)
         self.assertIsNotNone(order.get_type())
 
+    def test_from_dict_with_symbol(self):
+        order = Order.from_dict(
+            {
+                "reference_id": 10493,
+                "symbol": "DOT/USDT",
+                "amount_target_symbol": 40,
+                "status": "PENDING",
+                "price": 10,
+                "type": "LIMIT",
+                "side": "BUY"
+            }
+        )
+
+        self.assert_is_limit_order(order)
+
     def test_from_dict_pending_limit_order_buy(self):
         order = Order.from_dict(
             {
@@ -220,7 +235,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
                 "target_symbol": "DOT",
                 "trading_symbol": "USDT",
                 "amount_target_symbol": 40,
-                "status": "SUCCESS",
+                "status": "CLOSED",
                 "price": 10,
                 "initial_price": 10,
                 "type": "LIMIT",
@@ -245,7 +260,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
                     "target_symbol": "DOT",
                     "trading_symbol": "USDT",
                     "amount_target_symbol": 40,
-                    "status": "SUCCESS",
+                    "status": "CLOSED",
                     "price": 10,
                     "type": "LIMIT",
                     "side": "BUY"
@@ -323,7 +338,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
                 "target_symbol": "DOT",
                 "trading_symbol": "USDT",
                 "amount_target_symbol": 40,
-                "status": "SUCCESS",
+                "status": "CLOSED",
                 "price": 10,
                 "initial_price": 9,
                 "type": "LIMIT",
@@ -397,7 +412,7 @@ class TestOrderModel(TestBase, TestOrderAndPositionsObjectsMixin):
                 "target_symbol": "DOT",
                 "trading_symbol": "USDT",
                 "amount_target_symbol": 40,
-                "status": "SUCCESS",
+                "status": "CLOSED",
                 "price": 10,
                 "initial_price": 9,
                 "type": "LIMIT",

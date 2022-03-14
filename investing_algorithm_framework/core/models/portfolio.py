@@ -1,3 +1,4 @@
+from datetime import datetime
 from abc import abstractmethod
 from typing import List
 
@@ -16,9 +17,10 @@ class Portfolio:
         positions=None,
         orders=None
     ):
-        self.positions = positions
+        self.positions = []
         self.trading_symbol = trading_symbol
         self.identifier = identifier
+        self.updated_at = None
 
         if positions is not None:
             self.add_positions(positions)
@@ -58,7 +60,7 @@ class Portfolio:
 
         for position in self.get_positions():
 
-            if position.get_target_symbol() == target_symbol:
+            if position.get_target_symbol() == target_symbol.upper():
                 return position
 
         return None
@@ -122,7 +124,6 @@ class Portfolio:
         return Portfolio(
             identifier=data.get("identifier", None),
             trading_symbol=data.get("trading_symbol", None),
-            market=data.get("market", None),
             positions=data.get("positions", None),
             orders=data.get("orders", None)
         )
@@ -301,3 +302,6 @@ class Portfolio:
 
     def __repr__(self):
         return self.to_string()
+
+    def updated(self):
+        self.updated_at = datetime.utcnow()
