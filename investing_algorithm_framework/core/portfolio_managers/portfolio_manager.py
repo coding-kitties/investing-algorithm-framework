@@ -191,7 +191,8 @@ class PortfolioManager(ABC, Identifier):
         if portfolio.updated_at is None:
             return True
 
-        return portfolio.updated_at + timedelta(minutes=self.update_minutes) \
+        return \
+            (portfolio.updated_at + timedelta(minutes=self.update_minutes)) \
             < datetime.utcnow()
 
     def create_order(

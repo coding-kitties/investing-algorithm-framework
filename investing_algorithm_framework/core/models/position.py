@@ -1,7 +1,8 @@
 from typing import List
+
+from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import OrderStatus, OrderSide, \
     Order, OrderType
-from investing_algorithm_framework.core.exceptions import OperationalException
 
 
 class Position:

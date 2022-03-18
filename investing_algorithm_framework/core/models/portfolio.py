@@ -1,5 +1,5 @@
-from datetime import datetime
 from abc import abstractmethod
+from datetime import datetime
 from typing import List
 
 from investing_algorithm_framework.core.exceptions import OperationalException

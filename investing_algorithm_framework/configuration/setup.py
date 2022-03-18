@@ -8,7 +8,8 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
-from investing_algorithm_framework.configuration import ConfigValidator
+from investing_algorithm_framework.configuration.validator import \
+    ConfigValidator
 from investing_algorithm_framework.configuration.constants import \
     DATABASE_CONFIG, DATABASE_DIRECTORY_PATH, DATABASE_NAME, \
     RESOURCES_DIRECTORY

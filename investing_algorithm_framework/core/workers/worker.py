@@ -1,8 +1,8 @@
 from flask_apscheduler import APScheduler
 
 from investing_algorithm_framework.core.models import TimeUnit
-from investing_algorithm_framework.utils import random_string
 from investing_algorithm_framework.core.models import db
+from investing_algorithm_framework.utils import random_string
 
 
 class Worker:

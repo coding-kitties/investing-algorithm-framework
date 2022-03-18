@@ -1,7 +1,8 @@
 import logging
-from investing_algorithm_framework.core.exceptions import ImproperlyConfigured
+
 from investing_algorithm_framework.configuration.constants import \
     DATABASE_CONFIG, LOG_LEVEL, RESOURCES_DIRECTORY
+from investing_algorithm_framework.core.exceptions import ImproperlyConfigured
 
 logger = logging.getLogger(__name__)
 

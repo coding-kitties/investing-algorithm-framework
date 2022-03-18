@@ -1,6 +1,8 @@
 from investing_algorithm_framework.core.mixins import CCXTPortfolioManagerMixin
-from investing_algorithm_framework.core.portfolio_managers \
-    import SQLLitePortfolioManager, PortfolioManager
+from investing_algorithm_framework.core.portfolio_managers\
+    .portfolio_manager import PortfolioManager
+from investing_algorithm_framework.core.portfolio_managers\
+    .sqllite_portfolio_manager import SQLLitePortfolioManager
 
 
 class CCXTPortfolioManager(CCXTPortfolioManagerMixin, PortfolioManager):

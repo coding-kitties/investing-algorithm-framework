@@ -136,13 +136,21 @@ class CCXTMarketService(MarketService):
             )
 
         if since is not None:
-            since = self.exchange.parse8601(since.strftime("YYYY-MM-DD:HH:MM"))
+            since = self.exchange.parse8601(
+                since.strftime(":%Y-%m-%d %H:%M:%S")
+            )
 
-        try:
-            return self.exchange.fetchOrders(symbol, since)
-        except Exception as e:
-            logger.exception(e)
-            raise OperationalException("Could not retrieve orders")
+            try:
+                return self.exchange.fetchOrders(symbol, since=since)
+            except Exception as e:
+                logger.exception(e)
+                raise OperationalException("Could not retrieve orders")
+        else:
+            try:
+                return self.exchange.fetchOrders(symbol)
+            except Exception as e:
+                logger.exception(e)
+                raise OperationalException("Could not retrieve orders")
 
     def get_balance(self):
 

@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import OrderSide, OrderType
 

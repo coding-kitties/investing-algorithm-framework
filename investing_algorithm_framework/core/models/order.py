@@ -1,9 +1,10 @@
 import logging
 from abc import abstractmethod
 
+from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import OrderStatus, \
     OrderType, OrderSide
-from investing_algorithm_framework.core.exceptions import OperationalException
+
 logger = logging.getLogger(__name__)
 
 

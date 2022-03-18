@@ -1,7 +1,7 @@
-from investing_algorithm_framework.core.models.data_provider import \
-    Ticker, OrderBook
 from investing_algorithm_framework.core.data_providers.data_provider import \
     DataProvider
+from investing_algorithm_framework.core.models.data_provider import \
+    Ticker, OrderBook
 
 
 class CCXTDataProvider(DataProvider):

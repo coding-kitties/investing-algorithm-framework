@@ -1,9 +1,10 @@
 from datetime import datetime
+
 from sqlalchemy.orm import relationship
 
+from investing_algorithm_framework.core.models import db
 from investing_algorithm_framework.core.models.model_extension import \
     SQLAlchemyModelExtension
-from investing_algorithm_framework.core.models import db
 
 
 class AssetPrice:

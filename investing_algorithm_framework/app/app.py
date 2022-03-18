@@ -6,11 +6,10 @@ from distutils.sysconfig import get_python_lib
 
 from flask import Flask
 
-from investing_algorithm_framework.configuration import Config, create_app, \
+from investing_algorithm_framework.configuration import create_app, \
     setup_config, setup_database, setup_logging
 from investing_algorithm_framework.configuration.constants import \
-    SQLALCHEMY_DATABASE_URI, DATABASE_DIRECTORY_PATH, \
-    DATABASE_NAME, DATABASE_CONFIG, LOG_LEVEL, RESOURCES_DIRECTORY
+    LOG_LEVEL
 from investing_algorithm_framework.context import Singleton
 from investing_algorithm_framework.core.context \
     import AlgorithmContextConfiguration

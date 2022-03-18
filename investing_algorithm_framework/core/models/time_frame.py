@@ -1,5 +1,6 @@
-from enum import Enum
 from datetime import datetime, timedelta
+from enum import Enum
+
 from dateutil import relativedelta
 
 
