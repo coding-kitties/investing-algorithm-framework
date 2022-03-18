@@ -4,9 +4,12 @@ from investing_algorithm_framework.core.models.data_provider import \
 
 
 class DataProvider:
+    market = None
 
-    def __init__(self, market):
-        self.market = market
+    def __init__(self, market=None):
+
+        if market is not None:
+            self.market = market
 
     def provide_raw_data(self, algorithm_context, **kwargs) -> dict:
         raise OperationalException(

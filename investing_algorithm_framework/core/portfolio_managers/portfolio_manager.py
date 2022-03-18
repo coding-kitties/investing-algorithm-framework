@@ -1,7 +1,7 @@
-from datetime import datetime, timedelta, date
 from abc import abstractmethod, ABC
-from typing import List
+from datetime import datetime, timedelta
 from logging import getLogger
+from typing import List
 
 from investing_algorithm_framework.configuration.constants import \
     TRADING_SYMBOL
@@ -9,10 +9,10 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.identifier import Identifier
 from investing_algorithm_framework.core.models import OrderSide, OrderType, \
     Portfolio
-from investing_algorithm_framework.core.models.snapshots.asset_price import \
-    AssetPrice
 from investing_algorithm_framework.core.models.order import Order, OrderStatus
 from investing_algorithm_framework.core.models.position import Position
+from investing_algorithm_framework.core.models.snapshots.asset_price import \
+    AssetPrice
 from investing_algorithm_framework.core.order_validators import \
     OrderValidatorFactory
 
@@ -22,11 +22,19 @@ logger = getLogger(__name__)
 class PortfolioManager(ABC, Identifier):
     update_minutes = 5
     
-    def __init__(self, identifier, track_from, trading_symbol):
+    def __init__(self, identifier=None, track_from=None, trading_symbol=None):
         super(PortfolioManager, self).__init__(identifier)
-        self.track_from = track_from
+
+        if track_from is not None:
+            self.track_from = track_from
+
+        if identifier is not None:
+            self.identifier = identifier
+
+        if trading_symbol is not None:
+            self.trading_symbol = trading_symbol.upper()
+
         self.portfolio = None
-        self.trading_symbol = trading_symbol.upper()
 
     @abstractmethod
     def get_positions(
@@ -175,10 +183,6 @@ class PortfolioManager(ABC, Identifier):
         execute_update=True,
         **kwargs
     ) -> Portfolio:
-
-        if self.requires_update(algorithm_context):
-            self.sync_portfolio(algorithm_context)
-
         return self.portfolio
 
     def requires_update(self,  algorithm_context):

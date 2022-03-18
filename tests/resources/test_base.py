@@ -102,7 +102,7 @@ class OrderExecutorTest(OrderExecutor):
 
 
 class DataProviderTest(DataProvider):
-    identifier = "test"
+    market = "test"
 
     def provide_order_book(
         self, target_symbol, trading_symbol, algorithm_context, **kwargs

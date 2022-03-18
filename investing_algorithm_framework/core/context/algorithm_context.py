@@ -827,6 +827,10 @@ class AlgorithmContext:
 
     def get_portfolio(self, identifier=None) -> Portfolio:
         portfolio_manager = self.get_portfolio_manager(identifier)
+
+        if portfolio_manager.requires_update(self):
+            portfolio_manager.sync_portfolio(self)
+
         return portfolio_manager.get_portfolio(algorithm_context=self)
 
     def get_unallocated(self, identifier=None) -> Position:

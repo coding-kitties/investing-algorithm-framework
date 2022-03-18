@@ -188,12 +188,13 @@ class AlgorithmContextConfiguration:
     def get_portfolios(self):
         portfolio_configurations = []
 
-        for key in self.config[PORTFOLIOS]:
-            data = {"identifier": key}
-            data.update(self.config[PORTFOLIOS][key])
+        if PORTFOLIOS in self.config:
+            for key in self.config[PORTFOLIOS]:
+                data = {"identifier": key}
+                data.update(self.config[PORTFOLIOS][key])
 
-            portfolio_configurations.append(
-                PortfolioConfiguration.from_dict(data)
-            )
+                portfolio_configurations.append(
+                    PortfolioConfiguration.from_dict(data)
+                )
 
         return portfolio_configurations
