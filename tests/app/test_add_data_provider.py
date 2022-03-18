@@ -5,8 +5,7 @@ from investing_algorithm_framework.configuration.constants import \
 
 
 class DataProviderTest(DataProvider):
-    identifier = "test"
-    pass
+    market = "test"
 
 
 class Test(TestCase):

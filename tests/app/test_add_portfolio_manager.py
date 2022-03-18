@@ -1,41 +1,26 @@
+from datetime import datetime
+from typing import List
 from unittest import TestCase
-from investing_algorithm_framework import App, PortfolioManager, OrderType, \
-    OrderSide
+
+from investing_algorithm_framework import App, PortfolioManager, Order
+from investing_algorithm_framework import current_app
 from investing_algorithm_framework.configuration.constants import \
     RESOURCES_DIRECTORY
-from investing_algorithm_framework import current_app
+from investing_algorithm_framework.core.models import AssetPrice
 
 
 class PortfolioManagerTest(PortfolioManager):
+    def get_orders(self, symbol, since: datetime = None,
+                   algorithm_context=None, **kwargs) -> List[Order]:
+        return []
+
+    def get_prices(self, symbols, algorithm_context, **kwargs) -> List[AssetPrice]:
+        return []
+
     identifier = "testTwo"
 
-    def get_unallocated(self, algorithm_context, sync=False):
-        pass
-
-    def get_allocated(self, algorithm_context, sync=False):
-        pass
-
-    def initialize(self, algorithm_context):
-        pass
-
-    def get_portfolio(self, algorithm_context):
-        pass
-
     def get_positions(self, symbol: str = None, lazy=False):
-        pass
-
-    def get_orders(self, symbol: str = None, status=None, lazy=False):
-        pass
-
-    def create_order(self, symbol, price=None, amount_trading_symbol=None,
-                     amount_target_symbol=None,
-                     order_type=OrderType.LIMIT.value,
-                     order_side=OrderSide.BUY.value, context=None,
-                     validate_pair=True):
-        pass
-
-    def add_order(self, order):
-        pass
+        return []
 
 
 class Test(TestCase):

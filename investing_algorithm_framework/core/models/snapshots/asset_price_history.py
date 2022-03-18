@@ -1,5 +1,6 @@
 from abc import abstractmethod
 from datetime import datetime as dt, timedelta as td
+
 from investing_algorithm_framework.core.models import db, TimeFrame, \
     TimeInterval
 from investing_algorithm_framework.core.models.model_extension \

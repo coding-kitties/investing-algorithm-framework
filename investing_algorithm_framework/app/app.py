@@ -1,21 +1,25 @@
 import inspect
+import logging
 import os
 import shutil
 from distutils.sysconfig import get_python_lib
 
 from flask import Flask
 
-from investing_algorithm_framework.configuration import Config, create_app, \
+from investing_algorithm_framework.configuration import create_app, \
     setup_config, setup_database, setup_logging
 from investing_algorithm_framework.configuration.constants import \
-    RESOURCES_DIRECTORY, SQLALCHEMY_DATABASE_URI, DATABASE_DIRECTORY_PATH, \
-    DATABASE_NAME, DATABASE_CONFIG, LOG_LEVEL
+    LOG_LEVEL
 from investing_algorithm_framework.context import Singleton
+from investing_algorithm_framework.core.context \
+    import AlgorithmContextConfiguration
 from investing_algorithm_framework.core.context import algorithm
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import create_all_tables, \
     initialize_db
 from investing_algorithm_framework.extensions import scheduler
+
+logger = logging.getLogger(__name__)
 
 
 class App(metaclass=Singleton):
@@ -35,49 +39,37 @@ class App(metaclass=Singleton):
             self._resource_directory = resources_directory
 
         if config is not None:
-            self._config = config
+            self._initialize_config(config)
 
     def initialize(
-            self, resources_directory: str = None, config=None, arg=None
+        self, resources_directory: str = None, config=None, arg=None
     ):
-        if not self.started:
+        if not self._configured:
 
             if resources_directory is not None:
                 self._resource_directory = resources_directory
 
             if config is not None:
-                self._config = config
-
-    def _initialize_algorithm(self):
-        self._algorithm.initialize(config=self.config)
+                self._initialize_config(config)
+                self._config.set_resource_directory(self._resource_directory)
 
     def _initialize_config(self, config=None):
 
         if not self._configured:
 
             if config is not None:
-                self._config = config
+                if inspect.isclass(config):
+                    config = config()
+
+                self._config = AlgorithmContextConfiguration()
+                self._config.load(config)
 
             if self._config is None:
                 raise OperationalException("No config object set")
 
-            if inspect.isclass(self._config) \
-                    and issubclass(self._config, Config):
-                self._config = self._config()
-            elif type(self._config) is dict:
-                self._config = Config.from_dict(self._config)
-            else:
-                raise OperationalException("Config object not supported")
-
-            if self._resource_directory is not None:
-                self._config[RESOURCES_DIRECTORY] = self._resource_directory
-
-            if RESOURCES_DIRECTORY not in self._config \
-                    or self._config[RESOURCES_DIRECTORY] is None:
-                raise OperationalException("Resource directory not specified")
-
-            self._configured = True
+            self._algorithm.config = self._config
             setup_logging(self.config.get(LOG_LEVEL, "INFO"))
+            self._configured = True
 
     def _initialize_flask_app(self):
 
@@ -98,23 +90,8 @@ class App(metaclass=Singleton):
     def _initialize_database(self):
 
         if self._configured and not self._database_configured:
-            setup_database(self.config)
-
-            if self.config[DATABASE_CONFIG][DATABASE_DIRECTORY_PATH] is None:
-                raise OperationalException(
-                    f"{DATABASE_DIRECTORY_PATH} is not set in config"
-                )
-
-            if self.config[DATABASE_CONFIG][DATABASE_NAME] is None:
-                raise OperationalException(
-                    f"{DATABASE_NAME} is not set in config"
-                )
-
-            if self.config[SQLALCHEMY_DATABASE_URI] is None:
-                raise OperationalException(
-                    f"{SQLALCHEMY_DATABASE_URI} is not set in config"
-                )
-
+            setup_database(self._config)
+            self._config.validate_database_configuration()
             self._database_configured = True
 
     def _initialize_management_commands(self):
@@ -139,29 +116,38 @@ class App(metaclass=Singleton):
             self._flask_app.register_blueprint(blueprint)
 
     def start(self):
+        self._initialize_config()
 
-        # Setup config if it is not set
-        if self._config is None:
-            self._config = Config
+        if not self._config.resource_directory_configured():
+            raise OperationalException(
+                "Resource directory is not configured"
+            )
+
+        if not self._config.can_write_to_resource_directory():
+            raise OperationalException("Can't write to resource directory")
 
         self._initialize_flask_app()
         self._initialize_blueprints()
-        self._initialize_config()
         self._initialize_database()
         self._initialize_flask_config()
         self._initialize_flask_sql_alchemy()
-        self._initialize_algorithm()
         self._initialize_management_commands()
-
+        self._algorithm.initialize_portfolio_managers()
         self.start_scheduler()
         self.start_algorithm()
 
         # Start the app
         self._flask_app.run(
-            debug=True,
+            debug=False,
             threaded=True,
             use_reloader=False
         )
+
+        if not scheduler.running:
+            raise OperationalException(
+                "Could not start algorithm because the scheduler "
+                "is not running"
+            )
 
     def start_scheduler(self):
 
@@ -171,12 +157,6 @@ class App(metaclass=Singleton):
             scheduler.start()
 
     def start_algorithm(self):
-
-        if not scheduler.running:
-            raise OperationalException(
-                "Could not start algorithm because the scheduler "
-                "is not running"
-            )
 
         # Start the algorithm
         self._algorithm.start()

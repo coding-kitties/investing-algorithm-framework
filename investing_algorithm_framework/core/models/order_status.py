@@ -2,7 +2,6 @@ from enum import Enum
 
 
 class OrderStatus(Enum):
-    SUCCESS = 'SUCCESS'
     PENDING = 'PENDING'
     TO_BE_SENT = "TO_BE_SENT"
     FAILED = "FAILED"
@@ -33,14 +32,5 @@ class OrderStatus(Enum):
 
         raise ValueError("Could not convert value to OrderStatus")
 
-
     def equals(self, other):
-
-        if other is None:
-            return False
-
-        if isinstance(other, Enum):
-            return self.value == other.value
-
-        else:
-            return OrderStatus.from_string(other) == self
+        return OrderStatus.from_value(other) == self

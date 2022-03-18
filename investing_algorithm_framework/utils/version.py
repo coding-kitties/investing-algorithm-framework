@@ -1,3 +1,6 @@
+VERSION = (0, 16, 8, 'alpha', 0)
+
+
 def get_version(version=None):
     version = get_complete_version(version)
     main = get_main_version(version)
@@ -17,10 +20,8 @@ def get_complete_version(version=None):
     argument is non-empty,
     check for correctness of the tuple provided.
     """
-    if version is None:
-        from investing_algorithm_framework import VERSION as version
-    else:
-        assert len(version) == 5
-        assert version[3] in ('alpha', 'beta', 'rc', 'final')
 
-    return version
+    if version is not None:
+        return version
+
+    return VERSION
