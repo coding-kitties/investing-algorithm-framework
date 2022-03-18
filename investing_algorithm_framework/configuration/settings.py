@@ -1,11 +1,10 @@
-import os
-
-from enum import Enum
 import logging
+import os
+from enum import Enum
 
-from investing_algorithm_framework.core import OperationalException
 from investing_algorithm_framework.configuration.constants import \
     DATABASE_NAME, DATABASE_DIRECTORY_PATH, RESOURCES_DIRECTORY
+from investing_algorithm_framework.core import OperationalException
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,7 @@ class Environment(Enum):
 
 
 class Config(dict):
-    ENV = "DEV"
+    ENV = "PROD"
     LOG_LEVEL = 'DEBUG'
     APP_DIR = os.path.abspath(os.path.dirname(__file__))
     PROJECT_ROOT = os.path.abspath(os.path.join(APP_DIR, os.pardir))
@@ -183,6 +182,7 @@ class TestConfig(Config):
     DATABASE_CONFIG = {
         'DATABASE_NAME': "test",
     }
+    LOG_LEVEL = "INFO"
 
 
 class DevConfig(Config):
@@ -190,3 +190,4 @@ class DevConfig(Config):
     DATABASE_CONFIG = {
         'DATABASE_NAME': "dev",
     }
+    LOG_LEVEL = "INFO"

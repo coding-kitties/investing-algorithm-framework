@@ -18,7 +18,7 @@ class Identifier:
                 f"{self.__class__.__name__} has no identifier specified"
             )
 
-    def get_id(self, throw_exception=True) -> str:
+    def get_identifier(self, throw_exception=True) -> str:
         value = getattr(self, 'identifier', None)
 
         if value is None and throw_exception:

@@ -47,7 +47,7 @@ class StrategyTestThree(Strategy):
             trading_symbol="USDT",
             trading_data_type=TradingDataTypes.TICKER,
             target_symbol=TestBase.TARGET_SYMBOL_A,
-            data_provider_identifier="test"
+            market="test"
         )
         StrategyTestThree.has_run = False
         StrategyTestThree.has_ticker = False
@@ -73,7 +73,7 @@ class StrategyTestFour(Strategy):
                 TestBase.TARGET_SYMBOL_A, TestBase.TARGET_SYMBOL_B
             ],
             trading_data_type=TradingDataTypes.TICKER,
-            data_provider_identifier="test"
+            market="test"
         )
         StrategyTestFour.has_run = False
         StrategyTestFour.has_tickers = False
@@ -97,7 +97,7 @@ class StrategyTestFive(Strategy):
             target_symbol="BTC",
             trading_symbol="USDT",
             trading_data_type=TradingDataTypes.ORDER_BOOK,
-            data_provider_identifier="test"
+            market="test"
         )
         StrategyTestFive.has_run = False
         StrategyTestFive.has_order_book = False
@@ -121,7 +121,7 @@ class StrategyTestSix(Strategy):
             trading_symbol="USDT",
             target_symbols=[TestBase.TARGET_SYMBOL_A, TestBase.TARGET_SYMBOL_B],
             trading_data_type=TradingDataTypes.ORDER_BOOK,
-            data_provider_identifier="test"
+            market="test"
         )
         StrategyTestSix.has_run = False
         StrategyTestSix.has_order_book = False
@@ -146,7 +146,7 @@ class StrategyTestSeven(Strategy):
             trading_symbol="USDT",
             target_symbols=[TestBase.TARGET_SYMBOL_A, TestBase.TARGET_SYMBOL_B],
             trading_data_types=[TradingDataTypes.ORDER_BOOK, TradingDataTypes.TICKER],
-            data_provider_identifier="test"
+            market="test"
         )
         StrategyTestSeven.has_run = False
         StrategyTestSeven.has_order_books = False
@@ -177,7 +177,7 @@ class StrategyTestEight(Strategy):
             trading_data_types=[
                 TradingDataTypes.ORDER_BOOK, TradingDataTypes.TICKER
             ],
-            data_provider_identifier="test"
+            market="test"
         )
         StrategyTestEight.has_run = False
         StrategyTestEight.has_order_book = False

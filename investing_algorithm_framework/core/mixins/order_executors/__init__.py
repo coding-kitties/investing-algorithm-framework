@@ -1,3 +1,3 @@
-from .binance import BinanceOrderExecutorMixin
+from .ccxt import CCXTOrderExecutorMixin
 
-__all__ = ["BinanceOrderExecutorMixin"]
+__all__ = ["CCXTOrderExecutorMixin"]

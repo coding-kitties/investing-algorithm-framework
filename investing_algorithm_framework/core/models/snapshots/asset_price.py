@@ -1,28 +1,35 @@
-from abc import abstractmethod
+from datetime import datetime
+
 from sqlalchemy.orm import relationship
 
+from investing_algorithm_framework.core.models import db
 from investing_algorithm_framework.core.models.model_extension import \
     SQLAlchemyModelExtension
-from investing_algorithm_framework.core.models import db
 
 
 class AssetPrice:
 
-    @abstractmethod
-    def get_target_symbol(self):
-        pass
+    def __init__(self, symbol, price, datetime):
+        self.symbol = symbol
+        self.price = price
+        self.datetime = datetime
 
-    @abstractmethod
-    def get_trading_symbol(self):
-        pass
+    def get_symbol(self):
+        return self.symbol
 
-    @abstractmethod
     def get_price(self):
-        pass
 
-    @abstractmethod
+        if self.price is None:
+            return 0
+
+        return self.price
+
     def get_datetime(self):
-        pass
+
+        if self.datetime is None:
+            return datetime.utcnow()
+
+        return self.datetime
 
     def repr(self, **fields) -> str:
         """
@@ -41,14 +48,20 @@ class AssetPrice:
 
         return f"<{self.__class__.__name__} {id(self)}>"
 
+    def __repr__(self):
+        return self.repr(
+            symbol=self.get_symbol(),
+            price=self.price,
+            datetime=self.datetime
+        )
+
 
 class SQLLiteAssetPrice(AssetPrice, db.Model, SQLAlchemyModelExtension):
 
     __tablename__ = "asset_prices"
 
     id = db.Column(db.Integer, primary_key=True)
-    target_symbol = db.Column(db.String, nullable=False)
-    trading_symbol = db.Column(db.String, nullable=False)
+    symbol = db.Column(db.String, nullable=False)
     price = db.Column(db.Float, nullable=False)
     datetime = db.Column(db.DateTime, nullable=False)
 
@@ -59,12 +72,6 @@ class SQLLiteAssetPrice(AssetPrice, db.Model, SQLAlchemyModelExtension):
     asset_price_history = relationship(
         "SQLLiteAssetPriceHistory", back_populates="prices"
     )
-
-    def __init__(self, target_symbol, trading_symbol, price, datetime):
-        self.target_symbol = target_symbol
-        self.trading_symbol = trading_symbol
-        self.price = price
-        self.datetime = datetime
 
     def get_target_symbol(self):
         return self.target_symbol

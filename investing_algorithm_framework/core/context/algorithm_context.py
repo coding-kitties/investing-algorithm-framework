@@ -1,27 +1,29 @@
+import inspect
 import logging
 from typing import List
-import inspect
 
-from investing_algorithm_framework.configuration import Config
 from investing_algorithm_framework.configuration.constants import \
     TRADING_SYMBOL
+from investing_algorithm_framework.core.context \
+    .algorithm_context_configuration import AlgorithmContextConfiguration
+from investing_algorithm_framework.core.data_providers import \
+    DataProvider, CCXTDataProvider
 from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.core.market_services import \
+    CCXTMarketService
+from investing_algorithm_framework.core.market_services.market_service \
+    import MarketService
 from investing_algorithm_framework.core.models import TimeUnit, OrderType, \
     db, OrderSide, OrderStatus, Portfolio, Order, Position
 from investing_algorithm_framework.core.models.data_provider import \
     TradingDataTypes
+from investing_algorithm_framework.core.order_executors import \
+    CCXTOrderExecutor, OrderExecutor
+from investing_algorithm_framework.core.portfolio_managers \
+    import PortfolioManager, CCXTPortfolioManager, \
+    CCXTSQLitePortfolioManager
 from investing_algorithm_framework.core.workers import Worker, Strategy
 from investing_algorithm_framework.extensions import scheduler
-from investing_algorithm_framework.core.data_providers import\
-    DefaultDataProviderFactory, DataProvider
-from investing_algorithm_framework.configuration.constants import \
-    RESERVED_IDENTIFIERS
-from investing_algorithm_framework.core.market_services import \
-    DefaultMarketServiceFactory
-from investing_algorithm_framework.core.portfolio_managers import \
-    DefaultPortfolioManagerFactory
-from investing_algorithm_framework.core.order_executors import \
-    DefaultOrderExecutorFactory, OrderExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +68,7 @@ class AlgorithmContext:
         worker_id: str = None,
         time_unit: TimeUnit = TimeUnit.MINUTE,
         interval=10,
-        data_provider_identifier=None,
+        market=None,
         trading_data_type=None,
         trading_data_types=None,
         target_symbol=None,
@@ -80,7 +82,7 @@ class AlgorithmContext:
                 worker_id,
                 time_unit,
                 interval,
-                data_provider_identifier,
+                market,
                 trading_data_type,
                 trading_data_types,
                 target_symbol,
@@ -94,7 +96,7 @@ class AlgorithmContext:
                     worker_id,
                     time_unit,
                     interval,
-                    data_provider_identifier,
+                    market,
                     trading_data_type,
                     trading_data_types,
                     target_symbol,
@@ -104,17 +106,65 @@ class AlgorithmContext:
 
             return wrapper
 
-    def initialize(self, config=None):
+    def initialize_portfolio_managers(self):
 
-        if config is not None:
-            assert isinstance(config, Config), (
-                "Config is not an instance of config"
-            )
-            self._config = config
-        else:
-            self._config = Config()
+        for portfolio_manager_key in self._portfolio_managers:
+            portfolio_manager = self._portfolio_managers[portfolio_manager_key]
+            portfolio_manager.initialize(self)
+
+        portfolio_configurations = self.config.get_portfolios()
+
+        for portfolio_configuration in portfolio_configurations:
+
+            if portfolio_configuration.get_ccxt_enabled():
+
+                if portfolio_configuration.get_sqlite():
+                    self._portfolio_managers[
+                        portfolio_configuration.get_identifier()
+                    ] = CCXTSQLitePortfolioManager(
+                        identifier=portfolio_configuration.get_identifier(),
+                        market=portfolio_configuration.get_market(),
+                        api_key=portfolio_configuration.get_api_key(),
+                        secret_key=portfolio_configuration.get_secret_key(),
+                        trading_symbol=portfolio_configuration
+                        .get_trading_symbol(),
+                        track_from=portfolio_configuration.get_track_from()
+                    )
+                else:
+                    self._portfolio_managers[
+                        portfolio_configuration.get_identifier()
+                    ] = CCXTPortfolioManager(
+                        identifier=portfolio_configuration.get_identifier(),
+                        market=portfolio_configuration.get_market(),
+                        api_key=portfolio_configuration.get_api_key(),
+                        secret_key=portfolio_configuration.get_secret_key(),
+                        trading_symbol=portfolio_configuration
+                        .get_trading_symbol(),
+                        track_from=portfolio_configuration.get_track_from()
+                    )
+
+    def initialize_order_executors(self):
+        for order_executor_key in self._order_executors:
+            order_executor = self._order_executors[order_executor_key]
+            order_executor.initialize(self)
+
+        portfolio_configurations = self.config.get_portfolios()
+
+        for portfolio_configuration in portfolio_configurations:
+
+            if portfolio_configuration.get_ccxt_enabled():
+                self._order_executors[
+                    portfolio_configuration.get_identifier()
+                ] = CCXTOrderExecutor(
+                    identifier=portfolio_configuration.get_identifier(),
+                    market=portfolio_configuration.get_market(),
+                    api_key=portfolio_configuration.get_api_key(),
+                    secret_key=portfolio_configuration.get_secret_key(),
+                    trading_symbol=portfolio_configuration.get_trading_symbol()
+                )
 
     def start(self):
+        logger.info("starting algorithm")
 
         # Initialize the algorithm context
         if not self._initialized:
@@ -123,16 +173,8 @@ class AlgorithmContext:
             if self._initializer is not None:
                 self._initializer.initialize(self)
 
-        # Initialize the portfolio managers
-        for portfolio_manager_key in self._portfolio_managers:
-            portfolio_manager = self._portfolio_managers[portfolio_manager_key]
-            portfolio_manager.initialize(self)
-
-        for order_executor_key in self._order_executors:
-            order_executor = self._order_executors[order_executor_key]
-            order_executor.initialize(self)
-
-        self._initialized = True
+            self.initialize_portfolio_managers()
+            self._initialized = True
 
         # Start the workers
         self.start_workers()
@@ -221,21 +263,12 @@ class AlgorithmContext:
 
         return strategies
 
-    @property
-    def config(self) -> Config:
-        return self._config
-
     def add_order_executor(self, order_executor):
         from investing_algorithm_framework.core.order_executors \
             import OrderExecutor
 
         if inspect.isclass(order_executor):
             order_executor = order_executor()
-
-        if order_executor in RESERVED_IDENTIFIERS:
-            raise OperationalException(
-                "Identifier of order executor is reserved"
-            )
 
         assert isinstance(order_executor, OrderExecutor), (
             'Provided object must be an instance of the OrderExecutor class'
@@ -272,14 +305,6 @@ class AlgorithmContext:
 
         if identifier not in self._order_executors:
 
-            if identifier in RESERVED_IDENTIFIERS:
-                order_executor = DefaultOrderExecutorFactory\
-                    .of_market(identifier)
-                order_executor.initialize(self)
-                self._order_executors[order_executor.identifier] = \
-                    order_executor
-                return order_executor
-
             if throw_exception:
                 raise OperationalException(
                     f"No corresponding order executor found for "
@@ -297,19 +322,16 @@ class AlgorithmContext:
         if inspect.isclass(data_provider):
             data_provider = data_provider()
 
-        if data_provider.identifier in RESERVED_IDENTIFIERS:
-            raise OperationalException(
-                "Identifier of data provider is reserved"
-            )
-
         assert isinstance(data_provider, DataProvider), (
             'Provided object must be an instance of the DataProvider class'
         )
 
-        if data_provider.identifier in self._data_providers:
-            raise OperationalException("DataProvider id already exists")
+        if data_provider.market in self._data_providers:
+            raise OperationalException(
+                "DataProvider for this market already exists"
+            )
 
-        self._data_providers[data_provider.identifier] = data_provider
+        self._data_providers[data_provider.market] = data_provider
 
     @property
     def data_providers(self) -> List:
@@ -321,10 +343,10 @@ class AlgorithmContext:
         return data_providers
 
     def get_data_provider(
-            self, identifier=None, throw_exception: bool = True
+        self, market=None, throw_exception: bool = True
     ) -> DataProvider:
 
-        if identifier is None:
+        if market is None:
 
             if len(self._data_providers.keys()) == 0:
                 raise OperationalException(
@@ -335,25 +357,12 @@ class AlgorithmContext:
                 list(self._data_providers.keys())[0]
             ]
 
-        if identifier not in self._data_providers:
+        if market in self._data_providers:
+            return self._data_providers[market]
 
-            if identifier in RESERVED_IDENTIFIERS:
-                data_provider = DefaultDataProviderFactory\
-                    .of_identifier(identifier)
-
-                if data_provider is not None:
-                    self._data_providers[identifier.upper()] = data_provider
-                    return data_provider
-
-            if throw_exception:
-                raise OperationalException(
-                    f"No corresponding data provider found for "
-                    f"identifier {identifier}"
-                )
-
-            return None
-
-        return self._data_providers[identifier]
+        if market not in self._data_providers:
+            data_provider = CCXTDataProvider(market)
+            return data_provider
 
     def add_initializer(self, initializer):
         from investing_algorithm_framework.core.context \
@@ -402,7 +411,7 @@ class AlgorithmContext:
 
     def get_portfolio_manager(
         self, identifier: str = None, throw_exception: bool = True
-    ):
+    ) -> PortfolioManager:
 
         if identifier is None:
 
@@ -414,28 +423,17 @@ class AlgorithmContext:
             return self._portfolio_managers[
                 list(self._portfolio_managers.keys())[0]
             ]
+        else:
+            if identifier not in self._portfolio_managers:
 
-        if identifier not in self._portfolio_managers:
+                if throw_exception:
+                    raise OperationalException(
+                        f"Algorithm has no portfolio managers for {identifier}"
+                    )
 
-            if identifier in RESERVED_IDENTIFIERS:
-                portfolio_manager = DefaultPortfolioManagerFactory\
-                    .of_market(identifier)
+                return None
 
-                portfolio_manager.initialize(self)
-                self._portfolio_managers[portfolio_manager.identifier] \
-                    = portfolio_manager
-
-                return portfolio_manager
-
-            if throw_exception:
-                raise OperationalException(
-                    f"No corresponding portfolio manager found for "
-                    f"identifier {identifier}"
-                )
-
-            return None
-
-        return self._portfolio_managers[identifier]
+            return self._portfolio_managers[identifier]
 
     def add_market_service(self, market_service):
         from investing_algorithm_framework.core.market_services \
@@ -463,31 +461,26 @@ class AlgorithmContext:
         return market_services
 
     def get_market_service(
-            self, market: str, throw_exception: bool = True
-    ):
-        if market not in self._market_services:
+        self, market: str, api_key=None, secret_key=None, throw_exception=True
+    ) -> MarketService:
 
-            if market in RESERVED_IDENTIFIERS:
-                market_service = DefaultMarketServiceFactory\
-                    .of_market(market)
+        if market in self._market_services:
+            market_service = self._market_services[market]
+        else:
+            market_service = CCXTMarketService(market)
+            market_service.initialize(api_key=api_key, secret_key=secret_key)
+            return market_service
 
-                if market_service is not None:
-                    market_service.initialize(self.config)
-                    self._market_services[market.upper()] = market_service
-                    return market_service
+        if throw_exception:
+            raise OperationalException(
+                f"No corresponding market service found for "
+                f"market {market}"
+            )
 
-            if throw_exception:
-                raise OperationalException(
-                    f"No corresponding market service found for "
-                    f"market {market}"
-                )
-
-            return None
-
-        return self._market_services[market]
+        return market_service
 
     def set_algorithm_context_initializer(
-            self, algorithm_context_initializer
+        self, algorithm_context_initializer
     ) -> None:
 
         # Check if initializer is an instance of AlgorithmContextInitializer
@@ -501,125 +494,138 @@ class AlgorithmContext:
         )
         self._initializer = algorithm_context_initializer
 
-    def deposit(self, amount, identifier: str = None):
-        portfolio = self.get_portfolio_manager(identifier).get_portfolio()
-        portfolio.deposit(amount)
-
-    def withdraw(self, amount, identifier: str = None):
-        portfolio = self.get_portfolio_manager(identifier).get_portfolio()
-        portfolio.withdraw(amount)
-
     def add_order(self, order, identifier: str = None):
         portfolio_manager = self.get_portfolio_manager(identifier)
-        portfolio_manager.add_order(order)
+        portfolio_manager.add_order(order, algorithm_context=self)
 
-    def create_limit_buy_order(
-            self,
-            symbol: str,
-            price: float,
-            amount: float,
-            execute=False,
-            identifier: str = None,
-            validate_pair=True
+    def add_orders(self, orders, identifier: str = None):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        portfolio_manager.add_orders(orders, algorithm_context=self)
+
+    def add_position(self, position, identifier: str = None):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        portfolio_manager.add_position(position, algorithm_context=self)
+
+    def add_positions(self, positions, identifier: str = None):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        portfolio_manager.add_positions(positions, algorithm_context=self)
+
+    def create_order(
+        self,
+        target_symbol,
+        price,
+        type,
+        side,
+        amount_target_symbol=None,
+        amount_trading_symbol=None,
+        execute=False,
+        identifier: str = None,
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
-            symbol=symbol,
+            target_symbol=target_symbol,
             price=price,
-            amount_target_symbol=amount,
-            order_type=OrderType.LIMIT.value,
-            validate_pair=validate_pair
+            amount_target_symbol=amount_target_symbol,
+            amount_trading_symbol=amount_trading_symbol,
+            type=type,
+            side=side
         )
 
         if execute:
-            portfolio_manager.add_order(order)
-            self.execute_limit_buy_order(identifier, order)
-            order.set_pending()
-            db.session.commit()
+            order = self.execute_order(identifier, order)
+            portfolio_manager.add_order(order, algorithm_context=self)
+
+        return order
+
+    def create_limit_buy_order(
+        self,
+        target_symbol: str,
+        price: float,
+        amount_trading_symbol: float = None,
+        amount_target_symbol: float = None,
+        execute=False,
+        identifier: str = None,
+    ):
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        order = portfolio_manager.create_order(
+            target_symbol=target_symbol,
+            price=price,
+            amount_target_symbol=amount_target_symbol,
+            amount_trading_symbol=amount_trading_symbol,
+            type=OrderType.LIMIT.value,
+        )
+
+        if execute:
+            order = self.execute_order(identifier, order)
+            portfolio_manager.add_order(order, algorithm_context=self)
 
         return order
 
     def create_limit_sell_order(
-            self,
-            symbol,
-            price,
-            amount,
-            execute=False,
-            identifier: str = None,
-            validate_pair=True
+        self,
+        price,
+        target_symbol: str,
+        amount_trading_symbol: float = None,
+        amount_target_symbol: float = None,
+        execute=False,
+        identifier: str = None,
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
-            symbol=symbol,
+            target_symbol=target_symbol,
             price=price,
-            amount_target_symbol=amount,
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.SELL.value,
-            validate_pair=validate_pair
+            amount_target_symbol=amount_target_symbol,
+            amount_trading_symbol=amount_trading_symbol,
+            type=OrderType.LIMIT.value,
+            side=OrderSide.SELL.value,
         )
 
         if execute:
-            # Execute order and set to pending state
-            portfolio_manager.add_order(order)
-            self.execute_limit_sell_order(identifier, order)
-            order.set_pending()
+            order = self.execute_order(identifier, order)
+            portfolio_manager.add_order(order, algorithm_context=self)
 
         return order
 
     def create_market_sell_order(
         self,
-        symbol,
+        target_symbol,
         amount_target_symbol,
         execute=False,
         identifier: str = None,
-        validate_pair=True
     ):
         portfolio_manager = self.get_portfolio_manager(identifier)
         order = portfolio_manager.create_order(
-            symbol=symbol,
+            target_symbol=target_symbol,
             amount_target_symbol=amount_target_symbol,
-            order_type=OrderType.MARKET.value,
-            order_side=OrderSide.SELL.value,
-            validate_pair=validate_pair
+            type=OrderType.MARKET.value,
+            side=OrderSide.SELL.value,
         )
 
         if execute:
-            portfolio_manager.add_order(order)
-            self.execute_market_sell_order(identifier, order)
-            order.set_pending()
+            order = self.execute_order(identifier, order)
+            portfolio_manager.add_order(order, algorithm_context=self)
 
         return order
 
-    def execute_limit_sell_order(self, identifier, order):
+    def execute_order(self, identifier, order):
         order_executor = self.get_order_executor(identifier)
-        order_executor.execute_limit_order(order, self)
-
-    def execute_limit_buy_order(self, identifier, order):
-        order_executor = self.get_order_executor(identifier)
-        order_executor.execute_limit_order(order, self)
-
-    def execute_market_sell_order(self, identifier, order):
-        order_executor = self.get_order_executor(identifier)
-        order_executor.execute_market_order(order, self)
-
-    def execute_market_buy_order(self, identifier, order):
-        order_executor = self.get_order_executor(identifier)
-        order_executor.execute_market_order(order, self)
+        return order_executor.execute_order(order, self)
 
     def check_order_status(self, identifier=None, symbol: str = None):
         portfolio_manager = self.get_portfolio_manager(identifier)
-        orders = portfolio_manager\
-            .get_orders(symbol, status=OrderStatus.PENDING)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
+        orders = portfolio.get_orders(
+            target_symbol=symbol, status=OrderStatus.PENDING
+        )
         order_executor = self.get_order_executor(identifier)
 
         for order in orders:
-            status = order_executor.get_order_status(order, self)
-            order.update(db, {"status": status}, True)
+            order = order_executor.check_order_status(order, self)
+            portfolio_manager.add_order(algorithm_context=self, order=order)
 
     def check_pending_orders(self, identifier=None, symbol: str = None):
 
         if identifier is not None:
-
             portfolio_manager = self.get_portfolio_manager(identifier)
 
             order_executor = \
@@ -629,14 +635,9 @@ class AlgorithmContext:
                 .get_orders(symbol, status=OrderStatus.PENDING.value)
 
             for pending_order in pending_orders:
-                status = order_executor.get_order_status(
-                    pending_order, self
-                )
-
-                if OrderStatus.SUCCESS.equals(status):
-                    pending_order.set_executed()
-                else:
-                    pending_order.update(db, {status: status.value})
+                order = order_executor.check_order_status(pending_order, self)
+                portfolio_manager\
+                    .add_order(algorithm_context=self, order=order)
         else:
 
             for portfolio_manager_key in self._portfolio_managers:
@@ -653,25 +654,25 @@ class AlgorithmContext:
                 )
 
                 for pending_order in pending_orders:
-                    status = order_executor.get_order_status(
+                    status = order_executor.check_order_status(
                         pending_order, self
                     )
 
-                    if OrderStatus.SUCCESS.equals(status):
+                    if OrderStatus.CLOSED.equals(status):
                         pending_order.set_executed()
                     else:
                         pending_order.update(db, {status: status.value})
 
     def get_data(
         self,
-        data_provider_identifier,
+        market,
         trading_data_type=None,
         trading_data_types=None,
         target_symbol=None,
         trading_symbol=None,
         target_symbols: List = None
     ):
-        data_provider = self.get_data_provider(data_provider_identifier)
+        data_provider = self.get_data_provider(market=market)
         data = {}
 
         # Check if trading symbol is specified
@@ -824,9 +825,18 @@ class AlgorithmContext:
 
         return data
 
-    def get_unallocated_size(self, identifier):
+    def get_portfolio(self, identifier=None) -> Portfolio:
         portfolio_manager = self.get_portfolio_manager(identifier)
-        return portfolio_manager.unallocated
+
+        if portfolio_manager.requires_update(self):
+            portfolio_manager.sync_portfolio(self)
+
+        return portfolio_manager.get_portfolio(algorithm_context=self)
+
+    def get_unallocated(self, identifier=None) -> Position:
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
+        return portfolio.get_unallocated()
 
     def reset(self):
         self._workers = []
@@ -838,18 +848,43 @@ class AlgorithmContext:
         self._initializer = None
         self._initialized = False
 
+    def get_order(self, reference_id, identifier=None) -> Order:
+        portfolio_manager = self.get_portfolio_manager(identifier)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
+        return portfolio.get_order(reference_id)
+
     def get_orders(
-            self, identifier=None, symbol: str = None, status=None, lazy=False
+            self,
+            identifier=None,
+            target_symbol=None,
+            status=None,
+            type=None,
+            side=None,
+            **kwargs
     ) -> List[Order]:
         portfolio_manager = self.get_portfolio_manager(identifier)
-        return portfolio_manager.get_orders(symbol, status, lazy)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
+        return portfolio.get_orders(
+            target_symbol=target_symbol,
+            status=status,
+            type=type,
+            side=side
+        )
 
-    def get_positions(
-            self, identifier=None, symbol: str = None, lazy=False
-    ) -> List[Position]:
+    def get_positions(self, identifier=None, **kwargs) -> List[Position]:
         portfolio_manager = self.get_portfolio_manager(identifier)
-        return portfolio_manager.get_positions(symbol, lazy)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
+        return portfolio.get_positions(**kwargs)
 
-    def get_portfolio(self, identifier=None) -> Portfolio:
+    def get_position(self, symbol, identifier=None):
         portfolio_manager = self.get_portfolio_manager(identifier)
-        return portfolio_manager.get_portfolio()
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=self)
+        return portfolio.get_position(symbol)
+
+    @property
+    def config(self) -> AlgorithmContextConfiguration:
+        return self._config
+
+    @config.setter
+    def config(self, config: AlgorithmContextConfiguration):
+        self._config = config

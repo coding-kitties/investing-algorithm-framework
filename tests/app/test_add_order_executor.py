@@ -7,16 +7,14 @@ from investing_algorithm_framework.configuration.constants import \
 
 class OrderExecutorTest(OrderExecutor):
 
-    def execute_limit_order(self, order: Order, algorithm_context,
-                            **kwargs) -> bool:
+    def execute_order(
+        self, order: Order, algorithm_context, **kwargs
+    ) -> Order:
         pass
 
-    def execute_market_order(self, order: Order, algorithm_context,
-                             **kwargs) -> bool:
-        pass
-
-    def get_order_status(self, order: Order, algorithm_context,
-                         **kwargs) -> OrderStatus:
+    def check_order_status(
+        self, order: Order, algorithm_context, **kwargs
+    ) -> Order:
         pass
 
     identifier = "test"

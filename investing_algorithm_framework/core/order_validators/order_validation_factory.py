@@ -1,5 +1,5 @@
-from .order_validator import OrderValidator
 from .default_order_validator import DefaultOrderValidator
+from .order_validator import OrderValidator
 
 
 class OrderValidatorFactory:

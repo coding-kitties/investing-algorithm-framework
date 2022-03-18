@@ -14,7 +14,8 @@ class Test(TestBase, TestOrderAndPositionsObjectsMixin):
             10,
             self.TARGET_SYMBOL_A,
             self.BASE_SYMBOL_A_PRICE,
-            self.algo_app.algorithm.get_portfolio_manager()
+            self.algo_app.algorithm.get_portfolio_manager(),
+            10
         )
 
     def test(self):

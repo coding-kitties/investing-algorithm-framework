@@ -1,430 +1,376 @@
-from datetime import datetime
-from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.core.models import OrderSide, OrderType, \
-    SQLLitePortfolio
+from investing_algorithm_framework.core.models import Position, Portfolio, \
+    Order, OrderStatus, OrderType, OrderSide, db
 from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin
 
 
-class Test(TestBase, TestOrderAndPositionsObjectsMixin):
+class TestPortfolioModel(TestBase, TestOrderAndPositionsObjectsMixin):
 
     def setUp(self):
-        super(Test, self).setUp()
-        self.start_algorithm()
+        super(TestPortfolioModel, self).setUp()
+        self.algo_app.algorithm.start()
 
-    def test_creation(self):
-        self.assertEqual(1, SQLLitePortfolio.query.count())
+    def test_get_trading_symbol(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
 
-    def test_allocated(self):
-        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
-        portfolio = self.algo_app.algorithm.get_portfolio_manager()\
-            .get_portfolio()
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        self.assertIsNotNone(portfolio.get_trading_symbol())
 
-        initial_unallocated = portfolio.unallocated
+    def test_get_unallocated(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
 
-        self.assertEqual(1000, initial_unallocated)
-        self.assertEqual(0, portfolio.allocated)
-        self.assertEqual(0, portfolio.allocated_percentage)
-        self.assertEqual(100, portfolio.unallocated_percentage)
-        self.assertEqual(0, portfolio.positions.count())
-
-        order_a = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.BUY.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_A,
-            price=self.get_price(self.TARGET_SYMBOL_A, date=datetime.utcnow()).price,
-            context=None
-        )
-        portfolio.add_order(order_a)
-
-        self.assertEqual(
-            initial_unallocated - (self.BASE_SYMBOL_A_PRICE * 1),
-            portfolio.unallocated
-        )
-        self.assertEqual(0, portfolio.allocated)
-
-        order_a.set_pending()
-
-        self.assertEqual(0, portfolio.allocated)
-
-        order_a.set_executed()
-
-        self.assertEqual(
-            self.get_price(self.TARGET_SYMBOL_A, date=datetime.utcnow()).price * 1,
-            portfolio.allocated
-        )
-        self.assertNotEqual(0, portfolio.allocated_percentage)
-        self.assertNotEqual(100, portfolio.unallocated_percentage)
-        self.assertEqual(1, portfolio.positions.count())
-
-        order_b = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.BUY.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_B,
-            price=self.get_price(self.TARGET_SYMBOL_B).price,
-            context=None
-        )
-        portfolio.add_order(order_b)
-
-        self.assertEqual(
-            initial_unallocated - self.BASE_SYMBOL_A_PRICE *
-            1 - (self.get_price(self.TARGET_SYMBOL_B).price * 1),
-            portfolio.unallocated
+        self.create_buy_order(
+            amount=1,
+            target_symbol=self.TARGET_SYMBOL_A,
+            portfolio_manager=portfolio_manager,
+            reference_id=10,
+            price=10
         )
 
-        self.assertEqual(
-            self.get_price(self.TARGET_SYMBOL_A).price * 1,
-            portfolio.allocated
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+
+        self.assertIsNotNone(portfolio.get_unallocated())
+        self.assertIsNotNone(portfolio.get_unallocated())
+        self.assertTrue(
+            isinstance(portfolio.get_unallocated(), Position)
         )
 
-        order_b.set_pending()
+    def test_get_allocated(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
 
-        self.assertEqual(
-            self.get_price(self.TARGET_SYMBOL_A).price * 1,
-            portfolio.allocated
+        self.create_buy_order(
+            amount=1,
+            target_symbol=self.TARGET_SYMBOL_A,
+            portfolio_manager=portfolio_manager,
+            reference_id=10,
+            price=10
         )
 
-        order_b.set_executed()
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        positions = portfolio.get_positions()
 
-        self.assertEqual(
-            self.get_price(self.TARGET_SYMBOL_A).price *
-            1 + self.get_price(self.TARGET_SYMBOL_B).price * 1,
-            portfolio.allocated
-        )
+        for position in positions:
+            position.price = self.get_price(position.get_symbol()).price
 
-        self.assertNotEqual(0, portfolio.allocated_percentage)
-        self.assertNotEqual(100, portfolio.unallocated_percentage)
-        self.assertEqual(2, portfolio.positions.count())
+        self.assertIsNotNone(portfolio.get_allocated())
+        self.assertNotEqual(0, portfolio.get_allocated())
 
-        sell_order_a = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.SELL.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_A,
-            price=self.get_price(self.TARGET_SYMBOL_A).price,
-            context=None
-        )
+    def test_get_id(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
 
-        portfolio.add_order(sell_order_a)
-        sell_order_a.set_pending()
-        sell_order_a.set_executed()
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        self.assertIsNotNone(portfolio.get_identifier())
 
-        sell_order_b = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.SELL.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_B,
-            price=self.get_price(self.TARGET_SYMBOL_B).price,
-            context=None
-        )
-        portfolio.add_order(sell_order_b)
-        sell_order_b.set_pending()
-        sell_order_b.set_executed()
+    def test_get_total_revenue(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
 
-        self.assertEqual(0, portfolio.allocated)
-        self.assertEqual(2, portfolio.positions.count())
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        self.assertIsNotNone(portfolio.get_total_revenue())
+        self.assertEqual(0, portfolio.get_total_revenue())
 
-    def test_allocated_percentage(self):
-        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
-        portfolio = self.algo_app.algorithm.get_portfolio_manager()\
-            .get_portfolio()
-
-        initial_unallocated = portfolio.unallocated
-
-        self.assertEqual(1000, initial_unallocated)
-        self.assertEqual(0, portfolio.allocated)
-        self.assertEqual(0, portfolio.allocated_percentage)
-        self.assertEqual(100, portfolio.unallocated_percentage)
-        self.assertEqual(0, portfolio.positions.count())
-
-        order_a = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.BUY.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_A,
-            price=self.get_price(self.TARGET_SYMBOL_A).price,
-            context=None
-        )
-        portfolio.add_order(order_a)
-
-        self.assertEqual(
-            initial_unallocated - (self.BASE_SYMBOL_A_PRICE * 1),
-            portfolio.unallocated
-        )
-        self.assertEqual(0, portfolio.allocated_percentage)
-
-        order_a.set_pending()
-
-        self.assertEqual(0, portfolio.allocated_percentage)
-
-        order_a.set_executed()
-
-        self.assertEqual(
-            self.get_price(self.TARGET_SYMBOL_A).price * 1,
-            portfolio.allocated
-        )
-        self.assertNotEqual(0, portfolio.allocated_percentage)
-        self.assertNotEqual(100, portfolio.unallocated_percentage)
-        self.assertEqual(1, portfolio.positions.count())
-
-        order_b = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.BUY.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_B,
-            price=self.get_price(self.TARGET_SYMBOL_B).price,
-            context=None
-        )
-        portfolio.add_order(order_b)
-
-        self.assertEqual(
-            initial_unallocated - self.BASE_SYMBOL_A_PRICE *
-            1 - (self.get_price(self.TARGET_SYMBOL_B).price * 1),
-            portfolio.unallocated
-        )
-
-        self.assertEqual(
-            self.get_price(self.TARGET_SYMBOL_A).price * 1,
-            portfolio.allocated
-        )
-
-        order_b.set_pending()
-
-        self.assertEqual(
-            self.get_price(self.TARGET_SYMBOL_A).price * 1,
-            portfolio.allocated
-        )
-
-        order_b.set_executed()
-
-        self.assertEqual(
-            self.get_price(self.TARGET_SYMBOL_A).price *
-            1 + self.get_price(self.TARGET_SYMBOL_B).price * 1,
-            portfolio.allocated
-        )
-
-        self.assertNotEqual(0, portfolio.allocated_percentage)
-        self.assertNotEqual(100, portfolio.unallocated_percentage)
-        self.assertEqual(2, portfolio.positions.count())
-
-        sell_order_a = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.SELL.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_A,
-            price=self.get_price(self.TARGET_SYMBOL_A).price,
-            context=None
-        )
-
-        portfolio.add_order(sell_order_a)
-        sell_order_a.set_pending()
-        sell_order_a.set_executed()
-
-        sell_order_b = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.SELL.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_B,
-            price=self.get_price(self.TARGET_SYMBOL_B).price,
-            context=None
-        )
-        portfolio.add_order(sell_order_b)
-        sell_order_b.set_pending()
-        sell_order_b.set_executed()
-
-        self.assertEqual(0, portfolio.allocated_percentage)
-        self.assertEqual(2, portfolio.positions.count())
-
-    def test_limit_sell_order_creation(self):
-        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
+    def test_add_order(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
 
         order = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.SELL.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_B,
-            price=self.get_price(self.TARGET_SYMBOL_B).price,
-            context=None
+            amount_target_symbol=10,
+            target_symbol=self.TARGET_SYMBOL_A,
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+            type=OrderType.LIMIT.value
         )
 
-        self.assertIsNotNone(order)
-        self.assert_is_limit_order(order)
+        order.status = OrderStatus.PENDING
+        order.reference_id = 2
+        db.session.commit()
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
 
-    def test_limit_buy_order_creation(self):
-        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
+        self.assertEqual(0, len(portfolio.get_orders()))
+        self.assertEqual(1, len(portfolio.get_positions()))
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        portfolio.add_order(order)
+
+        self.assertEqual(1, len(portfolio.get_orders()))
+        self.assertEqual(2, len(portfolio.get_positions()))
+
+    def test_add_orders(self):
+        orders = []
+
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
 
         order = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.BUY.value,
+            target_symbol=self.TARGET_SYMBOL_A,
             amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_B,
-            price=self.get_price(self.TARGET_SYMBOL_B).price,
-            context=None
+            price=self.get_price(self.TARGET_SYMBOL_A).price,
+        )
+        order.reference_id = 1
+        db.session.commit()
+        orders.append(order)
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        portfolio.add_orders(orders)
+
+    def test_add_position(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        portfolio.add_position(
+            Position(target_symbol=self.TARGET_SYMBOL_C, amount=20)
         )
 
-        self.assertIsNotNone(order)
-        self.assert_is_limit_order(order)
+        self.assertEqual(2, len(portfolio.get_positions()))
 
-    def test_buy_order_creation_larger_then_unallocated(self):
-        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
+    def test_add_positions(self):
+        positions = [
+            Position(target_symbol=self.TARGET_SYMBOL_C, amount=20),
+            Position(target_symbol=self.TARGET_SYMBOL_D, amount=20)
+        ]
 
-        self.assertEqual(
-            float(1000),
-            float(portfolio_manager.get_portfolio().unallocated)
-        )
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
 
-        with self.assertRaises(OperationalException) as e:
-            order = portfolio_manager.create_order(
-                order_type=OrderType.LIMIT.value,
-                order_side=OrderSide.BUY.value,
-                amount_target_symbol=1000,
-                symbol=self.TARGET_SYMBOL_B,
-                price=self.get_price(self.TARGET_SYMBOL_B).price,
-                context=None
-            )
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        portfolio.add_positions(positions)
 
-            portfolio_manager.add_order(order)
+        self.assertEqual(3, len(portfolio.get_positions()))
+
+    def test_get_position(self):
+        positions = [
+            Position(symbol=self.TARGET_SYMBOL_B, amount=20),
+            Position(symbol=self.TARGET_SYMBOL_C, amount=20)
+        ]
+
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        portfolio.add_positions(positions)
+
+        self.assertEqual(3, len(portfolio.get_positions()))
+
+        position_b = portfolio.get_position(self.TARGET_SYMBOL_B)
+        position_c = portfolio.get_position(self.TARGET_SYMBOL_C)
+
+        self.assertIsNotNone(position_b)
+        self.assertIsNotNone(position_c)
+
+        self.assertEqual(self.TARGET_SYMBOL_B, position_b.get_target_symbol())
+        self.assertEqual(self.TARGET_SYMBOL_C, position_c.get_target_symbol())
 
     def test_get_positions(self):
-        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
-        portfolio = self.algo_app.algorithm.get_portfolio_manager()\
-            .get_portfolio()
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
 
-        self.assertEqual(len(portfolio_manager.get_positions()), 0)
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
 
-        order_a = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.BUY.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_A,
-            price=self.get_price(self.TARGET_SYMBOL_A).price,
-            context=None
+        self.assertIsNotNone(portfolio.get_positions())
+        self.assertEqual(1, len(portfolio.get_positions()))
+
+    def test_get_orders(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
+
+        orders = [
+            Order.from_dict(
+                {
+                    "reference_id": 2,
+                    "target_symbol": self.TARGET_SYMBOL_A,
+                    "trading_symbol": "usdt",
+                    "amount_target_symbol": 4,
+                    "price": self.get_price(self.TARGET_SYMBOL_A).price,
+                    "status": OrderStatus.PENDING.value,
+                    "side": OrderSide.BUY.value,
+                    "type": OrderType.LIMIT.value
+                }
+            ),
+            Order.from_dict(
+                {
+                    "reference_id": 3,
+                    "target_symbol": self.TARGET_SYMBOL_A,
+                    "trading_symbol": "usdt",
+                    "amount_target_symbol": 4,
+                    "price": self.get_price(self.TARGET_SYMBOL_A).price,
+                    "status": OrderStatus.CLOSED.value,
+                    "initial_price": self.get_price(
+                        self.TARGET_SYMBOL_A).price,
+                    "side": OrderSide.BUY.value,
+                    "type": OrderType.LIMIT.value
+                }
+            )
+        ]
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        portfolio.add_orders(orders)
+
+        self.assertEqual(2, len(portfolio.get_orders()))
+        self.assertEqual(
+            1, len(portfolio.get_orders(status=OrderStatus.CLOSED))
         )
-        portfolio.add_order(order_a)
-
-        order_b = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.BUY.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_B,
-            price=self.get_price(self.TARGET_SYMBOL_B).price,
-            context=None
-        )
-        portfolio.add_order(order_b)
-
-        self.assertEqual(len(portfolio_manager.get_positions()), 2)
-
-        position_a = portfolio.positions\
-            .filter_by(symbol=self.TARGET_SYMBOL_A)\
-            .first()
-        position_b = portfolio.positions\
-            .filter_by(symbol=self.TARGET_SYMBOL_B)\
-            .first()
-
-        self.assertEqual(0, position_a.amount)
-        self.assertEqual(0, position_b.amount)
-
-        # After executed
-        order_a.set_pending()
-        order_a.set_executed()
-        order_b.set_pending()
-        order_b.set_executed()
-
-        position_a = portfolio.positions\
-            .filter_by(symbol=self.TARGET_SYMBOL_A)\
-            .first()
-        position_b = portfolio.positions\
-            .filter_by(symbol=self.TARGET_SYMBOL_B)\
-            .first()
-
-        self.assertNotEqual(0, position_a.amount)
-        self.assertNotEqual(0, position_b.amount)
-
-    # def test_realized(self):
-    #     portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
-    #     portfolio = portfolio_manager.get_portfolio()
-    #
-    #     self.assertEqual(0, portfolio.realized)
-    #
-    #     order_a = portfolio_manager.create_order(
-    #         order_type=OrderType.LIMIT.value,
-    #         order_side=OrderSide.BUY.value,
-    #         amount_target_symbol=1,
-    #         symbol=self.TARGET_SYMBOL_A,
-    #         price=self.get_price(self.TARGET_SYMBOL_A).price,
-    #         validate_pair=True,
-    #         context=None
-    #     )
-    #     portfolio.add_order(order_a)
-    #
-    #     order_a.set_pending()
-    #     order_a.set_executed()
-    #
-    #     self.assertEqual(0, portfolio.realized)
-    #
-    #     self.update_price(
-    #         self.TARGET_SYMBOL_A,
-    #         1.1 * self.get_price(
-    #             self.TARGET_SYMBOL_A, date=datetime.utcnow()
-    #         ).price,
-    #         date=datetime.utcnow()
-    #     )
-    #
-    #     order_a = portfolio_manager.create_order(
-    #         order_type=OrderType.LIMIT.value,
-    #         order_side=OrderSide.SELL.value,
-    #         amount_target_symbol=1,
-    #         symbol=self.TARGET_SYMBOL_A,
-    #         price=self.get_price(self.TARGET_SYMBOL_A).price,
-    #         validate_pair=True,
-    #         context=None
-    #     )
-    #     portfolio.add_order(order_a)
-    #
-    #     order_a.set_pending()
-    #     order_a.set_executed()
-    #
-    #     self.assertNotEqual(0.0, portfolio.realized)
-
-    def test_unallocated_percentage(self):
-        portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
-        portfolio = portfolio_manager.get_portfolio()
-        initial_unallocated = portfolio.unallocated
-
-        self.assertEqual(0, portfolio.realized)
-
-        order_a = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.BUY.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_A,
-            price=self.get_price(self.TARGET_SYMBOL_A).price,
-            context=None
+        self.assertEqual(
+            1, len(portfolio.get_orders(status=OrderStatus.PENDING))
         )
 
-        self.assertEqual(initial_unallocated, portfolio.unallocated)
-
-        portfolio.add_order(order_a)
-
-        self.assertNotEqual(initial_unallocated, portfolio.unallocated)
-
-        order_a.set_pending()
-        order_a.set_executed()
-
-        self.assertNotEqual(initial_unallocated, portfolio.unallocated)
-
-        sell_order_a = portfolio_manager.create_order(
-            order_type=OrderType.LIMIT.value,
-            order_side=OrderSide.SELL.value,
-            amount_target_symbol=1,
-            symbol=self.TARGET_SYMBOL_A,
-            price=self.get_price(self.TARGET_SYMBOL_A).price,
-            context=None
+        self.assertEqual(
+            0, len(portfolio.get_orders(status=OrderStatus.TO_BE_SENT))
         )
-        portfolio.add_order(sell_order_a)
+        self.assertEqual(
+            0, len(portfolio.get_orders(side=OrderSide.SELL))
+        )
+        self.assertEqual(
+            0, len(portfolio.get_orders(type=OrderType.MARKET))
+        )
+        self.assertEqual(
+            1, len(portfolio.get_orders(
+                status=OrderStatus.PENDING,
+                type=OrderType.LIMIT,
+                side=OrderSide.BUY
+            ))
+        )
+        self.assertEqual(
+            1, len(portfolio.get_orders(
+                status=OrderStatus.CLOSED,
+                type=OrderType.LIMIT,
+                side=OrderSide.BUY
+            ))
+        )
 
-        sell_order_a.set_pending()
-        sell_order_a.set_executed()
+    def test_from_dict(self):
+        portfolio = Portfolio.from_dict(
+            {
+                "identifier": "BINANCE",
+                "trading_symbol": "USDT",
+                "market": "BINANCE",
+                "positions": [
+                    {"symbol": "USDT", "amount": 10000},
+                    {"symbol": "DOT", "amount": 40},
+                    {"symbol": "BTC", "amount": 0.04},
+                ]
+            }
+        )
+        self.assertIsNotNone(portfolio.get_identifier())
+        self.assertIsNotNone(portfolio.get_trading_symbol())
+        self.assertIsNotNone(portfolio.get_unallocated())
+        self.assertIsNotNone(portfolio.get_positions())
+        self.assertEqual(3, len(portfolio.get_positions()))
+        self.assertEqual(0, len(portfolio.get_orders()))
 
-        self.assertEqual(initial_unallocated, portfolio.unallocated)
+    def test_from_dict_with_orders(self):
+        portfolio = Portfolio(
+            orders=[
+                Order(
+                    reference_id=2,
+                    trading_symbol="USDT",
+                    target_symbol=self.TARGET_SYMBOL_A,
+                    status=OrderStatus.PENDING,
+                    price=10,
+                    amount_target_symbol=10,
+                    side=OrderSide.BUY,
+                    type=OrderType.LIMIT
+                )
+            ],
+            identifier="BINANCE",
+            trading_symbol="USDT",
+            positions=[
+                Position(amount=10, symbol=self.TARGET_SYMBOL_A, price=10),
+                Position(amount=10, symbol="USDT")
+            ],
+        )
+        self.assertIsNotNone(portfolio.get_identifier())
+        self.assertIsNotNone(portfolio.get_trading_symbol())
+        self.assertIsNotNone(portfolio.get_unallocated())
+        self.assertIsNotNone(portfolio.get_positions())
+        self.assertEqual(2, len(portfolio.get_positions()))
+        self.assertEqual(1, len(portfolio.get_orders()))
+
+    def test_to_dict(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+        data = portfolio.to_dict()
+        self.assertIsNotNone(data)
+
+    def test_update_positions(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+
+        positions = [
+            Position(symbol=self.TARGET_SYMBOL_A, amount=4),
+            Position(symbol=self.TARGET_SYMBOL_B, amount=20),
+            Position(symbol=self.TARGET_SYMBOL_C, amount=20)
+        ]
+
+        self.assertEqual(1, len(portfolio.get_positions()))
+        portfolio.add_positions(positions)
+        self.assertEqual(4, len(portfolio.get_positions()))
+
+        for position in portfolio.get_positions():
+            self.assertTrue(isinstance(position, Position))
+
+        position_a = portfolio.get_position(self.TARGET_SYMBOL_A)
+        position_b = portfolio.get_position(self.TARGET_SYMBOL_B)
+        position_c = portfolio.get_position(self.TARGET_SYMBOL_C)
+
+        self.assertEqual(4, position_a.get_amount())
+        self.assertEqual(20, position_b.get_amount())
+        self.assertEqual(20, position_c.get_amount())
+
+    def test_update_orders(self):
+        portfolio_manager = self.algo_app.algorithm \
+            .get_portfolio_manager("default")
+
+        portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
+
+        orders = [
+            Order.from_dict(
+                {
+                    "reference_id": 1,
+                    "target_symbol": self.TARGET_SYMBOL_A,
+                    "trading_symbol": "usdt",
+                    "amount_target_symbol": 4,
+                    "price": self.get_price(self.TARGET_SYMBOL_A).price,
+                    "initial_price": self.get_price(self.TARGET_SYMBOL_A).price,
+                    "status": OrderStatus.CLOSED.value,
+                    "side": OrderSide.BUY.value,
+                    "type": OrderType.LIMIT.value
+                }
+            ),
+            Order.from_dict(
+                {
+                    "reference_id": 2,
+                    "target_symbol": self.TARGET_SYMBOL_A,
+                    "trading_symbol": "usdt",
+                    "amount_target_symbol": 4,
+                    "price": self.get_price(self.TARGET_SYMBOL_A).price,
+                    "status": OrderStatus.PENDING.value,
+                    "side": OrderSide.BUY.value,
+                    "type": OrderType.LIMIT.value
+                }
+            ),
+            Order.from_dict(
+                {
+                    "reference_id": 3,
+                    "target_symbol": self.TARGET_SYMBOL_A,
+                    "trading_symbol": "usdt",
+                    "amount_target_symbol": 4,
+                    "price": self.get_price(self.TARGET_SYMBOL_A).price,
+                    "status": OrderStatus.CLOSED.value,
+                    "initial_price": self.get_price(self.TARGET_SYMBOL_A).price,
+                    "side": OrderSide.BUY.value,
+                    "type": OrderType.LIMIT.value
+                }
+            )
+        ]
+
+        portfolio.add_orders(orders)
+        order_one = portfolio.get_order(2)
+        self.assertTrue(OrderStatus.PENDING.equals(order_one.get_status()))
+        self.assertEqual(3, len(portfolio.get_orders()))

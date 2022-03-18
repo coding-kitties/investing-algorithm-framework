@@ -1,7 +1,7 @@
 from abc import abstractmethod, ABC
 
-from investing_algorithm_framework.core.models import Order, OrderStatus
 from investing_algorithm_framework.core.identifier import Identifier
+from investing_algorithm_framework.core.models import Order
 
 
 class OrderExecutor(ABC, Identifier):
@@ -10,19 +10,13 @@ class OrderExecutor(ABC, Identifier):
         pass
 
     @abstractmethod
-    def execute_limit_order(
+    def execute_order(
         self, order: Order, algorithm_context, **kwargs
-    ) -> bool:
+    ) -> Order:
         raise NotImplementedError()
 
     @abstractmethod
-    def execute_market_order(
+    def check_order_status(
         self, order: Order, algorithm_context, **kwargs
-    ) -> bool:
-        raise NotImplementedError()
-
-    @abstractmethod
-    def get_order_status(
-        self, order: Order, algorithm_context, **kwargs
-    ) -> OrderStatus:
+    ) -> Order:
         raise NotImplementedError()

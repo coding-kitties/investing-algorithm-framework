@@ -14,7 +14,7 @@ class OrderSide(Enum):
                 if value.upper() == order_type.value:
                     return order_type
 
-        raise ValueError("Could not convert value to OrderSide")
+        raise ValueError(f"Could not convert value {value} to OrderSide")
 
     @staticmethod
     def from_value(value):
