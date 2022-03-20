@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from random import randint
 from typing import List
 
@@ -14,7 +14,7 @@ from investing_algorithm_framework.configuration.constants import \
     DATABASE_CONFIG, DATABASE_NAME, RESOURCES_DIRECTORY
 from investing_algorithm_framework.configuration.settings import TestConfig
 from investing_algorithm_framework.core.models import db, OrderStatus, \
-    TimeInterval, SQLLiteAssetPrice
+    SQLLiteAssetPrice
 from investing_algorithm_framework.core.portfolio_managers \
     import SQLLitePortfolioManager
 
@@ -208,7 +208,7 @@ class MarketServiceTest(MarketService):
 
         return asset_prices
 
-    def get_order_book(self, target_symbol: str, trading_symbol: str):
+    def get_order_book(self, symbol):
         pass
 
     def get_balance(self, symbol: str = None):
@@ -248,6 +248,12 @@ class MarketServiceTest(MarketService):
         pass
 
     def cancel_order(self, order_id):
+        pass
+
+    def get_ohclv(self, symbol, time_unit, since):
+        pass
+
+    def get_ohclvs(self, symbols, time_unit, since):
         pass
 
 

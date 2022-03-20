@@ -13,7 +13,7 @@ class StrategyTestOne(Strategy):
             .__init__(time_unit=TimeUnit.SECONDS, interval=1)
         StrategyTestOne.has_run = False
 
-    def run_strategy(self, algorithm_context, **kwargs):
+    def run_strategy(self, context, **kwargs):
         StrategyTestOne.has_run = True
 
 
@@ -31,7 +31,7 @@ class StrategyTestTwo(Strategy):
         )
         StrategyTestTwo.has_run = False
 
-    def run_strategy(self, algorithm_context, **kwargs):
+    def run_strategy(self, context, **kwargs):
         StrategyTestTwo.has_run = True
 
 
@@ -52,7 +52,7 @@ class StrategyTestThree(Strategy):
         StrategyTestThree.has_run = False
         StrategyTestThree.has_ticker = False
 
-    def run_strategy(self, algorithm_context, ticker, **kwargs):
+    def run_strategy(self, context, ticker, **kwargs):
         StrategyTestThree.has_run = True
 
         if ticker is not None:
@@ -78,7 +78,7 @@ class StrategyTestFour(Strategy):
         StrategyTestFour.has_run = False
         StrategyTestFour.has_tickers = False
 
-    def run_strategy(self, algorithm_context, tickers, **kwargs):
+    def run_strategy(self, context, tickers, **kwargs):
         StrategyTestFour.has_run = True
 
         if tickers is not None:
@@ -102,7 +102,7 @@ class StrategyTestFive(Strategy):
         StrategyTestFive.has_run = False
         StrategyTestFive.has_order_book = False
 
-    def run_strategy(self, algorithm_context, order_book, **kwargs):
+    def run_strategy(self, context, order_book, **kwargs):
         StrategyTestFive.has_run = True
 
         if order_book is not None:
@@ -126,7 +126,7 @@ class StrategyTestSix(Strategy):
         StrategyTestSix.has_run = False
         StrategyTestSix.has_order_book = False
 
-    def run_strategy(self, algorithm_context, order_books, **kwargs):
+    def run_strategy(self, context, order_books, **kwargs):
         StrategyTestSix.has_run = True
 
         if order_books is not None:
@@ -152,7 +152,7 @@ class StrategyTestSeven(Strategy):
         StrategyTestSeven.has_order_books = False
         StrategyTestSeven.has_tickers = False
 
-    def run_strategy(self, algorithm_context, order_books, tickers, **kwargs):
+    def run_strategy(self, context, order_books, tickers, **kwargs):
         StrategyTestSeven.has_run = True
 
         if order_books is not None:
@@ -183,7 +183,7 @@ class StrategyTestEight(Strategy):
         StrategyTestEight.has_order_book = False
         StrategyTestEight.has_ticker = False
 
-    def run_strategy(self, algorithm_context, **kwargs):
+    def run_strategy(self, context, **kwargs):
         StrategyTestEight.has_run = True
 
         if "order_book" in kwargs:

@@ -10,7 +10,7 @@ from investing_algorithm_framework.core.models import OrderSide, Order, \
     Position, TimeUnit, db, Portfolio, OrderType, OrderStatus, \
     SQLLitePortfolio, SQLLiteOrder, SQLLitePosition
 from investing_algorithm_framework.core.models.data_provider import \
-    TradingDataTypes, OrderBook, Ticker
+    TradingDataTypes, OrderBook, Ticker, TradingTimeUnit, OHLCV
 from investing_algorithm_framework.core.order_executors import OrderExecutor
 from investing_algorithm_framework.core.portfolio_managers import \
     PortfolioManager, SQLLitePortfolioManager
@@ -47,5 +47,7 @@ __all__ = [
     "SQLLiteOrder",
     "SQLLitePosition",
     "ApiException",
-    "SQLLitePortfolioManager"
+    "SQLLitePortfolioManager",
+    "TradingTimeUnit",
+    "OHLCV"
 ]
