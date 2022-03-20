@@ -1,12 +1,12 @@
 import logging
 from datetime import datetime
-
+from time import sleep
 import ccxt
 
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.market_services.market_service \
     import MarketService
-from investing_algorithm_framework.core.models import AssetPrice
+from investing_algorithm_framework.core.models import AssetPrice, OHLCV
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +18,8 @@ class CCXTMarketService(MarketService):
     api_key = None,
     secret_key = None
     exchange_class = None
+    msec = 1000
+    minute = 60 * msec
 
     def __init__(
         self, market, config=None, api_key: str = None, secret_key: str = None
@@ -37,6 +39,12 @@ class CCXTMarketService(MarketService):
     def initialize(self, api_key=None, secret_key=None):
         self.api_key = api_key
         self.secret_key = secret_key
+
+        if not hasattr(ccxt, self.market):
+            raise OperationalException(
+                f"No market service found for market id {self.market}"
+            )
+
         self.exchange_class = getattr(ccxt, self.market)
 
         if self.exchange_class is None:
@@ -98,7 +106,7 @@ class CCXTMarketService(MarketService):
                 "Could not retrieve selection of tickers"
             )
 
-    def get_order_book(self, target_symbol: str, trading_symbol: str):
+    def get_order_book(self, symbol):
 
         if not self.exchange.has['fetchOrderBook']:
             raise OperationalException(
@@ -107,7 +115,6 @@ class CCXTMarketService(MarketService):
             )
 
         try:
-            symbol = f"{target_symbol.upper()}/{trading_symbol.upper()}"
             return self.exchange.fetchOrderBook(symbol)
         except Exception as e:
             logger.exception(e)
@@ -305,3 +312,62 @@ class CCXTMarketService(MarketService):
         except Exception as e:
             logger.exception(e)
             raise OperationalException("Could not retrieve prices")
+
+    def get_ohclv(self, symbol, time_unit, since):
+
+        if not self.exchange.has['fetchOHLCV']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality get_ohclvs"
+            )
+
+        from_timestamp = self.exchange.parse8601(
+            since.strftime(":%Y-%m-%d %H:%M:%S")
+        )
+
+        now = self.exchange.milliseconds()
+        data = []
+
+        while from_timestamp < now:
+            ohlcv = self.exchange.fetch_ohlcv(
+                symbol, time_unit, from_timestamp
+            )
+
+            sleep(self.exchange.rateLimit / 1000)
+            from_timestamp = \
+                ohlcv[-1][0] + self.exchange.parse_timeframe(time_unit) * 1000
+            data += ohlcv
+
+        return OHLCV.from_dict({"symbol": symbol, "data": data})
+
+    def get_ohclvs(self, symbols, time_unit, since):
+
+        if not self.exchange.has['fetchOHLCV']:
+            raise OperationalException(
+                f"Market service {self.market} does not support "
+                f"functionality get_ohclvs"
+            )
+
+        from_timestamp = self.exchange.parse8601(
+            since.strftime(":%Y-%m-%d %H:%M:%S")
+        )
+
+        now = self.exchange.milliseconds()
+        ohlcvs = []
+
+        for symbol in symbols:
+            data = []
+
+            while from_timestamp < now:
+                ohlcv = self.exchange.fetch_ohlcv(
+                    symbol, time_unit, from_timestamp
+                )
+                sleep(self.exchange.rateLimit / 1000)
+                from_timestamp = \
+                    ohlcv[-1][0] + \
+                    self.exchange.parse_timeframe(time_unit) * 1000
+                data += ohlcv
+
+            ohlcvs.append(OHLCV.from_dict({"symbol": symbol, "data": data}))
+
+        return ohlcvs

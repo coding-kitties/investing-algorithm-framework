@@ -1,6 +1,7 @@
+from typing import List
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models.data_provider import \
-    OrderBook, Ticker
+    OrderBook, Ticker, TradingTimeUnit, OHLCV
 
 
 class DataProvider:
@@ -33,5 +34,34 @@ class DataProvider:
         raise OperationalException(
             f"Data provider {self.__class__.__name__} does not support "
             f"trading data type order book, please specify a supported "
+            f"trading data type."
+        )
+
+    def provide_ohlcv(
+            self,
+            target_symbol,
+            trading_symbol,
+            trading_time_unit: TradingTimeUnit,
+            limit,
+            algorithm_context,
+            **kwargs
+    ):
+        raise OperationalException(
+            f"Data provider {self.__class__.__name__} does not support "
+            f"trading data type ohlcv, please specify a supported "
+            f"trading data type."
+        )
+
+    def provide_ohlcvs(
+        self,
+        target_symbols,
+        trading_symbol,
+        trading_time_unit: TradingTimeUnit,
+        limit,
+        algorithm_context
+    ) -> List[OHLCV]:
+        raise OperationalException(
+            f"Data provider {self.__class__.__name__} does not support "
+            f"trading data type ohlcv, please specify a supported "
             f"trading data type."
         )

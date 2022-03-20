@@ -73,36 +73,42 @@ class AlgorithmContext:
         trading_data_types=None,
         target_symbol=None,
         target_symbols=None,
-        trading_symbol=None
+        trading_symbol=None,
+        trading_time_unit=None,
+        limit=None
     ):
 
         if function:
             return Strategy(
-                function,
-                worker_id,
-                time_unit,
-                interval,
-                market,
-                trading_data_type,
-                trading_data_types,
-                target_symbol,
-                target_symbols,
-                trading_symbol
+                decorated=function,
+                worker_id=worker_id,
+                time_unit=time_unit,
+                interval=interval,
+                market=market,
+                trading_data_type=trading_data_type,
+                trading_data_types=trading_data_types,
+                target_symbol=target_symbol,
+                target_symbols=target_symbols,
+                trading_symbol=trading_symbol,
+                trading_time_unit=trading_time_unit,
+                limit=limit
             )
         else:
             def wrapper(f):
                 return Strategy(
-                    f,
-                    worker_id,
-                    time_unit,
-                    interval,
-                    market,
-                    trading_data_type,
-                    trading_data_types,
-                    target_symbol,
-                    target_symbols,
-                    trading_symbol
-                )
+                    decorated=f,
+                    worker_id=worker_id,
+                    time_unit=time_unit,
+                    interval=interval,
+                    market=market,
+                    trading_data_type=trading_data_type,
+                    trading_data_types=trading_data_types,
+                    target_symbol=target_symbol,
+                    target_symbols=target_symbols,
+                    trading_symbol=trading_symbol,
+                    trading_time_unit=trading_time_unit,
+                    limit=limit
+            )
 
             return wrapper
 
@@ -670,7 +676,9 @@ class AlgorithmContext:
         trading_data_types=None,
         target_symbol=None,
         trading_symbol=None,
-        target_symbols: List = None
+        target_symbols: List = None,
+        trading_time_unit=None,
+        limit=None
     ):
         data_provider = self.get_data_provider(market=market)
         data = {}
@@ -739,6 +747,30 @@ class AlgorithmContext:
                         trading_symbol=trading_symbol,
                         algorithm_context=self
                     )
+            elif TradingDataTypes.OHLCV.equals(trading_data_type):
+
+                if target_symbols is not None:
+                    ohlcvs = []
+
+                    for target_symbol in target_symbols:
+                        ohlcvs.append(
+                            data_provider.provide_ohlcv(
+                                target_symbol=target_symbol,
+                                trading_symbol=trading_symbol,
+                                limit=limit,
+                                trading_time_unit=trading_time_unit,
+                                algorithm_context=self
+                            )
+                        )
+                    data["ohlcvs"] = ohlcvs
+                else:
+                    data["ohlcv"] = data_provider.provide_ohlcv(
+                        target_symbol=target_symbol,
+                        trading_symbol=trading_symbol,
+                        limit=limit,
+                        trading_time_unit=trading_time_unit,
+                        algorithm_context=self
+                    )
             elif TradingDataTypes.RAW.equals(trading_data_type):
                 data["raw_data"] = data_provider.provide_raw_data(
                     target_symbol=target_symbol,
@@ -792,6 +824,18 @@ class AlgorithmContext:
                     trading_symbol=trading_symbol,
                     algorithm_context=self
                 )
+
+            if [trading_data_type for trading_data_type in trading_data_types
+                    if TradingDataTypes.RAW.equals(trading_data_type)]:
+
+                if target_symbols is not None:
+                    data["ohlcvs"] = data_provider.provide_ohlcvs(
+                        target_symbols=target_symbols,
+                        trading_symbol=trading_symbol,
+                        limit=limit,
+                        trading_time_unit=trading_time_unit,
+                        algorithm_context=self
+                    )
 
             if [trading_data_type for trading_data_type in trading_data_types
                     if TradingDataTypes.RAW.equals(trading_data_type)]:
