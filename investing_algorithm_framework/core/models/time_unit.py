@@ -2,7 +2,7 @@ from enum import Enum
 
 
 class TimeUnit(Enum):
-    SECONDS = "SECONDS"
+    SECOND = "SECOND"
     MINUTE = "MINUTE"
     HOUR = "HOUR"
 

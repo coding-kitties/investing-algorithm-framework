@@ -13,7 +13,7 @@ class TestAlgorithmStop(TestBase):
     def setUp(self):
         super(TestAlgorithmStop, self).setUp()
         self.algo_app.algorithm.schedule(
-            test_func, time_unit=TimeUnit.SECONDS, interval=1
+            test_func, time_unit=TimeUnit.SECOND, interval=1
         )
         TestAlgorithmStop.test_func_has_run = False
         self.start_algorithm()
