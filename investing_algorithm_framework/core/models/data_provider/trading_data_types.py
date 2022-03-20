@@ -5,6 +5,7 @@ class TradingDataTypes(Enum):
     TICKER = 'TICKER'
     ORDER_BOOK = 'ORDER_BOOK'
     RAW = "RAW"
+    OHLCV = "OHLCV"
 
     @staticmethod
     def from_value(value):

@@ -32,7 +32,7 @@ from investing_algorithm_framework.core.models.snapshots import AssetPrice, \
 #     PositionSnapshot, PortfolioSnapshot, SQLLitePortfolioSnapshot, \
 #     SQLLiteAssetPrice, SQLLitePositionSnapshot, SQLLiteAssetPriceHistory, \
 from investing_algorithm_framework.core.models.data_provider \
-    import TradingDataTypes
+    import TradingDataTypes, Ticker, OHLCV, OrderBook, TradingTimeUnit
 
 __all__ = [
     "db",
@@ -59,5 +59,9 @@ __all__ = [
     "AssetPriceHistory",
     "SQLLiteAssetPrice",
     "SQLLiteAssetPriceHistory",
-    "TradingDataTypes"
+    "TradingDataTypes",
+    "Ticker",
+    "OHLCV",
+    "OrderBook",
+    "TradingTimeUnit"
 ]

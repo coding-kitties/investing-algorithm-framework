@@ -20,7 +20,7 @@ class MarketService(ABC):
         pass
 
     @abstractmethod
-    def get_order_book(self, target_symbol: str, trading_symbol: str):
+    def get_order_book(self, symbol):
         pass
 
     @abstractmethod
@@ -72,4 +72,12 @@ class MarketService(ABC):
 
     @abstractmethod
     def cancel_order(self, order_id):
+        pass
+
+    @abstractmethod
+    def get_ohclv(self, symbol, time_unit, since):
+        pass
+
+    @abstractmethod
+    def get_ohclvs(self, symbols, time_unit, since):
         pass
