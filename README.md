@@ -36,9 +36,14 @@ dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
 app = App(
     resources_directory=dir_path,
     config={
-        BINANCE_API_KEY: "<BINANCE_API_KEY>",
-        BINANCE_SECRET_KEY: "<BINANCE_SECRET_KEY>",
-        TRADING_SYMBOL: "USDT",
+        "PORTFOLIOS": {
+            "MY_PORTFOLIO": {
+                "API_KEY": "<YOUR_API_KEY>",
+                "SECRET_KEY": "<YOUR_SECRET_KEY>",
+                "TRADING_SYMBOL": "USDT",
+                "MARKET": "BINANCE",
+            }
+        }
     }
 )
 
@@ -53,11 +58,14 @@ app = App(
 )
 def perform_strategy(context: AlgorithmContext, ticker):
     # Get unallocated trading symbol (USDT) from portfolio
-    position = context.get_unallocated_size(BINANCE)
+    position = context.get_unallocated("MY_PORTFOLIO")
     
     if position.get_amount() > 50000 and ticker.get_price() < 50000:
         context.create_limit_buy_order(
-            BINANCE, "BTC", price=50000, amount=1, execute=True
+            identifier="MY_PORTFOLIO", 
+            target_symbol="BTC", 
+            price=ticker.get_price(), 
+            amount_target_symbol=1
         )
 
 
