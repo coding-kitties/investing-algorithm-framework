@@ -10,7 +10,7 @@ class StrategyTestOne(Strategy):
 
     def __init__(self):
         super(StrategyTestOne, self)\
-            .__init__(time_unit=TimeUnit.SECONDS, interval=1)
+            .__init__(time_unit=TimeUnit.SECOND, interval=1)
         StrategyTestOne.has_run = False
 
     def run_strategy(self, context, **kwargs):
@@ -23,7 +23,7 @@ class StrategyTestTwo(Strategy):
     def __init__(self):
         super(StrategyTestTwo, self)\
             .__init__(
-            time_unit=TimeUnit.SECONDS,
+            time_unit=TimeUnit.SECOND,
             interval=1,
             trading_symbol="USDT",
             trading_data_type=TradingDataTypes.TICKER,
@@ -42,7 +42,7 @@ class StrategyTestThree(Strategy):
     def __init__(self):
         super(StrategyTestThree, self)\
             .__init__(
-            time_unit=TimeUnit.SECONDS,
+            time_unit=TimeUnit.SECOND,
             interval=1,
             trading_symbol="USDT",
             trading_data_type=TradingDataTypes.TICKER,
@@ -66,7 +66,7 @@ class StrategyTestFour(Strategy):
     def __init__(self):
         super(StrategyTestFour, self)\
             .__init__(
-            time_unit=TimeUnit.SECONDS,
+            time_unit=TimeUnit.SECOND,
             interval=1,
             trading_symbol="USDT",
             target_symbols=[
@@ -92,7 +92,7 @@ class StrategyTestFive(Strategy):
     def __init__(self):
         super(StrategyTestFive, self)\
             .__init__(
-            time_unit=TimeUnit.SECONDS,
+            time_unit=TimeUnit.SECOND,
             interval=1,
             target_symbol="BTC",
             trading_symbol="USDT",
@@ -116,7 +116,7 @@ class StrategyTestSix(Strategy):
     def __init__(self):
         super(StrategyTestSix, self)\
             .__init__(
-            time_unit=TimeUnit.SECONDS,
+            time_unit=TimeUnit.SECOND,
             interval=1,
             trading_symbol="USDT",
             target_symbols=[TestBase.TARGET_SYMBOL_A, TestBase.TARGET_SYMBOL_B],
@@ -141,7 +141,7 @@ class StrategyTestSeven(Strategy):
     def __init__(self):
         super(StrategyTestSeven, self)\
             .__init__(
-            time_unit=TimeUnit.SECONDS,
+            time_unit=TimeUnit.SECOND,
             interval=1,
             trading_symbol="USDT",
             target_symbols=[TestBase.TARGET_SYMBOL_A, TestBase.TARGET_SYMBOL_B],
@@ -170,7 +170,7 @@ class StrategyTestEight(Strategy):
     def __init__(self):
         super(StrategyTestEight, self)\
             .__init__(
-            time_unit=TimeUnit.SECONDS,
+            time_unit=TimeUnit.SECOND,
             interval=1,
             trading_symbol="USDT",
             target_symbol=TestBase.TARGET_SYMBOL_A,
