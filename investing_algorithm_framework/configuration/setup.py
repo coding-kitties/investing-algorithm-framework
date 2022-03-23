@@ -8,11 +8,9 @@ from flask import Flask, jsonify
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
-from investing_algorithm_framework.configuration.validator import \
-    ConfigValidator
 from investing_algorithm_framework.configuration.constants import \
     DATABASE_CONFIG, DATABASE_DIRECTORY_PATH, DATABASE_NAME, \
-    RESOURCES_DIRECTORY
+    RESOURCE_DIRECTORY
 from investing_algorithm_framework.exceptions import ApiException
 
 logger = logging.getLogger(__name__)
@@ -37,9 +35,6 @@ def create_app(config_object=None) -> Flask:
 
 
 def setup_config(flask_app, config_object):
-    # Validate the configuration
-    ConfigValidator.validate(config_object)
-
     for attribute_key in dir(config_object):
         if attribute_key.isupper():
             flask_app.config[attribute_key] = \
@@ -47,16 +42,17 @@ def setup_config(flask_app, config_object):
 
 
 def setup_database(config_object):
+
     database_config = config_object.get(DATABASE_CONFIG)
 
     if database_config is None:
         database_path = os.path.join(
-            config_object.get(RESOURCES_DIRECTORY),
+            config_object.get(RESOURCE_DIRECTORY),
             '{}.sqlite3'.format(DEFAULT_DATABASE_NAME)
         )
         config_object.set_database_name(DEFAULT_DATABASE_NAME)
         config_object.set_database_directory(
-            config_object.get(RESOURCES_DIRECTORY)
+            config_object.get(RESOURCE_DIRECTORY)
         )
         config_object.set_sql_alchemy_uri(database_path)
     else:
@@ -70,7 +66,7 @@ def setup_database(config_object):
             config_object.set_database_name(database_name)
 
         if database_directory_path is None:
-            database_directory_path = config_object.get(RESOURCES_DIRECTORY)
+            database_directory_path = config_object.get(RESOURCE_DIRECTORY)
             config_object.set_database_directory(database_directory_path)
 
         database_path = os.path.join(

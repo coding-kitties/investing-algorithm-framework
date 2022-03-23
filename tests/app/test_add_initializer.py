@@ -2,7 +2,7 @@ from unittest import TestCase
 from investing_algorithm_framework import App, AlgorithmContextInitializer, \
     current_app, AlgorithmContext
 from investing_algorithm_framework.configuration.constants import \
-    RESOURCES_DIRECTORY
+    RESOURCE_DIRECTORY
 
 
 class InitializerTest(AlgorithmContextInitializer):
@@ -18,14 +18,14 @@ class Test(TestCase):
 
     def test_from_class(self):
         app = App(
-            config={"ENVIRONMENT": "test", RESOURCES_DIRECTORY: "goaoge"}
+            config={"ENVIRONMENT": "test", RESOURCE_DIRECTORY: "goaoge"}
         )
         app.add_initializer(InitializerTest)
         self.assertIsNotNone(app.algorithm._initializer)
 
     def test_from_object(self):
         app = App(
-            config={"ENVIRONMENT": "test", RESOURCES_DIRECTORY: "goaoge"}
+            config={"ENVIRONMENT": "test", RESOURCE_DIRECTORY: "goaoge"}
         )
         app.add_initializer(InitializerTest())
         self.assertIsNotNone(app.algorithm._initializer)

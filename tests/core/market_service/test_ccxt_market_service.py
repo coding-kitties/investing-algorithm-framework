@@ -1,4 +1,3 @@
-from investing_algorithm_framework import Position
 from investing_algorithm_framework.configuration.constants import \
     API_KEY, SECRET_KEY, CCXT_ENABLED, MARKET
 from tests.resources import TestBase, random_string

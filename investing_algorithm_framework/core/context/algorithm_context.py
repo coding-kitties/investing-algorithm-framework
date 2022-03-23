@@ -108,7 +108,7 @@ class AlgorithmContext:
                     trading_symbol=trading_symbol,
                     trading_time_unit=trading_time_unit,
                     limit=limit
-            )
+                )
 
             return wrapper
 
@@ -118,7 +118,7 @@ class AlgorithmContext:
             portfolio_manager = self._portfolio_managers[portfolio_manager_key]
             portfolio_manager.initialize(self)
 
-        portfolio_configurations = self.config.get_portfolios()
+        portfolio_configurations = self.config.get_portfolio_configurations()
 
         for portfolio_configuration in portfolio_configurations:
 
@@ -477,7 +477,7 @@ class AlgorithmContext:
             market_service.initialize(api_key=api_key, secret_key=secret_key)
             return market_service
 
-        if throw_exception:
+        if throw_exception and market_service is None:
             raise OperationalException(
                 f"No corresponding market service found for "
                 f"market {market}"

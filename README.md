@@ -30,7 +30,7 @@ dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
 
 # Create an application (manages your algorithm, rest api, etc...)
 app = App(
-    resources_directory=dir_path,
+    resource_directory=dir_path,
     config={
         "PORTFOLIOS": {
             "MY_PORTFOLIO": {
