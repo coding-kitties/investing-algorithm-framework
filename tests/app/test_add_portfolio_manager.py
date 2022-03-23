@@ -5,7 +5,7 @@ from unittest import TestCase
 from investing_algorithm_framework import App, PortfolioManager, Order
 from investing_algorithm_framework import current_app
 from investing_algorithm_framework.configuration.constants import \
-    RESOURCES_DIRECTORY
+    RESOURCE_DIRECTORY
 from investing_algorithm_framework.core.models import AssetPrice
 
 
@@ -14,7 +14,8 @@ class PortfolioManagerTest(PortfolioManager):
                    algorithm_context=None, **kwargs) -> List[Order]:
         return []
 
-    def get_prices(self, symbols, algorithm_context, **kwargs) -> List[AssetPrice]:
+    def get_prices(self, symbols, algorithm_context, **kwargs) \
+            -> List[AssetPrice]:
         return []
 
     identifier = "testTwo"
@@ -30,7 +31,7 @@ class Test(TestCase):
 
     def test_from_class(self):
         app = App(
-            config={"ENVIRONMENT": "test", RESOURCES_DIRECTORY: "goaoge"}
+            config={"ENVIRONMENT": "test", RESOURCE_DIRECTORY: "goaoge"}
         )
 
         app.add_portfolio_manager(PortfolioManagerTest)
@@ -41,7 +42,7 @@ class Test(TestCase):
 
     def test_from_object(self):
         app = App(
-            config={"ENVIRONMENT": "test", RESOURCES_DIRECTORY: "goaoge"}
+            config={"ENVIRONMENT": "test", RESOURCE_DIRECTORY: "goaoge"}
         )
         app.add_portfolio_manager(PortfolioManagerTest())
         self.assertEqual(1, len(app.algorithm._portfolio_managers))

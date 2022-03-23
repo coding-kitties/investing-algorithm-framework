@@ -58,16 +58,16 @@ class CCXTPortfolioManagerMixin:
             api_key=self.api_key,
             secret_key=self.secret_key
         )
-        binance_balances = market_service.get_balance()
+        balances = market_service.get_balance()
         positions = []
 
-        for binance_balance in binance_balances["free"]:
+        for balance in balances["free"]:
 
-            if binance_balances[binance_balance]["free"] > 0:
+            if balances[balance]["free"] > 0:
                 position = Position.from_dict(
                     {
-                        "target_symbol": binance_balance,
-                        "amount": binance_balances[binance_balance]["free"]
+                        "target_symbol": balance,
+                        "amount": balances[balance]["free"]
                     }
                 )
                 positions.append(position)

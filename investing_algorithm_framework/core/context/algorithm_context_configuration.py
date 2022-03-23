@@ -1,24 +1,32 @@
+import inspect
 import os
 
 from investing_algorithm_framework.configuration.constants import \
-    CCXT_ENABLED, API_KEY, SECRET_KEY, MARKET, RESOURCES_DIRECTORY, \
-    DATABASE_DIRECTORY_PATH, DATABASE_NAME, DATABASE_CONFIG, \
-    SQLALCHEMY_DATABASE_URI, LOG_LEVEL, SQLITE_ENABLED, PORTFOLIOS
+    CCXT_ENABLED, MARKET, DATABASE_DIRECTORY_PATH, DATABASE_NAME, \
+    DATABASE_CONFIG, RESOURCE_DIRECTORY, APPLICATION_CONFIGURED, \
+    SQLALCHEMY_DATABASE_URI, LOG_LEVEL, SQLITE_ENABLED, PORTFOLIOS, \
+    SQLITE_INITIALIZED, SQLALCHEMY_INITIALIZED
 from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.core.portfolio_managers\
+    .sqllite_portfolio_manager import SQLLitePortfolioManager
 
 
 class PortfolioConfiguration:
 
     def __init__(
         self,
-            identifier,
-            api_key,
-            secret_key,
-            trading_symbol,
-            market,
-            ccxt=True,
-            sqlite=True,
-            track_from=None
+        identifier,
+        api_key,
+        secret_key,
+        trading_symbol,
+        market,
+        ccxt=True,
+        sqlite=True,
+        track_from=None,
+        check_api_key_specification=True,
+        check_secret_key_specification=True,
+        check_trading_symbol=True,
+        check_market=True
     ):
         self.identifier = identifier
         self.api_key = api_key
@@ -34,22 +42,22 @@ class PortfolioConfiguration:
                 "Identifier not specified in portfolio configuration"
             )
 
-        if self.api_key is None:
+        if check_api_key_specification and self.api_key is None:
             raise OperationalException(
                 "Api key not specified in portfolio configuration"
             )
 
-        if self.secret_key is None:
+        if check_secret_key_specification and self.secret_key is None:
             raise OperationalException(
                 "Secret key not specified in portfolio configuration"
             )
 
-        if self.trading_symbol is None:
+        if check_trading_symbol and self.trading_symbol is None:
             raise OperationalException(
                 "Trading symbol not specified in portfolio configuration"
             )
 
-        if self.market is None:
+        if check_market and self.market is None:
             raise OperationalException(
                 "Market not specified in portfolio configuration"
             )
@@ -87,8 +95,39 @@ class PortfolioConfiguration:
             trading_symbol=data.get("TRADING_SYMBOL"),
             ccxt=data.get("CCXT", True),
             market=data.get("MARKET"),
-            track_from=data.get("TRACK_FROM", None)
+            track_from=data.get("TRACK_FROM", None),
+            sqlite=data.get("SQLITE", True),
+            check_api_key_specification=data.get("CHECK_API_KEY", True),
+            check_secret_key_specification=data.get("CHECK_SECRET_KEY", True),
+            check_trading_symbol=data.get("CHECK_TRADING_SYMBOL", True),
+            check_market=data.get("CHECK_MARKET", True)
         )
+
+    def repr(self, **fields) -> str:
+        """
+        Helper for __repr__
+        """
+
+        field_strings = []
+        at_least_one_attached_attribute = False
+
+        for key, field in fields.items():
+            field_strings.append(f'{key}={field!r}')
+            at_least_one_attached_attribute = True
+
+        if at_least_one_attached_attribute:
+            return f"<{self.__class__.__name__}({','.join(field_strings)})>"
+
+        return f"<{self.__class__.__name__} {id(self)}>"
+
+    def to_string(self):
+        return self.repr(
+            identifier=self.get_identifier(),
+            sqlite=self.get_sqlite()
+        )
+
+    def __repr__(self):
+        return self.to_string()
 
 
 class AlgorithmContextConfiguration:
@@ -103,18 +142,51 @@ class AlgorithmContextConfiguration:
         return self.config.get(CCXT_ENABLED, False) \
                and self.config.get(MARKET, None) is not None
 
-    def ccxt_authentication_configured(self):
-        api_key = self.config.get(API_KEY, None)
-        secret_key = self.config.get(SECRET_KEY, None)
-        return self.ccxt_enabled() and api_key is not None \
-            and secret_key is not None
+    def sqlite_enabled(self):
+        sqlite = self.config.get(SQLITE_ENABLED)
+        return sqlite is not None and sqlite
+
+    def sqlite_required(self):
+        portfolio_configurations = self.get_portfolio_configurations()
+
+        if portfolio_configurations is None:
+            return False
+
+        sqlite_portfolios = [
+            portfolio_configuration for portfolio_configuration
+            in portfolio_configurations if portfolio_configuration.get_sqlite()
+        ]
+
+        return len(sqlite_portfolios) > 0
+
+    def sqlite_configured(self):
+
+        if SQLITE_INITIALIZED not in self.config:
+            return False
+
+        return self.config[SQLITE_INITIALIZED]
+
+    def set_sqlite_configured(self):
+        self.config[SQLITE_INITIALIZED] = True
 
     def resource_directory_configured(self):
-        resource_directory = self.config.get(RESOURCES_DIRECTORY, None)
+        resource_directory = self.config.get(RESOURCE_DIRECTORY, None)
         return resource_directory is not None
 
     def set_resource_directory(self, resource_directory):
-        self.config[RESOURCES_DIRECTORY] = resource_directory
+        self.config[RESOURCE_DIRECTORY] = resource_directory
+
+    def can_write_to_resource_directory(self):
+
+        if not self.resource_directory_configured():
+            return False
+
+        resource_directory = self.config.get(RESOURCE_DIRECTORY, None)
+
+        if not os.path.isdir(resource_directory):
+            return False
+
+        return os.access(resource_directory, os.W_OK)
 
     def set_database_name(self, name):
 
@@ -133,18 +205,6 @@ class AlgorithmContextConfiguration:
 
     def set_sql_alchemy_uri(self, sqlalchemy_uri):
         self.config[SQLALCHEMY_DATABASE_URI] = sqlalchemy_uri
-
-    def can_write_to_resource_directory(self):
-
-        if not self.resource_directory_configured():
-            return False
-
-        resource_directory = self.config.get(RESOURCES_DIRECTORY, None)
-
-        if not os.path.isdir(resource_directory):
-            return False
-
-        return os.access(resource_directory, os.W_OK)
 
     def validate_database_configuration(self):
         database_config = self.config.get(DATABASE_CONFIG)
@@ -173,10 +233,15 @@ class AlgorithmContextConfiguration:
                 f"{SQLALCHEMY_DATABASE_URI} is not set in config"
             )
 
-    def sqlite_enabled(self):
-        return self.config.get(SQLITE_ENABLED, False)
-
     def load(self, config):
+
+        if inspect.isclass(config):
+            config = config()
+
+        assert isinstance(config, dict), (
+            "Provided configuration is not of type Dict"
+        )
+
         self.config = config
 
         if LOG_LEVEL not in self.config:
@@ -185,16 +250,67 @@ class AlgorithmContextConfiguration:
     def get(self, key, default=None):
         return self.config.get(key, default)
 
-    def get_portfolios(self):
+    def get_portfolio_configurations(self):
         portfolio_configurations = []
 
         if PORTFOLIOS in self.config:
+
             for key in self.config[PORTFOLIOS]:
-                data = {"identifier": key}
-                data.update(self.config[PORTFOLIOS][key])
+                portfolio_data = self.config[PORTFOLIOS][key]
+                portfolio_data["identifier"] = key
 
                 portfolio_configurations.append(
-                    PortfolioConfiguration.from_dict(data)
+                    PortfolioConfiguration
+                        .from_dict(portfolio_data)
                 )
 
         return portfolio_configurations
+
+    def application_configured(self):
+
+        if APPLICATION_CONFIGURED not in self.config:
+            return False
+
+        return self.config[APPLICATION_CONFIGURED]
+
+    def set_application_configured(self):
+        self.config[APPLICATION_CONFIGURED] = True
+
+    def sql_alchemy_configured(self):
+
+        if SQLALCHEMY_INITIALIZED not in self.config:
+            return False
+
+        return self.config[SQLALCHEMY_INITIALIZED]
+
+    def set_sql_alchemy_configured(self):
+        self.config[SQLALCHEMY_INITIALIZED] = True
+
+    def get_database_config(self):
+
+        if DATABASE_CONFIG not in self.config:
+            return None
+
+        return self.config[DATABASE_CONFIG]
+
+    def add_portfolio_configuration(self, portfolio_managers):
+
+        if PORTFOLIOS not in self.config:
+            self.config[PORTFOLIOS] = {}
+
+        portfolio_configurations = self.config[PORTFOLIOS]
+
+        for portfolio_manager in portfolio_managers:
+            if portfolio_manager.identifier not in portfolio_configurations:
+                portfolio_configurations[portfolio_manager.identifier] = {
+                    "SQLITE": isinstance(
+                        portfolio_manager, SQLLitePortfolioManager
+                    ),
+                    "CHECK_API_KEY": False,
+                    "CHECK_SECRET_KEY": False,
+                    "CHECK_MARKET": False,
+                    "CHECK_TRADING_SYMBOL": False,
+                    "CCXT": False
+                }
+
+        self.config[PORTFOLIOS] = portfolio_configurations

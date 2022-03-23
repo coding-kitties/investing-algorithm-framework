@@ -1,8 +1,9 @@
 from unittest import TestCase
+
 from investing_algorithm_framework import App, OrderExecutor, Order, \
-    OrderStatus, current_app
+    current_app
 from investing_algorithm_framework.configuration.constants import \
-    RESOURCES_DIRECTORY
+    RESOURCE_DIRECTORY
 
 
 class OrderExecutorTest(OrderExecutor):
@@ -27,7 +28,7 @@ class Test(TestCase):
 
     def test_from_class(self):
         app = App(
-            config={"ENVIRONMENT": "test", RESOURCES_DIRECTORY: "goaoge"}
+            config={"ENVIRONMENT": "test", RESOURCE_DIRECTORY: "goaoge"}
         )
         app.add_order_executor(OrderExecutorTest)
         self.assertEqual(1, len(app.algorithm._order_executors))
@@ -37,7 +38,7 @@ class Test(TestCase):
 
     def test_from_object(self):
         app = App(
-            config={"ENVIRONMENT": "test", RESOURCES_DIRECTORY: "goaoge"}
+            config={"ENVIRONMENT": "test", RESOURCE_DIRECTORY: "goaoge"}
         )
         app.add_order_executor(OrderExecutorTest())
         self.assertEqual(1, len(app.algorithm._order_executors))

@@ -1,8 +1,9 @@
 import os
 
 from investing_algorithm_framework.configuration.constants import \
-    RESOURCES_DIRECTORY, LOG_LEVEL
-from investing_algorithm_framework.configuration.settings import Config
+    RESOURCE_DIRECTORY, LOG_LEVEL
+from investing_algorithm_framework.configuration.settings import Config, \
+    Environment
 from investing_algorithm_framework.configuration.setup import create_app, \
     setup_config, setup_database, setup_logging
 
@@ -15,7 +16,8 @@ __all__ = [
     "create_app",
     "setup_database",
     "setup_config",
-    "RESOURCES_DIRECTORY",
+    "RESOURCE_DIRECTORY",
     "LOG_LEVEL",
-    "setup_logging"
+    "setup_logging",
+    "Environment"
 ]

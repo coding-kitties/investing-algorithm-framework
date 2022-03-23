@@ -153,9 +153,19 @@ class Strategy:
                 limit=self.limit
             )
 
-        # Run the decorated function in app context
-        with db.app.app_context():
+        if app.config.sqlite_configured():
+            # Run the decorated function in app context
+            with db.app.app_context():
 
+                if self.decorated:
+
+                    if data is not None:
+                        self.decorated(context=app.algorithm, **data)
+                    else:
+                        self.decorated(context=app.algorithm)
+                else:
+                    self.run_strategy(context=app.algorithm, **data)
+        else:
             if self.decorated:
 
                 if data is not None:
