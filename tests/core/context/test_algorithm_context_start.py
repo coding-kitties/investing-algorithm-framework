@@ -15,10 +15,11 @@ class Test(TestBase):
 
     def setUp(self) -> None:
         super(Test, self).setUp()
+        self.algo_app.stop_algorithm()
         self.algo_app.algorithm._workers = []
-        self.algo_app.algorithm.schedule(worker_one, None, TimeUnit.SECONDS, 1)
-        self.algo_app.algorithm.schedule(worker_two, None, TimeUnit.SECONDS, 1)
-        self.algo_app.algorithm.start()
+        self.algo_app.algorithm.schedule(worker_one, None, TimeUnit.SECOND, 1)
+        self.algo_app.algorithm.schedule(worker_two, None, TimeUnit.SECOND, 1)
+        self.algo_app.start(algorithm_only=True)
 
     def test_start_context(self) -> None:
         self.assertTrue(self.algo_app.algorithm.running)

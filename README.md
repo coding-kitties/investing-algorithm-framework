@@ -23,41 +23,45 @@ Also, the algorithm can be controlled with a REST Api that will run in the backg
 ## Example Algorithm for Binance
 ```python
 import os
-
-from investing_algorithm_framework import App, TimeUnit, AlgorithmContext, \
-    TradingDataTypes
-from investing_algorithm_framework.configuration.constants import BINANCE, \
-    BINANCE_API_KEY, BINANCE_SECRET_KEY, TRADING_SYMBOL
+from investing_algorithm_framework import App, AlgorithmContext
 
 # Set parent dir as resources' directory (database, manage.py)
 dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
 
 # Create an application (manages your algorithm, rest api, etc...)
 app = App(
-    resources_directory=dir_path,
+    resource_directory=dir_path,
     config={
-        BINANCE_API_KEY: "<BINANCE_API_KEY>",
-        BINANCE_SECRET_KEY: "<BINANCE_SECRET_KEY>",
-        TRADING_SYMBOL: "USDT",
+        "PORTFOLIOS": {
+            "MY_PORTFOLIO": {
+                "API_KEY": "<YOUR_API_KEY>",
+                "SECRET_KEY": "<YOUR_SECRET_KEY>",
+                "TRADING_SYMBOL": "USDT",
+                "MARKET": "BINANCE",
+            }
+        }
     }
 )
 
 
 # Algorithm strategy that runs every 5 seconds and gets the ticker of BTC from BINANCE
 @app.algorithm.strategy(
-    time_unit=TimeUnit.SECONDS,
+    time_unit="MINUTE",
     interval=5,
-    data_provider_identifier=BINANCE,
+    market="BINANCE",
     target_symbol="BTC",
-    trading_data_type=TradingDataTypes.TICKER,
+    trading_data_type="TICKER",
 )
 def perform_strategy(context: AlgorithmContext, ticker):
     # Get unallocated trading symbol (USDT) from portfolio
-    position = context.get_unallocated_size(BINANCE)
+    position = context.get_unallocated("MY_PORTFOLIO")
     
     if position.get_amount() > 50000 and ticker.get_price() < 50000:
         context.create_limit_buy_order(
-            BINANCE, "BTC", price=50000, amount=1, execute=True
+            identifier="MY_PORTFOLIO", 
+            target_symbol="BTC", 
+            price=ticker.get_price(), 
+            amount_target_symbol=1
         )
 
 

@@ -1,8 +1,9 @@
 import logging
+
 from investing_algorithm_framework.app import App
-from investing_algorithm_framework.core.models import TimeUnit
 from investing_algorithm_framework.configuration.constants import \
     CHECK_PENDING_ORDERS
+from investing_algorithm_framework.core.models import TimeUnit
 
 logger = logging.getLogger("investing-algorithm-framework")
 

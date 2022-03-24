@@ -1,7 +1,7 @@
 from unittest import TestCase
 from investing_algorithm_framework import App
 from investing_algorithm_framework.configuration.constants import \
-    RESOURCES_DIRECTORY
+    RESOURCE_DIRECTORY
 
 
 class Test(TestCase):
@@ -12,8 +12,6 @@ class Test(TestCase):
 
     def test_config_from_dict(self):
         app = App(
-            config={"ENVIRONMENT": "test", RESOURCES_DIRECTORY: "goaoge"}
+            config={"ENVIRONMENT": "test", RESOURCE_DIRECTORY: "goaoge"}
         )
-        app._initialize_config()
         self.assertIsNotNone(app.config.get("ENVIRONMENT"))
-        self.assertIsNotNone(app.config["ENVIRONMENT"])

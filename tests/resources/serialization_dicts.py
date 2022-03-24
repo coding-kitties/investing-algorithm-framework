@@ -2,36 +2,24 @@ order_serialization_dict = {
     'amount_target_symbol',
     'trading_symbol',
     'initial_price',
-    'executed_at',
-    'id',
+    'closing_price',
+    'price',
     'target_symbol',
-    'order_side',
+    'side',
     'amount_trading_symbol',
     'status',
-    'identifier',
-    'order_type',
-    'position_id',
-    'order_reference'
+    'type',
+    'reference_id'
 }
 
 position_serialization_dict = {
-    'symbol', 'amount', 'id', 'orders', 'identifier'
+    'symbol', 'amount', 'orders'
 }
 
 portfolio_serialization_dict = {
-    'trading_symbol',
-    'updated_at',
-    'allocated',
-    'realized',
-    'unallocated_percentage',
-    'created_at',
-    'delta',
-    'unallocated',
-    'id',
     'identifier',
-    'allocated_percentage',
-    'market',
+    'trading_symbol',
+    'unallocated',
     'positions',
     'orders',
-    "performance"
 }

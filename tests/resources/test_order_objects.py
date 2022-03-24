@@ -1,18 +1,25 @@
-from investing_algorithm_framework import db, OrderSide
+from investing_algorithm_framework import OrderSide
 from investing_algorithm_framework.core.models import OrderType
 
 
 class TestOrderAndPositionsObjectsMixin:
 
     @staticmethod
-    def create_buy_order(amount, ticker, price, portfolio_manager):
+    def create_buy_order(
+        amount, target_symbol, price, portfolio_manager, reference_id=None
+    ):
         order = portfolio_manager.create_order(
             amount_target_symbol=amount,
-            symbol=ticker,
+            target_symbol=target_symbol,
             price=price,
-            order_type=OrderType.LIMIT.value
+            type=OrderType.LIMIT.value
         )
-        portfolio_manager.add_order(order)
+
+        if reference_id is not None:
+            order.reference_id = reference_id
+
+        portfolio_manager.add_order(order, algorithm_context=None)
+        return order
 
     @staticmethod
     def create_sell_order(amount, ticker, price, portfolio_manager):

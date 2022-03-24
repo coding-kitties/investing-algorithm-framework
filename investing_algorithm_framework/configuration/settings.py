@@ -1,11 +1,10 @@
-import os
-
-from enum import Enum
 import logging
+import os
+from enum import Enum
 
-from investing_algorithm_framework.core import OperationalException
 from investing_algorithm_framework.configuration.constants import \
-    DATABASE_NAME, DATABASE_DIRECTORY_PATH, RESOURCES_DIRECTORY
+    DATABASE_NAME, DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY
+from investing_algorithm_framework.core import OperationalException
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +54,7 @@ class Environment(Enum):
 
 
 class Config(dict):
-    ENV = "DEV"
+    ENVIRONMENT = Environment.PROD.value
     LOG_LEVEL = 'DEBUG'
     APP_DIR = os.path.abspath(os.path.dirname(__file__))
     PROJECT_ROOT = os.path.abspath(os.path.join(APP_DIR, os.pardir))
@@ -72,13 +71,11 @@ class Config(dict):
         'http://0.0.0.0:4000',
         'http://localhost:4000',
     ]
-    RESOURCES_DIRECTORY = os.getenv(RESOURCES_DIRECTORY)
-    DATABASE_CONFIG = {
-        DATABASE_NAME: os.getenv(DATABASE_NAME, "database"),
-        DATABASE_DIRECTORY_PATH: os.getenv(DATABASE_DIRECTORY_PATH)
-    }
+    RESOURCES_DIRECTORY = os.getenv(RESOURCE_DIRECTORY)
     SCHEDULER_API_ENABLED = True
     CHECK_PENDING_ORDERS = True
+    SQLITE_ENABLED = True
+    SQLITE_INITIALIZED = False
 
     def __init__(self):
         super().__init__()
@@ -178,15 +175,13 @@ class Config(dict):
 
 
 class TestConfig(Config):
-    ENV = Environment.TEST.value
+    ENVIRONMENT = Environment.TEST.value
     TESTING = True
-    DATABASE_CONFIG = {
-        'DATABASE_NAME': "test",
-    }
+    DATABASE_CONFIG = {'DATABASE_NAME': "test"}
+    LOG_LEVEL = "INFO"
 
 
 class DevConfig(Config):
-    ENV = Environment.DEV.value
-    DATABASE_CONFIG = {
-        'DATABASE_NAME': "dev",
-    }
+    ENVIRONMENT = Environment.DEV.value
+    DATABASE_CONFIG = {'DATABASE_NAME': "dev"}
+    LOG_LEVEL = "INFO"

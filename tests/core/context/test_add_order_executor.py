@@ -6,19 +6,14 @@ from tests.resources import TestBase
 class MyOrderExecutorOne(OrderExecutor):
     identifier = "BINANCE"
 
-    def execute_limit_order(
-            self, order: Order, algorithm_context, **kwargs
-    ) -> bool:
+    def execute_order(
+        self, order: Order, algorithm_context, **kwargs
+    ) -> Order:
         pass
 
-    def get_order_status(
-            self, order: Order, algorithm_context, **kwargs
-    ) -> OrderStatus:
-        pass
-
-    def execute_market_order(
-            self, order: Order, algorithm_context, **kwargs
-    ) -> bool:
+    def check_order_status(
+        self, order: Order, algorithm_context, **kwargs
+    ) -> Order:
         pass
 
 

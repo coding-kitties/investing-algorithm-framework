@@ -1,8 +1,8 @@
 from flask_apscheduler import APScheduler
 
 from investing_algorithm_framework.core.models import TimeUnit
-from investing_algorithm_framework.utils import random_string
 from investing_algorithm_framework.core.models import db
+from investing_algorithm_framework.utils import random_string
 
 
 class Worker:
@@ -28,7 +28,7 @@ class Worker:
         algorithm.add_worker(self)
 
     def add_to_scheduler(self, app_scheduler: APScheduler):
-        if TimeUnit.SECONDS.equals(self.time_unit):
+        if TimeUnit.SECOND.equals(self.time_unit):
             app_scheduler.add_job(
                 id=self.worker_id,
                 name=self.worker_id,

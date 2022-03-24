@@ -1,16 +1,16 @@
-import os
 import logging
 import logging.config
-import marshmallow.exceptions as marshmallow_exceptions
+import os
 from typing import Dict, List
+
+import marshmallow.exceptions as marshmallow_exceptions
 from flask import Flask, jsonify
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 
-from investing_algorithm_framework.configuration import ConfigValidator
 from investing_algorithm_framework.configuration.constants import \
-    DATABASE_CONFIG, DATABASE_DIRECTORY_PATH, DATABASE_NAME, LOG_LEVEL, \
-    SQLALCHEMY_DATABASE_URI, RESOURCES_DIRECTORY
+    DATABASE_CONFIG, DATABASE_DIRECTORY_PATH, DATABASE_NAME, \
+    RESOURCE_DIRECTORY
 from investing_algorithm_framework.exceptions import ApiException
 
 logger = logging.getLogger(__name__)
@@ -35,10 +35,6 @@ def create_app(config_object=None) -> Flask:
 
 
 def setup_config(flask_app, config_object):
-
-    # Validate the configuration
-    ConfigValidator.validate(config_object)
-
     for attribute_key in dir(config_object):
         if attribute_key.isupper():
             flask_app.config[attribute_key] = \
@@ -47,79 +43,80 @@ def setup_config(flask_app, config_object):
 
 def setup_database(config_object):
 
-    if DATABASE_CONFIG not in config_object:
+    database_config = config_object.get(DATABASE_CONFIG)
+
+    if database_config is None:
         database_path = os.path.join(
-            config_object[RESOURCES_DIRECTORY],
+            config_object.get(RESOURCE_DIRECTORY),
             '{}.sqlite3'.format(DEFAULT_DATABASE_NAME)
         )
-        config_object[SQLALCHEMY_DATABASE_URI] = database_path
+        config_object.set_database_name(DEFAULT_DATABASE_NAME)
+        config_object.set_database_directory(
+            config_object.get(RESOURCE_DIRECTORY)
+        )
+        config_object.set_sql_alchemy_uri(database_path)
     else:
-        database_name = DEFAULT_DATABASE_NAME
-        database_directory_path = config_object.get(RESOURCES_DIRECTORY)
+        database_directory_path = database_config.get(
+            DATABASE_DIRECTORY_PATH, None
+        )
+        database_name = database_config.get(DATABASE_NAME, None)
 
-        if DATABASE_NAME in config_object.get(DATABASE_CONFIG):
-            config_database_name = config_object.get(DATABASE_CONFIG)\
-                .get(DATABASE_NAME)
+        if database_name is None:
+            database_name = DEFAULT_DATABASE_NAME
+            config_object.set_database_name(database_name)
 
-            if config_database_name is not None:
-                database_name = config_database_name
-
-        if DATABASE_DIRECTORY_PATH in config_object.get(DATABASE_CONFIG):
-            config_database_directory_path = config_object.get(DATABASE_CONFIG)\
-                .get(DATABASE_DIRECTORY_PATH)
-
-            if config_database_directory_path is not None:
-                database_directory_path = config_database_directory_path
-
-        config_object[DATABASE_CONFIG][DATABASE_DIRECTORY_PATH] = \
-            database_directory_path
-        config_object[DATABASE_CONFIG][DATABASE_NAME] = database_name
+        if database_directory_path is None:
+            database_directory_path = config_object.get(RESOURCE_DIRECTORY)
+            config_object.set_database_directory(database_directory_path)
 
         database_path = os.path.join(
-            config_object[DATABASE_CONFIG][DATABASE_DIRECTORY_PATH],
-            f'{config_object[DATABASE_CONFIG][DATABASE_NAME]}.sqlite3'
+            database_directory_path, f'{database_name}.sqlite3'
         )
 
-    config_object[SQLALCHEMY_DATABASE_URI] = 'sqlite:////{}'.format(database_path)
+    config_object.set_sql_alchemy_uri(f'sqlite:////{database_path}')
 
     # Create the database if it not exist
     if not os.path.isfile(database_path):
         open(database_path, 'w').close()
 
 
-def setup_logging(log_level):
-    pass
-    # logging_config = {
-    #     'version': 1,
-    #     'disable_existing_loggers': True,
-    #     'formatters': {
-    #         'standard': {
-    #             'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-    #         },
-    #     },
-    #     'handlers': {
-    #         'console': {
-    #             'level': 'INFO',
-    #             'formatter': 'standard',
-    #             'class': 'logging.StreamHandler',
-    #             'stream': 'ext://sys.stdout',  # Default is stderr
-    #         },
-    #     },
-    #     'loggers': {
-    #         '': {  # root logger
-    #             'handlers': ['console'],
-    #             'level': "DEBUG",
-    #             'propagate': False
-    #         },
-    #         'app': {
-    #             'handlers': ['console'],
-    #             'level': "DEBUG",
-    #             'propagate': False
-    #         },
-    #     }
-    # }
-    #
-    # logging.config.dictConfig(logging_config)
+def setup_logging(log_level="INFO"):
+    DEFAULT_LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': True,
+        'formatters': {
+            'standard': {
+                'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+            },
+        },
+        'handlers': {
+            'default': {
+                'level': 'INFO',
+                'formatter': 'standard',
+                'class': 'logging.StreamHandler',
+                'stream': 'ext://sys.stdout',  # Default is stderr
+            },
+        },
+        'loggers': {
+            '': {  # root logger
+                'handlers': ['default'],
+                'level': 'WARNING',
+                'propagate': False
+            },
+            'investing_algorithm_framework': {
+                'handlers': ['default'],
+                'level': 'INFO',
+                'propagate': False
+            },
+            '__main__': {  # if __name__ == '__main__'
+                'handlers': ['default'],
+                'level': 'DEBUG',
+                'propagate': False
+            },
+        }
+    }
+
+    logging.config.dictConfig(DEFAULT_LOGGING)
 
 
 def register_error_handlers(app) -> None:

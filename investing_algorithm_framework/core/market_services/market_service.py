@@ -1,37 +1,30 @@
 from abc import ABC, abstractmethod
-from investing_algorithm_framework.core.market_identifier \
-    import MarketIdentifier
-from investing_algorithm_framework.core.models import TimeInterval
 
 
-class MarketService(ABC, MarketIdentifier):
+class MarketService(ABC):
 
     @abstractmethod
     def pair_exists(self, target_symbol: str, trading_symbol: str):
         pass
 
-    def get_price(self, target_symbol: str, trading_symbol: str):
-        return self.get_ticker(target_symbol, trading_symbol)
-
     @abstractmethod
-    def get_prices(
-        self,
-        target_symbol: str,
-        trading_symbol: str,
-        interval: TimeInterval
-    ):
+    def get_prices(self, symbols):
         pass
 
     @abstractmethod
-    def get_ticker(self, target_symbol: str, trading_symbol: str):
+    def get_ticker(self, symbol):
         pass
 
     @abstractmethod
-    def get_order_book(self, target_symbol: str, trading_symbol: str):
+    def get_tickers(self, symbols):
         pass
 
     @abstractmethod
-    def get_balance(self, symbol: str = None):
+    def get_order_book(self, symbol):
+        pass
+
+    @abstractmethod
+    def get_balance(self):
         pass
 
     @abstractmethod
@@ -55,15 +48,6 @@ class MarketService(ABC, MarketIdentifier):
         pass
 
     @abstractmethod
-    def create_market_buy_order(
-        self,
-        target_symbol: str,
-        trading_symbol: str,
-        amount: float,
-    ):
-        pass
-
-    @abstractmethod
     def create_market_sell_order(
         self,
         target_symbol: str,
@@ -73,17 +57,11 @@ class MarketService(ABC, MarketIdentifier):
         pass
 
     @abstractmethod
-    def get_orders(self, target_symbol: str, trading_symbol: str):
+    def get_orders(self, symbol: str, since=None):
         pass
 
     @abstractmethod
-    def get_order(self, order_id, target_symbol: str, trading_symbol: str):
-        pass
-
-    @abstractmethod
-    def get_open_orders(
-        self, target_symbol: str = None, trading_symbol: str = None
-    ):
+    def get_order(self, order_id):
         pass
 
     @abstractmethod
@@ -94,4 +72,12 @@ class MarketService(ABC, MarketIdentifier):
 
     @abstractmethod
     def cancel_order(self, order_id):
+        pass
+
+    @abstractmethod
+    def get_ohclv(self, symbol, time_unit, since):
+        pass
+
+    @abstractmethod
+    def get_ohclvs(self, symbols, time_unit, since):
         pass

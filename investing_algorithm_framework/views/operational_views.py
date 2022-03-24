@@ -2,8 +2,8 @@ import logging
 
 from flask import Blueprint, jsonify
 
-from investing_algorithm_framework.globals import current_app
 from investing_algorithm_framework.exceptions import ApiException
+from investing_algorithm_framework.globals import current_app
 
 logger = logging.getLogger(__name__)
 blueprint = Blueprint("operational-views", __name__)
