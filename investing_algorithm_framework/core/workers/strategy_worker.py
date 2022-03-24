@@ -61,22 +61,15 @@ class Strategy:
             else:
                 self.id = random_string(10)
 
-        if time_unit is None:
-            raise OperationalException(
-                "Time unit for strategy is not specified"
-            )
+        if time_unit is not None:
 
-        if isinstance(time_unit, TimeUnit):
-            self.time_unit = time_unit.value
-        else:
-            self.time_unit = TimeUnit.from_string(time_unit).value
+            if isinstance(time_unit, TimeUnit):
+                self.time_unit = time_unit.value
+            else:
+                self.time_unit = TimeUnit.from_string(time_unit).value
 
-        if interval is None:
-            raise OperationalException(
-                "Time interval for strategy is not specified"
-            )
-
-        self.interval = interval
+        if interval is not None:
+            self.interval = interval
 
         if self.target_symbol is None and self.target_symbols is None \
                 and (self.trading_data_type is not None
@@ -89,6 +82,10 @@ class Strategy:
         algorithm.add_strategy(self)
 
     def add_to_scheduler(self, app_scheduler: APScheduler):
+
+        if self.time_unit is None or self.interval is None:
+            return
+
         if TimeUnit.SECOND.equals(self.time_unit):
             app_scheduler.add_job(
                 id=self.worker_id,
@@ -114,16 +111,35 @@ class Strategy:
                 minutes=(self.interval * 60)
             )
 
-    def run_strategy(
+    def run_strategy(self, algorithm_context):
+        data = {}
+
+        if self.market is not None:
+            data = algorithm_context.get_data(
+                market=self.market,
+                trading_data_type=self.trading_data_type,
+                trading_data_types=self.trading_data_types,
+                target_symbols=self.target_symbols,
+                target_symbol=self.target_symbol,
+                trading_symbol=self.trading_symbol,
+                trading_time_unit=self.trading_time_unit,
+                limit=self.limit
+            )
+
+        self.apply_strategy(context=algorithm_context, **data)
+
+    def apply_strategy(
         self,
-        algorithm_context,
-        ticker,
-        tickers,
-        order_book,
-        order_books,
+        context,
+        ticker=None,
+        tickers=None,
+        order_book=None,
+        order_books=None,
+        ohclv=None,
+        ohclvs=None,
         **kwargs
     ):
-        raise NotImplementedError("Run strategy method is not implemented")
+        raise NotImplementedError("Apply strategy is not implemented")
 
     def __call__(
         self,

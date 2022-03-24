@@ -87,6 +87,7 @@ class Position:
             return []
 
     def add_order(self, order: Order):
+        print("adding order")
 
         if isinstance(order, dict):
             order = Order.from_dict(order)
@@ -124,6 +125,7 @@ class Position:
                 amount_target_symbol=order.get_amount_target_symbol()
             )
         else:
+
             if OrderStatus.CLOSED.equals(order.status):
 
                 if OrderSide.BUY.equals(order.side):

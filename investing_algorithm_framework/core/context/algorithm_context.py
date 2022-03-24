@@ -242,6 +242,23 @@ class AlgorithmContext:
 
         self._workers.append(strategy)
 
+    def run_strategy(self, identifier):
+        strategy = self.get_strategy(identifier)
+
+        if strategy is None:
+            raise OperationalException("Strategy not found")
+
+        strategy.run_strategy(algorithm_context=self)
+
+    def get_strategy(self, identifier):
+
+        for worker in self._workers:
+
+            if worker.worker_id == identifier:
+                return worker
+
+        return None
+
     @property
     def running(self) -> bool:
         """
@@ -418,7 +435,6 @@ class AlgorithmContext:
     def get_portfolio_manager(
         self, identifier: str = None, throw_exception: bool = True
     ) -> PortfolioManager:
-
         if identifier is None:
 
             if len(self._portfolio_managers.keys()) == 0:
@@ -434,7 +450,7 @@ class AlgorithmContext:
 
                 if throw_exception:
                     raise OperationalException(
-                        f"Algorithm has no portfolio managers for {identifier}"
+                        f"Algorithm has no portfolio manager for {identifier}"
                     )
 
                 return None
@@ -749,6 +765,17 @@ class AlgorithmContext:
                     )
             elif TradingDataTypes.OHLCV.equals(trading_data_type):
 
+                if limit is None:
+                    raise OperationalException(
+                        "'Limit' attribute is not specified for OHLCV data"
+                    )
+
+                if trading_time_unit is None:
+                    raise OperationalException(
+                        "'trading_time_unit' attribute is not specified "
+                        "for OHLCV data"
+                    )
+
                 if target_symbols is not None:
                     ohlcvs = []
 
@@ -771,6 +798,7 @@ class AlgorithmContext:
                         trading_time_unit=trading_time_unit,
                         algorithm_context=self
                     )
+                    print(data)
             elif TradingDataTypes.RAW.equals(trading_data_type):
                 data["raw_data"] = data_provider.provide_raw_data(
                     target_symbol=target_symbol,

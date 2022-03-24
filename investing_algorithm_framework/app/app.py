@@ -2,6 +2,7 @@ import logging
 import os
 import shutil
 from distutils.sysconfig import get_python_lib
+import json
 
 from flask import Flask
 
@@ -19,6 +20,8 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.models import create_all_tables, \
     initialize_db
 from investing_algorithm_framework.extensions import scheduler
+from investing_algorithm_framework.app.stateless import ActionHandler
+
 
 logger = logging.getLogger(__name__)
 
@@ -145,40 +148,54 @@ class App(metaclass=Singleton):
         for blueprint in self._blueprints:
             self._flask_app.register_blueprint(blueprint)
 
-    def start(self, algorithm_only=False):
+    def start(self, algorithm_only=False, stateless=False, payload: dict = None):
 
-        if not self.config.resource_directory_configured():
-            raise OperationalException("Resource directory not configured")
-
-        self.config.add_portfolio_configuration(
-            self.algorithm.portfolio_managers
-        )
-
-        self._initialize_flask_app()
-        self._initialize_blueprints()
-        self._initialize_database()
-        self._initialize_flask_config()
-        self._initialize_flask_sql_alchemy()
-        self._initialize_management_commands()
-
-        self.algorithm.config = self.config
-        self._algorithm.initialize_portfolio_managers()
-
-        self.start_scheduler()
-        self.start_algorithm()
-
-        if not algorithm_only:
-            self._flask_app.run(
-                debug=False,
-                threaded=True,
-                use_reloader=False
+        if stateless:
+            self.algorithm.config = self.config
+            action_handler = ActionHandler.of(payload)
+            action_handler.handle(
+                payload=payload, algorithm_context=self.algorithm
             )
 
-        if not scheduler.running:
-            raise OperationalException(
-                "Could not start algorithm because the scheduler "
-                "is not running"
+            return {
+                "statusCode": 200,
+                "headers": {"Content-Type": "application/json"},
+                "body": json.dumps({"message": "Algorithm has run"})
+            }
+
+        else:
+
+            if not self.config.resource_directory_configured():
+                raise OperationalException("Resource directory not configured")
+
+            self.config.add_portfolio_configuration(
+                self.algorithm.portfolio_managers
             )
+            self._initialize_flask_app()
+            self._initialize_blueprints()
+            self._initialize_database()
+            self._initialize_flask_config()
+            self._initialize_flask_sql_alchemy()
+            self._initialize_management_commands()
+
+            self.algorithm.config = self.config
+            self._algorithm.initialize_portfolio_managers()
+
+            self.start_scheduler()
+            self.start_algorithm()
+
+            if not algorithm_only:
+                self._flask_app.run(
+                    debug=False,
+                    threaded=True,
+                    use_reloader=False
+                )
+
+            if not scheduler.running:
+                raise OperationalException(
+                    "Could not start algorithm because the scheduler "
+                    "is not running"
+                )
 
     def start_scheduler(self):
 
