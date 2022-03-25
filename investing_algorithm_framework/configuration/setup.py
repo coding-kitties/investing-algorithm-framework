@@ -34,11 +34,14 @@ def create_app(config_object=None) -> Flask:
     return app
 
 
-def setup_config(flask_app, config_object):
-    for attribute_key in dir(config_object):
+def setup_config(flask_app, algorithm_context_config):
+    for attribute_key in algorithm_context_config.config.keys():
+
         if attribute_key.isupper():
             flask_app.config[attribute_key] = \
-                getattr(config_object, attribute_key)
+                algorithm_context_config.config[attribute_key]
+
+    flask_app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 
 def setup_database(config_object):

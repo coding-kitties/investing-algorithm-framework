@@ -96,7 +96,7 @@ class PortfolioManager(ABC, Identifier):
             if position.get_target_symbol() != \
                     self.get_trading_symbol(algorithm_context):
 
-                if self.track_from is not None:
+                if hasattr(self, "track_from") and self.track_from is not None:
                     orders = self.get_orders(
                         symbol=position.get_symbol(),
                         algorithm_context=algorithm_context,

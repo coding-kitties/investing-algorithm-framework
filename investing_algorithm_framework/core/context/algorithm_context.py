@@ -715,10 +715,8 @@ class AlgorithmContext:
 
             if trading_symbol is None:
                 raise OperationalException(
-                    "Trading symbol is not set. Either provide a "
-                    "'trading_symbol' param in the method or set "
-                    "the 'trading_symbol' attribute in the algorithm "
-                    "config."
+                    "Trading symbol is not set for strategy. Please provide a "
+                    "'trading_symbol' param in the 'strategy' decorator method"
                 )
 
         if target_symbols is None and target_symbol is None \
