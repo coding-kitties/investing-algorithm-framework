@@ -143,6 +143,10 @@ class AlgorithmContextConfiguration:
                and self.config.get(MARKET, None) is not None
 
     def sqlite_enabled(self):
+
+        if SQLITE_ENABLED not in self.config:
+            return True
+
         sqlite = self.config.get(SQLITE_ENABLED)
         return sqlite is not None and sqlite
 
