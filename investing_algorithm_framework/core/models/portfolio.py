@@ -28,7 +28,6 @@ class Portfolio:
             self.positions = []
 
         self.trading_symbol = self.trading_symbol.upper()
-        print(orders)
         self.add_orders(orders)
 
     def validate_portfolio(self):
@@ -236,7 +235,6 @@ class Portfolio:
             position.add_order(order)
 
     def add_orders(self, orders):
-        print(orders)
         if orders is not None:
 
             for order in orders:

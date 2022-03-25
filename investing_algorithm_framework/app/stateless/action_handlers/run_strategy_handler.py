@@ -21,5 +21,10 @@ class RunStrategyHandler(ActionHandlerStrategy):
                 )
             )
 
-        for strategy_identifier in payload[STRATEGIES]:
-            algorithm_context.run_strategy(strategy_identifier)
+        if STRATEGIES in payload:
+
+            for strategy_identifier in payload[STRATEGIES]:
+                algorithm_context.run_strategy(strategy_identifier)
+        else:
+            for strategy_identifier in algorithm_context.get_strategies():
+                algorithm_context.run_strategy(strategy_identifier)

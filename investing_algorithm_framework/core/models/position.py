@@ -87,7 +87,6 @@ class Position:
             return []
 
     def add_order(self, order: Order):
-        print("adding order")
 
         if isinstance(order, dict):
             order = Order.from_dict(order)
