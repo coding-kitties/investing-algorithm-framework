@@ -7,6 +7,12 @@ class ImproperlyConfigured(Exception):
         super(ImproperlyConfigured, self).__init__(message)
         self.error_message = message
 
+    def to_response(self):
+        return {
+            "status": "error",
+            "message": self.error_message
+        }
+
 
 class OperationalException(Exception):
     """
@@ -16,3 +22,10 @@ class OperationalException(Exception):
     def __init__(self, message) -> None:
         super(OperationalException, self).__init__(message)
         self.error_message = message
+
+    def to_response(self):
+        return {
+            "status": "error",
+            "message": self.error_message
+        }
+

@@ -235,10 +235,17 @@ class Portfolio:
             position.add_order(order)
 
     def add_orders(self, orders):
-
         if orders is not None:
 
             for order in orders:
+
+                if isinstance(order, dict):
+                    order = Order.from_dict(order)
+
+                if not isinstance(order, Order):
+                    raise OperationalException(
+                        "Provided order is not an Order"
+                    )
 
                 if isinstance(order, Order):
                     position = next(

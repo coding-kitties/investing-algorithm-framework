@@ -3,7 +3,7 @@ import os
 from enum import Enum
 
 from investing_algorithm_framework.configuration.constants import \
-    DATABASE_NAME, DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY
+    RESOURCE_DIRECTORY
 from investing_algorithm_framework.core import OperationalException
 
 logger = logging.getLogger(__name__)

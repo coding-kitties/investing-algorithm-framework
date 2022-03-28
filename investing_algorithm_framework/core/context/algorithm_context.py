@@ -154,7 +154,7 @@ class AlgorithmContext:
             order_executor = self._order_executors[order_executor_key]
             order_executor.initialize(self)
 
-        portfolio_configurations = self.config.get_portfolios()
+        portfolio_configurations = self.config.get_portfolio_configurations()
 
         for portfolio_configuration in portfolio_configurations:
 
@@ -241,6 +241,33 @@ class AlgorithmContext:
                 return
 
         self._workers.append(strategy)
+
+    def run_strategy(self, identifier):
+        strategy = self.get_strategy(identifier)
+
+        if strategy is None:
+            raise OperationalException(f"Strategy {identifier} not found")
+
+        strategy.run_strategy(algorithm_context=self)
+
+    def get_strategy(self, identifier):
+
+        for worker in self._workers:
+
+            if worker.worker_id == identifier:
+                return worker
+
+        return None
+
+    def get_strategies(self):
+        worker_ids = []
+
+        for worker in self._workers:
+
+            if worker.worker_id != "default_order_checker":
+                worker_ids.append(worker.worker_id)
+
+        return worker_ids
 
     @property
     def running(self) -> bool:
@@ -418,7 +445,6 @@ class AlgorithmContext:
     def get_portfolio_manager(
         self, identifier: str = None, throw_exception: bool = True
     ) -> PortfolioManager:
-
         if identifier is None:
 
             if len(self._portfolio_managers.keys()) == 0:
@@ -434,7 +460,7 @@ class AlgorithmContext:
 
                 if throw_exception:
                     raise OperationalException(
-                        f"Algorithm has no portfolio managers for {identifier}"
+                        f"Algorithm has no portfolio manager for {identifier}"
                     )
 
                 return None
@@ -689,10 +715,8 @@ class AlgorithmContext:
 
             if trading_symbol is None:
                 raise OperationalException(
-                    "Trading symbol is not set. Either provide a "
-                    "'trading_symbol' param in the method or set "
-                    "the 'trading_symbol' attribute in the algorithm "
-                    "config."
+                    "Trading symbol is not set for strategy. Please provide a "
+                    "'trading_symbol' param in the 'strategy' decorator method"
                 )
 
         if target_symbols is None and target_symbol is None \
@@ -749,6 +773,17 @@ class AlgorithmContext:
                     )
             elif TradingDataTypes.OHLCV.equals(trading_data_type):
 
+                if limit is None:
+                    raise OperationalException(
+                        "'Limit' attribute is not specified for OHLCV data"
+                    )
+
+                if trading_time_unit is None:
+                    raise OperationalException(
+                        "'trading_time_unit' attribute is not specified "
+                        "for OHLCV data"
+                    )
+
                 if target_symbols is not None:
                     ohlcvs = []
 
@@ -795,12 +830,12 @@ class AlgorithmContext:
                         )
 
                     data["tickers"] = tickers
-
-                data["ticker"] = data_provider.provide_ticker(
-                    target_symbol=target_symbol,
-                    trading_symbol=trading_symbol,
-                    algorithm_context=self
-                )
+                else:
+                    data["ticker"] = data_provider.provide_ticker(
+                        target_symbol=target_symbol,
+                        trading_symbol=trading_symbol,
+                        algorithm_context=self
+                    )
 
             if [trading_data_type for trading_data_type in trading_data_types
                     if TradingDataTypes.ORDER_BOOK.equals(trading_data_type)]:
@@ -818,12 +853,39 @@ class AlgorithmContext:
                         )
 
                     data["order_books"] = order_books
+                else:
+                    data["order_book"] = data_provider.provide_order_book(
+                        target_symbol=target_symbol,
+                        trading_symbol=trading_symbol,
+                        algorithm_context=self
+                    )
 
-                data["order_book"] = data_provider.provide_order_book(
-                    target_symbol=target_symbol,
-                    trading_symbol=trading_symbol,
-                    algorithm_context=self
-                )
+            if [trading_data_type for trading_data_type in trading_data_types
+                    if TradingDataTypes.OHLCV.equals(trading_data_type)]:
+
+                if target_symbols is not None:
+                    ohlcvs = []
+
+                    for target_symbol in target_symbols:
+                        ohlcvs.append(
+                            data_provider.provide_ohlcv(
+                                target_symbol=target_symbol,
+                                trading_symbol=trading_symbol,
+                                limit=limit,
+                                trading_time_unit=trading_time_unit,
+                                algorithm_context=self
+                            )
+                        )
+
+                    data["ohlcvs"] = ohlcvs
+                else:
+                    data["ohlcv"] = data_provider.provide_ohlcv(
+                        target_symbol=target_symbol,
+                        trading_symbol=trading_symbol,
+                        limit=limit,
+                        trading_time_unit=trading_time_unit,
+                        algorithm_context=self
+                    )
 
             if [trading_data_type for trading_data_type in trading_data_types
                     if TradingDataTypes.RAW.equals(trading_data_type)]:

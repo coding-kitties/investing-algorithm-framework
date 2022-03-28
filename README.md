@@ -50,20 +50,14 @@ app = App(
     interval=5,
     market="BINANCE",
     target_symbol="BTC",
-    trading_data_type="TICKER",
+    trading_symbol="USDT",
+    trading_data_type="OHLCV",
+    limit=100,
+    trading_time_unit="ONE_DAY"
 )
-def perform_strategy(context: AlgorithmContext, ticker):
-    # Get unallocated trading symbol (USDT) from portfolio
-    position = context.get_unallocated("MY_PORTFOLIO")
-    
-    if position.get_amount() > 50000 and ticker.get_price() < 50000:
-        context.create_limit_buy_order(
-            identifier="MY_PORTFOLIO", 
-            target_symbol="BTC", 
-            price=ticker.get_price(), 
-            amount_target_symbol=1
-        )
-
+def perform_strategy(context: AlgorithmContext, ohlcv):
+    print(context.get_unallocated("MY_PORTFOLIO"))
+    print(ohlcv)
 
 if __name__ == "__main__":
     app.start()

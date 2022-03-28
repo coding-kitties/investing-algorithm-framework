@@ -22,7 +22,13 @@ logger = getLogger(__name__)
 class PortfolioManager(ABC, Identifier):
     update_minutes = 5
     
-    def __init__(self, identifier=None, track_from=None, trading_symbol=None):
+    def __init__(
+            self,
+            identifier=None,
+            track_from=None,
+            trading_symbol=None,
+            portfolio=None
+    ):
         super(PortfolioManager, self).__init__(identifier)
 
         if track_from is not None:
@@ -34,25 +40,30 @@ class PortfolioManager(ABC, Identifier):
         if trading_symbol is not None:
             self.trading_symbol = trading_symbol.upper()
 
-        self.portfolio = None
+        self.portfolio = portfolio
 
-    @abstractmethod
+    @staticmethod
+    def of_portfolio(portfolio: Portfolio):
+        return PortfolioManager(
+            identifier=portfolio.get_identifier(),
+            trading_symbol=portfolio.get_trading_symbol(),
+            portfolio=portfolio
+        )
+
     def get_positions(
         self, algorithm_context=None, **kwargs
     ) -> List[Position]:
-        pass
+        return self.portfolio.get_positions()
 
-    @abstractmethod
     def get_orders(
         self, symbol, since: datetime = None,  algorithm_context=None, **kwargs
     ) -> List[Order]:
-        pass
+        return self.portfolio.get_orders()
 
-    @abstractmethod
     def get_prices(
         self, symbols, algorithm_context, **kwargs
     ) -> List[AssetPrice]:
-        pass
+        return []
 
     def initialize(self, algorithm_context):
         self.create_portfolio(algorithm_context)
@@ -85,7 +96,7 @@ class PortfolioManager(ABC, Identifier):
             if position.get_target_symbol() != \
                     self.get_trading_symbol(algorithm_context):
 
-                if self.track_from is not None:
+                if hasattr(self, "track_from") and self.track_from is not None:
                     orders = self.get_orders(
                         symbol=position.get_symbol(),
                         algorithm_context=algorithm_context,
