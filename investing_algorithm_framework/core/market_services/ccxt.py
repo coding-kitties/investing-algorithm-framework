@@ -336,6 +336,10 @@ class CCXTMarketService(MarketService):
             sleep(self.exchange.rateLimit / 1000)
             from_timestamp = \
                 ohlcv[-1][0] + self.exchange.parse_timeframe(time_unit) * 1000
+
+            ohlcv = [[self.exchange.iso8601(candle[0])] + candle[1:] for candle
+                     in ohlcv]
+
             data += ohlcv
 
         return OHLCV.from_dict({"symbol": symbol, "data": data})
@@ -362,10 +366,15 @@ class CCXTMarketService(MarketService):
                 ohlcv = self.exchange.fetch_ohlcv(
                     symbol, time_unit, from_timestamp
                 )
+
                 sleep(self.exchange.rateLimit / 1000)
                 from_timestamp = \
                     ohlcv[-1][0] + \
                     self.exchange.parse_timeframe(time_unit) * 1000
+
+                ohlcv = [[self.exchange.iso8601(candle[0])] + candle[1:] for
+                         candle in ohlcv]
+
                 data += ohlcv
 
             ohlcvs.append(OHLCV.from_dict({"symbol": symbol, "data": data}))
