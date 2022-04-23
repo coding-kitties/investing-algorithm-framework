@@ -4,7 +4,7 @@ from investing_algorithm_framework.configuration.constants import PORTFOLIOS, \
     STRATEGIES
 from investing_algorithm_framework.core.models import Portfolio
 from investing_algorithm_framework.core.portfolio_managers import \
-    PortfolioManager
+    PortfolioManager, StatelessPortfolioManager
 
 
 class RunStrategyHandler(ActionHandlerStrategy):
@@ -16,7 +16,7 @@ class RunStrategyHandler(ActionHandlerStrategy):
             portfolio_data["identifier"] = portfolio_key
 
             algorithm_context.add_portfolio_manager(
-                PortfolioManager.of_portfolio(
+                StatelessPortfolioManager.of_portfolio(
                     Portfolio.from_dict(portfolio_data)
                 )
             )
