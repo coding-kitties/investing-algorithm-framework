@@ -139,9 +139,10 @@ class PortfolioManager(ABC, Identifier):
 
         if trading_symbol is None:
             raise OperationalException(
-                "Trading symbol is not set. Either override "
+                "Trading symbol is not set for portfolio. Either override "
                 "'get_trading_symbol' method or set "
-                "the 'trading_symbol' attribute in the algorithm config."
+                "the 'TRADING_SYMBOL' attribute in your portfolio "
+                "configuration."
             )
 
         return trading_symbol
