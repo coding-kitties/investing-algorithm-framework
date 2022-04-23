@@ -1,8 +1,9 @@
-from investing_algorithm_framework.core.models.model_extension import \
-    SQLAlchemyModelExtension
+from datetime import datetime
 
 
-class OHLCV(SQLAlchemyModelExtension):
+class OHLCV:
+    DEFAULT_DATETIME_STRING = "%Y-%m-%dT%H:%M:%S.%f%z"
+    COLUMNS = ["open", "high", "low", "close", "volume"]
 
     def __init__(self, symbol, data):
         self.symbol = symbol
@@ -22,11 +23,22 @@ class OHLCV(SQLAlchemyModelExtension):
     def get_data(self):
         return self.data
 
-    def to_dict(self):
-        return {
-            "symbol": self.get_symbol(),
-            "data": self.get_data(),
-        }
+    def to_dict(self, date_format="%Y-%m-%d-%H:%M:%S"):
+        dict_data = {}
+
+        for column in self.COLUMNS:
+            dict_data[column] = []
+
+        for row in self.get_data():
+            date = datetime.strptime(row[0], self.DEFAULT_DATETIME_STRING)
+            date = date.strftime(date_format)
+            dict_data["open"].append(date)
+            dict_data["high"].append(row[1])
+            dict_data["low"].append(row[2])
+            dict_data["close"].append(row[3])
+            dict_data["volume"].append(row[4])
+
+        return dict_data
 
     @staticmethod
     def from_dict(data):
