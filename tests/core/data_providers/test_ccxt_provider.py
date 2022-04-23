@@ -30,7 +30,7 @@ class Test(TestBase):
             market="binance"
         )
 
-        self.assert_almost_equal(7200, len(data["ohlcv"].get_data()), 100)
+        self.assert_almost_equal(7200, len(data["ohlcv"].get_data()), 200)
 
         data = self.algo_app.algorithm.get_data(
             trading_data_type=TradingDataTypes.OHLCV,
@@ -67,7 +67,7 @@ class Test(TestBase):
         )
 
         for ohlcv_data in data["ohlcvs"]:
-            self.assert_almost_equal(7200, len(ohlcv_data.get_data()), 100)
+            self.assert_almost_equal(7200, len(ohlcv_data.get_data()), 200)
 
         data = self.algo_app.algorithm.get_data(
             trading_data_type=TradingDataTypes.OHLCV,
