@@ -1,4 +1,4 @@
-from abc import abstractmethod, ABC
+from abc import ABC
 from datetime import datetime, timedelta
 from logging import getLogger
 from typing import List
