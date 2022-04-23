@@ -1,5 +1,6 @@
 from typing import List
 
+from investing_algorithm_framework.core.exceptions import ImproperlyConfigured
 from investing_algorithm_framework.core.models.order import Order
 from investing_algorithm_framework.core.models.order_status import OrderStatus
 from investing_algorithm_framework.core.models.position import Position
@@ -8,9 +9,28 @@ from investing_algorithm_framework.core.models.snapshots import AssetPrice
 
 class CCXTPortfolioManagerMixin:
 
+    def check_credentials_configuration(self):
+        if self.api_key is None and self.secret_key is None:
+            raise ImproperlyConfigured(
+                f"Api key and secret key is not specified "
+                f"for portfolio {self.identifier}"
+            )
+
+        if self.api_key is None:
+            raise ImproperlyConfigured(
+                f"Api key is not specified for portfolio {self.identifier}"
+            )
+
+        if self.secret_key is None:
+            raise ImproperlyConfigured(
+                f"Secret key is not specified for portfolio {self.identifier}"
+            )
+
     def get_orders(
         self, symbol, since=None, algorithm_context=None, **kwargs
     ) -> List[Order]:
+        self.check_credentials_configuration()
+
         market_service = algorithm_context.get_market_service(
             market=self.market,
             api_key=self.api_key,
@@ -53,6 +73,8 @@ class CCXTPortfolioManagerMixin:
     def get_positions(
         self, algorithm_context=None, **kwargs
     ) -> List[Position]:
+        self.check_credentials_configuration()
+
         market_service = algorithm_context.get_market_service(
             market=self.market,
             api_key=self.api_key,
