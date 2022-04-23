@@ -23,10 +23,6 @@ class PortfolioConfiguration:
         ccxt=True,
         sqlite=True,
         track_from=None,
-        check_api_key_specification=True,
-        check_secret_key_specification=True,
-        check_trading_symbol=True,
-        check_market=True
     ):
         self.identifier = identifier
         self.api_key = api_key
@@ -42,22 +38,7 @@ class PortfolioConfiguration:
                 "Identifier not specified in portfolio configuration"
             )
 
-        if check_api_key_specification and self.api_key is None:
-            raise OperationalException(
-                "Api key not specified in portfolio configuration"
-            )
-
-        if check_secret_key_specification and self.secret_key is None:
-            raise OperationalException(
-                "Secret key not specified in portfolio configuration"
-            )
-
-        if check_trading_symbol and self.trading_symbol is None:
-            raise OperationalException(
-                "Trading symbol not specified in portfolio configuration"
-            )
-
-        if check_market and self.market is None:
+        if self.market is None:
             raise OperationalException(
                 "Market not specified in portfolio configuration"
             )
@@ -97,10 +78,6 @@ class PortfolioConfiguration:
             market=data.get("MARKET"),
             track_from=data.get("TRACK_FROM", None),
             sqlite=data.get("SQLITE", True),
-            check_api_key_specification=data.get("CHECK_API_KEY", True),
-            check_secret_key_specification=data.get("CHECK_SECRET_KEY", True),
-            check_trading_symbol=data.get("CHECK_TRADING_SYMBOL", True),
-            check_market=data.get("CHECK_MARKET", True)
         )
 
     def repr(self, **fields) -> str:
@@ -310,8 +287,6 @@ class AlgorithmContextConfiguration:
                     "SQLITE": isinstance(
                         portfolio_manager, SQLLitePortfolioManager
                     ),
-                    "CHECK_API_KEY": False,
-                    "CHECK_SECRET_KEY": False,
                     "CHECK_MARKET": False,
                     "CHECK_TRADING_SYMBOL": False,
                     "CCXT": False
