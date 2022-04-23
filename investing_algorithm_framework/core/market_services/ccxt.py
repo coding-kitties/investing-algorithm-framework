@@ -7,6 +7,7 @@ from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.market_services.market_service \
     import MarketService
 from investing_algorithm_framework.core.models import AssetPrice, OHLCV
+from investing_algorithm_framework.core.exceptions import ImproperlyConfigured
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,11 @@ class CCXTMarketService(MarketService):
         self, market, config=None, api_key: str = None, secret_key: str = None
     ):
         super().__init__()
+
+        if market is None:
+            raise ImproperlyConfigured(
+                "Market is not specified for market service"
+            )
 
         self.market = market.lower()
 

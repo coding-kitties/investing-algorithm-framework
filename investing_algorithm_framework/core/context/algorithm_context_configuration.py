@@ -38,11 +38,6 @@ class PortfolioConfiguration:
                 "Identifier not specified in portfolio configuration"
             )
 
-        if self.market is None:
-            raise OperationalException(
-                "Market not specified in portfolio configuration"
-            )
-
     def get_identifier(self):
         return self.identifier
 
