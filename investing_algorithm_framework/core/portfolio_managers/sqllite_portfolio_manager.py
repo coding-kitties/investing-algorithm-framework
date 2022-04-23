@@ -1,3 +1,4 @@
+from abc import ABCMeta
 from typing import List
 
 from investing_algorithm_framework.core.identifier import Identifier
@@ -10,7 +11,7 @@ from investing_algorithm_framework.core.portfolio_managers.portfolio_manager \
     import PortfolioManager
 
 
-class SQLLitePortfolioManager(PortfolioManager, Identifier):
+class SQLLitePortfolioManager(PortfolioManager, Identifier, metaclass=ABCMeta):
 
     def create_portfolio(self, algorithm_context):
 

@@ -1,4 +1,4 @@
-from abc import abstractmethod, ABC
+from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from logging import getLogger
 from typing import List
@@ -42,23 +42,17 @@ class PortfolioManager(ABC, Identifier):
 
         self.portfolio = portfolio
 
-    @staticmethod
-    def of_portfolio(portfolio: Portfolio):
-        return PortfolioManager(
-            identifier=portfolio.get_identifier(),
-            trading_symbol=portfolio.get_trading_symbol(),
-            portfolio=portfolio
-        )
-
+    @abstractmethod
     def get_positions(
         self, algorithm_context=None, **kwargs
     ) -> List[Position]:
-        return self.portfolio.get_positions()
+        raise NotImplementedError()
 
+    @abstractmethod
     def get_orders(
         self, symbol, since: datetime = None,  algorithm_context=None, **kwargs
     ) -> List[Order]:
-        return self.portfolio.get_orders()
+        raise NotImplementedError()
 
     def get_prices(
         self, symbols, algorithm_context, **kwargs
@@ -139,9 +133,10 @@ class PortfolioManager(ABC, Identifier):
 
         if trading_symbol is None:
             raise OperationalException(
-                "Trading symbol is not set. Either override "
+                "Trading symbol is not set for portfolio. Either override "
                 "'get_trading_symbol' method or set "
-                "the 'trading_symbol' attribute in the algorithm config."
+                "the 'TRADING_SYMBOL' attribute in your portfolio "
+                "configuration."
             )
 
         return trading_symbol
