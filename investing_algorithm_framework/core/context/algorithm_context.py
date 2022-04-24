@@ -174,19 +174,21 @@ class AlgorithmContext:
 
         # Initialize the algorithm context
         if not self._initialized:
-
-            # Run the initializer
-            if self._initializer is not None:
-                self._initializer.initialize(self)
-
+            self.initialize()
             self.initialize_portfolio_managers()
-            self._initialized = True
+            self.initialize_order_executors()
 
         # Start the workers
         self.start_workers()
 
     def stop(self):
         self.stop_all_workers()
+
+    def initialize(self):
+        # Run the initializer
+        if self._initializer is not None:
+            self._initializer.initialize(self)
+            self._initialized = True
 
     def start_workers(self):
 
