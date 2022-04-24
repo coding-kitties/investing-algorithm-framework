@@ -109,6 +109,7 @@ class AlgorithmContextConfiguration:
     specification
     """
     config = {}
+    custom_config = {}
 
     def ccxt_enabled(self):
         return self.config.get(CCXT_ENABLED, False) \
@@ -224,7 +225,18 @@ class AlgorithmContextConfiguration:
             self.config[LOG_LEVEL] = "INFO"
 
     def get(self, key, default=None):
-        return self.config.get(key, default)
+
+        if key in self.config:
+            return self.config.get(key, default)
+
+        return self.custom_config.get(key, default)
+
+    def add(self, key, value):
+
+        if self.custom_config is None:
+            self.custom_config = {}
+
+        self.custom_config[key] = value
 
     def get_portfolio_configurations(self):
         portfolio_configurations = []
