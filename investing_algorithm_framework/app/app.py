@@ -48,7 +48,6 @@ class App(metaclass=Singleton):
     def initialize(
             self, resource_directory: str = None, config=None
     ):
-
         if self.config is None:
             self.config = AlgorithmContextConfiguration()
             self.config.load(Config())
@@ -184,9 +183,7 @@ class App(metaclass=Singleton):
             self._initialize_blueprints()
             self._initialize_flask_sql_alchemy()
             self._initialize_management_commands()
-
             self.algorithm.config = self.config
-            self._algorithm.initialize_portfolio_managers()
 
             self.start_scheduler()
             self.start_algorithm()
