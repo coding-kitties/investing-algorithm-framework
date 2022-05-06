@@ -11,15 +11,16 @@ class RunStrategyHandler(ActionHandlerStrategy):
 
     def handle_event(self, payload, algorithm_context):
 
-        for portfolio_key in payload[PORTFOLIOS]:
-            portfolio_data = payload[PORTFOLIOS][portfolio_key]
-            portfolio_data["identifier"] = portfolio_key
+        if PORTFOLIOS in payload:
+            for portfolio_key in payload[PORTFOLIOS]:
+                portfolio_data = payload[PORTFOLIOS][portfolio_key]
+                portfolio_data["identifier"] = portfolio_key
 
-            algorithm_context.add_portfolio_manager(
-                StatelessPortfolioManager.of_portfolio(
-                    Portfolio.from_dict(portfolio_data)
+                algorithm_context.add_portfolio_manager(
+                    StatelessPortfolioManager.of_portfolio(
+                        Portfolio.from_dict(portfolio_data)
+                    )
                 )
-            )
 
         if STRATEGIES in payload:
 
