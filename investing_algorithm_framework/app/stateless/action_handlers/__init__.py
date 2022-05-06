@@ -1,13 +1,15 @@
-from investing_algorithm_framework.core.exceptions import OperationalException
-from investing_algorithm_framework.app.stateless.action_handlers\
-    .run_strategy_handler import RunStrategyHandler
-from investing_algorithm_framework.configuration.constants import ACTION
-
 from enum import Enum
+
+from investing_algorithm_framework.app.stateless.action_handlers \
+    .check_online_handler import CheckOnlineHandler
+from investing_algorithm_framework.app.stateless.action_handlers \
+    .run_strategy_handler import RunStrategyHandler
+from investing_algorithm_framework.core.exceptions import OperationalException
 
 
 class Action(Enum):
     RUN_STRATEGY = 'RUN_STRATEGY'
+    CHECK_ONLINE = "CHECK_ONLINE"
 
     @staticmethod
     def from_value(value: str):
@@ -43,7 +45,7 @@ class Action(Enum):
 
 
 class ActionHandler:
-    handle_strategy = None
+    strategy = None
 
     @staticmethod
     def of(payload: dict):
@@ -52,16 +54,29 @@ class ActionHandler:
         return action_handler
 
     def handle(self, payload, algorithm_context):
-        return self.handle_strategy.handle_event(
+        return self.strategy.handle_event(
             payload=payload, algorithm_context=algorithm_context
         )
 
     def set_strategy(self, payload):
+        action = ActionHandler.get_action_type(payload)
 
-        if ACTION not in payload:
-            raise OperationalException("Action type is not specified")
-
-        if Action.RUN_STRATEGY.equals(payload[ACTION]):
-            self.handle_strategy = RunStrategyHandler()
+        if Action.RUN_STRATEGY.equals(action):
+            self.strategy = RunStrategyHandler()
+        elif Action.CHECK_ONLINE.equals(action):
+            self.strategy = CheckOnlineHandler()
         else:
             raise OperationalException("Action not supported")
+
+    @staticmethod
+    def get_action_type(payload):
+
+        if "action" in payload:
+            action = payload["action"]
+        else:
+            action = payload["ACTION"]
+
+        if action is None:
+            raise OperationalException("Action type not supported")
+
+        return action
