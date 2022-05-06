@@ -156,6 +156,7 @@ class App(metaclass=Singleton):
 
         if stateless:
             self.algorithm.config = self.config
+            self.algorithm.start(stateless=True)
             action_handler = ActionHandler.of(payload)
             action_handler.handle(
                 payload=payload, algorithm_context=self.algorithm
