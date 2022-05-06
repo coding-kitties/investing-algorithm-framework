@@ -14,6 +14,7 @@ from investing_algorithm_framework.core.models.data_provider import \
 from investing_algorithm_framework.core.order_executors import OrderExecutor
 from investing_algorithm_framework.core.portfolio_managers import \
     PortfolioManager, SQLLitePortfolioManager
+from investing_algorithm_framework.core.workers import Strategy
 from investing_algorithm_framework.exceptions import ApiException
 from investing_algorithm_framework.globals import current_app
 from investing_algorithm_framework.utils.version import get_version
@@ -43,6 +44,7 @@ __all__ = [
     "OperationalException",
     "ImproperlyConfigured",
     "DataProvider",
+    "Strategy",
     "SQLLitePortfolio",
     "SQLLiteOrder",
     "SQLLitePosition",

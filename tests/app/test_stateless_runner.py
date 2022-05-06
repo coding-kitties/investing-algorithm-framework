@@ -1,6 +1,5 @@
 from investing_algorithm_framework import TradingDataTypes, TradingTimeUnit, \
-    AlgorithmContext
-from investing_algorithm_framework.core.workers import Strategy
+    AlgorithmContext, Strategy
 from investing_algorithm_framework.app.stateless.action_handlers import Action
 from tests.resources import TestBase
 
@@ -219,9 +218,9 @@ class Test(TestBase):
 
     def setUp(self):
         super(Test, self).setUp()
-        self.algo_app.algorithm.add_strategy(StrategyOne())
-        self.algo_app.algorithm.add_strategy(StrategyTwo())
-        self.algo_app.algorithm.add_strategy(StrategyThree())
+        self.algo_app.add_strategy(StrategyOne())
+        self.algo_app.add_strategy(StrategyTwo())
+        self.algo_app.add_strategy(StrategyThree())
         StrategyOne.reset()
         StrategyTwo.reset()
         StrategyThree.reset()

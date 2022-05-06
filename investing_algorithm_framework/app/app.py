@@ -250,3 +250,6 @@ class App(metaclass=Singleton):
 
     def add_portfolio_manager(self, portfolio_manager):
         self.algorithm.add_portfolio_manager(portfolio_manager)
+
+    def add_strategy(self, strategy):
+        self.algorithm.add_strategy(strategy)
