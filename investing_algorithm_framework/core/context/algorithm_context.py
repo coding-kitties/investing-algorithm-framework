@@ -169,7 +169,7 @@ class AlgorithmContext:
                     trading_symbol=portfolio_configuration.get_trading_symbol()
                 )
 
-    def start(self):
+    def start(self, stateless=False):
         logger.info("starting algorithm")
 
         # Initialize the algorithm context
@@ -178,8 +178,9 @@ class AlgorithmContext:
             self.initialize_portfolio_managers()
             self.initialize_order_executors()
 
-        # Start the workers
-        self.start_workers()
+        if not stateless:
+            # Start the workers
+            self.start_workers()
 
     def stop(self):
         self.stop_all_workers()
