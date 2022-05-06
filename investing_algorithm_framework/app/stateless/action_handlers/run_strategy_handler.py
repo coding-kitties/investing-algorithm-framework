@@ -4,7 +4,7 @@ from investing_algorithm_framework.configuration.constants import PORTFOLIOS, \
     STRATEGIES
 from investing_algorithm_framework.core.models import Portfolio
 from investing_algorithm_framework.core.portfolio_managers import \
-    PortfolioManager, StatelessPortfolioManager
+    StatelessPortfolioManager
 
 
 class RunStrategyHandler(ActionHandlerStrategy):

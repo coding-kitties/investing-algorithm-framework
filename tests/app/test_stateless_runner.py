@@ -1,6 +1,7 @@
 from investing_algorithm_framework import TradingDataTypes, TradingTimeUnit, \
     AlgorithmContext
 from investing_algorithm_framework.core.workers import Strategy
+from investing_algorithm_framework.app.stateless.action_handlers import Action
 from tests.resources import TestBase
 
 
@@ -227,7 +228,7 @@ class Test(TestBase):
 
     def test_with_strategy_specification(self):
         payload = {
-            "ACTION": "RUN_STRATEGY",
+            "ACTION": Action.RUN_STRATEGY,
             "STRATEGIES": [
                 "strategy_one"
             ],
@@ -286,7 +287,7 @@ class Test(TestBase):
 
     def test_with_no_strategy_specification(self):
         payload = {
-            "ACTION": "RUN_STRATEGY",
+            "ACTION": Action.RUN_STRATEGY,
             "PORTFOLIOS": {
                 "TEST_ONE": {
                     "trading_symbol": "USDT",
@@ -345,7 +346,7 @@ class Test(TestBase):
 
     def test_with_all_strategy_specifications(self):
         payload = {
-            "ACTION": "RUN_STRATEGY",
+            "ACTION": Action.RUN_STRATEGY,
             "STRATEGIES": [
                 "strategy_one",
                 "strategy_two",
@@ -411,3 +412,12 @@ class Test(TestBase):
         self.assertTrue(StrategyThree.has_order_books_data)
         self.assertTrue(StrategyThree.has_unallocated)
         self.assertTrue(StrategyThree.has_positions)
+
+    def test_check_online(self):
+        payload = {"action": Action.CHECK_ONLINE.value}
+        response = self.algo_app.start(stateless=True, payload=payload)
+        self.assertEqual(response["statusCode"], 200)
+
+        payload = {"ACTION": Action.CHECK_ONLINE.value}
+        response = self.algo_app.start(stateless=True, payload=payload)
+        self.assertEqual(response["statusCode"], 200)
