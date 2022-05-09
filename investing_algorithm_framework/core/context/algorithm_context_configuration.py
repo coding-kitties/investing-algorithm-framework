@@ -5,7 +5,7 @@ from investing_algorithm_framework.configuration.constants import \
     CCXT_ENABLED, MARKET, DATABASE_DIRECTORY_PATH, DATABASE_NAME, \
     DATABASE_CONFIG, RESOURCE_DIRECTORY, APPLICATION_CONFIGURED, \
     SQLALCHEMY_DATABASE_URI, LOG_LEVEL, SQLITE_ENABLED, PORTFOLIOS, \
-    SQLITE_INITIALIZED, SQLALCHEMY_INITIALIZED
+    SQLITE_INITIALIZED, SQLALCHEMY_INITIALIZED, STATELESS
 from investing_algorithm_framework.core.exceptions import OperationalException
 from investing_algorithm_framework.core.portfolio_managers\
     .sqllite_portfolio_manager import SQLLitePortfolioManager
@@ -273,6 +273,16 @@ class AlgorithmContextConfiguration:
 
     def set_sql_alchemy_configured(self):
         self.config[SQLALCHEMY_INITIALIZED] = True
+
+    def set_stateless(self):
+        self.config[STATELESS] = True
+
+    def get_stateless(self):
+
+        if STATELESS in self.config:
+            return self.config[STATELESS]
+
+        return False
 
     def get_database_config(self):
 
