@@ -276,6 +276,7 @@ class Test(TestBase):
             }
         }
         self.algo_app.start(stateless=True, payload=payload)
+        self.assertTrue(self.algo_app.config.get_stateless())
         self.assertTrue(StrategyOne.has_ohlcvs_data)
         self.assertFalse(StrategyOne.has_ohlcv_data)
         self.assertTrue(StrategyOne.has_orders)
@@ -332,6 +333,7 @@ class Test(TestBase):
             }
         }
         self.algo_app.start(stateless=True, payload=payload)
+        self.assertTrue(self.algo_app.config.get_stateless())
         self.assertTrue(StrategyOne.has_ohlcvs_data)
         self.assertFalse(StrategyOne.has_ohlcv_data)
         self.assertTrue(StrategyOne.has_orders)
@@ -396,6 +398,7 @@ class Test(TestBase):
             }
         }
         self.algo_app.start(stateless=True, payload=payload)
+        self.assertTrue(self.algo_app.config.get_stateless())
         self.assertTrue(StrategyOne.has_ohlcvs_data)
         self.assertFalse(StrategyOne.has_ohlcv_data)
         self.assertTrue(StrategyOne.has_orders)
@@ -415,8 +418,10 @@ class Test(TestBase):
     def test_check_online(self):
         payload = {"action": Action.CHECK_ONLINE.value}
         response = self.algo_app.start(stateless=True, payload=payload)
+        self.assertTrue(self.algo_app.config.get_stateless())
         self.assertEqual(response["statusCode"], 200)
 
         payload = {"ACTION": Action.CHECK_ONLINE.value}
         response = self.algo_app.start(stateless=True, payload=payload)
+        self.assertTrue(self.algo_app.config.get_stateless())
         self.assertEqual(response["statusCode"], 200)
