@@ -126,7 +126,7 @@ class Strategy:
                 limit=self.limit
             )
 
-        self.apply_strategy(context=algorithm_context, **data)
+        self.apply_strategy(context=algorithm_context, **data, data=data)
 
     def apply_strategy(
         self,
@@ -139,7 +139,11 @@ class Strategy:
         ohclvs=None,
         **kwargs
     ):
-        raise NotImplementedError("Apply strategy is not implemented")
+        if self.decorated:
+            data = kwargs["data"]
+            self.decorated(context=context, **data)
+        else:
+            raise NotImplementedError("Apply strategy is not implemented")
 
     def __call__(
         self,
