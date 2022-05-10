@@ -1,3 +1,4 @@
+import json
 from investing_algorithm_framework.app.stateless.action_handlers \
     .action_handler_strategy import ActionHandlerStrategy
 from investing_algorithm_framework.configuration.constants import PORTFOLIOS, \
@@ -8,6 +9,7 @@ from investing_algorithm_framework.core.portfolio_managers import \
 
 
 class RunStrategyHandler(ActionHandlerStrategy):
+    MESSAGE = {"message": "Ok"}
 
     def handle_event(self, payload, algorithm_context):
 
@@ -29,3 +31,9 @@ class RunStrategyHandler(ActionHandlerStrategy):
         else:
             for strategy_identifier in algorithm_context.get_strategies():
                 algorithm_context.run_strategy(strategy_identifier)
+
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"message": RunStrategyHandler.MESSAGE})
+        }

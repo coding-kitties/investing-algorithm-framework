@@ -159,15 +159,9 @@ class App(metaclass=Singleton):
             self.algorithm.config.set_stateless()
             self.algorithm.start(stateless=True)
             action_handler = ActionHandler.of(payload)
-            action_handler.handle(
+            return action_handler.handle(
                 payload=payload, algorithm_context=self.algorithm
             )
-
-            return {
-                "statusCode": 200,
-                "headers": {"Content-Type": "application/json"},
-                "body": json.dumps({"message": "Algorithm has run"})
-            }
 
         else:
 
