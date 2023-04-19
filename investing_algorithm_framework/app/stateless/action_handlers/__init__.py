@@ -4,7 +4,7 @@ from investing_algorithm_framework.app.stateless.action_handlers \
     .check_online_handler import CheckOnlineHandler
 from investing_algorithm_framework.app.stateless.action_handlers \
     .run_strategy_handler import RunStrategyHandler
-from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.domain.exceptions import OperationalException
 
 
 class Action(Enum):
@@ -53,10 +53,8 @@ class ActionHandler:
         action_handler.set_strategy(payload)
         return action_handler
 
-    def handle(self, payload, algorithm_context):
-        return self.strategy.handle_event(
-            payload=payload, algorithm_context=algorithm_context
-        )
+    def handle(self, payload, algorithm):
+        return self.strategy.handle_event(payload=payload, algorithm=algorithm)
 
     def set_strategy(self, payload):
         action = ActionHandler.get_action_type(payload)

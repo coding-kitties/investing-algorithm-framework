@@ -17,32 +17,24 @@ investment algorithms. It encourages rapid development and clean, pragmatic code
 
 The framework provides you with an all the components you need to create an 
 investing algorithm (data providing, portfolio management, order execution, etc..). 
-Also, the algorithm can be controlled with a REST Api that will run in the background.
+
+The goal of the framework is to provide you with a set of components for 
+your algorithm that takes care of a wide variety of operational processes 
+out of the box.
 
 
-## Example Algorithm for Binance
+## Example algorithm for Binance with web application (flask)
 ```python
 import os
-from investing_algorithm_framework import App, AlgorithmContext
+from investing_algorithm_framework import App, PortfolioConfiguration
 
-# Set parent dir as resources' directory (database, manage.py)
 dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
-
-# Create an application (manages your algorithm, rest api, etc...)
-app = App(
-    resource_directory=dir_path,
-    config={
-        "PORTFOLIOS": {
-            "MY_PORTFOLIO": {
-                "API_KEY": "<YOUR_API_KEY>",
-                "SECRET_KEY": "<YOUR_SECRET_KEY>",
-                "TRADING_SYMBOL": "USDT",
-                "MARKET": "BINANCE",
-            }
-        }
-    }
+app = App()
+app.add_portfolio_configuration(
+    PortfolioConfiguration(
+        market="binance", api_key="xxxx", secret_key="xxxx", trading_symbol="USDT"
+    )
 )
-
 
 # Algorithm strategy that runs every 5 seconds and gets the ticker of BTC from BINANCE
 @app.algorithm.strategy(
@@ -55,43 +47,111 @@ app = App(
     limit=100,
     trading_time_unit="ONE_DAY"
 )
-def perform_strategy(context: AlgorithmContext, ohlcv):
-    print(context.get_unallocated("MY_PORTFOLIO"))
-    print(ohlcv)
+def perform_strategy(algorithm, market_data):
+    print(algorithm.get_unallocated())
+    print(market_data["OHLCV"]["BTC/USDT"])
+    print(algorithm.get_positions())
+    print(algorithm.get_orders())
+    algorithm.create_order(
+        side="BUY",  
+        type="LIMIT",
+        target_symbol="BTC", 
+        price=market_data["TICKER"]["BTC/USDT"], 
+        amount_trading_symbol=algorithm.get_unallocated()
+    )
 
 if __name__ == "__main__":
     app.start()
 ```
 
-> **NOTE:** The framework is in **alpha**.
+## Example algorithm for Bitvavo that runs stateless (azure functions, aws lambda, etc..)
+```python
+from investing_algorithm_framework import App, PortfolioConfiguration
 
-The example algorithm makes use of the default data provider, order executor and 
-portfolio manager for BINANCE. However, your can also define your own 
-components for your algorithm making it compatible to any broker of choice.
+app = App()
+app.add_portfolio_configuration(
+    PortfolioConfiguration(
+        market="bitvavo", api_key="xxxx", secret_key="xxxx", trading_symbol="USDT"
+    )
+)
 
-The goal of the framework is to provide you with a set of components for 
-your algorithm that takes care of a wide variety of operational processes 
-out of the box.
+@app.algorithm.strategy(
+    market="BINANCE",
+    target_symbol="BTC",
+    trading_symbol="USDT",
+    trading_data_type="OHLCV",
+    limit=100,
+    trading_time_unit="ONE_DAY"
+)
+def perform_strategy(algorithm, market_data):
+    print(algorithm.get_unallocated())
+    print(market_data["OHLCV"]["BTC/USDT"])
+    print(algorithm.get_positions())
+    print(algorithm.get_orders())
+    algorithm.create_order(
+        side="BUY",  
+        type="LIMIT",
+        target_symbol="BTC", 
+        price=market_data["TICKER"]["BTC/USDT"], 
+        amount_trading_symbol=algorithm.portfolio.get_unallocated()
+    )
 
+if __name__ == "__main__":
+    app.start(stateless=True)
+```
 
-## Features
+## Example algorithm for Bitvavo that has strategy in separate component
+```python
+import os
+from investing_algorithm_framework import App, PortfolioConfiguration, Strategy
 
-- **Data Providing**  
-- **Order execution** 
-- **Portfolio management**
-- **Performance tracking**
-- **Strategy scheduling**
-- **Resource management**
-- **Historic portfolio snapshots**
-- **Order status management**
-- **Clients (Rest API)**
+dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
+app = App(resource_directory=dir_path)
+app.add_portfolio_configuration(
+    PortfolioConfiguration(
+        market="BITVAVO", api_key="xxxx", secret_key="xxxx", trading_symbol="USDT"
+    )
+)
 
-However, we aim to also provide a modular framework where you can write your
-own components or use third party plugins for the framework.
+class MyStrategy(Strategy):
+    interval = 5
+    time_unit = "MINUTE"
+    market = "BITVAVO"
+    target_symbols = ["BTC", "ETH"]
+    trading_symbol = "USDT"
+    
+    def apply_strategy(self, context, market_data):
+        print(context.get_unallocated())
+        print(market_data["OHLCV"]["BTC/USDT"])
+        print(context.get_positions())
+        print(context.get_orders())
+        context.create_order(
+            side="BUY",  
+            type="LIMIT",
+            target_symbol="BTC", 
+            price=market_data["TICKER"]["BTC/USDT"], 
+            amount_trading_symbol=context.portfolio.get_unallocated()
+        )
 
-Further information and the complete documentation can be found 
-at the [website](https://investing-algorithm-framework.com)
+app.add_strategy(MyStrategy)
 
+if __name__ == "__main__":
+    app.start()
+```
+## Broker/Exchange configuration
+The framework has by default support for [ccxt](https://github.com/ccxt/ccxt).
+This should allow you to connect to a lot of brokers/exchanges.
+
+You can specify the tracking date of your portfolio. This will specify to the
+framework from which date your portfolio is tracked.
+
+```python
+from investing_algorithm_framework import App, PortfolioConfiguration
+app = App()
+app.add_portfolio_configuration(
+    PortfolioConfiguration(market="bitvavo", api_key="xxxx", secret_key="xxxx", track_from="01/01/2022")
+)
+```
 
 ## Download
 You can download the framework with pypi.

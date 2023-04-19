@@ -3,12 +3,12 @@ from investing_algorithm_framework.app.stateless.action_handlers \
 from investing_algorithm_framework.app.stateless.action_handlers import Action
 from investing_algorithm_framework.app.stateless.exception_handler import \
     handle_exception
-from investing_algorithm_framework.core.exceptions import OperationalException
+from investing_algorithm_framework.domain.exceptions import OperationalException
 
 
 class StatelessHandler:
 
-    def handler(self, payload, context):
+    def handler(self, payload, algorithm):
         action = StatelessHandler.get_action_type(payload)
 
         try:
