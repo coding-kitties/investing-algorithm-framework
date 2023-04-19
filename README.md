@@ -6,7 +6,7 @@
 <a href="https://www.reddit.com/r/InvestingBots/"><img src="https://img.shields.io/reddit/subreddit-subscribers/investingbots?style=social"></a>
 ###### Sponsors
 <p align="left">
-<a href="https://eltyer.com">
+<a href="https://logicfunds.io">
   <img alt="logicfunds" src="https://logicfunds-web-app-images.s3.eu-central-1.amazonaws.com/logicfunds-logo.png" width="200px" />
 </a>
 </p>
