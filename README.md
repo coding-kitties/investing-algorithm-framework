@@ -44,8 +44,8 @@ app.add_portfolio_configuration(
     time_unit=TimeUnit.SECOND, # Algorithm will be executed every 5 seconds
     interval=5,
     market="binance", # Will retrieve trading data from binance
-    symbols=["BTC/USDT", "ETH/USDT", ["DOT/USDT"]],
-    trading_data_types=[TradingDataType.OHLCV, TradingDataType.TICKER, TradingDataType.ORDER_BOOK],
+    symbols=["BTC/USDT", "ETH/USDT", ["DOT/USDT"]], # Symbols must be in the format of TARGET/TRADE symbol (e.g. BTC/USDT)
+     trading_data_types=[TradingDataType.OHLCV, TradingDataType.TICKER, TradingDataType.ORDER_BOOK],
     trading_time_frame_start_date=datetime.utcnow() - timedelta(days=1), # Will retrieve data from the last 24 hours
     trading_time_frame=TradingTimeFrame.ONE_MINUTE # Will retrieve data on 1m interval (OHLCV)
 )
