@@ -15,141 +15,67 @@
 The Investing Algorithm Framework is a python framework for building
 investment algorithms. It encourages rapid development and clean, pragmatic code design.
 
-The framework provides you with an all the components you need to create an 
-investing algorithm (data providing, portfolio management, order execution, etc..). 
+The framework provides you with all the components you need to create an 
+investing algorithm (data providing, portfolio management, order execution, etc..). Also,
+it has various deployment options, such as web server, stateless, etc..
 
-The goal of the framework is to provide you with a set of components for 
-your algorithm that takes care of a wide variety of operational processes 
-out of the box.
-
-
-## Example algorithm for Binance with web application (flask)
+## Example
+The following algorithm connects to binance and buys BTC every 5 seconds. 
+It also exposes an REST API that allows you to interact with the algorithm.
 ```python
-import os
-from investing_algorithm_framework import App, PortfolioConfiguration
+import pathlib
+from datetime import datetime, timedelta
 
-dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
-app = App()
+from investing_algorithm_framework import create_app, PortfolioConfiguration, \
+    RESOURCE_DIRECTORY, TimeUnit, TradingTimeFrame, TradingDataType
+
+app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 app.add_portfolio_configuration(
     PortfolioConfiguration(
-        market="binance", api_key="xxxx", secret_key="xxxx", trading_symbol="USDT"
+        market="binance",
+        api_key="xxxxxx",
+        secret_key="xxxxxx",
+        trading_symbol="USDT"
     )
 )
 
-# Algorithm strategy that runs every 5 seconds and gets the ticker of BTC from BINANCE
-@app.algorithm.strategy(
-    time_unit="MINUTE",
+
+@app.strategy(
+    time_unit=TimeUnit.SECOND, # Algorithm will be executed every 5 seconds
     interval=5,
-    market="BINANCE",
-    target_symbol="BTC",
-    trading_symbol="USDT",
-    trading_data_type="OHLCV",
-    limit=100,
-    trading_time_unit="ONE_DAY"
+    market="BINANCE", # Will retrieve trading data from binance
+    symbols=["BTC/USDT", "ETH/USDT", ["DOT/USDT"]],
+    trading_data_types=[TradingDataType.OHLCV, TradingDataType.TICKER, TradingDataType.ORDER_BOOK],
+    trading_time_frame_start_date=datetime.utcnow() - timedelta(days=1), # Will retrieve data from the last 24 hours
+    trading_time_frame=TradingTimeFrame.ONE_MINUTE # Will retrieve data on 1m interval (OHLCV)
 )
 def perform_strategy(algorithm, market_data):
+    print(algorithm.get_allocated())
     print(algorithm.get_unallocated())
-    print(market_data["OHLCV"]["BTC/USDT"])
-    print(algorithm.get_positions())
-    print(algorithm.get_orders())
-    algorithm.create_order(
-        side="BUY",  
-        type="LIMIT",
-        target_symbol="BTC", 
-        price=market_data["TICKER"]["BTC/USDT"], 
-        amount_trading_symbol=algorithm.get_unallocated()
-    )
+    print(market_data)
+
 
 if __name__ == "__main__":
-    app.start()
+    app.run()
 ```
 
-## Example algorithm for Bitvavo that runs stateless (azure functions, aws lambda, etc..)
-```python
-from investing_algorithm_framework import App, PortfolioConfiguration
+> You can find more examples in the [examples](./examples) folder.
 
-app = App()
-app.add_portfolio_configuration(
-    PortfolioConfiguration(
-        market="bitvavo", api_key="xxxx", secret_key="xxxx", trading_symbol="USDT"
-    )
-)
-
-@app.algorithm.strategy(
-    market="BINANCE",
-    target_symbol="BTC",
-    trading_symbol="USDT",
-    trading_data_type="OHLCV",
-    limit=100,
-    trading_time_unit="ONE_DAY"
-)
-def perform_strategy(algorithm, market_data):
-    print(algorithm.get_unallocated())
-    print(market_data["OHLCV"]["BTC/USDT"])
-    print(algorithm.get_positions())
-    print(algorithm.get_orders())
-    algorithm.create_order(
-        side="BUY",  
-        type="LIMIT",
-        target_symbol="BTC", 
-        price=market_data["TICKER"]["BTC/USDT"], 
-        amount_trading_symbol=algorithm.portfolio.get_unallocated()
-    )
-
-if __name__ == "__main__":
-    app.start(stateless=True)
-```
-
-## Example algorithm for Bitvavo that has strategy in separate component
-```python
-import os
-from investing_algorithm_framework import App, PortfolioConfiguration, Strategy
-
-dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
-app = App(resource_directory=dir_path)
-app.add_portfolio_configuration(
-    PortfolioConfiguration(
-        market="BITVAVO", api_key="xxxx", secret_key="xxxx", trading_symbol="USDT"
-    )
-)
-
-class MyStrategy(Strategy):
-    interval = 5
-    time_unit = "MINUTE"
-    market = "BITVAVO"
-    target_symbols = ["BTC", "ETH"]
-    trading_symbol = "USDT"
-    
-    def apply_strategy(self, context, market_data):
-        print(context.get_unallocated())
-        print(market_data["OHLCV"]["BTC/USDT"])
-        print(context.get_positions())
-        print(context.get_orders())
-        context.create_order(
-            side="BUY",  
-            type="LIMIT",
-            target_symbol="BTC", 
-            price=market_data["TICKER"]["BTC/USDT"], 
-            amount_trading_symbol=context.portfolio.get_unallocated()
-        )
-
-app.add_strategy(MyStrategy)
-
-if __name__ == "__main__":
-    app.start()
-```
 ## Broker/Exchange configuration
 The framework has by default support for [ccxt](https://github.com/ccxt/ccxt).
 This should allow you to connect to a lot of brokers/exchanges.
 
-You can specify the tracking date of your portfolio. This will specify to the
-framework from which date your portfolio is tracked.
-
 ```python
 from investing_algorithm_framework import App, PortfolioConfiguration
 app = App()
 app.add_portfolio_configuration(
-    PortfolioConfiguration(market="bitvavo", api_key="xxxx", secret_key="xxxx", track_from="01/01/2022")
+    PortfolioConfiguration(
+        market="bitvavo", 
+        api_key="xxxx", 
+        secret_key="xxxx", 
+        track_from="01/01/2022",
+        trading_symbol="EUR"
+    )
 )
 ```
 
