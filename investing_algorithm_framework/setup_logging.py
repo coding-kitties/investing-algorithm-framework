@@ -1,3 +1,6 @@
+import logging
+
+
 def setup_logging(log_level="INFO"):
     DEFAULT_LOGGING = {
         'version': 1,
