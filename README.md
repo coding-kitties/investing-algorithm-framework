@@ -27,7 +27,7 @@ import pathlib
 from datetime import datetime, timedelta
 
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    RESOURCE_DIRECTORY, TimeUnit, TradingTimeFrame, TradingDataType
+    RESOURCE_DIRECTORY, TimeUnit, TradingTimeFrame, TradingDataType, OrderSide
 
 app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 app.add_portfolio_configuration(
@@ -50,10 +50,15 @@ app.add_portfolio_configuration(
     trading_time_frame=TradingTimeFrame.ONE_MINUTE # Will retrieve data on 1m interval (OHLCV)
 )
 def perform_strategy(algorithm, market_data):
-    print(market_data)
     print(algorithm.get_allocated())
     print(algorithm.get_unallocated())
     print(market_data)
+    algorithm.create_limit_order(
+        target_symbol="BTC", 
+        side=OrderSide.BUY,
+        price=market_data["TICKER"]["BTC/USDT"]["BID"], 
+        amount_target_symbol=0.00001
+    )
 
 
 if __name__ == "__main__":
