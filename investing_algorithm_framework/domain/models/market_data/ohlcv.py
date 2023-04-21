@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import pandas as pd
+
 
 class OHLCV:
     DEFAULT_DATETIME_STRING = "%Y-%m-%dT%H:%M:%S.%f%z"
