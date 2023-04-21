@@ -65,7 +65,7 @@ if __name__ == "__main__":
     app.run()
 ```
 
-> You can find more examples in the [examples](./examples) folder.
+> You can find more examples [here](./examples) folder.
 
 ## Broker/Exchange configuration
 The framework has by default support for [ccxt](https://github.com/ccxt/ccxt).
