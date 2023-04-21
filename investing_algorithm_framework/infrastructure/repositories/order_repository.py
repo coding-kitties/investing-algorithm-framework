@@ -1,6 +1,8 @@
 from .repository import Repository
 from investing_algorithm_framework.infrastructure.models import SQLOrder, \
     SQLPosition, SQLPortfolio
+from investing_algorithm_framework.domain import OrderStatus, OrderType, \
+    OrderSide
 
 
 class SQLOrderRepository(Repository):
@@ -11,16 +13,21 @@ class SQLOrderRepository(Repository):
             "external_id", query_params
         )
         portfolio_query_param = self.get_query_param("portfolio_id", query_params)
-        side_query_param = query_params.get("side")
-        type_query_param = query_params.get("type")
-        status_query_param = query_params.get("status")
-        price_query_param = query_params.get("price")
-        amount_query_param = query_params.get("amount")
+        side_query_param = self.get_query_param("side", query_params)
+        type_query_param = self.get_query_param("type", query_params)
+        status_query_param = self.get_query_param("status", query_params)
+        price_query_param = self.get_query_param("price", query_params)
+        amount_target_symbol_query_param = \
+            self.get_query_param("amount_target_symbol", query_params)
+        amount_trading_symbol_query_param = \
+            self.get_query_param("amount_trading_symbol", query_params)
         position_query_param = self.get_query_param(
             "position", query_params, many=True
         )
-        target_symbol_query_param = query_params.get("symbol")
-        trading_symbol_query_param = query_params.get("trading_symbol")
+        target_symbol_query_param = self.get_query_param("symbol", query_params)
+        trading_symbol_query_param = self.get_query_param(
+            "trading_symbol", query_params
+        )
 
         if portfolio_query_param:
             portfolio = db.query(SQLPortfolio).filter_by(
@@ -39,19 +46,29 @@ class SQLOrderRepository(Repository):
             query = query.filter_by(external_id=external_id_query_param)
 
         if side_query_param:
-            query = query.filter(SQLOrder.side == side_query_param)
+            side = OrderSide.from_value(side_query_param)
+            query = query.filter_by(side=side.value)
 
         if type_query_param:
-            query = query.filter(SQLOrder.type == type_query_param)
+            order_type = OrderType.from_value(type_query_param)
+            query = query.filter_by(type=order_type.value)
 
         if status_query_param:
-            query = query.filter(SQLOrder.status == status_query_param)
+            status = OrderStatus.from_value(status_query_param)
+            query = query.filter_by(status=status.value)
 
         if price_query_param:
             query = query.filter(SQLOrder.price == price_query_param)
 
-        if amount_query_param:
-            query = query.filter(SQLOrder.amount == amount_query_param)
+        if amount_target_symbol_query_param:
+            query = query.filter_by(
+                amount_target_symbol=amount_target_symbol_query_param
+            )
+
+        if amount_trading_symbol_query_param:
+            query = query.filter_by(
+                amount_trading_symbol=amount_trading_symbol_query_param
+            )
 
         if position_query_param:
             query = query.filter(SQLOrder.position_id.in_(position_query_param))

@@ -50,6 +50,15 @@ class App:
                     RESOURCE_DIRECTORY.upper(), None
                 )
 
+            if not os.path.exists(resource_dir):
+                try:
+                    os.makedirs(resource_dir)
+                except OSError as e:
+                    logger.error(e)
+                    raise OperationalException(
+                        f"Could not create resource directory: {e}"
+                    )
+
             self._config[DATABASE_DIRECTORY_PATH] = os.path.join(
                 resource_dir, "databases"
             )
@@ -71,6 +80,15 @@ class App:
 
             if not resource_dir:
                 resource_dir = self._config.get(RESOURCE_DIRECTORY.upper(), None)
+
+            if not os.path.exists(resource_dir):
+                try:
+                    os.makedirs(resource_dir)
+                except OSError as e:
+                    logger.error(e)
+                    raise OperationalException(
+                        f"Could not create resource directory: {e}"
+                    )
 
             self._config[DATABASE_DIRECTORY_PATH] = os.path.join(
                 resource_dir, "databases"
@@ -113,7 +131,7 @@ class App:
         portfolio_service = self.container.portfolio_service()
 
         if portfolio_configuration_service.count() == 0:
-            raise ApiException("No portfolios configured")
+            raise OperationalException("No portfolios configured")
 
         self.create_portfolios()
 
@@ -148,7 +166,7 @@ class App:
                     number_of_iterations_since_last_orders_check = 1
 
                 self.algorithm.run_strategies()
-                number_of_iterations += 1
+                number_of_iterations_since_last_orders_check += 1
                 sleep(1)
         except KeyboardInterrupt:
             exit(0)

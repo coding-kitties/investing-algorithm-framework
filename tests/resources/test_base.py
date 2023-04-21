@@ -50,7 +50,6 @@ class FlaskTestBase(FlaskTestCase):
         return self.iaf_app._flask_app
 
     def tearDown(self) -> None:
-        print("tear down")
         database_path = os.path.join(
             os.path.dirname(__file__), "databases/prod-database.sqlite3"
         )

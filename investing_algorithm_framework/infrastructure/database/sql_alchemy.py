@@ -1,4 +1,5 @@
-import os
+from os import mkdir, path
+import logging
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
@@ -7,6 +8,7 @@ from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI, \
     OperationalException, DATABASE_NAME, DATABASE_DIRECTORY_PATH
 
 Session = sessionmaker()
+logger = logging.getLogger(__name__)
 
 
 class SQLAlchemyAdapter:
@@ -20,10 +22,17 @@ class SQLAlchemyAdapter:
         if not app.stateless:
             database_dir = app.config[DATABASE_DIRECTORY_PATH]
             database_name = app.config[DATABASE_NAME]
-            database_path = os.path.join(database_dir, database_name)
+            database_path = path.join(database_dir, database_name)
 
-            if not os.path.exists(database_dir):
-                open(database_path, 'w').close()
+            if not path.exists(database_dir):
+                try:
+                    mkdir(database_dir)
+                    open(database_path, 'w').close()
+                except OSError as e:
+                    logger.error(e)
+                    raise OperationalException(
+                        "Could not create database directory"
+                    )
 
         global Session
         engine = create_engine(app.config[SQLALCHEMY_DATABASE_URI])

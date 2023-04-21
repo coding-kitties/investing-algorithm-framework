@@ -1,3 +1,6 @@
+from investing_algorithm_framework.domain import ApiException
+
+
 class PortfolioConfigurationService:
 
     def __init__(self, portfolio_repository, position_repository, market_service):
@@ -16,6 +19,29 @@ class PortfolioConfigurationService:
                 portfolio_configuration.market == identifier.lower()),
             None
         )
+
+    def find(self, query_params):
+        market = query_params.get("market", None)
+        identifier = query_params.get("market", None)
+
+        if market is not None:
+            return next(
+                (portfolio_configuration for portfolio_configuration in
+                 self.portfolio_configurations if
+                 portfolio_configuration.market == market.lower()),
+                None
+            )
+        elif identifier is not None:
+            return next(
+                (portfolio_configuration for portfolio_configuration in
+                 self.portfolio_configurations if
+                 portfolio_configuration.identifier == identifier.lower()),
+                None
+            )
+        elif market is None and identifier is None:
+            return self.portfolio_configurations[0]
+        else:
+            raise ApiException('Portfolio configuration not found', 404)
 
     def get_all(self):
         return self.portfolio_configurations

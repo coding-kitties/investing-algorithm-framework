@@ -13,6 +13,7 @@ from .utils import random_string, get_version, get_main_version, \
     get_complete_version, append_dict_as_row_to_csv, add_column_headers_to_csv,\
     get_total_amount_of_rows, csv_to_list, StoppableThread
 from .strategy import Strategy
+from .stateless_actions import StatelessActions
 
 __all__ = [
     'Config',
@@ -59,5 +60,6 @@ __all__ = [
     "Position",
     "Order",
     "Strategy",
-    "DATETIME_FORMAT"
+    "DATETIME_FORMAT",
+    "StatelessActions"
 ]

@@ -2,8 +2,7 @@ import logging
 from typing import List
 
 from investing_algorithm_framework.domain import OrderStatus, \
-    Position, Order, Portfolio, OrderType, \
-    OrderSide, ApiException
+    Position, Order, Portfolio, OrderType, OrderSide, ApiException
 
 logger = logging.getLogger(__name__)
 
@@ -222,55 +221,104 @@ class Algorithm:
             }
         )
 
-    def get_positions(self, market=None) -> List[Position]:
-        portfolio = self.portfolio_service.find({{"market": market}})
-        return self.position_service.get_all({"portfolio": portfolio.id})
+    def get_positions(self, market=None, identifier=None) -> List[Position]:
+        query_params = {}
 
-    def get_position(self, symbol, market=None) -> Position:
-        portfolio = self.portfolio_service.find({"market": market})
+        if market is not None:
+            query_params["market"] = market
+
+        if identifier is not None:
+            query_params["identifier"] = identifier
+
+        portfolios = self.portfolio_service.get_all(query_params)
+
+        if not portfolios:
+            raise ApiException("No portfolio found.")
+
+        portfolio = portfolios[0]
+        return self.position_service.get_all({"portfolio": portfolio.identifier})
+
+    def get_position(self, symbol, market=None, identifier=None) -> Position:
+        query_params = {}
+
+        if market is not None:
+            query_params["market"] = market
+
+        if identifier is not None:
+            query_params["identifier"] = identifier
+
+        portfolios = self.portfolio_service.get_all(query_params)
+
+        if not portfolios:
+            raise ApiException("No portfolio found.")
+
+        portfolio = portfolios[0]
         return self.position_service.find(
-            {"portfolio": portfolio.id, "symbol": symbol}
+            {"portfolio": portfolio.identifier, "symbol": symbol}
         )
+
+    def get_position_percentage(self, symbol, market=None, identifier=None) -> float:
+        query_params = {}
+
+        if market is not None:
+            query_params["market"] = market
+
+        if identifier is not None:
+            query_params["identifier"] = identifier
+
+        portfolios = self.portfolio_service.get_all(query_params)
+
+        if not portfolios:
+            raise ApiException("No portfolio found.")
+
+        portfolio = portfolios[0]
+        position = self.position_service.find(
+            {"portfolio": portfolio.identifier, "symbol": symbol}
+        )
+        ticker = self.market_service.get_ticker(
+            f"{symbol.upper()}/{portfolio.trading_symbol.upper()}"
+        )
+        return (position.amount * ticker["bid"] /
+                self.get_allocated(identifier=portfolio.identifier)) * 100
 
     def add_strategies(self, strategies):
         self.strategy_orchestrator_service.add_strategies(strategies)
 
-    def get_allocated(self, portfolio_identifier=None) -> float:
+    def get_allocated(self, market=None, identifier=None) -> float:
 
         if self.portfolio_configuration_service.count() > 1 \
-                and portfolio_identifier is None:
+                and identifier is None and market is None:
             raise ApiException(
                 "Multiple portfolios found. Please specify a "
                 "portfolio identifier."
             )
 
-        if portfolio_identifier is None:
-            portfolios = self.portfolio_service.get_all()
-            allocated = 0
+        if market is not None and identifier is not None:
+            portfolio_configurations = self.portfolio_configuration_service\
+                .get_all()
 
-            for portfolio in portfolios:
-                positions = self.position_service.get_all(
-                    {"portfolio": portfolio.id}
-                )
-
-                for position in positions:
-                    if portfolio.trading_symbol == position.symbol:
-                        continue
-
-                    symbol = f"{position.symbol.upper()}/" \
-                             f"{portfolio.trading_symbol.upper()}"
-                    self.market_service.market = portfolio.market
-                    price = self.market_service.get_ticker(symbol)
-                    allocated = allocated + (position.amount * price["ask"])
-
-            return allocated
         else:
+            query_params = {
+                "market": market,
+                "identifier": identifier
+            }
+            portfolio_configurations = [self.portfolio_configuration_service
+                                        .find(query_params)]
+
+        portfolios = []
+
+        for portfolio_configuration in portfolio_configurations:
             portfolio = self.portfolio_service.find(
-                {"identifier": portfolio_identifier}
+                {"identifier": portfolio_configuration.identifier}
             )
-            allocated = 0
+            portfolio.configuration = portfolio_configuration
+            portfolios.append(portfolio)
+
+        allocated = 0
+
+        for portfolio in portfolios:
             positions = self.position_service.get_all(
-                {"portfolio": portfolio.id}
+                {"portfolio": portfolio.identifier}
             )
 
             for position in positions:
@@ -279,8 +327,9 @@ class Algorithm:
 
                 symbol = f"{position.symbol.upper()}/" \
                          f"{portfolio.trading_symbol.upper()}"
-                self.market_service.market = portfolio.market
+                self.market_service.initialize(portfolio.configuration)
                 price = self.market_service.get_ticker(symbol)
-                allocated = allocated + (position.amount * price["ask"])
+                allocated = allocated + (position.amount * price["bid"])
 
-            return allocated
+        return allocated
+

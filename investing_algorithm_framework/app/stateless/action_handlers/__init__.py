@@ -7,33 +7,33 @@ from investing_algorithm_framework.app.stateless.action_handlers \
 from investing_algorithm_framework.domain.exceptions import OperationalException
 
 
-class Action(Enum):
+class StatelessAction(Enum):
     RUN_STRATEGY = 'RUN_STRATEGY'
-    CHECK_ONLINE = "CHECK_ONLINE"
+    PING = "PING"
 
     @staticmethod
     def from_value(value: str):
-        if isinstance(value, Action):
-            for action in Action:
+        if isinstance(value, StatelessAction):
+            for action in StatelessAction:
 
                 if value == action:
                     return action
 
         if isinstance(value, str):
-            return Action.from_string(value)
+            return StatelessAction.from_string(value)
 
-        raise ValueError("Could not convert value to action")
+        raise ValueError("Could not convert value to stateless action")
 
     @staticmethod
     def from_string(value: str):
 
         if isinstance(value, str):
-            for action in Action:
+            for action in StatelessAction:
 
                 if value.upper() == action.value:
                     return action
 
-        raise ValueError("Could not convert value to action")
+        raise ValueError("Could not convert value to stateless action")
 
     def equals(self, other):
 
@@ -41,7 +41,7 @@ class Action(Enum):
             return self.value == other.value
 
         else:
-            return Action.from_string(other) == self
+            return StatelessAction.from_string(other) == self
 
 
 class ActionHandler:
@@ -59,9 +59,9 @@ class ActionHandler:
     def set_strategy(self, payload):
         action = ActionHandler.get_action_type(payload)
 
-        if Action.RUN_STRATEGY.equals(action):
+        if StatelessAction.RUN_STRATEGY.equals(action):
             self.strategy = RunStrategyHandler()
-        elif Action.CHECK_ONLINE.equals(action):
+        elif StatelessAction.PING.equals(action):
             self.strategy = CheckOnlineHandler()
         else:
             raise OperationalException("Action not supported")

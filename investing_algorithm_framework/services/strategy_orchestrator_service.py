@@ -15,7 +15,26 @@ class StrategyOrchestratorService:
         self.clear()
         self.market_data_service = market_data_service
 
+    def cleanup_threads(self):
+
+        for stoppable in self.threads:
+            if not stoppable.is_alive():
+                # get results from thread
+                stoppable.done = True
+        self.threads = [t for t in self.threads if not t.done]
+
     def run_strategy(self, strategy, algorithm, sync=False):
+        self.cleanup_threads()
+
+        matching_thread = next(
+            (t for t in self.threads if t.name == strategy.worker_id),
+            None
+        )
+
+        # Don't run a strategy that is already running
+        if matching_thread:
+            return
+
         market_data = self.market_data_service.get_data_for_strategy(strategy)
 
         if sync:
@@ -32,6 +51,7 @@ class StrategyOrchestratorService:
                     "algorithm": algorithm
                 }
             )
+            thread.name = strategy.worker_id
             thread.start()
             self.threads.append(thread)
 
