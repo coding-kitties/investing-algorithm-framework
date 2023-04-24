@@ -11,11 +11,11 @@ from flask import Flask
 from investing_algorithm_framework.app.algorithm import Algorithm
 from investing_algorithm_framework.app.stateless import ActionHandler
 from investing_algorithm_framework.app.strategy import TradingStrategy
-from investing_algorithm_framework.app.web import scheduler, create_flask_app
+from investing_algorithm_framework.app.web import create_flask_app
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
     ImproperlyConfigured, SQLALCHEMY_DATABASE_URI, Config, \
-    ApiException, OperationalException
+    OperationalException
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables
 
@@ -63,7 +63,8 @@ class App:
                 resource_dir, "databases"
             )
             self._config[DATABASE_NAME] = "prod-database.sqlite3"
-            self._config[SQLALCHEMY_DATABASE_URI] = "sqlite:///" + os.path.join(
+            self._config[SQLALCHEMY_DATABASE_URI] = \
+                "sqlite:///" + os.path.join(
                 self._config[DATABASE_DIRECTORY_PATH],
                 self._config[DATABASE_NAME]
             )
@@ -79,7 +80,9 @@ class App:
             resource_dir = self._config.get(RESOURCE_DIRECTORY, None)
 
             if not resource_dir:
-                resource_dir = self._config.get(RESOURCE_DIRECTORY.upper(), None)
+                resource_dir = self._config.get(
+                    RESOURCE_DIRECTORY.upper(), None
+                )
 
             if not os.path.exists(resource_dir):
                 try:
@@ -94,10 +97,11 @@ class App:
                 resource_dir, "databases"
             )
             self._config[DATABASE_NAME] = "prod-database.sqlite3"
-            self._config[SQLALCHEMY_DATABASE_URI] = "sqlite:///" + os.path.join(
-                self._config[DATABASE_DIRECTORY_PATH],
-                self._config[DATABASE_NAME]
-            )
+            self._config[SQLALCHEMY_DATABASE_URI] = \
+                "sqlite:///" + os.path.join(
+                    self._config[DATABASE_DIRECTORY_PATH],
+                    self._config[DATABASE_NAME]
+                )
 
         setup_sqlalchemy(self)
         create_all_tables()
@@ -195,7 +199,6 @@ class App:
 
     def reset(self):
         self._started = False
-        scheduler.remove_all_jobs()
         self.algorithm.reset()
 
     def add_portfolio_configuration(self, portfolio_configuration):
@@ -242,20 +245,23 @@ class App:
             )
             self.add_strategy(strategy_object)
         else:
+            start_date = trading_time_frame_start_date
+
             def wrapper(f):
-                strategy_object = TradingStrategy(
-                    decorated=f,
-                    time_unit=time_unit,
-                    interval=interval,
-                    market=market,
-                    trading_data_type=trading_data_type,
-                    trading_data_types=trading_data_types,
-                    symbols=symbols,
-                    trading_time_frame=trading_time_frame,
-                    trading_time_frame_start_date=trading_time_frame_start_date,
-                    worker_id=f.__name__
+                self.add_strategy(
+                    TradingStrategy(
+                        decorated=f,
+                        time_unit=time_unit,
+                        interval=interval,
+                        market=market,
+                        trading_data_type=trading_data_type,
+                        trading_data_types=trading_data_types,
+                        symbols=symbols,
+                        trading_time_frame=trading_time_frame,
+                        trading_time_frame_start_date=start_date,
+                        worker_id=f.__name__
+                    )
                 )
-                self.add_strategy(strategy_object)
                 return f
 
             return wrapper
@@ -295,7 +301,8 @@ class App:
         portfolio_repository = self.container.portfolio_repository()
         position_repository = self.container.position_repository()
 
-        for portfolio_configuration in portfolio_configuration_service.get_all():
+        for portfolio_configuration in \
+                portfolio_configuration_service.get_all():
             market_service.initialize(portfolio_configuration)
             if portfolio_repository.exists(
                 {"identifier": portfolio_configuration.identifier}
@@ -310,7 +317,8 @@ class App:
                 )
 
             unallocated = float(
-                balances[portfolio_configuration.trading_symbol.upper()]["free"]
+                balances[portfolio_configuration.trading_symbol.upper()]
+                ["free"]
             )
             portfolio_repository.create(
                 {

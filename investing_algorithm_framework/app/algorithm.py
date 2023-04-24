@@ -191,7 +191,9 @@ class Algorithm:
 
         if market:
             portfolio = self.portfolio_service.find({"market": market})
-            positions = self.position_service.get_all({"portfolio": portfolio.id})
+            positions = self.position_service.get_all(
+                {"portfolio": portfolio.id}
+            )
             query_params["position"] = [position.id for position in positions]
 
         return self.order_service.find(query_params)
@@ -236,7 +238,9 @@ class Algorithm:
             raise ApiException("No portfolio found.")
 
         portfolio = portfolios[0]
-        return self.position_service.get_all({"portfolio": portfolio.identifier})
+        return self.position_service.get_all(
+            {"portfolio": portfolio.identifier}
+        )
 
     def get_position(self, symbol, market=None, identifier=None) -> Position:
         query_params = {}
@@ -257,7 +261,9 @@ class Algorithm:
             {"portfolio": portfolio.identifier, "symbol": symbol}
         )
 
-    def get_position_percentage(self, symbol, market=None, identifier=None) -> float:
+    def get_position_percentage(
+            self, symbol, market=None, identifier=None
+    ) -> float:
         query_params = {}
 
         if market is not None:
@@ -332,4 +338,3 @@ class Algorithm:
                 allocated = allocated + (position.amount * price["bid"])
 
         return allocated
-

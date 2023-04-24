@@ -12,7 +12,9 @@ class SQLOrderRepository(Repository):
         external_id_query_param = self.get_query_param(
             "external_id", query_params
         )
-        portfolio_query_param = self.get_query_param("portfolio_id", query_params)
+        portfolio_query_param = self.get_query_param(
+            "portfolio_id", query_params
+        )
         side_query_param = self.get_query_param("side", query_params)
         type_query_param = self.get_query_param("type", query_params)
         status_query_param = self.get_query_param("status", query_params)
@@ -24,7 +26,9 @@ class SQLOrderRepository(Repository):
         position_query_param = self.get_query_param(
             "position", query_params, many=True
         )
-        target_symbol_query_param = self.get_query_param("symbol", query_params)
+        target_symbol_query_param = self.get_query_param(
+            "symbol", query_params
+        )
         trading_symbol_query_param = self.get_query_param(
             "trading_symbol", query_params
         )
@@ -36,7 +40,7 @@ class SQLOrderRepository(Repository):
 
             if portfolio is None:
                 return query.filter_by(id=-1)
-            
+
             positions = db.query(SQLPosition).filter_by(
                 portfolio_id=portfolio.id
             ).all()
@@ -71,7 +75,9 @@ class SQLOrderRepository(Repository):
             )
 
         if position_query_param:
-            query = query.filter(SQLOrder.position_id.in_(position_query_param))
+            query = query.filter(SQLOrder.position_id.in_(
+                position_query_param)
+            )
 
         if target_symbol_query_param:
             query = query.filter(

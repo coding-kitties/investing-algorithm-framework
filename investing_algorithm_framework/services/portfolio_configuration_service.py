@@ -3,7 +3,9 @@ from investing_algorithm_framework.domain import ApiException
 
 class PortfolioConfigurationService:
 
-    def __init__(self, portfolio_repository, position_repository, market_service):
+    def __init__(
+            self, portfolio_repository, position_repository, market_service
+    ):
         self.portfolio_repository = portfolio_repository
         self.position_repository = position_repository
         self.market_service = market_service

@@ -11,4 +11,3 @@ def setup_blueprints(flask_app):
     flask_app.register_blueprint(orders_blueprint, prefix="/api")
     flask_app.register_blueprint(positions_blueprint, prefix="/api")
     return flask_app
-

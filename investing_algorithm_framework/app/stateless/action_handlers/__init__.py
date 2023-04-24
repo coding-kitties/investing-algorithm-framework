@@ -4,7 +4,8 @@ from investing_algorithm_framework.app.stateless.action_handlers \
     .check_online_handler import CheckOnlineHandler
 from investing_algorithm_framework.app.stateless.action_handlers \
     .run_strategy_handler import RunStrategyHandler
-from investing_algorithm_framework.domain.exceptions import OperationalException
+from investing_algorithm_framework.domain.exceptions import \
+    OperationalException
 
 
 class StatelessAction(Enum):

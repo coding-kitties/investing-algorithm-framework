@@ -1,7 +1,8 @@
 from .config import Config, Environment
-from .models import OrderStatus, OrderSide, OrderType, TimeInterval, TimeUnit, \
-    TimeFrame, TradingTimeFrame, TradingDataType, Ticker, OHLCV, OrderBook, \
-    PortfolioConfiguration, AssetPrice, Portfolio, Position, Order
+from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
+    TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, Ticker, \
+    OHLCV, OrderBook, PortfolioConfiguration, AssetPrice, Portfolio, \
+    Position, Order
 from .exceptions import OperationalException, ApiException, \
     PermissionDeniedApiException, ImproperlyConfigured
 from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
@@ -10,8 +11,9 @@ from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
     DATETIME_FORMAT
 from .singleton import Singleton
 from .utils import random_string, get_version, get_main_version, \
-    get_complete_version, append_dict_as_row_to_csv, add_column_headers_to_csv,\
-    get_total_amount_of_rows, csv_to_list, StoppableThread
+    get_complete_version, append_dict_as_row_to_csv, \
+    add_column_headers_to_csv, get_total_amount_of_rows, \
+    csv_to_list, StoppableThread
 from .strategy import Strategy
 from .stateless_actions import StatelessActions
 

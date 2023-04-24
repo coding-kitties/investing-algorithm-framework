@@ -85,7 +85,9 @@ class Repository(ABC):
 
             try:
                 query_set = db.query(self.base_class)
-                query_set = self.apply_query_params(db, query_set, query_params)
+                query_set = self.apply_query_params(
+                    db, query_set, query_params
+                )
 
                 for item in query_set.all():
                     item.delete(db)
@@ -102,7 +104,9 @@ class Repository(ABC):
         with Session() as db:
             try:
                 query_set = db.query(self.base_class)
-                query_set = self.apply_query_params(db, query_set, query_params)
+                query_set = self.apply_query_params(
+                    db, query_set, query_params
+                )
                 return query_set.all()
             except SQLAlchemyError as e:
                 logger.error(e)

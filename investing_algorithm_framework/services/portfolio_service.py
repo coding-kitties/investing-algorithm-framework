@@ -47,10 +47,14 @@ class PortfolioService(RepositoryService):
                             {"portfolio_id": portfolio.id, "symbol": symbol}
                         ):
                             position = self.position_repository.find(
-                                {"portfolio_id": portfolio.id, "symbol": symbol}
+                                {
+                                    "portfolio_id": portfolio.id,
+                                    "symbol": symbol
+                                }
                             )
                             self.position_repository.update(
-                                position.id, {"amount": balances[symbol]["free"]}
+                                position.id,
+                                {"amount": balances[symbol]["free"]}
                             )
                         else:
                             self.position_repository.create(

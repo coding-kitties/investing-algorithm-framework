@@ -21,7 +21,7 @@ class OrderService(RepositoryService):
         self.portfolio_repository = portfolio_repository
         self.portfolio_configuration_service = portfolio_configuration_service
 
-    def create(self, data, execute=True, validate = True):
+    def create(self, data, execute=True, validate=True):
         portfolio_id = data["portfolio_id"]
         portfolio = self.portfolio_repository.get(portfolio_id)
 
@@ -71,7 +71,7 @@ class OrderService(RepositoryService):
                     .find(
                         {"portfolio": portfolio.identifier,
                          "symbol": order.trading_symbol}
-                )
+                    )
                 self.position_repository.update(
                     trading_symbol_position.id,
                     {"amount": trading_symbol_position.amount
@@ -117,7 +117,7 @@ class OrderService(RepositoryService):
                 }
         ):
             raise OperationalException(
-                f"Can't add sell order to non existing position"
+                "Can't add sell order to non existing position"
             )
 
         position = self.position_repository\
@@ -155,7 +155,10 @@ class OrderService(RepositoryService):
                       order_data["price"]
         unallocated_position = self.position_repository\
             .find(
-                {"portfolio": portfolio.identifier, "symbol": portfolio.trading_symbol}
+                {
+                    "portfolio": portfolio.identifier,
+                    "symbol": portfolio.trading_symbol
+                }
             )
         amount = unallocated_position.amount
 
@@ -178,7 +181,8 @@ class OrderService(RepositoryService):
 
             if order_data['amount_trading_symbol'] > portfolio.unallocated:
                 raise OperationalException(
-                    f"Market order amount {order_data['amount_trading_symbol']} "
+                    f"Market order amount "
+                    f"{order_data['amount_trading_symbol']}"
                     f"{portfolio.trading_symbol.upper()} is larger then "
                     f"unallocated {portfolio.unallocated} "
                     f"{portfolio.trading_symbol.upper()}"
@@ -227,12 +231,18 @@ class OrderService(RepositoryService):
                 if OrderSide.BUY.equals(updated_order.side):
                     self.position_repository.update(
                         position.id,
-                        {"amount": position.amount + order.amount_target_symbol}
+                        {
+                            "amount": position.amount
+                            + order.amount_target_symbol
+                        }
                     )
                 else:
                     self.position_repository.update(
                         position.id,
-                        {"amount": position.amount - order.amount_target_symbol}
+                        {
+                            "amount": position.amount
+                            - order.amount_target_symbol
+                         }
                     )
                     trading_symbol_position = self.position_repository.find(
                         {"portfolio": portfolio.identifier,

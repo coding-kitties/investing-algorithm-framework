@@ -40,7 +40,8 @@ class MarketDataService:
                             "for OHLCV data"
                         )
 
-                    trading_time_frame_start_date = strategy.trading_time_frame_start_date
+                    trading_time_frame_start_date = \
+                        strategy.trading_time_frame_start_date
 
                     if strategy.trading_time_frame_start_date is not None:
 
@@ -73,7 +74,5 @@ class MarketDataService:
                         .from_value(strategy.trading_time_frame),
                         from_timestamp=trading_time_frame_start_date
                     )
-
-
 
         return data

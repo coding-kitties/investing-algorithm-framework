@@ -11,4 +11,3 @@ class OrderSerializer(Schema):
     status = fields.String(dump_only=True)
     type = fields.String(dump_only=True)
     side = fields.String(dump_only=True)
-

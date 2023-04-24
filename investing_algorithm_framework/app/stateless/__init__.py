@@ -4,7 +4,8 @@ from investing_algorithm_framework.app.stateless.action_handlers import \
     StatelessAction
 from investing_algorithm_framework.app.stateless.exception_handler import \
     handle_exception
-from investing_algorithm_framework.domain.exceptions import OperationalException
+from investing_algorithm_framework.domain.exceptions import \
+    OperationalException
 
 
 class StatelessHandler:
@@ -14,7 +15,8 @@ class StatelessHandler:
 
         try:
             # Handle the action
-            action_handler = ActionHandler.of(StatelessAction.from_string(action))
+            action_handler = ActionHandler.of(StatelessAction
+                                              .from_string(action))
             return action_handler.handle(payload)
         except Exception as e:
             return handle_exception(e)

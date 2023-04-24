@@ -60,4 +60,3 @@ class OperationalException(Exception):
             "status": "error",
             "message": self.error_message
         }
-

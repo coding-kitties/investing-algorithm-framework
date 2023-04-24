@@ -4,5 +4,9 @@ from investing_algorithm_framework.app.strategy import TradingStrategy
 from investing_algorithm_framework.app.stateless import StatelessAction
 
 __all__ = [
-    "App", "create_flask_app", "scheduler", "TradingStrategy", "StatelessAction"
+    "App",
+    "create_flask_app",
+    "scheduler",
+    "TradingStrategy",
+    "StatelessAction"
 ]

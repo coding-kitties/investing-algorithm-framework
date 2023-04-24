@@ -1,6 +1,7 @@
 from datetime import datetime
 from investing_algorithm_framework.domain.models.base_model import BaseModel
-from investing_algorithm_framework.domain.exceptions import ImproperlyConfigured
+from investing_algorithm_framework.domain.exceptions import \
+    ImproperlyConfigured
 
 
 class PortfolioConfiguration(BaseModel):

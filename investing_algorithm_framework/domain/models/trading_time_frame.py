@@ -1,7 +1,8 @@
 from enum import Enum
 from datetime import timedelta, datetime
 
-from investing_algorithm_framework.domain.exceptions import OperationalException
+from investing_algorithm_framework.domain.exceptions import \
+    OperationalException
 
 
 class TradingTimeFrame(Enum):
@@ -72,6 +73,7 @@ class TradingTimeFrame(Enum):
 
         dates.append(datetime.now())
         return dates
+
     def to_ccxt_string(self):
 
         if TradingTimeFrame.ONE_MINUTE.equals(self):

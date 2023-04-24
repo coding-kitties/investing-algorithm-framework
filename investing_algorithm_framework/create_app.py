@@ -10,10 +10,11 @@ def create_app(
 ):
     app = App(config=config, web=web, stateless=stateless)
     app = setup_dependency_container(
-        app, ["investing_algorithm_framework"], ["investing_algorithm_framework"]
+        app,
+        ["investing_algorithm_framework"],
+        ["investing_algorithm_framework"]
     )
 
     if initialize:
         app.initialize()
     return app
-

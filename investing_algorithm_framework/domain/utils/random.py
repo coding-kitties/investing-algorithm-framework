@@ -10,4 +10,3 @@ def random_string(n, spaces: bool = False):
         )
 
     return ''.join(random.choice(string.ascii_lowercase) for _ in range(n))
-

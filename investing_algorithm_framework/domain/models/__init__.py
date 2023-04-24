@@ -5,7 +5,6 @@ from .time_unit import TimeUnit
 from .market_data import OHLCV, OrderBook, Ticker, AssetPrice
 from .trading_data_types import TradingDataType
 from .trading_time_frame import TradingTimeFrame
-from .time_interval import TimeInterval
 from .portfolio import PortfolioConfiguration, Portfolio
 from .position import Position
 

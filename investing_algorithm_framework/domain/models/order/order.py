@@ -1,6 +1,7 @@
 import logging
 
-from investing_algorithm_framework.domain.exceptions import OperationalException
+from investing_algorithm_framework.domain.exceptions import \
+    OperationalException
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.order import OrderStatus, \
     OrderType, OrderSide

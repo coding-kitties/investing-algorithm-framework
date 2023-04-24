@@ -6,7 +6,7 @@ from dateutil.parser import parse
 import ccxt
 
 from investing_algorithm_framework.domain import OperationalException, \
-    OHLCV, AssetPrice, Order, TradingTimeFrame
+    OHLCV, AssetPrice, Order
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +126,8 @@ class MarketService:
             raise OperationalException("Could not retrieve order book")
 
     def get_order(self, order):
-        symbol = f"{order.target_symbol.upper()}/{order.trading_symbol.upper()}"
+        symbol = f"{order.target_symbol.upper()}/" \
+                 f"{order.trading_symbol.upper()}"
 
         if not self.exchange.has['fetchOrder']:
             raise OperationalException(
@@ -381,15 +382,19 @@ class MarketService:
                     sleep(self.exchange.rateLimit / 1000)
                     time_stamp = \
                         ohlcv[-1][0] + \
-                        self.exchange.parse_timeframe(time_frame.to_ccxt_string()) * 1000
+                        self.exchange.parse_timeframe(
+                            time_frame.to_ccxt_string()
+                        ) * 1000
 
-                    ohlcv = [[self.exchange.iso8601(candle[0])] + candle[1:] for
-                             candle in ohlcv]
+                    ohlcv = [[self.exchange.iso8601(candle[0])]
+                             + candle[1:] for candle in ohlcv]
                     df = pd.DataFrame(ohlcv,
                                       columns=['timestamp', 'open', 'high',
                                                'low', 'close', 'volume'])
                     df['timestamp'] = df['timestamp'].apply(lambda x: parse(x))
-                    df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+                    df['timestamp'] = pd.to_datetime(
+                        df['timestamp'], unit='ms'
+                    )
                     df.set_index('timestamp', inplace=True)
                     dfs.append(df)
 
