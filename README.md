@@ -6,8 +6,8 @@
 <a href="https://www.reddit.com/r/InvestingBots/"><img src="https://img.shields.io/reddit/subreddit-subscribers/investingbots?style=social"></a>
 ###### Sponsors
 <p align="left">
-<a href="https://eltyer.com">
-  <img src="https://eltyer-production.s3.eu-central-1.amazonaws.com/logos/eltyer-logo.svg" width="200px" />
+<a href="https://logicfunds.io">
+  <img alt="logicfunds" src="https://logicfunds-web-app-images.s3.eu-central-1.amazonaws.com/logicfunds-logo.png" width="200px" />
 </a>
 </p>
 
@@ -15,83 +15,75 @@
 The Investing Algorithm Framework is a python framework for building
 investment algorithms. It encourages rapid development and clean, pragmatic code design.
 
-The framework provides you with an all the components you need to create an 
-investing algorithm (data providing, portfolio management, order execution, etc..). 
-Also, the algorithm can be controlled with a REST Api that will run in the background.
+The framework provides you with all the components you need to create an 
+investing algorithm (data providing, portfolio management, order execution, etc..). Also,
+it has various deployment options, such as web server, stateless, etc..
 
-
-## Example Algorithm for Binance
+## Example
+The following algorithm connects to binance and buys BTC every 5 seconds. 
+It also exposes an REST API that allows you to interact with the algorithm.
 ```python
-import os
-from investing_algorithm_framework import App, AlgorithmContext
+import pathlib
+from datetime import datetime, timedelta
 
-# Set parent dir as resources' directory (database, manage.py)
-dir_path = os.path.abspath(os.path.join(os.path.realpath(__file__), os.pardir))
+from investing_algorithm_framework import create_app, PortfolioConfiguration, \
+    RESOURCE_DIRECTORY, TimeUnit, TradingTimeFrame, TradingDataType, OrderSide
 
-# Create an application (manages your algorithm, rest api, etc...)
-app = App(
-    resource_directory=dir_path,
-    config={
-        "PORTFOLIOS": {
-            "MY_PORTFOLIO": {
-                "API_KEY": "<YOUR_API_KEY>",
-                "SECRET_KEY": "<YOUR_SECRET_KEY>",
-                "TRADING_SYMBOL": "USDT",
-                "MARKET": "BINANCE",
-            }
-        }
-    }
+app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
+app.add_portfolio_configuration(
+    PortfolioConfiguration(
+        market="binance",
+        api_key="xxxxxx",
+        secret_key="xxxxxx",
+        trading_symbol="USDT"
+    )
 )
 
 
-# Algorithm strategy that runs every 5 seconds and gets the ticker of BTC from BINANCE
-@app.algorithm.strategy(
-    time_unit="MINUTE",
+@app.strategy(
+    time_unit=TimeUnit.SECOND, # Algorithm will be executed every 5 seconds
     interval=5,
-    market="BINANCE",
-    target_symbol="BTC",
-    trading_symbol="USDT",
-    trading_data_type="OHLCV",
-    limit=100,
-    trading_time_unit="ONE_DAY"
+    market="binance", # Will retrieve trading data from binance
+    symbols=["BTC/USDT", "ETH/USDT", ["DOT/USDT"]], # Symbols must be in the format of TARGET/TRADE symbol (e.g. BTC/USDT)
+    trading_data_types=[TradingDataType.OHLCV, TradingDataType.TICKER, TradingDataType.ORDER_BOOK],
+    trading_time_frame_start_date=datetime.utcnow() - timedelta(days=1), # Will retrieve data from the last 24 hours
+    trading_time_frame=TradingTimeFrame.ONE_MINUTE # Will retrieve data on 1m interval (OHLCV)
 )
-def perform_strategy(context: AlgorithmContext, ohlcv):
-    print(context.get_unallocated("MY_PORTFOLIO"))
-    print(ohlcv)
+def perform_strategy(algorithm, market_data):
+    print(algorithm.get_allocated())
+    print(algorithm.get_unallocated())
+    print(market_data)
+    algorithm.create_limit_order(
+        target_symbol="BTC", 
+        side=OrderSide.BUY,
+        price=market_data["TICKER"]["BTC/USDT"]["BID"], 
+        amount_target_symbol=0.00001
+    )
+
 
 if __name__ == "__main__":
-    app.start()
+    app.run()
 ```
 
-> **NOTE:** The framework is in **alpha**.
+> You can find more examples [here](./examples) folder.
 
-The example algorithm makes use of the default data provider, order executor and 
-portfolio manager for BINANCE. However, your can also define your own 
-components for your algorithm making it compatible to any broker of choice.
+## Broker/Exchange configuration
+The framework has by default support for [ccxt](https://github.com/ccxt/ccxt).
+This should allow you to connect to a lot of brokers/exchanges.
 
-The goal of the framework is to provide you with a set of components for 
-your algorithm that takes care of a wide variety of operational processes 
-out of the box.
-
-
-## Features
-
-- **Data Providing**  
-- **Order execution** 
-- **Portfolio management**
-- **Performance tracking**
-- **Strategy scheduling**
-- **Resource management**
-- **Historic portfolio snapshots**
-- **Order status management**
-- **Clients (Rest API)**
-
-However, we aim to also provide a modular framework where you can write your
-own components or use third party plugins for the framework.
-
-Further information and the complete documentation can be found 
-at the [website](https://investing-algorithm-framework.com)
-
+```python
+from investing_algorithm_framework import App, PortfolioConfiguration
+app = App()
+app.add_portfolio_configuration(
+    PortfolioConfiguration(
+        market="bitvavo", 
+        api_key="xxxx", 
+        secret_key="xxxx", 
+        track_from="01/01/2022",
+        trading_symbol="EUR"
+    )
+)
+```
 
 ## Download
 You can download the framework with pypi.

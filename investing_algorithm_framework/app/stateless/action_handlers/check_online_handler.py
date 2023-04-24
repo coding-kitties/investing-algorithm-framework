@@ -6,7 +6,7 @@ from investing_algorithm_framework.app.stateless.action_handlers \
 class CheckOnlineHandler(ActionHandlerStrategy):
     MESSAGE = {"message": "online"}
 
-    def handle_event(self, payload, algorithm_context):
+    def handle_event(self, payload, algorithm):
         return {
             "statusCode": 200,
             "headers": {"Content-Type": "application/json"},

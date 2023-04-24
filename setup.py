@@ -19,8 +19,10 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/coding-kitties/investing-algorithm-framework.git",
     download_url='https://github.com/coding-kitties/investing-algorithm-framework/archive/v0.1.1.tar.gz',
-    packages=setuptools.find_packages(exclude=['tests', 'tests.*']),
-    keywords=['INVESTING', 'BOT', 'ALGORITHM', 'FRAMEWORK'],
+    packages=setuptools.find_packages(
+        exclude=['tests', 'tests.*', 'examples', 'examples.*']
+    ),
+    keywords=['TRADING', 'INVESTING', 'BOT', 'ALGORITHM', 'FRAMEWORK'],
     classifiers=[
         "Intended Audience :: Developers",
         'Programming Language :: Python :: 3',
