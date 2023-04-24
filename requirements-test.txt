@@ -1,2 +1,2 @@
 flake8==3.8.3
-Flask-Testing==0.8.0
+Flask-Testing==0.8.1
