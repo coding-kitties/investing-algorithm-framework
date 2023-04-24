@@ -4,8 +4,7 @@ from investing_algorithm_framework.domain import ApiException, \
     TradingDataType, OrderBook, Ticker, TradingTimeFrame, OHLCV, OrderType,\
     OrderStatus, OrderSide, Config, TimeUnit, TimeInterval, Order, Portfolio, \
     Position
-from investing_algorithm_framework.domain import get_version, \
-    get_complete_version, get_main_version, PortfolioConfiguration, \
+from investing_algorithm_framework.domain import PortfolioConfiguration, \
     RESOURCE_DIRECTORY
 from investing_algorithm_framework.app import TradingStrategy, StatelessAction
 
@@ -23,9 +22,6 @@ __all__ = [
     "OrderStatus",
     "OrderSide",
     "Config",
-    "get_version",
-    "get_complete_version",
-    "get_main_version",
     "PortfolioConfiguration",
     "TimeUnit",
     "TimeInterval",
