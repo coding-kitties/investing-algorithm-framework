@@ -401,7 +401,6 @@ class MarketService:
 
                     ohlcv = [[self.exchange.iso8601(candle[0])]
                              + candle[1:] for candle in ohlcv]
-                    print(ohlcv)
                     df = pd.DataFrame(ohlcv,
                                       columns=['timestamp', 'open', 'high',
                                                'low', 'close', 'volume'])
@@ -418,5 +417,4 @@ class MarketService:
                 logger.exception(e)
                 logger.error(f"Could not retrieve ohclv data for {symbol}")
 
-        print(ohlcvs)
         return ohlcvs

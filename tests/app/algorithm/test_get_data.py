@@ -50,7 +50,7 @@ class Test(TestBase):
         self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
-                market="BITVAVO",
+                market="bitvavo",
                 api_key="test",
                 secret_key="test",
                 trading_symbol="USDT"
