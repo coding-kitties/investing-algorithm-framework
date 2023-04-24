@@ -125,6 +125,19 @@ class MarketService:
             logger.exception(e)
             raise OperationalException("Could not retrieve order book")
 
+    def get_order_books(self, symbols):
+        data = {}
+
+        for symbol in symbols:
+            try:
+                entry = self.get_order_book(symbol)
+                del entry['symbol']
+                data[symbol] = entry
+            except Exception as e:
+                logger.exception(e)
+
+        return data
+
     def get_order(self, order):
         symbol = f"{order.target_symbol.upper()}/" \
                  f"{order.trading_symbol.upper()}"
@@ -388,6 +401,7 @@ class MarketService:
 
                     ohlcv = [[self.exchange.iso8601(candle[0])]
                              + candle[1:] for candle in ohlcv]
+                    print(ohlcv)
                     df = pd.DataFrame(ohlcv,
                                       columns=['timestamp', 'open', 'high',
                                                'low', 'close', 'volume'])
@@ -403,4 +417,6 @@ class MarketService:
             except Exception as e:
                 logger.exception(e)
                 logger.error(f"Could not retrieve ohclv data for {symbol}")
+
+        print(ohlcvs)
         return ohlcvs

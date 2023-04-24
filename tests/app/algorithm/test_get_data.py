@@ -17,7 +17,7 @@ class StrategyOne(TradingStrategy):
     trading_time_frame = TradingTimeFrame.ONE_MINUTE
     trading_time_frame_start_date = datetime.utcnow() - timedelta(days=1)
     symbols = ["ETH/EUR", "BTC/EUR"]
-    market = "BINANCE"
+    market = "BITVAVO"
     market_data = False
 
     def apply_strategy(self, algorithm, market_data):
@@ -50,7 +50,7 @@ class Test(TestBase):
         self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
-                market="BINANCE",
+                market="BITVAVO",
                 api_key="test",
                 secret_key="test",
                 trading_symbol="USDT"

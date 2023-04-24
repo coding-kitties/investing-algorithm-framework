@@ -23,15 +23,9 @@ class MarketDataService:
                     )
 
                 elif TradingDataType.ORDER_BOOK.equals(trading_data_type):
-                    order_books = []
-
-                    for symbol in strategy.symbols:
-                        order_books.append(
-                            self.market_service.get_order_book(symbol)
-                        )
-
-                    data["order_books"] = order_books
-
+                    data["order_books"] = self.market_service.get_order_books(
+                        symbols=strategy.symbols
+                    )
                 elif TradingDataType.OHLCV.equals(trading_data_type):
 
                     if strategy.trading_time_frame is None:
