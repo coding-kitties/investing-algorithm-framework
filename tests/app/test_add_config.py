@@ -26,4 +26,4 @@ class Test(TestBase):
         )
         self.assertIsNotNone(app.config)
         self.assertIsNotNone(app.config.get("test"))
-        self.assertIsNotNone(app.config.get("resource_directory"))
+        self.assertIsNotNone(app.config.get(RESOURCE_DIRECTORY))

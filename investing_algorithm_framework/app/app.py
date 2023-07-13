@@ -37,71 +37,11 @@ class App:
     def initialize(self):
 
         if self._web:
-
-            if RESOURCE_DIRECTORY not in self._config \
-                    and RESOURCE_DIRECTORY.upper() not in self._config:
-                raise ImproperlyConfigured(
-                    "RESOURCE_DIRECTORY not set in configuration"
-                )
-            resource_dir = self._config.get(RESOURCE_DIRECTORY, None)
-
-            if not resource_dir:
-                resource_dir = self._config.get(
-                    RESOURCE_DIRECTORY.upper(), None
-                )
-
-            if not os.path.exists(resource_dir):
-                try:
-                    os.makedirs(resource_dir)
-                except OSError as e:
-                    logger.error(e)
-                    raise OperationalException(
-                        f"Could not create resource directory: {e}"
-                    )
-
-            self._config[DATABASE_DIRECTORY_PATH] = os.path.join(
-                resource_dir, "databases"
-            )
-            self._config[DATABASE_NAME] = "prod-database.sqlite3"
-            self._config[SQLALCHEMY_DATABASE_URI] = \
-                "sqlite:///" + os.path.join(
-                self._config[DATABASE_DIRECTORY_PATH],
-                self._config[DATABASE_NAME]
-            )
-            self._flask_app = create_flask_app(self._config)
+            self._initialize_web()
         elif self._stateless:
-            self._config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
+            self._initialize_stateless()
         else:
-            if RESOURCE_DIRECTORY not in self._config \
-                    and RESOURCE_DIRECTORY.upper() not in self._config:
-                raise ImproperlyConfigured(
-                    "RESOURCE_DIRECTORY not set in configuration"
-                )
-            resource_dir = self._config.get(RESOURCE_DIRECTORY, None)
-
-            if not resource_dir:
-                resource_dir = self._config.get(
-                    RESOURCE_DIRECTORY.upper(), None
-                )
-
-            if not os.path.exists(resource_dir):
-                try:
-                    os.makedirs(resource_dir)
-                except OSError as e:
-                    logger.error(e)
-                    raise OperationalException(
-                        f"Could not create resource directory: {e}"
-                    )
-
-            self._config[DATABASE_DIRECTORY_PATH] = os.path.join(
-                resource_dir, "databases"
-            )
-            self._config[DATABASE_NAME] = "prod-database.sqlite3"
-            self._config[SQLALCHEMY_DATABASE_URI] = \
-                "sqlite:///" + os.path.join(
-                    self._config[DATABASE_DIRECTORY_PATH],
-                    self._config[DATABASE_NAME]
-                )
+            self._initialize_standard()
 
         setup_sqlalchemy(self)
         create_all_tables()
@@ -337,3 +277,91 @@ class App:
                     "portfolio_id": portfolio.id
                 }
             )
+
+    def _initialize_web(self):
+        resource_dir = self._config[RESOURCE_DIRECTORY]
+
+        if resource_dir is None:
+            self._config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
+        else:
+            resource_dir = self._create_resource_directory_if_not_exists()
+            self._config[DATABASE_DIRECTORY_PATH] = os.path.join(
+                resource_dir, "databases"
+            )
+            self._config[DATABASE_NAME] = "prod-database.sqlite3"
+            self._config[SQLALCHEMY_DATABASE_URI] = \
+                "sqlite:///" + os.path.join(
+                    self._config[DATABASE_DIRECTORY_PATH],
+                    self._config[DATABASE_NAME]
+                )
+            self._create_database_if_not_exists()
+
+        self._flask_app = create_flask_app(self._config)
+
+    def _initialize_stateless(self):
+        self._config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
+
+    def _initialize_standard(self):
+        resource_dir = self._config[RESOURCE_DIRECTORY]
+
+        if resource_dir is None:
+            self._config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
+        else:
+            resource_dir = self._create_resource_directory_if_not_exists()
+            self._config[DATABASE_DIRECTORY_PATH] = os.path.join(
+                resource_dir, "databases"
+            )
+            self._config[DATABASE_NAME] = "prod-database.sqlite3"
+            self._config[SQLALCHEMY_DATABASE_URI] = \
+                "sqlite:///" + os.path.join(
+                    self._config[DATABASE_DIRECTORY_PATH],
+                    self._config[DATABASE_NAME]
+                )
+            self._create_database_if_not_exists()
+
+    def _create_resource_directory_if_not_exists(self):
+        if self._stateless:
+            return
+
+        resource_dir = self._config.get(RESOURCE_DIRECTORY, None)
+
+        if resource_dir is None:
+            return
+
+        if not os.path.exists(resource_dir):
+            try:
+                os.makedirs(resource_dir)
+                open(resource_dir, 'w').close()
+            except OSError as e:
+                logger.error(e)
+                raise OperationalException(
+                    "Could not create resource directory"
+                )
+
+        return resource_dir
+
+    def _create_database_if_not_exists(self):
+        if self._stateless:
+            return
+
+        database_dir = self._config.get(DATABASE_DIRECTORY_PATH, None)
+
+        if database_dir is None:
+            return
+
+        database_name = self._config.get(DATABASE_NAME, None)
+
+        if database_name is None:
+            return
+
+        database_path = os.path.join(database_dir, database_name)
+
+        if not os.path.exists(database_dir):
+            try:
+                os.makedirs(database_dir)
+                open(database_path, 'w').close()
+            except OSError as e:
+                logger.error(e)
+                raise OperationalException(
+                    "Could not create database directory"
+                )

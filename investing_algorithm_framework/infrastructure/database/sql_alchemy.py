@@ -1,11 +1,10 @@
-from os import mkdir, path
 import logging
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, StaticPool
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI, \
-    OperationalException, DATABASE_NAME, DATABASE_DIRECTORY_PATH
+    OperationalException
 
 Session = sessionmaker()
 logger = logging.getLogger(__name__)
@@ -14,28 +13,24 @@ logger = logging.getLogger(__name__)
 class SQLAlchemyAdapter:
 
     def __init__(self, app):
-
+        self._app = app
         if SQLALCHEMY_DATABASE_URI not in app.config \
                 or app.config[SQLALCHEMY_DATABASE_URI] is None:
             raise OperationalException("SQLALCHEMY_DATABASE_URI not set")
 
-        if not app.stateless:
-            database_dir = app.config[DATABASE_DIRECTORY_PATH]
-            database_name = app.config[DATABASE_NAME]
-            database_path = path.join(database_dir, database_name)
-
-            if not path.exists(database_dir):
-                try:
-                    mkdir(database_dir)
-                    open(database_path, 'w').close()
-                except OSError as e:
-                    logger.error(e)
-                    raise OperationalException(
-                        "Could not create database directory"
-                    )
-
         global Session
-        engine = create_engine(app.config[SQLALCHEMY_DATABASE_URI])
+
+        if app.config[SQLALCHEMY_DATABASE_URI] != "sqlite:///:memory:":
+            engine = create_engine(
+                app.config[SQLALCHEMY_DATABASE_URI],
+                connect_args={'check_same_thread': False},
+                poolclass=StaticPool
+            )
+        else:
+            engine = create_engine(
+                app.config[SQLALCHEMY_DATABASE_URI],
+            )
+
         Session.configure(bind=engine)
 
 
