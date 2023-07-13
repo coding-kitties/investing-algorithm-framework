@@ -1,5 +1,5 @@
 wrapt==1.11.2
-Flask==2.2.3
+Flask==2.3.2
 Flask-Migrate==2.6.0
 Flask-Cors==3.0.9
 SQLAlchemy==2.0.5.post1
