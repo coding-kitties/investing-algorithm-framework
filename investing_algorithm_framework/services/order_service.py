@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
     OperationalException, OrderStatus
 from investing_algorithm_framework.services.repository_service \
@@ -9,50 +11,78 @@ class OrderService(RepositoryService):
     def __init__(
         self,
         order_repository,
+        order_fee_repository,
         market_service,
         position_repository,
+        position_cost_repository,
         portfolio_repository,
         portfolio_configuration_service,
     ):
         super(OrderService, self).__init__(order_repository)
         self.order_repository = order_repository
+        self.order_fee_repository = order_fee_repository
         self.market_service = market_service
         self.position_repository = position_repository
+        self.position_cost_repository = position_cost_repository
         self.portfolio_repository = portfolio_repository
         self.portfolio_configuration_service = portfolio_configuration_service
 
-    def create(self, data, execute=True, validate=True):
+    def create(self, data, execute=True, validate=True, sync=True):
         portfolio_id = data["portfolio_id"]
         portfolio = self.portfolio_repository.get(portfolio_id)
 
         if validate:
             self.validate_order(data, portfolio)
 
+        order_fee = None
+
+        if "fee" in data:
+            order_fee = data.pop("fee")
+
         del data["portfolio_id"]
         symbol = data["target_symbol"]
-        self.validate_order(data, portfolio)
 
-        if not self.position_repository.exists(
-            {"portfolio": portfolio.identifier, "symbol": symbol}
-        ):
-            self.position_repository\
-                .create({"portfolio_id": portfolio.id, "symbol": symbol})
-            position = self.position_repository \
-                .find({"portfolio": portfolio.identifier, "symbol": symbol})
-        else:
-            position = self.position_repository\
-                .find({"portfolio": portfolio.identifier, "symbol": symbol})
+        if validate:
+            self.validate_order(data, portfolio)
 
+        position = self._create_position_if_not_exists(symbol, portfolio)
         data["position_id"] = position.id
         order = self.order_repository.create(data)
         order_id = order.id
+
+        if order_fee:
+            order_fee["order_id"] = order_id
+            self.order_fee_repository.create(order_fee)
 
         if execute:
             portfolio.configuration = self.portfolio_configuration_service\
                 .get(portfolio.identifier)
             self.execute_order(order_id, portfolio)
 
+        if sync:
+            if OrderSide.BUY.equals(order.get_side()):
+                self._sync_portfolio_with_created_buy_order(order)
+            else:
+                self._sync_portfolio_with_created_sell_order(order)
+
         return order
+
+    def update(self, object_id, data):
+
+        if "fee" in data:
+            order_fee_data = data.pop("fee")
+
+            if self.order_fee_repository.exists({"order_id": object_id}):
+                order_fee = self.order_fee_repository.find({"order_id": object_id})
+                self.order_fee_repository.update(order_fee.id, order_fee_data)
+            else:
+                order_fee_data["order_id"] = object_id
+                self.order_fee_repository.create(order_fee_data)
+
+        return self.order_repository.update(object_id, data)
+
+    def get_order_fee(self, order_id):
+        return self.order_fee_repository.find({"order": order_id})
 
     def execute_order(self, order_id, portfolio):
         self.market_service.initialize(portfolio.configuration)
@@ -64,25 +94,15 @@ class OrderService(RepositoryService):
                 self.market_service.create_limit_buy_order(
                     target_symbol=order.get_target_symbol(),
                     trading_symbol=order.get_trading_symbol(),
-                    amount=order.get_amount_target_symbol(),
+                    amount=order.get_amount(),
                     price=order.get_price
-                )
-                trading_symbol_position = self.position_repository \
-                    .find(
-                        {"portfolio": portfolio.identifier,
-                         "symbol": order.trading_symbol}
-                    )
-                self.position_repository.update(
-                    trading_symbol_position.id,
-                    {"amount": trading_symbol_position.amount
-                        - order.amount_trading_symbol}
                 )
                 return order
             else:
                 self.market_service.create_limit_sell_order(
                     target_symbol=order.get_target_symbol(),
                     trading_symbol=order.get_trading_symbol(),
-                    amount=order.get_amount_target_symbol(),
+                    amount=order.get_amount(),
                     price=order.get_price()
                 )
                 return order
@@ -93,7 +113,7 @@ class OrderService(RepositoryService):
                 self.market_service.create_market_sell_order(
                     target_symbol=order.get_target_symbol(),
                     trading_symbol=order.get_trading_symbol(),
-                    amount=order.get_amount_target_symbol(),
+                    amount=order.get_amount(),
                 )
             return order
 
@@ -111,10 +131,10 @@ class OrderService(RepositoryService):
 
     def validate_sell_order(self, order_data, portfolio):
         if not self.position_repository.exists(
-                {
-                    "symbol": order_data["target_symbol"],
-                    "portfolio": portfolio.identifier
-                }
+            {
+                "symbol": order_data["target_symbol"],
+                "portfolio": portfolio.identifier
+            }
         ):
             raise OperationalException(
                 "Can't add sell order to non existing position"
@@ -128,7 +148,7 @@ class OrderService(RepositoryService):
                 }
             )
 
-        if position.amount < order_data["amount_target_symbol"]:
+        if position.amount < order_data["amount"]:
             raise OperationalException(
                 "Order amount is larger then amount of open position"
             )
@@ -151,8 +171,7 @@ class OrderService(RepositoryService):
             )
 
     def validate_limit_order(self, order_data, portfolio):
-        total_price = order_data["amount_target_symbol"] * \
-                      order_data["price"]
+        total_price = order_data["amount"] * order_data["price"]
         unallocated_position = self.position_repository\
             .find(
                 {
@@ -173,16 +192,16 @@ class OrderService(RepositoryService):
 
         if OrderSide.BUY.equals(order_data["side"]):
 
-            if "amount_trading_symbol" not in order_data:
+            if "amount" not in order_data:
                 raise OperationalException(
                     f"Market order needs an amount specified in the trading "
                     f"symbol {order_data['trading_symbol']}"
                 )
 
-            if order_data['amount_trading_symbol'] > portfolio.unallocated:
+            if order_data['amount'] > portfolio.unallocated:
                 raise OperationalException(
                     f"Market order amount "
-                    f"{order_data['amount_trading_symbol']}"
+                    f"{order_data['amount']}"
                     f"{portfolio.trading_symbol.upper()} is larger then "
                     f"unallocated {portfolio.unallocated} "
                     f"{portfolio.trading_symbol.upper()}"
@@ -201,7 +220,7 @@ class OrderService(RepositoryService):
                     "Can't add market sell order to non existing position"
                 )
 
-            if order_data['amount_target_symbol'] > position.amount:
+            if order_data['amount'] > position.amount:
                 raise OperationalException(
                     "Sell order amount larger then position size"
                 )
@@ -221,63 +240,185 @@ class OrderService(RepositoryService):
                     .equals(order.status):
                 continue
 
-            updated_order = self.update(
-                order.id, {"status": external_order.status}
-            )
-            position = self.position_repository.get(updated_order.position_id)
+            updated_order = self.update(order.id, external_order.to_dict())
 
             if OrderStatus.SUCCESS.equals(updated_order.status):
 
                 if OrderSide.BUY.equals(updated_order.side):
-                    self.position_repository.update(
-                        position.id,
-                        {
-                            "amount": position.amount
-                            + order.amount_target_symbol
-                        }
+                    self._sync_portfolio_with_executed_buy_order(updated_order)
+                else:
+                    self._sync_portfolio_with_executed_sell_order(updated_order)
+            elif OrderStatus.CANCELED.equals(updated_order.status):
+
+                if OrderSide.BUY.equals(updated_order.side):
+                    self._sync_portfolio_with_cancelled_buy_order(
+                        updated_order
                     )
                 else:
-                    self.position_repository.update(
-                        position.id,
-                        {
-                            "amount": position.amount
-                            - order.amount_target_symbol
-                         }
+                    self._sync_portfolio_with_cancelled_sell_order(
+                        updated_order
                     )
-                    trading_symbol_position = self.position_repository.find(
-                        {"portfolio": portfolio.identifier,
-                         "symbol": order.trading_symbol}
-                    )
+            elif OrderStatus.FAILED.equals(updated_order.status):
 
-                    if OrderType.LIMIT.equals(order.type):
-                        self.position_repository.update(
-                            trading_symbol_position.id,
-                            {
-                                "amount":
-                                    trading_symbol_position.amount
-                                    + order.amount_trading_symbol
-                            }
-                        )
-                    else:
-                        updated_order = self.order_repository.update(
-                            updated_order.id, {"price": external_order.price}
-                        )
+                if OrderSide.BUY.equals(updated_order.side):
+                    self._sync_portfolio_with_failed_buy_order(updated_order)
+                else:
+                    self._sync_portfolio_with_failed_sell_order(updated_order)
 
-                        if OrderType.MARKET.equals(updated_order.type):
-                            updated_order = self.order_repository.update(
-                                updated_order.id,
-                                {
-                                    "amount_trading_symbol":
-                                        updated_order.amount_target_symbol
-                                        * updated_order.price
-                                }
-                            )
+    def _create_position_if_not_exists(self, symbol, portfolio):
+        if not self.position_repository.exists(
+            {"portfolio": portfolio.identifier, "symbol": symbol}
+        ):
+            self.position_repository \
+                .create({"portfolio_id": portfolio.id, "symbol": symbol})
+            position = self.position_repository \
+                .find({"portfolio": portfolio.identifier, "symbol": symbol})
+        else:
+            position = self.position_repository \
+                .find({"portfolio": portfolio.identifier, "symbol": symbol})
 
-                        self.position_repository.update(
-                            trading_symbol_position.id,
-                            {
-                                "amount":
-                                    trading_symbol_position.amount
-                                    + updated_order.amount_trading_symbol
-                            }
-                        )
+        return position
+
+    def _sync_portfolio_with_created_buy_order(self, order):
+        position = self.position_repository.get(order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        trading_symbol_position = self.position_repository.find(
+            {
+                "portfolio": portfolio.identifier,
+                "symbol": portfolio.trading_symbol
+            }
+        )
+        self.portfolio_repository.update(
+            portfolio.id,
+            {"unallocated": portfolio.unallocated - order.amount * order.price}
+        )
+        self.position_repository.update(
+            trading_symbol_position.id,
+            {
+                "amount": trading_symbol_position.amount - order.amount * order.price
+            }
+        )
+
+    def _sync_portfolio_with_created_sell_order(self, order):
+        position = self.position_repository.get(order.position_id)
+        self.position_repository.update(
+            position.id,
+            {
+                "amount": position.amount - order.amount
+            }
+        )
+
+    def _sync_portfolio_with_executed_buy_order(self, order):
+        position = self.position_repository.get(order.position_id)
+        self.position_cost_repository.create(
+            {
+                "position_id": position.id,
+                "price": order.price,
+                "amount": order.amount,
+                "created_at": order.created_at,
+            }
+        )
+        self.position_repository.update(
+            position.id, {"amount": position.amount + order.amount}
+        )
+
+    def _sync_portfolio_with_executed_sell_order(self, order):
+        position = self.position_repository.get(order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+        amount_to_sell = order.amount
+        net_gain = 0
+        revenue = order.amount * order.price
+        total_cost = 0
+
+        while amount_to_sell > 0:
+            position_cost = self.position_cost_repository.find(
+                {"position": position.id}
+            )
+            if position_cost is None:
+                break
+
+            if position_cost.amount > amount_to_sell:
+                net_gain += amount_to_sell * \
+                            (order.price - position_cost.price)
+                self.position_cost_repository.update(
+                    position_cost.id,
+                    {"amount": position_cost.amount - amount_to_sell}
+                )
+                amount_to_sell = 0
+            else:
+                net_gain += position_cost.amount * (order.price - position_cost.price)
+                total_cost += position_cost.amount * position_cost.price
+                amount_to_sell -= position_cost.amount
+                self.position_cost_repository.delete(position_cost.id)
+
+            # Update the buy order net gain
+            buy_order = self.order_repository.find(
+                {
+                    "position": position.id,
+                    "side": OrderSide.BUY.value,
+                    "created_at": position_cost.created_at
+                }
+            )
+
+            if buy_order is not None:
+                self.order_repository.update(
+                    buy_order.id,
+                    {
+                        "net_gain": buy_order.net_gain + net_gain,
+                        "trade_closed_at": datetime.now(),
+                        "trade_closing_price": order.price,
+                    }
+                )
+
+        # Update the portfolio
+        self.portfolio_repository.update(
+            portfolio.id,
+            {
+                "unallocated": portfolio.unallocated + revenue,
+                "total_net_gain": portfolio.total_net_gain + net_gain,
+            }
+        )
+
+    def _sync_portfolio_with_cancelled_buy_order(self, order):
+        position = self.position_repository.find({"id": order.position_id})
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+
+        if OrderType.LIMIT.equals(order.type):
+            self.portfolio_repository.update(
+                portfolio.id,
+                {
+                    "unallocated":
+                        portfolio.unallocated + order.amount * order.price
+                }
+            )
+
+    def _sync_portfolio_with_cancelled_sell_order(self, order):
+        position = self.position_repository.find({"id": order.position_id})
+        self.position_repository.update(
+            position.id,
+            {
+                "amount": position.amount + order.amount
+            }
+        )
+
+    def _sync_portfolio_with_failed_buy_order(self, order):
+        position = self.position_repository.find({"id": order.position_id})
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
+
+        if OrderType.LIMIT.equals(order.type):
+            self.portfolio_repository.update(
+                portfolio.id,
+                {
+                    "unallocated":
+                        portfolio.unallocated + order.amount * order.price
+                }
+            )
+
+    def _sync_portfolio_with_failed_sell_order(self, order):
+        position = self.position_repository.find({"id": order.position_id})
+        self.position_repository.update(
+            position.id,
+            {
+                "amount": position.amount + order.amount
+            }
+        )

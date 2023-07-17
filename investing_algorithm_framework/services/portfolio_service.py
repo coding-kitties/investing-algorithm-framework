@@ -8,14 +8,14 @@ class PortfolioService(RepositoryService):
         self,
         market_service,
         position_repository,
-        order_repository,
+        order_service,
         portfolio_repository,
         portfolio_configuration_service,
     ):
         self.market_service = market_service
         self.position_repository = position_repository
         self.portfolio_configuration_service = portfolio_configuration_service
-        self.order_repository = order_repository
+        self.order_service = order_service
         super(PortfolioService, self).__init__(portfolio_repository)
 
     def create(self, data):
@@ -79,11 +79,20 @@ class PortfolioService(RepositoryService):
                     )
 
                 for external_order in external_orders:
-                    if self.order_repository.exists(
+
+                    if self.order_service.exists(
                         {"external_id": external_order.external_id}
                     ):
-                        continue
-
-                    data = external_order.to_dict()
-                    data["position_id"] = position.id
-                    self.order_repository.create(data)
+                        order = self.order_service.find(
+                            {"external_id": external_order.external_id}
+                        )
+                        self.order_service.update(
+                            order.id, external_order.to_dict()
+                        )
+                    else:
+                        data = external_order.to_dict()
+                        data["position_id"] = position.id
+                        data["portfolio_id"] = portfolio.id
+                        self.order_service.create(
+                            data, execute=False, validate=False, sync=False
+                        )

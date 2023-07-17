@@ -19,6 +19,12 @@ class SQLPosition(SQLBaseModel, Position, SQLAlchemyModelExtension):
         lazy="dynamic",
         cascade="all, delete-orphan"
     )
+    position_costs = relationship(
+        "SQLPositionCost",
+        back_populates="position",
+        lazy="dynamic",
+        cascade="all, delete-orphan"
+    )
     portfolio_id = Column(Integer, ForeignKey('portfolios.id'))
     portfolio = relationship("SQLPortfolio", back_populates="positions")
     __table_args__ = (

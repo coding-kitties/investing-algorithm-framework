@@ -16,10 +16,11 @@ class StrategyOne(TradingStrategy):
     ):
         algorithm.create_order(
             target_symbol="BTC",
-            amount_target_symbol=1,
+            amount=1,
             price=10,
             side="BUY",
             type="LIMIT",
+            execute=False
         )
 
 
@@ -66,4 +67,3 @@ class Test(TestBase):
         self.assertEqual("SUCCESS", order.status)
         position = position_repository.find({"symbol": "BTC"})
         self.assertEqual(1, position.amount)
-

@@ -14,8 +14,8 @@
 #             amount=10, price=10, target_symbol="TEST"
 #         )
 #         self.assertIsNotNone(order.external_id)
-#         self.assertIsNotNone(order.amount_target_symbol)
-#         self.assertIsNotNone(order.amount_trading_symbol)
+#         self.assertIsNotNone(order.amount)
+#         self.assertIsNotNone(order.amount)
 #         self.assertIsNotNone(order.price)
 #         self.assertIsNotNone(order.target_symbol)
 #         self.assertIsNotNone(order.trading_symbol)
@@ -70,7 +70,7 @@
 #
 #         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
 #         order = portfolio.get_order(10)
-#         self.assertIsNotNone(order.get_amount_trading_symbol())
+#         self.assertIsNotNone(order.get_amount())
 #
 #     def test_get_amount_of_target_symbol(self):
 #         portfolio_manager = self.algo_app.algorithm \
@@ -86,7 +86,7 @@
 #
 #         portfolio = portfolio_manager.get_portfolio(algorithm_context=None)
 #         order = portfolio.get_order(10)
-#         self.assertIsNotNone(order.get_amount_target_symbol())
+#         self.assertIsNotNone(order.get_amount())
 #
 #     def test_get_initial_price(self):
 #         portfolio_manager = self.algo_app.algorithm \
@@ -192,7 +192,7 @@
 #             {
 #                 "reference_id": 10493,
 #                 "symbol": "DOT/USDT",
-#                 "amount_target_symbol": 40,
+#                 "amount": 40,
 #                 "status": "PENDING",
 #                 "price": 10,
 #                 "type": "LIMIT",
@@ -208,7 +208,7 @@
 #                 "reference_id": 10493,
 #                 "target_symbol": "DOT",
 #                 "trading_symbol": "USDT",
-#                 "amount_target_symbol": 40,
+#                 "amount": 40,
 #                 "status": "PENDING",
 #                 "price": 10,
 #                 "type": "LIMIT",
@@ -219,8 +219,8 @@
 #         self.assertIsNotNone(order.get_reference_id())
 #         self.assertIsNotNone(order.get_target_symbol())
 #         self.assertIsNotNone(order.get_trading_symbol())
-#         self.assertIsNotNone(order.get_amount_target_symbol())
-#         self.assertIsNotNone(order.get_amount_trading_symbol())
+#         self.assertIsNotNone(order.get_amount())
+#         self.assertIsNotNone(order.get_amount())
 #         self.assertIsNotNone(order.get_status())
 #         self.assertIsNotNone(order.get_side())
 #         self.assertIsNotNone(order.get_type())
@@ -232,7 +232,7 @@
 #                 "reference_id": 10493,
 #                 "target_symbol": "DOT",
 #                 "trading_symbol": "USDT",
-#                 "amount_target_symbol": 40,
+#                 "amount": 40,
 #                 "status": "CLOSED",
 #                 "price": 10,
 #                 "initial_price": 10,
@@ -244,8 +244,8 @@
 #         self.assertIsNotNone(order.get_reference_id())
 #         self.assertIsNotNone(order.get_target_symbol())
 #         self.assertIsNotNone(order.get_trading_symbol())
-#         self.assertIsNotNone(order.get_amount_target_symbol())
-#         self.assertIsNotNone(order.get_amount_trading_symbol())
+#         self.assertIsNotNone(order.get_amount())
+#         self.assertIsNotNone(order.get_amount())
 #         self.assertIsNotNone(order.get_status())
 #         self.assertIsNotNone(order.get_side())
 #         self.assertIsNotNone(order.get_type())
@@ -257,7 +257,7 @@
 #                     "reference_id": 10493,
 #                     "target_symbol": "DOT",
 #                     "trading_symbol": "USDT",
-#                     "amount_target_symbol": 40,
+#                     "amount": 40,
 #                     "status": "CLOSED",
 #                     "price": 10,
 #                     "type": "LIMIT",
@@ -271,7 +271,7 @@
 #                 "reference_id": 10493,
 #                 "target_symbol": "DOT",
 #                 "trading_symbol": "USDT",
-#                 "amount_target_symbol": 40,
+#                 "amount": 40,
 #                 "status": "CLOSED",
 #                 "initial_price": 10,
 #                 "closing_price": 11,
@@ -283,8 +283,8 @@
 #         self.assertIsNotNone(order.get_reference_id())
 #         self.assertIsNotNone(order.get_target_symbol())
 #         self.assertIsNotNone(order.get_trading_symbol())
-#         self.assertIsNotNone(order.get_amount_target_symbol())
-#         self.assertIsNotNone(order.get_amount_trading_symbol())
+#         self.assertIsNotNone(order.get_amount())
+#         self.assertIsNotNone(order.get_amount())
 #         self.assertIsNotNone(order.get_status())
 #         self.assertIsNotNone(order.get_side())
 #         self.assertIsNotNone(order.get_type())
@@ -297,7 +297,7 @@
 #                     "reference_id": 10493,
 #                     "target_symbol": "DOT",
 #                     "trading_symbol": "USDT",
-#                     "amount_target_symbol": 40,
+#                     "amount": 40,
 #                     "status": "CLOSED",
 #                     "price": 10,
 #                     "type": "LIMIT",
@@ -311,7 +311,7 @@
 #                 "reference_id": 10493,
 #                 "target_symbol": "DOT",
 #                 "trading_symbol": "USDT",
-#                 "amount_target_symbol": 40,
+#                 "amount": 40,
 #                 "status": "PENDING",
 #                 "price": 10,
 #                 "type": "LIMIT",
@@ -322,8 +322,8 @@
 #         self.assertIsNotNone(order.get_reference_id())
 #         self.assertIsNotNone(order.get_target_symbol())
 #         self.assertIsNotNone(order.get_trading_symbol())
-#         self.assertIsNotNone(order.get_amount_target_symbol())
-#         self.assertIsNotNone(order.get_amount_trading_symbol())
+#         self.assertIsNotNone(order.get_amount())
+#         self.assertIsNotNone(order.get_amount())
 #         self.assertIsNotNone(order.get_status())
 #         self.assertIsNotNone(order.get_side())
 #         self.assertIsNotNone(order.get_type())
@@ -335,7 +335,7 @@
 #                 "reference_id": 10493,
 #                 "target_symbol": "DOT",
 #                 "trading_symbol": "USDT",
-#                 "amount_target_symbol": 40,
+#                 "amount": 40,
 #                 "status": "CLOSED",
 #                 "price": 10,
 #                 "initial_price": 9,
@@ -347,8 +347,8 @@
 #         self.assertIsNotNone(order.get_reference_id())
 #         self.assertIsNotNone(order.get_target_symbol())
 #         self.assertIsNotNone(order.get_trading_symbol())
-#         self.assertIsNotNone(order.get_amount_target_symbol())
-#         self.assertIsNotNone(order.get_amount_trading_symbol())
+#         self.assertIsNotNone(order.get_amount())
+#         self.assertIsNotNone(order.get_amount())
 #         self.assertIsNotNone(order.get_status())
 #         self.assertIsNotNone(order.get_side())
 #         self.assertIsNotNone(order.get_type())
@@ -360,7 +360,7 @@
 #                 "reference_id": 10493,
 #                 "target_symbol": "DOT",
 #                 "trading_symbol": "USDT",
-#                 "amount_target_symbol": 40,
+#                 "amount": 40,
 #                 "status": "CLOSED",
 #                 "closing_price": 10,
 #                 "initial_price": 9,
@@ -372,8 +372,8 @@
 #         self.assertIsNotNone(order.get_reference_id())
 #         self.assertIsNotNone(order.get_target_symbol())
 #         self.assertIsNotNone(order.get_trading_symbol())
-#         self.assertIsNotNone(order.get_amount_target_symbol())
-#         self.assertIsNotNone(order.get_amount_trading_symbol())
+#         self.assertIsNotNone(order.get_amount())
+#         self.assertIsNotNone(order.get_amount())
 #         self.assertIsNotNone(order.get_status())
 #         self.assertIsNotNone(order.get_side())
 #         self.assertIsNotNone(order.get_type())
@@ -385,7 +385,7 @@
 #                 "reference_id": 10493,
 #                 "target_symbol": "DOT",
 #                 "trading_symbol": "USDT",
-#                 "amount_target_symbol": 40,
+#                 "amount": 40,
 #                 "status": "PENDING",
 #                 "price": 10,
 #                 "type": "MARKET",
@@ -396,8 +396,8 @@
 #         self.assertIsNotNone(order.get_reference_id())
 #         self.assertIsNotNone(order.get_target_symbol())
 #         self.assertIsNotNone(order.get_trading_symbol())
-#         self.assertIsNotNone(order.get_amount_target_symbol())
-#         self.assertIsNone(order.get_amount_trading_symbol())
+#         self.assertIsNotNone(order.get_amount())
+#         self.assertIsNone(order.get_amount())
 #         self.assertIsNotNone(order.get_status())
 #         self.assertIsNotNone(order.get_side())
 #         self.assertIsNotNone(order.get_type())
@@ -409,7 +409,7 @@
 #                 "reference_id": 10493,
 #                 "target_symbol": "DOT",
 #                 "trading_symbol": "USDT",
-#                 "amount_target_symbol": 40,
+#                 "amount": 40,
 #                 "status": "CLOSED",
 #                 "price": 10,
 #                 "initial_price": 9,
@@ -421,8 +421,8 @@
 #         self.assertIsNotNone(order.get_reference_id())
 #         self.assertIsNotNone(order.get_target_symbol())
 #         self.assertIsNotNone(order.get_trading_symbol())
-#         self.assertIsNotNone(order.get_amount_target_symbol())
-#         self.assertIsNotNone(order.get_amount_trading_symbol())
+#         self.assertIsNotNone(order.get_amount())
+#         self.assertIsNotNone(order.get_amount())
 #         self.assertIsNotNone(order.get_status())
 #         self.assertIsNotNone(order.get_side())
 #         self.assertIsNotNone(order.get_type())
@@ -434,7 +434,7 @@
 #                 "reference_id": 10493,
 #                 "target_symbol": "DOT",
 #                 "trading_symbol": "USDT",
-#                 "amount_target_symbol": 40,
+#                 "amount": 40,
 #                 "status": "CLOSED",
 #                 "closing_price": 10,
 #                 "initial_price": 9,
@@ -446,8 +446,8 @@
 #         self.assertIsNotNone(order.get_reference_id())
 #         self.assertIsNotNone(order.get_target_symbol())
 #         self.assertIsNotNone(order.get_trading_symbol())
-#         self.assertIsNotNone(order.get_amount_target_symbol())
-#         self.assertIsNotNone(order.get_amount_trading_symbol())
+#         self.assertIsNotNone(order.get_amount())
+#         self.assertIsNotNone(order.get_amount())
 #         self.assertIsNotNone(order.get_status())
 #         self.assertIsNotNone(order.get_side())
 #         self.assertIsNotNone(order.get_type())
