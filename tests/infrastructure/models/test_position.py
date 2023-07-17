@@ -47,7 +47,7 @@
 #                     "reference_id": 2,
 #                     "target_symbol": self.TARGET_SYMBOL_A,
 #                     "trading_symbol": "usdt",
-#                     "amount_target_symbol": 4,
+#                     "amount": 4,
 #                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "status": OrderStatus.PENDING.value,
 #                     "side": OrderSide.BUY.value,
@@ -59,7 +59,7 @@
 #                     "reference_id": 3,
 #                     "target_symbol": self.TARGET_SYMBOL_A,
 #                     "trading_symbol": "usdt",
-#                     "amount_target_symbol": 4,
+#                     "amount": 4,
 #                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "status": OrderStatus.CLOSED.value,
 #                     "initial_price": self.get_price(
@@ -126,7 +126,7 @@
 #                         'reference_id': 2,
 #                         "target_symbol": "DOT",
 #                         "trading_symbol": "USDT",
-#                         "amount_target_symbol": 40,
+#                         "amount": 40,
 #                         "status": "PENDING",
 #                         "price": 10,
 #                         "side": "BUY",
@@ -174,7 +174,7 @@
 #                 status=OrderStatus.PENDING.value,
 #                 type=OrderType.LIMIT.value,
 #                 side=OrderSide.SELL.value,
-#                 amount_trading_symbol=10,
+#                 amount=10,
 #                 price=10,
 #                 target_symbol=self.TARGET_SYMBOL_A,
 #                 trading_symbol="USDT"
@@ -184,7 +184,7 @@
 #                 status=OrderStatus.PENDING.value,
 #                 type=OrderType.LIMIT.value,
 #                 side=OrderSide.SELL.value,
-#                 amount_trading_symbol=10,
+#                 amount=10,
 #                 price=10,
 #                 target_symbol=self.TARGET_SYMBOL_A,
 #                 trading_symbol="USDT"
@@ -199,7 +199,7 @@
 #                 status=OrderStatus.PENDING.value,
 #                 type=OrderType.LIMIT.value,
 #                 side=OrderSide.SELL.value,
-#                 amount_trading_symbol=10,
+#                 amount=10,
 #                 price=10,
 #                 target_symbol=self.TARGET_SYMBOL_A,
 #                 trading_symbol="USDT"
@@ -209,7 +209,7 @@
 #                 status=OrderStatus.PENDING.value,
 #                 type=OrderType.LIMIT.value,
 #                 side=OrderSide.SELL.value,
-#                 amount_trading_symbol=10,
+#                 amount=10,
 #                 price=10,
 #                 target_symbol=self.TARGET_SYMBOL_A,
 #                 trading_symbol="USDT"
@@ -224,7 +224,7 @@
 #                 status=OrderStatus.PENDING.value,
 #                 type=OrderType.LIMIT.value,
 #                 side=OrderSide.SELL.value,
-#                 amount_trading_symbol=10,
+#                 amount=10,
 #                 price=10,
 #                 target_symbol=self.TARGET_SYMBOL_A,
 #                 trading_symbol="USDT"
@@ -234,7 +234,7 @@
 #                 status=OrderStatus.PENDING.value,
 #                 type=OrderType.LIMIT.value,
 #                 side=OrderSide.SELL.value,
-#                 amount_trading_symbol=10,
+#                 amount=10,
 #                 price=10,
 #                 target_symbol=self.TARGET_SYMBOL_A,
 #                 trading_symbol="USDT"
@@ -258,7 +258,7 @@
 #             status=OrderStatus.PENDING.value,
 #             type=OrderType.LIMIT.value,
 #             side=OrderSide.SELL.value,
-#             amount_trading_symbol=10,
+#             amount=10,
 #             price=10,
 #             target_symbol=self.TARGET_SYMBOL_A,
 #             trading_symbol="USDT"
@@ -271,7 +271,7 @@
 #             status=OrderStatus.PENDING.value,
 #             type=OrderType.LIMIT.value,
 #             side=OrderSide.SELL.value,
-#             amount_trading_symbol=10,
+#             amount=10,
 #             price=10,
 #             target_symbol=self.TARGET_SYMBOL_A,
 #             trading_symbol="USDT"
@@ -294,7 +294,7 @@
 #             status=OrderStatus.CLOSED.value,
 #             type=OrderType.LIMIT.value,
 #             side=OrderSide.SELL.value,
-#             amount_trading_symbol=10,
+#             amount=10,
 #             price=10,
 #             initial_price=10,
 #             target_symbol=self.TARGET_SYMBOL_A,

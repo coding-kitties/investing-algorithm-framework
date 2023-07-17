@@ -16,7 +16,7 @@
 #         order_a = portfolio_manager.create_order(
 #             type=OrderType.LIMIT.value,
 #             side=OrderSide.BUY.value,
-#             amount_target_symbol=1,
+#             amount=1,
 #             target_symbol=self.TARGET_SYMBOL_A,
 #             price=self.BASE_SYMBOL_A_PRICE,
 #             algorithm_context=None
@@ -30,7 +30,7 @@
 #         order_a = portfolio_manager.create_order(
 #             type=OrderType.LIMIT.value,
 #             side=OrderSide.BUY.value,
-#             amount_target_symbol=1,
+#             amount=1,
 #             target_symbol=self.TARGET_SYMBOL_A,
 #             price=self.BASE_SYMBOL_A_PRICE,
 #             algorithm_context=None
@@ -43,7 +43,7 @@
 #         order_a_sell = portfolio_manager.create_order(
 #             type=OrderType.LIMIT.value,
 #             side=OrderSide.SELL.value,
-#             amount_target_symbol=1,
+#             amount=1,
 #             target_symbol=self.TARGET_SYMBOL_A,
 #             price=self.BASE_SYMBOL_A_PRICE,
 #             algorithm_context=None
@@ -61,7 +61,7 @@
 #         order_a = portfolio_manager.create_order(
 #             type=OrderType.LIMIT.value,
 #             side=OrderSide.BUY.value,
-#             amount_target_symbol=1,
+#             amount=1,
 #             target_symbol=self.TARGET_SYMBOL_A,
 #             price=self.BASE_SYMBOL_A_PRICE,
 #             algorithm_context=None
@@ -75,7 +75,7 @@
 #             portfolio_manager.create_order(
 #                 type=OrderType.LIMIT.value,
 #                 side=OrderSide.SELL.value,
-#                 amount_target_symbol=2,
+#                 amount=2,
 #                 target_symbol=self.TARGET_SYMBOL_A,
 #                 price=self.BASE_SYMBOL_A_PRICE,
 #                 algorithm_context=None
@@ -88,7 +88,7 @@
 #             portfolio_manager.create_order(
 #                 type=OrderType.LIMIT.value,
 #                 side=OrderSide.BUY.value,
-#                 amount_target_symbol=10000,
+#                 amount=10000,
 #                 target_symbol=self.TARGET_SYMBOL_A,
 #                 price=self.BASE_SYMBOL_A_PRICE,
 #                 algorithm_context=None

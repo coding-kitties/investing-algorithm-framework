@@ -1,6 +1,7 @@
 from .order_service import OrderService
 from .portfolio_service import PortfolioService
 from .position_service import PositionService
+from .position_cost_service import PositionCostService
 from .repository_service import RepositoryService
 from .strategy_orchestrator_service import StrategyOrchestratorService
 from .portfolio_configuration_service import PortfolioConfigurationService
@@ -13,5 +14,6 @@ __all__ = [
     "PortfolioService",
     "PositionService",
     "PortfolioConfigurationService",
-    "MarketDataService"
+    "MarketDataService",
+    "PositionCostService"
 ]

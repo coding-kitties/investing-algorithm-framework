@@ -244,6 +244,7 @@ class App:
         for portfolio_configuration in \
                 portfolio_configuration_service.get_all():
             market_service.initialize(portfolio_configuration)
+
             if portfolio_repository.exists(
                 {"identifier": portfolio_configuration.identifier}
             ):
@@ -365,3 +366,6 @@ class App:
                 raise OperationalException(
                     "Could not create database directory"
                 )
+
+    def get_portfolio_configurations(self):
+        return self.algorithm.get_portfolio_configurations()

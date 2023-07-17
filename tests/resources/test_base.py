@@ -33,20 +33,19 @@ class TestBase(TestCase):
 
 class FlaskTestBase(FlaskTestCase):
     portfolio_configurations = []
+    iaf_app = None
 
     def create_app(self):
         self.resource_directory = os.path.dirname(__file__)
-        self.iaf_app = create_app({RESOURCE_DIRECTORY: self.resource_directory})
-        self.iaf_app._flask_app = create_flask_app(self.iaf_app.config)
-        self.iaf_app.container = DependencyContainer()
-        self.iaf_app.algorithm = DependencyContainer.algorithm()
+        self.iaf_app = create_app(
+            {RESOURCE_DIRECTORY: self.resource_directory}, web=True
+        )
 
         for portfolio_configuration in self.portfolio_configurations:
-            self.iaf_app.add_portfolio_configuration(
-                   portfolio_configuration
-            )
+            self.iaf_app.add_portfolio_configuration(portfolio_configuration)
+
         self.iaf_app.container.market_service.override(MarketServiceStub())
-        self.iaf_app.create_portfolios()
+        # self.app.create_portfolios()
         return self.iaf_app._flask_app
 
     def tearDown(self) -> None:

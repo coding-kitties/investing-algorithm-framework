@@ -17,6 +17,8 @@ class SQLPortfolio(SQLBaseModel, Portfolio, SQLAlchemyModelExtension):
     realized = Column(Float, nullable=False, default=0)
     total_revenue = Column(Float, nullable=False, default=0)
     total_cost = Column(Float, nullable=False, default=0)
+    total_net_gain = Column(Float, nullable=False, default=0)
+    unallocated = Column(Float, nullable=False, default=0)
     market = Column(String, nullable=False)
     positions = relationship(
         "SQLPosition",

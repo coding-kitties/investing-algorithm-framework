@@ -1,4 +1,4 @@
-from .order import OrderStatus, OrderSide, OrderType, Order
+from .order import OrderStatus, OrderSide, OrderType, Order, OrderFee
 from .time_frame import TimeFrame
 from .time_interval import TimeInterval
 from .time_unit import TimeUnit
@@ -6,7 +6,7 @@ from .market_data import OHLCV, OrderBook, Ticker, AssetPrice
 from .trading_data_types import TradingDataType
 from .trading_time_frame import TradingTimeFrame
 from .portfolio import PortfolioConfiguration, Portfolio
-from .position import Position
+from .position import Position, PositionCost
 
 __all__ = [
     "OrderStatus",
@@ -24,5 +24,7 @@ __all__ = [
     "PortfolioConfiguration",
     "AssetPrice",
     "Position",
-    "Portfolio"
+    "PositionCost",
+    "Portfolio",
+    "OrderFee"
 ]
