@@ -16,7 +16,7 @@ class StrategyOne(TradingStrategy):
     ):
         algorithm.create_order(
             target_symbol="BTC",
-            amount_target_symbol=1,
+            amount=1,
             price=10,
             side="BUY",
             type="LIMIT",

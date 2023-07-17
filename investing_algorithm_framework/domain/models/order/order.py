@@ -1,10 +1,12 @@
 import logging
-
+from datetime import datetime
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.order import OrderStatus, \
     OrderType, OrderSide
+from investing_algorithm_framework.domain.models.order.order_fee import \
+    OrderFee
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +18,20 @@ class Order(BaseModel):
         type,
         side,
         status,
+        amount,
         target_symbol=None,
         trading_symbol=None,
-        amount_trading_symbol=None,
-        amount_target_symbol=None,
         price=None,
-        external_id=None
+        net_gain=0,
+        created_at=None,
+        updated_at=None,
+        trade_closed_at=None,
+        trade_closed_price=None,
+        external_id=None,
+        filled_amount=None,
+        remaining_amount=None,
+        cost=None,
+        fee=None,
     ):
 
         if target_symbol is None:
@@ -47,79 +57,16 @@ class Order(BaseModel):
         self.side = OrderSide.from_value(side).value
         self.type = OrderType.from_value(type).value
         self.status = OrderStatus.from_value(status).value
-
-        if amount_target_symbol is None and amount_trading_symbol is None:
-            raise OperationalException(
-                "Amount target symbol or amount trading symbol is "
-                "not specified"
-            )
-
-        if OrderType.LIMIT.equals(self.type):
-
-            if amount_target_symbol is not None:
-                if OrderStatus.PENDING.equals(self.status) \
-                        or OrderStatus.TO_BE_SENT.equals(self.status):
-
-                    if price is None:
-                        raise OperationalException("Price is not specified")
-
-                    self.amount_target_symbol = amount_target_symbol
-                    self.amount_trading_symbol = amount_target_symbol * price
-
-                elif not (OrderStatus.CANCELED.equals(self.status)
-                          or OrderStatus.FAILED.equals(self.status)):
-
-                    self.amount_target_symbol = amount_target_symbol
-                    self.amount_trading_symbol = amount_target_symbol * price
-            else:
-                if OrderStatus.PENDING.equals(self.status) \
-                        or OrderStatus.TO_BE_SENT.equals(self.status):
-
-                    if price is None:
-                        raise OperationalException("Price is not specified")
-
-                    self.amount_trading_symbol = amount_trading_symbol
-                    self.amount_target_symbol = amount_trading_symbol / price
-                elif not (OrderStatus.CANCELED.equals(self.status)
-                          or OrderStatus.FAILED.equals(self.status)):
-
-                    self.amount_trading_symbol = amount_trading_symbol
-                    self.amount_target_symbol = amount_trading_symbol / price
-        else:
-            if OrderStatus.PENDING.equals(self.status) \
-                    or OrderStatus.TO_BE_SENT.equals(self.status):
-                # Only expect sell orders
-                self.amount_target_symbol = amount_target_symbol
-                self.amount_trading_symbol = None
-            elif not (OrderStatus.CANCELED.equals(self.status)
-                      or OrderStatus.FAILED.equals(self.status)):
-                # Only expect sell orders
-                self.amount_target_symbol = amount_target_symbol
-                self.amount_trading_symbol = amount_target_symbol * price
-
-    def set_amount_target_symbol(self, amount):
-        self.amount_target_symbol = amount
-
-        if OrderType.LIMIT.equals(self.type):
-
-            if OrderStatus.CLOSED.equals(self.get_status()):
-                self.amount_trading_symbol = \
-                    self.get_price() * self.get_amount_target_symbol()
-            else:
-                self.amount_trading_symbol = \
-                    self.get_price() * self.get_amount_target_symbol()
-
-    def set_amount_trading_symbol(self, amount):
-        self.amount_trading_symbol = amount
-
-        if OrderType.LIMIT.equals(self.type):
-
-            if OrderStatus.CLOSED.equals(self.get_status()):
-                self.amount_target_symbol = \
-                    self.get_amount_trading_symbol() / self.get_price()
-            else:
-                self.amount_target_symbol = \
-                    self.get_amount_trading_symbol() / self.get_price()
+        self.amount = amount
+        self.net_gain = net_gain
+        self.trade_closed_at = trade_closed_at
+        self.trade_closed_price = trade_closed_price
+        self.created_at = created_at
+        self.updated_at = updated_at
+        self.filled_amount = filled_amount
+        self.remaining_amount = remaining_amount
+        self.cost = cost
+        self.fee = fee
 
     def get_external_id(self):
         return self.external_id
@@ -151,14 +98,68 @@ class Order(BaseModel):
     def get_type(self):
         return self.type
 
-    def get_amount_target_symbol(self):
-        return self.amount_target_symbol
+    def get_amount(self):
+        return self.amount
+
+    def set_amount(self, amount):
+        self.amount = amount
 
     def set_external_id(self, external_id):
         self.external_id = external_id
 
-    def get_amount_trading_symbol(self):
-        return self.amount_trading_symbol
+    def get_net_gain(self):
+        return self.net_gain
+
+    def set_net_gain(self, net_gain):
+        self.net_gain = net_gain
+
+    def get_trade_closed_at(self):
+        return self.trade_closed_at
+
+    def set_trade_closed_at(self, trade_closed_at):
+        self.trade_closed_at = trade_closed_at
+
+    def get_trade_closed_price(self):
+        return self.trade_closed_price
+
+    def set_trade_closed_price(self, trade_closed_price):
+        self.trade_closed_price = trade_closed_price
+
+    def get_created_at(self):
+        return self.created_at
+
+    def set_created_at(self, created_at):
+        self.created_at = created_at
+
+    def get_updated_at(self):
+        return self.updated_at
+
+    def set_updated_at(self, updated_at):
+        self.updated_at = updated_at
+
+    def get_filled_amount(self):
+        return self.filled_amount
+
+    def set_filled_amount(self, filled_amount):
+        self.filled_amount = filled_amount
+
+    def get_remaining_amount(self):
+        return self.remaining_amount
+
+    def set_remaining_amount(self, remaining_amount):
+        self.remaining_amount = remaining_amount
+
+    def get_cost(self):
+        return self.cost
+
+    def set_cost(self, cost):
+        self.cost = cost
+
+    def get_fee(self):
+        return self.fee
+
+    def set_fee(self, order_fee):
+        self.fee = order_fee
 
     def to_dict(self):
         return {
@@ -169,25 +170,21 @@ class Order(BaseModel):
             "type": self.type,
             "status": self.status,
             "price": self.price,
-            "amount_target_symbol": self.amount_target_symbol,
-            "amount_trading_symbol": self.amount_trading_symbol
+            "amount": self.amount,
+            "net_gain": self.net_gain,
+            "trade_closed_at": self.trade_closed_at,
+            "trade_closed_price": self.trade_closed_price,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+            "filled_amount": self.filled_amount,
+            "remaining_amount": self.remaining_amount,
+            "cost": self.cost,
+            "fee": self.fee.to_dict() if self.fee is not None else None,
         }
 
     @staticmethod
     def from_ccxt_order(ccxt_order):
-        status = OrderStatus.PENDING.value
-
-        if ccxt_order["status"] == "open":
-            status = OrderStatus.PENDING.value
-        if ccxt_order["status"] == "closed":
-            status = OrderStatus.SUCCESS.value
-        if ccxt_order["status"] == "canceled":
-            status = OrderStatus.CANCELED.value
-        if ccxt_order["status"] == "expired":
-            status = OrderStatus.FAILED.value
-        if ccxt_order["status"] == "rejected":
-            status = OrderStatus.FAILED.value
-
+        status = OrderStatus.from_ccxt_status(ccxt_order["status"])
         target_symbol = ccxt_order.get("symbol").split("/")[0]
         trading_symbol = ccxt_order.get("symbol").split("/")[1]
 
@@ -196,10 +193,15 @@ class Order(BaseModel):
             target_symbol=target_symbol,
             trading_symbol=trading_symbol,
             price=ccxt_order.get("price", None),
-            amount_target_symbol=ccxt_order.get("amount", None),
+            amount=ccxt_order.get("amount", None),
             status=status,
             type=ccxt_order.get("type", None),
-            side=ccxt_order.get("side", None)
+            side=ccxt_order.get("side", None),
+            filled_amount=ccxt_order.get("filled", None),
+            remaining_amount=ccxt_order.get("remaining", None),
+            cost=ccxt_order.get("cost", None),
+            fee=OrderFee.from_ccxt_fee(ccxt_order.get("fee", None)),
+            created_at=datetime.strptime(ccxt_order.get("datetime", None), "%Y-%m-%dT%H:%M:%S.%fZ")
         )
 
     def __repr__(self):
@@ -216,27 +218,10 @@ class Order(BaseModel):
             target_symbol=self.target_symbol,
             trading_symbol=self.trading_symbol,
             price=self.price,
-            amount_trading_symbol=self.amount_trading_symbol,
-            amount_target_symbol=self.amount_target_symbol,
+            side=self.side,
+            type=self.type,
+            amount=self.amount,
+            filled_amount=self.filled_amount,
+            remaining_amount=self.remaining_amount,
+            cost=self.cost,
         )
-
-    def initialize_amount_target_symbol(self):
-
-        if not OrderType.MARKET.equals(self.type) \
-                and self.price is None:
-            raise OperationalException("Initial price is not set")
-
-        if self.amount_target_symbol is None:
-            self.amount_target_symbol = \
-                self.amount_trading_symbol / self.price
-
-    def initialize_amount_trading_symbol(self):
-
-        if OrderType.MARKET.equals(self.type):
-            if OrderStatus.SUCCESS.equals(self.status) \
-                    and self.price is None:
-                raise OperationalException("Initial price is not set")
-        else:
-            if self.amount_trading_symbol is None:
-                self.amount_trading_symbol = \
-                    self.amount_target_symbol * self.price

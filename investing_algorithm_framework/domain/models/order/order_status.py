@@ -33,5 +33,22 @@ class OrderStatus(Enum):
 
         raise ValueError("Could not convert value to OrderStatus")
 
+    @staticmethod
+    def from_ccxt_status(ccxt_status):
+        status = OrderStatus.PENDING.value
+
+        if ccxt_status == "open":
+            status = OrderStatus.PENDING.value
+        if ccxt_status == "closed":
+            status = OrderStatus.SUCCESS.value
+        if ccxt_status == "canceled":
+            status = OrderStatus.CANCELED.value
+        if ccxt_status == "expired":
+            status = OrderStatus.FAILED.value
+        if ccxt_status == "rejected":
+            status = OrderStatus.FAILED.value
+
+        return OrderStatus.from_value(status)
+
     def equals(self, other):
         return OrderStatus.from_value(other) == self
