@@ -9,10 +9,10 @@ app = create_app(
 )
 app.add_portfolio_configuration(
     PortfolioConfiguration(
-        market="YOUR_MARKET",
-        api_key="YOUR_API_KEY",
-        secret_key="YOUR_SECRET_KEY",
-        trading_symbol="YOUR_TRADING_SYMBOL"
+        market="<your_market>",
+        api_key="<your_api_key>",
+        secret_key="<your_secret_key>",
+        trading_symbol="<your_trading_symbol>"
     )
 )
 
@@ -27,8 +27,7 @@ app.add_portfolio_configuration(
     trading_time_frame=TradingTimeFrame.ONE_MINUTE
 )
 def perform_strategy(algorithm, market_data):
-    print(algorithm.get_allocated())
-    print(algorithm.get_unallocated())
+    print(len(algorithm.get_orders()))
     print(market_data)
 
 
