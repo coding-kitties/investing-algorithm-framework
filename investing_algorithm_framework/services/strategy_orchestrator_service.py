@@ -8,7 +8,8 @@ class StrategyOrchestratorService:
 
     def __init__(self, market_data_service):
         self.history = {}
-        self.strategies = []
+        self._strategies = []
+        self._tasks = []
         self.threads = []
         self.iterations = 0
         self.max_iterations = -1
@@ -57,6 +58,32 @@ class StrategyOrchestratorService:
 
         self.history[strategy.worker_id] = {"last_run": datetime.utcnow()}
 
+    def run_task(self, task, algorithm, sync=False):
+        self.cleanup_threads()
+
+        matching_thread = next(
+            (t for t in self.threads if t.name == task.worker_id),
+            None
+        )
+
+        # Don't run a strategy that is already running
+        if matching_thread:
+            return
+
+        if sync:
+            task.run(algorithm=algorithm)
+        else:
+            self.iterations += 1
+            thread = StoppableThread(
+                target=task.run,
+                kwargs={"algorithm": algorithm}
+            )
+            thread.name = task.worker_id
+            thread.start()
+            self.threads.append(thread)
+
+        self.history[task.worker_id] = {"last_run": datetime.utcnow()}
+
     def start(self, algorithm, number_of_iterations=None):
         self.max_iterations = number_of_iterations
 
@@ -64,19 +91,25 @@ class StrategyOrchestratorService:
 
             if TimeUnit.SECOND.equals(strategy.time_unit):
                 schedule.every(strategy.interval)\
-                    .seconds.do(
-                        self.run_strategy, strategy, algorithm
-                    )
+                    .seconds.do(self.run_strategy, strategy, algorithm)
             elif TimeUnit.MINUTE.equals(strategy.time_unit):
                 schedule.every(strategy.interval)\
-                    .minutes.do(
-                        self.run_strategy, strategy, algorithm
-                    )
+                    .minutes.do(self.run_strategy, strategy, algorithm)
             elif TimeUnit.HOUR.equals(strategy.time_unit):
                 schedule.every(strategy.interval)\
-                    .hours.do(
-                        self.run_strategy, strategy, algorithm
-                    )
+                    .hours.do(self.run_strategy, strategy, algorithm)
+
+        for task in self.tasks:
+            
+            if TimeUnit.SECOND.equals(task.time_unit):
+                schedule.every(task.interval)\
+                    .seconds.do(self.run_task, task, algorithm)
+            elif TimeUnit.MINUTE.equals(task.time_unit):
+                schedule.every(task.interval)\
+                    .minutes.do(self.run_task, task, algorithm)
+            elif TimeUnit.HOUR.equals(task.time_unit):
+                schedule.every(task.interval)\
+                    .hours.do(self.run_task, task, algorithm)
 
     def stop(self):
         for thread in self.threads:
@@ -99,7 +132,10 @@ class StrategyOrchestratorService:
 
         return strategies
 
-    def run_pending_strategies(self):
+    def get_jobs(self):
+        return schedule.jobs
+
+    def run_pending_jobs(self):
 
         if self.max_iterations is not None and \
                 self.max_iterations != -1 and \
@@ -133,6 +169,22 @@ class StrategyOrchestratorService:
 
         self.strategies = strategies
 
+    def add_tasks(self, tasks):
+        has_duplicates = False
+
+        for i in range(len(tasks)):
+            for j in range(i + 1, len(tasks)):
+                if tasks[i].worker_id == tasks[j].worker_id:
+                    has_duplicates = True
+                    break
+
+        if has_duplicates:
+            raise OperationalException(
+                "There are duplicate tasks with the same name"
+            )
+
+        self.tasks = tasks
+
     @property
     def strategies(self):
         return self._strategies
@@ -142,8 +194,16 @@ class StrategyOrchestratorService:
         self._strategies = strategies
 
     @property
+    def tasks(self):
+        return self._tasks
+
+    @tasks.setter
+    def tasks(self, tasks):
+        self._tasks = tasks
+
+    @property
     def running(self):
-        if len(self.strategies) == 0:
+        if len(self.strategies) == 0 and len(self.tasks) == 0:
             return False
 
         if self.max_iterations == -1:
