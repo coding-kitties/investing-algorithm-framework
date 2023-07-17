@@ -15,12 +15,16 @@ class PortfolioConfigurationService:
         self.portfolio_configurations.append(portfolio_configuration)
 
     def get(self, identifier):
-        return next(
+        portfolio_configuration = next(
             (portfolio_configuration for portfolio_configuration in
                 self.portfolio_configurations if
                 portfolio_configuration.market == identifier.lower()),
             None
         )
+        if portfolio_configuration is None:
+            raise ApiException('Portfolio configuration not found', 404)
+
+        return portfolio_configuration
 
     def find(self, query_params):
         market = query_params.get("market", None)

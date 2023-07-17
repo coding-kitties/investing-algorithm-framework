@@ -1,12 +1,12 @@
 order_serialization_dict = {
-    'amount_target_symbol',
+    'amount',
     'trading_symbol',
     'initial_price',
     'closing_price',
     'price',
     'target_symbol',
     'side',
-    'amount_trading_symbol',
+    'amount',
     'status',
     'type',
     'reference_id'

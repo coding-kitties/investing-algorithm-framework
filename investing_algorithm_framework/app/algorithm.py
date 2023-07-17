@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from investing_algorithm_framework.domain import OrderStatus, \
+from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
     Position, Order, Portfolio, OrderType, OrderSide, ApiException
 
 logger = logging.getLogger(__name__)
@@ -48,8 +48,8 @@ class Algorithm:
     def running(self) -> bool:
         return self.strategy_orchestrator_service.running
 
-    def run_strategies(self):
-        self.strategy_orchestrator_service.run_pending_strategies()
+    def run_jobs(self):
+        self.strategy_orchestrator_service.run_pending_jobs()
 
     def create_order(
         self,
@@ -57,19 +57,18 @@ class Algorithm:
         price,
         type,
         side,
-        amount_target_symbol=None,
-        amount_trading_symbol=None,
+        amount,
         market=None,
-        execute=False,
-        validate=False
+        execute=True,
+        validate=True,
+        sync=True
     ):
         portfolio = self.portfolio_service.find({"market": market})
         return self.order_service.create(
             {
                 "target_symbol": target_symbol,
                 "price": price,
-                "amount_target_symbol": amount_target_symbol,
-                "amount_trading_symbol": amount_trading_symbol,
+                "amount": amount,
                 "type": type,
                 "side": side,
                 "portfolio_id": portfolio.id,
@@ -77,7 +76,8 @@ class Algorithm:
                 "trading_symbol": portfolio.trading_symbol,
             },
             execute=execute,
-            validate=validate
+            validate=validate,
+            sync=sync
         )
 
     def create_limit_order(
@@ -85,19 +85,18 @@ class Algorithm:
             target_symbol,
             price,
             side,
-            amount_target_symbol=None,
-            amount_trading_symbol=None,
+            amount,
             market=None,
             execute=True,
-            validate=True
+            validate=True,
+            sync=True
     ):
         portfolio = self.portfolio_service.find({"market": market})
         return self.order_service.create(
             {
                 "target_symbol": target_symbol,
                 "price": price,
-                "amount_target_symbol": amount_target_symbol,
-                "amount_trading_symbol": amount_trading_symbol,
+                "amount": amount,
                 "type": OrderType.LIMIT.value,
                 "side": OrderSide.from_value(side).value,
                 "portfolio_id": portfolio.id,
@@ -105,25 +104,25 @@ class Algorithm:
                 "trading_symbol": portfolio.trading_symbol,
             },
             execute=execute,
-            validate=validate
+            validate=validate,
+            sync=sync
         )
 
     def create_market_order(
         self,
         target_symbol,
         side,
-        amount_target_symbol=None,
-        amount_trading_symbol=None,
+        amount,
         market=None,
         execute=False,
-        validate=False
+        validate=False,
+        sync=True
     ):
         portfolio = self.portfolio_service.find({"market": market})
         return self.order_service.create(
             {
                 "target_symbol": target_symbol,
-                "amount_target_symbol": amount_target_symbol,
-                "amount_trading_symbol": amount_trading_symbol,
+                "amount": amount,
                 "type": OrderType.MARKET.value,
                 "side": OrderSide.from_value(side).value,
                 "portfolio_id": portfolio.id,
@@ -131,7 +130,8 @@ class Algorithm:
                 "trading_symbol": portfolio.trading_symbol,
             },
             execute=execute,
-            validate=validate
+            validate=validate,
+            sync=sync
         )
 
     def check_order_status(self, market=None, symbol=None, status=None):
@@ -223,6 +223,9 @@ class Algorithm:
             }
         )
 
+    def get_order_fee(self, order_id) -> OrderFee:
+        return self.order_service.get_order_fee(order_id)
+
     def get_positions(self, market=None, identifier=None) -> List[Position]:
         query_params = {}
 
@@ -290,6 +293,10 @@ class Algorithm:
     def add_strategies(self, strategies):
         self.strategy_orchestrator_service.add_strategies(strategies)
 
+    def add_tasks(self, tasks):
+        self.strategy_orchestrator_service.add_tasks(tasks)
+
+
     def get_allocated(self, market=None, identifier=None) -> float:
 
         if self.portfolio_configuration_service.count() > 1 \
@@ -338,3 +345,6 @@ class Algorithm:
                 allocated = allocated + (position.amount * price["bid"])
 
         return allocated
+
+    def get_portfolio_configurations(self):
+        return self.portfolio_configuration_service.get_all()

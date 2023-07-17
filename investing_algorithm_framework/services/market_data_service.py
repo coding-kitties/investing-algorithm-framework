@@ -15,6 +15,9 @@ class MarketDataService:
                 (strategy.trading_data_types or strategy.trading_data_type):
             self.market_service.market = strategy.market
 
+            if not strategy.trading_data_types:
+                strategy.trading_data_types = [strategy.trading_data_type]
+
             for trading_data_type in strategy.trading_data_types:
 
                 if TradingDataType.TICKER.equals(trading_data_type):

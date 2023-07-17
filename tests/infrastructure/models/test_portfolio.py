@@ -77,7 +77,7 @@
 #             .get_portfolio_manager("default")
 #
 #         order = portfolio_manager.create_order(
-#             amount_target_symbol=10,
+#             amount=10,
 #             target_symbol=self.TARGET_SYMBOL_A,
 #             price=self.get_price(self.TARGET_SYMBOL_A).price,
 #             type=OrderType.LIMIT.value
@@ -105,7 +105,7 @@
 #
 #         order = portfolio_manager.create_order(
 #             target_symbol=self.TARGET_SYMBOL_A,
-#             amount_target_symbol=1,
+#             amount=1,
 #             price=self.get_price(self.TARGET_SYMBOL_A).price,
 #         )
 #         order.reference_id = 1
@@ -182,7 +182,7 @@
 #                     "reference_id": 2,
 #                     "target_symbol": self.TARGET_SYMBOL_A,
 #                     "trading_symbol": "usdt",
-#                     "amount_target_symbol": 4,
+#                     "amount": 4,
 #                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "status": OrderStatus.PENDING.value,
 #                     "side": OrderSide.BUY.value,
@@ -194,7 +194,7 @@
 #                     "reference_id": 3,
 #                     "target_symbol": self.TARGET_SYMBOL_A,
 #                     "trading_symbol": "usdt",
-#                     "amount_target_symbol": 4,
+#                     "amount": 4,
 #                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "status": OrderStatus.CLOSED.value,
 #                     "initial_price": self.get_price(
@@ -269,7 +269,7 @@
 #                     target_symbol=self.TARGET_SYMBOL_A,
 #                     status=OrderStatus.PENDING,
 #                     price=10,
-#                     amount_target_symbol=10,
+#                     amount=10,
 #                     side=OrderSide.BUY,
 #                     type=OrderType.LIMIT
 #                 )
@@ -335,7 +335,7 @@
 #                     "reference_id": 1,
 #                     "target_symbol": self.TARGET_SYMBOL_A,
 #                     "trading_symbol": "usdt",
-#                     "amount_target_symbol": 4,
+#                     "amount": 4,
 #                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "initial_price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "status": OrderStatus.CLOSED.value,
@@ -348,7 +348,7 @@
 #                     "reference_id": 2,
 #                     "target_symbol": self.TARGET_SYMBOL_A,
 #                     "trading_symbol": "usdt",
-#                     "amount_target_symbol": 4,
+#                     "amount": 4,
 #                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "status": OrderStatus.PENDING.value,
 #                     "side": OrderSide.BUY.value,
@@ -360,7 +360,7 @@
 #                     "reference_id": 3,
 #                     "target_symbol": self.TARGET_SYMBOL_A,
 #                     "trading_symbol": "usdt",
-#                     "amount_target_symbol": 4,
+#                     "amount": 4,
 #                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "status": OrderStatus.CLOSED.value,
 #                     "initial_price": self.get_price(self.TARGET_SYMBOL_A).price,

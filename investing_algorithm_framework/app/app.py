@@ -11,6 +11,7 @@ from flask import Flask
 from investing_algorithm_framework.app.algorithm import Algorithm
 from investing_algorithm_framework.app.stateless import ActionHandler
 from investing_algorithm_framework.app.strategy import TradingStrategy
+from investing_algorithm_framework.app.task import Task
 from investing_algorithm_framework.app.web import create_flask_app
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
@@ -33,6 +34,7 @@ class App:
         self.algorithm: Algorithm = None
         self._started = False
         self._strategies = []
+        self._tasks = []
 
     def initialize(self):
 
@@ -70,6 +72,7 @@ class App:
     ):
         self.algorithm = self.container.algorithm()
         self.algorithm.add_strategies(self.strategies)
+        self.algorithm.add_tasks(self.tasks)
         portfolio_configuration_service = self.container\
             .portfolio_configuration_service()
         portfolio_service = self.container.portfolio_service()
@@ -109,7 +112,7 @@ class App:
                     order_service.check_pending_orders()
                     number_of_iterations_since_last_orders_check = 1
 
-                self.algorithm.run_strategies()
+                self.algorithm.run_jobs()
                 number_of_iterations_since_last_orders_check += 1
                 sleep(1)
         except KeyboardInterrupt:
@@ -157,6 +160,32 @@ class App:
     @property
     def running(self):
         return self.algorithm.running
+
+    def task(
+        self,
+        function=None,
+        time_unit: TimeUnit = TimeUnit.MINUTE,
+        interval=10,
+    ):
+        if function:
+            task = Task(
+                decorated=function,
+                time_unit=time_unit,
+                interval=interval,
+            )
+            self.add_task(task)
+        else:
+            def wrapper(f):
+                self.add_task(
+                    Task(
+                        decorated=f,
+                        time_unit=time_unit,
+                        interval=interval
+                    )
+                )
+                return f
+
+            return wrapper
 
     def strategy(
         self,
@@ -218,14 +247,29 @@ class App:
 
         assert isinstance(strategy, TradingStrategy), \
             OperationalException(
-                "Strategy is not an instance of a Strategy"
+                "Strategy object is not an instance of a Strategy"
             )
 
         self._strategies.append(strategy)
 
+    def add_task(self, task):
+        if inspect.isclass(task):
+            task = task()
+
+        assert isinstance(task, Task), \
+            OperationalException(
+                "Task object is not an instance of a Task"
+            )
+
+        self._tasks.append(task)
+
     @property
     def strategies(self):
         return self._strategies
+
+    @property
+    def tasks(self):
+        return self._tasks
 
     def sync_portfolios(self):
         portfolio_configuration_service = self.container\
@@ -244,6 +288,7 @@ class App:
         for portfolio_configuration in \
                 portfolio_configuration_service.get_all():
             market_service.initialize(portfolio_configuration)
+
             if portfolio_repository.exists(
                 {"identifier": portfolio_configuration.identifier}
             ):
@@ -365,3 +410,7 @@ class App:
                 raise OperationalException(
                     "Could not create database directory"
                 )
+ 
+    def get_portfolio_configurations(self):
+        return self.algorithm.get_portfolio_configurations()
+

@@ -2,7 +2,7 @@ from .config import Config, Environment
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, Ticker, \
     OHLCV, OrderBook, PortfolioConfiguration, AssetPrice, Portfolio, \
-    Position, Order
+    Position, Order, PositionCost, OrderFee
 from .exceptions import OperationalException, ApiException, \
     PermissionDeniedApiException, ImproperlyConfigured
 from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
@@ -59,5 +59,7 @@ __all__ = [
     "Order",
     "Strategy",
     "DATETIME_FORMAT",
-    "StatelessActions"
+    "StatelessActions",
+    "PositionCost",
+    "OrderFee"
 ]

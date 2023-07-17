@@ -20,7 +20,7 @@ class PortfolioConfiguration(BaseModel):
         self._api_key = api_key
         self._secret_key = secret_key
         self._track_from = None
-        self._trading_symbol = trading_symbol
+        self._trading_symbol = trading_symbol.upper()
         self._identifier = identifier
         self._max_unallocated = max_unallocated
 

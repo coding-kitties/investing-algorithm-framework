@@ -19,10 +19,7 @@ class SQLOrderRepository(Repository):
         type_query_param = self.get_query_param("type", query_params)
         status_query_param = self.get_query_param("status", query_params)
         price_query_param = self.get_query_param("price", query_params)
-        amount_target_symbol_query_param = \
-            self.get_query_param("amount_target_symbol", query_params)
-        amount_trading_symbol_query_param = \
-            self.get_query_param("amount_trading_symbol", query_params)
+        amount_query_param = self.get_query_param("amount", query_params)
         position_query_param = self.get_query_param(
             "position", query_params, many=True
         )
@@ -64,15 +61,8 @@ class SQLOrderRepository(Repository):
         if price_query_param:
             query = query.filter(SQLOrder.price == price_query_param)
 
-        if amount_target_symbol_query_param:
-            query = query.filter_by(
-                amount_target_symbol=amount_target_symbol_query_param
-            )
-
-        if amount_trading_symbol_query_param:
-            query = query.filter_by(
-                amount_trading_symbol=amount_trading_symbol_query_param
-            )
+        if amount_query_param:
+            query = query.filter_by(amount=amount_query_param)
 
         if position_query_param:
             query = query.filter(SQLOrder.position_id.in_(

@@ -9,7 +9,7 @@
 #         amount, target_symbol, price, portfolio_manager, reference_id=None
 #     ):
 #         order = portfolio_manager.create_order(
-#             amount_target_symbol=amount,
+#             amount=amount,
 #             target_symbol=target_symbol,
 #             price=price,
 #             type=OrderType.LIMIT.value
@@ -24,7 +24,7 @@
 #     @staticmethod
 #     def create_sell_order(amount, ticker, price, portfolio_manager):
 #         order = portfolio_manager.create_order(
-#             amount_target_symbol=amount,
+#             amount=amount,
 #             symbol=ticker,
 #             price=price,
 #             order_type=OrderType.LIMIT.value,
@@ -35,7 +35,7 @@
 #     @staticmethod
 #     def create_market_buy_order(amount, ticker, portfolio_manager):
 #         order = portfolio_manager.create_order(
-#             amount_target_symbol=amount,
+#             amount=amount,
 #             symbol=ticker,
 #             order_type=OrderType.MARKET.value,
 #             order_side=OrderSide.BUY.value
@@ -45,7 +45,7 @@
 #     @staticmethod
 #     def create_market_sell_order(amount, ticker, portfolio_manager):
 #         order = portfolio_manager.create_order(
-#             amount_target_symbol=amount,
+#             amount=amount,
 #             symbol=ticker,
 #             order_type=OrderType.MARKET.value,
 #             order_side=OrderSide.SELL.value

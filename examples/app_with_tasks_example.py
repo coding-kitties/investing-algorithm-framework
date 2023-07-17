@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    TimeUnit, TradingTimeFrame, TradingDataType
+    TimeUnit, TradingTimeFrame, TradingDataType, Task
 
 # No resource directory specified, so an in-memory database will be used
 app = create_app()
@@ -15,6 +15,31 @@ app.add_portfolio_configuration(
 )
 
 
+class MyTask(Task):
+    time_unit = TimeUnit.SECOND
+    interval = 5
+
+    def run(self, algorithm):
+        print("Hello world from MyTask")
+
+
+class MyTaskTwo(Task):
+    time_unit = TimeUnit.SECOND
+    interval = 5
+
+    def run(self, algorithm):
+        print("Hello world from MyTaskTwo")
+
+
+app.add_task(MyTask)
+app.add_task(MyTaskTwo)
+
+
+@app.task(time_unit=TimeUnit.SECOND, interval=5)
+def say_hello(algorithm):
+    print("Hello world")
+
+
 @app.strategy(
     time_unit=TimeUnit.SECOND,
     interval=5,
@@ -26,7 +51,6 @@ app.add_portfolio_configuration(
 )
 def perform_strategy(algorithm, market_data):
     print(len(algorithm.get_orders()))
-    print(market_data)
 
 
 if __name__ == "__main__":

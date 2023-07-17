@@ -10,10 +10,10 @@ app = create_app(
 )
 app.add_portfolio_configuration(
     PortfolioConfiguration(
-        market="binance",
-        api_key="xxxxxx",
-        secret_key="xxxxxx",
-        trading_symbol="USDT"
+        market="<your_market>",
+        api_key="<your_api_key>",
+        secret_key="<your_secret_key>",
+        trading_symbol="<your_trading_symbol>"
     )
 )
 
