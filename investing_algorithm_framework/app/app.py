@@ -410,6 +410,7 @@ class App:
                 raise OperationalException(
                     "Could not create database directory"
                 )
-
+ 
     def get_portfolio_configurations(self):
         return self.algorithm.get_portfolio_configurations()
+
