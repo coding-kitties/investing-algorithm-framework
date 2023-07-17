@@ -48,8 +48,8 @@ class Algorithm:
     def running(self) -> bool:
         return self.strategy_orchestrator_service.running
 
-    def run_strategies(self):
-        self.strategy_orchestrator_service.run_pending_strategies()
+    def run_jobs(self):
+        self.strategy_orchestrator_service.run_pending_jobs()
 
     def create_order(
         self,
@@ -292,6 +292,10 @@ class Algorithm:
 
     def add_strategies(self, strategies):
         self.strategy_orchestrator_service.add_strategies(strategies)
+
+    def add_tasks(self, tasks):
+        self.strategy_orchestrator_service.add_tasks(tasks)
+
 
     def get_allocated(self, market=None, identifier=None) -> float:
 

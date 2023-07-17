@@ -6,7 +6,8 @@ from investing_algorithm_framework.domain import ApiException, \
     Position
 from investing_algorithm_framework.domain import PortfolioConfiguration, \
     RESOURCE_DIRECTORY
-from investing_algorithm_framework.app import TradingStrategy, StatelessAction
+from investing_algorithm_framework.app import TradingStrategy, \
+    StatelessAction, Task
 
 __all__ = [
     "RESOURCE_DIRECTORY",
@@ -29,5 +30,6 @@ __all__ = [
     "Order",
     "Portfolio",
     "Position",
-    "StatelessAction"
+    "StatelessAction",
+    "Task"
 ]
