@@ -10,10 +10,18 @@ class RunStrategyHandler(ActionHandlerStrategy):
     def handle_event(self, payload, algorithm):
         strategies = algorithm.strategy_orchestrator_service\
             .get_strategies(payload.get("strategies", None))
+        tasks = algorithm.strategy_orchestrator_service.get_tasks()
 
         for strategy in strategies:
             algorithm.strategy_orchestrator_service.run_strategy(
                 strategy=strategy,
+                algorithm=algorithm,
+                sync=True
+            )
+
+        for task in tasks:
+            algorithm.strategy_orchestrator_service.run_task(
+                task=task,
                 algorithm=algorithm,
                 sync=True
             )
