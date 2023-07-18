@@ -70,12 +70,12 @@ class ActionHandler:
     @staticmethod
     def get_action_type(payload):
 
+        if payload is None or ("ACTION" not in payload and "action" not in payload):
+            raise OperationalException("Action type is not defined")
+
         if "action" in payload:
             action = payload["action"]
         else:
             action = payload["ACTION"]
-
-        if action is None:
-            raise OperationalException("Action type not supported")
 
         return action

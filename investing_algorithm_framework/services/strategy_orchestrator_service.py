@@ -132,6 +132,9 @@ class StrategyOrchestratorService:
 
         return strategies
 
+    def get_tasks(self):
+        return self._tasks
+
     def get_jobs(self):
         return schedule.jobs
 
