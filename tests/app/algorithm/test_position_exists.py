@@ -39,6 +39,7 @@ class Test(TestBase):
         self.app.run(number_of_iterations=1, sync=False)
         trading_symbol_position = self.app.algorithm.get_position("USDT")
         self.assertEqual(1000, trading_symbol_position.amount)
+        self.assertFalse(self.app.algorithm.position_exists(symbol="BTC"))
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             amount=1,
@@ -47,6 +48,7 @@ class Test(TestBase):
         )
         btc_position = self.app.algorithm.get_position("BTC")
         self.assertIsNotNone(btc_position)
+        self.assertTrue(self.app.algorithm.position_exists("BTC"))
         self.assertEqual(0, btc_position.amount)
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
@@ -54,3 +56,4 @@ class Test(TestBase):
         self.assertIsNotNone(btc_position.amount)
         self.assertEqual(1, btc_position.amount)
         self.assertNotEqual(990, trading_symbol_position.amount)
+        self.assertTrue(self.app.algorithm.position_exists("BTC"))
