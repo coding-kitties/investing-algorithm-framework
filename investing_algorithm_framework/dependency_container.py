@@ -5,7 +5,8 @@ from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPositionCostRepository, SQLOrderFeeRepository
 from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, StrategyOrchestratorService, \
-    PortfolioConfigurationService, MarketDataService, PositionCostService
+    PortfolioConfigurationService, MarketDataService, PositionCostService, \
+    BackTestService
 from investing_algorithm_framework.app.algorithm import Algorithm
 
 
@@ -74,4 +75,8 @@ class DependencyContainer(containers.DeclarativeContainer):
         market_service=market_service,
         strategy_orchestrator_service=strategy_orchestrator_service,
         market_data_service=market_data_service
+    )
+    backtest_service = providers.Factory(
+        BackTestService,
+        market_data_service=market_data_service,
     )

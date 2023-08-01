@@ -8,7 +8,7 @@ class MarketDataService:
     def __init__(self, market_service):
         self.market_service = market_service
 
-    def get_data_for_strategy(self, strategy):
+    def get_data_for_strategy(self, strategy, start_date=None, end_date=None):
         data = {}
 
         if strategy.market and \
@@ -73,3 +73,4 @@ class MarketDataService:
                     )
 
         return data
+

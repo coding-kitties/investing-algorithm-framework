@@ -6,6 +6,7 @@ from .repository_service import RepositoryService
 from .strategy_orchestrator_service import StrategyOrchestratorService
 from .portfolio_configuration_service import PortfolioConfigurationService
 from .market_data_service import MarketDataService
+from .backtest_service import BackTestService
 
 __all__ = [
     "StrategyOrchestratorService",
@@ -15,5 +16,6 @@ __all__ = [
     "PositionService",
     "PortfolioConfigurationService",
     "MarketDataService",
-    "PositionCostService"
+    "PositionCostService",
+    "BackTestService",
 ]

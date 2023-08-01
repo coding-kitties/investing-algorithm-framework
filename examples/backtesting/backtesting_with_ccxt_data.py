@@ -1,7 +1,9 @@
+import pathlib
 from datetime import datetime, timedelta
 
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    TimeUnit, TradingTimeFrame, TradingDataType, TradingStrategy
+    TimeUnit, TradingTimeFrame, TradingDataType, TradingStrategy, \
+    RESOURCE_DIRECTORY
 
 
 class MyTradingStrategy(TradingStrategy):
@@ -23,7 +25,7 @@ class MyTradingStrategy(TradingStrategy):
 
 
 # No resource directory specified, so an in-memory database will be used
-app = create_app()
+app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 app.add_portfolio_configuration(
     PortfolioConfiguration(
         market="bitvavo",
@@ -35,4 +37,22 @@ app.add_portfolio_configuration(
 app.add_strategy(MyTradingStrategy)
 
 if __name__ == "__main__":
-    app.run()
+    report = app.backtest(
+        start_datetime=datetime.utcnow() - timedelta(days=1),
+        end_datetime=datetime.utcnow(),
+        source="ccxt"
+    )
+    # pretty_print_report(report)
+    # print(report.get_orders())
+    # print(report.get_trades())
+    # print(report.get_positions())
+    #
+    # report = app.backtest(
+    #     start_datetime=datetime.utcnow() - timedelta(days=1),
+    #     end_datetime=datetime.utcnow(),
+    #     source="ccxt",
+    #     unallocated=10000,
+    #     commission=0.001,
+    #     commission_currency="EUR"
+    # )
+    # pretty_print_report(report)

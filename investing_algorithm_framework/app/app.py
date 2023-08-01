@@ -118,6 +118,21 @@ class App:
         except KeyboardInterrupt:
             exit(0)
 
+    def backtest(self, start_datetime, end_datetime, source="ccxt"):
+        self.algorithm = self.container.algorithm()
+        self.algorithm.add_strategies(self.strategies)
+        portfolio_configuration_service = self.container\
+            .portfolio_configuration_service()
+
+        if portfolio_configuration_service.count() == 0:
+            raise OperationalException("No portfolios configured")
+
+        self.create_portfolios(backtesting=True)
+        backtest_service = self.container.backtest_service()
+        return backtest_service.backtest(
+            start_datetime, end_datetime, self.strategies, self.config
+        )
+
     def start_algorithm(self):
         self.algorithm.start()
 
@@ -278,7 +293,7 @@ class App:
         portfolio_service = self.container.portfolio_service()
         portfolio_service.sync_portfolios()
 
-    def create_portfolios(self):
+    def create_portfolios(self, backtesting=False):
         portfolio_configuration_service = self.container\
             .portfolio_configuration_service()
         market_service = self.container.market_service()

@@ -177,6 +177,7 @@ class MarketService:
         else:
             try:
                 ccxt_orders = self.exchange.fetchOrders(symbol)
+                print(ccxt_orders)
                 return [Order.from_ccxt_order(order) for order in ccxt_orders]
             except Exception as e:
                 logger.exception(e)
@@ -368,7 +369,7 @@ class MarketService:
 
         return OHLCV.from_dict({"symbol": symbol, "data": data})
 
-    def get_ohclvs(self, symbols, time_frame, from_timestamp):
+    def get_ohclvs(self, symbols, time_frame, from_timestamp, to_timestamp=None):
 
         if not self.exchange.has['fetchOHLCV']:
             raise OperationalException(
@@ -376,7 +377,12 @@ class MarketService:
                 f"functionality get_ohclvs"
             )
 
-        now = self.exchange.milliseconds()
+        if to_timestamp is None:
+            to_timestamp = self.exchange.milliseconds()
+        else:
+            to_timestamp = self.exchange.parse8601(
+                from_timestamp.strftime(":%Y-%m-%d %H:%M:%S")
+            )
         ohlcvs = {}
 
         for symbol in symbols:
@@ -387,7 +393,7 @@ class MarketService:
                 )
                 dfs = []
 
-                while time_stamp < now:
+                while time_stamp < to_timestamp:
 
                     ohlcv = self.exchange.fetch_ohlcv(
                         symbol, time_frame.to_ccxt_string(), time_stamp
