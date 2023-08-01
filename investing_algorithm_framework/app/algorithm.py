@@ -260,9 +260,25 @@ class Algorithm:
             raise ApiException("No portfolio found.")
 
         portfolio = portfolios[0]
-        return self.position_service.find(
-            {"portfolio": portfolio.identifier, "symbol": symbol}
-        )
+
+        try:
+            return self.position_service.find(
+                {"portfolio": portfolio.identifier, "symbol": symbol}
+            )
+        except ApiException:
+            return None
+
+    def position_exists(self, symbol, market=None, identifier=None) -> bool:
+        query_params = {}
+
+        if market is not None:
+            query_params["market"] = market
+
+        if identifier is not None:
+            query_params["identifier"] = identifier
+
+        query_params["symbol"] = symbol
+        return self.position_service.exists(query_params)
 
     def get_position_percentage(
             self, symbol, market=None, identifier=None
@@ -295,7 +311,6 @@ class Algorithm:
 
     def add_tasks(self, tasks):
         self.strategy_orchestrator_service.add_tasks(tasks)
-
 
     def get_allocated(self, market=None, identifier=None) -> float:
 
