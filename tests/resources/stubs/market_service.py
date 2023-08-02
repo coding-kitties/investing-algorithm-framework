@@ -154,62 +154,37 @@ class MarketServiceStub(MarketService):
         }
         return Order.from_ccxt_order(order_data)
 
-    # def get_tickers(self, symbols):
-    #     return {'BTC/EUR': {'symbol': 'BTC/EUR', 'timestamp': 1682344906543,
-    #                  'datetime': '2023-04-24T14:01:46.543Z', 'high': 25574.14,
-    #                  'low': 24774.88, 'bid': 25148.37, 'bidVolume': 0.00551,
-    #                  'ask': 25151.41, 'askVolume': 0.05492,
-    #                  'vwap': 25100.30316741, 'open': 25208.4,
-    #                  'close': 25148.99, 'last': 25148.99,
-    #                  'previousClose': 25206.38, 'change': -59.41,
-    #                  'percentage': -0.236, 'average': 25178.695,
-    #                  'baseVolume': 1002.04119, 'quoteVolume': 25151537.655228,
-    #                  'info': {'symbol': 'BTCEUR',
-    #                           'priceChange': '-59.41000000',
-    #                           'priceChangePercent': '-0.236',
-    #                           'weightedAvgPrice': '25100.30316741',
-    #                           'prevClosePrice': '25206.38000000',
-    #                           'lastPrice': '25148.99000000',
-    #                           'lastQty': '0.00551000',
-    #                           'bidPrice': '25148.37000000',
-    #                           'bidQty': '0.00551000',
-    #                           'askPrice': '25151.41000000',
-    #                           'askQty': '0.05492000',
-    #                           'openPrice': '25208.40000000',
-    #                           'highPrice': '25574.14000000',
-    #                           'lowPrice': '24774.88000000',
-    #                           'volume': '1002.04119000',
-    #                           'quoteVolume': '25151537.65522800',
-    #                           'openTime': '1682258506543',
-    #                           'closeTime': '1682344906543',
-    #                           'firstId': '120709746', 'lastId': '120776508',
-    #                           'count': '66763'}},
-    #      'ETH/EUR': {'symbol': 'ETH/EUR', 'timestamp': 1682344906550,
-    #                  'datetime': '2023-04-24T14:01:46.550Z', 'high': 1725.63,
-    #                  'low': 1671.11, 'bid': 1699.51, 'bidVolume': 0.4987,
-    #                  'ask': 1699.59, 'askVolume': 0.8683,
-    #                  'vwap': 1691.43939645, 'open': 1709.96, 'close': 1699.3,
-    #                  'last': 1699.3, 'previousClose': 1709.72,
-    #                  'change': -10.66, 'percentage': -0.623,
-    #                  'average': 1704.63, 'baseVolume': 10304.8821,
-    #                  'quoteVolume': 17430083.559682,
-    #                  'info': {'symbol': 'ETHEUR',
-    #                           'priceChange': '-10.66000000',
-    #                           'priceChangePercent': '-0.623',
-    #                           'weightedAvgPrice': '1691.43939645',
-    #                           'prevClosePrice': '1709.72000000',
-    #                           'lastPrice': '1699.30000000',
-    #                           'lastQty': '0.36560000',
-    #                           'bidPrice': '1699.51000000',
-    #                           'bidQty': '0.49870000',
-    #                           'askPrice': '1699.59000000',
-    #                           'askQty': '0.86830000',
-    #                           'openPrice': '1709.96000000',
-    #                           'highPrice': '1725.63000000',
-    #                           'lowPrice': '1671.11000000',
-    #                           'volume': '10304.88210000',
-    #                           'quoteVolume': '17430083.55968200',
-    #                           'openTime': '1682258506550',
-    #                           'closeTime': '1682344906550',
-    #                           'firstId': '86201967', 'lastId': '86237119',
-    #                           'count': '35153'}}}
+    def get_tickers(self, symbols):
+        data = {}
+
+        for symbol in symbols:
+            data[symbol] = {
+                'symbol': symbol,
+                'timestamp': 1682344906543,
+                "bid": 25148.37,
+                "ask": 25151.41,
+                "last": 25148.99,
+                "open": 25208.4,
+                "close": 25148.99,
+                "percentage": -0.236,
+                "average": 25178.695,
+                "baseVolume": 1002.04119,
+                "quoteVolume": 25151537.655228
+            }
+
+        return data
+
+    def get_ticker(self, symbol):
+        return {
+            'symbol': symbol,
+            'timestamp': 1682344906543,
+            "bid": 25148.37,
+            "ask": 25151.41,
+            "last": 25148.99,
+            "open": 25208.4,
+            "close": 25148.99,
+            "percentage": -0.236,
+            "average": 25178.695,
+            "baseVolume": 1002.04119,
+            "quoteVolume": 25151537.655228
+        }

@@ -58,7 +58,6 @@ class Test(TestBase):
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
         position = self.app.algorithm.get_position("BTC")
-        print(position)
         order = self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
@@ -89,7 +88,6 @@ def test_create_limit_sell_order_with_percentage_position(self):
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
         position = self.app.algorithm.get_position("BTC")
-        print(position)
         order = self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
