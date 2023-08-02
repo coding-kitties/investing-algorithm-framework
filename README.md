@@ -15,7 +15,7 @@
 # [Investing Algorithm Framework](https://github.com/coding-kitties/investing-algorithm-framework)
 
 The Investing Algorithm Framework is a Python tool that enables swift and 
-elegant development of investment algorithms. It comes with all the necessary 
+elegant development of investment algorithms and trading bots. It comes with all the necessary 
 components for creating algorithms, including data provisioning, portfolio management, and order execution.
 
 
