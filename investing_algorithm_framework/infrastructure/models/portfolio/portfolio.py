@@ -18,6 +18,7 @@ class SQLPortfolio(SQLBaseModel, Portfolio, SQLAlchemyModelExtension):
     total_revenue = Column(Float, nullable=False, default=0)
     total_cost = Column(Float, nullable=False, default=0)
     total_net_gain = Column(Float, nullable=False, default=0)
+    net_size = Column(Float, nullable=False, default=0)
     unallocated = Column(Float, nullable=False, default=0)
     market = Column(String, nullable=False)
     positions = relationship(
@@ -42,14 +43,18 @@ class SQLPortfolio(SQLBaseModel, Portfolio, SQLAlchemyModelExtension):
             raise ValueError("{} is write-once".format(key))
         return value
 
-    def __init__(self, trading_symbol, market, identifier=None):
-        super().__init__()
-        self.realized = 0
-        self.total_revenue = 0
-        self.total_cost = 0
-        self.market = market
-        self.identifier = identifier
-        self.trading_symbol = trading_symbol
+    def __init__(self, trading_symbol, market, unallocated, identifier=None):
 
-        if self.identifier is None:
-            self.identifier = self.market
+        if identifier is None:
+            identifier = market
+
+        super().__init__(
+            trading_symbol=trading_symbol,
+            market=market,
+            identifier=identifier,
+            net_size=unallocated,
+            unallocated=unallocated,
+            realized=0,
+            total_revenue=0,
+            total_cost=0,
+        )

@@ -72,7 +72,7 @@ class Algorithm:
                 "type": type,
                 "side": side,
                 "portfolio_id": portfolio.id,
-                "status": OrderStatus.PENDING.value,
+                "status": OrderStatus.CREATED.value,
                 "trading_symbol": portfolio.trading_symbol,
             },
             execute=execute,
@@ -81,17 +81,35 @@ class Algorithm:
         )
 
     def create_limit_order(
-            self,
-            target_symbol,
-            price,
-            side,
-            amount,
-            market=None,
-            execute=True,
-            validate=True,
-            sync=True
+        self,
+        target_symbol,
+        price,
+        side,
+        amount=None,
+        percentage_of_portfolio=None,
+        percentage_of_position=None,
+        market=None,
+        execute=True,
+        validate=True,
+        sync=True
     ):
         portfolio = self.portfolio_service.find({"market": market})
+
+        if percentage_of_portfolio is not None and OrderSide.BUY.equals(side):
+            size = portfolio.net_size * (percentage_of_portfolio / 100)
+            amount = size / price
+
+        if percentage_of_position is not None and OrderSide.SELL.equals(side):
+            print(target_symbol)
+            print(portfolio.id)
+            position = self.position_service.find(
+                {
+                    "symbol": target_symbol,
+                    "portfolio": portfolio.id
+                }
+            )
+            amount = position.amount * (percentage_of_position / 100)
+
         return self.order_service.create(
             {
                 "target_symbol": target_symbol,
@@ -100,7 +118,7 @@ class Algorithm:
                 "type": OrderType.LIMIT.value,
                 "side": OrderSide.from_value(side).value,
                 "portfolio_id": portfolio.id,
-                "status": OrderStatus.PENDING.value,
+                "status": OrderStatus.CREATED.value,
                 "trading_symbol": portfolio.trading_symbol,
             },
             execute=execute,
@@ -126,19 +144,13 @@ class Algorithm:
                 "type": OrderType.MARKET.value,
                 "side": OrderSide.from_value(side).value,
                 "portfolio_id": portfolio.id,
-                "status": OrderStatus.PENDING.value,
+                "status": OrderStatus.CREATED.value,
                 "trading_symbol": portfolio.trading_symbol,
             },
             execute=execute,
             validate=validate,
             sync=sync
         )
-
-    def check_order_status(self, market=None, symbol=None, status=None):
-        portfolio = self.portfolio_service.get({"market": market})
-        orders = self.order_service \
-            .get_all({"target_symbol": symbol, "status": status})
-        self.order_service.check_order_status(portfolio, orders)
 
     def get_portfolio(self, market=None) -> Portfolio:
 
@@ -156,7 +168,7 @@ class Algorithm:
 
         trading_symbol = portfolio.trading_symbol
         return self.position_service.find(
-            {"portfolio": portfolio.identifier, "symbol": trading_symbol}
+            {"portfolio": portfolio.id, "symbol": trading_symbol}
         ).amount
 
     def reset(self):
@@ -242,7 +254,7 @@ class Algorithm:
 
         portfolio = portfolios[0]
         return self.position_service.get_all(
-            {"portfolio": portfolio.identifier}
+            {"portfolio": portfolio.id}
         )
 
     def get_position(self, symbol, market=None, identifier=None) -> Position:
@@ -263,7 +275,7 @@ class Algorithm:
 
         try:
             return self.position_service.find(
-                {"portfolio": portfolio.identifier, "symbol": symbol}
+                {"portfolio": portfolio.id, "symbol": symbol}
             )
         except ApiException:
             return None
@@ -298,13 +310,48 @@ class Algorithm:
 
         portfolio = portfolios[0]
         position = self.position_service.find(
-            {"portfolio": portfolio.identifier, "symbol": symbol}
+            {"portfolio": portfolio.id, "symbol": symbol}
         )
         ticker = self.market_service.get_ticker(
             f"{symbol.upper()}/{portfolio.trading_symbol.upper()}"
         )
         return (position.amount * ticker["bid"] /
                 self.get_allocated(identifier=portfolio.identifier)) * 100
+
+    def close_position(self, symbol, market=None, identifier=None):
+        query_params = {}
+
+        if market is not None:
+            query_params["market"] = market
+
+        if identifier is not None:
+            query_params["identifier"] = identifier
+
+        position = self.get_position(symbol, market, identifier)
+
+        if position is None:
+            raise ApiException("No position found.")
+
+        if position.amount == 0:
+            return
+
+        for order in self.order_service\
+                .get_all({
+                    "position": position.id, "status": OrderStatus.OPEN.value
+                }):
+            self.order_service.cancel_order(order.id)
+
+        portfolio = self.portfolio_service.find({"position": position.id})
+        self.market_service.market = portfolio.market
+        ticker = self.market_service.get_ticker(
+            symbol=f"{symbol.upper()}/{portfolio.trading_symbol.upper()}"
+        )
+        self.create_limit_order(
+            target_symbol=position.symbol,
+            amount=position.amount,
+            side=OrderSide.SELL.value,
+            price=ticker["bid"],
+        )
 
     def add_strategies(self, strategies):
         self.strategy_orchestrator_service.add_strategies(strategies)
@@ -346,7 +393,7 @@ class Algorithm:
 
         for portfolio in portfolios:
             positions = self.position_service.get_all(
-                {"portfolio": portfolio.identifier}
+                {"portfolio": portfolio.id}
             )
 
             for position in positions:

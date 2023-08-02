@@ -19,4 +19,4 @@ class PortfolioSerializer(Schema):
     @staticmethod
     def get_positions(obj):
         position_service = DependencyContainer.position_service()
-        return position_service.count({"portfolio": obj.identifier})
+        return position_service.count({"portfolio": obj.id})
