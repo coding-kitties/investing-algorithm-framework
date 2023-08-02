@@ -21,6 +21,7 @@ class PortfolioConfigurationService:
                 portfolio_configuration.market == identifier.lower()),
             None
         )
+
         if portfolio_configuration is None:
             raise ApiException('Portfolio configuration not found', 404)
 

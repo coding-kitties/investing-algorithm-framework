@@ -48,3 +48,8 @@ class PositionService(RepositoryService):
 
         if position.amount != synced_amount:
             self.update(position.id, {"amount": synced_amount})
+
+    def close_position(self, position_id):
+
+        self.market_service.initialize(position.portfolio.portfolio_configuration)
+        self.market_service.close_position(position)

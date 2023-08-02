@@ -46,7 +46,7 @@ class Test(TestBase):
                 "type": OrderType.LIMIT.value,
                 "side": OrderSide.BUY.value,
                 "portfolio_id": portfolio.id,
-                "status": OrderStatus.PENDING.value,
+                "status": OrderStatus.CREATED.value,
                 "trading_symbol": portfolio.trading_symbol,
             },
         )

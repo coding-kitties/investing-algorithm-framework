@@ -103,7 +103,7 @@ class SQLOrder(SQLBaseModel, Order, SQLAlchemyModelExtension):
 
     @staticmethod
     def from_ccxt_order(ccxt_order):
-        status = OrderStatus.from_ccxt_status(ccxt_order["status"])
+        status = OrderStatus.from_value(ccxt_order["status"])
         target_symbol = ccxt_order.get("symbol").split("/")[0]
         trading_symbol = ccxt_order.get("symbol").split("/")[1]
 
