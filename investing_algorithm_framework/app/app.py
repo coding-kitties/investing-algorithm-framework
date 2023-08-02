@@ -105,6 +105,7 @@ class App:
 
         order_service = self.container.order_service()
         number_of_iterations_since_last_orders_check = 1
+        order_service.check_pending_orders()
 
         try:
             while self.algorithm.running:
@@ -307,6 +308,7 @@ class App:
             )
             portfolio_repository.create(
                 {
+                    "unallocated": unallocated,
                     "identifier": portfolio_configuration.identifier,
                     "trading_symbol": portfolio_configuration.trading_symbol,
                     "market": portfolio_configuration.market,

@@ -19,12 +19,5 @@ class SQLPositionRepository(Repository):
             query = query.filter_by(symbol=symbol_query_param)
 
         if portfolio_query_param:
-            portfolio = db.query(SQLPortfolio).filter_by(
-                identifier=portfolio_query_param
-            ).first()
-
-            if portfolio is None:
-                return query.filter_by(id=-1)
-
-            query = query.filter_by(portfolio_id=portfolio.id)
+            query = query.filter_by(portfolio_id=portfolio_query_param)
         return query

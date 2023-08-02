@@ -35,41 +35,64 @@ class Test(TestBase):
         )
         self.app.container.market_service.override(MarketServiceStub())
         self.app.create_portfolios()
-        portfolio_service = self.app.container.portfolio_service()
-        portfolio = portfolio_service.find({"market": "binance"})
-        order_service = self.app.container.order_service()
-        order_service.create(
-            {
-                "target_symbol": "BTC",
-                "price": 10,
-                "amount": 1,
-                "type": OrderType.LIMIT.value,
-                "side": OrderSide.BUY.value,
-                "portfolio_id": portfolio.id,
-                "status": OrderStatus.PENDING.value,
-                "trading_symbol": portfolio.trading_symbol,
-            },
-        )
-        order_service.check_pending_orders()
 
     def test_create_limit_sell_order(self):
-        position_service = self.app.container.position_service()
-        order_service = self.app.container.order_service()
-        trading_symbol_position = position_service.find({"symbol": "USDT"})
-        self.assertEqual(990, trading_symbol_position.amount)
         self.app.run(number_of_iterations=1, sync=False)
-        trading_symbol_position = position_service.find({"symbol": "USDT"})
-        self.assertEqual(990, trading_symbol_position.amount)
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
-            amount=1,
+            price=10,
+            side="BUY",
+            percentage_of_portfolio=20
+        )
+        order_repository = self.app.container.order_repository()
+        self.assertEqual(
+            1, order_repository.count({"type": "LIMIT", "side": "BUY"})
+        )
+        order = order_repository.find({"target_symbol": "BTC"})
+        self.assertEqual(OrderStatus.OPEN.value, order.status)
+        self.assertEqual(20, order.amount)
+        self.assertEqual(10, order.price)
+        portfolio = self.app.algorithm.get_portfolio()
+        self.assertEqual(1000, portfolio.net_size)
+        self.assertEqual(800, portfolio.unallocated)
+        order_service = self.app.container.order_service()
+        order_service.check_pending_orders()
+        position = self.app.algorithm.get_position("BTC")
+        order = self.app.algorithm.create_limit_order(
+            target_symbol="BTC",
             price=10,
             side="SELL",
+            amount=20
         )
-        btc_position = position_service.find({"symbol": "BTC"})
-        self.assertEqual(0, btc_position.amount)
+        self.assertEqual(20, order.amount)
+
+def test_create_limit_sell_order_with_percentage_position(self):
+        self.app.run(number_of_iterations=1, sync=False)
+        self.app.algorithm.create_limit_order(
+            target_symbol="BTC",
+            price=10,
+            side="BUY",
+            percentage_of_portfolio=20
+        )
+        order_repository = self.app.container.order_repository()
+        self.assertEqual(
+            1, order_repository.count({"type": "LIMIT", "side": "BUY"})
+        )
+        order = order_repository.find({"target_symbol": "BTC"})
+        self.assertEqual(OrderStatus.OPEN.value, order.status)
+        self.assertEqual(20, order.amount)
+        self.assertEqual(10, order.price)
+        portfolio = self.app.algorithm.get_portfolio()
+        self.assertEqual(1000, portfolio.net_size)
+        self.assertEqual(800, portfolio.unallocated)
+        order_service = self.app.container.order_service()
         order_service.check_pending_orders()
-        btc_position = position_service.find({"symbol": "BTC"})
-        trading_symbol_position = position_service.find({"symbol": "USDT"})
-        self.assertEqual(0, btc_position.amount)
-        self.assertNotEqual(1000, trading_symbol_position.amount)
+        position = self.app.algorithm.get_position("BTC")
+        order = self.app.algorithm.create_limit_order(
+            target_symbol="BTC",
+            price=10,
+            side="SELL",
+            percentage_of_position=20
+        )
+        # 20% of 20 = 4
+        self.assertEqual(4, order.amount)

@@ -269,7 +269,7 @@ class MarketService:
             raise OperationalException("Could not create market sell order")
 
     def cancel_order(self, order):
-
+        print("cancel order")
         if not self.exchange.has['cancelOrder']:
             raise OperationalException(
                 f"Market service {self.market} does not support "
@@ -378,6 +378,9 @@ class MarketService:
 
         now = self.exchange.milliseconds()
         ohlcvs = {}
+
+        # Set timeout to 30 seconds
+        self.exchange.timeout = 30000
 
         for symbol in symbols:
 

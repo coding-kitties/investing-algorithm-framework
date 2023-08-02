@@ -18,6 +18,13 @@ class PortfolioService(RepositoryService):
         self.order_service = order_service
         super(PortfolioService, self).__init__(portfolio_repository)
 
+    def find(self, query_params):
+        portfolio = self.repository.find(query_params)
+        portfolio_configuration = self.portfolio_configuration_service\
+            .get(portfolio.identifier)
+        portfolio.configuration = portfolio_configuration
+        return portfolio
+
     def create(self, data):
         unallocated = data.get("unallocated", 0)
         del data["unallocated"]
