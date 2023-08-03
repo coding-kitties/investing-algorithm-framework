@@ -95,7 +95,7 @@ class OrderService(RepositoryService):
                     target_symbol=order.get_target_symbol(),
                     trading_symbol=order.get_trading_symbol(),
                     amount=order.get_amount(),
-                    price=order.get_price
+                    price=order.get_price()
                 )
             else:
                 self.market_service.create_limit_sell_order(
