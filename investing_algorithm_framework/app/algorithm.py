@@ -100,8 +100,6 @@ class Algorithm:
             amount = size / price
 
         if percentage_of_position is not None and OrderSide.SELL.equals(side):
-            print(target_symbol)
-            print(portfolio.id)
             position = self.position_service.find(
                 {
                     "symbol": target_symbol,
