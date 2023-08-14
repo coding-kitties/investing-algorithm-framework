@@ -1,9 +1,12 @@
+import logging
 from datetime import datetime
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
     OperationalException, OrderStatus
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
+
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class OrderService(RepositoryService):
@@ -244,6 +247,8 @@ class OrderService(RepositoryService):
     def check_pending_orders(self):
         pending_orders = self.get_all({"status": OrderStatus.OPEN.value})
 
+        logger.info(f"Checking {len(pending_orders)} open orders")
+
         for order in pending_orders:
             position = self.position_repository.get(order.position_id)
             portfolio = self.portfolio_repository.get(position.portfolio_id)
@@ -259,12 +264,14 @@ class OrderService(RepositoryService):
             updated_order = self.update(order.id, external_order.to_dict())
 
             if OrderStatus.CLOSED.equals(updated_order.status):
+                logger.info(f"Order {updated_order.id} closed")
 
                 if OrderSide.BUY.equals(updated_order.side):
                     self._sync_portfolio_with_executed_buy_order(updated_order)
                 else:
                     self._sync_portfolio_with_executed_sell_order(updated_order)
             elif OrderStatus.CANCELED.equals(updated_order.status):
+                logger.info(f"Order {updated_order.id} canceled")
 
                 if OrderSide.BUY.equals(updated_order.side):
                     self._sync_portfolio_with_cancelled_buy_order(
@@ -276,6 +283,7 @@ class OrderService(RepositoryService):
                     )
             elif OrderStatus.REJECTED.equals(updated_order.status) \
                     or OrderStatus.EXPIRED.equals(updated_order.status):
+                logger.info(f"Order {updated_order.id} rejected or expired")
 
                 if OrderSide.BUY.equals(updated_order.side):
                     self._sync_portfolio_with_failed_buy_order(updated_order)

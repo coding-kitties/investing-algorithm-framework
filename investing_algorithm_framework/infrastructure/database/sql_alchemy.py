@@ -7,7 +7,7 @@ from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI, \
     OperationalException
 
 Session = sessionmaker()
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class SQLAlchemyAdapter:

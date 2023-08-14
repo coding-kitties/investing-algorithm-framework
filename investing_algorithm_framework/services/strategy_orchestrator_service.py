@@ -1,7 +1,10 @@
+import logging
 import schedule
 from datetime import datetime
 from investing_algorithm_framework.domain import StoppableThread, TimeUnit, \
     OperationalException
+
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class StrategyOrchestratorService:
@@ -38,10 +41,11 @@ class StrategyOrchestratorService:
 
         market_data = self.market_data_service.get_data_for_strategy(strategy)
 
+        logger.info(f"Running strategy {strategy.worker_id}")
+
         if sync:
             strategy.run_strategy(
-                market_data=market_data,
-                algorithm=algorithm
+                market_data=market_data, algorithm=algorithm
             )
         else:
             self.iterations += 1
@@ -69,6 +73,8 @@ class StrategyOrchestratorService:
         # Don't run a strategy that is already running
         if matching_thread:
             return
+
+        logger.info(f"Running task {task.worker_id}")
 
         if sync:
             task.run(algorithm=algorithm)

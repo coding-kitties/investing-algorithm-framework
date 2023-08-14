@@ -15,12 +15,11 @@ from investing_algorithm_framework.app.task import Task
 from investing_algorithm_framework.app.web import create_flask_app
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
-    ImproperlyConfigured, SQLALCHEMY_DATABASE_URI, Config, \
-    OperationalException
+    SQLALCHEMY_DATABASE_URI, Config, OperationalException
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class App:
@@ -92,11 +91,13 @@ class App:
         )
 
         if self.stateless:
+            logger.info("Running stateless")
             action_handler = ActionHandler.of(payload)
             return action_handler.handle(
                 payload=payload, algorithm=self.algorithm
             )
         elif self._web:
+            logger.info("Running web")
             flask_thread = threading.Thread(
                 name='Web App', target=self._flask_app.run
             )
@@ -110,6 +111,7 @@ class App:
         try:
             while self.algorithm.running:
                 if number_of_iterations_since_last_orders_check == 30:
+                    logger.info("Checking pending orders")
                     order_service.check_pending_orders()
                     number_of_iterations_since_last_orders_check = 1
 
@@ -280,6 +282,7 @@ class App:
         portfolio_service.sync_portfolios()
 
     def create_portfolios(self):
+        logger.info("Creating portfolios")
         portfolio_configuration_service = self.container\
             .portfolio_configuration_service()
         market_service = self.container.market_service()
@@ -317,13 +320,14 @@ class App:
             portfolio = portfolio_repository.find(
                 {"identifier": portfolio_configuration.identifier}
             )
-            position_repository.create(
+            portfolio = position_repository.create(
                 {
                     "symbol": portfolio_configuration.trading_symbol,
                     "amount": unallocated,
                     "portfolio_id": portfolio.id
                 }
             )
+            logger.info(f"Created portfolio {portfolio}")
 
     def _initialize_web(self):
         resource_dir = self._config[RESOURCE_DIRECTORY]
@@ -415,4 +419,3 @@ class App:
  
     def get_portfolio_configurations(self):
         return self.algorithm.get_portfolio_configurations()
-

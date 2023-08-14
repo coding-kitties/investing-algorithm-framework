@@ -5,6 +5,7 @@ from .database import setup_sqlalchemy, Session, \
     create_all_tables
 from .models import SQLPortfolio, SQLOrder, SQLPosition, SQLOrderFee, \
     SQLPositionCost
+from .logging import DEFAULT_LOGGING_CONFIG
 
 __all__ = [
     "create_all_tables",
@@ -20,5 +21,6 @@ __all__ = [
     "SQLOrder",
     "SQLOrderFee",
     "SQLPosition",
-    "SQLPositionCost"
+    "SQLPositionCost",
+    "DEFAULT_LOGGING_CONFIG"
 ]

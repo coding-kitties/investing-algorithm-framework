@@ -8,7 +8,7 @@ from investing_algorithm_framework.domain.models.order import OrderStatus, \
 from investing_algorithm_framework.domain.models.order.order_fee import \
     OrderFee
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class Order(BaseModel):

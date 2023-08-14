@@ -9,7 +9,7 @@ from investing_algorithm_framework.domain import ApiException, \
     DEFAULT_PAGE_VALUE, DEFAULT_PER_PAGE_VALUE
 from investing_algorithm_framework.infrastructure.database import Session
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class Repository(ABC):
