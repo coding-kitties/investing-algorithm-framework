@@ -6,7 +6,7 @@ from dependency_injector.wiring import inject, Provide
 from investing_algorithm_framework.app.web.schemas import PositionSerializer
 from investing_algorithm_framework.app.web.responses import create_response
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 blueprint = Blueprint("position-views", __name__)
 

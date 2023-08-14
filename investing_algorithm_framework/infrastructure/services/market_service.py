@@ -8,7 +8,7 @@ import ccxt
 from investing_algorithm_framework.domain import OperationalException, \
     OHLCV, AssetPrice, Order
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class MarketService:

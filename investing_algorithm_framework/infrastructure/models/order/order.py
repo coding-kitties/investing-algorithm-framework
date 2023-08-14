@@ -10,7 +10,7 @@ from investing_algorithm_framework.infrastructure.database import SQLBaseModel
 from investing_algorithm_framework.infrastructure.models.model_extension \
     import SQLAlchemyModelExtension
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class SQLOrder(SQLBaseModel, Order, SQLAlchemyModelExtension):

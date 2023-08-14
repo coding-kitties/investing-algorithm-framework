@@ -8,7 +8,7 @@ from investing_algorithm_framework.app.web.schemas import PortfolioSerializer
 from investing_algorithm_framework.dependency_container import \
     DependencyContainer
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 blueprint = Blueprint("portfolio-views", __name__)
 

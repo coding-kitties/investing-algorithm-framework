@@ -7,7 +7,7 @@ from werkzeug.exceptions import HTTPException
 
 from investing_algorithm_framework.domain import ApiException
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 def setup_error_handler(app) -> None:

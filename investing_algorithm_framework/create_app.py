@@ -1,6 +1,9 @@
-from investing_algorithm_framework.app import App
+import logging
+
+from .app import App
 from .dependency_container import setup_dependency_container
 
+logger = logging.getLogger("investing_algorithm_framework")
 
 def create_app(
     config={},
@@ -17,4 +20,6 @@ def create_app(
 
     if initialize:
         app.initialize()
+
+    logger.info( "Investing algoritm framework app created")
     return app
