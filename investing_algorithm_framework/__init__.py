@@ -1,4 +1,4 @@
-from investing_algorithm_framework.app import App
+from investing_algorithm_framework.app import App, Algorithm
 from .create_app import create_app
 from investing_algorithm_framework.domain import ApiException, \
     TradingDataType, OrderBook, Ticker, TradingTimeFrame, OHLCV, OrderType,\
@@ -10,6 +10,7 @@ from investing_algorithm_framework.app import TradingStrategy, \
     StatelessAction, Task
 
 __all__ = [
+    "Algorithm",
     "RESOURCE_DIRECTORY",
     "App",
     "create_app",
