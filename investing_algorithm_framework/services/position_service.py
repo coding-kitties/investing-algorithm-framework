@@ -4,9 +4,10 @@ from investing_algorithm_framework.services.repository_service import \
 
 class PositionService(RepositoryService):
 
-    def __init__(self, repository, market_service):
+    def __init__(self, repository, order_repository, market_service):
         super().__init__(repository)
         self.market_service = market_service
+        self.order_repository = order_repository
 
     def sync_positions(self, portfolio, market_service):
         self.market_service.initialize(portfolio.portfolio_configuration)
@@ -48,3 +49,15 @@ class PositionService(RepositoryService):
 
         if position.amount != synced_amount:
             self.update(position.id, {"amount": synced_amount})
+
+    def close_position(self, position_id, portfolio):
+        self.market_service.initialize(portfolio.portfolio_configuration)
+        position = self.get(position_id)
+
+        if position.amount > 0:
+            self.market_service.create_market_sell_order(
+                position.symbol,
+                portfolio.get_trading_symbol(),
+                position.amount,
+            )
+

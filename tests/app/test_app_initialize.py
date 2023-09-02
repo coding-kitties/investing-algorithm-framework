@@ -1,8 +1,8 @@
 import os
 
-from investing_algorithm_framework import create_app
+from investing_algorithm_framework import create_app, PortfolioConfiguration
 from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketServiceStub
 
 
 class TestAppInitialize(TestBase):
@@ -25,6 +25,15 @@ class TestAppInitialize(TestBase):
         app = create_app(
             config={"test": "test", 'resource_directory': self.resource_dir}
         )
+        app.container.market_service.override(MarketServiceStub())
+        app.add_portfolio_configuration(
+            PortfolioConfiguration(
+                market="BITVAVO",
+                trading_symbol="USDT",
+                api_key="test",
+                secret_key="test"
+            )
+        )
         app.initialize()
         self.assertIsNotNone(app.config)
         self.assertIsNone(app._flask_app)
@@ -38,6 +47,15 @@ class TestAppInitialize(TestBase):
             config={"test": "test", 'resource_directory': self.resource_dir},
             web=True
         )
+        app.container.market_service.override(MarketServiceStub())
+        app.add_portfolio_configuration(
+            PortfolioConfiguration(
+                market="BITVAVO",
+                trading_symbol="USDT",
+                api_key="test",
+                secret_key="test"
+            )
+        )
         app.initialize()
         self.assertIsNotNone(app.config)
         self.assertIsNotNone(app._flask_app)
@@ -50,6 +68,15 @@ class TestAppInitialize(TestBase):
         app = create_app(
             config={"test": "test"},
             stateless=True
+        )
+        app.container.market_service.override(MarketServiceStub())
+        app.add_portfolio_configuration(
+            PortfolioConfiguration(
+                market="BITVAVO",
+                trading_symbol="USDT",
+                api_key="test",
+                secret_key="test"
+            )
         )
         app.initialize()
         order_service = app.container.order_service()

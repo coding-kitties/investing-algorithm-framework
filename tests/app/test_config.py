@@ -9,20 +9,20 @@ class TestConfig(TestBase):
 
     def test_config(self):
         app = create_app(
-            config={self.ATTRIBUTE_ONE: self.ATTRIBUTE_ONE}, initialize=False
+            config={self.ATTRIBUTE_ONE: self.ATTRIBUTE_ONE}
         )
         self.assertIsNotNone(app.config)
 
     def test_get_item(self):
         app = create_app(
-            config={self.ATTRIBUTE_ONE: self.ATTRIBUTE_ONE}, initialize=False
+            config={self.ATTRIBUTE_ONE: self.ATTRIBUTE_ONE}
         )
         self.assertIsNotNone(app.config)
         self.assertIsNotNone(app.config.get(self.ATTRIBUTE_ONE))
 
     def test_set_item(self):
         app = create_app(
-            config={self.ATTRIBUTE_ONE: self.ATTRIBUTE_ONE}, initialize=False
+            config={self.ATTRIBUTE_ONE: self.ATTRIBUTE_ONE}
         )
         self.assertIsNotNone(app.config)
         new_value = random_string(10)

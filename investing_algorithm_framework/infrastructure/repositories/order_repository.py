@@ -52,7 +52,7 @@ class SQLOrderRepository(Repository):
 
         if type_query_param:
             order_type = OrderType.from_value(type_query_param)
-            query = query.filter_by(type=order_type.value)
+            query = query.filter_by(order_type=order_type.value)
 
         if status_query_param:
             status = OrderStatus.from_value(status_query_param)

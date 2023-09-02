@@ -1,5 +1,5 @@
-from .portfolio_service import PortfolioService
+from .portfolio_service import RepositoryService
 
 
-class PositionCostService(PortfolioService):
+class PositionCostService(RepositoryService):
     pass

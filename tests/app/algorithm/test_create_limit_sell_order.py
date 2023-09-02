@@ -1,8 +1,8 @@
 import os
+from decimal import Decimal
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, OrderType, OrderSide, \
-    OrderStatus
+    PortfolioConfiguration, OrderStatus
 from tests.resources import TestBase, MarketServiceStub
 
 
@@ -34,7 +34,7 @@ class Test(TestBase):
             )
         )
         self.app.container.market_service.override(MarketServiceStub())
-        self.app.create_portfolios()
+        self.app.initialize()
 
     def test_create_limit_sell_order(self):
         self.app.run(number_of_iterations=1, sync=False)
@@ -50,11 +50,11 @@ class Test(TestBase):
         )
         order = order_repository.find({"target_symbol": "BTC"})
         self.assertEqual(OrderStatus.OPEN.value, order.status)
-        self.assertEqual(20, order.amount)
-        self.assertEqual(10, order.price)
+        self.assertEqual(Decimal(20), order.get_amount())
+        self.assertEqual(Decimal(10), order.get_price())
         portfolio = self.app.algorithm.get_portfolio()
-        self.assertEqual(1000, portfolio.net_size)
-        self.assertEqual(800, portfolio.unallocated)
+        self.assertEqual(Decimal(1000), portfolio.get_net_size())
+        self.assertEqual(Decimal(800), portfolio.get_unallocated())
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
         position = self.app.algorithm.get_position("BTC")
@@ -64,9 +64,9 @@ class Test(TestBase):
             side="SELL",
             amount=20
         )
-        self.assertEqual(20, order.amount)
+        self.assertEqual(Decimal(20), order.get_amount())
 
-def test_create_limit_sell_order_with_percentage_position(self):
+    def test_create_limit_sell_order_with_percentage_position(self):
         self.app.run(number_of_iterations=1, sync=False)
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
@@ -80,14 +80,13 @@ def test_create_limit_sell_order_with_percentage_position(self):
         )
         order = order_repository.find({"target_symbol": "BTC"})
         self.assertEqual(OrderStatus.OPEN.value, order.status)
-        self.assertEqual(20, order.amount)
-        self.assertEqual(10, order.price)
+        self.assertEqual(Decimal(20), order.get_amount())
+        self.assertEqual(Decimal(10), order.get_price())
         portfolio = self.app.algorithm.get_portfolio()
-        self.assertEqual(1000, portfolio.net_size)
-        self.assertEqual(800, portfolio.unallocated)
+        self.assertEqual(Decimal(1000), portfolio.get_net_size())
+        self.assertEqual(Decimal(800), portfolio.get_unallocated())
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
-        position = self.app.algorithm.get_position("BTC")
         order = self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
@@ -95,4 +94,4 @@ def test_create_limit_sell_order_with_percentage_position(self):
             percentage_of_position=20
         )
         # 20% of 20 = 4
-        self.assertEqual(4, order.amount)
+        self.assertEqual(Decimal(4), order.get_amount())

@@ -46,12 +46,13 @@ class DependencyContainer(containers.DeclarativeContainer):
     )
     position_cost_service = providers.Factory(
         PositionCostService,
-        repository=position_cost_repository,
+        repository=position_cost_repository
     )
     position_service = providers.Factory(
         PositionService,
         repository=position_repository,
         market_service=market_service,
+        order_repository=order_repository,
     )
     portfolio_service = providers.Factory(
         PortfolioService,
@@ -73,5 +74,6 @@ class DependencyContainer(containers.DeclarativeContainer):
         order_service=order_service,
         market_service=market_service,
         strategy_orchestrator_service=strategy_orchestrator_service,
-        market_data_service=market_data_service
+        market_data_service=market_data_service,
+        position_cost_service=position_cost_service,
     )

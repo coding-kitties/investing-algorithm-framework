@@ -1,5 +1,5 @@
 import os
-
+from decimal import Decimal
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration, OrderStatus
 from tests.resources import TestBase, MarketServiceStub
@@ -66,4 +66,4 @@ class Test(TestBase):
         order = order_repository.find({"target_symbol": "BTC"})
         self.assertEqual(OrderStatus.CLOSED.value, order.status)
         position = position_repository.find({"symbol": "BTC"})
-        self.assertEqual(1, position.amount)
+        self.assertEqual(Decimal(1), position.get_amount())

@@ -1,7 +1,8 @@
 import os
-from investing_algorithm_framework import create_app, Config
+from investing_algorithm_framework import create_app, Config, \
+    PortfolioConfiguration
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketServiceStub
 
 
 class TestCreateApp(TestBase):
@@ -48,10 +49,22 @@ class TestCreateApp(TestBase):
         self.assertIsNone(app.algorithm)
 
     def test_create_app_web(self):
-        app = create_app(web=True, config={RESOURCE_DIRECTORY: self.resource_dir})
+        app = create_app(
+            web=True, config={RESOURCE_DIRECTORY: self.resource_dir}
+        )
+        app.add_portfolio_configuration(
+            PortfolioConfiguration(
+                market="BITVAVO",
+                trading_symbol="USDT",
+                api_key="test",
+                secret_key="test"
+            )
+        )
+        app.container.market_service.override(MarketServiceStub())
+        app.initialize()
         self.assertIsNotNone(app)
         self.assertIsNotNone(app._flask_app)
         self.assertIsNotNone(app.container)
         self.assertIsNotNone(app.config)
-        self.assertIsNone(app.algorithm)
+        self.assertIsNotNone(app.algorithm)
 

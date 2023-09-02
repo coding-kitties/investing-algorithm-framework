@@ -1,5 +1,6 @@
 from investing_algorithm_framework.infrastructure.services import MarketService
 from investing_algorithm_framework import OrderStatus, Order
+from random import randint
 
 
 class MarketServiceStub(MarketService):
@@ -14,7 +15,15 @@ class MarketServiceStub(MarketService):
         trading_symbol: str,
         amount: float,
     ):
-        pass
+        return Order(
+            external_id=randint(0, 1000),
+            amount=amount,
+            status=OrderStatus.OPEN,
+            order_type="market",
+            side="sell",
+            target_symbol=target_symbol,
+            trading_symbol=trading_symbol,
+        )
 
     def create_limit_buy_order(
         self,
@@ -23,7 +32,16 @@ class MarketServiceStub(MarketService):
         amount: float,
         price: float
     ):
-        pass
+        return Order(
+            external_id=randint(0, 1000),
+            amount=amount,
+            status=OrderStatus.OPEN,
+            order_type="limit",
+            side="buy",
+            target_symbol=target_symbol,
+            trading_symbol=trading_symbol,
+            price=price
+        )
 
     def create_limit_sell_order(
         self,
@@ -32,7 +50,15 @@ class MarketServiceStub(MarketService):
         amount: float,
         price: float
     ):
-        pass
+        return Order(
+            external_id=randint(0, 1000),
+            amount=amount,
+            status=OrderStatus.OPEN,
+            order_type="limit",
+            side="sell",
+            target_symbol=target_symbol,
+            trading_symbol=trading_symbol,
+        )
 
     def get_balance(self):
         return {
@@ -82,7 +108,7 @@ class MarketServiceStub(MarketService):
                 'updated': '1674386553394',
                 'status': 'closed',
                 'side': 'buy',
-                'orderType': order.type,
+                'orderType': order.order_type,
                 'amountQuote': order.amount,
                 'amountQuoteRemaining': '0',
                 'onHold': '0',
@@ -118,7 +144,7 @@ class MarketServiceStub(MarketService):
             'timeInForce': 'IOC',
             'postOnly': None,
             'side': order.side,
-            'price': order.price if order.type == 'limit' else 10,
+            'price': order.price if order.order_type == 'limit' else 10,
             'stopPrice': None,
             'triggerPrice': None,
             'amount': order.amount,

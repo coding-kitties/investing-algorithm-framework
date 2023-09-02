@@ -47,6 +47,17 @@ class App:
         setup_sqlalchemy(self)
         create_all_tables()
 
+        self.algorithm = self.container.algorithm()
+        self.algorithm.add_strategies(self.strategies)
+        self.algorithm.add_tasks(self.tasks)
+        portfolio_configuration_service = self.container\
+            .portfolio_configuration_service()
+
+        if portfolio_configuration_service.count() == 0:
+            raise OperationalException("No portfolios configured")
+
+        self.create_portfolios()
+
     def _initialize_management_commands(self):
 
         if not Environment.TEST.equals(self.config.get(ENVIRONMENT)):
@@ -69,17 +80,9 @@ class App:
         number_of_iterations: int = None,
         sync=True
     ):
-        self.algorithm = self.container.algorithm()
-        self.algorithm.add_strategies(self.strategies)
-        self.algorithm.add_tasks(self.tasks)
-        portfolio_configuration_service = self.container\
-            .portfolio_configuration_service()
+        self.initialize()
+
         portfolio_service = self.container.portfolio_service()
-
-        if portfolio_configuration_service.count() == 0:
-            raise OperationalException("No portfolios configured")
-
-        self.create_portfolios()
 
         if sync:
             portfolio_service.sync_portfolios()

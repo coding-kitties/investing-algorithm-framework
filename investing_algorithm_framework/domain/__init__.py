@@ -15,6 +15,7 @@ from .utils import random_string, append_dict_as_row_to_csv, \
     csv_to_list, StoppableThread
 from .strategy import Strategy
 from .stateless_actions import StatelessActions
+from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
 
 __all__ = [
     'Config',
@@ -61,5 +62,7 @@ __all__ = [
     "DATETIME_FORMAT",
     "StatelessActions",
     "PositionCost",
-    "OrderFee"
+    "OrderFee",
+    "parse_decimal_to_string",
+    "parse_string_to_decimal"
 ]

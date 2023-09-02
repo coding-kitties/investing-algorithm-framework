@@ -1,7 +1,8 @@
 import os
+from decimal import Decimal
 
-from investing_algorithm_framework import create_app, TradingStrategy,\
-    TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration, OrderStatus
+from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
+    PortfolioConfiguration, OrderStatus
 from tests.resources import TestBase, MarketServiceStub
 
 
@@ -33,7 +34,7 @@ class Test(TestBase):
             )
         )
         self.app.container.market_service.override(MarketServiceStub())
-        self.app.create_portfolios()
+        self.app.initialize()
 
     def test_create_limit_buy_order(self):
         self.app.run(number_of_iterations=1, sync=False)
@@ -51,7 +52,6 @@ class Test(TestBase):
         self.assertEqual(OrderStatus.OPEN.value, order.status)
 
     def test_create_limit_buy_order_with_percentage_of_portfolio(self):
-        self.app.run(number_of_iterations=1, sync=False)
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
@@ -64,8 +64,8 @@ class Test(TestBase):
         )
         order = order_repository.find({"target_symbol": "BTC"})
         self.assertEqual(OrderStatus.OPEN.value, order.status)
-        self.assertEqual(20, order.amount)
-        self.assertEqual(10, order.price)
+        self.assertEqual(Decimal(20), order.get_amount())
+        self.assertEqual(Decimal(10), order.get_price())
         portfolio = self.app.algorithm.get_portfolio()
-        self.assertEqual(1000, portfolio.net_size)
-        self.assertEqual(800, portfolio.unallocated)
+        self.assertEqual(Decimal(1000), portfolio.get_net_size())
+        self.assertEqual(Decimal(800), portfolio.get_unallocated())

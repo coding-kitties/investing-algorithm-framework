@@ -45,6 +45,7 @@ class FlaskTestBase(FlaskTestCase):
             self.iaf_app.add_portfolio_configuration(portfolio_configuration)
 
         self.iaf_app.container.market_service.override(MarketServiceStub())
+        self.iaf_app.initialize()
         # self.app.create_portfolios()
         return self.iaf_app._flask_app
 
