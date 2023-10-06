@@ -30,6 +30,7 @@ class Order(BaseModel):
         updated_at=None,
         trade_closed_at=None,
         trade_closed_price=None,
+        trade_closed_amount=None,
         external_id=None,
         filled_amount=None,
         remaining_amount=None,
@@ -65,6 +66,7 @@ class Order(BaseModel):
         self.net_gain = parse_decimal_to_string(net_gain)
         self.trade_closed_at = trade_closed_at
         self.trade_closed_price = trade_closed_price
+        self.trade_closed_amount = trade_closed_amount
         self.created_at = created_at
         self.updated_at = updated_at
         self.filled_amount = parse_decimal_to_string(filled_amount)
@@ -128,6 +130,12 @@ class Order(BaseModel):
 
     def set_trade_closed_price(self, trade_closed_price):
         self.trade_closed_price = trade_closed_price
+
+    def get_trade_closed_amount(self):
+        return parse_string_to_decimal(self.trade_closed_amount)
+
+    def set_trade_closed_amount(self, trade_closed_amount):
+        self.trade_closed_amount = trade_closed_amount
 
     def get_created_at(self):
         return self.created_at
@@ -218,25 +226,33 @@ class Order(BaseModel):
 
     def update(self, data):
 
-        if 'amount' in data:
+        if 'amount' in data and data['amount'] is not None:
             amount = data.pop('amount')
             self.amount = parse_decimal_to_string(amount)
 
-        if 'price' in data:
+        if 'price' in data and data['price'] is not None:
             price = data.pop('price')
             self.price = parse_decimal_to_string(price)
 
-        if 'filled' in data:
+        if 'filled' in data and data['filled'] is not None:
             filled_amount = data.pop('filled')
             self.filled_amount = parse_decimal_to_string(filled_amount)
 
-        if 'remaining' in data:
+        if 'remaining' in data and data['remaining'] is not None:
             remaining_amount = data.pop('remaining')
             self.remaining_amount = parse_decimal_to_string(remaining_amount)
 
-        if 'net_gain' in data:
+        if 'net_gain' in data and data['net_gain'] is not None:
             net_gain = data.pop('net_gain')
             self.net_gain = parse_decimal_to_string(net_gain)
+
+        if 'trade_closed_price' in data and data['trade_closed_price'] is not None:
+            trade_closed_price = data.pop('trade_closed_price')
+            self.trade_closed_price = parse_decimal_to_string(trade_closed_price)
+
+        if 'trade_closed_amount' in data and data['trade_closed_amount'] is not None:
+            trade_closed_amount = data.pop('trade_closed_amount')
+            self.trade_closed_amount = parse_decimal_to_string(trade_closed_amount)
 
         super().update(data)
 
@@ -249,8 +265,9 @@ class Order(BaseModel):
 
         return self.repr(
             id=id_value,
-            price=self.price,
-            amount=self.amount,
+            price=self.get_price(),
+            amount=self.get_amount(),
+            net_gain=self.get_net_gain(),
             external_id=self.external_id,
             status=self.status,
             target_symbol=self.target_symbol,
@@ -259,5 +276,5 @@ class Order(BaseModel):
             order_type=self.order_type,
             filled_amount=self.get_filled(),
             remaining_amount=self.get_remaining(),
-            cost=self.cost,
+            cost=self.get_cost(),
         )

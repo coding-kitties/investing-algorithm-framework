@@ -15,14 +15,9 @@ class SQLPosition(SQLBaseModel, Position, SQLAlchemyModelExtension):
     id = Column(Integer, primary_key=True, unique=True)
     symbol = Column(String)
     amount = Column(String)
+    cost = Column(String)
     orders = relationship(
         "SQLOrder",
-        back_populates="position",
-        lazy="dynamic",
-        cascade="all, delete-orphan"
-    )
-    position_costs = relationship(
-        "SQLPositionCost",
         back_populates="position",
         lazy="dynamic",
         cascade="all, delete-orphan"
@@ -34,7 +29,6 @@ class SQLPosition(SQLBaseModel, Position, SQLAlchemyModelExtension):
             'symbol', 'portfolio_id', name='_symbol_portfolio_uc'
         ),
     )
-    _cost = 0
 
     def __init__(
         self,
@@ -59,6 +53,9 @@ class SQLPosition(SQLBaseModel, Position, SQLAlchemyModelExtension):
 
         if 'amount' in data:
             self.amount = parse_decimal_to_string(data.pop('amount'))
+
+        if 'cost' in data:
+            self.cost = parse_decimal_to_string(data.pop('cost'))
 
         super(SQLPosition, self).update(data)
 

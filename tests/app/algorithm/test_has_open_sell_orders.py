@@ -33,9 +33,9 @@ class Test(TestBase):
             )
         )
         self.app.container.market_service.override(MarketServiceStub())
-        self.app.create_portfolios()
+        self.app.initialize()
 
-    def test_has_open_buy_orders(self):
+    def test_has_open_sell_orders(self):
         self.app.run(number_of_iterations=1, sync=False)
         trading_symbol_position = self.app.algorithm.get_position("USDT")
         self.assertEqual(1000, trading_symbol_position.get_amount())
