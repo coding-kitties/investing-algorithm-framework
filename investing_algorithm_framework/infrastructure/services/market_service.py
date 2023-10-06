@@ -8,7 +8,7 @@ import ccxt
 from investing_algorithm_framework.domain import OperationalException, \
     OHLCV, AssetPrice, Order
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class MarketService:
@@ -177,7 +177,6 @@ class MarketService:
         else:
             try:
                 ccxt_orders = self.exchange.fetchOrders(symbol)
-                print(ccxt_orders)
                 return [Order.from_ccxt_order(order) for order in ccxt_orders]
             except Exception as e:
                 logger.exception(e)
@@ -270,7 +269,6 @@ class MarketService:
             raise OperationalException("Could not create market sell order")
 
     def cancel_order(self, order):
-
         if not self.exchange.has['cancelOrder']:
             raise OperationalException(
                 f"Market service {self.market} does not support "
@@ -342,7 +340,7 @@ class MarketService:
             logger.exception(e)
             raise OperationalException("Could not retrieve prices")
 
-    def get_ohclv(self, symbol, time_unit, since):
+    def get_ohclv(self, symbol, time_frame, from_timestamp):
 
         if not self.exchange.has['fetchOHLCV']:
             raise OperationalException(
@@ -350,75 +348,42 @@ class MarketService:
                 f"functionality get_ohclvs"
             )
 
-        from_timestamp = self.exchange.parse8601(
-            since.strftime(":%Y-%m-%d %H:%M:%S")
+        time_stamp = self.exchange.parse8601(
+            from_timestamp.strftime(":%Y-%m-%d %H:%M:%S")
         )
         now = self.exchange.milliseconds()
         data = []
 
-        while from_timestamp < now:
+        while time_stamp < now:
             ohlcv = self.exchange.fetch_ohlcv(
-                symbol, time_unit, from_timestamp
+                symbol, time_frame.to_ccxt_string(), time_stamp
             )
-            sleep(self.exchange.rateLimit / 1000)
-            from_timestamp = \
-                ohlcv[-1][0] + self.exchange.parse_timeframe(time_unit) * 1000
-            ohlcv = [[self.exchange.iso8601(candle[0])] + candle[1:] for candle
-                     in ohlcv]
+
+            if len(ohlcv) > 0:
+                time_stamp = \
+                    ohlcv[-1][0] + \
+                    self.exchange.parse_timeframe(
+                        time_frame.to_ccxt_string()
+                    ) * 1000
+            else:
+                time_stamp = now
+
+            ohlcv = [[self.exchange.iso8601(candle[0])]
+                     + candle[1:] for candle in ohlcv]
             data += ohlcv
+            sleep(self.exchange.rateLimit / 1000)
 
         return OHLCV.from_dict({"symbol": symbol, "data": data})
 
-    def get_ohclvs(self, symbols, time_frame, from_timestamp, to_timestamp=None):
-
-        if not self.exchange.has['fetchOHLCV']:
-            raise OperationalException(
-                f"Market service {self.market} does not support "
-                f"functionality get_ohclvs"
-            )
-
-        if to_timestamp is None:
-            to_timestamp = self.exchange.milliseconds()
-        else:
-            to_timestamp = self.exchange.parse8601(
-                from_timestamp.strftime(":%Y-%m-%d %H:%M:%S")
-            )
+    def get_ohclvs(self, symbols, time_frame, from_timestamp):
         ohlcvs = {}
 
         for symbol in symbols:
 
             try:
-                time_stamp = self.exchange.parse8601(
-                    from_timestamp.strftime(":%Y-%m-%d %H:%M:%S")
+                ohlcvs[symbol] = self.get_ohclv(
+                    symbol, time_frame, from_timestamp
                 )
-                dfs = []
-
-                while time_stamp < to_timestamp:
-
-                    ohlcv = self.exchange.fetch_ohlcv(
-                        symbol, time_frame.to_ccxt_string(), time_stamp
-                    )
-                    sleep(self.exchange.rateLimit / 1000)
-                    time_stamp = \
-                        ohlcv[-1][0] + \
-                        self.exchange.parse_timeframe(
-                            time_frame.to_ccxt_string()
-                        ) * 1000
-
-                    ohlcv = [[self.exchange.iso8601(candle[0])]
-                             + candle[1:] for candle in ohlcv]
-                    df = pd.DataFrame(ohlcv,
-                                      columns=['timestamp', 'open', 'high',
-                                               'low', 'close', 'volume'])
-                    df['timestamp'] = df['timestamp'].apply(lambda x: parse(x))
-                    df['timestamp'] = pd.to_datetime(
-                        df['timestamp'], unit='ms'
-                    )
-                    df.set_index('timestamp', inplace=True)
-                    dfs.append(df)
-
-                combined_df = pd.concat(dfs, axis=0)
-                ohlcvs[symbol] = combined_df
             except Exception as e:
                 logger.exception(e)
                 logger.error(f"Could not retrieve ohclv data for {symbol}")

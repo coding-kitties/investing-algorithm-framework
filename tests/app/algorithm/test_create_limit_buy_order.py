@@ -1,21 +1,9 @@
 import os
+from decimal import Decimal
 
-from investing_algorithm_framework import create_app, TradingStrategy,\
-    TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration
+from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
+    PortfolioConfiguration, OrderStatus
 from tests.resources import TestBase, MarketServiceStub
-
-
-class StrategyOne(TradingStrategy):
-    time_unit = TimeUnit.SECOND
-    interval = 1
-
-    def apply_strategy(self, algorithm, market_data):
-        algorithm.create_limit_order(
-            target_symbol="BTC",
-            amount=1,
-            price=10,
-            side="BUY",
-        )
 
 
 class Test(TestBase):
@@ -39,23 +27,45 @@ class Test(TestBase):
         self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
-                market="BITVAVO",
+                market="binance",
                 api_key="test",
                 secret_key="test",
                 trading_symbol="USDT"
             )
         )
         self.app.container.market_service.override(MarketServiceStub())
-        self.app.add_strategy(StrategyOne)
+        self.app.initialize()
 
     def test_create_limit_buy_order(self):
-        order_repository = self.app.container.order_repository()
-        self.assertEqual(
-            0, order_repository.count({"type": "LIMIT", "side": "BUY"})
-        )
         self.app.run(number_of_iterations=1, sync=False)
+        self.app.algorithm.create_limit_order(
+            target_symbol="BTC",
+            amount=1,
+            price=10,
+            side="BUY",
+        )
+        order_repository = self.app.container.order_repository()
         self.assertEqual(
             1, order_repository.count({"type": "LIMIT", "side": "BUY"})
         )
         order = order_repository.find({"target_symbol": "BTC"})
-        self.assertEqual("PENDING", order.status)
+        self.assertEqual(OrderStatus.OPEN.value, order.status)
+
+    def test_create_limit_buy_order_with_percentage_of_portfolio(self):
+        self.app.algorithm.create_limit_order(
+            target_symbol="BTC",
+            price=10,
+            side="BUY",
+            percentage_of_portfolio=20
+        )
+        order_repository = self.app.container.order_repository()
+        self.assertEqual(
+            1, order_repository.count({"type": "LIMIT", "side": "BUY"})
+        )
+        order = order_repository.find({"target_symbol": "BTC"})
+        self.assertEqual(OrderStatus.OPEN.value, order.status)
+        self.assertEqual(Decimal(20), order.get_amount())
+        self.assertEqual(Decimal(10), order.get_price())
+        portfolio = self.app.algorithm.get_portfolio()
+        self.assertEqual(Decimal(1000), portfolio.get_net_size())
+        self.assertEqual(Decimal(800), portfolio.get_unallocated())

@@ -2,7 +2,7 @@ import os
 from decimal import Decimal
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, OrderStatus
+    PortfolioConfiguration
 from tests.resources import TestBase, MarketServiceStub
 
 
@@ -36,14 +36,18 @@ class Test(TestBase):
         self.app.container.market_service.override(MarketServiceStub())
         self.app.initialize()
 
-    def test_create_limit_buy_order_with_percentage_of_portfolio(self):
+    def test_has_open_buy_orders(self):
+        self.app.run(number_of_iterations=1, sync=False)
+        trading_symbol_position = self.app.algorithm.get_position("USDT")
+        self.assertEqual(Decimal(1000), trading_symbol_position.get_amount())
+        self.assertFalse(self.app.algorithm.position_exists(symbol="BTC"))
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
+            amount=1,
             price=10,
             side="BUY",
-            amount=20
         )
-        order = self.app.algorithm.get_order()
-        self.assertEqual(OrderStatus.OPEN.value, order.status)
-        self.assertEqual(Decimal(10), order.get_price())
-        self.assertEqual(Decimal(20), order.get_amount())
+        order_service = self.app.container.order_service()
+        self.assertTrue(self.app.algorithm.has_open_buy_orders("BTC"))
+        order_service.check_pending_orders()
+        self.assertFalse(self.app.algorithm.has_open_buy_orders("BTC"))

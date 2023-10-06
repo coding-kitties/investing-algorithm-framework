@@ -2,7 +2,7 @@ import os
 from decimal import Decimal
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, OrderStatus
+    PortfolioConfiguration
 from tests.resources import TestBase, MarketServiceStub
 
 
@@ -36,14 +36,25 @@ class Test(TestBase):
         self.app.container.market_service.override(MarketServiceStub())
         self.app.initialize()
 
-    def test_create_limit_buy_order_with_percentage_of_portfolio(self):
+    def test_close_position(self):
+        trading_symbol_position = self.app.algorithm.get_position("USDT")
+        self.assertEqual(1000, trading_symbol_position.get_amount())
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
+            amount=1,
             price=10,
             side="BUY",
-            amount=20
         )
-        order = self.app.algorithm.get_order()
-        self.assertEqual(OrderStatus.OPEN.value, order.status)
-        self.assertEqual(Decimal(10), order.get_price())
-        self.assertEqual(Decimal(20), order.get_amount())
+        btc_position = self.app.algorithm.get_position("BTC")
+        self.assertIsNotNone(btc_position)
+        self.assertEqual(0, btc_position.get_amount())
+        order_service = self.app.container.order_service()
+        order_service.check_pending_orders()
+        btc_position = self.app.algorithm.get_position("BTC")
+        self.assertIsNotNone(btc_position.get_amount())
+        self.assertEqual(Decimal(1), btc_position.get_amount())
+        self.assertNotEqual(Decimal(990), trading_symbol_position.get_amount())
+        self.app.algorithm.close_position("BTC")
+        self.app.run(number_of_iterations=1, sync=False)
+        btc_position = self.app.algorithm.get_position("BTC")
+        self.assertEqual(Decimal(0), btc_position.get_amount())

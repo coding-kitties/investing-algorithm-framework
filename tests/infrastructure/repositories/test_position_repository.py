@@ -48,14 +48,15 @@ class Test(TestBase):
                 "trading_symbol": "USDT",
                 "price": 10,
                 "side": "BUY",
-                "type": "LIMIT",
+                "order_type": "LIMIT",
                 "status": "OPEN",
             }
         )
-        self.assertEqual(1, order_service.count({"portfolio": portfolio.identifier}))
         self.assertEqual(
-            2, position_service.count(
-                {"portfolio": portfolio.identifier})
+            1, order_service.count({"portfolio": portfolio.identifier})
+        )
+        self.assertEqual(
+            2, position_service.count({"portfolio": portfolio.id})
         )
         self.assertEqual(
             0, position_service.count({"portfolio": f"{portfolio.identifier}aeokgopge"})

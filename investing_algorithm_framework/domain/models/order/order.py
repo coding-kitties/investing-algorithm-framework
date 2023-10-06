@@ -1,5 +1,8 @@
 import logging
 from datetime import datetime
+
+from investing_algorithm_framework.domain.decimal_parsing \
+    import parse_string_to_decimal, parse_decimal_to_string
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
 from investing_algorithm_framework.domain.models.base_model import BaseModel
@@ -8,14 +11,14 @@ from investing_algorithm_framework.domain.models.order import OrderStatus, \
 from investing_algorithm_framework.domain.models.order.order_fee import \
     OrderFee
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class Order(BaseModel):
 
     def __init__(
         self,
-        type,
+        order_type,
         side,
         status,
         amount,
@@ -32,8 +35,8 @@ class Order(BaseModel):
         remaining_amount=None,
         cost=None,
         fee=None,
+        position_id=None,
     ):
-
         if target_symbol is None:
             raise OperationalException("Target symbol is not specified")
 
@@ -46,26 +49,27 @@ class Order(BaseModel):
         if side is None:
             raise OperationalException("Order side is not set")
 
-        if type is None:
+        if order_type is None:
             raise OperationalException("Order type is not set")
 
         if status is None:
             raise OperationalException("Status is not set")
 
         self.external_id = external_id
-        self.price = price
+        self.price = parse_decimal_to_string(price)
         self.side = OrderSide.from_value(side).value
-        self.type = OrderType.from_value(type).value
+        self.order_type = OrderType.from_value(order_type).value
         self.status = OrderStatus.from_value(status).value
-        self.amount = amount
-        self.net_gain = net_gain
+        self.position_id = position_id
+        self.amount = parse_decimal_to_string(amount)
+        self.net_gain = parse_decimal_to_string(net_gain)
         self.trade_closed_at = trade_closed_at
         self.trade_closed_price = trade_closed_price
         self.created_at = created_at
         self.updated_at = updated_at
-        self.filled_amount = filled_amount
-        self.remaining_amount = remaining_amount
-        self.cost = cost
+        self.filled_amount = parse_decimal_to_string(filled_amount)
+        self.remaining_amount = parse_decimal_to_string(remaining_amount)
+        self.cost = parse_decimal_to_string(cost)
         self.fee = fee
 
     def get_external_id(self):
@@ -79,7 +83,7 @@ class Order(BaseModel):
 
     def get_price(self):
         if self.price is not None:
-            return self.price
+            return parse_string_to_decimal(self.price)
 
         return 0
 
@@ -95,11 +99,11 @@ class Order(BaseModel):
     def set_status(self, status):
         self.status = OrderStatus.from_value(status).value
 
-    def get_type(self):
-        return self.type
+    def get_order_type(self):
+        return self.order_type
 
     def get_amount(self):
-        return self.amount
+        return parse_string_to_decimal(self.amount)
 
     def set_amount(self, amount):
         self.amount = amount
@@ -108,7 +112,7 @@ class Order(BaseModel):
         self.external_id = external_id
 
     def get_net_gain(self):
-        return self.net_gain
+        return parse_string_to_decimal(self.net_gain)
 
     def set_net_gain(self, net_gain):
         self.net_gain = net_gain
@@ -120,7 +124,7 @@ class Order(BaseModel):
         self.trade_closed_at = trade_closed_at
 
     def get_trade_closed_price(self):
-        return self.trade_closed_price
+        return parse_string_to_decimal(self.trade_closed_price)
 
     def set_trade_closed_price(self, trade_closed_price):
         self.trade_closed_price = trade_closed_price
@@ -137,20 +141,28 @@ class Order(BaseModel):
     def set_updated_at(self, updated_at):
         self.updated_at = updated_at
 
-    def get_filled_amount(self):
-        return self.filled_amount
+    def get_filled(self):
 
-    def set_filled_amount(self, filled_amount):
+        if self.filled_amount is None:
+            return parse_string_to_decimal('0')
+
+        return parse_string_to_decimal(self.filled_amount)
+
+    def set_filled(self, filled_amount):
         self.filled_amount = filled_amount
 
-    def get_remaining_amount(self):
-        return self.remaining_amount
+    def get_remaining(self):
 
-    def set_remaining_amount(self, remaining_amount):
+        if self.remaining_amount is None:
+            return parse_string_to_decimal('0')
+
+        return parse_string_to_decimal(self.remaining_amount)
+
+    def set_remaining(self, remaining_amount):
         self.remaining_amount = remaining_amount
 
     def get_cost(self):
-        return self.cost
+        return parse_string_to_decimal(self.cost)
 
     def set_cost(self, cost):
         self.cost = cost
@@ -167,7 +179,7 @@ class Order(BaseModel):
             "target_symbol": self.target_symbol,
             "trading_symbol": self.trading_symbol,
             "side": self.side,
-            "type": self.type,
+            "order_type": self.order_type,
             "status": self.status,
             "price": self.price,
             "amount": self.amount,
@@ -184,7 +196,7 @@ class Order(BaseModel):
 
     @staticmethod
     def from_ccxt_order(ccxt_order):
-        status = OrderStatus.from_ccxt_status(ccxt_order["status"])
+        status = OrderStatus.from_value(ccxt_order["status"])
         target_symbol = ccxt_order.get("symbol").split("/")[0]
         trading_symbol = ccxt_order.get("symbol").split("/")[1]
 
@@ -195,7 +207,7 @@ class Order(BaseModel):
             price=ccxt_order.get("price", None),
             amount=ccxt_order.get("amount", None),
             status=status,
-            type=ccxt_order.get("type", None),
+            order_type=ccxt_order.get("type", None),
             side=ccxt_order.get("side", None),
             filled_amount=ccxt_order.get("filled", None),
             remaining_amount=ccxt_order.get("remaining", None),
@@ -203,6 +215,30 @@ class Order(BaseModel):
             fee=OrderFee.from_ccxt_fee(ccxt_order.get("fee", None)),
             created_at=datetime.strptime(ccxt_order.get("datetime", None), "%Y-%m-%dT%H:%M:%S.%fZ")
         )
+
+    def update(self, data):
+
+        if 'amount' in data:
+            amount = data.pop('amount')
+            self.amount = parse_decimal_to_string(amount)
+
+        if 'price' in data:
+            price = data.pop('price')
+            self.price = parse_decimal_to_string(price)
+
+        if 'filled' in data:
+            filled_amount = data.pop('filled')
+            self.filled_amount = parse_decimal_to_string(filled_amount)
+
+        if 'remaining' in data:
+            remaining_amount = data.pop('remaining')
+            self.remaining_amount = parse_decimal_to_string(remaining_amount)
+
+        if 'net_gain' in data:
+            net_gain = data.pop('net_gain')
+            self.net_gain = parse_decimal_to_string(net_gain)
+
+        super().update(data)
 
     def __repr__(self):
 
@@ -213,15 +249,15 @@ class Order(BaseModel):
 
         return self.repr(
             id=id_value,
+            price=self.price,
+            amount=self.amount,
             external_id=self.external_id,
             status=self.status,
             target_symbol=self.target_symbol,
             trading_symbol=self.trading_symbol,
-            price=self.price,
             side=self.side,
-            type=self.type,
-            amount=self.amount,
-            filled_amount=self.filled_amount,
-            remaining_amount=self.remaining_amount,
+            order_type=self.order_type,
+            filled_amount=self.get_filled(),
+            remaining_amount=self.get_remaining(),
             cost=self.cost,
         )

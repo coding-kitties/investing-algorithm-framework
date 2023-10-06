@@ -1,6 +1,8 @@
+from sqlalchemy import cast, Numeric, Float
 from .repository import Repository
 from investing_algorithm_framework.infrastructure.models import SQLPosition, \
     SQLPortfolio
+from decimal import Decimal
 
 
 class SQLPositionRepository(Repository):
@@ -11,20 +13,44 @@ class SQLPositionRepository(Repository):
         amount_query_param = self.get_query_param("amount", query_params)
         symbol_query_param = self.get_query_param("symbol", query_params)
         portfolio_query_param = self.get_query_param("portfolio", query_params)
+        amount_gt_query_param = self.get_query_param("amount_gt", query_params)
+        amount_gte_query_param = self.get_query_param(
+            "amount_gte", query_params
+        )
+        amount_lt_query_param = self.get_query_param("amount_lt", query_params)
+        amount_lte_query_param = self.get_query_param(
+            "amount_lte", query_params
+        )
 
         if amount_query_param:
-            query = query.filter(SQLPosition.amount == amount_query_param)
+            query = query.filter(
+                cast(SQLPosition.amount, Float) == amount_query_param
+            )
 
         if symbol_query_param:
             query = query.filter_by(symbol=symbol_query_param)
 
-        if portfolio_query_param:
-            portfolio = db.query(SQLPortfolio).filter_by(
-                identifier=portfolio_query_param
-            ).first()
+        if portfolio_query_param is not None:
+            query = query.filter_by(portfolio_id=portfolio_query_param)
 
-            if portfolio is None:
-                return query.filter_by(id=-1)
+        if amount_gt_query_param is not None:
+            query = query.filter(
+                cast(SQLPosition.amount, Numeric) > amount_gt_query_param
+            )
 
-            query = query.filter_by(portfolio_id=portfolio.id)
+        if amount_gte_query_param is not None:
+            query = query.filter(
+                cast(SQLPosition.amount, Numeric) >= amount_gte_query_param
+            )
+
+        if amount_lt_query_param is not None:
+            query = query.filter(
+                cast(SQLPosition.amount, Numeric) < amount_lt_query_param
+            )
+
+        if amount_lte_query_param:
+            query = query.filter(
+                cast(SQLPosition.amount, Numeric) <= amount_lte_query_param
+            )
+
         return query

@@ -20,5 +20,5 @@ __all__ = [
     "SQLOrder",
     "SQLOrderFee",
     "SQLPosition",
-    "SQLPositionCost"
+    "SQLPositionCost",
 ]

@@ -18,9 +18,10 @@ class PortfolioConfigurationService:
         portfolio_configuration = next(
             (portfolio_configuration for portfolio_configuration in
                 self.portfolio_configurations if
-                portfolio_configuration.market == identifier.lower()),
+                portfolio_configuration.identifier == identifier.lower()),
             None
         )
+
         if portfolio_configuration is None:
             raise ApiException('Portfolio configuration not found', 404)
 

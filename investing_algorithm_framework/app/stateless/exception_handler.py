@@ -4,7 +4,7 @@ from typing import Dict, List
 
 from investing_algorithm_framework.domain import OperationalException
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 def create_error_response(error_message, status_code: int = 400):

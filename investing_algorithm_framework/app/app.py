@@ -15,12 +15,11 @@ from investing_algorithm_framework.app.task import Task
 from investing_algorithm_framework.app.web import create_flask_app
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
-    ImproperlyConfigured, SQLALCHEMY_DATABASE_URI, Config, \
-    OperationalException
+    SQLALCHEMY_DATABASE_URI, Config, OperationalException
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class App:
@@ -48,6 +47,17 @@ class App:
         setup_sqlalchemy(self)
         create_all_tables()
 
+        self.algorithm = self.container.algorithm()
+        self.algorithm.add_strategies(self.strategies)
+        self.algorithm.add_tasks(self.tasks)
+        portfolio_configuration_service = self.container\
+            .portfolio_configuration_service()
+
+        if portfolio_configuration_service.count() == 0:
+            raise OperationalException("No portfolios configured")
+
+        self.create_portfolios()
+
     def _initialize_management_commands(self):
 
         if not Environment.TEST.equals(self.config.get(ENVIRONMENT)):
@@ -70,17 +80,9 @@ class App:
         number_of_iterations: int = None,
         sync=True
     ):
-        self.algorithm = self.container.algorithm()
-        self.algorithm.add_strategies(self.strategies)
-        self.algorithm.add_tasks(self.tasks)
-        portfolio_configuration_service = self.container\
-            .portfolio_configuration_service()
+        self.initialize()
+
         portfolio_service = self.container.portfolio_service()
-
-        if portfolio_configuration_service.count() == 0:
-            raise OperationalException("No portfolios configured")
-
-        self.create_portfolios()
 
         if sync:
             portfolio_service.sync_portfolios()
@@ -92,11 +94,13 @@ class App:
         )
 
         if self.stateless:
+            logger.info("Running stateless")
             action_handler = ActionHandler.of(payload)
             return action_handler.handle(
                 payload=payload, algorithm=self.algorithm
             )
         elif self._web:
+            logger.info("Running web")
             flask_thread = threading.Thread(
                 name='Web App', target=self._flask_app.run
             )
@@ -105,10 +109,12 @@ class App:
 
         order_service = self.container.order_service()
         number_of_iterations_since_last_orders_check = 1
+        order_service.check_pending_orders()
 
         try:
             while self.algorithm.running:
                 if number_of_iterations_since_last_orders_check == 30:
+                    logger.info("Checking pending orders")
                     order_service.check_pending_orders()
                     number_of_iterations_since_last_orders_check = 1
 
@@ -117,21 +123,6 @@ class App:
                 sleep(1)
         except KeyboardInterrupt:
             exit(0)
-
-    def backtest(self, start_datetime, end_datetime, source="ccxt"):
-        self.algorithm = self.container.algorithm()
-        self.algorithm.add_strategies(self.strategies)
-        portfolio_configuration_service = self.container\
-            .portfolio_configuration_service()
-
-        if portfolio_configuration_service.count() == 0:
-            raise OperationalException("No portfolios configured")
-
-        self.create_portfolios(backtesting=True)
-        backtest_service = self.container.backtest_service()
-        return backtest_service.backtest(
-            start_datetime, end_datetime, self.strategies, self.config
-        )
 
     def start_algorithm(self):
         self.algorithm.start()
@@ -293,7 +284,8 @@ class App:
         portfolio_service = self.container.portfolio_service()
         portfolio_service.sync_portfolios()
 
-    def create_portfolios(self, backtesting=False):
+    def create_portfolios(self):
+        logger.info("Creating portfolios")
         portfolio_configuration_service = self.container\
             .portfolio_configuration_service()
         market_service = self.container.market_service()
@@ -322,6 +314,7 @@ class App:
             )
             portfolio_repository.create(
                 {
+                    "unallocated": unallocated,
                     "identifier": portfolio_configuration.identifier,
                     "trading_symbol": portfolio_configuration.trading_symbol,
                     "market": portfolio_configuration.market,
@@ -330,13 +323,14 @@ class App:
             portfolio = portfolio_repository.find(
                 {"identifier": portfolio_configuration.identifier}
             )
-            position_repository.create(
+            portfolio = position_repository.create(
                 {
                     "symbol": portfolio_configuration.trading_symbol,
                     "amount": unallocated,
                     "portfolio_id": portfolio.id
                 }
             )
+            logger.info(f"Created portfolio {portfolio}")
 
     def _initialize_web(self):
         resource_dir = self._config[RESOURCE_DIRECTORY]
@@ -428,4 +422,3 @@ class App:
  
     def get_portfolio_configurations(self):
         return self.algorithm.get_portfolio_configurations()
-

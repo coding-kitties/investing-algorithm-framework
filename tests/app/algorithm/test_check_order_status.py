@@ -1,7 +1,7 @@
 import os
-
+from decimal import Decimal
 from investing_algorithm_framework import create_app, TradingStrategy, \
-    TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration
+    TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration, OrderStatus
 from tests.resources import TestBase, MarketServiceStub
 
 
@@ -20,7 +20,7 @@ class StrategyOne(TradingStrategy):
             price=10,
             side="BUY",
             type="LIMIT",
-            execute=False
+            execute=True
         )
 
 
@@ -64,6 +64,6 @@ class Test(TestBase):
         self.assertEqual(1, order_repository.count())
         self.assertEqual(2, position_repository.count())
         order = order_repository.find({"target_symbol": "BTC"})
-        self.assertEqual("SUCCESS", order.status)
+        self.assertEqual(OrderStatus.CLOSED.value, order.status)
         position = position_repository.find({"symbol": "BTC"})
-        self.assertEqual(1, position.amount)
+        self.assertEqual(Decimal(1), position.get_amount())

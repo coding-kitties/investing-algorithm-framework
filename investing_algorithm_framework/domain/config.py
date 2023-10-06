@@ -5,7 +5,7 @@ from enum import Enum
 from .constants import RESOURCE_DIRECTORY
 from .exceptions import OperationalException
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class Environment(Enum):
