@@ -1,4 +1,5 @@
 from enum import Enum
+from datetime import datetime, timedelta
 
 
 class TimeUnit(Enum):
@@ -38,3 +39,12 @@ class TimeUnit(Enum):
                     return entry
 
         return TimeUnit.from_string(value)
+
+    def create_date(self, start_date, interval):
+
+        if TimeUnit.SECOND.equals(self):
+            return timedelta(minutes=interval)
+        elif TimeUnit.MINUTE.equals(self):
+            return timedelta(minutes=interval)
+        else:
+            return timedelta(hours=interval)

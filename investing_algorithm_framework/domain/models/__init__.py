@@ -7,6 +7,7 @@ from .trading_data_types import TradingDataType
 from .trading_time_frame import TradingTimeFrame
 from .portfolio import PortfolioConfiguration, Portfolio
 from .position import Position, PositionCost
+from .backtest_profile import BacktestProfile
 
 __all__ = [
     "OrderStatus",
@@ -26,5 +27,6 @@ __all__ = [
     "Position",
     "PositionCost",
     "Portfolio",
-    "OrderFee"
+    "OrderFee",
+    "BacktestProfile"
 ]

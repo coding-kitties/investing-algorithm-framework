@@ -2,7 +2,7 @@ from .config import Config, Environment
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, Ticker, \
     OHLCV, OrderBook, PortfolioConfiguration, AssetPrice, Portfolio, \
-    Position, Order, PositionCost, OrderFee
+    Position, Order, PositionCost, OrderFee, BacktestProfile
 from .exceptions import OperationalException, ApiException, \
     PermissionDeniedApiException, ImproperlyConfigured
 from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
@@ -64,5 +64,6 @@ __all__ = [
     "PositionCost",
     "OrderFee",
     "parse_decimal_to_string",
-    "parse_string_to_decimal"
+    "parse_string_to_decimal",
+    "BacktestProfile"
 ]
