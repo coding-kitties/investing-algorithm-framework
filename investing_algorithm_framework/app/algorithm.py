@@ -21,7 +21,7 @@ class Algorithm:
         order_service,
         market_service,
         market_data_service,
-        strategy_orchestrator_service
+        strategy_orchestrator_service,
     ):
         self.portfolio_service = portfolio_service
         self.position_service = position_service
@@ -399,6 +399,10 @@ class Algorithm:
 
     def add_tasks(self, tasks):
         self.strategy_orchestrator_service.add_tasks(tasks)
+
+    @property
+    def strategies(self):
+        return self.strategy_orchestrator_service.get_strategies()
 
     def get_allocated(self, market=None, identifier=None) -> float:
 

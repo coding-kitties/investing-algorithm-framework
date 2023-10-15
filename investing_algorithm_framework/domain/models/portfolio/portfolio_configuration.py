@@ -15,6 +15,7 @@ class PortfolioConfiguration(BaseModel):
         track_from=None,
         identifier=None,
         max_unallocated=-1,
+        backtest=False
     ):
         self._market = market
         self._api_key = api_key
@@ -23,6 +24,7 @@ class PortfolioConfiguration(BaseModel):
         self._trading_symbol = trading_symbol.upper()
         self._identifier = identifier
         self._max_unallocated = max_unallocated
+        self._backtest = backtest
 
         if self.identifier is None:
             self._identifier = market.lower()
@@ -35,12 +37,12 @@ class PortfolioConfiguration(BaseModel):
                 "Portfolio configuration requires a trading symbol"
             )
 
-        if self.api_key is None:
+        if self.api_key is None and not self._backtest:
             raise ImproperlyConfigured(
                 "Portfolio configuration requires an api key"
             )
 
-        if self.secret_key is None:
+        if self.secret_key is None and not self._backtest:
             raise ImproperlyConfigured(
                 "Portfolio configuration requires a secret key"
             )
@@ -80,6 +82,10 @@ class PortfolioConfiguration(BaseModel):
     @property
     def has_unallocated_limit(self):
         return self.max_unallocated != -1
+
+    @property
+    def backtest(self):
+        return self._backtest
 
     def __repr__(self):
         return self.repr(

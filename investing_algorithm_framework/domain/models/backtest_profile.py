@@ -1,4 +1,7 @@
-class BacktestProfile:
+from .base_model import BaseModel
+from datetime import datetime
+
+class BacktestProfile(BaseModel):
 
     def __init__(self, strategy_id, interval, time_unit):
         self._strategy_id = strategy_id
@@ -64,3 +67,14 @@ class BacktestProfile:
     @backtest_index_date.setter
     def backtest_index_date(self, value):
         self._backtest_index_date = value
+
+    def __repr__(self):
+        return self.repr(
+            strategy_id=self._strategy_id,
+            start_date=self.backtest_start_date,
+            end_date=self.backtest_end_date,
+            backtest_index_date=self.backtest_index_date,
+            start_date_data=self.backtest_start_date_data,
+            time_unit=self.time_unit,
+            interval=self.interval
+        )

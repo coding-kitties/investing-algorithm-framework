@@ -15,7 +15,8 @@ from investing_algorithm_framework.app.task import Task
 from investing_algorithm_framework.app.web import create_flask_app
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
-    SQLALCHEMY_DATABASE_URI, Config, OperationalException
+    SQLALCHEMY_DATABASE_URI, Config, OperationalException, \
+    PortfolioConfiguration
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables
 
@@ -35,18 +36,20 @@ class App:
         self._strategies = []
         self._tasks = []
 
-    def initialize(self):
+    def initialize(self, backtest=False):
 
-        if self._web:
-            self._initialize_web()
-        elif self._stateless:
-            self._initialize_stateless()
+        if backtest:
+            self._initialize_standard(backtest=True)
         else:
-            self._initialize_standard()
+            if self._web:
+                self._initialize_web()
+            elif self._stateless:
+                self._initialize_stateless()
+            else:
+                self._initialize_standard()
 
         setup_sqlalchemy(self)
         create_all_tables()
-
         self.algorithm = self.container.algorithm()
         self.algorithm.add_strategies(self.strategies)
         self.algorithm.add_tasks(self.tasks)
@@ -294,32 +297,44 @@ class App:
 
         for portfolio_configuration in \
                 portfolio_configuration_service.get_all():
-            market_service.initialize(portfolio_configuration)
 
-            if portfolio_repository.exists(
-                {"identifier": portfolio_configuration.identifier}
-            ):
-                continue
+            if portfolio_configuration.backtest:
+                creation_data = {
+                    "unallocated": portfolio_configuration.max_unallocated,
+                    "identifier": portfolio_configuration.identifier,
+                    "trading_symbol": portfolio_configuration.trading_symbol,
+                    "market": portfolio_configuration.market,
+                }
+                unallocated = portfolio_configuration.max_unallocated
+            else:
+                market_service.initialize(portfolio_configuration)
 
-            balances = market_service.get_balance()
-            if portfolio_configuration.trading_symbol.upper() not in balances:
-                raise OperationalException(
-                    f"Trading symbol balance not available "
-                    f"in portfolio on market {portfolio_configuration.market}"
+                if portfolio_repository.exists(
+                    {"identifier": portfolio_configuration.identifier}
+                ):
+                    continue
+
+                balances = market_service.get_balance()
+
+                if portfolio_configuration.trading_symbol.upper() not in balances:
+                    raise OperationalException(
+                        f"Trading symbol balance not available "
+                        f"in portfolio on market {portfolio_configuration.market}"
+                    )
+
+                unallocated = float(
+                    balances[portfolio_configuration.trading_symbol.upper()]
+                    ["free"]
                 )
 
-            unallocated = float(
-                balances[portfolio_configuration.trading_symbol.upper()]
-                ["free"]
-            )
-            portfolio_repository.create(
-                {
+                creation_data = {
                     "unallocated": unallocated,
                     "identifier": portfolio_configuration.identifier,
                     "trading_symbol": portfolio_configuration.trading_symbol,
                     "market": portfolio_configuration.market,
                 }
-            )
+
+            portfolio_repository.create(creation_data)
             portfolio = portfolio_repository.find(
                 {"identifier": portfolio_configuration.identifier}
             )
@@ -355,23 +370,51 @@ class App:
     def _initialize_stateless(self):
         self._config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
 
-    def _initialize_standard(self):
+    def _initialize_standard(self, backtest=False):
         resource_dir = self._config[RESOURCE_DIRECTORY]
 
-        if resource_dir is None:
-            self._config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
-        else:
+        if backtest:
+
+            if resource_dir is None:
+                raise OperationalException(
+                    "Resource directory is not specified. "
+                    "A resource directory is required for running a backtest."
+                )
+
             resource_dir = self._create_resource_directory_if_not_exists()
             self._config[DATABASE_DIRECTORY_PATH] = os.path.join(
                 resource_dir, "databases"
             )
-            self._config[DATABASE_NAME] = "prod-database.sqlite3"
+            self._config[DATABASE_NAME] = "backtest-database.sqlite3"
+            database_path = os.path.join(
+                self._config[DATABASE_DIRECTORY_PATH],
+                self._config[DATABASE_NAME]
+            )
+
+            if os.path.exists(database_path):
+                os.remove(database_path)
+
             self._config[SQLALCHEMY_DATABASE_URI] = \
                 "sqlite:///" + os.path.join(
                     self._config[DATABASE_DIRECTORY_PATH],
                     self._config[DATABASE_NAME]
                 )
             self._create_database_if_not_exists()
+        else:
+            if resource_dir is None:
+                self._config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
+            else:
+                resource_dir = self._create_resource_directory_if_not_exists()
+                self._config[DATABASE_DIRECTORY_PATH] = os.path.join(
+                    resource_dir, "databases"
+                )
+                self._config[DATABASE_NAME] = "prod-database.sqlite3"
+                self._config[SQLALCHEMY_DATABASE_URI] = \
+                    "sqlite:///" + os.path.join(
+                        self._config[DATABASE_DIRECTORY_PATH],
+                        self._config[DATABASE_NAME]
+                    )
+                self._create_database_if_not_exists()
 
     def _create_resource_directory_if_not_exists(self):
         if self._stateless:
@@ -422,3 +465,27 @@ class App:
  
     def get_portfolio_configurations(self):
         return self.algorithm.get_portfolio_configurations()
+
+    def backtest(self, start_date, end_date, unallocated=None, trading_symbol=None):
+
+        # Add custom portfolio configuration
+        # if trading symbol and unallocated are specified
+        if unallocated is not None and trading_symbol is not None:
+            portfolio_configuration_service = self.container \
+                .portfolio_configuration_service()
+            portfolio_configuration_service.clear()
+            portfolio_configuration_service.add(PortfolioConfiguration(
+                market="backtest",
+                trading_symbol=trading_symbol,
+                api_key=None,
+                secret_key=None,
+                track_from=None,
+                identifier="backtest",
+                max_unallocated=unallocated,
+                backtest=True
+            ))
+            print(portfolio_configuration_service.get_all())
+
+        self.initialize(backtest=True)
+        backtest_service = self.container.backtest_service()
+        return backtest_service.backtest(self.algorithm, start_date, end_date)

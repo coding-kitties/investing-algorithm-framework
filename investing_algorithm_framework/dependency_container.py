@@ -67,6 +67,10 @@ class DependencyContainer(containers.DeclarativeContainer):
         StrategyOrchestratorService,
         market_data_service=market_data_service
     )
+    backtest_service = providers.Factory(
+        BackTestService,
+        market_data_service=market_data_service,
+    )
     algorithm = providers.Factory(
         Algorithm,
         portfolio_configuration_service=portfolio_configuration_service,
@@ -78,7 +82,4 @@ class DependencyContainer(containers.DeclarativeContainer):
         market_data_service=market_data_service,
         position_cost_service=position_cost_service,
     )
-    backtest_service = providers.Factory(
-        BackTestService,
-        market_data_service=market_data_service,
-    )
+

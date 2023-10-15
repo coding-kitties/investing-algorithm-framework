@@ -7,7 +7,7 @@ from investing_algorithm_framework.domain import OperationalException, \
 
 class BackTestService:
 
-    def __init__(self, market_data_service, resource_directory):
+    def __init__(self, market_data_service):
         self._market_data_service = market_data_service
         self._resource_directory = None
 
@@ -19,33 +19,21 @@ class BackTestService:
     def resource_directory(self, resource_directory):
         self._resource_directory = resource_directory
 
-    def backtest(self, algorithm, start_date = None, end_date = None):
+    def backtest(self, algorithm, start_date=None, end_date=None):
         backtest_profiles = []
 
         for strategy in algorithm.strategies:
-            backtest_profile = BacktestProfile(
-                strategy_id=strategy.worker_id,
-                time_unit=strategy.time_unit,
-                interval=strategy.interval
+            backtest_profile = self.create_backtest_profile(
+                strategy, start_date, end_date
             )
 
-            if start_date is None:
-                backtest_profile.backtest_start_date = \
-                    self._create_start_date_backtest(strategy)
-            else:
-                backtest_profile.backtest_start_date = start_date
-
-            if end_date is None:
-                backtest_profile.backtest_end_date = datetime.utcnow()
-            else:
-                backtest_profile.backtest_end_date = end_date
-
-            backtest_profile.backtest_start_date_data = \
-                self._create_start_date_backtest_data(backtest_profile)
-
-            backtest_profiles.append(backtest_profile)
-            self.run_backtest(backtest_profile, strategy, algorithm)
-            self.evaluate(backtest_profile, algorithm)
+            print(backtest_profile)
+            # backtest_profile.backtest_start_date_data = \
+            #     self._create_start_date_backtest_data(backtest_profile)
+            #
+            # backtest_profiles.append(backtest_profile)
+            # self.run_backtest(backtest_profile, strategy, algorithm)
+            # self.evaluate(backtest_profile, algorithm)
 
     def run_backtest(self, backtest_profile, strategy, algorithm):
         backtest_profile.backtest_index_date = \
@@ -71,25 +59,25 @@ class BackTestService:
         pass
 
     def _create_test_data(self, backtest_profile):
-
-        for trade_profile in trade_profiles:
-            time_frame = trade_profile.time_frame
-            in_between_date, end_date = time_frame.create_time_frame(datetime.utcnow())
-            start_date, in_between_date = time_frame.create_time_frame(in_between_date)
-
-            for target_symbol in trade_profile.target_symbols:
-
-                if not self._test_data_csv_file_exists(start_date, end_date, target_symbol):
-                    file_path = self._create_test_data_csv_files(
-                        start_date, end_date, target_symbol
-                    )
-                    data = self._market_data_service.get_market_data(
-                        trade_profile.market,
-                        trade_profile.trading_symbol,
-                        start_date,
-                        end_date
-                    )
-                    self._write_test_data_to_csv(file_path, data)
+        pass
+        # for trade_profile in trade_profiles:
+        #     time_frame = trade_profile.time_frame
+        #     in_between_date, end_date = time_frame.create_time_frame(datetime.utcnow())
+        #     start_date, in_between_date = time_frame.create_time_frame(in_between_date)
+        #
+        #     for target_symbol in trade_profile.target_symbols:
+        #
+        #         if not self._test_data_csv_file_exists(start_date, end_date, target_symbol):
+        #             file_path = self._create_test_data_csv_files(
+        #                 start_date, end_date, target_symbol
+        #             )
+        #             data = self._market_data_service.get_market_data(
+        #                 trade_profile.market,
+        #                 trade_profile.trading_symbol,
+        #                 start_date,
+        #                 end_date
+        #             )
+        #             self._write_test_data_to_csv(file_path, data)
 
     def _test_data_csv_file_exists(self, start_date, end_date, target_symbol):
         if self.resource_directory is None:
@@ -131,7 +119,19 @@ class BackTestService:
             interval=strategy.interval,
             time_unit=strategy.time_unit,
         )
-        backtest_profile.
+
+        if start_date is None:
+            backtest_profile.backtest_start_date = \
+                self._create_start_date_backtest(strategy)
+        else:
+            backtest_profile.backtest_start_date = start_date
+
+        if end_date is None:
+            backtest_profile.backtest_end_date = datetime.utcnow()
+        else:
+            backtest_profile.backtest_end_date = end_date
+
+        return backtest_profile
 
     def _create_start_date_backtest(self, strategy):
         pass
@@ -139,8 +139,7 @@ class BackTestService:
     def _create_start_date_backtest_data(self, backtest_profile):
         trading_time_frame = backtest_profile.trading_time_frame
 
-        if TradingTimeFrame.create_start_date(backtest_profile.backtest_start_date, )
-
+        # if TradingTimeFrame.create_start_date(backtest_profile.backtest_start_date, )
 
     def _create_index_date_backtest(self, backtest_profile):
         time_unit = backtest_profile.time_unit
