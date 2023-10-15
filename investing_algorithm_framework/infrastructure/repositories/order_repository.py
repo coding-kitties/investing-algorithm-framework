@@ -24,7 +24,7 @@ class SQLOrderRepository(Repository):
             "position", query_params, many=True
         )
         target_symbol_query_param = self.get_query_param(
-            "symbol", query_params
+            "target_symbol", query_params
         )
         trading_symbol_query_param = self.get_query_param(
             "trading_symbol", query_params

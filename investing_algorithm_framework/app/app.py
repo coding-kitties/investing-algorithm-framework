@@ -302,6 +302,7 @@ class App:
                 continue
 
             balances = market_service.get_balance()
+
             if portfolio_configuration.trading_symbol.upper() not in balances:
                 raise OperationalException(
                     f"Trading symbol balance not available "

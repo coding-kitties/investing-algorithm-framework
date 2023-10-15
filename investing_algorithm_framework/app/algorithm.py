@@ -99,14 +99,13 @@ class Algorithm:
         portfolio = self.portfolio_service.find({"market": market})
 
         if percentage_of_portfolio is not None:
-
             if not OrderSide.BUY.equals(side):
                 raise ApiException(
                     "Percentage of portfolio is only supported for BUY orders."
                 )
 
             size = float(portfolio.net_size) * (percentage_of_portfolio / 100)
-            amount = floor(size / price)
+            amount = size / price
 
         elif percentage_of_position is not None:
 
