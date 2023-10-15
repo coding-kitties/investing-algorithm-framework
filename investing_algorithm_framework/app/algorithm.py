@@ -559,10 +559,6 @@ class Algorithm:
 
         query_params["target_symbol"] = target_symbol
         query_params["status"] = OrderStatus.OPEN.value
-
-        print(query_params)
-        for order in self.order_service.get_all():
-            print(order)
         return self.order_service.exists(query_params)
 
     def check_pending_orders(self):
