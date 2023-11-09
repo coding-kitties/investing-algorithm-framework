@@ -1,6 +1,6 @@
 from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLPortfolioRepository, SQLPositionCostRepository, SQLOrderFeeRepository
-from .services import MarketService
+from .services import MarketService, MarketBacktestService
 from .database import setup_sqlalchemy, Session, \
     create_all_tables
 from .models import SQLPortfolio, SQLOrder, SQLPosition, SQLOrderFee, \
@@ -21,4 +21,5 @@ __all__ = [
     "SQLOrderFee",
     "SQLPosition",
     "SQLPositionCost",
+    "MarketBacktestService"
 ]

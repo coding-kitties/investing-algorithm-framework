@@ -48,3 +48,28 @@ class TimeUnit(Enum):
             return timedelta(minutes=interval)
         else:
             return timedelta(hours=interval)
+
+    @property
+    def single_name(self):
+
+        if TimeUnit.SECOND.equals(self.value):
+            return "second"
+
+        if TimeUnit.MINUTE.equals(self.value):
+            return "minute"
+
+        if TimeUnit.HOUR.equals(self.value):
+            return "hour"
+
+    @property
+    def plural_name(self):
+
+        if TimeUnit.SECOND.equals(self.value):
+            return "seconds"
+
+        if TimeUnit.MINUTE.equals(self.value):
+            return "minutes"
+
+        if TimeUnit.HOUR.equals(self.value):
+            return "hours"
+

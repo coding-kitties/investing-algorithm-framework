@@ -5,7 +5,7 @@ from investing_algorithm_framework.domain import ApiException, \
     OrderStatus, OrderSide, Config, TimeUnit, TimeInterval, Order, Portfolio, \
     Position
 from investing_algorithm_framework.domain import PortfolioConfiguration, \
-    RESOURCE_DIRECTORY
+    RESOURCE_DIRECTORY, pretty_print_backtest
 from investing_algorithm_framework.app import TradingStrategy, \
     StatelessAction, Task
 
@@ -32,5 +32,6 @@ __all__ = [
     "Portfolio",
     "Position",
     "StatelessAction",
-    "Task"
+    "Task",
+    "pretty_print_backtest"
 ]

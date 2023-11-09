@@ -12,7 +12,7 @@ from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
 from .singleton import Singleton
 from .utils import random_string, append_dict_as_row_to_csv, \
     add_column_headers_to_csv, get_total_amount_of_rows, \
-    csv_to_list, StoppableThread
+    csv_to_list, StoppableThread, pretty_print_backtest
 from .strategy import Strategy
 from .stateless_actions import StatelessActions
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
@@ -65,5 +65,6 @@ __all__ = [
     "OrderFee",
     "parse_decimal_to_string",
     "parse_string_to_decimal",
-    "BacktestProfile"
+    "BacktestProfile",
+    "pretty_print_backtest"
 ]

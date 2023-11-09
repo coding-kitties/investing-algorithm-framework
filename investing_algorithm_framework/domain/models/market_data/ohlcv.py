@@ -42,6 +42,21 @@ class OHLCV:
 
         return dict_data
 
+    def to_array(self):
+        rows = []
+
+        for row in self.get_data():
+            rows.append([
+                datetime.strptime(row[0], self.DEFAULT_DATETIME_STRING),
+                row[1],
+                row[2],
+                row[3],
+                row[4],
+                row[5]
+            ])
+
+        return rows
+
     @staticmethod
     def from_dict(data):
         return OHLCV(

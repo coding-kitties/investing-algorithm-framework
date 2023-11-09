@@ -18,7 +18,8 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     SQLALCHEMY_DATABASE_URI, Config, OperationalException, \
     PortfolioConfiguration
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
-    create_all_tables
+    create_all_tables, MarketBacktestService
+from investing_algorithm_framework.services import OrderBacktestService
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -467,6 +468,7 @@ class App:
         return self.algorithm.get_portfolio_configurations()
 
     def backtest(self, start_date, end_date, unallocated=None, trading_symbol=None):
+        logger.info("Running backtest")
 
         # Add custom portfolio configuration
         # if trading symbol and unallocated are specified
@@ -484,8 +486,20 @@ class App:
                 max_unallocated=unallocated,
                 backtest=True
             ))
-            print(portfolio_configuration_service.get_all())
 
         self.initialize(backtest=True)
         backtest_service = self.container.backtest_service()
+        backtest_service.resource_directory = self.config.get(RESOURCE_DIRECTORY)
+
+        # Override some services with backtest variants
+        self.container.market_service.override(MarketBacktestService())
+        self.container.order_service.override(OrderBacktestService(
+            order_repository=self.container.order_repository(),
+            order_fee_repository=self.container.order_fee_repository(),
+            market_service=self.container.market_service(),
+            position_repository=self.container.position_repository(),
+            position_cost_repository=self.container.position_cost_repository(),
+            portfolio_repository=self.container.portfolio_repository(),
+            portfolio_configuration_service=self.container.portfolio_configuration_service()
+        ))
         return backtest_service.backtest(self.algorithm, start_date, end_date)

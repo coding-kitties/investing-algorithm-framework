@@ -9,7 +9,7 @@ from investing_algorithm_framework.services.repository_service \
 logger = logging.getLogger("investing_algorithm_framework")
 
 
-class OrderService(RepositoryService):
+class OrderBacktestService(RepositoryService):
 
     def __init__(
         self,
@@ -21,7 +21,7 @@ class OrderService(RepositoryService):
         portfolio_repository,
         portfolio_configuration_service,
     ):
-        super(OrderService, self).__init__(order_repository)
+        super(OrderBacktestService, self).__init__(order_repository)
         self.order_repository = order_repository
         self.order_fee_repository = order_fee_repository
         self.market_service = market_service

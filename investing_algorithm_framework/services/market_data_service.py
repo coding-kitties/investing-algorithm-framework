@@ -8,6 +8,14 @@ class MarketDataService:
     def __init__(self, market_service):
         self.market_service = market_service
 
+    def get_data_for_backtest(self, backtest_profile):
+        self.market_service.market = backtest_profile.market
+        return {"ohlcvs": self.market_service.get_ohclvs(
+            backtest_profile.symbols,
+            time_frame=backtest_profile.trading_time_frame,
+            from_timestamp=backtest_profile.backtest_start_date_data
+        )}
+
     def get_data_for_strategy(self, strategy, start_date=None, end_date=None):
         data = {}
 

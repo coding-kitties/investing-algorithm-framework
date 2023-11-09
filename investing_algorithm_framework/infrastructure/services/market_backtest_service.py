@@ -10,7 +10,7 @@ from investing_algorithm_framework.domain import OperationalException, \
 logger = logging.getLogger("investing_algorithm_framework")
 
 
-class MarketService:
+class MarketBacktestService:
     exchange = None
     _market = None
     api_key = None,

@@ -404,6 +404,13 @@ class Algorithm:
     def strategies(self):
         return self.strategy_orchestrator_service.get_strategies()
 
+    def get_strategy(self, strategy_id):
+        for strategy in self.strategy_orchestrator_service.get_strategies():
+            if strategy.worker_id == strategy_id:
+                return strategy
+
+        return None
+
     def get_allocated(self, market=None, identifier=None) -> float:
 
         if self.portfolio_configuration_service.count() > 1 \
