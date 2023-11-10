@@ -1,13 +1,12 @@
 from dependency_injector import containers, providers
 
+from investing_algorithm_framework.app.algorithm import Algorithm
 from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPositionRepository, MarketService, SQLPortfolioRepository, \
-    SQLPositionCostRepository, SQLOrderFeeRepository
+    SQLOrderFeeRepository
 from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, StrategyOrchestratorService, \
-    PortfolioConfigurationService, MarketDataService, PositionCostService, \
-    BackTestService
-from investing_algorithm_framework.app.algorithm import Algorithm
+    PortfolioConfigurationService, MarketDataService, BackTestService
 
 
 def setup_dependency_container(app, modules=None, packages=None):
@@ -22,7 +21,6 @@ class DependencyContainer(containers.DeclarativeContainer):
     order_repository = providers.Factory(SQLOrderRepository)
     order_fee_repository = providers.Factory(SQLOrderFeeRepository)
     position_repository = providers.Factory(SQLPositionRepository)
-    position_cost_repository = providers.Factory(SQLPositionCostRepository)
     portfolio_repository = providers.Factory(SQLPortfolioRepository)
     market_service = providers.Factory(MarketService)
     market_data_service = providers.Factory(
@@ -37,17 +35,12 @@ class DependencyContainer(containers.DeclarativeContainer):
     )
     order_service = providers.Factory(
         OrderService,
-        position_cost_repository=position_cost_repository,
         order_repository=order_repository,
         order_fee_repository=order_fee_repository,
         portfolio_repository=portfolio_repository,
         position_repository=position_repository,
         market_service=market_service,
         portfolio_configuration_service=portfolio_configuration_service,
-    )
-    position_cost_service = providers.Factory(
-        PositionCostService,
-        repository=position_cost_repository
     )
     position_service = providers.Factory(
         PositionService,
@@ -80,6 +73,4 @@ class DependencyContainer(containers.DeclarativeContainer):
         market_service=market_service,
         strategy_orchestrator_service=strategy_orchestrator_service,
         market_data_service=market_data_service,
-        position_cost_service=position_cost_service,
     )
-

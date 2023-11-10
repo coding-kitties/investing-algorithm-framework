@@ -1,4 +1,6 @@
 import logging
+from queue import PriorityQueue
+from datetime import datetime
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
     OperationalException, OrderStatus, parse_string_to_decimal, \
@@ -17,7 +19,6 @@ class OrderService(RepositoryService):
         order_fee_repository,
         market_service,
         position_repository,
-        position_cost_repository,
         portfolio_repository,
         portfolio_configuration_service,
     ):
@@ -26,7 +27,6 @@ class OrderService(RepositoryService):
         self.order_fee_repository = order_fee_repository
         self.market_service = market_service
         self.position_repository = position_repository
-        self.position_cost_repository = position_cost_repository
         self.portfolio_repository = portfolio_repository
         self.portfolio_configuration_service = portfolio_configuration_service
 
@@ -73,7 +73,7 @@ class OrderService(RepositoryService):
         return order
 
     def update(self, object_id, data):
-        previous_order = self.get(object_id)
+        previous_order = self.order_repository.get(object_id)
 
         if "fee" in data:
             order_fee_data = data.pop("fee")
@@ -372,7 +372,8 @@ class OrderService(RepositoryService):
         self.position_repository.update(
             position.id,
             {
-                "amount": position.get_amount() + filled_difference
+                "amount": position.get_amount() + filled_difference,
+                "cost": position.get_cost() + filled_size,
             }
         )
 
@@ -387,35 +388,6 @@ class OrderService(RepositoryService):
             }
         )
 
-        # Update position cost
-        if self.position_cost_repository.exists(
-            {
-                "position": position.id,
-                "created_at": current_order.created_at
-            }
-        ):
-            position_cost = self.position_cost_repository.find(
-                {
-                    "position": position.id,
-                    "created_at": current_order.created_at
-                }
-            )
-            self.position_cost_repository.update(
-                position_cost.id,
-                {
-                    "amount": position_cost.get_amount() + filled_difference
-                }
-            )
-        else:
-            self.position_cost_repository.create(
-                {
-                    "position_id": position.id,
-                    "amount": filled_difference,
-                    "price": current_order.get_price(),
-                    "created_at": current_order.get_created_at()
-                }
-            )
-
     def _sync_with_sell_order_filled(self, previous_order, current_order):
         filled_difference = current_order.get_filled() - \
                             previous_order.get_filled()
@@ -429,7 +401,6 @@ class OrderService(RepositoryService):
 
         # Update the portfolio
         portfolio = self.portfolio_repository.get(position.portfolio_id)
-
         self.portfolio_repository.update(
             portfolio.id,
             {
@@ -454,20 +425,11 @@ class OrderService(RepositoryService):
             }
         )
 
-        self._close_position_costs(filled_difference, current_order)
+        self._close_trades(filled_difference, current_order)
 
     def _sync_with_buy_order_cancelled(self, order):
         remaining = order.get_amount() - order.get_filled()
         size = remaining * order.get_price()
-        position_cost = self.position_cost_repository.find(
-            {
-                "position": order.position_id,
-                "created_at": order.created_at
-            }
-        )
-
-        if position_cost.get_amount() == 0:
-            self.position_cost_repository.delete(position_cost.id)
 
         # Add the remaining amount to the portfolio
         portfolio = self.portfolio_repository.find(
@@ -511,15 +473,6 @@ class OrderService(RepositoryService):
     def _sync_with_buy_order_failed(self, order):
         remaining = order.get_amount() - order.get_filled()
         size = remaining * order.get_price()
-        position_cost = self.position_cost_repository.find(
-            {
-                "position": order.position_id,
-                "created_at": order.created_at
-            }
-        )
-
-        if position_cost.get_amount() == 0:
-            self.position_cost_repository.delete(position_cost.id)
 
         # Add the remaining amount to the portfolio
         portfolio = self.portfolio_repository.find(
@@ -563,15 +516,6 @@ class OrderService(RepositoryService):
     def _sync_with_buy_order_expired(self, order):
         remaining = order.get_amount() - order.get_filled()
         size = remaining * order.get_price()
-        position_cost = self.position_cost_repository.find(
-            {
-                "position": order.position_id,
-                "created_at": order.created_at
-            }
-        )
-
-        if position_cost.get_amount() == 0:
-            self.position_cost_repository.delete(position_cost.id)
 
         # Add the remaining amount to the portfolio
         portfolio = self.portfolio_repository.find(
@@ -615,15 +559,6 @@ class OrderService(RepositoryService):
     def _sync_with_buy_order_rejected(self, order):
         remaining = order.get_amount() - order.get_filled()
         size = remaining * order.get_price()
-        position_cost = self.position_cost_repository.find(
-            {
-                "position": order.position_id,
-                "created_at": order.created_at
-            }
-        )
-
-        if position_cost.get_amount() == 0:
-            self.position_cost_repository.delete(position_cost.id)
 
         # Add the remaining amount to the portfolio
         portfolio = self.portfolio_repository.find(
@@ -664,79 +599,90 @@ class OrderService(RepositoryService):
             }
         )
 
-
-    def _close_position_costs(self, amount_to_close, current_order):
-        total_net_gain = 0
-        position_costs = self.position_cost_repository.get_all(
+    def _close_trades(self, amount_to_close, sell_order):
+        matching_buy_orders = self.order_repository.get_all(
             {
-                "position": current_order.position_id
+                "position": sell_order.position_id,
+                "order_side": "buy",
+                "trade_closed_at": None
             }
         )
+        order_queue = PriorityQueue()
 
-        while amount_to_close > 0 and len(position_costs) > 0:
-            position_cost = position_costs[0]
+        for order in matching_buy_orders:
+            order_queue.put(order)
 
-            matching_buy_order = self.position_cost_repository.find({
-                "position": current_order.position_id,
-                "side": OrderSide.BUY.value,
-                "created_at": position_cost.get_created_at()
-            })
-            net_gain = matching_buy_order.get_price() \
-                       - position_cost.get_price()
+        total_net_gain = 0
+        total_cost = 0
 
-            if amount_to_close > position_cost.get_amount():
-                amount_to_close -= position_cost.get_amount()
-                self.order_repository.update(
-                    matching_buy_order.id,
-                    {
-                        "net_gain": net_gain,
-                        "trade_closed_at": current_order.get_created_at(),
-                        "TradeClosedPrice": current_order.get_price()
-                    }
-                )
-                self.position_cost_repository.delete(position_cost.id)
+        while amount_to_close > 0 and not order_queue.empty():
+            buy_order = order_queue.get()
+
+            if buy_order.get_trade_closed_amount() != None:
+                available_to_close = buy_order.get_filled() \
+                                     - buy_order.get_trade_closed_amount()
             else:
-                self.order_repository.update(
-                    matching_buy_order.id,
-                    {
-                        "net_gain": net_gain,
-                        "trade_closed_at": current_order.get_created_at(),
-                        "trade_close_price": current_order.get_price()
-                    }
-                )
-                position_cost = self.position_cost_repository.update(
-                    position_cost.id,
-                    {
-                        "amount": position_cost.get_amount()
-                                  - amount_to_close
-                    }
-                )
+                available_to_close = buy_order.get_filled()
 
-                self.position_cost_repository.delete(position_cost.id)
+            if amount_to_close >= available_to_close:
+                to_be_closed = available_to_close
+                remaining = amount_to_close - to_be_closed
+                cost = buy_order.get_price() * to_be_closed
+                net_gain = (sell_order.get_price() - buy_order.get_price()) * to_be_closed
+                amount_to_close = remaining
+                self.order_repository.update(
+                    buy_order.id,
+                    {
+                        "trade_closed_amount": buy_order.get_filled(),
+                        "trade_closed_at": datetime.utcnow(),
+                        "trade_closed_price": sell_order.get_price(),
+                        "net_gain": buy_order.get_net_gain() + net_gain
+                    }
+                )
+            else:
+                to_be_closed = amount_to_close
+                net_gain = (sell_order.get_price() - buy_order.get_price()) * to_be_closed
+                cost = buy_order.get_price() * amount_to_close
+                self.order_repository.update(
+                    buy_order.id,
+                    {
+                        "trade_closed_amount": buy_order.get_trade_closed_amount() + to_be_closed,
+                        "trade_closed_price": sell_order.get_price(),
+                        "net_gain": buy_order.get_net_gain() + net_gain
+                    }
+                )
                 amount_to_close = 0
 
-                if position_cost.get_amount() > 0:
-                    self.position_cost_repository.delete(position_cost.id)
-
             total_net_gain += net_gain
+            total_cost += cost
 
-        # Update the portfolio
-        position = self.position_repository.get(current_order.position_id)
+        position = self.position_repository.get(sell_order.position_id)
+
+        # Update portfolio
         portfolio = self.portfolio_repository.get(position.portfolio_id)
         self.portfolio_repository.update(
             portfolio.id,
             {
-                "total_net_gain": portfolio.get_total_net_gain()
-                + total_net_gain
+                "total_net_gain": portfolio.get_total_net_gain() + total_net_gain,
+                "total_cost": portfolio.get_total_cost() - total_cost
+            }
+        )
+        # Update the position
+        position = self.position_repository.get(sell_order.position_id)
+        self.position_repository.update(
+            position.id,
+            {
+                "cost": position.get_cost() - total_cost
             }
         )
 
         # Update the sell order
         self.order_repository.update(
-            current_order.id,
+            sell_order.id,
             {
-                "net_gain": total_net_gain,
-                "trade_closed_at": current_order.created_at,
-                "TradeClosedPrice": current_order.get_price()
+                "trade_closed_amount": sell_order.get_filled(),
+                "trade_closed_at": datetime.utcnow(),
+                "trade_closed_price": sell_order.get_price(),
+                "net_gain": sell_order.get_net_gain() + total_net_gain
             }
         )

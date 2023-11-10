@@ -15,8 +15,7 @@ from investing_algorithm_framework.app.task import Task
 from investing_algorithm_framework.app.web import create_flask_app
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
-    SQLALCHEMY_DATABASE_URI, Config, OperationalException, \
-    PortfolioConfiguration
+    SQLALCHEMY_DATABASE_URI, Config, OperationalException, PortfolioConfiguration
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, MarketBacktestService
 from investing_algorithm_framework.services import OrderBacktestService
@@ -463,7 +462,7 @@ class App:
                 raise OperationalException(
                     "Could not create database directory"
                 )
- 
+
     def get_portfolio_configurations(self):
         return self.algorithm.get_portfolio_configurations()
 

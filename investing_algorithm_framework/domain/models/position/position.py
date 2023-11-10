@@ -9,10 +9,12 @@ class Position(BaseModel):
         self,
         symbol=None,
         amount=0,
+        cost=0,
         portfolio_id=None
     ):
         self.symbol = symbol
         self.amount = amount
+        self.cost = cost
         self.portfolio_id = portfolio_id
 
     def get_symbol(self):
@@ -23,6 +25,12 @@ class Position(BaseModel):
 
     def get_amount(self):
         return parse_string_to_decimal(self.amount)
+
+    def get_cost(self):
+        return parse_string_to_decimal(self.cost)
+
+    def set_cost(self, cost):
+        self.cost = cost
 
     def set_amount(self, amount):
         self.amount = amount

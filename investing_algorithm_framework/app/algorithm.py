@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
     Position, Order, Portfolio, OrderType, OrderSide, ApiException, \
-    parse_decimal_to_string, PositionCost
+    parse_decimal_to_string
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -17,7 +17,6 @@ class Algorithm:
         portfolio_configuration_service,
         portfolio_service,
         position_service,
-        position_cost_service,
         order_service,
         market_service,
         market_data_service,
@@ -25,7 +24,6 @@ class Algorithm:
     ):
         self.portfolio_service = portfolio_service
         self.position_service = position_service
-        self.position_cost_service = position_cost_service
         self.order_service = order_service
         self.market_service = market_service
         self._config = None
@@ -100,11 +98,22 @@ class Algorithm:
     ):
         portfolio = self.portfolio_service.find({"market": market})
 
-        if percentage_of_portfolio is not None and OrderSide.BUY.equals(side):
-            size = float(portfolio.net_size) * (percentage_of_portfolio / 100)
-            amount = floor(size / price)
+        if percentage_of_portfolio is not None:
+            if not OrderSide.BUY.equals(side):
+                raise ApiException(
+                    "Percentage of portfolio is only supported for BUY orders."
+                )
 
-        if percentage_of_position is not None and OrderSide.SELL.equals(side):
+            size = float(portfolio.net_size) * (percentage_of_portfolio / 100)
+            amount = size / price
+
+        elif percentage_of_position is not None:
+
+            if not OrderSide.SELL.equals(side):
+                raise ApiException(
+                    "Percentage of position is only supported for SELL orders."
+                )
+
             position = self.position_service.find(
                 {
                     "symbol": target_symbol,
@@ -562,10 +571,6 @@ class Algorithm:
         query_params["target_symbol"] = target_symbol
         query_params["status"] = OrderStatus.OPEN.value
         return self.order_service.exists(query_params)
-
-    def get_position_costs(self, symbol, market=None, identifier=None) -> List[PositionCost]:
-        position = self.get_position(symbol, market, identifier)
-        return self.position_cost_service.get_all({"position": position.id, "itemized": True})
 
     def check_pending_orders(self):
         self.order_service.check_pending_orders()

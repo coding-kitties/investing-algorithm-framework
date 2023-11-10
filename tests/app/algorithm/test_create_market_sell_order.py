@@ -71,4 +71,4 @@ class Test(TestBase):
         btc_position = position_service.find({"symbol": "BTC"})
         trading_symbol_position = position_service.find({"symbol": "USDT"})
         self.assertEqual(Decimal(0), btc_position.get_amount())
-        self.assertNotEqual(Decimal(1000), trading_symbol_position.get_amount())
+        self.assertEqual(Decimal(1000), trading_symbol_position.get_amount())

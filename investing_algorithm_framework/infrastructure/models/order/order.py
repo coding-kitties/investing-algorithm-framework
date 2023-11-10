@@ -33,6 +33,7 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     updated_at = Column(DateTime, default=datetime.utcnow)
     trade_closed_at = Column(DateTime, default=None)
     trade_closed_price = Column(String, default=None)
+    trade_closed_amount = Column(String, default=None)
     net_gain = Column(String, default=0)
     fee = relationship(
         "SQLOrderFee",
@@ -56,6 +57,7 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
             updated_at=order.get_updated_at(),
             trade_closed_at=order.get_trade_closed_at(),
             trade_closed_price=order.get_trade_closed_price(),
+            trade_closed_amount=order.get_trade_closed_amount(),
             net_gain=order.get_net_gain(),
         )
 
@@ -79,3 +81,7 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
             fee=OrderFee.from_ccxt_fee(ccxt_order.get("fee", None)),
             created_at=ccxt_order.get("datetime", None),
         )
+
+    def __lt__(self, other):
+        # Define the less-than comparison based on created_at attribute
+        return self.created_at < other.created_at
