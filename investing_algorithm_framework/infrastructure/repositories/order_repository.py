@@ -30,13 +30,10 @@ class SQLOrderRepository(Repository):
             "trading_symbol", query_params
         )
 
-        if portfolio_query_param:
+        if portfolio_query_param is not None:
             portfolio = db.query(SQLPortfolio).filter_by(
-                identifier=portfolio_query_param
+                id=portfolio_query_param
             ).first()
-
-            if portfolio is None:
-                return query.filter_by(id=-1)
 
             positions = db.query(SQLPosition).filter_by(
                 portfolio_id=portfolio.id

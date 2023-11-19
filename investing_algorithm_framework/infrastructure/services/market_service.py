@@ -339,7 +339,7 @@ class MarketService:
             logger.exception(e)
             raise OperationalException("Could not retrieve prices")
 
-    def get_ohclv(self, symbol, time_frame, from_timestamp):
+    def get_ohclv(self, symbol, time_frame, from_timestamp, to_timestamp=None):
 
         if not self.exchange.has['fetchOHLCV']:
             raise OperationalException(
@@ -350,10 +350,17 @@ class MarketService:
         time_stamp = self.exchange.parse8601(
             from_timestamp.strftime(":%Y-%m-%d %H:%M:%S")
         )
-        now = self.exchange.milliseconds()
+
+        if to_timestamp is None:
+            to_timestamp = self.exchange.milliseconds()
+        else:
+            to_timestamp = self.exchange.parse8601(
+                to_timestamp.strftime(":%Y-%m-%d %H:%M:%S")
+            )
+
         data = []
 
-        while time_stamp < now:
+        while time_stamp < to_timestamp:
             ohlcv = self.exchange.fetch_ohlcv(
                 symbol, time_frame.to_ccxt_string(), time_stamp
             )
@@ -365,7 +372,7 @@ class MarketService:
                         time_frame.to_ccxt_string()
                     ) * 1000
             else:
-                time_stamp = now
+                time_stamp = to_timestamp
 
             ohlcv = [[self.exchange.iso8601(candle[0])]
                      + candle[1:] for candle in ohlcv]
@@ -374,14 +381,20 @@ class MarketService:
 
         return OHLCV.from_dict({"symbol": symbol, "data": data})
 
-    def get_ohclvs(self, symbols, time_frame, from_timestamp):
+    def get_ohclvs(
+        self,
+        symbols,
+        time_frame,
+        from_timestamp,
+        to_timestamp=None
+    ):
         ohlcvs = {}
 
         for symbol in symbols:
 
             try:
                 ohlcvs[symbol] = self.get_ohclv(
-                    symbol, time_frame, from_timestamp
+                    symbol, time_frame, from_timestamp, to_timestamp
                 )
             except Exception as e:
                 logger.exception(e)

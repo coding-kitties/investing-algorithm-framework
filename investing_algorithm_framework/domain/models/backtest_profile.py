@@ -1,15 +1,70 @@
 from .base_model import BaseModel
 from .time_unit import TimeUnit
+from investing_algorithm_framework.domain.decimal_parsing import \
+    parse_string_to_decimal
+import decimal
+
+
+class BacktestPosition(BaseModel):
+
+    def __init__(self, position, trading_symbol=False):
+        self.symbol = position.symbol
+        self.amount = parse_string_to_decimal(position.amount)
+        self._cost = parse_string_to_decimal(position.cost)
+        self._price = 0.0
+        self._trading_symbol = trading_symbol
+
+    @property
+    def price(self):
+        return self._price
+
+    @price.setter
+    def price(self, value):
+        self._price = value
+
+    @property
+    def cost(self):
+
+        if self._trading_symbol:
+            return self.amount
+
+        return self._cost
+
+    @property
+    def value(self):
+
+        if self._trading_symbol:
+            return self.amount
+
+        return decimal.Decimal(self._price) * self.amount
+
+    @property
+    def growth(self):
+
+        if self._trading_symbol:
+            return 0.0
+
+        return self.value - self.cost
+
+    @property
+    def growth_rate(self):
+
+        if self._trading_symbol:
+            return 0.0
+
+        return self.growth / self.cost * 100
 
 
 class BacktestProfile(BaseModel):
 
     def __init__(
         self,
-        strategy_id=None,
+        portfolio_id=None,
+        initial_unallocated=0.0,
         interval=None,
         time_unit=None,
         backtest_start_date_data=None,
+        backtest_data_index_date=None,
         backtest_start_date=None,
         backtest_end_date=None,
         backtest_index_date=None,
@@ -19,9 +74,22 @@ class BacktestProfile(BaseModel):
         market=None,
         number_of_days=0,
         number_of_orders=0,
-        number_of_positions=0
+        number_of_positions=0,
+        market_data_file=None,
+        number_of_trades_closed=0,
+        number_of_trades_open=0,
+        percentage_positive_trades=0.0,
+        percentage_negative_trades=0.0,
+        total_cost=0.0,
+        trading_symbol=None,
+        total_net_gain_percentage=0.0,
+        total_net_gain=0,
+        growth_rate=0.0,
+        growth=0,
+        total_value=0.0,
+        positions=None
     ):
-        self._strategy_id = strategy_id
+        self._portfolio_id = portfolio_id
         self._interval = interval
         self._time_unit = time_unit
         self._backtest_start_date_data = backtest_start_date_data
@@ -36,14 +104,31 @@ class BacktestProfile(BaseModel):
         self._number_of_days = number_of_days
         self._number_of_orders = number_of_orders
         self._number_of_positions = number_of_positions
+        self._market_data_file = market_data_file
+        self._percentage_positive_trades = percentage_positive_trades
+        self._percentage_negative_trades = percentage_negative_trades
+        self._number_of_trades_closed = number_of_trades_closed
+        self._number_of_trades_open = number_of_trades_open
+        self._total_cost = total_cost
+        self._growth_rate = 0.0
+        self._growth = 0.0
+        self._initial_unallocated = initial_unallocated
+        self._trading_symbol = trading_symbol
+        self._total_net_gain_percentage = total_net_gain_percentage
+        self._total_net_gain = total_net_gain
+        self._backtest_data_index_date = backtest_data_index_date
+        self._growth_rate = growth_rate
+        self._growth = growth
+        self._total_value = total_value
+        self.positions = positions
 
     @property
-    def strategy_id(self):
-        return self._strategy_id
+    def portfolio_id(self):
+        return self._portfolio_id
 
-    @strategy_id.setter
-    def strategy_id(self, strategy_id):
-        self._strategy_id = strategy_id
+    @portfolio_id.setter
+    def portfolio_id(self, portfolio_id):
+        self._portfolio_id = portfolio_id
 
     @property
     def interval(self):
@@ -157,6 +242,125 @@ class BacktestProfile(BaseModel):
     def number_of_positions(self, value):
         self._number_of_positions = value
 
+    @property
+    def backtest_data_index_date(self):
+        return self._backtest_data_index_date
+
+    @backtest_data_index_date.setter
+    def backtest_data_index_date(self, value):
+        self._backtest_data_index_date = value
+
+    @property
+    def market_data_file(self):
+        return self._market_data_file
+
+    @market_data_file.setter
+    def market_data_file(self, value):
+        self._market_data_file = value
+
+    @property
+    def percentage_positive_trades(self):
+        return self._percentage_positive_trades
+
+    @percentage_positive_trades.setter
+    def percentage_positive_trades(self, value):
+        self._percentage_positive_trades = value
+
+    @property
+    def percentage_negative_trades(self):
+        return self._percentage_negative_trades
+
+    @percentage_negative_trades.setter
+    def percentage_negative_trades(self, value):
+        self._percentage_negative_trades = value
+
+    @property
+    def number_of_trades_closed(self):
+        return self._number_of_trades_closed
+
+    @number_of_trades_closed.setter
+    def number_of_trades_closed(self, value):
+        self._number_of_trades_closed = value
+
+    @property
+    def number_of_trades_open(self):
+        return self._number_of_trades_open
+
+    @number_of_trades_open.setter
+    def number_of_trades_open(self, value):
+        self._number_of_trades_open = value
+
+    @property
+    def total_cost(self):
+        return self._total_cost
+
+    @total_cost.setter
+    def total_cost(self, value):
+        self._total_cost = value
+
+    @property
+    def growth_rate(self):
+        return self._growth_rate
+
+    @growth_rate.setter
+    def growth_rate(self, value):
+        self._growth_rate = value
+
+    @property
+    def growth(self):
+        return self._growth
+
+    @growth.setter
+    def growth(self, value):
+        self._growth = value
+
+    @property
+    def initial_unallocated(self):
+        return self._initial_unallocated
+
+    @initial_unallocated.setter
+    def initial_unallocated(self, value):
+        self._initial_unallocated = value
+
+    @property
+    def trading_symbol(self):
+        return self._trading_symbol
+
+    @trading_symbol.setter
+    def trading_symbol(self, value):
+        self._trading_symbol = value
+
+    @property
+    def total_net_gain_percentage(self):
+        return self._total_net_gain_percentage
+
+    @total_net_gain_percentage.setter
+    def total_net_gain_percentage(self, value):
+        self._total_net_gain_percentage = value
+
+    @property
+    def total_net_gain(self):
+        return self._total_net_gain
+
+    @total_net_gain.setter
+    def total_net_gain(self, value):
+        self._total_net_gain = value
+
+    @property
+    def total_value(self):
+        return self._total_value
+
+    @total_value.setter
+    def total_value(self, value):
+        self._total_value = value
+
+    @property
+    def positions(self):
+        return self._positions
+
+    @positions.setter
+    def positions(self, value):
+        self._positions = value
 
     def get_runs_per_day(self):
 
@@ -171,7 +375,6 @@ class BacktestProfile(BaseModel):
 
     def __repr__(self):
         return self.repr(
-            strategy_id=self._strategy_id,
             start_date=self.backtest_start_date,
             end_date=self.backtest_end_date,
             backtest_index_date=self.backtest_index_date,

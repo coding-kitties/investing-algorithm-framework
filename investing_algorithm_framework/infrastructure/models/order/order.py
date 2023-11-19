@@ -4,8 +4,8 @@ from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Numeric
 from sqlalchemy.orm import relationship
 
-from investing_algorithm_framework.domain.models import OrderType, \
-    OrderSide, Order, OrderStatus, OrderFee
+from investing_algorithm_framework.domain import OrderType, \
+    OrderSide, Order, OrderStatus, OrderFee, parse_decimal_to_string
 from investing_algorithm_framework.infrastructure.database import SQLBaseModel
 from investing_algorithm_framework.infrastructure.models.model_extension \
     import SQLAlchemyModelExtension
@@ -23,8 +23,8 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     order_type = Column(String, nullable=False, default=OrderType.LIMIT.value)
     price = Column(String)
     amount = Column(String)
-    filled_amount = Column(String)
-    remaining_amount = Column(String)
+    filled = Column(String)
+    remaining = Column(String)
     cost = Column(String)
     status = Column(String)
     position_id = Column(Integer, ForeignKey('positions.id'))
@@ -41,6 +41,45 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
         back_populates="order",
         cascade="all, delete"
     )
+
+    def update(self, data):
+
+        if 'amount' in data and data['amount'] is not None:
+            amount = data.pop('amount')
+            self.amount = parse_decimal_to_string(amount)
+
+        if 'price' in data and data['price'] is not None:
+            price = data.pop('price')
+            self.price = parse_decimal_to_string(price)
+
+        if 'filled' in data and data['filled'] is not None:
+            filled = data.pop('filled')
+            self.filled = parse_decimal_to_string(filled)
+
+        if 'remaining' in data and data['remaining'] is not None:
+            remaining = data.pop('remaining')
+            self.remaining = parse_decimal_to_string(remaining)
+
+        if 'net_gain' in data and data['net_gain'] is not None:
+            net_gain = data.pop('net_gain')
+            self.net_gain = parse_decimal_to_string(net_gain)
+
+        if 'trade_closed_price' in data and \
+                data['trade_closed_price'] is not None:
+            trade_closed_price = data.pop('trade_closed_price')
+            self.trade_closed_price = parse_decimal_to_string(
+                trade_closed_price)
+
+        if 'trade_closed_amount' in data and \
+                data['trade_closed_amount'] is not None:
+            trade_closed_amount = data.pop('trade_closed_amount')
+            self.trade_closed_amount = parse_decimal_to_string(
+                trade_closed_amount)
+
+        if "status" in data and data["status"] is not None:
+            self.status = OrderStatus.from_value(data.pop("status")).value
+
+        super().update(data)
 
     @staticmethod
     def from_order(order):
@@ -75,8 +114,8 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
             status=status,
             order_type=ccxt_order.get("type", None),
             side=ccxt_order.get("side", None),
-            filled_amount=ccxt_order.get("filled", None),
-            remaining_amount=ccxt_order.get("remaining", None),
+            filled=ccxt_order.get("filled", None),
+            remaining=ccxt_order.get("remaining", None),
             cost=ccxt_order.get("cost", None),
             fee=OrderFee.from_ccxt_fee(ccxt_order.get("fee", None)),
             created_at=ccxt_order.get("datetime", None),

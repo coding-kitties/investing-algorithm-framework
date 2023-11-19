@@ -1,10 +1,10 @@
 from datetime import datetime
+from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
 
 import pandas as pd
 
 
 class OHLCV:
-    DEFAULT_DATETIME_STRING = "%Y-%m-%dT%H:%M:%S.%f%z"
     COLUMNS = ["open", "high", "low", "close", "volume"]
 
     def __init__(self, symbol, data):
@@ -25,14 +25,14 @@ class OHLCV:
     def get_data(self):
         return self.data
 
-    def to_dict(self, date_format="%Y-%m-%d-%H:%M:%S"):
+    def to_dict(self, date_format=DATETIME_FORMAT):
         dict_data = {}
 
         for column in self.COLUMNS:
             dict_data[column] = []
 
         for row in self.get_data():
-            date = datetime.strptime(row[0], self.DEFAULT_DATETIME_STRING)
+            date = datetime.strptime(row[0], date_format)
             date = date.strftime(date_format)
             dict_data["open"].append(date)
             dict_data["high"].append(row[1])
@@ -42,12 +42,15 @@ class OHLCV:
 
         return dict_data
 
-    def to_array(self):
+    def to_array(self, date_format=DATETIME_FORMAT):
         rows = []
 
         for row in self.get_data():
+            datetime_object = datetime.strptime(
+                row[0], "%Y-%m-%dT%H:%M:%S.%fZ"
+            )
             rows.append([
-                datetime.strptime(row[0], self.DEFAULT_DATETIME_STRING),
+                datetime_object.strftime(date_format),
                 row[1],
                 row[2],
                 row[3],

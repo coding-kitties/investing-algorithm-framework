@@ -1,11 +1,10 @@
 import logging
-from math import floor
-from typing import List
 from decimal import Decimal
+from typing import List
 
 from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
     Position, Order, Portfolio, OrderType, OrderSide, ApiException, \
-    parse_decimal_to_string
+    parse_decimal_to_string, BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -13,20 +12,21 @@ logger = logging.getLogger("investing_algorithm_framework")
 class Algorithm:
 
     def __init__(
-        self,
-        portfolio_configuration_service,
-        portfolio_service,
-        position_service,
-        order_service,
-        market_service,
-        market_data_service,
-        strategy_orchestrator_service,
+            self,
+            configuration_service,
+            portfolio_configuration_service,
+            portfolio_service,
+            position_service,
+            order_service,
+            market_service,
+            market_data_service,
+            strategy_orchestrator_service,
     ):
         self.portfolio_service = portfolio_service
         self.position_service = position_service
         self.order_service = order_service
         self.market_service = market_service
-        self._config = None
+        self.configuration_service = configuration_service
         self.portfolio_configuration_service = portfolio_configuration_service
         self.strategy_orchestrator_service = strategy_orchestrator_service
         self.market_data_service = market_data_service
@@ -41,11 +41,7 @@ class Algorithm:
 
     @property
     def config(self):
-        return self._config
-
-    @config.setter
-    def config(self, config):
-        self._config = config
+        return self.configuration_service.config
 
     @property
     def running(self) -> bool:
@@ -55,32 +51,36 @@ class Algorithm:
         self.strategy_orchestrator_service.run_pending_jobs()
 
     def create_order(
-        self,
-        target_symbol,
-        price,
-        type,
-        side,
-        amount,
-        market=None,
-        execute=True,
-        validate=True,
-        sync=True
+            self,
+            target_symbol,
+            price,
+            type,
+            side,
+            amount,
+            market=None,
+            execute=True,
+            validate=True,
+            sync=True
     ):
         portfolio = self.portfolio_service.find({"market": market})
+        order_data = {
+            "target_symbol": target_symbol,
+            "price": price,
+            "amount": parse_decimal_to_string(amount),
+            "order_type": type,
+            "side": side,
+            "portfolio_id": portfolio.id,
+            "status": OrderStatus.CREATED.value,
+            "trading_symbol": portfolio.trading_symbol,
+        }
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            order_data["created_at"] = \
+                self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+
         return self.order_service.create(
-            {
-                "target_symbol": target_symbol,
-                "price": price,
-                "amount": parse_decimal_to_string(amount),
-                "order_type": type,
-                "side": side,
-                "portfolio_id": portfolio.id,
-                "status": OrderStatus.CREATED.value,
-                "trading_symbol": portfolio.trading_symbol,
-            },
-            execute=execute,
-            validate=validate,
-            sync=sync
+            order_data, execute=execute, validate=validate, sync=sync
         )
 
     def create_limit_order(
@@ -123,46 +123,54 @@ class Algorithm:
             amount = position.get_amount() * \
                      (Decimal(percentage_of_position) / 100)
 
+        order_data = {
+            "target_symbol": target_symbol,
+            "price": price,
+            "amount": amount,
+            "order_type": OrderType.LIMIT.value,
+            "side": OrderSide.from_value(side).value,
+            "portfolio_id": portfolio.id,
+            "status": OrderStatus.CREATED.value,
+            "trading_symbol": portfolio.trading_symbol,
+        }
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            order_data["created_at"] = \
+                self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+
         return self.order_service.create(
-            {
-                "target_symbol": target_symbol,
-                "price": price,
-                "amount": amount,
-                "order_type": OrderType.LIMIT.value,
-                "side": OrderSide.from_value(side).value,
-                "portfolio_id": portfolio.id,
-                "status": OrderStatus.CREATED.value,
-                "trading_symbol": portfolio.trading_symbol,
-            },
-            execute=execute,
-            validate=validate,
-            sync=sync
+            order_data, execute=execute, validate=validate, sync=sync
         )
 
     def create_market_order(
-        self,
-        target_symbol,
-        side,
-        amount,
-        market=None,
-        execute=False,
-        validate=False,
-        sync=True
+            self,
+            target_symbol,
+            side,
+            amount,
+            market=None,
+            execute=False,
+            validate=False,
+            sync=True
     ):
         portfolio = self.portfolio_service.find({"market": market})
+        order_data = {
+            "target_symbol": target_symbol,
+            "amount": amount,
+            "order_type": OrderType.MARKET.value,
+            "side": OrderSide.from_value(side).value,
+            "portfolio_id": portfolio.id,
+            "status": OrderStatus.CREATED.value,
+            "trading_symbol": portfolio.trading_symbol,
+        }
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            order_data["created_at"] = \
+                self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+
         return self.order_service.create(
-            {
-                "target_symbol": target_symbol,
-                "amount": amount,
-                "order_type": OrderType.MARKET.value,
-                "side": OrderSide.from_value(side).value,
-                "portfolio_id": portfolio.id,
-                "status": OrderStatus.CREATED.value,
-                "trading_symbol": portfolio.trading_symbol,
-            },
-            execute=execute,
-            validate=validate,
-            sync=sync
+            order_data, execute=execute, validate=validate, sync=sync
         )
 
     def get_portfolio(self, market=None) -> Portfolio:
@@ -189,13 +197,13 @@ class Algorithm:
         self._running_workers = []
 
     def get_order(
-        self,
-        reference_id=None,
-        market=None,
-        target_symbol=None,
-        trading_symbol=None,
-        side=None,
-        type=None
+            self,
+            reference_id=None,
+            market=None,
+            target_symbol=None,
+            trading_symbol=None,
+            side=None,
+            type=None
     ) -> Order:
         query_params = {}
 
@@ -313,7 +321,7 @@ class Algorithm:
         except ApiException:
             return None
 
-    def position_exists(
+    def has_position(
         self,
         symbol,
         market=None,
@@ -322,6 +330,26 @@ class Algorithm:
         amount_gte=None,
         amount_lt=None,
         amount_lte=None
+    ):
+        return self.position_exists(
+            symbol,
+            market,
+            identifier,
+            amount_gt,
+            amount_gte,
+            amount_lt,
+            amount_lte
+        )
+
+    def position_exists(
+            self,
+            symbol,
+            market=None,
+            identifier=None,
+            amount_gt=None,
+            amount_gte=None,
+            amount_lt=None,
+            amount_lte=None
     ) -> bool:
         query_params = {}
 
@@ -387,10 +415,10 @@ class Algorithm:
         if position.get_amount() == 0:
             return
 
-        for order in self.order_service\
+        for order in self.order_service \
                 .get_all({
-                    "position": position.id, "status": OrderStatus.OPEN.value
-                }):
+            "position": position.id, "status": OrderStatus.OPEN.value
+        }):
             self.market_service.cancel_order(order.id)
 
         ticker = self.market_service.get_ticker(
@@ -430,7 +458,7 @@ class Algorithm:
             )
 
         if market is not None and identifier is not None:
-            portfolio_configurations = self.portfolio_configuration_service\
+            portfolio_configurations = self.portfolio_configuration_service \
                 .get_all()
 
         else:
@@ -480,7 +508,7 @@ class Algorithm:
             )
 
         if market is not None and identifier is not None:
-            portfolio_configurations = self.portfolio_configuration_service\
+            portfolio_configurations = self.portfolio_configuration_service \
                 .get_all()
 
         else:
@@ -506,7 +534,8 @@ class Algorithm:
                 {"status": OrderStatus.OPEN.value, "portfolio": portfolio.id}
             )
             unfilled = unfilled \
-                       + sum([order.get_amount() * order.get_price() for order in orders])
+                       + sum(
+                [order.get_amount() * order.get_price() for order in orders])
 
         return unfilled
 
@@ -533,7 +562,8 @@ class Algorithm:
         query_params["status"] = OrderStatus.OPEN.value
         return self.order_service.exists(query_params)
 
-    def has_open_sell_orders(self, target_symbol, identifier=None, market=None):
+    def has_open_sell_orders(self, target_symbol, identifier=None,
+                             market=None):
         query_params = {}
 
         if identifier is not None:

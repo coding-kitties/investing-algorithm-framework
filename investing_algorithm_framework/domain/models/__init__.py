@@ -5,8 +5,10 @@ from .time_unit import TimeUnit
 from .market_data import OHLCV, OrderBook, Ticker, AssetPrice
 from .trading_data_types import TradingDataType
 from .trading_time_frame import TradingTimeFrame
-from .portfolio import PortfolioConfiguration, Portfolio
-from .position import Position
+from .portfolio import PortfolioConfiguration, Portfolio, PortfolioSnapshot
+from .position import Position, PositionSnapshot
+from .backtest_profile import BacktestProfile, BacktestPosition
+from .strategy_profile import StrategyProfile
 
 __all__ = [
     "OrderStatus",
@@ -25,5 +27,10 @@ __all__ = [
     "AssetPrice",
     "Position",
     "Portfolio",
-    "OrderFee"
+    "OrderFee",
+    "BacktestProfile",
+    "PositionSnapshot",
+    "PortfolioSnapshot",
+    "StrategyProfile",
+    "BacktestPosition",
 ]

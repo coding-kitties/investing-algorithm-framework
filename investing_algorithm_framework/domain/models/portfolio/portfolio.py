@@ -17,6 +17,8 @@ class Portfolio(BaseModel):
         total_cost=0,
         total_net_gain=0,
         total_trade_volume=0,
+        created_at=None,
+        updated_at=None
     ):
         self.identifier = identifier
         self.updated_at = None
@@ -29,6 +31,8 @@ class Portfolio(BaseModel):
         self.total_net_gain = parse_decimal_to_string(total_net_gain)
         self.total_trade_volume = parse_decimal_to_string(total_trade_volume)
         self.market = market
+        self.created_at = created_at
+        self.updated_at = updated_at
 
     def __repr__(self):
         return self.repr(
@@ -61,3 +65,12 @@ class Portfolio(BaseModel):
 
     def get_total_trade_volume(self):
         return parse_string_to_decimal(self.total_trade_volume)
+
+    def get_created_at(self):
+        return self.created_at
+
+    def get_updated_at(self):
+        return self.updated_at
+
+    def get_trading_symbol(self):
+        return self.trading_symbol

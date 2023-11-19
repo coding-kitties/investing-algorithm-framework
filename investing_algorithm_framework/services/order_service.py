@@ -1,6 +1,6 @@
 import logging
-from queue import PriorityQueue
 from datetime import datetime
+from queue import PriorityQueue
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
     OperationalException, OrderStatus, parse_string_to_decimal, \
@@ -21,6 +21,7 @@ class OrderService(RepositoryService):
         position_repository,
         portfolio_repository,
         portfolio_configuration_service,
+        portfolio_snapshot_service,
     ):
         super(OrderService, self).__init__(order_repository)
         self.order_repository = order_repository
@@ -29,6 +30,7 @@ class OrderService(RepositoryService):
         self.position_repository = position_repository
         self.portfolio_repository = portfolio_repository
         self.portfolio_configuration_service = portfolio_configuration_service
+        self.portfolio_snapshot_service = portfolio_snapshot_service
 
     def create(self, data, execute=True, validate=True, sync=True):
         portfolio_id = data["portfolio_id"]
@@ -50,8 +52,8 @@ class OrderService(RepositoryService):
 
         position = self._create_position_if_not_exists(symbol, portfolio)
         data["position_id"] = position.id
-        data["remaining_amount"] = data["amount"]
-        data["status"] = OrderStatus.OPEN.value
+        data["remaining"] = data["amount"]
+        data["status"] = OrderStatus.CREATED.value
         order = self.order_repository.create(data)
         order_id = order.id
 
@@ -59,21 +61,32 @@ class OrderService(RepositoryService):
             order_fee["order_id"] = order_id
             self.order_fee_repository.create(order_fee)
 
-        if execute:
-            portfolio.configuration = self.portfolio_configuration_service\
-                .get(portfolio.identifier)
-            self.execute_order(order_id, portfolio)
-
         if sync:
             if OrderSide.BUY.equals(order.get_side()):
                 self._sync_portfolio_with_created_buy_order(order)
             else:
                 self._sync_portfolio_with_created_sell_order(order)
 
+        self.create_snapshot(portfolio.id, created_at=order.created_at)
+
+        if execute:
+            portfolio.configuration = self.portfolio_configuration_service\
+                .get(portfolio.identifier)
+            self.execute_order(order_id, portfolio)
+
         return order
 
     def update(self, object_id, data):
         previous_order = self.order_repository.get(object_id)
+        trading_symbol_position = self.position_repository.find(
+            {
+                "id": previous_order.position_id,
+                "symbol": previous_order.trading_symbol
+            }
+        )
+        portfolio = self.portfolio_repository.get(
+            trading_symbol_position.portfolio_id
+        )
 
         if "fee" in data:
             order_fee_data = data.pop("fee")
@@ -121,6 +134,12 @@ class OrderService(RepositoryService):
                 else:
                     self._sync_with_sell_order_expired(new_order)
 
+        if "updated_at" in data:
+            created_at = data["updated_at"]
+        else:
+            created_at = datetime.now()
+
+        self.create_snapshot(portfolio.id, created_at=created_at)
         return new_order
 
     def get_order_fee(self, order_id):
@@ -157,11 +176,24 @@ class OrderService(RepositoryService):
                         amount=parse_decimal_to_string(order.get_amount()),
                     )
 
-            self.update(order_id, executed_order.to_dict())
+            order = self.update(
+                order_id,
+                {
+                    "status": OrderStatus.OPEN.value,
+                    "remaining": order.remaining,
+                    "updated_at": datetime.now()
+                }
+            )
+            return order
         except Exception as e:
             logger.error("Error executing order: {}".format(e))
-            self.update(order_id, {"status": OrderStatus.REJECTED.value})
-            raise e
+            return self.update(
+                order_id,
+                {
+                    "status": OrderStatus.REJECTED.value,
+                    "updated_at": datetime.now()
+                }
+            )
 
     def validate_order(self, order_data, portfolio):
 
@@ -603,7 +635,7 @@ class OrderService(RepositoryService):
         matching_buy_orders = self.order_repository.get_all(
             {
                 "position": sell_order.position_id,
-                "order_side": "buy",
+                "order_side": OrderSide.BUY.value,
                 "trade_closed_at": None
             }
         )
@@ -685,4 +717,31 @@ class OrderService(RepositoryService):
                 "trade_closed_price": sell_order.get_price(),
                 "net_gain": sell_order.get_net_gain() + total_net_gain
             }
+        )
+
+    def create_snapshot(self, portfolio_id, created_at=None):
+
+        if created_at is None:
+            created_at = datetime.utcnow()
+
+        portfolio = self.portfolio_repository.get(portfolio_id)
+        pending_orders = self.get_all(
+            {
+                "side": OrderSide.BUY.value,
+                "status": OrderStatus.OPEN.value,
+                "portfolio_id": portfolio.id
+            }
+        )
+        created_orders = self.get_all(
+            {
+                "side": OrderSide.BUY.value,
+                "status": OrderStatus.CREATED.value,
+                "portfolio_id": portfolio.id
+            }
+        )
+        return self.portfolio_snapshot_service.create_snapshot(
+            portfolio,
+            pending_orders=pending_orders,
+            created_orders=created_orders,
+            created_at=created_at
         )

@@ -34,13 +34,14 @@ class SQLPosition(SQLBaseModel, Position, SQLAlchemyModelExtension):
         self,
         symbol,
         amount=0,
-        portfolio_id=None
+        cost=0,
+        portfolio_id=None,
     ):
         super(SQLPosition, self).__init__()
         self.symbol = symbol
         self.amount = parse_decimal_to_string(amount)
         self.portfolio_id = portfolio_id
-        self.cost = 0
+        self.cost = cost
 
     @validates('id', 'symbol')
     def _write_once(self, key, value):

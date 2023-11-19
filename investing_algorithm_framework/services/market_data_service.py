@@ -1,5 +1,5 @@
 from investing_algorithm_framework.domain import TradingDataType, \
-    OperationalException, TradingTimeFrame, DATETIME_FORMAT
+    OperationalException, TradingTimeFrame, DATETIME_FORMAT, StrategyProfile
 from datetime import datetime, timedelta
 
 
@@ -8,12 +8,13 @@ class MarketDataService:
     def __init__(self, market_service):
         self.market_service = market_service
 
-    def get_data_for_backtest(self, backtest_profile):
-        self.market_service.market = backtest_profile.market
+    def get_data_for_backtest(self, to_timestamp, strategy_profile: StrategyProfile):
+        self.market_service.market = strategy_profile.market
         return {"ohlcvs": self.market_service.get_ohclvs(
-            backtest_profile.symbols,
-            time_frame=backtest_profile.trading_time_frame,
-            from_timestamp=backtest_profile.backtest_start_date_data
+            strategy_profile.symbols,
+            time_frame=strategy_profile.trading_time_frame,
+            from_timestamp=strategy_profile.backtest_start_date_data,
+            to_timestamp=to_timestamp
         )}
 
     def get_data_for_strategy(self, strategy, start_date=None, end_date=None):

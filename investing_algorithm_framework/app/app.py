@@ -15,7 +15,8 @@ from investing_algorithm_framework.app.task import Task
 from investing_algorithm_framework.app.web import create_flask_app
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
-    SQLALCHEMY_DATABASE_URI, Config, OperationalException, PortfolioConfiguration
+    SQLALCHEMY_DATABASE_URI, OperationalException, PortfolioConfiguration, \
+    BACKTESTING_FLAG, BACKTESTING_START_DATE
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, MarketBacktestService
 from investing_algorithm_framework.services import OrderBacktestService
@@ -25,16 +26,19 @@ logger = logging.getLogger("investing_algorithm_framework")
 
 class App:
 
-    def __init__(self, config=None, stateless=False, web=False):
+    def __init__(self, stateless=False, web=False):
         self._flask_app: Flask = None
         self.container = None
-        self.config = Config.from_dict(config)
         self._stateless = stateless
         self._web = web
         self.algorithm: Algorithm = None
         self._started = False
         self._strategies = []
         self._tasks = []
+
+    def set_config(self, config: dict):
+        configuration_service = self.container.configuration_service()
+        configuration_service.set_config(config)
 
     def initialize(self, backtest=False):
 
@@ -141,13 +145,13 @@ class App:
 
     @property
     def config(self):
-        return self._config
+        configuration_service = self.container.configuration_service()
+        return configuration_service.config
 
     @config.setter
-    def config(self, config):
-
-        if config is not None:
-            self._config = config
+    def config(self, config: dict):
+        configuration_service = self.container.configuration_service()
+        configuration_service.initialize_from_dict(config)
 
     def reset(self):
         self._started = False
@@ -292,8 +296,8 @@ class App:
         portfolio_configuration_service = self.container\
             .portfolio_configuration_service()
         market_service = self.container.market_service()
-        portfolio_repository = self.container.portfolio_repository()
-        position_repository = self.container.position_repository()
+        portfolio_service = self.container.portfolio_service()
+        configuration_service = self.container.configuration_service()
 
         for portfolio_configuration in \
                 portfolio_configuration_service.get_all():
@@ -304,12 +308,13 @@ class App:
                     "identifier": portfolio_configuration.identifier,
                     "trading_symbol": portfolio_configuration.trading_symbol,
                     "market": portfolio_configuration.market,
+                    "created_at":
+                        configuration_service.config[BACKTESTING_START_DATE]
                 }
-                unallocated = portfolio_configuration.max_unallocated
             else:
                 market_service.initialize(portfolio_configuration)
 
-                if portfolio_repository.exists(
+                if portfolio_service.exists(
                     {"identifier": portfolio_configuration.identifier}
                 ):
                     continue
@@ -326,7 +331,6 @@ class App:
                     balances[portfolio_configuration.trading_symbol.upper()]
                     ["free"]
                 )
-
                 creation_data = {
                     "unallocated": unallocated,
                     "identifier": portfolio_configuration.identifier,
@@ -334,44 +338,40 @@ class App:
                     "market": portfolio_configuration.market,
                 }
 
-            portfolio_repository.create(creation_data)
-            portfolio = portfolio_repository.find(
+            portfolio_service.create(creation_data)
+            portfolio = portfolio_service.find(
                 {"identifier": portfolio_configuration.identifier}
-            )
-            portfolio = position_repository.create(
-                {
-                    "symbol": portfolio_configuration.trading_symbol,
-                    "amount": unallocated,
-                    "portfolio_id": portfolio.id
-                }
             )
             logger.info(f"Created portfolio {portfolio}")
 
     def _initialize_web(self):
-        resource_dir = self._config[RESOURCE_DIRECTORY]
+        configuration_service = self.container.configuration_service()
+        resource_dir = configuration_service.config[RESOURCE_DIRECTORY]
 
         if resource_dir is None:
-            self._config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
+            configuration_service.config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
         else:
             resource_dir = self._create_resource_directory_if_not_exists()
-            self._config[DATABASE_DIRECTORY_PATH] = os.path.join(
+            configuration_service.config[DATABASE_DIRECTORY_PATH] = os.path.join(
                 resource_dir, "databases"
             )
-            self._config[DATABASE_NAME] = "prod-database.sqlite3"
-            self._config[SQLALCHEMY_DATABASE_URI] = \
+            configuration_service.config[DATABASE_NAME] = "prod-database.sqlite3"
+            configuration_service.config[SQLALCHEMY_DATABASE_URI] = \
                 "sqlite:///" + os.path.join(
-                    self._config[DATABASE_DIRECTORY_PATH],
-                    self._config[DATABASE_NAME]
+                    configuration_service.config[DATABASE_DIRECTORY_PATH],
+                    configuration_service.config[DATABASE_NAME]
                 )
             self._create_database_if_not_exists()
 
-        self._flask_app = create_flask_app(self._config)
+        self._flask_app = create_flask_app(configuration_service.config)
 
     def _initialize_stateless(self):
-        self._config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
+        configuration_service = self.container.configuration_service()
+        configuration_service.config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
 
     def _initialize_standard(self, backtest=False):
-        resource_dir = self._config[RESOURCE_DIRECTORY]
+        configuration_service = self.container.configuration_service()
+        resource_dir = configuration_service.config[RESOURCE_DIRECTORY]
 
         if backtest:
 
@@ -382,45 +382,46 @@ class App:
                 )
 
             resource_dir = self._create_resource_directory_if_not_exists()
-            self._config[DATABASE_DIRECTORY_PATH] = os.path.join(
-                resource_dir, "databases"
-            )
-            self._config[DATABASE_NAME] = "backtest-database.sqlite3"
+            configuration_service.config[DATABASE_DIRECTORY_PATH] = \
+                os.path.join(resource_dir, "databases")
+            configuration_service.config[DATABASE_NAME] = "backtest-database.sqlite3"
             database_path = os.path.join(
-                self._config[DATABASE_DIRECTORY_PATH],
-                self._config[DATABASE_NAME]
+                configuration_service.config[DATABASE_DIRECTORY_PATH],
+                configuration_service.config[DATABASE_NAME]
             )
 
             if os.path.exists(database_path):
                 os.remove(database_path)
 
-            self._config[SQLALCHEMY_DATABASE_URI] = \
+            configuration_service.config[SQLALCHEMY_DATABASE_URI] = \
                 "sqlite:///" + os.path.join(
-                    self._config[DATABASE_DIRECTORY_PATH],
-                    self._config[DATABASE_NAME]
+                    configuration_service.config[DATABASE_DIRECTORY_PATH],
+                    configuration_service.config[DATABASE_NAME]
                 )
             self._create_database_if_not_exists()
         else:
             if resource_dir is None:
-                self._config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
+                configuration_service.config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
             else:
                 resource_dir = self._create_resource_directory_if_not_exists()
-                self._config[DATABASE_DIRECTORY_PATH] = os.path.join(
-                    resource_dir, "databases"
-                )
-                self._config[DATABASE_NAME] = "prod-database.sqlite3"
-                self._config[SQLALCHEMY_DATABASE_URI] = \
+                configuration_service.config[DATABASE_DIRECTORY_PATH] = \
+                    os.path.join(resource_dir, "databases")
+                configuration_service.config[DATABASE_NAME] \
+                    = "prod-database.sqlite3"
+                configuration_service.config[SQLALCHEMY_DATABASE_URI] = \
                     "sqlite:///" + os.path.join(
-                        self._config[DATABASE_DIRECTORY_PATH],
-                        self._config[DATABASE_NAME]
+                        configuration_service.config[DATABASE_DIRECTORY_PATH],
+                        configuration_service.config[DATABASE_NAME]
                     )
                 self._create_database_if_not_exists()
 
     def _create_resource_directory_if_not_exists(self):
+
         if self._stateless:
             return
 
-        resource_dir = self._config.get(RESOURCE_DIRECTORY, None)
+        configuration_service = self.container.configuration_service()
+        resource_dir = configuration_service.config.get(RESOURCE_DIRECTORY, None)
 
         if resource_dir is None:
             return
@@ -438,15 +439,18 @@ class App:
         return resource_dir
 
     def _create_database_if_not_exists(self):
+
         if self._stateless:
             return
 
-        database_dir = self._config.get(DATABASE_DIRECTORY_PATH, None)
+        configuration_service = self.container.configuration_service()
+        database_dir = configuration_service.config\
+            .get(DATABASE_DIRECTORY_PATH, None)
 
         if database_dir is None:
             return
 
-        database_name = self._config.get(DATABASE_NAME, None)
+        database_name = configuration_service.config.get(DATABASE_NAME, None)
 
         if database_name is None:
             return
@@ -468,6 +472,8 @@ class App:
 
     def backtest(self, start_date, end_date, unallocated=None, trading_symbol=None):
         logger.info("Running backtest")
+        configuration_service = self.container.configuration_service()
+        configuration_service.config[BACKTESTING_FLAG] = True
 
         # Add custom portfolio configuration
         # if trading symbol and unallocated are specified
@@ -486,9 +492,8 @@ class App:
                 backtest=True
             ))
 
+        configuration_service.config[BACKTESTING_START_DATE] = start_date
         self.initialize(backtest=True)
-        backtest_service = self.container.backtest_service()
-        backtest_service.resource_directory = self.config.get(RESOURCE_DIRECTORY)
 
         # Override some services with backtest variants
         self.container.market_service.override(MarketBacktestService())
@@ -497,8 +502,20 @@ class App:
             order_fee_repository=self.container.order_fee_repository(),
             market_service=self.container.market_service(),
             position_repository=self.container.position_repository(),
-            position_cost_repository=self.container.position_cost_repository(),
             portfolio_repository=self.container.portfolio_repository(),
-            portfolio_configuration_service=self.container.portfolio_configuration_service()
+            portfolio_configuration_service=self.container
+            .portfolio_configuration_service(),
+            portfolio_snapshot_service=self.container
+            .portfolio_snapshot_service(),
+            configuration_service=self.container.configuration_service(),
         ))
-        return backtest_service.backtest(self.algorithm, start_date, end_date)
+        backtest_service = self.container.backtest_service()
+        backtest_service.resource_directory = self.config.get(
+            RESOURCE_DIRECTORY
+        )
+        self.algorithm.order_service = self.container.order_service()
+        backtest_profile = backtest_service.backtest(
+            self.algorithm, start_date, end_date
+        )
+        configuration_service.config[BACKTESTING_FLAG] = False
+        return backtest_profile

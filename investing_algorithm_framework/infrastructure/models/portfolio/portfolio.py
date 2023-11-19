@@ -1,8 +1,9 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm import validates
 
+from datetime import datetime
 from investing_algorithm_framework.domain import Portfolio, \
     parse_decimal_to_string
 from investing_algorithm_framework.infrastructure.database import SQLBaseModel
@@ -29,6 +30,8 @@ class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
         lazy="dynamic",
         cascade="all,delete",
     )
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     __table_args__ = (
         UniqueConstraint(
             'trading_symbol',
@@ -45,20 +48,31 @@ class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
             raise ValueError("{} is write-once".format(key))
         return value
 
-    def __init__(self, trading_symbol, market, unallocated, identifier=None):
+    def __init__(
+        self,
+        trading_symbol,
+        market,
+        unallocated,
+        identifier=None,
+        created_at=None,
+    ):
 
         if identifier is None:
             identifier = market
+
+        if created_at is None:
+            created_at = datetime.utcnow()
 
         super().__init__(
             trading_symbol=trading_symbol,
             market=market,
             identifier=identifier,
-            net_size=str(unallocated),
-            unallocated=str(unallocated),
+            net_size=parse_decimal_to_string(unallocated),
+            unallocated=parse_decimal_to_string(unallocated),
             realized=0,
             total_revenue=0,
             total_cost=0,
+            created_at=created_at,
         )
 
     def update(self, data):
@@ -90,4 +104,5 @@ class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
                 data.pop("total_net_gain")
             )
 
+        super().update(data)
         return self

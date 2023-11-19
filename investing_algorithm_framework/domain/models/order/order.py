@@ -32,8 +32,8 @@ class Order(BaseModel):
         trade_closed_price=None,
         trade_closed_amount=None,
         external_id=None,
-        filled_amount=None,
-        remaining_amount=None,
+        filled=None,
+        remaining=None,
         cost=None,
         fee=None,
         position_id=None,
@@ -69,8 +69,8 @@ class Order(BaseModel):
         self.trade_closed_amount = trade_closed_amount
         self.created_at = created_at
         self.updated_at = updated_at
-        self.filled_amount = parse_decimal_to_string(filled_amount)
-        self.remaining_amount = parse_decimal_to_string(remaining_amount)
+        self.filled = parse_decimal_to_string(filled)
+        self.remaining = parse_decimal_to_string(remaining)
         self.cost = parse_decimal_to_string(cost)
         self.fee = fee
 
@@ -151,23 +151,23 @@ class Order(BaseModel):
 
     def get_filled(self):
 
-        if self.filled_amount is None:
+        if self.filled is None:
             return parse_string_to_decimal('0')
 
-        return parse_string_to_decimal(self.filled_amount)
+        return parse_string_to_decimal(self.filled)
 
-    def set_filled(self, filled_amount):
-        self.filled_amount = filled_amount
+    def set_filled(self, filled):
+        self.filled = filled
 
     def get_remaining(self):
 
-        if self.remaining_amount is None:
+        if self.remaining is None:
             return parse_string_to_decimal('0')
 
-        return parse_string_to_decimal(self.remaining_amount)
+        return parse_string_to_decimal(self.remaining)
 
-    def set_remaining(self, remaining_amount):
-        self.remaining_amount = remaining_amount
+    def set_remaining(self, remaining):
+        self.remaining = remaining
 
     def get_cost(self):
         return parse_string_to_decimal(self.cost)
@@ -196,8 +196,8 @@ class Order(BaseModel):
             "trade_closed_price": self.trade_closed_price,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
-            "filled_amount": self.filled_amount,
-            "remaining_amount": self.remaining_amount,
+            "filled": self.filled,
+            "remaing": self.remaing,
             "cost": self.cost,
             "fee": self.fee.to_dict() if self.fee is not None else None,
         }
@@ -217,44 +217,12 @@ class Order(BaseModel):
             status=status,
             order_type=ccxt_order.get("type", None),
             side=ccxt_order.get("side", None),
-            filled_amount=ccxt_order.get("filled", None),
-            remaining_amount=ccxt_order.get("remaining", None),
+            filled=ccxt_order.get("filled", None),
+            remaining=ccxt_order.get("remaining", None),
             cost=ccxt_order.get("cost", None),
             fee=OrderFee.from_ccxt_fee(ccxt_order.get("fee", None)),
             created_at=datetime.strptime(ccxt_order.get("datetime", None), "%Y-%m-%dT%H:%M:%S.%fZ")
         )
-
-    def update(self, data):
-
-        if 'amount' in data and data['amount'] is not None:
-            amount = data.pop('amount')
-            self.amount = parse_decimal_to_string(amount)
-
-        if 'price' in data and data['price'] is not None:
-            price = data.pop('price')
-            self.price = parse_decimal_to_string(price)
-
-        if 'filled' in data and data['filled'] is not None:
-            filled_amount = data.pop('filled')
-            self.filled_amount = parse_decimal_to_string(filled_amount)
-
-        if 'remaining' in data and data['remaining'] is not None:
-            remaining_amount = data.pop('remaining')
-            self.remaining_amount = parse_decimal_to_string(remaining_amount)
-
-        if 'net_gain' in data and data['net_gain'] is not None:
-            net_gain = data.pop('net_gain')
-            self.net_gain = parse_decimal_to_string(net_gain)
-
-        if 'trade_closed_price' in data and data['trade_closed_price'] is not None:
-            trade_closed_price = data.pop('trade_closed_price')
-            self.trade_closed_price = parse_decimal_to_string(trade_closed_price)
-
-        if 'trade_closed_amount' in data and data['trade_closed_amount'] is not None:
-            trade_closed_amount = data.pop('trade_closed_amount')
-            self.trade_closed_amount = parse_decimal_to_string(trade_closed_amount)
-
-        super().update(data)
 
     def __repr__(self):
 
@@ -274,7 +242,7 @@ class Order(BaseModel):
             trading_symbol=self.trading_symbol,
             side=self.side,
             order_type=self.order_type,
-            filled_amount=self.get_filled(),
-            remaining_amount=self.get_remaining(),
+            filled=self.get_filled(),
+            remaining=self.get_remaining(),
             cost=self.get_cost(),
         )

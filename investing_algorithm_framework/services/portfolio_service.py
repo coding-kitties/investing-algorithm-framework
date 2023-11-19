@@ -1,7 +1,9 @@
 import logging
+from datetime import datetime
+
+from investing_algorithm_framework.domain import OrderSide, OrderStatus
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
-
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -15,11 +17,13 @@ class PortfolioService(RepositoryService):
         order_service,
         portfolio_repository,
         portfolio_configuration_service,
+        portfolio_snapshot_service
     ):
         self.market_service = market_service
         self.position_repository = position_repository
         self.portfolio_configuration_service = portfolio_configuration_service
         self.order_service = order_service
+        self.portfolio_snapshot_service = portfolio_snapshot_service
         super(PortfolioService, self).__init__(portfolio_repository)
 
     def find(self, query_params):
@@ -31,15 +35,17 @@ class PortfolioService(RepositoryService):
 
     def create(self, data):
         unallocated = data.get("unallocated", 0)
-        del data["unallocated"]
         portfolio = super(PortfolioService, self).create(data)
         self.position_repository.create(
             {
                 "symbol": portfolio.get_trading_symbol(),
                 "amount": unallocated,
-                "portfolio_id": portfolio.id
+                "portfolio_id": portfolio.id,
+                "cost": unallocated
             }
         )
+        self.create_snapshot(portfolio.id, created_at=portfolio.created_at)
+        return portfolio
 
     def sync_portfolios(self):
 
@@ -137,3 +143,22 @@ class PortfolioService(RepositoryService):
                         self.order_service.create(
                             data, execute=False, validate=False, sync=False
                         )
+
+    def create_snapshot(self, portfolio_id, created_at=None):
+
+        if created_at is None:
+            created_at = datetime.utcnow()
+
+        portfolio = self.get(portfolio_id)
+        pending_orders = self.order_service.get_all(
+            {
+                "side": OrderSide.BUY.value,
+                "status": OrderStatus.OPEN.value,
+                "portfolio_id": portfolio.id
+            }
+        )
+        return self.portfolio_snapshot_service.create_snapshot(
+            portfolio,
+            pending_orders=pending_orders,
+            created_at=created_at
+        )
