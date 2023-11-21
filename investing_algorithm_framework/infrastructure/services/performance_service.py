@@ -104,7 +104,7 @@ class PerformanceService:
                 continue
 
             allocated += parse_string_to_decimal(position.amount)\
-                * Decimal(tickers[position.symbol].price)
+                * Decimal(tickers[position.symbol]["bid"])
 
         current_total_value = allocated + \
             parse_string_to_decimal(portfolio.unallocated)
@@ -124,7 +124,7 @@ class PerformanceService:
                 continue
 
             allocated += parse_string_to_decimal(position.amount)\
-                * Decimal(tickers[position.symbol].price)
+                * Decimal(tickers[position.symbol]["bid"])
 
         current_total_value = allocated + \
             parse_string_to_decimal(portfolio.unallocated)
@@ -148,6 +148,6 @@ class PerformanceService:
                 continue
 
             allocated += parse_string_to_decimal(position.amount)\
-                * Decimal(tickers[position.symbol].price)
+                * Decimal(tickers[position.symbol]["bid"])
 
         return allocated + parse_string_to_decimal(portfolio.unallocated)

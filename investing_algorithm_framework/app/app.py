@@ -5,6 +5,7 @@ import shutil
 import threading
 from distutils.sysconfig import get_python_lib
 from time import sleep
+from datetime import datetime
 
 from flask import Flask
 
@@ -16,9 +17,9 @@ from investing_algorithm_framework.app.web import create_flask_app
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
     SQLALCHEMY_DATABASE_URI, OperationalException, PortfolioConfiguration, \
-    BACKTESTING_FLAG, BACKTESTING_START_DATE
+    BACKTESTING_FLAG, BACKTESTING_START_DATE, BACKTEST_DATA_DIRECTORY_NAME
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
-    create_all_tables, MarketBacktestService
+    create_all_tables, MarketBacktestService, MarketService
 from investing_algorithm_framework.services import OrderBacktestService
 
 logger = logging.getLogger("investing_algorithm_framework")
@@ -38,7 +39,7 @@ class App:
 
     def set_config(self, config: dict):
         configuration_service = self.container.configuration_service()
-        configuration_service.set_config(config)
+        configuration_service.initialize_from_dict(config)
 
     def initialize(self, backtest=False):
 
@@ -384,7 +385,8 @@ class App:
             resource_dir = self._create_resource_directory_if_not_exists()
             configuration_service.config[DATABASE_DIRECTORY_PATH] = \
                 os.path.join(resource_dir, "databases")
-            configuration_service.config[DATABASE_NAME] = "backtest-database.sqlite3"
+            configuration_service.config[DATABASE_NAME] = \
+                "backtest-database.sqlite3"
             database_path = os.path.join(
                 configuration_service.config[DATABASE_DIRECTORY_PATH],
                 configuration_service.config[DATABASE_NAME]
@@ -470,7 +472,9 @@ class App:
     def get_portfolio_configurations(self):
         return self.algorithm.get_portfolio_configurations()
 
-    def backtest(self, start_date, end_date, unallocated=None, trading_symbol=None):
+    def backtest(
+        self, start_date, end_date, unallocated=None, trading_symbol=None
+    ):
         logger.info("Running backtest")
         configuration_service = self.container.configuration_service()
         configuration_service.config[BACKTESTING_FLAG] = True
@@ -496,7 +500,13 @@ class App:
         self.initialize(backtest=True)
 
         # Override some services with backtest variants
-        self.container.market_service.override(MarketBacktestService())
+        self.container.market_service.override(MarketBacktestService(
+            os.path.join(
+                self.config.get(RESOURCE_DIRECTORY),
+                self.config.get(BACKTEST_DATA_DIRECTORY_NAME)
+            ),
+            self.container.configuration_service(),
+        ))
         self.container.order_service.override(OrderBacktestService(
             order_repository=self.container.order_repository(),
             order_fee_repository=self.container.order_fee_repository(),
@@ -514,8 +524,22 @@ class App:
             RESOURCE_DIRECTORY
         )
         self.algorithm.order_service = self.container.order_service()
+        self.algorithm.market_service = self.container.market_service()
         backtest_profile = backtest_service.backtest(
             self.algorithm, start_date, end_date
         )
         configuration_service.config[BACKTESTING_FLAG] = False
         return backtest_profile
+
+    def get_ohclv(
+        self,
+        market,
+        symbol,
+        time_frame,
+        from_timestamp,
+        to_timestamp=datetime.utcnow()
+    ):
+        market_service: MarketService = self.container.market_service()
+        market_service.market = market
+        return market_service\
+            .get_ohclv(symbol, time_frame, from_timestamp, to_timestamp)

@@ -54,18 +54,20 @@ class OrderBacktestService(OrderService):
             if symbol in ohlcvs:
                 data_slice = [
                     ohclv for ohclv in ohlcvs[symbol]
-                    if datetime.strptime(ohclv[0], DATETIME_FORMAT)
-                    >= order.created_at
+                    if ohclv[0] >= order.get_created_at()
                 ]
 
                 if self.has_executed(order, data_slice):
+                    print(f"Order {order.id} has executed")
+                    print(f"Order amount {order.get_amount()}")
                     self.update(
                         order.id,
                         {
                             "status": OrderStatus.CLOSED.value,
-                            "filled": order.amount,
+                            "filled": order.get_amount(),
                             "remaining": 0,
-                            "updated_at": self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+                            "updated_at": self.configuration_service
+                            .config[BACKTESTING_INDEX_DATETIME]
                         }
                     )
 
@@ -104,7 +106,7 @@ class OrderBacktestService(OrderService):
             else:
                 highest_price = max(highest_price, ohclv[2])
 
-        if order.price <= highest_price and order.price >= lowest_price:
+        if highest_price >= order.get_price() >= lowest_price:
             return True
 
         return False

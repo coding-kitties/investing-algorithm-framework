@@ -1,12 +1,10 @@
-import csv
 import os
 from datetime import datetime, timedelta
 from math import floor
 
 from investing_algorithm_framework.domain import BacktestProfile, \
-    DATETIME_FORMAT_BACKTESTING, DATETIME_FORMAT, BACKTESTING_INDEX_DATETIME, \
-    StrategyProfile, OperationalException, Ticker, BacktestPosition, \
-    parse_string_to_decimal
+    BACKTESTING_INDEX_DATETIME, \
+    StrategyProfile, BacktestPosition, parse_string_to_decimal
 
 
 class BackTestService:
@@ -14,6 +12,7 @@ class BackTestService:
     def __init__(
         self,
         market_data_service,
+        market_service,
         order_service,
         portfolio_repository,
         position_repository,
@@ -26,6 +25,7 @@ class BackTestService:
         self._data_index = {"OHCLV": {}, "TICKER": {}}
         self._performance_service = performance_service
         self._position_repository = position_repository
+        self._market_service = market_service
 
     @property
     def resource_directory(self):
@@ -34,33 +34,6 @@ class BackTestService:
     @resource_directory.setter
     def resource_directory(self, resource_directory):
         self._resource_directory = resource_directory
-
-    def create_backtest_data_file(
-        self,
-        backtest_profile: BacktestProfile,
-        strategy_profile: StrategyProfile,
-        symbol
-    ):
-        data_dir = os.path.join(self.resource_directory, "backtest_data")
-
-        if not os.path.isdir(data_dir):
-            os.mkdir(data_dir)
-
-        symbol_string = symbol.replace("/", "-")
-        time_frame_string = strategy_profile.trading_time_frame\
-            .value.replace("_", "")
-
-        return os.path.join(
-            self.resource_directory,
-            os.path.join(
-                "backtest_data",
-                f"OHCLV_"
-                f"{symbol_string}_"
-                f"{time_frame_string}_"
-                f"{strategy_profile.backtest_start_date_data.strftime(DATETIME_FORMAT_BACKTESTING)}_"
-                f"{backtest_profile.backtest_end_date.strftime(DATETIME_FORMAT_BACKTESTING)}.csv"
-            )
-        )
 
     def backtest(self, algorithm, start_date=None, end_date=None):
         strategy_profiles = []
@@ -76,9 +49,11 @@ class BackTestService:
         backtest_profile = self.create_backtest_profile(
             start_date=start_date, end_date=end_date
         )
+        self._market_service.create_backtest_data(
+            backtest_profile, strategy_profiles,
+        )
 
         for strategy_profile in strategy_profiles:
-            self._create_test_data(backtest_profile, strategy_profile)
             self.run_backtest_for_profile(
                 backtest_profile,
                 strategy_profile,
@@ -111,9 +86,8 @@ class BackTestService:
         for position in positions:
 
             if position.symbol != portfolio.trading_symbol:
-                tickers[position.symbol] = self.get_ticker(
-                    f"{position.symbol}/{portfolio.trading_symbol}",
-                    backtest_profile.backtest_end_date
+                tickers[position.symbol] = self._market_service.get_ticker(
+                    f"{position.symbol}/{portfolio.trading_symbol}"
                 )
 
         backtest_profile.growth_rate = self._performance_service\
@@ -139,11 +113,10 @@ class BackTestService:
                 backtest_position.price = 1
             else:
                 backtest_position = BacktestPosition(position)
-                ticker = self.get_ticker(
-                    f"{position.symbol}/{portfolio.trading_symbol}",
-                    backtest_profile.backtest_end_date
+                ticker = self._market_service.get_ticker(
+                    f"{position.symbol}/{portfolio.trading_symbol}"
                 )
-                backtest_position.price = ticker.price
+                backtest_position.price = ticker["bid"]
             backtest_positions.append(backtest_position)
         backtest_profile.positions = backtest_positions
         return backtest_profile
@@ -169,8 +142,9 @@ class BackTestService:
 
                     for symbol in strategy_profile.symbols:
                         data["ohlcvs"][symbol] = \
-                            self.get_ohclv(
+                            self._market_service.get_ohclv(
                                 symbol,
+                                strategy_profile.trading_time_frame,
                                 strategy_profile.backtest_data_index_date,
                                 backtest_profile.backtest_index_date
                             )
@@ -185,8 +159,9 @@ class BackTestService:
 
                     for symbol in backtest_profile.symbols:
                         data["ohlcvs"][symbol] = \
-                            self.get_ohclv(
+                            self._market_service.get_ohclv(
                                 symbol,
+                                strategy_profile.trading_time_frame,
                                 strategy_profile.backtest_data_index_date,
                                 backtest_profile.backtest_index_date
                             )
@@ -207,35 +182,6 @@ class BackTestService:
         backtest_profile.number_of_orders += len(algorithm.get_orders())
         backtest_profile.number_of_positions += len(algorithm.get_positions())
 
-    def _create_test_data(
-        self,
-        backtest_profile: BacktestProfile,
-        strategy_profile: StrategyProfile
-    ):
-        data = self._market_data_service\
-            .get_data_for_backtest(
-                backtest_profile.backtest_end_date, strategy_profile
-            )
-
-        for symbol in strategy_profile.symbols:
-            data_file = self.create_backtest_data_file(
-                backtest_profile, strategy_profile, symbol
-            )
-
-            if not os.path.exists(data_file):
-                # Create the source data file if it does not exist
-                with open(data_file, "w") as file:
-                    column_headers = [
-                        "Datetime", "Open", "High", "low", "Close", "Volume"
-                    ]
-                    writer = csv.writer(file)
-                    writer.writerow(column_headers)
-                    symbol_data = data["ohlcvs"][symbol]
-                    rows = symbol_data.to_array()
-                    writer.writerows(rows)
-
-            self.index_data()
-
     def create_backtest_profile(self, start_date, end_date):
         portfolio = self._portfolio_repository.find(
             {"identifier": "backtest"}
@@ -249,16 +195,7 @@ class BackTestService:
         )
 
     def create_strategy_profile(self, strategy, backtest_start_date):
-        strategy_profile = StrategyProfile(
-            strategy_id=strategy.worker_id,
-            interval=strategy.interval,
-            time_unit=strategy.time_unit,
-            symbols=strategy.symbols,
-            market=strategy.market,
-            trading_time_frame=strategy.trading_time_frame,
-            trading_time_frame_start_date=strategy
-            .trading_time_frame_start_date,
-        )
+        strategy_profile = strategy.profile
 
         # Calculating the backtest data start date
         difference = datetime.utcnow() - strategy_profile \
@@ -277,120 +214,6 @@ class BackTestService:
             strategy_profile.backtest_start_date_data
         return strategy_profile
 
-    def _get_data(
-        self,
-        symbol,
-        backtest_profile: BacktestProfile,
-        strategy_profile: StrategyProfile
-    ):
-        matching_rows = []
-        data_file = self.create_backtest_data_file(
-            backtest_profile, strategy_profile, symbol
-        )
-
-        with open(data_file, 'r') as file:
-            reader = csv.reader(file)
-            next(reader)  # Skip the header row
-
-            for row in reader:
-                row_date = datetime.strptime(row[0], DATETIME_FORMAT)
-
-                if strategy_profile.backtest_data_index_date \
-                        <= row_date <= backtest_profile.backtest_index_date:
-                    matching_rows.append(row)
-
-        return matching_rows
-
-    def get_ohclv(self, symbol, start_date, end_date):
-        matching_rows = []
-        matching_file = None
-        symbol_string = symbol.replace("/", "-")
-        self._data_index["OHCLV"][symbol_string]["files"].sort()
-
-        for file in self._data_index["OHCLV"][symbol_string]["files"]:
-            start_date_file = datetime.strptime(
-                file.split("_")[3], DATETIME_FORMAT_BACKTESTING
-            )
-            end_date_file = datetime.strptime(
-                file.split("_")[4].split(".")[0], DATETIME_FORMAT_BACKTESTING
-            )
-
-            if start_date_file <= start_date and end_date <= end_date_file:
-                matching_file = file
-
-        if matching_file is None:
-            raise OperationalException(
-                f"No backtest data found for symbol "
-                f"{symbol} between {start_date} and {end_date}"
-            )
-
-        with open(os.path.join(self.resource_directory, "backtest_data", matching_file), 'r') as file:
-            reader = csv.reader(file)
-            next(reader)  # Skip the header row
-
-            for row in reader:
-                row_date = datetime.strptime(row[0], DATETIME_FORMAT)
-
-                if start_date <= row_date <= end_date:
-                    matching_rows.append(row)
-
-        return matching_rows
-
-    def get_ticker(self, symbol, date_time):
-        matching_file = None
-        match = None
-        symbol_string = symbol.replace("/", "-")
-        self._data_index["OHCLV"][symbol_string]["files"].sort()
-
-        for file in self._data_index["OHCLV"][symbol_string]["files"]:
-            start_date_file = datetime.strptime(
-                file.split("_")[3], DATETIME_FORMAT_BACKTESTING
-            )
-            end_date_file = datetime.strptime(
-                file.split("_")[4].split(".")[0], DATETIME_FORMAT_BACKTESTING
-            )
-
-            if start_date_file <= date_time <= end_date_file:
-                matching_file = file
-
-        if matching_file is None:
-            raise OperationalException(
-                f"No backtest data found for symbol {symbol} on {date_time}"
-            )
-
-        with open(os.path.join(self.resource_directory, "backtest_data", matching_file), 'r') as file:
-            reader = csv.reader(file)
-            next(reader)  # Skip the header row
-            last_row = None
-
-            for row in reader:
-                row_date = datetime.strptime(row[0], DATETIME_FORMAT)
-
-                if row_date > date_time:
-                    match = last_row
-                    break
-
-                last_row = row
-
-        if last_row is not None and match is None:
-            match = last_row
-
-        if match is None:
-            raise OperationalException(
-                f"No backtest data found for symbol {symbol} on {date_time}"
-            )
-
-        return Ticker.from_dict({
-            "symbol": symbol,
-            "price": match[4],
-            "ask_price": match[4],
-            "ask_volume": match[4],
-            "bid_price": match[4],
-            "bid_volume": match[5],
-            "high_price": match[2],
-            "low_price": match[3]
-        })
-
     def index_data(self):
         data_dir = os.path.join(self.resource_directory, "backtest_data")
 
@@ -403,13 +226,3 @@ class BackTestService:
                 self._data_index[data_type][symbol]["files"].append(file)
             else:
                 self._data_index[data_type][symbol]["files"] = [file]
-
-    def _get_last_row(self, file):
-        with open(file, 'r') as csv_file:
-            # Create a CSV reader object
-            csv_reader = csv.reader(csv_file)
-
-            # Convert the CSV reader object to a list and get the last row
-            rows = list(csv_reader)
-            last_row = rows[-1]
-            return last_row

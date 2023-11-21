@@ -11,7 +11,18 @@ class OHLCV:
         self.symbol = symbol
         self.target_symbol = symbol.split("/")[0]
         self.trading_symbol = symbol.split("/")[1]
-        self.data = data
+        self.data = []
+        for row in data:
+            self.data.append(
+                [
+                    row[0],
+                    float(row[1]),
+                    float(row[2]),
+                    float(row[3]),
+                    float(row[4]),
+                    float(row[5])
+                ]
+            )
 
     def get_symbol(self):
         return self.symbol
@@ -47,7 +58,7 @@ class OHLCV:
 
         for row in self.get_data():
             datetime_object = datetime.strptime(
-                row[0], "%Y-%m-%dT%H:%M:%S.%fZ"
+                row[0], DATETIME_FORMAT
             )
             rows.append([
                 datetime_object.strftime(date_format),

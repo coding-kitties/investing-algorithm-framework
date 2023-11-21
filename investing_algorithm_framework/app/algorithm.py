@@ -1,10 +1,12 @@
+import decimal
 import logging
 from decimal import Decimal
 from typing import List
 
 from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
     Position, Order, Portfolio, OrderType, OrderSide, ApiException, \
-    parse_decimal_to_string, BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME
+    parse_decimal_to_string, BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, \
+    parse_string_to_decimal
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -104,8 +106,10 @@ class Algorithm:
                     "Percentage of portfolio is only supported for BUY orders."
                 )
 
-            size = float(portfolio.net_size) * (percentage_of_portfolio / 100)
-            amount = size / price
+            percentage_of_portfolio = Decimal(percentage_of_portfolio)
+            net_size = parse_string_to_decimal(portfolio.net_size)
+            size = net_size * percentage_of_portfolio / Decimal('100')
+            amount = size / Decimal(price)
 
         elif percentage_of_position is not None:
 
@@ -424,6 +428,7 @@ class Algorithm:
         ticker = self.market_service.get_ticker(
             symbol=f"{symbol.upper()}/{portfolio.trading_symbol.upper()}"
         )
+
         self.create_limit_order(
             target_symbol=position.symbol,
             amount=position.get_amount(),

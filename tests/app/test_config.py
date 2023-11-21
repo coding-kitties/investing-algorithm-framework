@@ -1,4 +1,5 @@
 from investing_algorithm_framework import create_app
+from investing_algorithm_framework.domain import BACKTEST_DATA_DIRECTORY_NAME
 from tests.resources import random_string, TestBase
 
 TEST_VALUE = random_string(10)
@@ -19,6 +20,7 @@ class TestConfig(TestBase):
         )
         self.assertIsNotNone(app.config)
         self.assertIsNotNone(app.config.get(self.ATTRIBUTE_ONE))
+        self.assertIsNotNone(app.config.get(BACKTEST_DATA_DIRECTORY_NAME))
 
     def test_set_item(self):
         app = create_app(

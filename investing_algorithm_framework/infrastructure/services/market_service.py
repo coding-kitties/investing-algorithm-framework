@@ -5,7 +5,7 @@ from time import sleep
 import ccxt
 
 from investing_algorithm_framework.domain import OperationalException, \
-    OHLCV, AssetPrice, Order
+    OHLCV, AssetPrice, Order, CCXT_DATETIME_FORMAT
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -348,16 +348,15 @@ class MarketService:
             )
 
         time_stamp = self.exchange.parse8601(
-            from_timestamp.strftime(":%Y-%m-%d %H:%M:%S")
+            from_timestamp.strftime(CCXT_DATETIME_FORMAT)
         )
 
         if to_timestamp is None:
             to_timestamp = self.exchange.milliseconds()
         else:
             to_timestamp = self.exchange.parse8601(
-                to_timestamp.strftime(":%Y-%m-%d %H:%M:%S")
+                to_timestamp.strftime(CCXT_DATETIME_FORMAT)
             )
-
         data = []
 
         while time_stamp < to_timestamp:
@@ -374,12 +373,20 @@ class MarketService:
             else:
                 time_stamp = to_timestamp
 
-            ohlcv = [[self.exchange.iso8601(candle[0])]
-                     + candle[1:] for candle in ohlcv]
-            data += ohlcv
+            for candle in ohlcv:
+                datetime_stamp = datetime.strptime(
+                    self.exchange.iso8601(candle[0]), CCXT_DATETIME_FORMAT
+                )
+                to_timestamp_datetime = datetime.strptime(
+                    self.exchange.iso8601(to_timestamp), CCXT_DATETIME_FORMAT
+                )
+
+                if datetime_stamp < to_timestamp_datetime:
+                    data.append([datetime_stamp] + candle[1:])
+
             sleep(self.exchange.rateLimit / 1000)
 
-        return OHLCV.from_dict({"symbol": symbol, "data": data})
+        return data
 
     def get_ohclvs(
         self,

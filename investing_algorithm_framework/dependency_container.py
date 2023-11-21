@@ -92,6 +92,7 @@ class DependencyContainer(containers.DeclarativeContainer):
     backtest_service = providers.Factory(
         BackTestService,
         market_data_service=market_data_service,
+        market_service=market_service,
         order_service=order_service,
         portfolio_repository=portfolio_repository,
         performance_service=performance_service,

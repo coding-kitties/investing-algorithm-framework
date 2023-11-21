@@ -1,6 +1,6 @@
 from typing import List
 from investing_algorithm_framework.domain import \
-    TimeUnit, TradingTimeFrame, TradingDataType
+    TimeUnit, TradingTimeFrame, TradingDataType, StrategyProfile
 
 
 class TradingStrategy:
@@ -86,21 +86,15 @@ class TradingStrategy:
             raise NotImplementedError("Apply strategy is not implemented")
 
     @property
-    def trade_profile(self):
-        trading_data_types = []
-
-        if self.trading_data_type is not None:
-            trading_data_types.append(self.trading_data_type)
-
-        if self.trading_data_types is not None:
-            trading_data_types.extend(self.trading_data_types)
-
-        return {
-            "time_unit": self.time_unit,
-            "interval": self.interval,
-            "market": self.market,
-            "symbols": self.symbols,
-            "trading_data_types": trading_data_types,
-            "trading_time_frame": self.trading_time_frame,
-            "trading_time_frame_start_date": self.trading_time_frame_start_date,
-        }
+    def profile(self):
+        return StrategyProfile(
+            strategy_id=self.worker_id,
+            interval=self.interval,
+            time_unit=self.time_unit,
+            trading_time_frame=self.trading_time_frame,
+            trading_time_frame_start_date=self.trading_time_frame_start_date,
+            symbols=self.symbols,
+            market=self.market,
+            trading_data_type=self.trading_data_type,
+            trading_data_types=self.trading_data_types,
+        )

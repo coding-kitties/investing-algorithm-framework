@@ -370,6 +370,11 @@ class OrderService(RepositoryService):
 
     def _sync_portfolio_with_created_sell_order(self, order):
         position = self.position_repository.get(order.position_id)
+        print("Sell order created")
+        print(position.get_amount())
+        print(order.get_amount())
+
+        print(position.get_amount() - order.get_amount())
         self.position_repository.update(
             position.id,
             {
@@ -428,6 +433,9 @@ class OrderService(RepositoryService):
         if filled_difference <= 0:
             return
 
+        print("Syncing with sell order filled")
+        print(filled_difference)
+        print(filled_size)
         # Get position
         position = self.position_repository.get(current_order.position_id)
 
@@ -660,7 +668,8 @@ class OrderService(RepositoryService):
                 to_be_closed = available_to_close
                 remaining = amount_to_close - to_be_closed
                 cost = buy_order.get_price() * to_be_closed
-                net_gain = (sell_order.get_price() - buy_order.get_price()) * to_be_closed
+                net_gain = (sell_order.get_price() - buy_order.get_price()) \
+                           * to_be_closed
                 amount_to_close = remaining
                 self.order_repository.update(
                     buy_order.id,
@@ -673,7 +682,8 @@ class OrderService(RepositoryService):
                 )
             else:
                 to_be_closed = amount_to_close
-                net_gain = (sell_order.get_price() - buy_order.get_price()) * to_be_closed
+                net_gain = (sell_order.get_price() - buy_order.get_price()) \
+                           * to_be_closed
                 cost = buy_order.get_price() * amount_to_close
                 self.order_repository.update(
                     buy_order.id,
