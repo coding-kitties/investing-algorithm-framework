@@ -1,8 +1,7 @@
 import logging
-from datetime import datetime
 
 from investing_algorithm_framework.domain import BACKTESTING_INDEX_DATETIME, \
-    OrderStatus, DATETIME_FORMAT
+    OrderStatus
 from .order_service import OrderService
 
 logger = logging.getLogger("investing_algorithm_framework")
@@ -38,7 +37,8 @@ class OrderBacktestService(OrderService):
             {
                 "status": OrderStatus.OPEN.value,
                 "remaining": order.remaining,
-                "updated_at": self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+                "updated_at": self.configuration_service
+                .config[BACKTESTING_INDEX_DATETIME]
             }
         )
         return order
@@ -58,8 +58,6 @@ class OrderBacktestService(OrderService):
                 ]
 
                 if self.has_executed(order, data_slice):
-                    print(f"Order {order.id} has executed")
-                    print(f"Order amount {order.get_amount()}")
                     self.update(
                         order.id,
                         {

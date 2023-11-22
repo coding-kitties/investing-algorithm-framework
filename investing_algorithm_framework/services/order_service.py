@@ -62,7 +62,7 @@ class OrderService(RepositoryService):
             self.order_fee_repository.create(order_fee)
 
         if sync:
-            if OrderSide.BUY.equals(order.get_side()):
+            if OrderSide.BUY.equals(order.get_order_side()):
                 self._sync_portfolio_with_created_buy_order(order)
             else:
                 self._sync_portfolio_with_created_sell_order(order)
@@ -106,7 +106,7 @@ class OrderService(RepositoryService):
 
         if filled_difference:
 
-            if OrderSide.BUY.equals(new_order.get_side()):
+            if OrderSide.BUY.equals(new_order.get_order_side()):
                 self._sync_with_buy_order_filled(previous_order, new_order)
             else:
                 self._sync_with_sell_order_filled(previous_order, new_order)
@@ -115,21 +115,21 @@ class OrderService(RepositoryService):
 
             if OrderStatus.CANCELED.equals(new_order.get_status()):
 
-                if OrderSide.BUY.equals(new_order.get_side()):
+                if OrderSide.BUY.equals(new_order.get_order_side()):
                     self._sync_with_buy_order_cancelled(new_order)
                 else:
                     self._sync_with_sell_order_cancelled(new_order)
 
             if OrderStatus.EXPIRED.equals(new_order.get_status()):
 
-                if OrderSide.BUY.equals(new_order.get_side()):
+                if OrderSide.BUY.equals(new_order.get_order_side()):
                     self._sync_with_buy_order_expired(new_order)
                 else:
                     self._sync_with_sell_order_expired(new_order)
 
             if OrderStatus.REJECTED.equals(new_order.get_status()):
 
-                if OrderSide.BUY.equals(new_order.get_side()):
+                if OrderSide.BUY.equals(new_order.get_order_side()):
                     self._sync_with_buy_order_rejected(new_order)
                 else:
                     self._sync_with_sell_order_expired(new_order)
@@ -152,28 +152,28 @@ class OrderService(RepositoryService):
         try:
             if OrderType.LIMIT.equals(order.get_order_type()):
 
-                if OrderSide.BUY.equals(order.get_side()):
-                    executed_order = self.market_service.create_limit_buy_order(
+                if OrderSide.BUY.equals(order.get_order_side()):
+                     self.market_service.create_limit_buy_order(
                         target_symbol=order.get_target_symbol(),
                         trading_symbol=order.get_trading_symbol(),
-                        amount=parse_decimal_to_string(order.get_amount()),
-                        price=parse_decimal_to_string(order.get_price())
+                        amount=order.get_amount(),
+                        price=order.get_price()
                     )
                 else:
-                    executed_order = self.market_service.create_limit_sell_order(
+                     self.market_service.create_limit_sell_order(
                         target_symbol=order.get_target_symbol(),
                         trading_symbol=order.get_trading_symbol(),
-                        amount=parse_decimal_to_string(order.get_amount()),
-                        price=parse_decimal_to_string(order.get_price())
+                        amount=order.get_amount(),
+                        price=order.get_price()
                     )
             else:
-                if OrderSide.BUY.equals(order.get_side()):
+                if OrderSide.BUY.equals(order.get_order_side()):
                     raise OperationalException("Market buy order not supported")
                 else:
-                    executed_order = self.market_service.create_market_sell_order(
+                    self.market_service.create_market_sell_order(
                         target_symbol=order.get_target_symbol(),
                         trading_symbol=order.get_trading_symbol(),
-                        amount=parse_decimal_to_string(order.get_amount()),
+                        amount=order.get_amount(),
                     )
 
             order = self.update(
@@ -197,7 +197,7 @@ class OrderService(RepositoryService):
 
     def validate_order(self, order_data, portfolio):
 
-        if OrderSide.BUY.equals(order_data["side"]):
+        if OrderSide.BUY.equals(order_data["order_side"]):
             self.validate_buy_order(order_data, portfolio)
         else:
             self.validate_sell_order(order_data, portfolio)
@@ -226,7 +226,7 @@ class OrderService(RepositoryService):
                 }
             )
 
-        if position.get_amount() < parse_string_to_decimal(order_data["amount"]):
+        if position.get_amount() < order_data["amount"]:
             raise OperationalException(
                 "Order amount is larger then amount of open position"
             )
@@ -250,8 +250,8 @@ class OrderService(RepositoryService):
 
     def validate_limit_order(self, order_data, portfolio):
 
-        if OrderSide.SELL.equals(order_data["side"]):
-            amount = parse_string_to_decimal(order_data["amount"])
+        if OrderSide.SELL.equals(order_data["order_side"]):
+            amount = order_data["amount"]
             position = self.position_repository\
                 .find(
                     {
@@ -266,8 +266,7 @@ class OrderService(RepositoryService):
                     f"{position.symbol} of the portfolio"
                 )
         else:
-            total_price = parse_string_to_decimal(order_data["amount"]) \
-                          * parse_string_to_decimal(order_data["price"])
+            total_price = order_data["amount"] * order_data["price"]
             unallocated_position = self.position_repository\
                 .find(
                     {
@@ -286,7 +285,7 @@ class OrderService(RepositoryService):
 
     def validate_market_order(self, order_data, portfolio):
 
-        if OrderSide.BUY.equals(order_data["side"]):
+        if OrderSide.BUY.equals(order_data["order_side"]):
 
             if "amount" not in order_data:
                 raise OperationalException(
@@ -316,7 +315,7 @@ class OrderService(RepositoryService):
                     "Can't add market sell order to non existing position"
                 )
 
-            if parse_string_to_decimal(order_data['amount']) > position.get_amount():
+            if order_data['amount'] > position.get_amount():
                 raise OperationalException(
                     "Sell order amount larger then position size"
                 )
@@ -370,11 +369,6 @@ class OrderService(RepositoryService):
 
     def _sync_portfolio_with_created_sell_order(self, order):
         position = self.position_repository.get(order.position_id)
-        print("Sell order created")
-        print(position.get_amount())
-        print(order.get_amount())
-
-        print(position.get_amount() - order.get_amount())
         self.position_repository.update(
             position.id,
             {
@@ -433,9 +427,6 @@ class OrderService(RepositoryService):
         if filled_difference <= 0:
             return
 
-        print("Syncing with sell order filled")
-        print(filled_difference)
-        print(filled_size)
         # Get position
         position = self.position_repository.get(current_order.position_id)
 
@@ -644,9 +635,13 @@ class OrderService(RepositoryService):
             {
                 "position": sell_order.position_id,
                 "order_side": OrderSide.BUY.value,
-                "trade_closed_at": None
+                "status": OrderStatus.CLOSED.value
             }
         )
+        matching_buy_orders = [
+            buy_order for buy_order in matching_buy_orders
+            if buy_order.get_trade_closed_at() is None
+        ]
         order_queue = PriorityQueue()
 
         for order in matching_buy_orders:
@@ -675,7 +670,7 @@ class OrderService(RepositoryService):
                     buy_order.id,
                     {
                         "trade_closed_amount": buy_order.get_filled(),
-                        "trade_closed_at": datetime.utcnow(),
+                        "trade_closed_at": sell_order.get_updated_at(),
                         "trade_closed_price": sell_order.get_price(),
                         "net_gain": buy_order.get_net_gain() + net_gain
                     }
@@ -706,7 +701,8 @@ class OrderService(RepositoryService):
             portfolio.id,
             {
                 "total_net_gain": portfolio.get_total_net_gain() + total_net_gain,
-                "total_cost": portfolio.get_total_cost() - total_cost
+                "total_cost": portfolio.get_total_cost() - total_cost,
+                "net_size": portfolio.get_net_size() + total_net_gain
             }
         )
         # Update the position
@@ -723,7 +719,7 @@ class OrderService(RepositoryService):
             sell_order.id,
             {
                 "trade_closed_amount": sell_order.get_filled(),
-                "trade_closed_at": datetime.utcnow(),
+                "trade_closed_at": sell_order.get_updated_at(),
                 "trade_closed_price": sell_order.get_price(),
                 "net_gain": sell_order.get_net_gain() + total_net_gain
             }
@@ -737,14 +733,14 @@ class OrderService(RepositoryService):
         portfolio = self.portfolio_repository.get(portfolio_id)
         pending_orders = self.get_all(
             {
-                "side": OrderSide.BUY.value,
+                "order_side": OrderSide.BUY.value,
                 "status": OrderStatus.OPEN.value,
                 "portfolio_id": portfolio.id
             }
         )
         created_orders = self.get_all(
             {
-                "side": OrderSide.BUY.value,
+                "order_side": OrderSide.BUY.value,
                 "status": OrderStatus.CREATED.value,
                 "portfolio_id": portfolio.id
             }

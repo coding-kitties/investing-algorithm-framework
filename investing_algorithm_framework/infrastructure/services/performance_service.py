@@ -1,6 +1,4 @@
-from investing_algorithm_framework.domain import OrderStatus, OrderSide, \
-    parse_string_to_decimal
-from decimal import Decimal
+from investing_algorithm_framework.domain import OrderStatus, OrderSide
 
 
 class PerformanceService:
@@ -103,11 +101,9 @@ class PerformanceService:
             if position.symbol == portfolio.trading_symbol:
                 continue
 
-            allocated += parse_string_to_decimal(position.amount)\
-                * Decimal(tickers[position.symbol]["bid"])
+            allocated += position.amount * tickers[position.symbol]["bid"]
 
-        current_total_value = allocated + \
-            parse_string_to_decimal(portfolio.unallocated)
+        current_total_value = allocated + portfolio.unallocated
         gain = current_total_value - backtest_profile.initial_unallocated
         return gain / backtest_profile.initial_unallocated * 100
 
@@ -123,16 +119,14 @@ class PerformanceService:
             if position.symbol == portfolio.trading_symbol:
                 continue
 
-            allocated += parse_string_to_decimal(position.amount)\
-                * Decimal(tickers[position.symbol]["bid"])
+            allocated += position.amount * tickers[position.symbol]["bid"]
 
-        current_total_value = allocated + \
-            parse_string_to_decimal(portfolio.unallocated)
+        current_total_value = allocated + portfolio.unallocated
         return current_total_value - backtest_profile.initial_unallocated
 
     def get_total_net_gain_percentage_of_backtest(self, portfolio_id, backtest_profile):
         portfolio = self.portfolio_repository.find({"id": portfolio_id})
-        return parse_string_to_decimal(portfolio.total_net_gain) \
+        return portfolio.total_net_gain \
                / backtest_profile.initial_unallocated * 100
 
     def get_total_value(self, portfolio_id, tickers, backtest_profile):
@@ -147,7 +141,52 @@ class PerformanceService:
             if position.symbol == portfolio.trading_symbol:
                 continue
 
-            allocated += parse_string_to_decimal(position.amount)\
-                * Decimal(tickers[position.symbol]["bid"])
+            allocated += position.amount * tickers[position.symbol]["bid"]
 
-        return allocated + parse_string_to_decimal(portfolio.unallocated)
+        return allocated + portfolio.unallocated
+
+    def get_average_trade_duration(self, portfolio_id):
+        portfolio = self.portfolio_repository.find({"id": portfolio_id})
+        buy_orders = self.order_repository.get_all(
+            {
+                "portfolio_id": portfolio.id,
+                "order_side": OrderSide.BUY.value,
+            }
+        )
+        buy_orders_with_trade_closed = [
+            order for order in buy_orders if order.get_trade_closed_at() != None
+        ]
+
+        if len(buy_orders_with_trade_closed) == 0:
+            return 0
+
+        total_duration = 0
+
+        for order in buy_orders_with_trade_closed:
+            duration = order.get_trade_closed_at() - order.get_created_at()
+            total_duration += duration.total_seconds() / 3600
+
+        return total_duration / len(buy_orders_with_trade_closed)
+
+    def get_average_trade_size(self, portfolio_id):
+        portfolio = self.portfolio_repository.find({"id": portfolio_id})
+        buy_orders = self.order_repository.get_all(
+            {
+                "portfolio_id": portfolio.id,
+                "order_side": OrderSide.BUY.value,
+            }
+        )
+        closed_buy_orders = [
+            order for order in buy_orders
+            if order.get_trade_closed_at() != None
+        ]
+
+        if len(closed_buy_orders) == 0:
+            return 0
+
+        total_size = 0
+
+        for order in closed_buy_orders:
+            total_size += order.get_amount() * order.get_price()
+
+        return total_size / len(closed_buy_orders)

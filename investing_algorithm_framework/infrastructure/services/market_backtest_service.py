@@ -2,7 +2,6 @@ import csv
 import logging
 import os
 from datetime import datetime
-from typing import List
 
 from investing_algorithm_framework.domain import \
     DATETIME_FORMAT_BACKTESTING, DATETIME_FORMAT, BacktestProfile, \
@@ -24,6 +23,9 @@ class MarketBacktestService(MarketService):
         self._market = portfolio_configuration.market
 
     def write_ohlcv_to_file(self, data_file, data):
+
+        if not os.path.isdir(self._backtest_data_directory):
+            os.mkdir(self._backtest_data_directory)
 
         # Create the source data file if it does not exist
         with open(data_file, "w") as file:
@@ -70,63 +72,62 @@ class MarketBacktestService(MarketService):
     def create_backtest_data(
         self,
         backtest_profile: BacktestProfile,
-        strategy_profiles: List[StrategyProfile],
+        strategy_profile: StrategyProfile,
     ):
-        for strategy_profile in strategy_profiles:
 
-            for symbol in strategy_profile.symbols:
+        for symbol in strategy_profile.symbols:
 
-                if strategy_profile.trading_data_types is not None:
+            if strategy_profile.trading_data_types is not None:
 
-                    if TradingDataType.OHLCV in strategy_profile\
-                            .trading_data_types:
+                if TradingDataType.OHLCV in strategy_profile\
+                        .trading_data_types:
 
-                        if not self._backtest_data_exists(
+                    if not self._backtest_data_exists(
+                        backtest_profile,
+                        strategy_profile,
+                        TradingDataType.OHLCV,
+                        symbol
+                    ):
+                        self.market = strategy_profile.market
+                        data = super().get_ohclv(
+                            symbol,
+                            time_frame=strategy_profile.trading_time_frame,
+                            from_timestamp=strategy_profile
+                            .backtest_start_date_data,
+                            to_timestamp=backtest_profile.backtest_end_date
+                        )
+                        file = self.create_backtest_data_file_path(
                             backtest_profile,
                             strategy_profile,
-                            TradingDataType.OHLCV,
+                            symbol,
+                            TradingDataType.OHLCV
+                        )
+                        self.write_ohlcv_to_file(file, data)
+
+                if TradingDataType.TICKER in strategy_profile\
+                        .trading_data_types:
+
+                    if not self._backtest_data_exists(
+                            backtest_profile,
+                            strategy_profile,
+                            TradingDataType.TICKER,
                             symbol
-                        ):
-                            self.market = strategy_profile.market
-                            data = super().get_ohclv(
-                                symbol,
-                                time_frame=strategy_profile.trading_time_frame,
-                                from_timestamp=strategy_profile
-                                .backtest_start_date_data,
-                                to_timestamp=backtest_profile.backtest_end_date
-                            )
-                            file = self.create_backtest_data_file_path(
-                                backtest_profile,
-                                strategy_profile,
-                                symbol,
-                                TradingDataType.OHLCV
-                            )
-                            self.write_ohlcv_to_file(file, data)
-
-                    if TradingDataType.TICKER in strategy_profile\
-                            .trading_data_types:
-
-                        if not self._backtest_data_exists(
-                                backtest_profile,
-                                strategy_profile,
-                                TradingDataType.TICKER,
-                                symbol
-                        ):
-                            self.market = strategy_profile.market
-                            data = super().get_ohclv(
-                                symbol,
-                                time_frame=strategy_profile.trading_time_frame,
-                                from_timestamp=strategy_profile
-                                .backtest_start_date_data,
-                                to_timestamp=backtest_profile.backtest_end_date
-                            )
-                            file = self.create_backtest_data_file_path(
-                                backtest_profile,
-                                strategy_profile,
-                                symbol,
-                                TradingDataType.TICKER
-                            )
-                            self.write_tickers_to_file(file, data)
+                    ):
+                        self.market = strategy_profile.market
+                        data = super().get_ohclv(
+                            symbol,
+                            time_frame=strategy_profile.trading_time_frame,
+                            from_timestamp=strategy_profile
+                            .backtest_start_date_data,
+                            to_timestamp=backtest_profile.backtest_end_date
+                        )
+                        file = self.create_backtest_data_file_path(
+                            backtest_profile,
+                            strategy_profile,
+                            symbol,
+                            TradingDataType.TICKER
+                        )
+                        self.write_tickers_to_file(file, data)
 
     def create_backtest_data_file_path(
         self,

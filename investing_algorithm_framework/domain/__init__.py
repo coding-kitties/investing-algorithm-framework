@@ -3,7 +3,7 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, Ticker, \
     OHLCV, OrderBook, PortfolioConfiguration, AssetPrice, Portfolio, \
     Position, Order, OrderFee, BacktestProfile, PositionSnapshot, \
-    PortfolioSnapshot, StrategyProfile, BacktestPosition
+    PortfolioSnapshot, StrategyProfile, BacktestPosition, Trade
 from .exceptions import OperationalException, ApiException, \
     PermissionDeniedApiException, ImproperlyConfigured
 from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
@@ -11,7 +11,7 @@ from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
     DEFAULT_PAGE_VALUE, SQLALCHEMY_DATABASE_URI, RESOURCE_DIRECTORY, \
     DATETIME_FORMAT, DATETIME_FORMAT_BACKTESTING, BACKTESTING_FLAG, \
     BACKTESTING_INDEX_DATETIME, BACKTESTING_START_DATE, CCXT_DATETIME_FORMAT, \
-    BACKTEST_DATA_DIRECTORY_NAME
+    BACKTEST_DATA_DIRECTORY_NAME, TICKER_DATA_TYPE, OHLCV_DATA_TYPE
 from .singleton import Singleton
 from .utils import random_string, append_dict_as_row_to_csv, \
     add_column_headers_to_csv, get_total_amount_of_rows, \
@@ -78,5 +78,8 @@ __all__ = [
     "StrategyProfile",
     "BacktestPosition",
     "CCXT_DATETIME_FORMAT",
-    "BACKTEST_DATA_DIRECTORY_NAME"
+    "BACKTEST_DATA_DIRECTORY_NAME",
+    "Trade",
+    "TICKER_DATA_TYPE",
+    "OHLCV_DATA_TYPE"
 ]

@@ -1,10 +1,11 @@
-import os
+from typing import List
 from datetime import datetime, timedelta
-from math import floor
+import pandas as pd
+from tqdm import tqdm
 
 from investing_algorithm_framework.domain import BacktestProfile, \
-    BACKTESTING_INDEX_DATETIME, \
-    StrategyProfile, BacktestPosition, parse_string_to_decimal
+    BACKTESTING_INDEX_DATETIME, TimeUnit, StrategyProfile, BacktestPosition, \
+    TradingDataType
 
 
 class BackTestService:
@@ -22,7 +23,10 @@ class BackTestService:
         self._resource_directory = None
         self._order_service = order_service
         self._portfolio_repository = portfolio_repository
-        self._data_index = {"OHCLV": {}, "TICKER": {}}
+        self._data_index = {
+            TradingDataType.OHLCV: {},
+            TradingDataType.TICKER: {}
+        }
         self._performance_service = performance_service
         self._position_repository = position_repository
         self._market_service = market_service
@@ -49,19 +53,44 @@ class BackTestService:
         backtest_profile = self.create_backtest_profile(
             start_date=start_date, end_date=end_date
         )
-        self._market_service.create_backtest_data(
-            backtest_profile, strategy_profiles,
-        )
 
-        for strategy_profile in strategy_profiles:
+        for strategy_profile in tqdm(strategy_profiles,
+                                     total=len(strategy_profiles),
+                                     desc="Preparing backtest market data",
+                                     colour="GREEN"):
+            self._market_service.create_backtest_data(
+                backtest_profile, strategy_profile,
+            )
+
+        schedule = self.generate_schedule(
+            strategy_profiles, start_date, end_date
+        )
+        backtest_profile.number_of_runs = len(schedule)
+        backtest_profile.number_of_days = (end_date - start_date).days
+
+        for index, row in tqdm(schedule.iterrows(), total=len(schedule),
+                               desc="Running backtests", colour="GREEN"):
+            strategy_profile = self.get_strategy_from_strateg_profiles(
+                strategy_profiles, row['id']
+            )
+
             self.run_backtest_for_profile(
                 backtest_profile,
                 strategy_profile,
                 algorithm,
-                algorithm.get_strategy(strategy_profile.strategy_id)
+                algorithm.get_strategy(strategy_profile.strategy_id),
+                index,
+                row['ohlcv_data_index_date']
             )
 
         portfolio = self._portfolio_repository.find({"identifier": "backtest"})
+        backtest_profile.number_of_orders = self._order_service.count({
+            "portfolio": portfolio.id
+        })
+        backtest_profile.number_of_positions = self._position_repository.count({
+            "portfolio": portfolio.id,
+            "amount_gt": 0
+        })
         backtest_profile.percentage_negative_trades = self._performance_service \
             .get_percentage_negative_trades(portfolio.id)
         backtest_profile.percentage_positive_trades = self._performance_service \
@@ -70,10 +99,8 @@ class BackTestService:
             .get_number_of_trades_closed(portfolio.id)
         backtest_profile.number_of_trades_open = self._performance_service \
             .get_number_of_trades_open(portfolio.id)
-        backtest_profile.total_cost = \
-            parse_string_to_decimal(portfolio.total_cost)
-        backtest_profile.total_net_gain = \
-            parse_string_to_decimal(portfolio.total_net_gain)
+        backtest_profile.total_cost = portfolio.total_cost
+        backtest_profile.total_net_gain = portfolio.total_net_gain
         backtest_profile.total_net_gain_percentage = self._performance_service \
             .get_total_net_gain_percentage_of_backtest(
                 portfolio.id, backtest_profile
@@ -98,6 +125,10 @@ class BackTestService:
             .get_growth_of_backtest(portfolio.id, tickers, backtest_profile)
         backtest_profile.total_value = self._performance_service\
             .get_total_value(portfolio.id, tickers, backtest_profile)
+        backtest_profile.average_trade_duration = \
+            self._performance_service.get_average_trade_duration(portfolio.id)
+        backtest_profile.average_trade_size= \
+            self._performance_service.get_average_trade_size(portfolio.id)
 
         positions = self._position_repository.get_all({
             "portfolio": portfolio.id
@@ -119,6 +150,7 @@ class BackTestService:
                 backtest_position.price = ticker["bid"]
             backtest_positions.append(backtest_position)
         backtest_profile.positions = backtest_positions
+        backtest_profile.trades = algorithm.get_trades()
         return backtest_profile
 
     def run_backtest_for_profile(
@@ -126,61 +158,31 @@ class BackTestService:
         backtest_profile: BacktestProfile,
         strategy_profile: StrategyProfile,
         algorithm,
-        strategy
+        strategy,
+        index_date,
+        ohlcv_data_index_date
     ):
-        amount_of_runs_per_day = strategy_profile.get_runs_per_day()
-        days_run_without_execution = 0
+        data = {TradingDataType.OHLCV: {}, TradingDataType.TICKER: {}}
+        backtest_profile.backtest_index_date = index_date
+        algorithm.config[BACKTESTING_INDEX_DATETIME] = index_date
 
-        while backtest_profile.backtest_index_date \
-                < backtest_profile.backtest_end_date:
-            algorithm.config[BACKTESTING_INDEX_DATETIME] \
-                = backtest_profile.backtest_index_date
+        for symbol in strategy_profile.symbols:
 
-            if amount_of_runs_per_day > 0:
-                for _ in range(floor(amount_of_runs_per_day)):
-                    data = {"ohlcvs": {}}
+            if TradingDataType.OHLCV in strategy_profile.trading_data_types:
+                data[TradingDataType.OHLCV][symbol] = \
+                    self._market_service.get_ohclv(
+                        symbol,
+                        strategy_profile.trading_time_frame,
+                        ohlcv_data_index_date,
+                        backtest_profile.backtest_index_date
+                    )
 
-                    for symbol in strategy_profile.symbols:
-                        data["ohlcvs"][symbol] = \
-                            self._market_service.get_ohclv(
-                                symbol,
-                                strategy_profile.trading_time_frame,
-                                strategy_profile.backtest_data_index_date,
-                                backtest_profile.backtest_index_date
-                            )
+            if TradingDataType.TICKER in strategy_profile.trading_data_types:
+                data[TradingDataType.TICKER][symbol] = \
+                    self._market_service.get_ticker(symbol)
 
-                    self._order_service.check_pending_orders(data["ohlcvs"])
-                    strategy.run_strategy(data, algorithm)
-            else:
-
-                if (days_run_without_execution % amount_of_runs_per_day) \
-                        < amount_of_runs_per_day:
-                    data = {"ohlcvs": {}}
-
-                    for symbol in backtest_profile.symbols:
-                        data["ohlcvs"][symbol] = \
-                            self._market_service.get_ohclv(
-                                symbol,
-                                strategy_profile.trading_time_frame,
-                                strategy_profile.backtest_data_index_date,
-                                backtest_profile.backtest_index_date
-                            )
-
-                    self._order_service.check_pending_orders()
-                    strategy.run_strategy(data, algorithm)
-                    days_run_without_execution = 0
-                else:
-                    days_run_without_execution += 1
-
-            backtest_profile.backtest_index_date = \
-                backtest_profile.backtest_index_date + timedelta(days=1)
-            strategy_profile.backtest_data_index_date = \
-                strategy_profile.backtest_data_index_date + timedelta(days=1)
-            backtest_profile.number_of_days += 1
-            backtest_profile.number_of_runs += 1
-
-        backtest_profile.number_of_orders += len(algorithm.get_orders())
-        backtest_profile.number_of_positions += len(algorithm.get_positions())
+        self._order_service.check_pending_orders(data[TradingDataType.OHLCV])
+        strategy.run_strategy(data, algorithm)
 
     def create_backtest_profile(self, start_date, end_date):
         portfolio = self._portfolio_repository.find(
@@ -214,15 +216,50 @@ class BackTestService:
             strategy_profile.backtest_start_date_data
         return strategy_profile
 
-    def index_data(self):
-        data_dir = os.path.join(self.resource_directory, "backtest_data")
+    def generate_schedule(
+        self,
+        strategy_profiles: List[StrategyProfile],
+        start_date,
+        end_date
+    ):
+        data = []
 
-        for file in os.listdir(data_dir):
-            data_type = file.split("_")[0]
-            symbol = file.split("_")[1]
-            self._data_index[data_type][symbol] = {}
+        for profile in strategy_profiles:
+            id = profile.strategy_id
+            time_unit = profile.time_unit
+            interval = profile.interval
+            current_time = start_date
+            ohlcv_data_index_date = profile.backtest_data_index_date
 
-            if "files" in self._data_index[data_type]:
-                self._data_index[data_type][symbol]["files"].append(file)
-            else:
-                self._data_index[data_type][symbol]["files"] = [file]
+            while current_time <= end_date:
+                data.append({
+                    "id": id,
+                    'run_time': current_time,
+                    'ohlcv_data_index_date': ohlcv_data_index_date
+                })
+
+                if TimeUnit.MINUTE.equals(time_unit):
+                    current_time += timedelta(minutes=interval)
+                    ohlcv_data_index_date += timedelta(minutes=interval)
+                elif TimeUnit.HOUR.equals(time_unit):
+                    current_time += timedelta(hours=interval)
+                    ohlcv_data_index_date += timedelta(hours=interval)
+                elif TimeUnit.DAY.equals(time_unit):
+                    current_time += timedelta(days=interval)
+                    ohlcv_data_index_date += timedelta(days=interval)
+                else:
+                    raise ValueError(f"Unsupported time unit: {time_unit}")
+
+        schedule_df = pd.DataFrame(data)
+        schedule_df.sort_values(by='run_time', inplace=True)
+        schedule_df.set_index('run_time', inplace=True)
+        return schedule_df
+
+    def get_strategy_from_strateg_profiles(self, strategy_profiles, id):
+
+        for strategy_profile in strategy_profiles:
+
+            if strategy_profile.strategy_id == id:
+                return strategy_profile
+
+        raise ValueError(f"Strategy profile with id {id} not found.")

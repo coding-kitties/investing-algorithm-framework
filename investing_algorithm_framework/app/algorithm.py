@@ -1,12 +1,9 @@
-import decimal
 import logging
-from decimal import Decimal
 from typing import List
 
 from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
     Position, Order, Portfolio, OrderType, OrderSide, ApiException, \
-    parse_decimal_to_string, BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, \
-    parse_string_to_decimal
+    BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, Trade
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -53,24 +50,24 @@ class Algorithm:
         self.strategy_orchestrator_service.run_pending_jobs()
 
     def create_order(
-            self,
-            target_symbol,
-            price,
-            type,
-            side,
-            amount,
-            market=None,
-            execute=True,
-            validate=True,
-            sync=True
+        self,
+        target_symbol,
+        price,
+        order_type,
+        order_side,
+        amount,
+        market=None,
+        execute=True,
+        validate=True,
+        sync=True
     ):
         portfolio = self.portfolio_service.find({"market": market})
         order_data = {
             "target_symbol": target_symbol,
             "price": price,
-            "amount": parse_decimal_to_string(amount),
-            "order_type": type,
-            "side": side,
+            "amount": amount,
+            "order_type": order_type,
+            "order_side": order_side,
             "portfolio_id": portfolio.id,
             "status": OrderStatus.CREATED.value,
             "trading_symbol": portfolio.trading_symbol,
@@ -89,10 +86,11 @@ class Algorithm:
         self,
         target_symbol,
         price,
-        side,
+        order_side,
         amount=None,
         percentage_of_portfolio=None,
         percentage_of_position=None,
+        precision=3,
         market=None,
         execute=True,
         validate=True,
@@ -101,19 +99,20 @@ class Algorithm:
         portfolio = self.portfolio_service.find({"market": market})
 
         if percentage_of_portfolio is not None:
-            if not OrderSide.BUY.equals(side):
+            if not OrderSide.BUY.equals(order_side):
                 raise ApiException(
                     "Percentage of portfolio is only supported for BUY orders."
                 )
 
-            percentage_of_portfolio = Decimal(percentage_of_portfolio)
-            net_size = parse_string_to_decimal(portfolio.net_size)
-            size = net_size * percentage_of_portfolio / Decimal('100')
-            amount = size / Decimal(price)
+            percentage_of_portfolio = percentage_of_portfolio
+            net_size = portfolio.get_net_size()
+            size = net_size * percentage_of_portfolio / 100
+            amount = size / price
+            amount = self.round_down(amount, precision)
 
         elif percentage_of_position is not None:
 
-            if not OrderSide.SELL.equals(side):
+            if not OrderSide.SELL.equals(order_side):
                 raise ApiException(
                     "Percentage of position is only supported for SELL orders."
                 )
@@ -124,15 +123,14 @@ class Algorithm:
                     "portfolio": portfolio.id
                 }
             )
-            amount = position.get_amount() * \
-                     (Decimal(percentage_of_position) / 100)
+            amount = position.get_amount() * (percentage_of_position / 100)
 
         order_data = {
             "target_symbol": target_symbol,
             "price": price,
             "amount": amount,
             "order_type": OrderType.LIMIT.value,
-            "side": OrderSide.from_value(side).value,
+            "order_side": OrderSide.from_value(order_side).value,
             "portfolio_id": portfolio.id,
             "status": OrderStatus.CREATED.value,
             "trading_symbol": portfolio.trading_symbol,
@@ -150,7 +148,7 @@ class Algorithm:
     def create_market_order(
             self,
             target_symbol,
-            side,
+            order_side,
             amount,
             market=None,
             execute=False,
@@ -162,7 +160,7 @@ class Algorithm:
             "target_symbol": target_symbol,
             "amount": amount,
             "order_type": OrderType.MARKET.value,
-            "side": OrderSide.from_value(side).value,
+            "order_side": OrderSide.from_value(order_side).value,
             "portfolio_id": portfolio.id,
             "status": OrderStatus.CREATED.value,
             "trading_symbol": portfolio.trading_symbol,
@@ -201,13 +199,13 @@ class Algorithm:
         self._running_workers = []
 
     def get_order(
-            self,
-            reference_id=None,
-            market=None,
-            target_symbol=None,
-            trading_symbol=None,
-            side=None,
-            type=None
+        self,
+        reference_id=None,
+        market=None,
+        target_symbol=None,
+        trading_symbol=None,
+        order_side=None,
+        order_type=None
     ) -> Order:
         query_params = {}
 
@@ -220,11 +218,11 @@ class Algorithm:
         if trading_symbol:
             query_params["trading_symbol"] = trading_symbol
 
-        if side:
-            query_params["side"] = side
+        if order_side:
+            query_params["order_side"] = order_side
 
-        if type:
-            query_params["type"] = type
+        if order_type:
+            query_params["order_type"] = order_type
 
         if market:
             portfolio = self.portfolio_service.find({"market": market})
@@ -236,12 +234,12 @@ class Algorithm:
         return self.order_service.find(query_params)
 
     def get_orders(
-            self,
-            target_symbol=None,
-            status=None,
-            type=None,
-            side=None,
-            market=None
+        self,
+        target_symbol=None,
+        status=None,
+        order_type=None,
+        order_side=None,
+        market=None
     ) -> List[Order]:
 
         if market is None:
@@ -255,8 +253,8 @@ class Algorithm:
                 "position": [position.id for position in positions],
                 "target_symbol": target_symbol,
                 "status": status,
-                "type": type,
-                "side": side
+                "order_type": order_type,
+                "order_side": order_side
             }
         )
 
@@ -330,7 +328,7 @@ class Algorithm:
         symbol,
         market=None,
         identifier=None,
-        amount_gt=None,
+        amount_gt=0,
         amount_gte=None,
         amount_lt=None,
         amount_lte=None
@@ -420,20 +418,19 @@ class Algorithm:
             return
 
         for order in self.order_service \
-                .get_all({
-            "position": position.id, "status": OrderStatus.OPEN.value
-        }):
+            .get_all({
+                "position": position.id, "status": OrderStatus.OPEN.value
+            }):
             self.market_service.cancel_order(order.id)
 
         ticker = self.market_service.get_ticker(
             symbol=f"{symbol.upper()}/{portfolio.trading_symbol.upper()}"
         )
-
         self.create_limit_order(
             target_symbol=position.symbol,
             amount=position.get_amount(),
-            side=OrderSide.SELL.value,
-            price=parse_decimal_to_string(ticker["bid"]),
+            order_side=OrderSide.SELL.value,
+            price=ticker["bid"],
         )
 
     def add_strategies(self, strategies):
@@ -499,7 +496,7 @@ class Algorithm:
                 self.market_service.initialize(portfolio.configuration)
                 price = self.market_service.get_ticker(symbol)
                 allocated = allocated + \
-                            (position.get_amount() * Decimal(price["bid"]))
+                            (position.get_amount() * price["bid"])
 
         return allocated
 
@@ -563,7 +560,7 @@ class Algorithm:
             query_params["portfolio"] = portfolio.id
 
         query_params["target_symbol"] = target_symbol
-        query_params["side"] = OrderSide.BUY.value
+        query_params["order_side"] = OrderSide.BUY.value
         query_params["status"] = OrderStatus.OPEN.value
         return self.order_service.exists(query_params)
 
@@ -584,7 +581,7 @@ class Algorithm:
             query_params["portfolio"] = portfolio.id
 
         query_params["target_symbol"] = target_symbol
-        query_params["side"] = OrderSide.SELL.value
+        query_params["order_side"] = OrderSide.SELL.value
         query_params["status"] = OrderStatus.OPEN.value
         return self.order_service.exists(query_params)
 
@@ -609,3 +606,25 @@ class Algorithm:
 
     def check_pending_orders(self):
         self.order_service.check_pending_orders()
+
+    def get_trades(self):
+        buy_orders = self.order_service.get_all({
+            "status": OrderStatus.CLOSED.value,
+            "order_side": OrderSide.BUY.value
+        })
+        return [
+            Trade(
+                target_symbol=order.get_target_symbol(),
+                trading_symbol=order.get_trading_symbol(),
+                amount=order.get_amount(),
+                open_price=order.get_price(),
+                closed_price=order.get_trade_closed_price(),
+                closed_at=order.get_trade_closed_at(),
+                opened_at=order.get_created_at()
+            ) for order in buy_orders
+            if order.get_trade_closed_at() is not None
+        ]
+
+    def round_down(self, value, decimals):
+        factor = 1 / (10 ** decimals)
+        return (value // factor) * factor

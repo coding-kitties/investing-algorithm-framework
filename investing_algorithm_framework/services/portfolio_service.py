@@ -152,7 +152,7 @@ class PortfolioService(RepositoryService):
         portfolio = self.get(portfolio_id)
         pending_orders = self.order_service.get_all(
             {
-                "side": OrderSide.BUY.value,
+                "order_side": OrderSide.BUY.value,
                 "status": OrderStatus.OPEN.value,
                 "portfolio_id": portfolio.id
             }

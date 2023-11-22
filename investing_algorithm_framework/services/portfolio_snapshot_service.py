@@ -41,7 +41,7 @@ class PortfolioSnapshotService(RepositoryService):
         data = {
             "portfolio_id": portfolio.id,
             "trading_symbol": portfolio.trading_symbol,
-            "pending_value": parse_decimal_to_string(pending_value),
+            "pending_value": pending_value,
             "unallocated": portfolio.unallocated,
             "total_net_gain": portfolio.total_net_gain,
             "total_revenue": portfolio.total_revenue,

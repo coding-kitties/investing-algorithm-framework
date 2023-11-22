@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey
+from sqlalchemy import Column, Integer, String, ForeignKey, Float
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.domain import PositionSnapshot
@@ -13,8 +13,8 @@ class SQLPositionSnapshot(
     __tablename__ = "position_snapshots"
     id = Column(Integer, primary_key=True, unique=True)
     symbol = Column(String)
-    amount = Column(String)
-    cost = Column(String)
+    amount = Column(Float)
+    cost = Column(Float)
     portfolio_snapshot_id = Column(Integer, ForeignKey('portfolio_snapshots.id'))
     portfolio_snapshot = relationship(
         "SQLPortfolioSnapshot", back_populates="position_snapshots"

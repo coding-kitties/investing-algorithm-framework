@@ -24,10 +24,10 @@ class PositionSnapshot(BaseModel):
         self.symbol = symbol.upper()
 
     def get_amount(self):
-        return parse_string_to_decimal(self.amount)
+        return self.amount
 
     def get_cost(self):
-        return parse_string_to_decimal(self.cost)
+        return self.cost
 
     def set_cost(self, cost):
         self.cost = cost

@@ -1,16 +1,13 @@
 from .base_model import BaseModel
 from .time_unit import TimeUnit
-from investing_algorithm_framework.domain.decimal_parsing import \
-    parse_string_to_decimal
-import decimal
 
 
 class BacktestPosition(BaseModel):
 
     def __init__(self, position, trading_symbol=False):
         self.symbol = position.symbol
-        self.amount = parse_string_to_decimal(position.amount)
-        self._cost = parse_string_to_decimal(position.cost)
+        self.amount = position.amount
+        self._cost = position.cost
         self._price = 0.0
         self._trading_symbol = trading_symbol
 
@@ -36,7 +33,7 @@ class BacktestPosition(BaseModel):
         if self._trading_symbol:
             return self.amount
 
-        return decimal.Decimal(self._price) * self.amount
+        return self._price * self.amount
 
     @property
     def growth(self):
@@ -50,6 +47,9 @@ class BacktestPosition(BaseModel):
     def growth_rate(self):
 
         if self._trading_symbol:
+            return 0.0
+
+        if self.cost == 0:
             return 0.0
 
         return self.growth / self.cost * 100
@@ -87,7 +87,10 @@ class BacktestProfile(BaseModel):
         growth_rate=0.0,
         growth=0,
         total_value=0.0,
-        positions=None
+        positions=None,
+        average_trade_duration=0,
+        average_trade_size=0.0,
+        trades=None
     ):
         self._portfolio_id = portfolio_id
         self._interval = interval
@@ -121,6 +124,9 @@ class BacktestProfile(BaseModel):
         self._growth = growth
         self._total_value = total_value
         self.positions = positions
+        self._average_trade_duration = average_trade_duration
+        self._average_trade_size = average_trade_size
+        self._trades = trades
 
     @property
     def portfolio_id(self):
@@ -361,6 +367,30 @@ class BacktestProfile(BaseModel):
     @positions.setter
     def positions(self, value):
         self._positions = value
+
+    @property
+    def average_trade_duration(self):
+        return self._average_trade_duration
+
+    @average_trade_duration.setter
+    def average_trade_duration(self, value):
+        self._average_trade_duration = value
+
+    @property
+    def average_trade_size(self):
+        return self._average_trade_size
+
+    @average_trade_size.setter
+    def average_trade_size(self, value):
+        self._average_trade_size = value
+
+    @property
+    def trades(self):
+        return self._trades
+
+    @trades.setter
+    def trades(self, value):
+        self._trades = value
 
     def get_runs_per_day(self):
 

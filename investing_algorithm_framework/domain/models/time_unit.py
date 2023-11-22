@@ -1,11 +1,12 @@
+from datetime import timedelta
 from enum import Enum
-from datetime import datetime, timedelta
 
 
 class TimeUnit(Enum):
     SECOND = "SECOND"
     MINUTE = "MINUTE"
     HOUR = "HOUR"
+    DAY = "DAY"
 
     @staticmethod
     def from_string(value: str):
@@ -46,8 +47,12 @@ class TimeUnit(Enum):
             return timedelta(minutes=interval)
         elif TimeUnit.MINUTE.equals(self):
             return timedelta(minutes=interval)
-        else:
+        elif TimeUnit.HOUR.equals(self):
             return timedelta(hours=interval)
+        elif TimeUnit.DAY.equals(self):
+            return timedelta(days=interval)
+
+        raise ValueError(f"Unsupported time unit: {self}")
 
     @property
     def single_name(self):
@@ -61,6 +66,9 @@ class TimeUnit(Enum):
         if TimeUnit.HOUR.equals(self.value):
             return "hour"
 
+        if TimeUnit.DAY.equals(self.value):
+            return "day"
+
     @property
     def plural_name(self):
 
@@ -73,3 +81,5 @@ class TimeUnit(Enum):
         if TimeUnit.HOUR.equals(self.value):
             return "hours"
 
+        if TimeUnit.DAY.equals(self.value):
+            return "days"

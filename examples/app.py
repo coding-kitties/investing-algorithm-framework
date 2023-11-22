@@ -36,7 +36,7 @@ def perform_strategy(algorithm: Algorithm, market_data):
     else:
         algorithm.create_limit_order(
             target_symbol="<symbol>",
-            side="buy",
+            order_side="buy",
             percentage_of_portfolio=20,
             price=market_data["tickers"]["<symbol>"]["bid"]
         )

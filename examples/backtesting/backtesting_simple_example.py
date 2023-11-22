@@ -4,14 +4,13 @@ from datetime import datetime, timedelta
 from investing_algorithm_framework import create_app, TimeUnit, \
     TradingTimeFrame, TradingDataType, TradingStrategy, \
     RESOURCE_DIRECTORY, pretty_print_backtest, Algorithm, \
-    OrderType, OrderSide
-from investing_algorithm_framework.domain import BACKTESTING_INDEX_DATETIME
+    OrderSide
 
 
 class MyTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 24
-    trading_data_type = TradingDataType.OHLCV
+    trading_data_types = [TradingDataType.OHLCV, TradingDataType.TICKER]
     trading_time_frame_start_date = datetime.utcnow() - timedelta(days=365)
     trading_time_frame = TradingTimeFrame.ONE_DAY
     market = "BITVAVO"
@@ -22,12 +21,20 @@ class MyTradingStrategy(TradingStrategy):
         algorithm: Algorithm,
         market_data,
     ):
-        price = market_data["ohlcvs"]["BTC/EUR"][-1][3]
+        for symbol in self.symbols:
+            target_symbol = symbol.split('/')[0]
+            price = market_data[TradingDataType.TICKER][symbol]["bid"]
 
-        if not algorithm.has_open_orders("BTC") and not algorithm.has_position("BTC"):
-            algorithm.create_order(
-                "BTC", price, OrderType.LIMIT, OrderSide.BUY, amount=0.002
-            )
+            if algorithm.has_open_orders(target_symbol):
+                continue
+
+            if not algorithm.has_position(target_symbol):
+                algorithm.create_limit_order(
+                    target_symbol,
+                    order_side=OrderSide.BUY,
+                    percentage_of_portfolio=25,
+                    price=price
+                )
 
 
 app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})

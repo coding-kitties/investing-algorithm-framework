@@ -8,5 +8,5 @@ class OrderSerializer(Schema):
     price = fields.Float(dump_only=True)
     amount = fields.Float(dump_only=True)
     status = fields.String(dump_only=True)
-    type = fields.String(dump_only=True)
-    side = fields.String(dump_only=True)
+    order_type = fields.String(dump_only=True)
+    order_side = fields.String(dump_only=True)

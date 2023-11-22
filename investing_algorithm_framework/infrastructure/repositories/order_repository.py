@@ -15,8 +15,8 @@ class SQLOrderRepository(Repository):
         portfolio_query_param = self.get_query_param(
             "portfolio_id", query_params
         )
-        side_query_param = self.get_query_param("side", query_params)
-        type_query_param = self.get_query_param("type", query_params)
+        side_query_param = self.get_query_param("order_side", query_params)
+        type_query_param = self.get_query_param("order_type", query_params)
         status_query_param = self.get_query_param("status", query_params)
         price_query_param = self.get_query_param("price", query_params)
         amount_query_param = self.get_query_param("amount", query_params)
@@ -44,8 +44,8 @@ class SQLOrderRepository(Repository):
             query = query.filter_by(external_id=external_id_query_param)
 
         if side_query_param:
-            side = OrderSide.from_value(side_query_param)
-            query = query.filter_by(side=side.value)
+            order_side = OrderSide.from_value(side_query_param)
+            query = query.filter_by(order_side=order_side.value)
 
         if type_query_param:
             order_type = OrderType.from_value(type_query_param)

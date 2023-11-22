@@ -1,6 +1,4 @@
 from investing_algorithm_framework.domain.models.base_model import BaseModel
-from investing_algorithm_framework.domain.decimal_parsing import \
-    parse_string_to_decimal
 
 
 class Position(BaseModel):
@@ -24,10 +22,10 @@ class Position(BaseModel):
         self.symbol = symbol.upper()
 
     def get_amount(self):
-        return parse_string_to_decimal(self.amount)
+        return self.amount
 
     def get_cost(self):
-        return parse_string_to_decimal(self.cost)
+        return self.cost
 
     def set_cost(self, cost):
         self.cost = cost

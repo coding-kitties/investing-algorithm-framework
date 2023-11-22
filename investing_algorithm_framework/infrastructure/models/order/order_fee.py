@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Numeric
+from sqlalchemy import Column, Integer, String, ForeignKey, Float
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.domain import OrderFee
@@ -11,8 +11,8 @@ class SQLOrderFee(OrderFee, SQLBaseModel, SQLAlchemyModelExtension):
     __tablename__ = "order_fees"
     id = Column(Integer, primary_key=True, unique=True)
     currency = Column(String)
-    cost = Column(Numeric(precision=24, scale=20))
-    rate = Column(Numeric(precision=24, scale=20))
+    cost = Column(Float)
+    rate = Column(Float)
     order_id = Column(Integer, ForeignKey('orders.id'))
     order = relationship("SQLOrder", back_populates="fee")
 
