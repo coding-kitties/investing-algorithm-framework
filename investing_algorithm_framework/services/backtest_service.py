@@ -238,7 +238,10 @@ class BackTestService:
                     'ohlcv_data_index_date': ohlcv_data_index_date
                 })
 
-                if TimeUnit.MINUTE.equals(time_unit):
+                if TimeUnit.SECOND.equals(time_unit):
+                    current_time += timedelta(seconds=interval)
+                    ohlcv_data_index_date += timedelta(seconds=interval)
+                elif TimeUnit.MINUTE.equals(time_unit):
                     current_time += timedelta(minutes=interval)
                     ohlcv_data_index_date += timedelta(minutes=interval)
                 elif TimeUnit.HOUR.equals(time_unit):
