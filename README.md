@@ -19,7 +19,7 @@ elegant development of investment algorithms and trading bots. It comes with all
 components for creating algorithms, including data provisioning, portfolio management, and order execution.
 
 
-## Example
+## Example implementation
 The following algorithm connects to binance and buys BTC every 5 seconds. 
 It also exposes an REST API that allows you to interact with the algorithm.
 ```python
@@ -32,7 +32,7 @@ from investing_algorithm_framework import create_app, PortfolioConfiguration, \
 app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 app.add_portfolio_configuration(
     PortfolioConfiguration(
-        market="binance",
+        market="BITVAVO",
         api_key="xxxxxx",
         secret_key="xxxxxx",
         trading_symbol="USDT"
@@ -41,31 +41,88 @@ app.add_portfolio_configuration(
 
 
 @app.strategy(
-    time_unit=TimeUnit.SECOND, # Algorithm will be executed every 5 seconds
-    interval=5,
-    market="binance", # Will retrieve trading data from binance
-    symbols=["BTC/USDT", "ETH/USDT", ["DOT/USDT"]], # Symbols must be in the format of TARGET/TRADE symbol (e.g. BTC/USDT)
-    trading_data_types=[TradingDataType.OHLCV, TradingDataType.TICKER, TradingDataType.ORDER_BOOK],
-    trading_time_frame_start_date=datetime.utcnow() - timedelta(days=1), # Will retrieve data from the last 24 hours
-    trading_time_frame=TradingTimeFrame.ONE_MINUTE # Will retrieve data on 1m interval (OHLCV)
+    time_unit=TimeUnit.HOUR,  # Algorithm will be executed every 2 hours
+    interval=2,
+    market="BITVAVO",  # Will retrieve trading data from binance
+    symbols=["BTC/EUR", "ETH/EUR", "DOT/EUR"],
+    # Symbols must be in the format of TARGET/TRADE symbol (e.g. BTC/USDT)
+    trading_data_types=[TradingDataType.OHLCV, TradingDataType.TICKER],
+    trading_time_frame_start_date=datetime.utcnow() - timedelta(days=1),
+    # Will retrieve data from the last 24 hours
+    trading_time_frame=TradingTimeFrame.ONE_MINUTE
+    # Will retrieve data on 1m interval (OHLCV)
 )
 def perform_strategy(algorithm, market_data):
-    print(algorithm.get_allocated())
-    print(algorithm.get_unallocated())
-    print(market_data)
-    algorithm.create_limit_order(
-        target_symbol="BTC", 
-        side=OrderSide.BUY,
-        price=market_data["TICKER"]["BTC/USDT"]["BID"], 
-        amount_target_symbol=0.00001
-    )
+    target_symbol = "BTC"
+    price = market_data[TradingDataType.TICKER]["BTC/EUR"]["bid"]
 
+    if not algorithm.has_open_orders(target_symbol) and \
+            not algorithm.has_position(target_symbol):
+        algorithm.create_limit_order(
+            target_symbol,
+            order_side=OrderSide.BUY,
+            percentage_of_portfolio=25,
+            # You can also use amount instead of percentage_of_portfolio
+            price=price
+        )
 
 if __name__ == "__main__":
     app.run()
 ```
 
 > You can find more examples [here](./examples) folder.
+
+## Backtesting
+The framework also supports backtesting. You can use the same code as above,
+but instead of running the algorithm, you can run a backtest.
+
+```python
+import pathlib
+from datetime import datetime, timedelta
+
+from investing_algorithm_framework import create_app, OrderSide, \
+    RESOURCE_DIRECTORY, TimeUnit, TradingTimeFrame, TradingDataType, \
+    pretty_print_backtest
+
+app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
+
+@app.strategy(
+    time_unit=TimeUnit.HOUR,  # Algorithm will be executed every 2 hours
+    interval=2,
+    market="BITVAVO",  # Will retrieve trading data from binance
+    symbols=["BTC/EUR", "ETH/EUR", "DOT/EUR"],
+    # Symbols must be in the format of TARGET/TRADE symbol (e.g. BTC/USDT)
+    trading_data_types=[TradingDataType.OHLCV, TradingDataType.TICKER],
+    trading_time_frame_start_date=datetime.utcnow() - timedelta(days=1),
+    # Will retrieve data from the last 24 hours
+    trading_time_frame=TradingTimeFrame.ONE_MINUTE
+    # Will retrieve data on 1m interval (OHLCV)
+)
+def perform_strategy(algorithm, market_data):
+    target_symbol = "BTC"
+    price = market_data[TradingDataType.TICKER]["BTC/EUR"]["bid"]
+
+    if not algorithm.has_open_orders(target_symbol) and \
+            not algorithm.has_position(target_symbol):
+        algorithm.create_limit_order(
+            target_symbol,
+            order_side=OrderSide.BUY,
+            percentage_of_portfolio=25,
+            # You can also use amount instead of percentage_of_portfolio
+            price=price
+        )
+
+
+if __name__ == "__main__":
+    backtest_report = app.backtest(
+        start_date=datetime(2023, 11, 12) - timedelta(days=10),
+        end_date=datetime(2023, 11, 12),
+        unallocated=400,
+        trading_symbol="EUR"
+    )
+    pretty_print_backtest(backtest_report)
+```
+For more examples, check out the [examples](./examples/backtesting) folder.
 
 ## Broker/Exchange configuration
 The framework has by default support for [ccxt](https://github.com/ccxt/ccxt).
@@ -76,7 +133,7 @@ from investing_algorithm_framework import App, PortfolioConfiguration
 app = App()
 app.add_portfolio_configuration(
     PortfolioConfiguration(
-        market="bitvavo", 
+        market="BITVAVO", 
         api_key="xxxx", 
         secret_key="xxxx", 
         track_from="01/01/2022",
