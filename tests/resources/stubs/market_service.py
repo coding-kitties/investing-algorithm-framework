@@ -1,6 +1,7 @@
-from investing_algorithm_framework.infrastructure.services import MarketService
-from investing_algorithm_framework import OrderStatus, Order
 from random import randint
+
+from investing_algorithm_framework import OrderStatus, Order
+from investing_algorithm_framework.infrastructure.services import MarketService
 
 
 class MarketServiceStub(MarketService):
@@ -20,7 +21,7 @@ class MarketServiceStub(MarketService):
             amount=amount,
             status=OrderStatus.OPEN,
             order_type="market",
-            side="sell",
+            order_side="sell",
             target_symbol=target_symbol,
             trading_symbol=trading_symbol,
         )
@@ -37,7 +38,7 @@ class MarketServiceStub(MarketService):
             amount=amount,
             status=OrderStatus.OPEN,
             order_type="limit",
-            side="buy",
+            order_side="buy",
             target_symbol=target_symbol,
             trading_symbol=trading_symbol,
             price=price
@@ -55,7 +56,7 @@ class MarketServiceStub(MarketService):
             amount=amount,
             status=OrderStatus.OPEN,
             order_type="limit",
-            side="sell",
+            order_side="sell",
             target_symbol=target_symbol,
             trading_symbol=trading_symbol,
         )
@@ -107,7 +108,7 @@ class MarketServiceStub(MarketService):
                 'created': '1674386553394',
                 'updated': '1674386553394',
                 'status': 'closed',
-                'side': 'buy',
+                'order_side': 'buy',
                 'orderType': order.order_type,
                 'amountQuote': order.amount,
                 'amountQuoteRemaining': '0',
@@ -140,10 +141,11 @@ class MarketServiceStub(MarketService):
             'datetime': '2023-01-22T11:22:33.394Z',
             'lastTradeTimestamp': 1674386553405,
             'symbol': f'{symbol}',
-            'type': 'market',
+            'order_type': 'market',
             'timeInForce': 'IOC',
             'postOnly': None,
-            'side': order.side,
+            'type': order.order_type,
+            'side': order.order_side,
             'price': order.price if order.order_type == 'limit' else 10,
             'stopPrice': None,
             'triggerPrice': None,
@@ -169,7 +171,7 @@ class MarketServiceStub(MarketService):
                     'id': '16d3b5b7-a460-472b-ab6d-964b890f7d03',
                     'symbol': 'DOT/EUR', 'timestamp': 1674386553405,
                     'datetime': '2023-01-22T11:22:33.405Z', 'order': None,
-                    'type': None, 'side': None, 'takerOrMaker': 'taker',
+                    'order_type': None, 'order_side': None, 'takerOrMaker': 'taker',
                     'price': 5.7915, 'amount': 2.99863309,
                     'cost': 17.366583540735,
                     'fee': {'cost': 0.043416459265, 'currency': 'EUR'},

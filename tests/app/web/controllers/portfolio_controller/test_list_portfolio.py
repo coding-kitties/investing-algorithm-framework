@@ -18,8 +18,8 @@ class StrategyOne(TradingStrategy):
             target_symbol="BTC",
             amount=1,
             price=10,
-            side="BUY",
-            type="LIMIT",
+            order_side="BUY",
+            order_type="LIMIT",
         )
 
 

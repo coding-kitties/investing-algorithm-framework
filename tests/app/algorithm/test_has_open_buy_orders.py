@@ -45,7 +45,7 @@ class Test(TestBase):
             target_symbol="BTC",
             amount=1,
             price=10,
-            side="BUY",
+            order_side="BUY",
         )
         order_service = self.app.container.order_service()
         self.assertTrue(self.app.algorithm.has_open_buy_orders("BTC"))

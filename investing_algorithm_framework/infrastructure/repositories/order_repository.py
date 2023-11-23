@@ -1,4 +1,5 @@
 from .repository import Repository
+
 from investing_algorithm_framework.infrastructure.models import SQLOrder, \
     SQLPosition, SQLPortfolio
 from investing_algorithm_framework.domain import OrderStatus, OrderType, \
@@ -15,8 +16,8 @@ class SQLOrderRepository(Repository):
         portfolio_query_param = self.get_query_param(
             "portfolio_id", query_params
         )
-        side_query_param = self.get_query_param("side", query_params)
-        type_query_param = self.get_query_param("type", query_params)
+        side_query_param = self.get_query_param("order_side", query_params)
+        type_query_param = self.get_query_param("order_type", query_params)
         status_query_param = self.get_query_param("status", query_params)
         price_query_param = self.get_query_param("price", query_params)
         amount_query_param = self.get_query_param("amount", query_params)
@@ -30,25 +31,26 @@ class SQLOrderRepository(Repository):
             "trading_symbol", query_params
         )
 
-        if portfolio_query_param:
+        if portfolio_query_param is not None:
             portfolio = db.query(SQLPortfolio).filter_by(
-                identifier=portfolio_query_param
+                id=portfolio_query_param
             ).first()
 
-            if portfolio is None:
-                return query.filter_by(id=-1)
+            if portfolio:
+                positions = db.query(SQLPosition).filter_by(
+                    portfolio_id=portfolio.id
+                ).all()
+                position_ids = [p.id for p in positions]
+                query = query.filter(SQLOrder.position_id.in_(position_ids))
+            else:
+                query = query.filter_by(id=None)
 
-            positions = db.query(SQLPosition).filter_by(
-                portfolio_id=portfolio.id
-            ).all()
-            position_ids = [p.id for p in positions]
-            query = query.filter(SQLOrder.position_id.in_(position_ids))
         if external_id_query_param:
             query = query.filter_by(external_id=external_id_query_param)
 
         if side_query_param:
-            side = OrderSide.from_value(side_query_param)
-            query = query.filter_by(side=side.value)
+            order_side = OrderSide.from_value(side_query_param)
+            query = query.filter_by(order_side=order_side.value)
 
         if type_query_param:
             order_type = OrderType.from_value(type_query_param)

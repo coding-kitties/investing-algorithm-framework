@@ -1,5 +1,6 @@
 import os
 from decimal import Decimal
+
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration, OrderStatus
 from tests.resources import TestBase, MarketServiceStub
@@ -18,8 +19,8 @@ class StrategyOne(TradingStrategy):
             target_symbol="BTC",
             amount=1,
             price=10,
-            side="BUY",
-            type="LIMIT",
+            order_side="BUY",
+            order_type="LIMIT",
             execute=True
         )
 

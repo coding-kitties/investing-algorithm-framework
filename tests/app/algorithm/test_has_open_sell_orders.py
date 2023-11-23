@@ -44,7 +44,7 @@ class Test(TestBase):
             target_symbol="BTC",
             amount=1,
             price=10,
-            side="BUY",
+            order_side="BUY",
         )
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
@@ -52,7 +52,7 @@ class Test(TestBase):
             target_symbol="BTC",
             amount=1,
             price=10,
-            side="SELL",
+            order_side="SELL",
         )
         self.assertTrue(self.app.algorithm.has_open_sell_orders("BTC"))
         order_service.check_pending_orders()

@@ -5,10 +5,10 @@ order_serialization_dict = {
     'closing_price',
     'price',
     'target_symbol',
-    'side',
+    'order_side',
     'amount',
     'status',
-    'type',
+    'order_type',
     'reference_id'
 }
 

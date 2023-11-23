@@ -11,3 +11,4 @@ MarkupSafe==2.1.2
 dependency-injector==4.40.0
 schedule==1.1.0
 pandas==2.0.0
+tqdm==4.66.1

@@ -1,8 +1,4 @@
-from decimal import Decimal
-
 from investing_algorithm_framework.domain.models.base_model import BaseModel
-from investing_algorithm_framework.domain.decimal_parsing \
-    import parse_string_to_decimal
 
 
 class OrderFee(BaseModel):
@@ -18,13 +14,13 @@ class OrderFee(BaseModel):
         self.currency = currency
 
     def get_cost(self):
-        return parse_string_to_decimal(self.cost)
+        return self.cost
 
     def set_cost(self, cost):
         self.cost = cost
 
     def get_rate(self):
-        return parse_string_to_decimal(self.rate)
+        return self.rate
 
     @staticmethod
     def from_ccxt_fee(ccxt_fee):

@@ -14,8 +14,8 @@
 #         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 #
 #         order_a = portfolio_manager.create_order(
-#             type=OrderType.LIMIT.value,
-#             side=OrderSide.BUY.value,
+#             order_type=OrderType.LIMIT.value,
+#             order_side=OrderSide.BUY.value,
 #             amount=1,
 #             target_symbol=self.TARGET_SYMBOL_A,
 #             price=self.BASE_SYMBOL_A_PRICE,
@@ -28,8 +28,8 @@
 #         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 #
 #         order_a = portfolio_manager.create_order(
-#             type=OrderType.LIMIT.value,
-#             side=OrderSide.BUY.value,
+#             order_type=OrderType.LIMIT.value,
+#             order_side=OrderSide.BUY.value,
 #             amount=1,
 #             target_symbol=self.TARGET_SYMBOL_A,
 #             price=self.BASE_SYMBOL_A_PRICE,
@@ -41,8 +41,8 @@
 #         portfolio_manager.add_order(order_a, algorithm_context=None)
 #         order_a.set_status(OrderStatus.PENDING)
 #         order_a_sell = portfolio_manager.create_order(
-#             type=OrderType.LIMIT.value,
-#             side=OrderSide.SELL.value,
+#             order_type=OrderType.LIMIT.value,
+#             order_side=OrderSide.SELL.value,
 #             amount=1,
 #             target_symbol=self.TARGET_SYMBOL_A,
 #             price=self.BASE_SYMBOL_A_PRICE,
@@ -59,8 +59,8 @@
 #         portfolio_manager = self.algo_app.algorithm.get_portfolio_manager()
 #
 #         order_a = portfolio_manager.create_order(
-#             type=OrderType.LIMIT.value,
-#             side=OrderSide.BUY.value,
+#             order_type=OrderType.LIMIT.value,
+#             order_side=OrderSide.BUY.value,
 #             amount=1,
 #             target_symbol=self.TARGET_SYMBOL_A,
 #             price=self.BASE_SYMBOL_A_PRICE,
@@ -73,8 +73,8 @@
 #
 #         with self.assertRaises(OperationalException) as exc:
 #             portfolio_manager.create_order(
-#                 type=OrderType.LIMIT.value,
-#                 side=OrderSide.SELL.value,
+#                 order_type=OrderType.LIMIT.value,
+#                 order_side=OrderSide.SELL.value,
 #                 amount=2,
 #                 target_symbol=self.TARGET_SYMBOL_A,
 #                 price=self.BASE_SYMBOL_A_PRICE,
@@ -86,8 +86,8 @@
 #
 #         with self.assertRaises(OperationalException):
 #             portfolio_manager.create_order(
-#                 type=OrderType.LIMIT.value,
-#                 side=OrderSide.BUY.value,
+#                 order_type=OrderType.LIMIT.value,
+#                 order_side=OrderSide.BUY.value,
 #                 amount=10000,
 #                 target_symbol=self.TARGET_SYMBOL_A,
 #                 price=self.BASE_SYMBOL_A_PRICE,

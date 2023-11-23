@@ -12,7 +12,7 @@
 #             amount=amount,
 #             target_symbol=target_symbol,
 #             price=price,
-#             type=OrderType.LIMIT.value
+#             order_type=OrderType.LIMIT.value
 #         )
 #
 #         if reference_id is not None:

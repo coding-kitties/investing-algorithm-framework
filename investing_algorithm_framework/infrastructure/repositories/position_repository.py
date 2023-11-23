@@ -1,8 +1,7 @@
 from sqlalchemy import cast, Numeric, Float
+
+from investing_algorithm_framework.infrastructure.models import SQLPosition
 from .repository import Repository
-from investing_algorithm_framework.infrastructure.models import SQLPosition, \
-    SQLPortfolio
-from decimal import Decimal
 
 
 class SQLPositionRepository(Repository):

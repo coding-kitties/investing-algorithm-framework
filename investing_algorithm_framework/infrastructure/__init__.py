@@ -1,6 +1,7 @@
 from .repositories import SQLOrderRepository, SQLPositionRepository, \
-    SQLPortfolioRepository, SQLOrderFeeRepository
-from .services import MarketService
+    SQLPortfolioRepository, SQLOrderFeeRepository, \
+    SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository
+from .services import MarketService, MarketBacktestService, PerformanceService
 from .database import setup_sqlalchemy, Session, \
     create_all_tables
 from .models import SQLPortfolio, SQLOrder, SQLPosition, SQLOrderFee
@@ -11,6 +12,8 @@ __all__ = [
     "SQLPortfolioRepository",
     "SQLOrderRepository",
     "SQLOrderFeeRepository",
+    "SQLPortfolioSnapshotRepository",
+    "SQLPositionSnapshotRepository",
     "MarketService",
     "setup_sqlalchemy",
     "Session",
@@ -18,4 +21,6 @@ __all__ = [
     "SQLOrder",
     "SQLOrderFee",
     "SQLPosition",
+    "MarketBacktestService",
+    "PerformanceService"
 ]

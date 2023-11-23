@@ -43,7 +43,7 @@ class Test(TestBase):
             target_symbol="BTC",
             amount=1,
             price=10,
-            side="BUY",
+            order_side="BUY",
         )
         btc_position = self.app.algorithm.get_position("BTC")
         self.assertIsNotNone(btc_position)

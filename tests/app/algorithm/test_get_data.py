@@ -24,7 +24,7 @@
 #         algorithm.create_limit_order(
 #             target_symbol="BTC",
 #             amount=1,
-#             side="BUY",
+#             order_side="BUY",
 #             price=10,
 #         )
 #

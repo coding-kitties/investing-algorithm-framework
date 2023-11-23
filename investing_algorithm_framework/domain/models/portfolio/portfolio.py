@@ -1,6 +1,4 @@
 from investing_algorithm_framework.domain.models.base_model import BaseModel
-from investing_algorithm_framework.domain.decimal_parsing import \
-    parse_string_to_decimal, parse_decimal_to_string
 
 
 class Portfolio(BaseModel):
@@ -17,18 +15,22 @@ class Portfolio(BaseModel):
         total_cost=0,
         total_net_gain=0,
         total_trade_volume=0,
+        created_at=None,
+        updated_at=None
     ):
         self.identifier = identifier
         self.updated_at = None
         self.trading_symbol = trading_symbol.upper()
-        self.net_size = parse_decimal_to_string(net_size)
-        self.unallocated = parse_decimal_to_string(unallocated)
-        self.realized = parse_decimal_to_string(realized)
-        self.total_revenue = parse_decimal_to_string(total_revenue)
-        self.total_cost = parse_decimal_to_string(total_cost)
-        self.total_net_gain = parse_decimal_to_string(total_net_gain)
-        self.total_trade_volume = parse_decimal_to_string(total_trade_volume)
+        self.net_size = net_size
+        self.unallocated = unallocated
+        self.realized = realized
+        self.total_revenue = total_revenue
+        self.total_cost = total_cost
+        self.total_net_gain = total_net_gain
+        self.total_trade_volume = total_trade_volume
         self.market = market
+        self.created_at = created_at
+        self.updated_at = updated_at
 
     def __repr__(self):
         return self.repr(
@@ -42,22 +44,31 @@ class Portfolio(BaseModel):
         )
 
     def get_unallocated(self):
-        return parse_string_to_decimal(self.unallocated)
+        return self.unallocated
 
     def get_net_size(self):
-        return parse_string_to_decimal(self.net_size)
+        return self.net_size
 
     def get_realized(self):
-        return parse_string_to_decimal(self.realized)
+        return self.realized
 
     def get_total_revenue(self):
-        return parse_string_to_decimal(self.total_revenue)
+        return self.total_revenue
 
     def get_total_cost(self):
-        return parse_string_to_decimal(self.total_cost)
+        return self.total_cost
 
     def get_total_net_gain(self):
-        return parse_string_to_decimal(self.total_net_gain)
+        return self.total_net_gain
 
     def get_total_trade_volume(self):
-        return parse_string_to_decimal(self.total_trade_volume)
+        return self.total_trade_volume
+
+    def get_created_at(self):
+        return self.created_at
+
+    def get_updated_at(self):
+        return self.updated_at
+
+    def get_trading_symbol(self):
+        return self.trading_symbol

@@ -10,11 +10,12 @@ def create_app(
     stateless=False,
     web=False,
 ):
-    app = App(config=config, web=web, stateless=stateless)
+    app = App(web=web, stateless=stateless)
     app = setup_dependency_container(
         app,
         ["investing_algorithm_framework"],
         ["investing_algorithm_framework"]
     )
+    app.set_config(config)
     logger.info( "Investing algoritm framework app created")
     return app

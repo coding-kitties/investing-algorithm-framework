@@ -6,7 +6,7 @@ from investing_algorithm_framework import create_app, PortfolioConfiguration, \
 
 class MyTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.SECOND
-    interval = 5
+    interval = 3
     trading_data_type = TradingDataType.OHLCV
     trading_time_frame_start_date = datetime.utcnow() - timedelta(days=1)
     trading_time_frame = TradingTimeFrame.ONE_MINUTE
@@ -26,10 +26,10 @@ class MyTradingStrategy(TradingStrategy):
 app = create_app()
 app.add_portfolio_configuration(
     PortfolioConfiguration(
-        market="<your_market>",
+        market="bitvavo",
         api_key="<your_api_key>",
         secret_key="<your_secret_key>",
-        trading_symbol="<your_trading_symbol>"
+        trading_symbol="EUR"
     )
 )
 app.add_strategy(MyTradingStrategy)
