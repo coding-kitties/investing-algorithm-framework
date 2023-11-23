@@ -1,5 +1,6 @@
 import os
 from decimal import Decimal
+
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     PortfolioConfiguration
 from tests.resources import TestBase, MarketServiceStub
@@ -42,7 +43,7 @@ class Test(TestBase):
             target_symbol="BTC",
             amount=1,
             price=10,
-            side="BUY",
+            order_side="BUY",
         )
         btc_position = self.app.algorithm.get_position("BTC")
         self.assertIsNotNone(btc_position)

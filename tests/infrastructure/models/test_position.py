@@ -1,11 +1,8 @@
 import os
-from decimal import Decimal
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     PortfolioConfiguration
 from tests.resources import TestBase, MarketServiceStub
-from investing_algorithm_framework.infrastructure.models.decimal_parser \
-    import parse_decimal
 
 
 class Test(TestBase):
@@ -45,15 +42,15 @@ class Test(TestBase):
         self.position_repository.create(
             {
                 "symbol": "ADA",
-                "amount": '2004.5303357979318',
+                "amount": 2004.5303357979318,
                 "portfolio_id": portfolio.id,
             }
         )
         position = self.position_repository.find(
             {"symbol": "ADA", "portfolio": portfolio.id}
         )
-        self.assertEqual(position.amount, '2004.5303357979318')
-        self.assertEqual(position.get_amount(), Decimal('2004.5303357979318'))
+        self.assertEqual(position.amount, 2004.5303357979318)
+        self.assertEqual(position.get_amount(), 2004.5303357979318)
 
     def test_position_update(self):
         self.portfolio_service = self.app.container.portfolio_service()
@@ -62,20 +59,20 @@ class Test(TestBase):
         self.position_repository.create(
             {
                 "symbol": "ADA",
-                "amount": '2004.5303357979318',
+                "amount": 2004.5303357979318,
                 "portfolio_id": portfolio.id,
             }
         )
         position = self.position_repository.find(
             {"symbol": "ADA", "portfolio": portfolio.id}
         )
-        self.assertEqual(position.amount, '2004.5303357979318')
-        self.assertEqual(position.get_amount(), Decimal('2004.5303357979318'))
+        self.assertEqual(position.amount, 2004.5303357979318)
+        self.assertEqual(position.get_amount(), 2004.5303357979318)
         position = self.position_repository.update(
             position.id,
             {
-                "amount": position.get_amount() + Decimal('1000.0')
+                "amount": position.get_amount() + 1000.0
             }
         )
-        self.assertEqual(position.amount, '3004.5303357979318')
-        self.assertEqual(position.get_amount(), Decimal('3004.5303357979318'))
+        self.assertEqual(position.amount, 3004.5303357979318)
+        self.assertEqual(position.get_amount(), 3004.5303357979318)

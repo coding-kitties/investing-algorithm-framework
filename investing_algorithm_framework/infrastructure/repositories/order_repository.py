@@ -1,4 +1,5 @@
 from .repository import Repository
+
 from investing_algorithm_framework.infrastructure.models import SQLOrder, \
     SQLPosition, SQLPortfolio
 from investing_algorithm_framework.domain import OrderStatus, OrderType, \
@@ -35,11 +36,15 @@ class SQLOrderRepository(Repository):
                 id=portfolio_query_param
             ).first()
 
-            positions = db.query(SQLPosition).filter_by(
-                portfolio_id=portfolio.id
-            ).all()
-            position_ids = [p.id for p in positions]
-            query = query.filter(SQLOrder.position_id.in_(position_ids))
+            if portfolio:
+                positions = db.query(SQLPosition).filter_by(
+                    portfolio_id=portfolio.id
+                ).all()
+                position_ids = [p.id for p in positions]
+                query = query.filter(SQLOrder.position_id.in_(position_ids))
+            else:
+                query = query.filter_by(id=None)
+
         if external_id_query_param:
             query = query.filter_by(external_id=external_id_query_param)
 

@@ -40,7 +40,7 @@ class Test(TestBase):
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
-            side="BUY",
+            order_side="BUY",
             amount=20
         )
         order = self.app.algorithm.get_order()

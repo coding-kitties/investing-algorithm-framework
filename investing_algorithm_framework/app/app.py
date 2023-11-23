@@ -95,7 +95,6 @@ class App:
         if sync:
             portfolio_service.sync_portfolios()
 
-        self.algorithm.config = self.config
         self.algorithm.start(
             number_of_iterations=number_of_iterations,
             stateless=self.stateless
@@ -110,7 +109,9 @@ class App:
         elif self._web:
             logger.info("Running web")
             flask_thread = threading.Thread(
-                name='Web App', target=self._flask_app.run
+                name='Web App',
+                target=self._flask_app.run,
+                kwargs={"port": 8080}
             )
             flask_thread.setDaemon(True)
             flask_thread.start()

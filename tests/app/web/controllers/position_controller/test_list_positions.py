@@ -1,8 +1,8 @@
 import json
 
-from investing_algorithm_framework import create_app, TradingStrategy, \
-    TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration
-from tests.resources import TestBase, FlaskTestBase
+from investing_algorithm_framework import TradingStrategy, \
+    TimeUnit, PortfolioConfiguration
+from tests.resources import FlaskTestBase
 
 
 class StrategyOne(TradingStrategy):
@@ -18,8 +18,8 @@ class StrategyOne(TradingStrategy):
             target_symbol="BTC",
             amount=1,
             price=10,
-            side="BUY",
-            type="LIMIT",
+            order_side="BUY",
+            order_type="LIMIT",
         )
 
 

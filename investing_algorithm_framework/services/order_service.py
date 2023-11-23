@@ -3,8 +3,7 @@ from datetime import datetime
 from queue import PriorityQueue
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
-    OperationalException, OrderStatus, parse_string_to_decimal, \
-    parse_decimal_to_string
+    OperationalException, OrderStatus
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 

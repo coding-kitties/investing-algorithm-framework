@@ -1,10 +1,9 @@
 import os
-from decimal import Decimal
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     PortfolioConfiguration
-from tests.resources import TestBase, MarketServiceStub
 from investing_algorithm_framework.infrastructure.models import SQLOrder
+from tests.resources import TestBase, MarketServiceStub
 
 
 class Test(TestBase):
@@ -39,15 +38,15 @@ class Test(TestBase):
 
     def test_creation(self):
         order = SQLOrder(
-            amount=Decimal('2004.5303357979318'),
-            price=Decimal('0.2431'),
-            side="BUY",
+            amount=2004.5303357979318,
+            price=0.2431,
+            order_side="BUY",
             order_type="LIMIT",
             status="OPEN",
             target_symbol="ADA",
             trading_symbol="USDT",
         )
-        self.assertEqual(order.amount, '2004.5303357979318')
-        self.assertEqual(order.get_amount(), Decimal('2004.5303357979318'))
-        self.assertEqual(order.price, '0.2431')
-        self.assertEqual(order.get_price(), Decimal('0.2431'))
+        self.assertEqual(order.amount, 2004.5303357979318)
+        self.assertEqual(order.get_amount(), 2004.5303357979318)
+        self.assertEqual(order.price, 0.2431)
+        self.assertEqual(order.get_price(), 0.2431)

@@ -1,5 +1,4 @@
 import os
-from decimal import Decimal
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     PortfolioConfiguration, OrderStatus
@@ -42,11 +41,11 @@ class Test(TestBase):
             target_symbol="BTC",
             amount=1,
             price=10,
-            side="BUY",
+            order_side="BUY",
         )
         order_repository = self.app.container.order_repository()
         self.assertEqual(
-            1, order_repository.count({"type": "LIMIT", "side": "BUY"})
+            1, order_repository.count({"order_type": "LIMIT", "order_side": "BUY"})
         )
         order = order_repository.find({"target_symbol": "BTC"})
         self.assertEqual(OrderStatus.OPEN.value, order.status)
@@ -55,17 +54,18 @@ class Test(TestBase):
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
-            side="BUY",
-            percentage_of_portfolio=20
+            order_side="BUY",
+            percentage_of_portfolio=20,
+            precision=0
         )
         order_repository = self.app.container.order_repository()
         self.assertEqual(
-            1, order_repository.count({"type": "LIMIT", "side": "BUY"})
+            1, order_repository.count({"order_type": "LIMIT", "order_side": "BUY"})
         )
         order = order_repository.find({"target_symbol": "BTC"})
         self.assertEqual(OrderStatus.OPEN.value, order.status)
-        self.assertEqual(Decimal(20), order.get_amount())
-        self.assertEqual(Decimal(10), order.get_price())
+        self.assertEqual(20, order.get_amount())
+        self.assertEqual(10, order.get_price())
         portfolio = self.app.algorithm.get_portfolio()
-        self.assertEqual(Decimal(1000), portfolio.get_net_size())
-        self.assertEqual(Decimal(800), portfolio.get_unallocated())
+        self.assertEqual(1000, portfolio.get_net_size())
+        self.assertEqual(800, portfolio.get_unallocated())

@@ -47,7 +47,7 @@ class Test(TestBase):
                 "amount": 1,
                 "trading_symbol": "USDT",
                 "price": 10,
-                "side": "BUY",
+                "order_side": "BUY",
                 "order_type": "LIMIT",
                 "status": "OPEN",
             }

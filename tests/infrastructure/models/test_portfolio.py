@@ -80,7 +80,7 @@
 #             amount=10,
 #             target_symbol=self.TARGET_SYMBOL_A,
 #             price=self.get_price(self.TARGET_SYMBOL_A).price,
-#             type=OrderType.LIMIT.value
+#             order_type=OrderType.LIMIT.value
 #         )
 #
 #         order.status = OrderStatus.PENDING
@@ -185,8 +185,8 @@
 #                     "amount": 4,
 #                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "status": OrderStatus.PENDING.value,
-#                     "side": OrderSide.BUY.value,
-#                     "type": OrderType.LIMIT.value
+#                     "order_side": OrderSide.BUY.value,
+#                     "order_type": OrderType.LIMIT.value
 #                 }
 #             ),
 #             Order.from_dict(
@@ -199,8 +199,8 @@
 #                     "status": OrderStatus.CLOSED.value,
 #                     "initial_price": self.get_price(
 #                         self.TARGET_SYMBOL_A).price,
-#                     "side": OrderSide.BUY.value,
-#                     "type": OrderType.LIMIT.value
+#                     "order_side": OrderSide.BUY.value,
+#                     "order_type": OrderType.LIMIT.value
 #                 }
 #             )
 #         ]
@@ -220,23 +220,23 @@
 #             0, len(portfolio.get_orders(status=OrderStatus.TO_BE_SENT))
 #         )
 #         self.assertEqual(
-#             0, len(portfolio.get_orders(side=OrderSide.SELL))
+#             0, len(portfolio.get_orders(order_side=OrderSide.SELL))
 #         )
 #         self.assertEqual(
-#             0, len(portfolio.get_orders(type=OrderType.MARKET))
+#             0, len(portfolio.get_orders(order_type=OrderType.MARKET))
 #         )
 #         self.assertEqual(
 #             1, len(portfolio.get_orders(
 #                 status=OrderStatus.PENDING,
-#                 type=OrderType.LIMIT,
-#                 side=OrderSide.BUY
+#                 order_type=OrderType.LIMIT,
+#                 order_side=OrderSide.BUY
 #             ))
 #         )
 #         self.assertEqual(
 #             1, len(portfolio.get_orders(
 #                 status=OrderStatus.CLOSED,
-#                 type=OrderType.LIMIT,
-#                 side=OrderSide.BUY
+#                 order_type=OrderType.LIMIT,
+#                 order_side=OrderSide.BUY
 #             ))
 #         )
 #
@@ -270,8 +270,8 @@
 #                     status=OrderStatus.PENDING,
 #                     price=10,
 #                     amount=10,
-#                     side=OrderSide.BUY,
-#                     type=OrderType.LIMIT
+#                     order_side=OrderSide.BUY,
+#                     order_type=OrderType.LIMIT
 #                 )
 #             ],
 #             identifier="BINANCE",
@@ -339,8 +339,8 @@
 #                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "initial_price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "status": OrderStatus.CLOSED.value,
-#                     "side": OrderSide.BUY.value,
-#                     "type": OrderType.LIMIT.value
+#                     "order_side": OrderSide.BUY.value,
+#                     "order_type": OrderType.LIMIT.value
 #                 }
 #             ),
 #             Order.from_dict(
@@ -351,8 +351,8 @@
 #                     "amount": 4,
 #                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "status": OrderStatus.PENDING.value,
-#                     "side": OrderSide.BUY.value,
-#                     "type": OrderType.LIMIT.value
+#                     "order_side": OrderSide.BUY.value,
+#                     "order_type": OrderType.LIMIT.value
 #                 }
 #             ),
 #             Order.from_dict(
@@ -364,8 +364,8 @@
 #                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "status": OrderStatus.CLOSED.value,
 #                     "initial_price": self.get_price(self.TARGET_SYMBOL_A).price,
-#                     "side": OrderSide.BUY.value,
-#                     "type": OrderType.LIMIT.value
+#                     "order_side": OrderSide.BUY.value,
+#                     "order_type": OrderType.LIMIT.value
 #                 }
 #             )
 #         ]
