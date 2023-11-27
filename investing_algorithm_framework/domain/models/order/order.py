@@ -115,6 +115,10 @@ class Order(BaseModel):
         self.external_id = external_id
 
     def get_net_gain(self):
+
+        if self.net_gain is None:
+            return 0
+
         return self.net_gain
 
     def set_net_gain(self, net_gain):
@@ -133,6 +137,10 @@ class Order(BaseModel):
         self.trade_closed_price = trade_closed_price
 
     def get_trade_closed_amount(self):
+
+        if self.trade_closed_amount is None:
+            return 0
+
         return self.trade_closed_amount
 
     def set_trade_closed_amount(self, trade_closed_amount):
@@ -163,7 +171,7 @@ class Order(BaseModel):
     def get_remaining(self):
 
         if self.remaining is None:
-            return '0'
+            return self.amount
 
         return self.remaining
 
@@ -171,6 +179,10 @@ class Order(BaseModel):
         self.remaining = remaining
 
     def get_cost(self):
+
+        if self.cost is None:
+            return 0
+
         return self.cost
 
     def set_cost(self, cost):
