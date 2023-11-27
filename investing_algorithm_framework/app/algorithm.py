@@ -90,7 +90,7 @@ class Algorithm:
         amount=None,
         percentage_of_portfolio=None,
         percentage_of_position=None,
-        precision=3,
+        precision=None,
         market=None,
         execute=True,
         validate=True,
@@ -108,7 +108,6 @@ class Algorithm:
             net_size = portfolio.get_net_size()
             size = net_size * percentage_of_portfolio / 100
             amount = size / price
-            amount = self.round_down(amount, precision)
 
         elif percentage_of_position is not None:
 
@@ -124,6 +123,9 @@ class Algorithm:
                 }
             )
             amount = position.get_amount() * (percentage_of_position / 100)
+
+        if precision is not None:
+            amount = self.round_down(amount, precision)
 
         order_data = {
             "target_symbol": target_symbol,
@@ -182,7 +184,7 @@ class Algorithm:
 
         return self.portfolio_service.find({{"market": market}})
 
-    def get_unallocated(self, market=None) -> Position:
+    def get_unallocated(self, market=None) -> float:
 
         if market:
             portfolio = self.portfolio_service.find({{"market": market}})
