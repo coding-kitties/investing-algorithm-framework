@@ -4,9 +4,29 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from investing_algorithm_framework import create_app, TimeUnit, \
-    TradingTimeFrame, TradingDataType, TradingStrategy, \
-    RESOURCE_DIRECTORY, pretty_print_backtest, Algorithm, OrderSide
+    TradingStrategy, \
+    RESOURCE_DIRECTORY, pretty_print_backtest, Algorithm, OrderSide, \
+    CCXTOHLCVMarketDataSource
 
+
+def start_date_func():
+    return datetime.utcnow() - timedelta(days=17)
+
+# Define market data sources
+bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
+    identifier="BTC",
+    market="BITVAVO",
+    symbol="BTC/EUR",
+    timeframe="2h",
+    start_date_func=start_date_func
+)
+bitvavo_dot_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
+    identifier="DOT",
+    market="BITVAVO",
+    symbol="DOT/EUR",
+    timeframe="2h",
+    start_date_func=start_date_func
+)
 
 def is_golden_cross(df: pd.DataFrame, period_one, period_two, date_time=None):
     """
@@ -89,11 +109,8 @@ def calculate_moving_average(df: pd.DataFrame, period):
 class MyTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 2
-    trading_data_types = [TradingDataType.OHLCV, TradingDataType.TICKER]
-    trading_time_frame_start_date = datetime.utcnow() - timedelta(days=365)
-    trading_time_frame = TradingTimeFrame.TWO_HOUR
-    market = "BITVAVO"
     symbols = ["BTC/EUR"]
+    market_data_sources = [bitvavo_btc_eur_ohlcv_2h, bitvavo_dot_eur_ohlcv_2h]
 
     def apply_strategy(self, algorithm: Algorithm, market_data):
 
@@ -103,7 +120,7 @@ class MyTradingStrategy(TradingStrategy):
             if algorithm.has_open_orders(target_symbol):
                 continue
 
-            ohlcv_data = market_data[TradingDataType.OHLCV][symbol]
+            ohlcv_data = market_data[target_symbol]
             df = pd.DataFrame(
                 ohlcv_data,
                 columns=['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
@@ -111,7 +128,7 @@ class MyTradingStrategy(TradingStrategy):
             df["ma_9"] = calculate_moving_average(df, 9)
             df["ma_50"] = calculate_moving_average(df, 50)
             df["ma_100"] = calculate_moving_average(df, 100)
-            price = market_data[TradingDataType.TICKER][symbol]["bid"]
+            price = ohlcv_data[-1][4]
 
             if is_golden_cross(df, '9', '50') \
                     and not algorithm.has_position(target_symbol) \
@@ -133,9 +150,11 @@ app.add_strategy(MyTradingStrategy)
 
 
 if __name__ == "__main__":
+    end_date = datetime(2023, 12, 2)
+    start_date = end_date - timedelta(days=100)
     backtest_report = app.backtest(
-        start_date=datetime(2023, 11, 12) - timedelta(days=100),
-        end_date=datetime(2023, 11, 12),
+        start_date=start_date,
+        end_date=end_date,
         unallocated=400,
         trading_symbol="EUR"
     )
