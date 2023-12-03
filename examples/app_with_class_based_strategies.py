@@ -1,29 +1,36 @@
+import pathlib
 from datetime import datetime, timedelta
 
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    TimeUnit, TradingTimeFrame, TradingDataType, TradingStrategy
+    TimeUnit, CCXTOHLCVMarketDataSource, TradingStrategy, RESOURCE_DIRECTORY
+
+
+def start_date_func():
+    return datetime.utcnow() - timedelta(days=17)
+
+# Define market data sources
+bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
+    identifier="BTC",
+    market="BITVAVO",
+    symbol="BTC/EUR",
+    timeframe="2h",
+    start_date_func=start_date_func
+)
 
 
 class MyTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.SECOND
     interval = 3
-    trading_data_type = TradingDataType.OHLCV
-    trading_time_frame_start_date = datetime.utcnow() - timedelta(days=1)
-    trading_time_frame = TradingTimeFrame.ONE_MINUTE
-    market = "BITVAVO"
-    symbols = ["BTC/EUR"]
+    market_data_sources = [bitvavo_btc_eur_ohlcv_2h]
 
-    def apply_strategy(
-        self,
-        algorithm,
-        market_data,
-    ):
-        print(len(algorithm.get_orders()))
-        print(market_data)
+    def apply_strategy(self, algorithm, market_data):
+        pass
 
 
 # No resource directory specified, so an in-memory database will be used
-app = create_app()
+app = create_app(
+    config={RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()}
+)
 app.add_portfolio_configuration(
     PortfolioConfiguration(
         market="bitvavo",

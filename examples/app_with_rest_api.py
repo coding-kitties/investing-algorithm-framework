@@ -1,8 +1,7 @@
 import pathlib
-from datetime import datetime, timedelta
 
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    RESOURCE_DIRECTORY, TimeUnit, TradingTimeFrame, TradingDataType
+    RESOURCE_DIRECTORY, TimeUnit
 
 app = create_app(
     {RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()}, web=True
@@ -17,18 +16,9 @@ app.add_portfolio_configuration(
 )
 
 
-@app.strategy(
-    time_unit=TimeUnit.SECOND,
-    interval=5,
-    market="BINANCE",
-    symbols=["BTC/USDT"],
-    trading_data_types=[TradingDataType.OHLCV],
-    trading_time_frame_start_date=datetime.utcnow() - timedelta(days=1),
-    trading_time_frame=TradingTimeFrame.ONE_MINUTE
-)
+@app.strategy(time_unit=TimeUnit.SECOND, interval=5)
 def perform_strategy(algorithm, market_data):
-    print(len(algorithm.get_orders()))
-    print(market_data)
+    pass
 
 
 if __name__ == "__main__":

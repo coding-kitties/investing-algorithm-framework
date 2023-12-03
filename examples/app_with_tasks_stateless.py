@@ -1,7 +1,5 @@
-from datetime import datetime, timedelta
-
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    TimeUnit, TradingTimeFrame, TradingDataType, Task, StatelessAction
+    TimeUnit, Task, StatelessAction
 
 # No resource directory specified, so an in-memory database will be used
 app = create_app(stateless=True)
@@ -40,17 +38,9 @@ def say_hello(algorithm):
     print("Hello world")
 
 
-@app.strategy(
-    time_unit=TimeUnit.SECOND,
-    interval=5,
-    market="BINANCE",
-    symbols=["BTC/EUR"],
-    trading_data_types=[TradingDataType.OHLCV],
-    trading_time_frame_start_date=datetime.utcnow() - timedelta(days=1),
-    trading_time_frame=TradingTimeFrame.ONE_MINUTE
-)
+@app.strategy(time_unit=TimeUnit.SECOND, interval=5)
 def perform_strategy(algorithm, market_data):
-    print(len(algorithm.get_orders()))
+    pass
 
 
 if __name__ == "__main__":

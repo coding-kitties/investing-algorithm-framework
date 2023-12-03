@@ -13,5 +13,3 @@ app.add_portfolio_configuration(
 
 if __name__ == "__main__":
     app.run()
-    print(app.algorithm.get_allocated())
-    print(app.algorithm.get_unallocated())

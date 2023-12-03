@@ -1,8 +1,8 @@
 import pathlib
+from datetime import datetime, timedelta
 
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    RESOURCE_DIRECTORY, TimeUnit, TradingDataType, TradingTimeFrame, Algorithm
-from datetime import datetime, timedelta
+    RESOURCE_DIRECTORY, TimeUnit, Algorithm, CCXTOHLCVMarketDataSource
 
 app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 app.add_portfolio_configuration(
@@ -16,30 +16,26 @@ app.add_portfolio_configuration(
 )
 
 
+def start_date_func():
+    return datetime.utcnow() - timedelta(days=17)
+
+# Define market data sources
+bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
+    identifier="BTC",
+    market="BITVAVO",
+    symbol="BTC/EUR",
+    timeframe="2h",
+    start_date_func=start_date_func
+)
+
+
 @app.strategy(
     time_unit=TimeUnit.SECOND,
     interval=5,
-    market="BITVAVO",
-    trading_data_types=[TradingDataType.OHLCV, TradingDataType.TICKER],
-    trading_time_frame=TradingTimeFrame.ONE_DAY,
-    symbols=["BTC/EUR"],
-    trading_time_frame_start_date=datetime.now() - timedelta(days=60),
+    market_data_sources=[bitvavo_btc_eur_ohlcv_2h]
 )
 def perform_strategy(algorithm: Algorithm, market_data):
-    print(algorithm.get_portfolio())
-    print(algorithm.get_positions())
-    print(algorithm.get_orders())
-    print(market_data)
-
-    if algorithm.position_exists("<symbol>"):
-        algorithm.close_position("<symbol>")
-    else:
-        algorithm.create_limit_order(
-            target_symbol="<symbol>",
-            order_side="buy",
-            percentage_of_portfolio=20,
-            price=market_data["tickers"]["<symbol>"]["bid"]
-        )
+    pass
 
 
 if __name__ == "__main__":
