@@ -1,10 +1,14 @@
 from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLPortfolioRepository, SQLOrderFeeRepository, \
     SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository
-from .services import MarketService, MarketBacktestService, PerformanceService
+from .services import MarketService, MarketBacktestService, \
+    PerformanceService, CCXTMarketService
 from .database import setup_sqlalchemy, Session, \
     create_all_tables
-from .models import SQLPortfolio, SQLOrder, SQLPosition, SQLOrderFee
+from .models import SQLPortfolio, SQLOrder, SQLPosition, SQLOrderFee, \
+    SQLPortfolioSnapshot, SQLPositionSnapshot, \
+    CCXTOHLCVBacktestMarketDataSource, CCXTOrderBookMarketDataSource, \
+    CCXTTickerMarketDataSource, CCXTOHLCVMarketDataSource
 
 __all__ = [
     "create_all_tables",
@@ -22,5 +26,12 @@ __all__ = [
     "SQLOrderFee",
     "SQLPosition",
     "MarketBacktestService",
-    "PerformanceService"
+    "PerformanceService",
+    "SQLPortfolioSnapshot",
+    "SQLPositionSnapshot",
+    "CCXTOHLCVMarketDataSource",
+    "CCXTOrderBookMarketDataSource",
+    "CCXTTickerMarketDataSource",
+    "CCXTOHLCVMarketDataSource",
+    "CCXTMarketService"
 ]

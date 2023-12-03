@@ -1,30 +1,20 @@
-from typing import List
 from investing_algorithm_framework.domain import \
-    TimeUnit, TradingTimeFrame, TradingDataType, StrategyProfile
+    TimeUnit, StrategyProfile, Trade
+from .algorithm import Algorithm
 
 
 class TradingStrategy:
-    symbols: List[str] = []
     time_unit: str = None
     interval: int = None
-    market: str = None
-    trading_data_type = None
-    trading_data_types: list = None
-    trading_time_frame = None
-    trading_time_frame_start_date = None
     worker_id: str = None
     decorated = None
+    market_data_sources = None
 
     def __init__(
         self,
         time_unit=None,
         interval=None,
-        market=None,
-        symbols=None,
-        trading_data_type=None,
-        trading_data_types=None,
-        trading_time_frame=None,
-        trading_time_frame_start_date=None,
+        market_data_sources=None,
         worker_id=None,
         decorated=None
     ):
@@ -35,32 +25,11 @@ class TradingStrategy:
         if interval is not None:
             self.interval = interval
 
-        if market is not None:
-            self.market = market
-
         if time_unit is not None:
             self.time_unit = TimeUnit.from_value(time_unit)
 
-        if symbols is not None:
-            self.symbols = symbols
-
-        if trading_time_frame_start_date is not None:
-            self.trading_time_frame_start_date = trading_time_frame_start_date
-
-        if trading_data_type is not None:
-            self.trading_data_types = [
-                TradingDataType.from_value(trading_data_type)
-            ]
-
-        if trading_data_types is not None:
-            self.trading_data_types = [
-                TradingDataType.from_value(trading_data_type)
-                for trading_data_type in trading_data_types
-            ]
-
-        if trading_time_frame is not None:
-            self.trading_time_frame = TradingTimeFrame\
-                .from_value(trading_time_frame)
+        if market_data_sources is not None:
+            self.market_data_sources = market_data_sources
 
         if decorated is not None:
             self.decorated = decorated
@@ -72,7 +41,7 @@ class TradingStrategy:
         else:
             self.worker_id = self.__class__.__name__
 
-    def run_strategy(self, market_data, algorithm):
+    def run_strategy(self, algorithm, market_data):
         self.apply_strategy(algorithm=algorithm, market_data=market_data)
 
     def apply_strategy(
@@ -86,15 +55,50 @@ class TradingStrategy:
             raise NotImplementedError("Apply strategy is not implemented")
 
     @property
-    def profile(self):
+    def strategy_profile(self):
         return StrategyProfile(
             strategy_id=self.worker_id,
             interval=self.interval,
             time_unit=self.time_unit,
-            trading_time_frame=self.trading_time_frame,
-            trading_time_frame_start_date=self.trading_time_frame_start_date,
-            symbols=self.symbols,
-            market=self.market,
-            trading_data_type=self.trading_data_type,
-            trading_data_types=self.trading_data_types,
+            market_data_sources=self.market_data_sources
         )
+
+    def on_trade_closed(self, algorithm: Algorithm, trade: Trade):
+        pass
+
+    def on_trade_updated(self, algorithm: Algorithm, trade: Trade):
+        pass
+
+    def on_trade_created(self, algorithm: Algorithm, trade: Trade):
+        pass
+
+    def on_trade_opened(self, algorithm: Algorithm, trade: Trade):
+        pass
+
+    def on_trade_stop_loss_triggered(self, algorithm: Algorithm, trade: Trade):
+        pass
+
+    def on_trade_trailing_stop_loss_triggered(self, algorithm: Algorithm, trade: Trade):
+        pass
+
+    def on_trade_take_profit_triggered(self, algorithm: Algorithm, trade: Trade):
+        pass
+
+    def on_trade_stop_loss_updated(self, algorithm: Algorithm, trade: Trade):
+        pass
+
+    def on_trade_trailing_stop_loss_updated(self, algorithm: Algorithm, trade: Trade):
+        pass
+
+    def on_trade_take_profit_updated(self, algorithm: Algorithm, trade: Trade):
+        pass
+
+    def on_trade_stop_loss_created(self, algorithm: Algorithm, trade: Trade):
+        pass
+
+    def on_trade_trailing_stop_loss_created(self, algorithm: Algorithm, trade: Trade):
+        pass
+
+    def on_trade_take_profit_created(self, algorithm: Algorithm, trade: Trade):
+        pass
+

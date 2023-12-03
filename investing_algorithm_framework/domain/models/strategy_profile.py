@@ -17,6 +17,7 @@ class StrategyProfile(BaseModel):
         backtest_data_index_date=None,
         trading_data_type=None,
         trading_data_types=None,
+        market_data_sources=None,
     ):
         self._strategy_id = strategy_id
         self._interval = interval
@@ -30,6 +31,7 @@ class StrategyProfile(BaseModel):
         self._market = market
         self._trading_data_type = trading_data_type
         self._trading_data_types = trading_data_types
+        self._market_data_sources = market_data_sources
 
     @property
     def strategy_id(self):
@@ -126,6 +128,14 @@ class StrategyProfile(BaseModel):
     @trading_data_types.setter
     def trading_data_types(self, value):
         self._trading_data_types = value
+
+    @property
+    def market_data_sources(self):
+        return self._market_data_sources
+
+    @market_data_sources.setter
+    def market_data_sources(self, value):
+        self._market_data_sources = value
 
     def get_runs_per_day(self):
 

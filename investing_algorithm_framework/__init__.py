@@ -5,9 +5,13 @@ from investing_algorithm_framework.domain import ApiException, \
     OrderStatus, OrderSide, Config, TimeUnit, TimeInterval, Order, Portfolio, \
     Position, TimeFrame, BACKTESTING_INDEX_DATETIME
 from investing_algorithm_framework.domain import PortfolioConfiguration, \
-    RESOURCE_DIRECTORY, pretty_print_backtest
+    RESOURCE_DIRECTORY, pretty_print_backtest, Trade, OHLCVMarketDataSource, \
+    OrderBookMarketDataSource, TickerMarketDataSource
 from investing_algorithm_framework.app import TradingStrategy, \
     StatelessAction, Task
+from investing_algorithm_framework.infrastructure import \
+    CCXTOrderBookMarketDataSource, \
+    CCXTTickerMarketDataSource, CCXTOHLCVMarketDataSource
 
 __all__ = [
     "Algorithm",
@@ -34,5 +38,16 @@ __all__ = [
     "StatelessAction",
     "Task",
     "pretty_print_backtest",
-    "BACKTESTING_INDEX_DATETIME"
+    "BACKTESTING_INDEX_DATETIME",
+    "Trade",
+    "TimeFrame",
+    "CCXTOHLCVMarketDataSourceBacktest",
+    "CCXTOrderBookMarketDataSource",
+    "CCXTTickerMarketDataSource",
+    "CCXTOHLCVMarketDataSource",
+    "CCXTOrderBookMarketDataSourceBacktest",
+    "CCXTTickerMarketDataSourceBacktest",
+    "OHLCVMarketDataSource",
+    "OrderBookMarketDataSource",
+    "TickerMarketDataSource",
 ]

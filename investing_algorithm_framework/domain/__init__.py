@@ -20,6 +20,8 @@ from .strategy import Strategy
 from .stateless_actions import StatelessActions
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
 from .utils.backtesting import pretty_print_backtest
+from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
+    OHLCVMarketDataSource, BacktestMarketDataSource
 
 __all__ = [
     'Config',
@@ -81,5 +83,9 @@ __all__ = [
     "BACKTEST_DATA_DIRECTORY_NAME",
     "Trade",
     "TICKER_DATA_TYPE",
-    "OHLCV_DATA_TYPE"
+    "OHLCV_DATA_TYPE",
+    "TickerMarketDataSource",
+    "OrderBookMarketDataSource",
+    "OHLCVMarketDataSource",
+    "BacktestMarketDataSource"
 ]

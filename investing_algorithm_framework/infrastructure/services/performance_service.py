@@ -101,7 +101,19 @@ class PerformanceService:
             if position.symbol == portfolio.trading_symbol:
                 continue
 
+            pending_orders = self.order_repository.get_all(
+                {
+                    "position_id": position.id,
+                    "status": OrderStatus.OPEN.value,
+                }
+            )
+            pending_value = 0
+
+            for order in pending_orders:
+                pending_value += order.amount * order.price
+
             allocated += position.amount * tickers[position.symbol]["bid"]
+            allocated += pending_value
 
         current_total_value = allocated + portfolio.unallocated
         gain = current_total_value - backtest_profile.initial_unallocated
@@ -119,7 +131,19 @@ class PerformanceService:
             if position.symbol == portfolio.trading_symbol:
                 continue
 
+            pending_orders = self.order_repository.get_all(
+                {
+                    "position_id": position.id,
+                    "status": OrderStatus.OPEN.value,
+                }
+            )
+            pending_value = 0
+
+            for order in pending_orders:
+                pending_value += order.amount * order.price
+
             allocated += position.amount * tickers[position.symbol]["bid"]
+            allocated += pending_value
 
         current_total_value = allocated + portfolio.unallocated
         return current_total_value - backtest_profile.initial_unallocated

@@ -11,15 +11,15 @@ logger = logging.getLogger("investing_algorithm_framework")
 class Algorithm:
 
     def __init__(
-            self,
-            configuration_service,
-            portfolio_configuration_service,
-            portfolio_service,
-            position_service,
-            order_service,
-            market_service,
-            market_data_service,
-            strategy_orchestrator_service,
+        self,
+        configuration_service,
+        portfolio_configuration_service,
+        portfolio_service,
+        position_service,
+        order_service,
+        market_service,
+        market_data_service,
+        strategy_orchestrator_service,
     ):
         self.portfolio_service = portfolio_service
         self.position_service = position_service
@@ -148,14 +148,14 @@ class Algorithm:
         )
 
     def create_market_order(
-            self,
-            target_symbol,
-            order_side,
-            amount,
-            market=None,
-            execute=False,
-            validate=False,
-            sync=True
+        self,
+        target_symbol,
+        order_side,
+        amount,
+        market=None,
+        execute=False,
+        validate=False,
+        sync=True
     ):
         portfolio = self.portfolio_service.find({"market": market})
         order_data = {
@@ -379,7 +379,7 @@ class Algorithm:
         return self.position_service.exists(query_params)
 
     def get_position_percentage(
-            self, symbol, market=None, identifier=None
+        self, symbol, market=None, identifier=None
     ) -> float:
         query_params = {}
 
@@ -614,8 +614,36 @@ class Algorithm:
             "status": OrderStatus.CLOSED.value,
             "order_side": OrderSide.BUY.value
         })
+
+        symbols = [order.get_symbol() for order in buy_orders]
+        symbols = list(set(symbols))
+        tickers = {}
+
+        for symbol in symbols:
+            tickers[symbol] = self.market_service.get_ticker(symbol)
+
         return [
             Trade(
+                buy_order_id=order.id,
+                target_symbol=order.get_target_symbol(),
+                trading_symbol=order.get_trading_symbol(),
+                amount=order.get_amount(),
+                open_price=order.get_price(),
+                closed_price=order.get_trade_closed_price(),
+                closed_at=order.get_trade_closed_at(),
+                opened_at=order.get_created_at(),
+                current_price=tickers[order.get_symbol()]["bid"]
+            ) for order in buy_orders
+        ]
+
+    def get_closed_trades(self):
+        buy_orders = self.order_service.get_all({
+            "status": OrderStatus.CLOSED.value,
+            "order_side": OrderSide.BUY.value
+        })
+        return [
+            Trade(
+                buy_order_id=order.id,
                 target_symbol=order.get_target_symbol(),
                 trading_symbol=order.get_trading_symbol(),
                 amount=order.get_amount(),
@@ -630,3 +658,53 @@ class Algorithm:
     def round_down(self, value, decimals):
         factor = 1 / (10 ** decimals)
         return (value // factor) * factor
+
+    def get_open_trades(self, target_symbol):
+        buy_orders = self.order_service.get_all({
+            "status": OrderStatus.CLOSED.value,
+            "order_side": OrderSide.BUY.value,
+            "target_symbol": target_symbol
+        })
+        symbols = [order.get_symbol() for order in buy_orders]
+        symbols = list(set(symbols))
+        tickers = {}
+
+        for symbol in symbols:
+            tickers[symbol] = self.market_service.get_ticker(symbol)
+
+        trades = [
+            Trade(
+                buy_order_id=order.id,
+                target_symbol=order.get_target_symbol(),
+                trading_symbol=order.get_trading_symbol(),
+                amount=order.get_amount(),
+                open_price=order.get_price(),
+                opened_at=order.get_created_at(),
+                current_price=tickers[order.get_symbol()]["bid"]
+            ) for order in buy_orders if order.get_trade_closed_at() is None
+        ]
+
+        return trades
+
+    def close_trade(self, trade):
+
+        if trade.closed_at is not None:
+            raise ApiException("Trade already closed.")
+
+        order = self.order_service.get(trade.buy_order_id)
+
+        if order.get_amount() < 0:
+            raise ApiException(
+                "Buy order belonging to the trade has no amount."
+            )
+
+        ticker = self.market_service.get_ticker(
+            symbol=f"{order.target_symbol.upper()}"
+                   f"/{order.trading_symbol.upper()}"
+        )
+        self.create_limit_order(
+            target_symbol=order.target_symbol,
+            amount=order.get_amount(),
+            order_side=OrderSide.SELL.value,
+            price=ticker["bid"],
+        )

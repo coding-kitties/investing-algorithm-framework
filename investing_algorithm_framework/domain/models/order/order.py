@@ -35,6 +35,10 @@ class Order(BaseModel):
         cost=None,
         fee=None,
         position_id=None,
+        stop_loss=None,
+        stop_loss_percentage=None,
+        trailing_stop_loss=None,
+        trailing_stop_loss_percentage=None,
     ):
         if target_symbol is None:
             raise OperationalException("Target symbol is not specified")
@@ -71,6 +75,10 @@ class Order(BaseModel):
         self.remaining = remaining
         self.cost = cost
         self.fee = fee
+        self.stop_loss = stop_loss
+        self.stop_loss_percentage = stop_loss_percentage
+        self.trailing_stop_loss = trailing_stop_loss
+        self.trailing_stop_loss_percentage = trailing_stop_loss_percentage
 
     def get_external_id(self):
         return self.external_id
@@ -194,6 +202,21 @@ class Order(BaseModel):
     def set_fee(self, order_fee):
         self.fee = order_fee
 
+    def get_symbol(self):
+        return self.get_target_symbol() + "/" + self.get_trading_symbol()
+
+    def get_stop_loss(self):
+        return self.stop_loss
+
+    def get_stop_loss_percentage(self):
+        return self.stop_loss_percentage
+
+    def get_trailing_stop_loss(self):
+        return self.trailing_stop_loss
+
+    def get_trailing_stop_loss_percentage(self):
+        return self.trailing_stop_loss_percentage
+
     def to_dict(self):
         return {
             "external_id": self.external_id,
@@ -213,6 +236,10 @@ class Order(BaseModel):
             "remaining": self.remaining,
             "cost": self.cost,
             "fee": self.fee.to_dict() if self.fee is not None else None,
+            "stop_loss": self.stop_loss,
+            "stop_loss_percentage": self.stop_loss_percentage,
+            "trailing_stop_loss": self.trailing_stop_loss,
+            "trailing_stop_loss_percentage": self.trailing_stop_loss_percentage
         }
 
     @staticmethod

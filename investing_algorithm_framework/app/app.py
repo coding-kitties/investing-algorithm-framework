@@ -89,7 +89,6 @@ class App:
         sync=True
     ):
         self.initialize()
-
         portfolio_service = self.container.portfolio_service()
 
         if sync:
@@ -207,12 +206,7 @@ class App:
         function=None,
         time_unit: TimeUnit = TimeUnit.MINUTE,
         interval=10,
-        market=None,
-        trading_data_type=None,
-        trading_data_types=None,
-        trading_time_frame=None,
-        trading_time_frame_start_date=None,
-        symbols=None,
+        market_data_sources=None,
     ):
 
         if function:
@@ -220,16 +214,10 @@ class App:
                 decorated=function,
                 time_unit=time_unit,
                 interval=interval,
-                market=market,
-                trading_data_type=trading_data_type,
-                trading_data_types=trading_data_types,
-                symbols=symbols,
-                trading_time_frame=trading_time_frame,
-                trading_time_frame_start_date=trading_time_frame_start_date
+                market_data_sources=market_data_sources
             )
             self.add_strategy(strategy_object)
         else:
-            start_date = trading_time_frame_start_date
 
             def wrapper(f):
                 self.add_strategy(
@@ -237,12 +225,7 @@ class App:
                         decorated=f,
                         time_unit=time_unit,
                         interval=interval,
-                        market=market,
-                        trading_data_type=trading_data_type,
-                        trading_data_types=trading_data_types,
-                        symbols=symbols,
-                        trading_time_frame=trading_time_frame,
-                        trading_time_frame_start_date=start_date,
+                        market_data_sources=market_data_sources,
                         worker_id=f.__name__
                     )
                 )
@@ -526,11 +509,11 @@ class App:
         )
         self.algorithm.order_service = self.container.order_service()
         self.algorithm.market_service = self.container.market_service()
-        backtest_profile = backtest_service.backtest(
+        report = backtest_service.backtest(
             self.algorithm, start_date, end_date
         )
         configuration_service.config[BACKTESTING_FLAG] = False
-        return backtest_profile
+        return report
 
     def get_ohclv(
         self,

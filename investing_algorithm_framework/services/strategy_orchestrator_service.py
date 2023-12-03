@@ -29,7 +29,6 @@ class StrategyOrchestratorService:
 
     def run_strategy(self, strategy, algorithm, sync=False):
         self.cleanup_threads()
-
         matching_thread = next(
             (t for t in self.threads if t.name == strategy.worker_id),
             None
@@ -39,7 +38,13 @@ class StrategyOrchestratorService:
         if matching_thread:
             return
 
-        market_data = self.market_data_service.get_data_for_strategy(strategy)
+        market_data = {}
+
+        if strategy.market_data_sources is not None \
+                and len(strategy.market_data_sources) > 0:
+            for market_data_source in strategy.market_data_sources:
+                market_data[market_data_source.get_identifier()] \
+                    = market_data_source.get_data()
 
         logger.info(f"Running strategy {strategy.worker_id}")
 
@@ -145,7 +150,6 @@ class StrategyOrchestratorService:
         return schedule.jobs
 
     def run_pending_jobs(self):
-
         if self.max_iterations is not None and \
                 self.max_iterations != -1 and \
                 self.iterations >= self.max_iterations:

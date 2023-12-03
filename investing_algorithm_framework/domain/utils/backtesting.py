@@ -1,4 +1,4 @@
-
+from tabulate import tabulate
 
 def print_number_of_runs(report):
 
@@ -32,22 +32,15 @@ def pretty_print_backtest(backtest_report, show_positions=True, show_trades=True
 
     if show_positions:
         print("====================Positions overview========================")
-        print(f"* Number of positions at the end of backtest: {backtest_report.number_of_positions}")
-        print(f"* Total cost of current positions: "
-              f"{backtest_report.total_cost:.{precision}f} "
-              f"{backtest_report.trading_symbol}")
-        for position in backtest_report.positions:
-            print(
-                f"{position.symbol}, "
-                f"amount: {position.amount:.{precision}f}, "
-                f"cost: {position.cost:.{precision}f} "
-                f"{backtest_report.trading_symbol}, "
-                f"value: {position.value:.{precision}f} "
-                f"{backtest_report.trading_symbol}, "
-                f"growth: {position.growth:.{precision}f} "
-                f"{backtest_report.trading_symbol} "
-                f"({position.growth_rate:.{precision}f}%)."
-            )
+        position_table = {}
+        position_table["Position"] = [position.symbol for position in backtest_report.positions if position.amount > 0 or position.amount_pending > 0]
+        position_table["Amount"] = [f"{position.amount:.{precision}f}" for position in backtest_report.positions if position.amount > 0 or position.amount_pending > 0]
+        position_table["Pending amount"] = [f"{position.amount_pending:.{precision}f}" for position in backtest_report.positions if position.amount > 0 or position.amount_pending > 0]
+        position_table[f"Cost ({backtest_report.trading_symbol})"] = [f"{position.cost:.{precision}f}" for position in backtest_report.positions if position.amount > 0 or position.amount_pending > 0]
+        position_table[f"Value ({backtest_report.trading_symbol})"] = [f"{position.value:.{precision}f}" for position in backtest_report.positions if position.amount > 0 or position.amount_pending > 0]
+        position_table[f"Growth ({backtest_report.trading_symbol})"] = [f"{position.growth:.{precision}f}" for position in backtest_report.positions if position.amount > 0 or position.amount_pending > 0]
+        position_table["Growth_rate"] = [f"{position.growth_rate:.{precision}f}%" for position in backtest_report.positions if position.amount > 0 or position.amount_pending > 0]
+        print(tabulate(position_table, headers="keys", tablefmt="rounded_grid"))
 
     if show_trades:
         print("====================Trades overview===========================")
@@ -66,17 +59,15 @@ def pretty_print_backtest(backtest_report, show_positions=True, show_trades=True
               f"{backtest_report.trading_symbol}")
         print(f"* Average trade duration: "
               f"{backtest_report.average_trade_duration} hours")
-        for trade in backtest_report.trades:
-            print(
-                f"{trade.target_symbol} -> {trade.trading_symbol}, "
-                f"open date: {trade.opened_at}, "
-                f"close date: {trade.closed_at}, "
-                f"size: {trade.size:.{precision}f} {trade.trading_symbol}, "
-                f"net gain: {trade.net_gain:.{precision}f}, "
-                f"net gain percentage: "
-                f"{trade.net_gain_percentage:.{precision}f}%, "
-                f"duration: {trade.duration} hours, "
-                f"open price: {trade.open_price}, "
-                f"close price: {trade.closed_price}"
-            )
+        trades_table = {}
+        trades_table["Pair"] = [f"{trade.target_symbol}-{trade.trading_symbol}" for trade in backtest_report.trades]
+        trades_table["Open date"] = [trade.opened_at for trade in backtest_report.trades]
+        trades_table["Close date"] = [trade.closed_at for trade in backtest_report.trades]
+        trades_table["Duration (hours)"] = [trade.duration for trade in backtest_report.trades]
+        trades_table[f"Size ({backtest_report.trading_symbol})"] = [f"{trade.size:.{precision}f}" for trade in backtest_report.trades]
+        trades_table[f"Net gain ({backtest_report.trading_symbol})"] = [f"{trade.net_gain:.{precision}f}" for trade in backtest_report.trades]
+        trades_table["Net gain percentage"] = [f"{trade.net_gain_percentage:.{precision}f}%" for trade in backtest_report.trades]
+        trades_table[f"Open price ({backtest_report.trading_symbol})"] = [trade.open_price for trade in backtest_report.trades]
+        trades_table[f"Close price ({backtest_report.trading_symbol})"] = [trade.closed_price for trade in backtest_report.trades]
+        print(tabulate(trades_table, headers="keys", tablefmt="rounded_grid"))
     print("==================================================================")

@@ -56,50 +56,47 @@ class PortfolioService(RepositoryService):
             self.market_service.initialize(portfolio_configuration)
             balances = self.market_service.get_balance()
 
-            for symbol in balances:
+            for symbol in balances["free"]:
+                balance = balances["free"][symbol]
                 logger.info(f"Syncing {symbol} balance")
-                logger.info(f"Balance: {balances[symbol]}")
 
-                if "free" in balances[symbol]:
+                if self.position_repository.exists(
+                    {"portfolio_id": portfolio.id, "symbol": symbol}
+                ):
+                    position = self.position_repository.find(
+                        {
+                            "portfolio_id": portfolio.id,
+                            "symbol": symbol
+                        }
+                    )
+                    self.position_repository.update(
+                        position.id,
+                        {"amount": balance}
+                    )
+                else:
+                    self.position_repository.create(
+                        {
+                            "symbol": symbol,
+                            "amount": balance,
+                            "portfolio_id": portfolio.id
+                        }
+                    )
 
-                    if self.position_repository.exists(
-                        {"portfolio_id": portfolio.id, "symbol": symbol}
-                    ):
-                        position = self.position_repository.find(
+                if symbol == portfolio.trading_symbol:
+                    if portfolio.unallocated != balance:
+                        logger.info(
+                            "Updating unallocated balance "
+                            f"from {portfolio.unallocated} "
+                            f"to {balance}"
+                        )
+                        difference = balance - portfolio.get_unallocated()
+                        self.update(
+                            portfolio.id,
                             {
-                                "portfolio_id": portfolio.id,
-                                "symbol": symbol
+                                "unallocated": portfolio.get_unallocated() + difference,
+                                "net_size": portfolio.get_net_size() + difference
                             }
                         )
-                        self.position_repository.update(
-                            position.id,
-                            {"amount": balances[symbol]["free"]}
-                        )
-                    else:
-                        self.position_repository.create(
-                            {
-                                "symbol": symbol,
-                                "amount": balances[symbol]["free"],
-                                "portfolio_id": portfolio.id
-                            }
-                        )
-
-                    if symbol == portfolio.trading_symbol:
-                        if portfolio.unallocated != balances[symbol]["free"]:
-                            logger.info(
-                                "Updating unallocated balance "
-                                f"from {portfolio.unallocated} "
-                                f"to {balances[symbol]['free']}"
-                            )
-                            difference = balances[symbol]["free"] \
-                                         - portfolio.get_unallocated()
-                            self.update(
-                                portfolio.id,
-                                {
-                                    "unallocated": portfolio.get_unallocated() + difference,
-                                    "net_size": portfolio.get_net_size() + difference
-                                }
-                            )
 
 
             for position in self.position_repository.get_all(

@@ -4,12 +4,13 @@ from .time_unit import TimeUnit
 
 class BacktestPosition(BaseModel):
 
-    def __init__(self, position, trading_symbol=False):
-        self.symbol = position.symbol
-        self.amount = position.amount
+    def __init__(self, position, trading_symbol=False, amount_pending=0.0):
+        self._symbol = position.symbol
+        self._amount = position.amount
         self._cost = position.cost
         self._price = 0.0
         self._trading_symbol = trading_symbol
+        self._amount_pending = amount_pending
 
     @property
     def price(self):
@@ -38,6 +39,9 @@ class BacktestPosition(BaseModel):
     @property
     def growth(self):
 
+        if self._amount == 0:
+            return 0.0
+
         if self._trading_symbol:
             return 0.0
 
@@ -53,6 +57,22 @@ class BacktestPosition(BaseModel):
             return 0.0
 
         return self.growth / self.cost * 100
+
+    @property
+    def symbol(self):
+        return self._symbol
+
+    @property
+    def amount(self):
+        return self._amount
+
+    @property
+    def amount_pending(self):
+        return self._amount_pending
+
+    @amount_pending.setter
+    def amount_pending(self, value):
+        self._amount_pending = value
 
 
 class BacktestProfile(BaseModel):

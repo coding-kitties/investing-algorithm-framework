@@ -4,13 +4,14 @@ from time import sleep
 
 import ccxt
 
-from investing_algorithm_framework.domain import OperationalException, \
-    AssetPrice, Order, CCXT_DATETIME_FORMAT
+from investing_algorithm_framework.domain import OperationalException, Order, \
+    CCXT_DATETIME_FORMAT, AssetPrice
+from .market_service import MarketService
 
-logger = logging.getLogger("investing_algorithm_framework")
+logger = logging.getLogger(__name__)
 
 
-class MarketService:
+class CCXTMarketService(MarketService):
     exchange = None
     _market = None
     api_key = None,
@@ -196,11 +197,11 @@ class MarketService:
             raise OperationalException("Could not retrieve balance")
 
     def create_limit_buy_order(
-        self,
-        target_symbol: str,
-        trading_symbol: str,
-        amount: float,
-        price: float
+            self,
+            target_symbol: str,
+            trading_symbol: str,
+            amount: float,
+            price: float
     ):
 
         if not self.exchange.has['createLimitBuyOrder']:
@@ -221,11 +222,11 @@ class MarketService:
             raise OperationalException("Could not create limit buy order")
 
     def create_limit_sell_order(
-        self,
-        target_symbol: str,
-        trading_symbol: str,
-        amount: float,
-        price: float
+            self,
+            target_symbol: str,
+            trading_symbol: str,
+            amount: float,
+            price: float
     ):
 
         if not self.exchange.has['createLimitSellOrder']:
@@ -246,10 +247,10 @@ class MarketService:
             raise OperationalException("Could not create limit sell order")
 
     def create_market_sell_order(
-        self,
-        target_symbol: str,
-        trading_symbol: str,
-        amount: float,
+            self,
+            target_symbol: str,
+            trading_symbol: str,
+            amount: float,
     ):
 
         if not self.exchange.has['createMarketSellOrder']:
@@ -279,7 +280,7 @@ class MarketService:
             f"{order.get_target_symbol()}/{order.get_trading_symbol()}")
 
     def get_open_orders(
-        self, target_symbol: str = None, trading_symbol: str = None
+            self, target_symbol: str = None, trading_symbol: str = None
     ):
 
         if not self.exchange.has['fetchOpenOrders']:
@@ -300,7 +301,7 @@ class MarketService:
             raise OperationalException("Could not retrieve open orders")
 
     def get_closed_orders(
-        self, target_symbol: str = None, trading_symbol: str = None
+            self, target_symbol: str = None, trading_symbol: str = None
     ):
 
         if not self.exchange.has['fetchClosedOrders']:
@@ -339,7 +340,7 @@ class MarketService:
             logger.exception(e)
             raise OperationalException("Could not retrieve prices")
 
-    def get_ohclv(self, symbol, time_frame, from_timestamp, to_timestamp=None):
+    def get_ohlcv(self, symbol, time_frame, from_timestamp, to_timestamp=None):
 
         if not self.exchange.has['fetchOHLCV']:
             raise OperationalException(
@@ -347,7 +348,7 @@ class MarketService:
                 f"functionality get_ohclvs"
             )
 
-        time_stamp = self.exchange.parse8601(
+        from_time_stamp = self.exchange.parse8601(
             from_timestamp.strftime(CCXT_DATETIME_FORMAT)
         )
 
@@ -359,17 +360,17 @@ class MarketService:
             )
         data = []
 
-        while time_stamp < to_timestamp:
+        while from_time_stamp <= to_timestamp:
             ohlcv = self.exchange.fetch_ohlcv(
-                symbol, time_frame, time_stamp
+                symbol, time_frame, from_time_stamp
             )
 
             if len(ohlcv) > 0:
-                time_stamp = \
+                from_time_stamp = \
                     ohlcv[-1][0] + \
                     self.exchange.parse_timeframe(time_frame) * 1000
             else:
-                time_stamp = to_timestamp
+                from_time_stamp = to_timestamp
 
             for candle in ohlcv:
                 datetime_stamp = datetime.strptime(
@@ -379,19 +380,19 @@ class MarketService:
                     self.exchange.iso8601(to_timestamp), CCXT_DATETIME_FORMAT
                 )
 
-                if datetime_stamp < to_timestamp_datetime:
+                if datetime_stamp <= to_timestamp_datetime:
                     data.append([datetime_stamp] + candle[1:])
 
             sleep(self.exchange.rateLimit / 1000)
 
         return data
 
-    def get_ohclvs(
-        self,
-        symbols,
-        time_frame,
-        from_timestamp,
-        to_timestamp=None
+    def get_ohlcvs(
+            self,
+            symbols,
+            time_frame,
+            from_timestamp,
+            to_timestamp=None
     ):
         ohlcvs = {}
 
@@ -403,6 +404,6 @@ class MarketService:
                 )
             except Exception as e:
                 logger.exception(e)
-                logger.error(f"Could not retrieve ohclv data for {symbol}")
+                logger.error(f"Could not retrieve ohlcv data for {symbol}")
 
         return ohlcvs

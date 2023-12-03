@@ -43,7 +43,7 @@ class OrderBacktestService(OrderService):
         )
         return order
 
-    def check_pending_orders(self, ohlcvs=None):
+    def check_pending_orders(self, market_data=None):
         pending_orders = self.get_all({"status": OrderStatus.OPEN.value})
         logger.info(f"Checking {len(pending_orders)} open orders")
 
@@ -51,9 +51,9 @@ class OrderBacktestService(OrderService):
             symbol = f"{order.target_symbol.upper()}" \
                      f"/{order.trading_symbol.upper()}"
 
-            if symbol in ohlcvs:
+            if symbol in market_data:
                 data_slice = [
-                    ohclv for ohclv in ohlcvs[symbol]
+                    ohclv for ohclv in market_data[symbol]
                     if ohclv[0] >= order.get_created_at()
                 ]
 
