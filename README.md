@@ -176,7 +176,10 @@ found [here](https://github.com/investing-algorithms/investing-algorithm-framewo
 If you discover a bug in the framework, please [search our issue tracker](https://github.com/investing-algorithms/investing-algorithm-framework/issues?q=is%3Aissue)
 first. If it hasn't been reported, please [create a new issue](https://github.com/investing-algorithms/investing-algorithm-framework/issues/new).
 
+### Contributing
 Feel like the framework is missing a feature? We welcome your pull requests!
+If you want to contribute to the project roadmap, please take a look at the [project board](https://github.com/coding-kitties/investing-algorithm-framework/projects?query=is%3Aopen).
+You can pick up a task by assigning yourself to it. 
 
 **Note** before starting any major new feature work, *please open an issue describing what you are planning to do*.
 This will ensure that interested parties can give valuable feedback on the feature, and let others know that you are working on it.
