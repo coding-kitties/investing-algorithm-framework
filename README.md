@@ -27,44 +27,40 @@ import pathlib
 from datetime import datetime, timedelta
 
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    RESOURCE_DIRECTORY, TimeUnit, TradingTimeFrame, TradingDataType, OrderSide
+    RESOURCE_DIRECTORY, TimeUnit, CCXTOHLCVMarketDataSource, Algorithm
 
+def start_date_func():
+    return datetime.utcnow() - timedelta(days=17)
+
+# Define market data sources
+bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
+    identifier="BTC",
+    market="BITVAVO",
+    symbol="BTC/EUR",
+    timeframe="2h",
+    start_date_func=start_date_func
+)
 app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 app.add_portfolio_configuration(
     PortfolioConfiguration(
         market="BITVAVO",
-        api_key="xxxxxx",
-        secret_key="xxxxxx",
+        api_key="<your api key>",
+        secret_key="<your secret key>",
         trading_symbol="USDT"
     )
 )
 
 
 @app.strategy(
-    time_unit=TimeUnit.HOUR,  # Algorithm will be executed every 2 hours
-    interval=2,
-    market="BITVAVO",  # Will retrieve trading data from binance
-    symbols=["BTC/EUR", "ETH/EUR", "DOT/EUR"],
-    # Symbols must be in the format of TARGET/TRADE symbol (e.g. BTC/USDT)
-    trading_data_types=[TradingDataType.OHLCV, TradingDataType.TICKER],
-    trading_time_frame_start_date=datetime.utcnow() - timedelta(days=1),
-    # Will retrieve data from the last 24 hours
-    trading_time_frame=TradingTimeFrame.ONE_MINUTE
-    # Will retrieve data on 1m interval (OHLCV)
+    time_unit=TimeUnit.HOUR, 
+    interval=2, 
+    market_data_sources=[bitvavo_btc_eur_ohlcv_2h]
 )
-def perform_strategy(algorithm, market_data):
-    target_symbol = "BTC"
-    price = market_data[TradingDataType.TICKER]["BTC/EUR"]["bid"]
-
-    if not algorithm.has_open_orders(target_symbol) and \
-            not algorithm.has_position(target_symbol):
-        algorithm.create_limit_order(
-            target_symbol,
-            order_side=OrderSide.BUY,
-            percentage_of_portfolio=25,
-            # You can also use amount instead of percentage_of_portfolio
-            price=price
-        )
+def perform_strategy(algorithm: Algorithm, market_data):
+    print(
+        f"Performing trading strategy on market " +
+        f"data {market_data[bitvavo_btc_eur_ohlcv_2h.get_identifier()]}"
+    )
 
 if __name__ == "__main__":
     app.run()
@@ -80,38 +76,32 @@ but instead of running the algorithm, you can run a backtest.
 import pathlib
 from datetime import datetime, timedelta
 
-from investing_algorithm_framework import create_app, OrderSide, \
-    RESOURCE_DIRECTORY, TimeUnit, TradingTimeFrame, TradingDataType, \
-    pretty_print_backtest
+from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
+    TimeUnit, CCXTOHLCVMarketDataSource, Algorithm
 
+def start_date_func():
+    return datetime.utcnow() - timedelta(days=17)
+
+# Define market data sources
+bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
+    identifier="BTC",
+    market="BITVAVO",
+    symbol="BTC/EUR",
+    timeframe="2h",
+    start_date_func=start_date_func
+)
 app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 
 @app.strategy(
-    time_unit=TimeUnit.HOUR,  # Algorithm will be executed every 2 hours
-    interval=2,
-    market="BITVAVO",  # Will retrieve trading data from binance
-    symbols=["BTC/EUR", "ETH/EUR", "DOT/EUR"],
-    # Symbols must be in the format of TARGET/TRADE symbol (e.g. BTC/USDT)
-    trading_data_types=[TradingDataType.OHLCV, TradingDataType.TICKER],
-    trading_time_frame_start_date=datetime.utcnow() - timedelta(days=1),
-    # Will retrieve data from the last 24 hours
-    trading_time_frame=TradingTimeFrame.ONE_MINUTE
-    # Will retrieve data on 1m interval (OHLCV)
+    time_unit=TimeUnit.HOUR, 
+    interval=2, 
+    market_data_sources=[bitvavo_btc_eur_ohlcv_2h]
 )
-def perform_strategy(algorithm, market_data):
-    target_symbol = "BTC"
-    price = market_data[TradingDataType.TICKER]["BTC/EUR"]["bid"]
-
-    if not algorithm.has_open_orders(target_symbol) and \
-            not algorithm.has_position(target_symbol):
-        algorithm.create_limit_order(
-            target_symbol,
-            order_side=OrderSide.BUY,
-            percentage_of_portfolio=25,
-            # You can also use amount instead of percentage_of_portfolio
-            price=price
-        )
-
+def perform_strategy(algorithm: Algorithm, market_data):
+    print(
+        f"Performing trading strategy on market " +
+        f"data {market_data[bitvavo_btc_eur_ohlcv_2h.get_identifier()]}"
+    )
 
 if __name__ == "__main__":
     backtest_report = app.backtest(
