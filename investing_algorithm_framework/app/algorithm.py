@@ -378,9 +378,16 @@ class Algorithm:
         query_params["symbol"] = symbol
         return self.position_service.exists(query_params)
 
-    def get_position_percentage(
+    def get_position_percentage_of_portfolio(
         self, symbol, market=None, identifier=None
     ) -> float:
+        """
+        Returns the percentage of the current total value of the portfolio
+        that is allocated to a position. This is calculated by dividing
+        the current value of the position by the total current value
+        of the portfolio.
+        """
+
         query_params = {}
 
         if market is not None:
@@ -401,8 +408,40 @@ class Algorithm:
         ticker = self.market_service.get_ticker(
             f"{symbol.upper()}/{portfolio.trading_symbol.upper()}"
         )
-        return (position.amount * ticker["bid"] /
-                self.get_allocated(identifier=portfolio.identifier)) * 100
+        total = self.get_unallocated() + self.get_allocated()
+        return (position.amount * ticker["bid"] / total) * 100
+
+    def get_position_percentage_of_portfolio_by_net_size(
+        self, symbol, market=None, identifier=None
+    ) -> float:
+        """
+        Returns the percentage of the portfolio that is allocated to a
+        position. This is calculated by dividing the cost of the position
+        by the total net size of the portfolio.
+
+        The total net size of the portfolio is the initial balance of the
+        portfolio plus the all the net gains of your trades.
+        """
+        query_params = {}
+
+        if market is not None:
+            query_params["market"] = market
+
+        if identifier is not None:
+            query_params["identifier"] = identifier
+
+        portfolios = self.portfolio_service.get_all(query_params)
+
+        if not portfolios:
+            raise ApiException("No portfolio found.")
+
+        portfolio = portfolios[0]
+        position = self.position_service.find(
+            {"portfolio": portfolio.id, "symbol": symbol}
+        )
+        net_size = portfolio.get_net_size()
+        return (position.cost / net_size) * 100
+
 
     def close_position(self, symbol, market=None, identifier=None):
         portfolio = self.portfolio_service.find(
