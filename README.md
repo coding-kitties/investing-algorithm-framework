@@ -25,12 +25,8 @@ It also exposes an REST API that allows you to interact with the algorithm.
 ```python
 import pathlib
 from datetime import datetime, timedelta
-
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
     RESOURCE_DIRECTORY, TimeUnit, CCXTOHLCVMarketDataSource, Algorithm
-
-def start_date_func():
-    return datetime.utcnow() - timedelta(days=17)
 
 # Define market data sources
 bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
@@ -38,7 +34,7 @@ bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
     market="BITVAVO",
     symbol="BTC/EUR",
     timeframe="2h",
-    start_date_func=start_date_func
+    start_date_func=lambda : datetime.utcnow() - timedelta(days=17)
 )
 app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 app.add_portfolio_configuration(
@@ -75,12 +71,8 @@ but instead of running the algorithm, you can run a backtest.
 ```python
 import pathlib
 from datetime import datetime, timedelta
-
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, pretty_print_backtest
-
-def start_date_func():
-    return datetime.utcnow() - timedelta(days=17)
 
 # Define market data sources
 bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
@@ -88,7 +80,7 @@ bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
     market="BITVAVO",
     symbol="BTC/EUR",
     timeframe="2h",
-    start_date_func=start_date_func
+    start_date_func=lambda : datetime.utcnow() - timedelta(days=17)
 )
 app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 
