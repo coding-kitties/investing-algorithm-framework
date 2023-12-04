@@ -289,7 +289,9 @@ class BackTestService:
 
             if position.symbol == portfolio.trading_symbol:
                 backtest_position = BacktestPosition(
-                    position, trading_symbol=True
+                    position,
+                    trading_symbol=True,
+                    total_value_portfolio=backtest_profile.total_value
                 )
                 backtest_position.price = 1
             else:
@@ -305,7 +307,9 @@ class BackTestService:
                     amount_in_pending_orders += order.amount
 
                 backtest_position = BacktestPosition(
-                    position, amount_pending=amount_in_pending_orders
+                    position,
+                    amount_pending=amount_in_pending_orders,
+                    total_value_portfolio=backtest_profile.total_value
                 )
                 ticker = self._market_service.get_ticker(
                     f"{position.symbol}/{portfolio.trading_symbol}"

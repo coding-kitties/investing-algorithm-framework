@@ -4,13 +4,20 @@ from .time_unit import TimeUnit
 
 class BacktestPosition(BaseModel):
 
-    def __init__(self, position, trading_symbol=False, amount_pending=0.0):
+    def __init__(
+        self,
+        position,
+        trading_symbol=False,
+        amount_pending=0.0,
+        total_value_portfolio=0.0
+    ):
         self._symbol = position.symbol
         self._amount = position.amount
         self._cost = position.cost
         self._price = 0.0
         self._trading_symbol = trading_symbol
         self._amount_pending = amount_pending
+        self._total_value_portfolio = total_value_portfolio
 
     @property
     def price(self):
@@ -73,6 +80,21 @@ class BacktestPosition(BaseModel):
     @amount_pending.setter
     def amount_pending(self, value):
         self._amount_pending = value
+
+    @property
+    def percentage_of_portfolio(self):
+
+        if self._total_value_portfolio == 0:
+            return 0.0
+
+        return self.value / self._total_value_portfolio * 100
+
+    def get_percentage_of_portfolio(self):
+
+        if self._total_value_portfolio == 0:
+            return 0.0
+
+        return self.value / self._total_value_portfolio * 100
 
 
 class BacktestProfile(BaseModel):

@@ -38,6 +38,7 @@ def pretty_print_backtest(backtest_report, show_positions=True, show_trades=True
         position_table["Pending amount"] = [f"{position.amount_pending:.{precision}f}" for position in backtest_report.positions if position.amount > 0 or position.amount_pending > 0]
         position_table[f"Cost ({backtest_report.trading_symbol})"] = [f"{position.cost:.{precision}f}" for position in backtest_report.positions if position.amount > 0 or position.amount_pending > 0]
         position_table[f"Value ({backtest_report.trading_symbol})"] = [f"{position.value:.{precision}f}" for position in backtest_report.positions if position.amount > 0 or position.amount_pending > 0]
+        position_table["Percentage of portfolio"] = [f"{position.percentage_of_portfolio:.{precision}f}%" for position in backtest_report.positions if position.amount > 0 or position.amount_pending > 0]
         position_table[f"Growth ({backtest_report.trading_symbol})"] = [f"{position.growth:.{precision}f}" for position in backtest_report.positions if position.amount > 0 or position.amount_pending > 0]
         position_table["Growth_rate"] = [f"{position.growth_rate:.{precision}f}%" for position in backtest_report.positions if position.amount > 0 or position.amount_pending > 0]
         print(tabulate(position_table, headers="keys", tablefmt="rounded_grid"))

@@ -126,7 +126,7 @@ app.add_strategy(MyTradingStrategy)
 
 if __name__ == "__main__":
     end_date = datetime(2023, 12, 2)
-    start_date = end_date - timedelta(days=100)
+    start_date = end_date - timedelta(days=20)
     backtest_report = app.backtest(
         start_date=start_date,
         end_date=end_date,
