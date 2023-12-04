@@ -46,7 +46,7 @@ app.add_portfolio_configuration(
         market="BITVAVO",
         api_key="<your api key>",
         secret_key="<your secret key>",
-        trading_symbol="USDT"
+        trading_symbol="EUR"
     )
 )
 
@@ -77,7 +77,7 @@ import pathlib
 from datetime import datetime, timedelta
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    TimeUnit, CCXTOHLCVMarketDataSource, Algorithm
+    TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, pretty_print_backtest
 
 def start_date_func():
     return datetime.utcnow() - timedelta(days=17)
