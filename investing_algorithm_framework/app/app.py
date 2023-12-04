@@ -19,7 +19,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     SQLALCHEMY_DATABASE_URI, OperationalException, PortfolioConfiguration, \
     BACKTESTING_FLAG, BACKTESTING_START_DATE, BACKTEST_DATA_DIRECTORY_NAME
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
-    create_all_tables, MarketBacktestService, MarketService
+    create_all_tables, MarketBacktestService, MarketService, CCXTMarketService
 from investing_algorithm_framework.services import OrderBacktestService
 
 logger = logging.getLogger("investing_algorithm_framework")
@@ -513,6 +513,8 @@ class App:
             self.algorithm, start_date, end_date
         )
         configuration_service.config[BACKTESTING_FLAG] = False
+        self.container.market_service.override(CCXTMarketService)
+        self.container.order_service.override(Order)
         return report
 
     def get_ohclv(

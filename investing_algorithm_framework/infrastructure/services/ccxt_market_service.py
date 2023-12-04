@@ -360,7 +360,7 @@ class CCXTMarketService(MarketService):
             )
         data = []
 
-        while from_time_stamp <= to_timestamp:
+        while from_time_stamp < to_timestamp:
             ohlcv = self.exchange.fetch_ohlcv(
                 symbol, time_frame, from_time_stamp
             )
