@@ -126,13 +126,13 @@ class CCXTOHLCVBacktestMarketDataSource(
             minutes=self.total_minutes_timeframe
         )
 
-        if from_timestamp > self.start_date:
+        if from_timestamp < self.backtest_data_start_date:
             raise OperationalException(
                 f"Cannot get data from {from_timestamp} as the "
                 f"backtest data starts at {self.start_date}"
             )
 
-        if to_timestamp > self.end_date:
+        if to_timestamp > self.backtest_data_end_date:
             raise OperationalException(
                 f"Cannot get data to {to_timestamp} as the "
                 f"backtest data ends at {self.end_date}"
