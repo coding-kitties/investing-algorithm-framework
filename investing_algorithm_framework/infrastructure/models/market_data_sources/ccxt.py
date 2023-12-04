@@ -306,7 +306,7 @@ class CCXTTickerBacktestMarketDataSource(
 
             # If the difference is more than 4 hours, we can assume
             # that the data is not available
-            if difference_in_minutes < 240:
+            if difference_in_minutes <= 240:
                 return {
                     "symbol": self.symbol,
                     "bid": float(previous_row[4]),
