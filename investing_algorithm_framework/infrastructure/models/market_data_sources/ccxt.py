@@ -221,7 +221,7 @@ class CCXTTickerBacktestMarketDataSource(
         market_service.market = self.market
         ohlcv = market_service.get_ohlcv(
             symbol=self.symbol,
-            time_frame="1d",
+            time_frame="4h",
             from_timestamp=backtest_data_start_date,
             to_timestamp=backtest_end_date
         )
@@ -297,6 +297,22 @@ class CCXTTickerBacktestMarketDataSource(
                         )
                 else:
                     previous_row = row
+
+        if previous_row is not None:
+            difference = backtest_index_date - datetime\
+                .strptime(previous_row[0], DATETIME_FORMAT)
+            difference_in_minutes = difference.days * 24 * 60 + \
+                difference.seconds / 60
+
+            # If the difference is more than 4 hours, we can assume
+            # that the data is not available
+            if difference_in_minutes < 240:
+                return {
+                    "symbol": self.symbol,
+                    "bid": float(previous_row[4]),
+                    "ask": float(previous_row[4]),
+                    "datetime": previous_row[0],
+                }
 
         raise OperationalException(
             f"Could not find ticker data for date "
