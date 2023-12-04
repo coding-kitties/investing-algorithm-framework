@@ -514,7 +514,6 @@ class App:
         )
         configuration_service.config[BACKTESTING_FLAG] = False
         self.container.market_service.override(CCXTMarketService)
-        self.container.order_service.override(Order)
         return report
 
     def get_ohclv(
