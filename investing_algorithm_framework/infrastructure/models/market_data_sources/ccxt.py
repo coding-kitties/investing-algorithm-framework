@@ -279,15 +279,15 @@ class CCXTTickerBacktestMarketDataSource(
                     if backtest_index_date == row_date:
                         return {
                             "symbol": self.symbol,
-                            "bid": row[4],
-                            "ask": row[4],
+                            "bid": float(row[4]),
+                            "ask": float(row[4]),
                             "datetime": row[0],
                         }
                     elif previous_row is not None:
                         return {
                             "symbol": self.symbol,
-                            "bid": previous_row[4],
-                            "ask": previous_row[4],
+                            "bid": float(previous_row[4]),
+                            "ask": float(previous_row[4]),
                             "datetime": previous_row[0],
                         }
                     else:
