@@ -79,6 +79,7 @@ class Order(BaseModel):
         self.stop_loss_percentage = stop_loss_percentage
         self.trailing_stop_loss = trailing_stop_loss
         self.trailing_stop_loss_percentage = trailing_stop_loss_percentage
+        self._available_amount = self.filled
 
     def get_external_id(self):
         return self.external_id
@@ -205,17 +206,23 @@ class Order(BaseModel):
     def get_symbol(self):
         return self.get_target_symbol() + "/" + self.get_trading_symbol()
 
-    def get_stop_loss(self):
-        return self.stop_loss
+    def get_available_amount(self):
 
-    def get_stop_loss_percentage(self):
-        return self.stop_loss_percentage
+        if self._available_amount is None:
+            return self.get_filled()
 
-    def get_trailing_stop_loss(self):
-        return self.trailing_stop_loss
+        return self._available_amount
 
-    def get_trailing_stop_loss_percentage(self):
-        return self.trailing_stop_loss_percentage
+    @property
+    def available_amount(self):
+        return self.get_available_amount()
+
+    def set_available_amount(self, available_amount):
+        self._available_amount = available_amount
+
+    @available_amount.setter
+    def available_amount(self, available_amount):
+        self.set_available_amount(available_amount)
 
     def to_dict(self):
         return {

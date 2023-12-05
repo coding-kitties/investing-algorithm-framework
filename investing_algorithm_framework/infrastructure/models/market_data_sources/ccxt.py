@@ -315,8 +315,10 @@ class CCXTTickerBacktestMarketDataSource(
                 }
 
         raise OperationalException(
-            f"Could not find ticker data for date "
-            f"{backtest_index_date}"
+            f"Could not find {self.symbol} ticker data for date "
+            f"{backtest_index_date}. Please make sure that the selected "
+            f"broker or exchange {self.market} has ticker data"
+            f" available for symbol {self.symbol}"
         )
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:

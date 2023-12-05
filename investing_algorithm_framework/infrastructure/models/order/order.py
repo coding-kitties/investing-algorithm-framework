@@ -41,6 +41,7 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
         back_populates="order",
         cascade="all, delete"
     )
+    _available_amount = None
 
     def update(self, data):
 

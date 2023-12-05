@@ -61,5 +61,6 @@ class Test(TestBase):
             order_side="SELL",
             amount=20
         )
+        self.assertEqual(0, len(self.app.algorithm.get_open_trades("BTC")))
         order_service.check_pending_orders()
         self.assertEqual(0, len(self.app.algorithm.get_open_trades("BTC")))

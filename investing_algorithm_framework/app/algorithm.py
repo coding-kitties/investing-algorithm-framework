@@ -50,16 +50,16 @@ class Algorithm:
         self.strategy_orchestrator_service.run_pending_jobs()
 
     def create_order(
-        self,
-        target_symbol,
-        price,
-        order_type,
-        order_side,
-        amount,
-        market=None,
-        execute=True,
-        validate=True,
-        sync=True
+            self,
+            target_symbol,
+            price,
+            order_type,
+            order_side,
+            amount,
+            market=None,
+            execute=True,
+            validate=True,
+            sync=True
     ):
         portfolio = self.portfolio_service.find({"market": market})
         order_data = {
@@ -83,18 +83,18 @@ class Algorithm:
         )
 
     def create_limit_order(
-        self,
-        target_symbol,
-        price,
-        order_side,
-        amount=None,
-        percentage_of_portfolio=None,
-        percentage_of_position=None,
-        precision=None,
-        market=None,
-        execute=True,
-        validate=True,
-        sync=True
+            self,
+            target_symbol,
+            price,
+            order_side,
+            amount=None,
+            percentage_of_portfolio=None,
+            percentage_of_position=None,
+            precision=None,
+            market=None,
+            execute=True,
+            validate=True,
+            sync=True
     ):
         portfolio = self.portfolio_service.find({"market": market})
 
@@ -148,14 +148,14 @@ class Algorithm:
         )
 
     def create_market_order(
-        self,
-        target_symbol,
-        order_side,
-        amount,
-        market=None,
-        execute=False,
-        validate=False,
-        sync=True
+            self,
+            target_symbol,
+            order_side,
+            amount,
+            market=None,
+            execute=False,
+            validate=False,
+            sync=True
     ):
         portfolio = self.portfolio_service.find({"market": market})
         order_data = {
@@ -201,13 +201,13 @@ class Algorithm:
         self._running_workers = []
 
     def get_order(
-        self,
-        reference_id=None,
-        market=None,
-        target_symbol=None,
-        trading_symbol=None,
-        order_side=None,
-        order_type=None
+            self,
+            reference_id=None,
+            market=None,
+            target_symbol=None,
+            trading_symbol=None,
+            order_side=None,
+            order_type=None
     ) -> Order:
         query_params = {}
 
@@ -236,12 +236,12 @@ class Algorithm:
         return self.order_service.find(query_params)
 
     def get_orders(
-        self,
-        target_symbol=None,
-        status=None,
-        order_type=None,
-        order_side=None,
-        market=None
+            self,
+            target_symbol=None,
+            status=None,
+            order_type=None,
+            order_side=None,
+            market=None
     ) -> List[Order]:
 
         if market is None:
@@ -326,14 +326,14 @@ class Algorithm:
             return None
 
     def has_position(
-        self,
-        symbol,
-        market=None,
-        identifier=None,
-        amount_gt=0,
-        amount_gte=None,
-        amount_lt=None,
-        amount_lte=None
+            self,
+            symbol,
+            market=None,
+            identifier=None,
+            amount_gt=0,
+            amount_gte=None,
+            amount_lt=None,
+            amount_lte=None
     ):
         return self.position_exists(
             symbol,
@@ -379,7 +379,7 @@ class Algorithm:
         return self.position_service.exists(query_params)
 
     def get_position_percentage_of_portfolio(
-        self, symbol, market=None, identifier=None
+            self, symbol, market=None, identifier=None
     ) -> float:
         """
         Returns the percentage of the current total value of the portfolio
@@ -412,7 +412,7 @@ class Algorithm:
         return (position.amount * ticker["bid"] / total) * 100
 
     def get_position_percentage_of_portfolio_by_net_size(
-        self, symbol, market=None, identifier=None
+            self, symbol, market=None, identifier=None
     ) -> float:
         """
         Returns the percentage of the portfolio that is allocated to a
@@ -442,7 +442,6 @@ class Algorithm:
         net_size = portfolio.get_net_size()
         return (position.cost / net_size) * 100
 
-
     def close_position(self, symbol, market=None, identifier=None):
         portfolio = self.portfolio_service.find(
             {"market": market, "identifier": identifier}
@@ -459,9 +458,9 @@ class Algorithm:
             return
 
         for order in self.order_service \
-            .get_all({
-                "position": position.id, "status": OrderStatus.OPEN.value
-            }):
+                .get_all({
+            "position": position.id, "status": OrderStatus.OPEN.value
+        }):
             self.market_service.cancel_order(order.id)
 
         ticker = self.market_service.get_ticker(
@@ -704,6 +703,27 @@ class Algorithm:
             "order_side": OrderSide.BUY.value,
             "target_symbol": target_symbol
         })
+        sell_orders = self.order_service.get_all({
+            "status": OrderStatus.OPEN.value,
+            "order_side": OrderSide.SELL.value,
+            "target_symbol": target_symbol
+        })
+        sell_amount = sum([order.get_amount() for order in sell_orders])
+
+        # Subtract the amount of the open sell orders
+        # from the amount of the buy orders
+        while sell_amount > 0 and len(buy_orders) > 0:
+            first_order = buy_orders[0]
+
+            if first_order.get_available_amount() > sell_amount:
+                first_order.set_available_amount(
+                    first_order.get_available_amount() - sell_amount
+                )
+                sell_amount = 0
+            else:
+                sell_amount = sell_amount - first_order.get_available_amount()
+                buy_orders.pop(0)
+
         symbols = [order.get_symbol() for order in buy_orders]
         symbols = list(set(symbols))
         tickers = {}
@@ -737,13 +757,24 @@ class Algorithm:
                 "Buy order belonging to the trade has no amount."
             )
 
+        position = self.get_position(order.get_target_symbol())
+        amount = order.get_amount()
+        if position.get_amount() < amount:
+            logger.warning(
+                f"Order amount {amount} is larger then amount "
+                f"of available {position.symbol} "
+                f"position: {position.get_amount()}, "
+                f"changing order amount to size of position"
+            )
+            amount = position.get_amount()
+
         ticker = self.market_service.get_ticker(
             symbol=f"{order.target_symbol.upper()}"
                    f"/{order.trading_symbol.upper()}"
         )
         self.create_limit_order(
             target_symbol=order.target_symbol,
-            amount=order.get_amount(),
+            amount=amount,
             order_side=OrderSide.SELL.value,
             price=ticker["bid"],
         )
