@@ -172,7 +172,7 @@ class CCXTTickerBacktestMarketDataSource(
     backtest_data_index_date = None
     backtest_data_start_date = None
     backtest_data_end_date = None
-    total_minutes_timeframe = 1440
+    total_minutes_timeframe = 15
 
     def __init__(
         self,
@@ -221,7 +221,7 @@ class CCXTTickerBacktestMarketDataSource(
         market_service.market = self.market
         ohlcv = market_service.get_ohlcv(
             symbol=self.symbol,
-            time_frame="4h",
+            time_frame="15m",
             from_timestamp=backtest_data_start_date,
             to_timestamp=backtest_end_date
         )
@@ -309,8 +309,8 @@ class CCXTTickerBacktestMarketDataSource(
             if difference_in_minutes <= 240:
                 return {
                     "symbol": self.symbol,
-                    "bid": float(previous_row[4]),
-                    "ask": float(previous_row[4]),
+                    "bid": float(previous_row[3]) + float(previous_row[2]) / 2,
+                    "ask": float(previous_row[3]) + float(previous_row[2]) / 2,
                     "datetime": previous_row[0],
                 }
 
