@@ -5,7 +5,7 @@ import pandas as pd
 
 from investing_algorithm_framework import create_app, TimeUnit, \
     TradingStrategy, RESOURCE_DIRECTORY, pretty_print_backtest, \
-    Algorithm, OrderSide, CCXTOHLCVMarketDataSource
+    Algorithm, OrderSide, CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource
 
 
 def start_date_func():
@@ -25,6 +25,17 @@ bitvavo_dot_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
     symbol="DOT/EUR",
     timeframe="2h",
     start_date_func=start_date_func
+)
+# Add ticker data for backtesting purposes
+bitvavo_dot_eur_ticker = CCXTTickerMarketDataSource(
+    identifier="DOT/EUR-ticker",
+    market="BITVAVO",
+    symbol="DOT/EUR",
+)
+bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
+    identifier="BTC/EUR-ticker",
+    market="BITVAVO",
+    symbol="BTC/EUR",
 )
 
 
@@ -84,7 +95,12 @@ def calculate_moving_average(df: pd.DataFrame, period):
 class MyTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 2
-    market_data_sources = [bitvavo_btc_eur_ohlcv_2h, bitvavo_dot_eur_ohlcv_2h]
+    market_data_sources = [
+        bitvavo_btc_eur_ohlcv_2h,
+        bitvavo_dot_eur_ohlcv_2h,
+        bitvavo_btc_eur_ticker,
+        bitvavo_dot_eur_ticker
+    ]
     symbols = ["BTC/EUR", "DOT/EUR"]
 
     def apply_strategy(self, algorithm: Algorithm, market_data):

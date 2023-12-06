@@ -251,52 +251,62 @@ class CCXTTickerBacktestMarketDataSource(
         )
 
     def get_data(self, backtest_index_date, **kwargs):
-        file_path = self._create_file_path()
-        to_timestamp = backtest_index_date
+        market_service = CCXTMarketService()
+        market_service.market = self.market
+        ohlcv = market_service.get_ohlcv(
+            symbol=self.symbol,
+            time_frame="15m",
+            from_timestamp=backtest_index_date - timedelta(minutes=15),
+            to_timestamp=backtest_index_date + timedelta(minutes=15)
+        )
+        return ohlcv[1]
 
-        if backtest_index_date < self.backtest_data_start_date:
-            raise OperationalException(
-                f"Cannot get data from {backtest_index_date} as the "
-                f"backtest data starts at {self.backtest_data_start_date}"
-            )
-
-        if backtest_index_date > self.backtest_data_end_date:
-            raise OperationalException(
-                f"Cannot get data to {to_timestamp} as the "
-                f"backtest data ends at {self.backtest_data_end_date}"
-            )
-
-        with open(file_path, 'r') as file:
-            reader = csv.reader(file)
-            next(reader)  # Skip the header row
-            previous_row = None
-
-            for row in reader:
-                row_date = datetime.strptime(row[0], DATETIME_FORMAT)
-
-                if backtest_index_date <= row_date:
-
-                    if backtest_index_date == row_date:
-                        return {
-                            "symbol": self.symbol,
-                            "bid": float(row[4]),
-                            "ask": float(row[4]),
-                            "datetime": row[0],
-                        }
-                    elif previous_row is not None:
-                        return {
-                            "symbol": self.symbol,
-                            "bid": float(previous_row[4]),
-                            "ask": float(previous_row[4]),
-                            "datetime": previous_row[0],
-                        }
-                    else:
-                        raise OperationalException(
-                            f"Could not find ticker data for date "
-                            f"{backtest_index_date}"
-                        )
-                else:
-                    previous_row = row
+        # file_path = self._create_file_path()
+        # to_timestamp = backtest_index_date
+        #
+        # if backtest_index_date < self.backtest_data_start_date:
+        #     raise OperationalException(
+        #         f"Cannot get data from {backtest_index_date} as the "
+        #         f"backtest data starts at {self.backtest_data_start_date}"
+        #     )
+        #
+        # if backtest_index_date > self.backtest_data_end_date:
+        #     raise OperationalException(
+        #         f"Cannot get data to {to_timestamp} as the "
+        #         f"backtest data ends at {self.backtest_data_end_date}"
+        #     )
+        #
+        # with open(file_path, 'r') as file:
+        #     reader = csv.reader(file)
+        #     next(reader)  # Skip the header row
+        #     previous_row = None
+        #
+        #     for row in reader:
+        #         row_date = datetime.strptime(row[0], DATETIME_FORMAT)
+        #
+        #         if backtest_index_date <= row_date:
+        #
+        #             if backtest_index_date == row_date:
+        #                 return {
+        #                     "symbol": self.symbol,
+        #                     "bid": float(row[4]),
+        #                     "ask": float(row[4]),
+        #                     "datetime": row[0],
+        #                 }
+        #             elif previous_row is not None:
+        #                 return {
+        #                     "symbol": self.symbol,
+        #                     "bid": float(previous_row[4]),
+        #                     "ask": float(previous_row[4]),
+        #                     "datetime": previous_row[0],
+        #                 }
+        #             else:
+        #                 raise OperationalException(
+        #                     f"Could not find ticker data for date "
+        #                     f"{backtest_index_date}"
+        #                 )
+        #         else:
+        #             previous_row = row
 
         if previous_row is not None:
             difference = backtest_index_date - datetime\
