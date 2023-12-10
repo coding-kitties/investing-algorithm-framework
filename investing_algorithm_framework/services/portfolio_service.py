@@ -1,7 +1,8 @@
 import logging
 from datetime import datetime
 
-from investing_algorithm_framework.domain import OrderSide, OrderStatus
+from investing_algorithm_framework.domain import OrderSide, OrderStatus, \
+    OperationalException
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
@@ -159,3 +160,45 @@ class PortfolioService(RepositoryService):
             pending_orders=pending_orders,
             created_at=created_at
         )
+
+    def create_portfolio_from_configuration(self, portfolio_configuration):
+        logger.info("Creating portfolios")
+
+        self.market_service.initialize(portfolio_configuration)
+
+        if self.repository.exists(
+            {"identifier": portfolio_configuration.identifier}
+        ):
+            return self.repository.find(
+                {"identifier": portfolio_configuration.identifier}
+            )
+
+        balances = self.market_service.get_balance()
+
+        if portfolio_configuration.trading_symbol.upper() not in balances:
+            raise OperationalException(
+                f"Trading symbol balance not available "
+                f"in portfolio on market {portfolio_configuration.market}"
+            )
+
+        unallocated = float(
+            balances[portfolio_configuration.trading_symbol.upper()]
+            ["free"]
+        )
+        creation_data = {
+            "unallocated": unallocated,
+            "identifier": portfolio_configuration.identifier,
+            "trading_symbol": portfolio_configuration.trading_symbol.upper(),
+            "market": portfolio_configuration.market.upper(),
+        }
+
+        portfolio = self.repository.create(creation_data)
+        self.position_repository.create(
+            {
+                "symbol": portfolio.get_trading_symbol(),
+                "amount": unallocated,
+                "portfolio_id": portfolio.id,
+                "cost": unallocated
+            }
+        )
+        self.create_snapshot(portfolio.id, created_at=portfolio.created_at)

@@ -3,7 +3,8 @@ from .portfolio import SQLPortfolio, SQLPortfolioSnapshot
 from .position import SQLPosition, SQLPositionSnapshot
 from .market_data_sources import CCXTOrderBookMarketDataSource, \
     CCXTTickerMarketDataSource, CCXTOHLCVMarketDataSource, \
-    CCXTOHLCVBacktestMarketDataSource
+    CCXTOHLCVBacktestMarketDataSource, CSVOHLCVMarketDataSource, \
+    CSVTickerMarketDataSource
 
 __all__ = [
     "SQLOrder",
@@ -16,4 +17,6 @@ __all__ = [
     "CCXTOrderBookMarketDataSource",
     "CCXTTickerMarketDataSource",
     "CCXTOHLCVMarketDataSource",
+    "CSVTickerMarketDataSource",
+    "CSVOHLCVMarketDataSource",
 ]

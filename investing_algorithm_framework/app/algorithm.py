@@ -3,7 +3,8 @@ from typing import List
 
 from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
     Position, Order, Portfolio, OrderType, OrderSide, ApiException, \
-    BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, Trade
+    BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, Trade, \
+    TickerMarketDataSource, OHLCVMarketDataSource, OrderBookMarketDataSource
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -18,7 +19,6 @@ class Algorithm:
         position_service,
         order_service,
         market_service,
-        market_data_service,
         strategy_orchestrator_service,
     ):
         self.portfolio_service = portfolio_service
@@ -28,7 +28,8 @@ class Algorithm:
         self.configuration_service = configuration_service
         self.portfolio_configuration_service = portfolio_configuration_service
         self.strategy_orchestrator_service = strategy_orchestrator_service
-        self.market_data_service = market_data_service
+        self._market_data_sources = []
+        self._strategies = []
 
     def start(self, number_of_iterations=None, stateless=False):
 
@@ -379,7 +380,7 @@ class Algorithm:
         return self.position_service.exists(query_params)
 
     def get_position_percentage_of_portfolio(
-            self, symbol, market=None, identifier=None
+        self, symbol, market=None, identifier=None
     ) -> float:
         """
         Returns the percentage of the current total value of the portfolio
@@ -405,9 +406,13 @@ class Algorithm:
         position = self.position_service.find(
             {"portfolio": portfolio.id, "symbol": symbol}
         )
-        ticker = self.market_service.get_ticker(
-            f"{symbol.upper()}/{portfolio.trading_symbol.upper()}"
-        )
+        full_symbol = f"{position.symbol.upper()}/" \
+                      f"{portfolio.trading_symbol.upper()}"
+        ticker = self.get_ticker_market_data_source(portfolio.market, full_symbol)\
+            .get_data(
+                backtest_index_date=self.config
+                .get(BACKTESTING_INDEX_DATETIME)
+            )
         total = self.get_unallocated() + self.get_allocated()
         return (position.amount * ticker["bid"] / total) * 100
 
@@ -458,14 +463,19 @@ class Algorithm:
             return
 
         for order in self.order_service \
-                .get_all({
-            "position": position.id, "status": OrderStatus.OPEN.value
-        }):
+                .get_all(
+                    {
+                        "position": position.id,
+                        "status": OrderStatus.OPEN.value
+                    }
+                ):
             self.market_service.cancel_order(order.id)
 
-        ticker = self.market_service.get_ticker(
-            symbol=f"{symbol.upper()}/{portfolio.trading_symbol.upper()}"
-        )
+        symbol = f"{symbol.upper()}/{portfolio.trading_symbol.upper()}"
+        ticker = self.get_ticker_market_data_source(portfolio.market, symbol)\
+            .get_data(
+                backtest_index_date=self.config.get(BACKTESTING_INDEX_DATETIME)
+            )
         self.create_limit_order(
             target_symbol=position.symbol,
             amount=position.get_amount(),
@@ -533,10 +543,14 @@ class Algorithm:
 
                 symbol = f"{position.symbol.upper()}/" \
                          f"{portfolio.trading_symbol.upper()}"
-                self.market_service.initialize(portfolio.configuration)
-                price = self.market_service.get_ticker(symbol)
+                ticker = self.get_ticker_market_data_source(
+                    portfolio.market, symbol
+                ).get_data(
+                    backtest_index_date=self.config
+                    .get(BACKTESTING_INDEX_DATETIME)
+                )
                 allocated = allocated + \
-                            (position.get_amount() * price["bid"])
+                    (position.get_amount() * ticker["bid"])
 
         return allocated
 
@@ -648,31 +662,39 @@ class Algorithm:
         self.order_service.check_pending_orders()
 
     def get_trades(self):
-        buy_orders = self.order_service.get_all({
-            "status": OrderStatus.CLOSED.value,
-            "order_side": OrderSide.BUY.value
-        })
+        portfolios = self.portfolio_service.get_all()
+        trades = []
 
-        symbols = [order.get_symbol() for order in buy_orders]
-        symbols = list(set(symbols))
-        tickers = {}
+        for portfolio in portfolios:
+            buy_orders = self.order_service.get_all({
+                "status": OrderStatus.CLOSED.value,
+                "order_side": OrderSide.BUY.value,
+                "portfolio_id": portfolio.id
+            })
 
-        for symbol in symbols:
-            tickers[symbol] = self.market_service.get_ticker(symbol)
+            for buy_order in buy_orders:
+                symbol = buy_order.get_symbol()
+                ticker = self.get_ticker_market_data_source(
+                    portfolio.market, symbol
+                ).get_data(
+                    backtest_index_date=self.config
+                    .get(BACKTESTING_INDEX_DATETIME)
+                )
+                trades.append(
+                    Trade(
+                        buy_order_id=buy_order.id,
+                        target_symbol=buy_order.get_target_symbol(),
+                        trading_symbol=buy_order.get_trading_symbol(),
+                        amount=buy_order.get_amount(),
+                        open_price=buy_order.get_price(),
+                        closed_price=buy_order.get_trade_closed_price(),
+                        closed_at=buy_order.get_trade_closed_at(),
+                        opened_at=buy_order.get_created_at(),
+                        current_price=ticker["bid"]
+                    )
+                )
 
-        return [
-            Trade(
-                buy_order_id=order.id,
-                target_symbol=order.get_target_symbol(),
-                trading_symbol=order.get_trading_symbol(),
-                amount=order.get_amount(),
-                open_price=order.get_price(),
-                closed_price=order.get_trade_closed_price(),
-                closed_at=order.get_trade_closed_at(),
-                opened_at=order.get_created_at(),
-                current_price=tickers[order.get_symbol()]["bid"]
-            ) for order in buy_orders
-        ]
+        return trades
 
     def get_closed_trades(self):
         buy_orders = self.order_service.get_all({
@@ -697,51 +719,81 @@ class Algorithm:
         factor = 1 / (10 ** decimals)
         return (value // factor) * factor
 
-    def get_open_trades(self, target_symbol):
-        buy_orders = self.order_service.get_all({
-            "status": OrderStatus.CLOSED.value,
-            "order_side": OrderSide.BUY.value,
-            "target_symbol": target_symbol
-        })
-        sell_orders = self.order_service.get_all({
-            "status": OrderStatus.OPEN.value,
-            "order_side": OrderSide.SELL.value,
-            "target_symbol": target_symbol
-        })
-        sell_amount = sum([order.get_amount() for order in sell_orders])
+    def get_open_trades(self, target_symbol=None):
+        portfolios = self.portfolio_service.get_all()
+        trades = []
+        for portfolio in portfolios:
 
-        # Subtract the amount of the open sell orders
-        # from the amount of the buy orders
-        while sell_amount > 0 and len(buy_orders) > 0:
-            first_order = buy_orders[0]
-
-            if first_order.get_available_amount() > sell_amount:
-                first_order.set_available_amount(
-                    first_order.get_available_amount() - sell_amount
-                )
-                sell_amount = 0
+            if target_symbol is not None:
+                buy_orders = self.order_service.get_all({
+                    "status": OrderStatus.CLOSED.value,
+                    "order_side": OrderSide.BUY.value,
+                    "portfolio_id": portfolio.id,
+                    "target_symbol": target_symbol
+                })
             else:
-                sell_amount = sell_amount - first_order.get_available_amount()
-                buy_orders.pop(0)
+                buy_orders = self.order_service.get_all({
+                    "status": OrderStatus.CLOSED.value,
+                    "order_side": OrderSide.BUY.value,
+                    "portfolio_id": portfolio.id
+                })
+            buy_orders = [
+                buy_order for buy_order in buy_orders
+                if buy_order.get_trade_closed_at() is None
+            ]
+            sell_orders = self.order_service.get_all({
+                "status": OrderStatus.OPEN.value,
+                "order_side": OrderSide.SELL.value,
+                "portfolio_id": portfolio.id
+            })
+            sell_amount = sum([order.get_amount() for order in sell_orders])
 
-        symbols = [order.get_symbol() for order in buy_orders]
-        symbols = list(set(symbols))
-        tickers = {}
+            # Subtract the amount of the open sell orders
+            # from the amount of the buy orders
+            while sell_amount > 0 and len(buy_orders) > 0:
+                first_order = buy_orders[0]
 
-        for symbol in symbols:
-            tickers[symbol] = self.market_service.get_ticker(symbol)
+                if first_order.get_available_amount() > sell_amount:
+                    first_order.set_available_amount(
+                        first_order.get_available_amount() - sell_amount
+                    )
+                    sell_amount = 0
+                else:
+                    sell_amount = sell_amount - first_order.get_available_amount()
+                    buy_orders.pop(0)
 
-        trades = [
-            Trade(
-                buy_order_id=order.id,
-                target_symbol=order.get_target_symbol(),
-                trading_symbol=order.get_trading_symbol(),
-                amount=order.get_amount(),
-                open_price=order.get_price(),
-                opened_at=order.get_created_at(),
-                current_price=tickers[order.get_symbol()]["bid"]
-            ) for order in buy_orders if order.get_trade_closed_at() is None
-        ]
+            for buy_order in buy_orders:
+                symbol = buy_order.get_symbol()
+
+                try:
+                    ticker = self.get_ticker_market_data_source(
+                        portfolio.market, symbol
+                    ).get_data(
+                        backtest_index_date=self.config
+                        .get(BACKTESTING_INDEX_DATETIME)
+                    )
+                except Exception as e:
+                    logger.error(e)
+                    raise ApiException(
+                        f"Error getting ticker data for "
+                        f"trade {buy_order.get_target_symbol()}"
+                        f"-{buy_order.get_trading_symbol()}. Make sure you "
+                        f"have registered a ticker market data source for "
+                        f"{buy_order.get_target_symbol()}"
+                        f"-{buy_order.get_trading_symbol()} "
+                        f"for market {portfolio.market}"
+                    )
+                trades.append(
+                    Trade(
+                        buy_order_id=buy_order.id,
+                        target_symbol=buy_order.get_target_symbol(),
+                        trading_symbol=buy_order.get_trading_symbol(),
+                        amount=buy_order.get_amount(),
+                        open_price=buy_order.get_price(),
+                        opened_at=buy_order.get_created_at(),
+                        current_price=ticker["bid"]
+                    )
+                )
 
         return trades
 
@@ -752,13 +804,16 @@ class Algorithm:
 
         order = self.order_service.get(trade.buy_order_id)
 
-        if order.get_amount() < 0:
+        if order.get_filled() <= 0:
             raise ApiException(
                 "Buy order belonging to the trade has no amount."
             )
 
+        portfolio = self.portfolio_service\
+            .find({"position": order.position_id})
         position = self.get_position(order.get_target_symbol())
         amount = order.get_amount()
+
         if position.get_amount() < amount:
             logger.warning(
                 f"Order amount {amount} is larger then amount "
@@ -768,13 +823,86 @@ class Algorithm:
             )
             amount = position.get_amount()
 
-        ticker = self.market_service.get_ticker(
-            symbol=f"{order.target_symbol.upper()}"
-                   f"/{order.trading_symbol.upper()}"
-        )
+        symbol = f"{order.get_target_symbol().upper()}" \
+                 f"/{order.get_trading_symbol().upper()}"
+        ticker = self.get_ticker_market_data_source(portfolio.market, symbol)\
+            .get_data(
+                backtest_index_date=self.config
+                .get(BACKTESTING_INDEX_DATETIME)
+            )
         self.create_limit_order(
             target_symbol=order.target_symbol,
             amount=amount,
             order_side=OrderSide.SELL.value,
             price=ticker["bid"],
+        )
+
+    def get_market_data_sources(self):
+        market_data_sources = []
+
+        for key in self._market_data_sources.keys():
+            market_data_sources.append(self._market_data_sources[key])
+
+        return market_data_sources
+
+    def get_market_data_source(self, identifier):
+
+        if identifier in self._market_data_sources:
+            return self._market_data_sources[identifier]
+
+        raise ApiException(
+            f"No market data source found for with identifier {identifier}."
+        )
+
+    def set_market_data_sources(self, market_data_sources):
+        self._market_data_sources = {}
+
+        for market_data_source in market_data_sources:
+            self._market_data_sources[market_data_source.identifier] = \
+                market_data_source
+
+    def get_ticker_market_data_source(self, market, symbol):
+
+        for identifier in self._market_data_sources:
+            market_data_source = self._market_data_sources[identifier]
+
+            if isinstance(market_data_source, TickerMarketDataSource):
+
+                if market_data_source.symbol == symbol \
+                        and market_data_source.market == market:
+                    return market_data_source
+
+        raise ApiException(
+            f"No ticker market data source found for with symbol {symbol} "
+            f"and market {market}."
+        )
+
+    def get_ohlcv_market_data_source(self, market, symbol):
+
+        for market_data_source in self._market_data_sources.values():
+
+            if isinstance(market_data_source, OHLCVMarketDataSource):
+
+                if market_data_source.symbol == symbol \
+                        and market_data_source.market == market:
+                    return market_data_source
+
+        raise ApiException(
+            f"No OHLCV market data source found for with symbol {symbol} "
+            f"and market {market}."
+        )
+
+    def get_order_book_market_data_source(self, market, symbol):
+
+        for market_data_source in self._market_data_sources.values():
+
+            if isinstance(market_data_source, OrderBookMarketDataSource):
+
+                if market_data_source.symbol == symbol \
+                        and market_data_source.market == market:
+                    return market_data_source
+
+        raise ApiException(
+            f"No OHLCV market data source found for with symbol {symbol} "
+            f"and market {market}."
         )

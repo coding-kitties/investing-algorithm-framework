@@ -280,7 +280,7 @@ class CCXTMarketService(MarketService):
             f"{order.get_target_symbol()}/{order.get_trading_symbol()}")
 
     def get_open_orders(
-            self, target_symbol: str = None, trading_symbol: str = None
+        self, target_symbol: str = None, trading_symbol: str = None
     ):
 
         if not self.exchange.has['fetchOpenOrders']:
@@ -301,7 +301,7 @@ class CCXTMarketService(MarketService):
             raise OperationalException("Could not retrieve open orders")
 
     def get_closed_orders(
-            self, target_symbol: str = None, trading_symbol: str = None
+        self, target_symbol: str = None, trading_symbol: str = None
     ):
 
         if not self.exchange.has['fetchClosedOrders']:
@@ -399,7 +399,7 @@ class CCXTMarketService(MarketService):
         for symbol in symbols:
 
             try:
-                ohlcvs[symbol] = self.get_ohclv(
+                ohlcvs[symbol] = self.get_ohlcv(
                     symbol, time_frame, from_timestamp, to_timestamp
                 )
             except Exception as e:

@@ -1,7 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest import TestCase
+import pandas as pd
 
 from investing_algorithm_framework.domain import Trade
+from investing_algorithm_framework import CSVOHLCVMarketDataSource, \
+    CSVTickerMarketDataSource
 
 
 class Test(TestCase):
@@ -23,3 +26,55 @@ class Test(TestCase):
         self.assertEqual(trade.amount, 1)
         self.assertEqual(trade.open_price, 19822.0)
         self.assertEqual(trade.opened_at, trade_opened_at)
+
+    def test_stop_loss_manual(self):
+        current_datetime = datetime(2021, 6, 20, 00, 00, 0)
+        csv_ohlcv_market_data_source = CSVOHLCVMarketDataSource(
+            identifier="BTC",
+            market="BITVAVO",
+            symbol="BTC/EUR",
+            timeframe="15m",
+            start_date=current_datetime - timedelta(days=17),
+            end_date=current_datetime,
+            csv_file_path="../../../tests/resources/"
+                          "market_data_sources/"
+                          "OHLCV_BTC-EUR_15m_2021-05-17:00"
+                          ":00_2021-06-26:00:00.csv"
+        )
+        csv_ticker_market_data_source = CSVTickerMarketDataSource(
+            identifier="BTC",
+            market="BITVAVO",
+            symbol="BTC/EUR",
+            csv_file_path="../../../tests/resources/"
+                          "market_data_sources/"
+                          "TICKER_BTC-EUR_BITVAVO_2021-06-02:00"
+                          ":00_2021-06-26:00:00.csv"
+        )
+        trade_opened_at = datetime(2021, 6, 17, 12, 0, 0)
+        open_price = 32589
+        trade = Trade(
+            buy_order_id=1,
+            target_symbol="BTC",
+            trading_symbol="EUR",
+            amount=1,
+            open_price=open_price,
+            opened_at=trade_opened_at,
+            closed_price=None,
+            closed_at=None,
+        )
+        ohlcv_data = csv_ohlcv_market_data_source.get_data()
+        print(ohlcv_data[-1])
+        current_price = csv_ticker_market_data_source\
+            .get_data(index_datetime=current_datetime)
+
+        df = pd.DataFrame(
+            ohlcv_data,
+            columns=['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
+        )
+        filtered_df = df[df['Date'] <= trade.opened_at]
+        close_prices = filtered_df['Close'].tolist()
+        self.assertTrue(trade.is_manual_stop_loss_trigger(
+            current_price=current_price["bid"],
+            prices=close_prices,
+            stop_loss_percentage=2
+        ))

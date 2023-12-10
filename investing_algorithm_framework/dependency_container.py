@@ -4,7 +4,8 @@ from investing_algorithm_framework.app.algorithm import Algorithm
 from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPositionRepository, SQLPortfolioRepository, \
     SQLOrderFeeRepository, SQLPortfolioSnapshotRepository, \
-    SQLPositionSnapshotRepository, PerformanceService, CCXTMarketService
+    SQLPositionSnapshotRepository, PerformanceService, CCXTMarketService, \
+    CCXTTickerMarketDataSource
 from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, StrategyOrchestratorService, \
     PortfolioConfigurationService, MarketDataService, BackTestService, \
@@ -38,12 +39,6 @@ class DependencyContainer(containers.DeclarativeContainer):
         MarketDataService,
         market_service=market_service
     )
-    portfolio_configuration_service = providers.ThreadSafeSingleton(
-        PortfolioConfigurationService,
-        market_service=market_service,
-        portfolio_repository=portfolio_repository,
-        position_repository=position_repository,
-    )
     position_snapshot_service = providers.Factory(
         PositionSnapshotService,
         repository=position_snapshot_repository,
@@ -52,6 +47,12 @@ class DependencyContainer(containers.DeclarativeContainer):
         PortfolioSnapshotService,
         repository=portfolio_snapshot_repository,
         position_snapshot_service=position_snapshot_service,
+        position_repository=position_repository,
+    )
+    portfolio_configuration_service = providers.ThreadSafeSingleton(
+        PortfolioConfigurationService,
+        market_service=market_service,
+        portfolio_repository=portfolio_repository,
         position_repository=position_repository,
     )
     order_service = providers.Factory(
@@ -107,6 +108,5 @@ class DependencyContainer(containers.DeclarativeContainer):
         order_service=order_service,
         market_service=market_service,
         strategy_orchestrator_service=strategy_orchestrator_service,
-        market_data_service=market_data_service,
-    )
 
+    )

@@ -5,11 +5,7 @@ from .dependency_container import setup_dependency_container
 
 logger = logging.getLogger("investing_algorithm_framework")
 
-def create_app(
-    config={},
-    stateless=False,
-    web=False,
-):
+def create_app(config={}, stateless=False, web=False) -> App:
     app = App(web=web, stateless=stateless)
     app = setup_dependency_container(
         app,

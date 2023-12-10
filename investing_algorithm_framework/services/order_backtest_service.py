@@ -1,7 +1,7 @@
 import logging
 
 from investing_algorithm_framework.domain import BACKTESTING_INDEX_DATETIME, \
-    OrderStatus
+    OrderStatus, OHLCVMarketDataSource
 from .order_service import OrderService
 
 logger = logging.getLogger("investing_algorithm_framework")
@@ -30,6 +30,7 @@ class OrderBacktestService(OrderService):
         self.portfolio_snapshot_service = portfolio_snapshot_service
         self.configuration_service = configuration_service
 
+
     def execute_order(self, order_id, portfolio):
         order = self.get(order_id)
         order = self.update(
@@ -43,7 +44,7 @@ class OrderBacktestService(OrderService):
         )
         return order
 
-    def check_pending_orders(self, market_data=None):
+    def check_pending_orders(self):
         pending_orders = self.get_all({"status": OrderStatus.OPEN.value})
         logger.info(f"Checking {len(pending_orders)} open orders")
 
@@ -51,23 +52,31 @@ class OrderBacktestService(OrderService):
             symbol = f"{order.target_symbol.upper()}" \
                      f"/{order.trading_symbol.upper()}"
 
-            if symbol in market_data:
-                data_slice = [
-                    ohclv for ohclv in market_data[symbol]
-                    if ohclv[0] >= order.get_created_at()
-                ]
+            for market_data_source in \
+                    self.market_service.backtest_market_data_sources:
 
-                if self.has_executed(order, data_slice):
-                    self.update(
-                        order.id,
-                        {
-                            "status": OrderStatus.CLOSED.value,
-                            "filled": order.get_amount(),
-                            "remaining": 0,
-                            "updated_at": self.configuration_service
-                            .config[BACKTESTING_INDEX_DATETIME]
-                        }
+                if isinstance(market_data_source, OHLCVMarketDataSource) \
+                        and market_data_source.symbol == symbol:
+                    market_data = market_data_source.get_data(
+                        backtest_index_date=self.configuration_service.config.get(BACKTESTING_INDEX_DATETIME)
                     )
+                    data_slice = [
+                        ohclv for ohclv in market_data
+                        if ohclv[0] >= order.get_created_at()
+                    ]
+
+                    if self.has_executed(order, data_slice):
+                        self.update(
+                            order.id,
+                            {
+                                "status": OrderStatus.CLOSED.value,
+                                "filled": order.get_amount(),
+                                "remaining": 0,
+                                "updated_at": self.configuration_service
+                                .config[BACKTESTING_INDEX_DATETIME]
+                            }
+                        )
+                        break
 
     def cancel_order(self, order_id):
         self.check_pending_orders(ohlcvs={})

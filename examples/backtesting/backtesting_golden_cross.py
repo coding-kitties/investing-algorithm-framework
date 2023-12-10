@@ -4,29 +4,25 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 from investing_algorithm_framework import create_app, TimeUnit, \
-    TradingStrategy, \
-    RESOURCE_DIRECTORY, pretty_print_backtest, Algorithm, OrderSide, \
-    CCXTOHLCVMarketDataSource
+    TradingStrategy, RESOURCE_DIRECTORY, pretty_print_backtest, Algorithm,\
+    OrderSide, CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, \
+    BacktestPortfolioConfiguration
 
-
-def start_date_func():
-    return datetime.utcnow() - timedelta(days=17)
 
 # Define market data sources
 bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
-    identifier="BTC",
+    identifier="BTC/EUR-ohlcv",
     market="BITVAVO",
     symbol="BTC/EUR",
     timeframe="2h",
-    start_date_func=start_date_func
+    start_date_func=lambda : datetime.utcnow() - timedelta(days=17)
 )
-bitvavo_dot_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
-    identifier="DOT",
+bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
+    identifier="BTC/EUR-ticker",
     market="BITVAVO",
-    symbol="DOT/EUR",
-    timeframe="2h",
-    start_date_func=start_date_func
+    symbol="BTC/EUR",
 )
+
 
 def is_golden_cross(df: pd.DataFrame, period_one, period_two, date_time=None):
     """
@@ -110,7 +106,7 @@ class MyTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 2
     symbols = ["BTC/EUR"]
-    market_data_sources = [bitvavo_btc_eur_ohlcv_2h, bitvavo_dot_eur_ohlcv_2h]
+    market_data_sources = [bitvavo_btc_eur_ohlcv_2h, bitvavo_btc_eur_ticker]
 
     def apply_strategy(self, algorithm: Algorithm, market_data):
 
@@ -120,7 +116,7 @@ class MyTradingStrategy(TradingStrategy):
             if algorithm.has_open_orders(target_symbol):
                 continue
 
-            ohlcv_data = market_data[target_symbol]
+            ohlcv_data = market_data[f"{symbol}-ohlcv"]
             df = pd.DataFrame(
                 ohlcv_data,
                 columns=['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
@@ -128,7 +124,7 @@ class MyTradingStrategy(TradingStrategy):
             df["ma_9"] = calculate_moving_average(df, 9)
             df["ma_50"] = calculate_moving_average(df, 50)
             df["ma_100"] = calculate_moving_average(df, 100)
-            price = ohlcv_data[-1][4]
+            ticker_data = market_data[f"{symbol}-ticker"]
 
             if is_golden_cross(df, '9', '50') \
                     and not algorithm.has_position(target_symbol) \
@@ -136,26 +132,31 @@ class MyTradingStrategy(TradingStrategy):
                 algorithm.create_limit_order(
                     target_symbol=target_symbol,
                     order_side=OrderSide.BUY,
-                    price=price,
+                    price=ticker_data['bid'],
                     percentage_of_portfolio=25,
                     precision=4
                 )
             elif algorithm.has_position(target_symbol) \
-                    and is_death_cross(df, '9', '50'):
+                    and is_death_cross(df, '9', '25'):
                 algorithm.close_position(target_symbol)
 
 
 app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 app.add_strategy(MyTradingStrategy)
+app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
+app.add_market_data_source(bitvavo_btc_eur_ticker)
+app.add_portfolio_configuration(BacktestPortfolioConfiguration(
+    market="BITVAVO",
+    trading_symbol="EUR",
+    unallocated=400,
+))
 
 
 if __name__ == "__main__":
-    end_date = datetime(2023, 12, 2)
-    start_date = end_date - timedelta(days=100)
+    start_date = datetime(2021, 1, 1)
+    end_date = datetime(2022, 1, 1)
     backtest_report = app.backtest(
         start_date=start_date,
         end_date=end_date,
-        unallocated=400,
-        trading_symbol="EUR"
     )
     pretty_print_backtest(backtest_report)

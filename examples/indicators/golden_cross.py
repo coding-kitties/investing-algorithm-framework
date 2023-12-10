@@ -95,6 +95,8 @@ app.add_portfolio_configuration(
 
     )
 )
+app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
+app.add_market_data_source(bitvavo_dot_eur_ohlcv_2h)
 
 if __name__ == "__main__":
     app.run()

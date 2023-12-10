@@ -154,8 +154,8 @@ class TickerMarketDataSource(MarketDataSource, ABC):
     def __init__(
             self,
             identifier,
-            market,
-            symbol,
+            market=None,
+            symbol=None,
     ):
         super().__init__(
             identifier=identifier,

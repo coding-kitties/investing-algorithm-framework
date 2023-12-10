@@ -7,8 +7,8 @@ from investing_algorithm_framework.infrastructure.services import \
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
     BACKTEST_DATA_DIRECTORY_NAME, DATETIME_FORMAT_BACKTESTING, \
     OperationalException, DATETIME_FORMAT, OHLCVMarketDataSource, \
-    BacktestMarketDataSource, \
-    OrderBookMarketDataSource, TickerMarketDataSource
+    BacktestMarketDataSource, OrderBookMarketDataSource, \
+    TickerMarketDataSource
 
 logger = logging.getLogger(__name__)
 
@@ -169,32 +169,29 @@ class CCXTTickerBacktestMarketDataSource(
     TickerMarketDataSource, BacktestMarketDataSource
 ):
     backtest_data_directory = None
-    backtest_data_index_date = None
     backtest_data_start_date = None
     backtest_data_end_date = None
-    total_minutes_timeframe = 15
+    timeframe = "15m"
 
     def __init__(
         self,
         identifier,
         market,
-        symbol,
+        symbol=None,
+        timeframe="15m"
     ):
         super().__init__(
             identifier=identifier,
             market=market,
             symbol=symbol,
         )
+        if timeframe is not None:
+            self.timeframe = timeframe
 
     def prepare_data(self, config, backtest_start_date, backtest_end_date):
-        # Calculating the backtest data start date
-        backtest_data_start_date = \
-            backtest_start_date - timedelta(
-                minutes=self.total_minutes_timeframe
-            )
-        self.backtest_data_start_date = backtest_data_start_date
-        self.backtest_data_index_date = backtest_data_start_date
+        self.backtest_data_start_date = backtest_start_date - timedelta(days=1)
         self.backtest_data_end_date = backtest_end_date
+
         # Creating the backtest data directory and file
         self.backtest_data_directory = os.path.join(
             config.get(RESOURCE_DIRECTORY),
@@ -221,8 +218,8 @@ class CCXTTickerBacktestMarketDataSource(
         market_service.market = self.market
         ohlcv = market_service.get_ohlcv(
             symbol=self.symbol,
-            time_frame="15m",
-            from_timestamp=backtest_data_start_date,
+            time_frame=self.timeframe,
+            from_timestamp=self.backtest_data_start_date,
             to_timestamp=backtest_end_date
         )
         self.write_ohlcv_to_file(file_path, ohlcv)
@@ -239,74 +236,117 @@ class CCXTTickerBacktestMarketDataSource(
             writer.writerows(rows)
 
     def _create_file_path(self):
+
+        if self.symbol is None or self.market is None:
+            return None
+
         symbol_string = self.symbol.replace("/", "-")
+        market_string = self.market.replace("/", "-")
         return os.path.join(
             self.backtest_data_directory,
             os.path.join(
                 f"TICKER_"
                 f"{symbol_string}_"
+                f"{market_string}_"
                 f"{self.backtest_data_start_date.strftime(DATETIME_FORMAT_BACKTESTING)}_"
                 f"{self.backtest_data_end_date.strftime(DATETIME_FORMAT_BACKTESTING)}.csv"
             )
         )
 
     def get_data(self, backtest_index_date, **kwargs):
+        file_path = self._create_file_path()
+
+        if file_path is None:
+            return self._get_ticker_from_ccxt(backtest_index_date, **kwargs)
+        else:
+            return self._get_ticker_from_file(file_path, backtest_index_date)
+
+    def _get_ticker_from_ccxt(self, backtest_index_date, **kwargs):
         market_service = CCXTMarketService()
-        market_service.market = self.market
+
+        if self.market is None:
+
+            if "market" not in kwargs:
+                raise OperationalException(
+                    "Either market should be set as an attribute "
+                    "or market should be passed as a parameter for "
+                    "CCXTTickerBacktestMarketDataSource"
+                )
+            else:
+                market = kwargs["market"]
+        else:
+            market = self.market
+
+        market_service.market = market
+
+        if self.symbol is None:
+
+            if "symbol" not in kwargs:
+                raise OperationalException(
+                    "Either symbol shoudl be set as an attribute "
+                    "or symbol should be passed as a parameter for the "
+                    "CCXTTickerBacktestMarketDataSource"
+                )
+            else:
+                symbol = kwargs["symbol"]
+        else:
+            symbol = self.symbol
+
         ohlcv = market_service.get_ohlcv(
-            symbol=self.symbol,
+            symbol=symbol,
             time_frame="15m",
             from_timestamp=backtest_index_date - timedelta(minutes=15),
             to_timestamp=backtest_index_date + timedelta(minutes=15)
         )
         return ohlcv[1]
 
-        # file_path = self._create_file_path()
-        # to_timestamp = backtest_index_date
-        #
-        # if backtest_index_date < self.backtest_data_start_date:
-        #     raise OperationalException(
-        #         f"Cannot get data from {backtest_index_date} as the "
-        #         f"backtest data starts at {self.backtest_data_start_date}"
-        #     )
-        #
-        # if backtest_index_date > self.backtest_data_end_date:
-        #     raise OperationalException(
-        #         f"Cannot get data to {to_timestamp} as the "
-        #         f"backtest data ends at {self.backtest_data_end_date}"
-        #     )
-        #
-        # with open(file_path, 'r') as file:
-        #     reader = csv.reader(file)
-        #     next(reader)  # Skip the header row
-        #     previous_row = None
-        #
-        #     for row in reader:
-        #         row_date = datetime.strptime(row[0], DATETIME_FORMAT)
-        #
-        #         if backtest_index_date <= row_date:
-        #
-        #             if backtest_index_date == row_date:
-        #                 return {
-        #                     "symbol": self.symbol,
-        #                     "bid": float(row[4]),
-        #                     "ask": float(row[4]),
-        #                     "datetime": row[0],
-        #                 }
-        #             elif previous_row is not None:
-        #                 return {
-        #                     "symbol": self.symbol,
-        #                     "bid": float(previous_row[4]),
-        #                     "ask": float(previous_row[4]),
-        #                     "datetime": previous_row[0],
-        #                 }
-        #             else:
-        #                 raise OperationalException(
-        #                     f"Could not find ticker data for date "
-        #                     f"{backtest_index_date}"
-        #                 )
-        #         else:
-        #             previous_row = row
+    def _get_ticker_from_file(self, file_path, backtest_index_date):
+        file_path = self._create_file_path()
+        to_timestamp = backtest_index_date
+
+        if backtest_index_date < self.backtest_data_start_date:
+            raise OperationalException(
+                f"Cannot get data from {backtest_index_date} as the "
+                f"backtest data starts at {self.backtest_data_start_date}"
+            )
+
+        if backtest_index_date > self.backtest_data_end_date:
+            raise OperationalException(
+                f"Cannot get data to {to_timestamp} as the "
+                f"backtest data ends at {self.backtest_data_end_date}"
+            )
+
+        with open(file_path, 'r') as file:
+            reader = csv.reader(file)
+            next(reader)  # Skip the header row
+            previous_row = None
+
+            for row in reader:
+                row_date = datetime.strptime(row[0], DATETIME_FORMAT)
+
+                if backtest_index_date <= row_date:
+
+                    if backtest_index_date == row_date:
+                        return {
+                            "symbol": self.symbol,
+                            "bid": float(row[4]),
+                            "ask": float(row[4]),
+                            "datetime": row[0],
+                        }
+                    elif previous_row is not None:
+                        return {
+                            "symbol": self.symbol,
+                            "bid": float(previous_row[4]),
+                            "ask": float(previous_row[4]),
+                            "datetime": previous_row[0],
+                        }
+                    else:
+                        raise OperationalException(
+                            f"Could not find ticker data for date "
+                            f"{backtest_index_date}"
+                        )
+                else:
+                    previous_row = row
 
         if previous_row is not None:
             difference = backtest_index_date - datetime\
@@ -348,7 +388,7 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
                 "for OHLCVMarketDataSource"
             )
 
-        return market_service.get_ohclv(
+        return market_service.get_ohlcv(
             symbol=self.symbol,
             time_frame=self.timeframe,
             from_timestamp=self.start_date,
@@ -383,16 +423,54 @@ class CCXTOrderBookMarketDataSource(OrderBookMarketDataSource):
 
 class CCXTTickerMarketDataSource(TickerMarketDataSource):
 
+    def __init__(
+        self,
+        identifier,
+        market,
+        symbol=None,
+        backtest_timeframe=None
+    ):
+        super().__init__(
+            identifier=identifier,
+            market=market,
+            symbol=symbol,
+        )
+        self._backtest_timeframe = backtest_timeframe
+
     def get_data(self, **kwargs):
         market_service = CCXTMarketService()
-        market_service.market = self.market
-        return market_service.get_ticker(
-            symbol=self.symbol,
-        )
+
+        if self.market is None:
+
+                if "market" not in kwargs:
+                    raise OperationalException(
+                        "Either market or market should be "
+                        "passed as a parameter"
+                    )
+                else:
+                    market = kwargs["market"]
+        else:
+            market = self.market
+
+        market_service.market = market
+
+        if self.symbol is None:
+
+            if "symbol" not in kwargs:
+                raise OperationalException(
+                    "Either symbol or symbol should be passed as a parameter"
+                )
+            else:
+                symbol = kwargs["symbol"]
+        else:
+            symbol = self.symbol
+
+        return market_service.get_ticker(symbol=symbol)
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
         return CCXTTickerBacktestMarketDataSource(
             identifier=self.identifier,
             market=self.market,
             symbol=self.symbol,
+            timeframe=self._backtest_timeframe
         )

@@ -129,6 +129,8 @@ app.add_portfolio_configuration(
         trading_symbol="<your_trading_symbol>"
     )
 )
+app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
+app.add_market_data_source(bitvavo_dot_eur_ohlcv_2h)
 
 if __name__ == "__main__":
     app.run()

@@ -5,37 +5,35 @@ import pandas as pd
 
 from investing_algorithm_framework import create_app, TimeUnit, \
     TradingStrategy, RESOURCE_DIRECTORY, pretty_print_backtest, \
-    Algorithm, OrderSide, CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource
-
-
-def start_date_func():
-    return datetime.utcnow() - timedelta(days=17)
+    Algorithm, OrderSide, CCXTOHLCVMarketDataSource, \
+    CCXTTickerMarketDataSource, BacktestPortfolioConfiguration
 
 # Define market data sources
 bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
-    identifier="BTC",
+    identifier="BTC/EUR-ohlcv",
     market="BITVAVO",
     symbol="BTC/EUR",
     timeframe="2h",
-    start_date_func=start_date_func
+    start_date_func=lambda: datetime.utcnow() - timedelta(days=17)
 )
 bitvavo_dot_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
-    identifier="DOT",
+    identifier="DOT/EUR-ohlcv",
     market="BITVAVO",
     symbol="DOT/EUR",
     timeframe="2h",
-    start_date_func=start_date_func
+    start_date_func=lambda: datetime.utcnow() - timedelta(days=17)
 )
-# Add ticker data for backtesting purposes
 bitvavo_dot_eur_ticker = CCXTTickerMarketDataSource(
     identifier="DOT/EUR-ticker",
     market="BITVAVO",
     symbol="DOT/EUR",
+    backtest_timeframe="30m",
 )
 bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     identifier="BTC/EUR-ticker",
     market="BITVAVO",
     symbol="BTC/EUR",
+    backtest_timeframe="30m",
 )
 
 
@@ -104,14 +102,16 @@ class MyTradingStrategy(TradingStrategy):
     symbols = ["BTC/EUR", "DOT/EUR"]
 
     def apply_strategy(self, algorithm: Algorithm, market_data):
-        algorithm.check_pending_orders()
+
         for symbol in self.symbols:
             target_symbol = symbol.split('/')[0]
 
             if algorithm.has_open_orders(target_symbol):
                 continue
 
-            ohlcv_data = market_data[target_symbol]
+            ohlcv_data = market_data[f"{symbol}-ohlcv"]
+            ticker_data = market_data[f"{symbol}-ticker"]
+            print(f"ticker data datetime: {ticker_data['datetime']} backtest index datetime {algorithm.config['BACKTESTING_INDEX_DATETIME']}")
             df = pd.DataFrame(
                 ohlcv_data,
                 columns=['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
@@ -119,7 +119,7 @@ class MyTradingStrategy(TradingStrategy):
             df["ma_9"] = calculate_moving_average(df, 9)
             df["ma_50"] = calculate_moving_average(df, 50)
             df["ma_100"] = calculate_moving_average(df, 100)
-            price = ohlcv_data[-1][4]
+            price = ticker_data['bid']
 
             if not algorithm.has_position(target_symbol) \
                     and is_crossover(df, '9', '50') \
@@ -133,12 +133,24 @@ class MyTradingStrategy(TradingStrategy):
                 )
             elif algorithm.has_position(target_symbol) \
                     and is_crossover(df, '50', '9'):
-                algorithm.close_position(target_symbol)
+                open_trades = algorithm.get_open_trades(target_symbol=target_symbol)
+
+                for trade in open_trades:
+                    algorithm.close_trade(trade)
+                # algorithm.close_position(target_symbol)
 
 
 app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 app.add_strategy(MyTradingStrategy)
-
+app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
+app.add_market_data_source(bitvavo_dot_eur_ohlcv_2h)
+app.add_market_data_source(bitvavo_btc_eur_ticker)
+app.add_market_data_source(bitvavo_dot_eur_ticker)
+app.add_portfolio_configuration(BacktestPortfolioConfiguration(
+    market="BITVAVO",
+    trading_symbol="EUR",
+    unallocated=400,
+))
 
 if __name__ == "__main__":
     end_date = datetime(2023, 12, 2)
@@ -146,7 +158,5 @@ if __name__ == "__main__":
     backtest_report = app.backtest(
         start_date=start_date,
         end_date=end_date,
-        unallocated=400,
-        trading_symbol="EUR"
     )
     pretty_print_backtest(backtest_report)

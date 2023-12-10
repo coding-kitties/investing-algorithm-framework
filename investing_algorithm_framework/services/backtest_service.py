@@ -1,13 +1,11 @@
-from typing import List
 from datetime import datetime, timedelta
+
 import pandas as pd
 from tqdm import tqdm
 
 from investing_algorithm_framework.domain import BacktestProfile, \
-    BACKTESTING_INDEX_DATETIME, TimeUnit, StrategyProfile, BacktestPosition, \
-    TradingDataType, OrderStatus, OperationalException
-from investing_algorithm_framework.infrastructure import \
-    CCXTOHLCVBacktestMarketDataSource
+    BACKTESTING_INDEX_DATETIME, TimeUnit, BacktestPosition, \
+    TradingDataType, OrderStatus, OperationalException, MarketDataSource
 
 
 class BackTestService:
@@ -32,6 +30,7 @@ class BackTestService:
         self._performance_service = performance_service
         self._position_repository = position_repository
         self._market_service = market_service
+        self._backtest_market_data_sources = []
 
     @property
     def resource_directory(self):
@@ -43,8 +42,14 @@ class BackTestService:
 
     def backtest(self, algorithm, start_date, end_date=None):
         strategy_profiles = []
-        portfolio = self._portfolio_repository.find({"identifier": "backtest"})
-        initial_unallocated = portfolio.get_unallocated()
+        portfolios = self._portfolio_repository.get_all()
+        initial_unallocated = 0
+
+        for portfolio in portfolios:
+            initial_unallocated += portfolio.unallocated
+
+        for strategy in algorithm.strategies:
+            strategy_profiles.append(strategy.strategy_profile)
 
         if end_date is None:
             end_date = datetime.utcnow()
@@ -54,35 +59,18 @@ class BackTestService:
                 "Start date cannot be greater than end date for backtest"
             )
 
-        market_data_sources = []
-        backtest_market_data_sources = []
-
-        for strategy in algorithm.strategies:
-            strategy_profiles.append(strategy.strategy_profile)
-            if strategy.strategy_profile.market_data_sources is not None:
-                for market_data_source in \
-                        strategy.strategy_profile.market_data_sources:
-
-                    if market_data_source not in market_data_sources:
-                        market_data_sources.append(market_data_source)
-
-        for market_data_source in tqdm(
-                market_data_sources,
-                total=len(market_data_sources),
-                desc="Preparing backtest market data",
-                colour="GREEN"
+        for backtest_market_data_source in tqdm(
+            algorithm.get_market_data_sources(),
+            total=len(algorithm.get_market_data_sources()),
+            desc="Preparing backtest market data",
+            colour="GREEN"
         ):
-            backtest_market_data_source = market_data_source \
-                .to_backtest_market_data_source()
             backtest_market_data_source.prepare_data(
                 config=algorithm.config,
                 backtest_start_date=start_date,
                 backtest_end_date=end_date
             )
-            backtest_market_data_sources.append(backtest_market_data_source)
 
-        algorithm.market_service.backtest_market_data_sources = \
-            backtest_market_data_sources
         schedule = self.generate_schedule(
             strategies=algorithm.strategies,
             start_date=start_date,
@@ -91,70 +79,35 @@ class BackTestService:
 
         for index, row in tqdm(schedule.iterrows(), total=len(schedule),
                                desc="Running backtests", colour="GREEN"):
-            strategy_profile = self.get_strategy_from_strateg_profiles(
+            strategy_profile = self.get_strategy_from_strategy_profiles(
                 strategy_profiles, row['id']
             )
             self.run_backtest_for_profile(
                 algorithm=algorithm,
                 strategy=algorithm.get_strategy(strategy_profile.strategy_id),
                 index_date=index,
-                backtest_market_data_sources=backtest_market_data_sources
             )
 
         return self.create_backtest_report(
             algorithm, len(schedule), start_date, end_date, initial_unallocated
         )
 
-    def run_backtest_for_profile(
-        self,
-        algorithm,
-        strategy,
-        index_date,
-        backtest_market_data_sources=None
-    ):
+    def run_backtest_for_profile(self, algorithm, strategy, index_date):
         algorithm.config[BACKTESTING_INDEX_DATETIME] = index_date
         market_data = {}
 
-        if strategy.strategy_profile.market_data_sources is None or \
-                len(strategy.strategy_profile.market_data_sources) == 0:
-            raise OperationalException(
-                f"No market data sources found for strategy "
-                f"with id {strategy.strategy_profile.strategy_id}."
-            )
+        for data_id in strategy.strategy_profile.market_data_sources:
 
-        for market_data_source in strategy.strategy_profile.market_data_sources:
-            backtest_market_data_source = [
-                backtest_market_data_source for backtest_market_data_source
-                in backtest_market_data_sources
-                if backtest_market_data_source.get_identifier()
-                == market_data_source.get_identifier()
-            ]
+            if isinstance(data_id, MarketDataSource):
+                market_data[data_id.get_identifier()] = \
+                    algorithm.get_market_data_source(data_id.get_identifier())\
+                    .get_data(backtest_index_date=index_date)
+            else:
+                market_data[data_id] = \
+                    algorithm.get_market_data_source(data_id.get_identifier()) \
+                        .get_data(backtest_index_date=index_date)
 
-            if len(backtest_market_data_source) == 0:
-                raise OperationalException(
-                    f"Backtest market data source with identifier "
-                    f"{market_data_source.get_identifier()} not found."
-                )
-
-            backtest_market_data_source = backtest_market_data_source[0]
-            market_data[market_data_source.get_identifier()] = \
-                backtest_market_data_source.get_data(
-                    backtest_index_date=index_date
-                )
-
-        pending_orders_ohlcv_data = {}
-
-        for market_data_source in backtest_market_data_sources:
-
-            if isinstance(market_data_source, CCXTOHLCVBacktestMarketDataSource):
-
-                if market_data_source.symbol not in pending_orders_ohlcv_data:
-                    pending_orders_ohlcv_data[market_data_source.symbol] = \
-                        market_data_source.get_data(
-                            backtest_index_date=index_date
-                        )
-
-        self._order_service.check_pending_orders(pending_orders_ohlcv_data)
+        self._order_service.check_pending_orders()
         strategy.run_strategy(algorithm=algorithm, market_data=market_data)
 
     def generate_schedule(
@@ -206,7 +159,7 @@ class BackTestService:
         schedule_df.set_index('run_time', inplace=True)
         return schedule_df
 
-    def get_strategy_from_strateg_profiles(self, strategy_profiles, id):
+    def get_strategy_from_strategy_profiles(self, strategy_profiles, id):
 
         for strategy_profile in strategy_profiles:
 
@@ -223,99 +176,106 @@ class BackTestService:
         end_date,
         initial_unallocated=0
     ):
-        portfolio = self._portfolio_repository.find({"identifier": "backtest"})
-        backtest_profile = BacktestProfile(
-            backtest_index_date=start_date,
-            backtest_start_date=start_date,
-            backtest_end_date=end_date,
-            initial_unallocated=initial_unallocated,
-            trading_symbol=portfolio.trading_symbol,
-        )
-        backtest_profile.number_of_runs = number_of_runs
-        backtest_profile.number_of_days = (end_date - start_date).days
-        backtest_profile.number_of_orders = self._order_service.count({
-            "portfolio": portfolio.id
-        })
-        backtest_profile.number_of_positions = self._position_repository.count(
-            {
-                "portfolio": portfolio.id,
-                "amount_gt": 0
+        for portfolio in self._portfolio_repository.get_all():
+
+            backtest_profile = BacktestProfile(
+                backtest_index_date=start_date,
+                backtest_start_date=start_date,
+                backtest_end_date=end_date,
+                initial_unallocated=initial_unallocated,
+                trading_symbol=portfolio.trading_symbol,
+            )
+            backtest_profile.number_of_runs = number_of_runs
+            backtest_profile.number_of_days = (end_date - start_date).days
+            backtest_profile.number_of_orders = self._order_service.count({
+                "portfolio": portfolio.id
             })
-        backtest_profile.percentage_negative_trades = self._performance_service \
-            .get_percentage_negative_trades(portfolio.id)
-        backtest_profile.percentage_positive_trades = self._performance_service \
-            .get_percentage_positive_trades(portfolio.id)
-        backtest_profile.number_of_trades_closed = self._performance_service \
-            .get_number_of_trades_closed(portfolio.id)
-        backtest_profile.number_of_trades_open = self._performance_service \
-            .get_number_of_trades_open(portfolio.id)
-        backtest_profile.total_cost = portfolio.total_cost
-        backtest_profile.total_net_gain = portfolio.total_net_gain
-        backtest_profile.total_net_gain_percentage = self._performance_service \
-            .get_total_net_gain_percentage_of_backtest(
-            portfolio.id, backtest_profile
-        )
-        positions = self._position_repository.get_all({
-            "portfolio": portfolio.id
-        })
-        tickers = {}
-
-        for position in positions:
-
-            if position.symbol != portfolio.trading_symbol:
-                tickers[position.symbol] = self._market_service.get_ticker(
-                    f"{position.symbol}/{portfolio.trading_symbol}"
-                )
-
-        backtest_profile.growth_rate = self._performance_service \
-            .get_growth_rate_of_backtest(
-            portfolio.id, tickers, backtest_profile
-        )
-        backtest_profile.growth = self._performance_service \
-            .get_growth_of_backtest(portfolio.id, tickers, backtest_profile)
-        backtest_profile.total_value = self._performance_service \
-            .get_total_value(portfolio.id, tickers, backtest_profile)
-        backtest_profile.average_trade_duration = \
-            self._performance_service.get_average_trade_duration(portfolio.id)
-        backtest_profile.average_trade_size = \
-            self._performance_service.get_average_trade_size(portfolio.id)
-
-        positions = self._position_repository.get_all({
-            "portfolio": portfolio.id
-        })
-        backtest_positions = []
-
-        for position in positions:
-
-            if position.symbol == portfolio.trading_symbol:
-                backtest_position = BacktestPosition(
-                    position,
-                    trading_symbol=True,
-                    total_value_portfolio=backtest_profile.total_value
-                )
-                backtest_position.price = 1
-            else:
-                pending_orders = self._order_service.get_all({
+            backtest_profile.number_of_positions = self._position_repository.count(
+                {
                     "portfolio": portfolio.id,
-                    "target_symbol": position.symbol,
-                    "status": OrderStatus.OPEN.value
+                    "amount_gt": 0
                 })
+            backtest_profile.percentage_negative_trades = self._performance_service \
+                .get_percentage_negative_trades(portfolio.id)
+            backtest_profile.percentage_positive_trades = self._performance_service \
+                .get_percentage_positive_trades(portfolio.id)
+            backtest_profile.number_of_trades_closed = self._performance_service \
+                .get_number_of_trades_closed(portfolio.id)
+            backtest_profile.number_of_trades_open = self._performance_service \
+                .get_number_of_trades_open(portfolio.id)
+            backtest_profile.total_cost = portfolio.total_cost
+            backtest_profile.total_net_gain = portfolio.total_net_gain
+            backtest_profile.total_net_gain_percentage = self._performance_service \
+                .get_total_net_gain_percentage_of_backtest(
+                portfolio.id, backtest_profile
+            )
+            positions = self._position_repository.get_all({
+                "portfolio": portfolio.id
+            })
+            tickers = {}
 
-                amount_in_pending_orders = 0
+            for position in positions:
 
-                for order in pending_orders:
-                    amount_in_pending_orders += order.amount
+                if position.symbol != portfolio.trading_symbol:
+                    tickers[position.symbol] = self._market_service.get_ticker(
+                        f"{position.symbol}/{portfolio.trading_symbol}"
+                    )
 
-                backtest_position = BacktestPosition(
-                    position,
-                    amount_pending=amount_in_pending_orders,
-                    total_value_portfolio=backtest_profile.total_value
-                )
-                ticker = self._market_service.get_ticker(
-                    f"{position.symbol}/{portfolio.trading_symbol}"
-                )
-                backtest_position.price = ticker["bid"]
-            backtest_positions.append(backtest_position)
-        backtest_profile.positions = backtest_positions
-        backtest_profile.trades = algorithm.get_trades()
-        return backtest_profile
+            backtest_profile.growth_rate = self._performance_service \
+                .get_growth_rate_of_backtest(
+                portfolio.id, tickers, backtest_profile
+            )
+            backtest_profile.growth = self._performance_service \
+                .get_growth_of_backtest(portfolio.id, tickers, backtest_profile)
+            backtest_profile.total_value = self._performance_service \
+                .get_total_value(portfolio.id, tickers, backtest_profile)
+            backtest_profile.average_trade_duration = \
+                self._performance_service.get_average_trade_duration(portfolio.id)
+            backtest_profile.average_trade_size = \
+                self._performance_service.get_average_trade_size(portfolio.id)
+
+            positions = self._position_repository.get_all({
+                "portfolio": portfolio.id
+            })
+            backtest_positions = []
+
+            for position in positions:
+
+                if position.symbol == portfolio.trading_symbol:
+                    backtest_position = BacktestPosition(
+                        position,
+                        trading_symbol=True,
+                        total_value_portfolio=backtest_profile.total_value
+                    )
+                    backtest_position.price = 1
+                else:
+                    pending_orders = self._order_service.get_all({
+                        "portfolio": portfolio.id,
+                        "target_symbol": position.symbol,
+                        "status": OrderStatus.OPEN.value
+                    })
+
+                    amount_in_pending_orders = 0
+
+                    for order in pending_orders:
+                        amount_in_pending_orders += order.amount
+
+                    backtest_position = BacktestPosition(
+                        position,
+                        amount_pending=amount_in_pending_orders,
+                        total_value_portfolio=backtest_profile.total_value
+                    )
+                    ticker = self._market_service.get_ticker(
+                        f"{position.symbol}/{portfolio.trading_symbol}"
+                    )
+                    backtest_position.price = ticker["bid"]
+                backtest_positions.append(backtest_position)
+            backtest_profile.positions = backtest_positions
+            backtest_profile.trades = algorithm.get_trades()
+            return backtest_profile
+
+    def set_backtest_market_data_sources(self, market_data_sources):
+        self._backtest_market_data_sources = market_data_sources
+
+    def get_backtest_market_data_sources(self):
+        return self._backtest_market_data_sources

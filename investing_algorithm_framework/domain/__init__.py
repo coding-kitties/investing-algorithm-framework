@@ -3,7 +3,8 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, Ticker, \
     OHLCV, OrderBook, PortfolioConfiguration, AssetPrice, Portfolio, \
     Position, Order, OrderFee, BacktestProfile, PositionSnapshot, \
-    PortfolioSnapshot, StrategyProfile, BacktestPosition, Trade
+    PortfolioSnapshot, StrategyProfile, BacktestPosition, Trade, \
+    BacktestPortfolioConfiguration
 from .exceptions import OperationalException, ApiException, \
     PermissionDeniedApiException, ImproperlyConfigured
 from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
@@ -21,7 +22,7 @@ from .stateless_actions import StatelessActions
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
 from .utils.backtesting import pretty_print_backtest
 from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
-    OHLCVMarketDataSource, BacktestMarketDataSource
+    OHLCVMarketDataSource, BacktestMarketDataSource, MarketDataSource
 
 __all__ = [
     'Config',
@@ -87,5 +88,7 @@ __all__ = [
     "TickerMarketDataSource",
     "OrderBookMarketDataSource",
     "OHLCVMarketDataSource",
-    "BacktestMarketDataSource"
+    "BacktestMarketDataSource",
+    "BacktestPortfolioConfiguration",
+    "MarketDataSource"
 ]
