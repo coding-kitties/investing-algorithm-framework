@@ -104,7 +104,7 @@ class BackTestService:
                     .get_data(backtest_index_date=index_date)
             else:
                 market_data[data_id] = \
-                    algorithm.get_market_data_source(data_id.get_identifier()) \
+                    algorithm.get_market_data_source(data_id) \
                         .get_data(backtest_index_date=index_date)
 
         self._order_service.check_pending_orders()

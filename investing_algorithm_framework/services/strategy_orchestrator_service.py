@@ -2,7 +2,7 @@ import logging
 import schedule
 from datetime import datetime
 from investing_algorithm_framework.domain import StoppableThread, TimeUnit, \
-    OperationalException
+    OperationalException, MarketDataSource
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -42,9 +42,17 @@ class StrategyOrchestratorService:
 
         if strategy.market_data_sources is not None \
                 and len(strategy.market_data_sources) > 0:
-            for market_data_source in strategy.market_data_sources:
-                market_data[market_data_source.get_identifier()] \
-                    = market_data_source.get_data()
+
+            for data_id in strategy.market_data_sources:
+
+                if isinstance(data_id, MarketDataSource):
+                    market_data[data_id.get_identifier()] = \
+                        algorithm.get_market_data_source(
+                            data_id.get_identifier()
+                        ).get_data()
+                else:
+                    market_data[data_id] = \
+                        algorithm.get_market_data_source(data_id).get_data()
 
         logger.info(f"Running strategy {strategy.worker_id}")
 
