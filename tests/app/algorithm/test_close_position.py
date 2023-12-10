@@ -2,7 +2,7 @@ import os
 from decimal import Decimal
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration
+    PortfolioConfiguration, CSVTickerMarketDataSource
 from tests.resources import TestBase, MarketServiceStub
 
 
@@ -27,17 +27,27 @@ class Test(TestBase):
         self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
-                market="binance",
+                market="BITVAVO",
                 api_key="test",
                 secret_key="test",
-                trading_symbol="USDT"
+                trading_symbol="EUR"
             )
         )
         self.app.container.market_service.override(MarketServiceStub())
+        self.app.add_market_data_source(CSVTickerMarketDataSource(
+            identifier="BTC/EUR-ticker",
+            market="BITVAVO",
+            symbol="BTC/EUR",
+            csv_file_path=os.path.join(
+                self.resource_dir,
+                "market_data_sources",
+                "TICKER_BTC-EUR_BITVAVO_2021-06-02:00:00_2021-06-26:00:00.csv"
+            )
+        ))
         self.app.initialize()
 
     def test_close_position(self):
-        trading_symbol_position = self.app.algorithm.get_position("USDT")
+        trading_symbol_position = self.app.algorithm.get_position("EUR")
         self.assertEqual(1000, trading_symbol_position.get_amount())
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",

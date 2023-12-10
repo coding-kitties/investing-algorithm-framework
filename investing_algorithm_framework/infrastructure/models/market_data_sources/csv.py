@@ -59,7 +59,6 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
                     df['Datetime']):
                 df['Datetime'] = pd.to_datetime(df['Datetime'])
 
-            print(to_timestamp)
             # Filter rows based on the start and end dates
             filtered_df = df[
                 (df['Datetime'] >= from_timestamp)

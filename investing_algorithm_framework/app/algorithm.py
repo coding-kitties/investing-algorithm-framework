@@ -158,7 +158,11 @@ class Algorithm:
             validate=False,
             sync=True
     ):
-        portfolio = self.portfolio_service.find({"market": market})
+
+        if market is None:
+            portfolio = self.portfolio_service.get_all()[0]
+        else:
+            portfolio = self.portfolio_service.find({"market": market})
         order_data = {
             "target_symbol": target_symbol,
             "amount": amount,

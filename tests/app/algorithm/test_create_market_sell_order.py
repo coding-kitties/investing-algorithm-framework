@@ -27,16 +27,16 @@ class Test(TestBase):
         self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
-                market="binance",
+                market="BITVAVO",
                 api_key="test",
                 secret_key="test",
-                trading_symbol="USDT"
+                trading_symbol="EUR"
             )
         )
         self.app.container.market_service.override(MarketServiceStub())
         self.app.initialize()
         portfolio_service = self.app.container.portfolio_service()
-        portfolio = portfolio_service.find({"market": "binance"})
+        portfolio = portfolio_service.find({"market": "BITVAVO"})
         order_service = self.app.container.order_service()
         order_service.create(
             {
@@ -55,10 +55,10 @@ class Test(TestBase):
     def test_create_market_sell_order(self):
         position_service = self.app.container.position_service()
         order_service = self.app.container.order_service()
-        trading_symbol_position = position_service.find({"symbol": "USDT"})
+        trading_symbol_position = position_service.find({"symbol": "EUR"})
         self.assertEqual(990, trading_symbol_position.get_amount())
         self.app.run(number_of_iterations=1, sync=False)
-        trading_symbol_position = position_service.find({"symbol": "USDT"})
+        trading_symbol_position = position_service.find({"symbol": "EUR"})
         self.assertEqual(990, trading_symbol_position.get_amount())
         self.app.algorithm.create_market_order(
             target_symbol="BTC",
@@ -69,6 +69,6 @@ class Test(TestBase):
         self.assertEqual(0, btc_position.get_amount())
         order_service.check_pending_orders()
         btc_position = position_service.find({"symbol": "BTC"})
-        trading_symbol_position = position_service.find({"symbol": "USDT"})
+        trading_symbol_position = position_service.find({"symbol": "EUR"})
         self.assertEqual(0, btc_position.get_amount())
         self.assertEqual(990, trading_symbol_position.get_amount())

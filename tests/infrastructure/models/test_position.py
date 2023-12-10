@@ -26,7 +26,7 @@ class Test(TestBase):
         self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
-                market="binance",
+                market="BITVAVO",
                 api_key="test",
                 secret_key="test",
                 trading_symbol="USDT"
@@ -37,7 +37,7 @@ class Test(TestBase):
 
     def test_store_position_amount(self):
         self.portfolio_service = self.app.container.portfolio_service()
-        portfolio = self.portfolio_service.find({"market": "binance"})
+        portfolio = self.portfolio_service.find({"market": "BITVAVO"})
         self.position_repository = self.app.container.position_repository()
         self.position_repository.create(
             {
@@ -54,7 +54,7 @@ class Test(TestBase):
 
     def test_position_update(self):
         self.portfolio_service = self.app.container.portfolio_service()
-        portfolio = self.portfolio_service.find({"market": "binance"})
+        portfolio = self.portfolio_service.find({"market": "BITVAVO"})
         self.position_repository = self.app.container.position_repository()
         self.position_repository.create(
             {

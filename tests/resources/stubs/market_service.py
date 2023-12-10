@@ -1,3 +1,4 @@
+from datetime import datetime
 from random import randint
 
 from investing_algorithm_framework import OrderStatus, Order
@@ -5,6 +6,42 @@ from investing_algorithm_framework.infrastructure.services import MarketService
 
 
 class MarketServiceStub(MarketService):
+
+    def initialize(self, portfolio_configuration):
+        pass
+
+    def pair_exists(self, target_symbol: str, trading_symbol: str):
+        pass
+
+    def get_order_book(self, symbol):
+        pass
+
+    def get_order_books(self, symbols):
+        pass
+
+    def get_orders(self, symbol, since: datetime = None):
+        pass
+
+    def cancel_order(self, order):
+        pass
+
+    def get_open_orders(self, target_symbol: str = None,
+                        trading_symbol: str = None):
+        pass
+
+    def get_closed_orders(self, target_symbol: str = None,
+                          trading_symbol: str = None):
+        pass
+
+    def get_prices(self, symbols):
+        pass
+
+    def get_ohlcv(self, symbol, time_frame, from_timestamp, to_timestamp=None):
+        pass
+
+    def get_ohlcvs(self, symbols, time_frame, from_timestamp,
+                   to_timestamp=None):
+        pass
 
     def __init__(self):
         self._get_market_data_called = False
@@ -67,14 +104,14 @@ class MarketServiceStub(MarketService):
                 {'symbol': 'USDT', 'available': '1000', 'inOrder': '0'},
                 {'symbol': 'BTC', 'available': '0.0013795', 'inOrder': '0'},
                 {'symbol': 'DOT', 'available': '16', 'inOrder': '0'},
-                {'symbol': 'EUR', 'available': '500.22', 'inOrder': '0'},
+                {'symbol': 'EUR', 'available': '1000', 'inOrder': '0'},
                 {'symbol': 'KSM', 'available': '2.98923511', 'inOrder': '0'},
             ],
             'timestamp': None,
             'datetime': None,
             'BTC': {'free': 0.0013795, 'used': 0.0, 'total': 0.0013795},
             'DOT': {'free': 16.0, 'used': 0.0, 'total': 16.0},
-            'EUR': {'free': 500.22, 'used': 0.0, 'total': 500.22},
+            'EUR': {'free': 1000, 'used': 0.0, 'total': 500.22},
             'KSM': {'free': 2.98923511, 'used': 0.0, 'total': 2.98923511},
             'USDT': {'free': 1000, 'used': 0.0, 'total': 200},
             'free': {

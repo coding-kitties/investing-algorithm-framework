@@ -40,7 +40,8 @@ class Portfolio(BaseModel):
             unallocated=self.unallocated,
             realized=self.realized,
             total_revenue=self.total_revenue,
-            total_cost=self.total_cost
+            total_cost=self.total_cost,
+            market=self.market,
         )
 
     def get_unallocated(self):

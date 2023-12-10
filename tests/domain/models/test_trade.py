@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from unittest import TestCase
 import pandas as pd
+import os
 
 from investing_algorithm_framework.domain import Trade
 from investing_algorithm_framework import CSVOHLCVMarketDataSource, \
@@ -29,6 +30,21 @@ class Test(TestCase):
 
     def test_stop_loss_manual(self):
         current_datetime = datetime(2021, 6, 20, 00, 00, 0)
+        resource_dir = os.path.abspath(
+            os.path.join(
+                os.path.join(
+                    os.path.join(
+                        os.path.join(
+                            os.path.realpath(__file__),
+                            os.pardir
+                        ),
+                        os.pardir
+                    ),
+                    os.pardir
+                ),
+                "resources"
+            )
+        )
         csv_ohlcv_market_data_source = CSVOHLCVMarketDataSource(
             identifier="BTC",
             market="BITVAVO",
@@ -36,17 +52,16 @@ class Test(TestCase):
             timeframe="15m",
             start_date=current_datetime - timedelta(days=17),
             end_date=current_datetime,
-            csv_file_path="../../../tests/resources/"
+            csv_file_path=f"{resource_dir}/"
                           "market_data_sources/"
-                          "OHLCV_BTC-EUR_15m_2021-05-17:00"
-                          ":00_2021-06-26:00:00.csv"
+                          "OHLCV_BTC-EUR_15m_2021-05-17:00:00_2021-06-26:00:00.csv"
         )
         csv_ticker_market_data_source = CSVTickerMarketDataSource(
             identifier="BTC",
             market="BITVAVO",
             symbol="BTC/EUR",
-            csv_file_path="../../../tests/resources/"
-                          "market_data_sources/"
+            csv_file_path=f"{resource_dir}"
+                          "/market_data_sources/"
                           "TICKER_BTC-EUR_BITVAVO_2021-06-02:00"
                           ":00_2021-06-26:00:00.csv"
         )
@@ -63,7 +78,6 @@ class Test(TestCase):
             closed_at=None,
         )
         ohlcv_data = csv_ohlcv_market_data_source.get_data()
-        print(ohlcv_data[-1])
         current_price = csv_ticker_market_data_source\
             .get_data(index_datetime=current_datetime)
 
