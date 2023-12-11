@@ -79,7 +79,7 @@ class OrderBacktestService(OrderService):
                         break
 
     def cancel_order(self, order):
-        self.check_pending_orders(ohlcvs={})
+        self.check_pending_orders()
         order = self.order_repository.get(order.id)
 
         if order is not None:
