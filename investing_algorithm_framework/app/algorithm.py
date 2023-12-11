@@ -473,7 +473,7 @@ class Algorithm:
                         "status": OrderStatus.OPEN.value
                     }
                 ):
-            self.market_service.cancel_order(order.id)
+            self.market_service.cancel_order(order.reference_id)
 
         symbol = f"{symbol.upper()}/{portfolio.trading_symbol.upper()}"
         ticker = self.get_ticker_market_data_source(portfolio.market, symbol)\

@@ -135,11 +135,8 @@ class BacktestMarketService(MarketService):
             f"functionality create_market_sell_order"
         )
 
-    def cancel_order(self, order):
-        raise OperationalException(
-            f"Backtest market service {self.market} does not support "
-            f"functionality cancel_order"
-        )
+    def cancel_order(self, order_id):
+        pass
 
     def get_open_orders(
         self, target_symbol: str = None, trading_symbol: str = None
