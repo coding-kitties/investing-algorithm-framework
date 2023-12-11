@@ -59,7 +59,7 @@ def is_crossover(df: pd.DataFrame, period_one, period_two, date_time=None):
         )
 
     last_row = filtered_df.iloc[-1]
-    return last_row[f"ma_{period_one}_ma_{period_two}_crosses"] == 1
+    return last_row[f"ma_{period_one}_ma_{period_two}_crosses"] != 0
 
 
 def is_ma_above(df: pd.DataFrame, period_one, period_two, date_time=None):
@@ -111,7 +111,6 @@ class MyTradingStrategy(TradingStrategy):
 
             ohlcv_data = market_data[f"{symbol}-ohlcv"]
             ticker_data = market_data[f"{symbol}-ticker"]
-            print(f"ticker data datetime: {ticker_data['datetime']} backtest index datetime {algorithm.config['BACKTESTING_INDEX_DATETIME']}")
             df = pd.DataFrame(
                 ohlcv_data,
                 columns=['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
@@ -131,7 +130,8 @@ class MyTradingStrategy(TradingStrategy):
                     percentage_of_portfolio=25,
                     precision=4,
                 )
-            elif algorithm.has_position(target_symbol) \
+
+            if algorithm.has_position(target_symbol) \
                     and is_crossover(df, '50', '9'):
                 open_trades = algorithm.get_open_trades(target_symbol=target_symbol)
 
