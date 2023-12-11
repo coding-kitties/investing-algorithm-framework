@@ -375,9 +375,9 @@ class OrderService(RepositoryService):
             }
         )
 
-    def cancel_order(self, order_id):
+    def cancel_order(self, order):
         self.check_pending_orders()
-        order = self.order_repository.get(order_id)
+        order = self.order_repository.get(order.id)
 
         if order is not None:
 
@@ -387,7 +387,7 @@ class OrderService(RepositoryService):
                 portfolio_configuration = self.portfolio_configuration_service\
                     .get(portfolio.identifier)
                 self.market_service.initialize(portfolio_configuration)
-                self.market_service.cancel_order(order_id)
+                self.market_service.cancel_order(order)
 
     def _sync_with_buy_order_filled(self, previous_order, current_order):
         filled_difference = current_order.get_filled() - \

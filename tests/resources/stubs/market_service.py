@@ -22,7 +22,7 @@ class MarketServiceStub(MarketService):
     def get_orders(self, symbol, since: datetime = None):
         pass
 
-    def cancel_order(self, order):
+    def cancel_order(self, order_id):
         pass
 
     def get_open_orders(self, target_symbol: str = None,

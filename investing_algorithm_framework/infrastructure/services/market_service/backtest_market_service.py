@@ -135,7 +135,7 @@ class BacktestMarketService(MarketService):
             f"functionality create_market_sell_order"
         )
 
-    def cancel_order(self, order_id):
+    def cancel_order(self, order):
         pass
 
     def get_open_orders(

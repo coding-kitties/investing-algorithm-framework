@@ -78,9 +78,9 @@ class OrderBacktestService(OrderService):
                         )
                         break
 
-    def cancel_order(self, order_id):
+    def cancel_order(self, order):
         self.check_pending_orders(ohlcvs={})
-        order = self.order_repository.get(order_id)
+        order = self.order_repository.get(order.id)
 
         if order is not None:
 
@@ -90,7 +90,7 @@ class OrderBacktestService(OrderService):
                 portfolio_configuration = self.portfolio_configuration_service\
                     .get(portfolio.identifier)
                 self.market_service.initialize(portfolio_configuration)
-                self.market_service.cancel_order(order_id)
+                self.market_service.cancel_order(order)
 
     def check_ohclv(self, order, ohclv):
         data = ohclv
