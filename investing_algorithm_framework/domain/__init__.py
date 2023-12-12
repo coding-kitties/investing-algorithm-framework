@@ -12,7 +12,8 @@ from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
     DEFAULT_PAGE_VALUE, SQLALCHEMY_DATABASE_URI, RESOURCE_DIRECTORY, \
     DATETIME_FORMAT, DATETIME_FORMAT_BACKTESTING, BACKTESTING_FLAG, \
     BACKTESTING_INDEX_DATETIME, BACKTESTING_START_DATE, CCXT_DATETIME_FORMAT, \
-    BACKTEST_DATA_DIRECTORY_NAME, TICKER_DATA_TYPE, OHLCV_DATA_TYPE
+    BACKTEST_DATA_DIRECTORY_NAME, TICKER_DATA_TYPE, OHLCV_DATA_TYPE, \
+    CURRENT_UTC_DATETIME
 from .singleton import Singleton
 from .utils import random_string, append_dict_as_row_to_csv, \
     add_column_headers_to_csv, get_total_amount_of_rows, \
@@ -90,5 +91,6 @@ __all__ = [
     "OHLCVMarketDataSource",
     "BacktestMarketDataSource",
     "BacktestPortfolioConfiguration",
-    "MarketDataSource"
+    "MarketDataSource",
+    "CURRENT_UTC_DATETIME"
 ]

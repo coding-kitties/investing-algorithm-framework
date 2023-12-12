@@ -97,6 +97,113 @@ class TestOrderService(TestBase):
     def test_update_sell_order_with_successful_order(self):
         pass
 
+    def test_update_sell_order_with_successful_order_filled_and_closing_partial_buy_orders(self):
+        order_service = self.app.container.order_service()
+        buy_order_one = order_service.create(
+            {
+                "target_symbol": "ADA",
+                "trading_symbol": "USDT",
+                "amount": 5,
+                "order_side": "BUY",
+                "price": 0.24262,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CREATED",
+            }
+        )
+        order_service.update(
+            buy_order_one.id,
+            {
+                "status": "CLOSED",
+                "filled": 5,
+                "remaining": Decimal('0'),
+            }
+        )
+        buy_order_two = order_service.create(
+            {
+                "target_symbol": "ADA",
+                "trading_symbol": "USDT",
+                "amount": 5,
+                "order_side": "BUY",
+                "price": 0.24262,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CREATED",
+            }
+        )
+        order_service.update(
+            buy_order_two.id,
+            {
+                "status": "CLOSED",
+                "filled": 5,
+                "remaining": Decimal('0'),
+            }
+        )
+        sell_order_one = order_service.create(
+            {
+                "target_symbol": "ADA",
+                "trading_symbol": "USDT",
+                "amount": 2.5,
+                "order_side": "SELL",
+                "price": 0.24262,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CREATED",
+            }
+        )
+        order_service.update(
+            sell_order_one.id,
+            {
+                "status": "CLOSED",
+                "filled": 2.5,
+                "remaining": Decimal('0'),
+            }
+        )
+        buy_order_one = order_service.get(buy_order_one.id)
+        buy_order_two = order_service.get(buy_order_two.id)
+        self.assertEqual(
+            2.5,
+            buy_order_one.get_filled()
+            - buy_order_one.get_trade_closed_amount()
+        )
+        self.assertEqual(
+            5,
+            buy_order_two.get_filled()
+            - buy_order_two.get_trade_closed_amount()
+        )
+        sell_order_two = order_service.create(
+            {
+                "target_symbol": "ADA",
+                "trading_symbol": "USDT",
+                "amount": 5,
+                "order_side": "SELL",
+                "price": 0.24262,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CREATED",
+            }
+        )
+        order_service.update(
+            sell_order_two.id,
+            {
+                "status": "CLOSED",
+                "filled": 5,
+                "remaining": Decimal('0'),
+            }
+        )
+        buy_order_one = order_service.get(buy_order_one.id)
+        buy_order_two = order_service.get(buy_order_two.id)
+        self.assertEqual(
+            0,
+            buy_order_one.get_filled()
+            - buy_order_one.get_trade_closed_amount()
+        )
+        self.assertEqual(
+            2.5,
+            buy_order_two.get_filled()
+            - buy_order_two.get_trade_closed_amount()
+        )
+
     def test_update_sell_order_with_successful_order_filled(self):
         pass
 

@@ -1,5 +1,6 @@
 import logging
 from typing import List
+from queue import Queue
 
 from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
     Position, Order, Portfolio, OrderType, OrderSide, ApiException, \
@@ -7,6 +8,49 @@ from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
     TickerMarketDataSource, OHLCVMarketDataSource, OrderBookMarketDataSource
 
 logger = logging.getLogger("investing_algorithm_framework")
+
+
+class PeekableQueue:
+    def __init__(self):
+        self.queue = []
+        self.index = 0
+
+    def enqueue(self, item):
+        self.queue.append(item)
+
+    def dequeue(self):
+        if not self.is_empty():
+            return self.queue.pop(0)
+        else:
+            raise IndexError("Queue is empty")
+
+    def peek(self):
+        if not self.is_empty():
+            return self.queue[0]
+        else:
+            raise IndexError("Queue is empty")
+
+    def is_empty(self):
+        return len(self.queue) == 0
+
+    def __len__(self):
+        return len(self.queue)
+
+    def size(self):
+        return len(self.queue)
+
+    def __iter__(self):
+        self.index = 0
+        return self
+
+    def __next__(self):
+        if self.index < len(self.queue):
+            result = self.queue[self.index]
+            self.index += 1
+            return result
+        else:
+            self.index = 0  # Reset index for next iteration
+            raise StopIteration
 
 
 class Algorithm:
@@ -726,6 +770,7 @@ class Algorithm:
     def get_open_trades(self, target_symbol=None):
         portfolios = self.portfolio_service.get_all()
         trades = []
+
         for portfolio in portfolios:
 
             if target_symbol is not None:
@@ -735,38 +780,51 @@ class Algorithm:
                     "portfolio_id": portfolio.id,
                     "target_symbol": target_symbol
                 })
+                sell_orders = self.order_service.get_all({
+                    "status": OrderStatus.OPEN.value,
+                    "order_side": OrderSide.SELL.value,
+                    "portfolio_id": portfolio.id,
+                    "target_symbol": target_symbol
+                })
             else:
                 buy_orders = self.order_service.get_all({
                     "status": OrderStatus.CLOSED.value,
                     "order_side": OrderSide.BUY.value,
                     "portfolio_id": portfolio.id
                 })
+                sell_orders = self.order_service.get_all({
+                    "status": OrderStatus.OPEN.value,
+                    "order_side": OrderSide.SELL.value,
+                    "portfolio_id": portfolio.id
+                })
+
             buy_orders = [
                 buy_order for buy_order in buy_orders
                 if buy_order.get_trade_closed_at() is None
             ]
-            sell_orders = self.order_service.get_all({
-                "status": OrderStatus.OPEN.value,
-                "order_side": OrderSide.SELL.value,
-                "portfolio_id": portfolio.id
-            })
-            sell_amount = sum([order.get_amount() for order in sell_orders])
+            sell_amount = sum([order.amount for order in sell_orders])
 
             # Subtract the amount of the open sell orders
             # from the amount of the buy orders
-            while sell_amount > 0 and len(buy_orders) > 0:
-                first_order = buy_orders[0]
-
-                if first_order.get_available_amount() > sell_amount:
-                    first_order.set_available_amount(
-                        first_order.get_available_amount() - sell_amount
-                    )
-                    sell_amount = 0
-                else:
-                    sell_amount = sell_amount - first_order.get_available_amount()
-                    buy_orders.pop(0)
+            buy_orders_queue = PeekableQueue()
 
             for buy_order in buy_orders:
+                buy_orders_queue.enqueue(buy_order)
+
+            while sell_amount > 0 and not buy_orders_queue.is_empty():
+                first_buy_order = buy_orders_queue.peek()
+                available = first_buy_order.get_filled() \
+                    - first_buy_order.get_trade_closed_amount()
+
+                if available > sell_amount:
+                    remaining = available - sell_amount
+                    sell_amount = 0
+                    first_buy_order.set_filled(remaining)
+                else:
+                    sell_amount = sell_amount - available
+                    buy_orders_queue.dequeue()
+
+            for buy_order in buy_orders_queue:
                 symbol = buy_order.get_symbol()
 
                 try:
@@ -792,7 +850,8 @@ class Algorithm:
                         buy_order_id=buy_order.id,
                         target_symbol=buy_order.get_target_symbol(),
                         trading_symbol=buy_order.get_trading_symbol(),
-                        amount=buy_order.get_amount(),
+                        amount=buy_order.get_filled()
+                               - buy_order.get_trade_closed_amount(),
                         open_price=buy_order.get_price(),
                         opened_at=buy_order.get_created_at(),
                         current_price=ticker["bid"]
