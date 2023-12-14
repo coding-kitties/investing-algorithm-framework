@@ -31,7 +31,7 @@ class CCXTOHLCVBacktestMarketDataSource(
         start_date,
         start_date_func=None,
         end_date_func=None,
-        end_date=None
+        end_date=None,
     ):
         super().__init__(
             identifier=identifier,
@@ -41,10 +41,17 @@ class CCXTOHLCVBacktestMarketDataSource(
             start_date=start_date,
             start_date_func=start_date_func,
             end_date=end_date,
-            end_date_func=end_date_func
+            end_date_func=end_date_func,
         )
 
-    def prepare_data(self, config, backtest_start_date, backtest_end_date):
+    def prepare_data(
+        self,
+        config,
+        backtest_start_date,
+        backtest_end_date,
+        market_credential_service,
+        **kwargs
+    ):
         # Calculating the backtest data start date
         difference = self.end_date - self.start_date
         total_minutes = 0
@@ -84,13 +91,13 @@ class CCXTOHLCVBacktestMarketDataSource(
                 )
 
         # Get the OHLCV data from the ccxt market service
-        market_service = CCXTMarketService()
-        market_service.market = self.market
+        market_service = CCXTMarketService(market_credential_service)
         ohlcv = market_service.get_ohlcv(
             symbol=self.symbol,
             time_frame=self.timeframe,
             from_timestamp=backtest_data_start_date,
-            to_timestamp=backtest_end_date
+            to_timestamp=backtest_end_date,
+            market=self.market
         )
         self.write_ohlcv_to_file(file_path, ohlcv)
 
@@ -113,6 +120,7 @@ class CCXTOHLCVBacktestMarketDataSource(
             os.path.join(
                 f"OHLCV_"
                 f"{symbol_string}_"
+                f"{self.market}_"
                 f"{time_frame_string}_"
                 f"{self.backtest_data_start_date.strftime(DATETIME_FORMAT_BACKTESTING)}_"
                 f"{self.backtest_data_end_date.strftime(DATETIME_FORMAT_BACKTESTING)}.csv"
@@ -168,6 +176,25 @@ class CCXTOHLCVBacktestMarketDataSource(
 class CCXTTickerBacktestMarketDataSource(
     TickerMarketDataSource, BacktestMarketDataSource
 ):
+    def get_data(self, market_credential_service, **kwargs):
+
+        if "backtest_index_date" not in kwargs:
+            raise OperationalException(
+                "backtest_index_date should be passed as a parameter "
+                "for CCXTTickerBacktestMarketDataSource"
+            )
+
+        file_path = self._create_file_path()
+        backtest_index_date = kwargs["backtest_index_date"]
+        if file_path is None:
+            return self._get_ticker_from_ccxt(
+                backtest_index_date=backtest_index_date,
+                market_credential_service=market_credential_service,
+                **kwargs
+            )
+        else:
+            return self._get_ticker_from_file(backtest_index_date)
+
     backtest_data_directory = None
     backtest_data_start_date = None
     backtest_data_end_date = None
@@ -178,7 +205,7 @@ class CCXTTickerBacktestMarketDataSource(
         identifier,
         market,
         symbol=None,
-        timeframe="15m"
+        timeframe="15m",
     ):
         super().__init__(
             identifier=identifier,
@@ -188,7 +215,14 @@ class CCXTTickerBacktestMarketDataSource(
         if timeframe is not None:
             self.timeframe = timeframe
 
-    def prepare_data(self, config, backtest_start_date, backtest_end_date):
+    def prepare_data(
+        self,
+        config,
+        backtest_start_date,
+        backtest_end_date,
+        market_credential_service,
+        **kwargs
+    ):
         self.backtest_data_start_date = backtest_start_date - timedelta(days=1)
         self.backtest_data_end_date = backtest_end_date
 
@@ -214,13 +248,13 @@ class CCXTTickerBacktestMarketDataSource(
                 )
 
         # Get the OHLCV data from the ccxt market service
-        market_service = CCXTMarketService()
-        market_service.market = self.market
+        market_service = CCXTMarketService(market_credential_service)
         ohlcv = market_service.get_ohlcv(
             symbol=self.symbol,
             time_frame=self.timeframe,
             from_timestamp=self.backtest_data_start_date,
-            to_timestamp=backtest_end_date
+            to_timestamp=backtest_end_date,
+            market=self.market
         )
         self.write_ohlcv_to_file(file_path, ohlcv)
 
@@ -253,16 +287,10 @@ class CCXTTickerBacktestMarketDataSource(
             )
         )
 
-    def get_data(self, backtest_index_date, **kwargs):
-        file_path = self._create_file_path()
-
-        if file_path is None:
-            return self._get_ticker_from_ccxt(backtest_index_date, **kwargs)
-        else:
-            return self._get_ticker_from_file(file_path, backtest_index_date)
-
-    def _get_ticker_from_ccxt(self, backtest_index_date, **kwargs):
-        market_service = CCXTMarketService()
+    def _get_ticker_from_ccxt(
+        self, market_credential_service, backtest_index_date, **kwargs
+    ):
+        market_service = CCXTMarketService(market_credential_service)
 
         if self.market is None:
 
@@ -276,8 +304,6 @@ class CCXTTickerBacktestMarketDataSource(
                 market = kwargs["market"]
         else:
             market = self.market
-
-        market_service.market = market
 
         if self.symbol is None:
 
@@ -296,11 +322,12 @@ class CCXTTickerBacktestMarketDataSource(
             symbol=symbol,
             time_frame="15m",
             from_timestamp=backtest_index_date - timedelta(minutes=15),
-            to_timestamp=backtest_index_date + timedelta(minutes=15)
+            to_timestamp=backtest_index_date + timedelta(minutes=15),
+            market=market
         )
         return ohlcv[1]
 
-    def _get_ticker_from_file(self, file_path, backtest_index_date):
+    def _get_ticker_from_file(self, backtest_index_date):
         file_path = self._create_file_path()
         to_timestamp = backtest_index_date
 
@@ -379,8 +406,7 @@ class CCXTTickerBacktestMarketDataSource(
 class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
 
     def get_data(self, **kwargs):
-        market_service = CCXTMarketService()
-        market_service.market = self.market
+        market_service = CCXTMarketService(None)
 
         if self.start_date is None:
             raise OperationalException(
@@ -392,7 +418,8 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
             symbol=self.symbol,
             time_frame=self.timeframe,
             from_timestamp=self.start_date,
-            to_timestamp=self.end_date
+            to_timestamp=self.end_date,
+            market=self.market
         )
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
@@ -404,17 +431,16 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
             start_date_func=self.start_date_func,
             end_date=self.end_date,
             end_date_func=self.end_date_func,
-            timeframe=self.timeframe
+            timeframe=self.timeframe,
         )
 
 
 class CCXTOrderBookMarketDataSource(OrderBookMarketDataSource):
 
-    def get_data(self, **kwargs):
-        market_service = CCXTMarketService()
-        market_service.market = self.market
+    def get_data(self, market_credential_service, **kwargs):
+        market_service = CCXTMarketService(market_credential_service)
         return market_service.get_order_book(
-            symbol=self.symbol,
+            symbol=self.symbol, market=self.market
         )
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
@@ -437,18 +463,18 @@ class CCXTTickerMarketDataSource(TickerMarketDataSource):
         )
         self._backtest_timeframe = backtest_timeframe
 
-    def get_data(self, **kwargs):
-        market_service = CCXTMarketService()
+    def get_data(self, market_credential_service, **kwargs):
+        market_service = CCXTMarketService(market_credential_service)
 
         if self.market is None:
 
-                if "market" not in kwargs:
-                    raise OperationalException(
-                        "Either market or market should be "
-                        "passed as a parameter"
-                    )
-                else:
-                    market = kwargs["market"]
+            if "market" not in kwargs:
+                raise OperationalException(
+                    "Either market or market should be "
+                    "passed as a parameter"
+                )
+            else:
+                market = kwargs["market"]
         else:
             market = self.market
 
@@ -465,12 +491,12 @@ class CCXTTickerMarketDataSource(TickerMarketDataSource):
         else:
             symbol = self.symbol
 
-        return market_service.get_ticker(symbol=symbol)
+        return market_service.get_ticker(symbol=symbol, market=market)
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
         return CCXTTickerBacktestMarketDataSource(
             identifier=self.identifier,
             market=self.market,
             symbol=self.symbol,
-            timeframe=self._backtest_timeframe
+            timeframe=self._backtest_timeframe,
         )

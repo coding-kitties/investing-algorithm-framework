@@ -2,7 +2,7 @@ from datetime import datetime
 from random import randint
 
 from investing_algorithm_framework import OrderStatus, Order
-from investing_algorithm_framework.infrastructure.services import MarketService
+from investing_algorithm_framework.domain import MarketService
 
 
 class MarketServiceStub(MarketService):
@@ -10,40 +10,46 @@ class MarketServiceStub(MarketService):
     def initialize(self, portfolio_configuration):
         pass
 
-    def pair_exists(self, target_symbol: str, trading_symbol: str):
+    def pair_exists(self, target_symbol: str, trading_symbol: str, market):
         pass
 
-    def get_order_book(self, symbol):
+    def get_order_book(self, symbol, market):
         pass
 
-    def get_order_books(self, symbols):
+    def get_order_books(self, symbols, market):
         pass
 
-    def get_orders(self, symbol, since: datetime = None):
+    def get_orders(self, symbol, market, since: datetime = None):
         pass
 
-    def cancel_order(self, order_id):
+    def cancel_order(self, order_id, market):
         pass
 
-    def get_open_orders(self, target_symbol: str = None,
-                        trading_symbol: str = None):
+    def get_open_orders(
+        self, market, target_symbol: str = None, trading_symbol: str = None
+    ):
         pass
 
-    def get_closed_orders(self, target_symbol: str = None,
-                          trading_symbol: str = None):
+    def get_closed_orders(
+        self, market, target_symbol: str = None, trading_symbol: str = None
+    ):
         pass
 
     def get_prices(self, symbols):
         pass
 
-    def get_ohlcv(self, symbol, time_frame, from_timestamp, to_timestamp=None):
+    def get_ohlcv(
+        self, symbol, time_frame, from_timestamp, market, to_timestamp=None
+    ):
         pass
 
-    def get_ohlcvs(self, symbols, time_frame, from_timestamp,
-                   to_timestamp=None):
+    def get_ohlcvs(
+        self, symbols, time_frame, from_timestamp, market, to_timestamp=None
+    ):
         pass
 
-    def __init__(self):
+    def __init__(self, market_credential_service):
+        super().__init__(market_credential_service)
         self._get_market_data_called = False
         self._get_market_data_return_value = None
 
@@ -52,6 +58,7 @@ class MarketServiceStub(MarketService):
         target_symbol: str,
         trading_symbol: str,
         amount: float,
+        market
     ):
         return Order(
             external_id=randint(0, 1000),
@@ -68,7 +75,8 @@ class MarketServiceStub(MarketService):
         target_symbol: str,
         trading_symbol: str,
         amount: float,
-        price: float
+        price: float,
+        market
     ):
         return Order(
             external_id=randint(0, 1000),
@@ -86,7 +94,8 @@ class MarketServiceStub(MarketService):
         target_symbol: str,
         trading_symbol: str,
         amount: float,
-        price: float
+        price: float,
+        market
     ):
         return Order(
             external_id=randint(0, 1000),
@@ -98,7 +107,7 @@ class MarketServiceStub(MarketService):
             trading_symbol=trading_symbol,
         )
 
-    def get_balance(self):
+    def get_balance(self, market):
         return {
             'info': [
                 {'symbol': 'USDT', 'available': '1000', 'inOrder': '0'},
@@ -136,7 +145,7 @@ class MarketServiceStub(MarketService):
             }
         }
 
-    def get_order(self, order):
+    def get_order(self, order, market):
         symbol = f"{order.target_symbol.upper()}/{order.trading_symbol.upper()}"
         order_data = {
             'info': {
@@ -219,7 +228,7 @@ class MarketServiceStub(MarketService):
         }
         return Order.from_ccxt_order(order_data)
 
-    def get_tickers(self, symbols):
+    def get_tickers(self, symbols, market):
         data = {}
 
         for symbol in symbols:
@@ -239,7 +248,7 @@ class MarketServiceStub(MarketService):
 
         return data
 
-    def get_ticker(self, symbol):
+    def get_ticker(self, symbol, market):
         return {
             'symbol': symbol,
             'timestamp': 1682344906543,

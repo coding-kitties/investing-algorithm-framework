@@ -48,7 +48,7 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
         def csv_file_path(self):
             return self._csv_file_path
 
-        def get_data(self, **kwargs):
+        def get_data(self, market_credential_service, **kwargs):
             to_timestamp = self.end_date
             from_timestamp = self.start_date
             df = pd.read_csv(self._csv_file_path)
@@ -119,7 +119,7 @@ class CSVTickerMarketDataSource(TickerMarketDataSource):
     def csv_file_path(self):
         return self._csv_file_path
 
-    def get_data(self, index_datetime=None, **kwargs):
+    def get_data(self, market_credential_service, index_datetime=None, **kwargs):
 
         if index_datetime is None:
             index_datetime = datetime.utcnow()
@@ -134,14 +134,6 @@ class CSVTickerMarketDataSource(TickerMarketDataSource):
 
         # Filter rows based on the start and end dates
         filtered_df = df[(df['Datetime'] <= index_datetime)]
-
-        # Specify the columns you want in the inner lists
-        # selected_columns = ["Datetime", "Open", "High", "Low", "Close",
-        #                     "Volume"]
-
-        # Convert DataFrame to a list of lists with selected columns
-        # filtered_list_of_lists = \
-        #     self.dataframe_to_list_of_lists(filtered_df, selected_columns)
         last_row = filtered_df.iloc[-1]
         return {
             "symbol": self.symbol,

@@ -27,8 +27,6 @@ class Test(TestBase):
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BITVAVO",
-                api_key="test",
-                secret_key="test",
                 trading_symbol="EUR"
             )
         )
@@ -42,7 +40,7 @@ class Test(TestBase):
                 "TICKER_BTC-EUR_BITVAVO_2021-06-02:00:00_2021-06-26:00:00.csv"
             )
         ))
-        self.app.container.market_service.override(MarketServiceStub())
+        self.app.container.market_service.override(MarketServiceStub(None))
         self.app.initialize()
 
     def test_get_open_trades(self):

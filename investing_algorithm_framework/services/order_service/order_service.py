@@ -3,7 +3,7 @@ from datetime import datetime
 from queue import PriorityQueue
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
-    OperationalException, OrderStatus
+    OperationalException, OrderStatus, MarketService
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
@@ -16,20 +16,22 @@ class OrderService(RepositoryService):
         self,
         order_repository,
         order_fee_repository,
-        market_service,
+        market_service: MarketService,
         position_repository,
         portfolio_repository,
         portfolio_configuration_service,
         portfolio_snapshot_service,
+        market_credential_service
     ):
         super(OrderService, self).__init__(order_repository)
         self.order_repository = order_repository
         self.order_fee_repository = order_fee_repository
-        self.market_service = market_service
+        self.market_service: MarketService = market_service
         self.position_repository = position_repository
         self.portfolio_repository = portfolio_repository
         self.portfolio_configuration_service = portfolio_configuration_service
         self.portfolio_snapshot_service = portfolio_snapshot_service
+        self.market_credential_service = market_credential_service
 
     def create(self, data, execute=True, validate=True, sync=True):
         portfolio_id = data["portfolio_id"]
@@ -145,25 +147,26 @@ class OrderService(RepositoryService):
         return self.order_fee_repository.find({"order": order_id})
 
     def execute_order(self, order_id, portfolio):
-        self.market_service.initialize(portfolio.configuration)
         order = self.get(order_id)
 
         try:
             if OrderType.LIMIT.equals(order.get_order_type()):
 
                 if OrderSide.BUY.equals(order.get_order_side()):
-                     self.market_service.create_limit_buy_order(
+                    self.market_service.create_limit_buy_order(
                         target_symbol=order.get_target_symbol(),
                         trading_symbol=order.get_trading_symbol(),
                         amount=order.get_amount(),
-                        price=order.get_price()
+                        price=order.get_price(),
+                        market=portfolio.get_market()
                     )
                 else:
-                     self.market_service.create_limit_sell_order(
+                    self.market_service.create_limit_sell_order(
                         target_symbol=order.get_target_symbol(),
                         trading_symbol=order.get_trading_symbol(),
                         amount=order.get_amount(),
-                        price=order.get_price()
+                        price=order.get_price(),
+                        market=portfolio.get_market()
                     )
             else:
                 if OrderSide.BUY.equals(order.get_order_side()):
@@ -173,6 +176,7 @@ class OrderService(RepositoryService):
                         target_symbol=order.get_target_symbol(),
                         trading_symbol=order.get_trading_symbol(),
                         amount=order.get_amount(),
+                        market=portfolio.get_market()
                     )
 
             order = self.update(
@@ -326,10 +330,8 @@ class OrderService(RepositoryService):
         for order in pending_orders:
             position = self.position_repository.get(order.position_id)
             portfolio = self.portfolio_repository.get(position.portfolio_id)
-            portfolio_configuration = self.portfolio_configuration_service\
-                .get(portfolio.identifier)
-            self.market_service.initialize(portfolio_configuration)
-            external_order = self.market_service.get_order(order)
+            external_order = self.market_service\
+                .get_order(order, market=portfolio.get_market())
             self.update(order.id, external_order.to_dict())
 
     def _create_position_if_not_exists(self, symbol, portfolio):
@@ -384,10 +386,9 @@ class OrderService(RepositoryService):
             if OrderStatus.OPEN.equals(order.status):
                 portfolio = self.portfolio_repository\
                     .find({"position": order.position_id})
-                portfolio_configuration = self.portfolio_configuration_service\
-                    .get(portfolio.identifier)
-                self.market_service.initialize(portfolio_configuration)
-                self.market_service.cancel_order(order)
+                self.market_service.cancel_order(
+                    order, market=portfolio.get_market()
+                )
 
     def _sync_with_buy_order_filled(self, previous_order, current_order):
         filled_difference = current_order.get_filled() - \
@@ -696,7 +697,8 @@ class OrderService(RepositoryService):
         self.portfolio_repository.update(
             portfolio.id,
             {
-                "total_net_gain": portfolio.get_total_net_gain() + total_net_gain,
+                "total_net_gain": portfolio.get_total_net_gain()
+                                  + total_net_gain,
                 "total_cost": portfolio.get_total_cost() - total_cost,
                 "net_size": portfolio.get_net_size() + total_net_gain
             }

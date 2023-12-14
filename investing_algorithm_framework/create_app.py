@@ -12,6 +12,8 @@ def create_app(config={}, stateless=False, web=False) -> App:
         ["investing_algorithm_framework"],
         ["investing_algorithm_framework"]
     )
+    # After the container is setup, initialize the services
+    app.initialize_services()
     app.set_config(config)
-    logger.info( "Investing algoritm framework app created")
+    logger.info("Investing algoritm framework app created")
     return app

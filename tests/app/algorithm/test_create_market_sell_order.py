@@ -28,12 +28,10 @@ class Test(TestBase):
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BITVAVO",
-                api_key="test",
-                secret_key="test",
                 trading_symbol="EUR"
             )
         )
-        self.app.container.market_service.override(MarketServiceStub())
+        self.app.container.market_service.override(MarketServiceStub(None))
         self.app.initialize()
         portfolio_service = self.app.container.portfolio_service()
         portfolio = portfolio_service.find({"market": "BITVAVO"})

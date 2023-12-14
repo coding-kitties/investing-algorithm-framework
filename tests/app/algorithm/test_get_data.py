@@ -56,7 +56,7 @@
 #                 trading_symbol="USDT"
 #             )
 #         )
-#         self.app.container.market_service.override(MarketServiceStub())
+#         self.app.container.market_service.override(MarketServiceStub(None))
 #         self.app.add_strategy(StrategyOne)
 #         self.app.initialize()
 #

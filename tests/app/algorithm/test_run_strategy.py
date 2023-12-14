@@ -43,12 +43,10 @@ class Test(TestBase):
 
     def test_with_strategy_object(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        app.container.market_service.override(MarketServiceStub())
+        app.container.market_service.override(MarketServiceStub(None))
         app.container.portfolio_configuration_service().clear()
         app.add_portfolio_configuration(
             PortfolioConfiguration(
-                api_key=random_string(10),
-                secret_key=random_string(10),
                 market="BINANCE",
                 trading_symbol="USDT",
             )
@@ -64,12 +62,10 @@ class Test(TestBase):
 
     def test_with_decorator(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        app.container.market_service.override(MarketServiceStub())
+        app.container.market_service.override(MarketServiceStub(None))
         app.container.portfolio_configuration_service().clear()
         app.add_portfolio_configuration(
             PortfolioConfiguration(
-                api_key=random_string(10),
-                secret_key=random_string(10),
                 market="BINANCE",
                 trading_symbol="USDT",
             )
@@ -86,12 +82,10 @@ class Test(TestBase):
 
     def test_stateless(self):
         app = create_app(stateless=True)
-        app.container.market_service.override(MarketServiceStub())
+        app.container.market_service.override(MarketServiceStub(None))
         app.container.portfolio_configuration_service().clear()
         app.add_portfolio_configuration(
             PortfolioConfiguration(
-                api_key=random_string(10),
-                secret_key=random_string(10),
                 market="BITVAVO",
                 trading_symbol="EUR"
             )

@@ -10,7 +10,9 @@ from tests.resources import TestBase, MarketServiceStub
 class Test(TestBase):
 
     def setUp(self) -> None:
-        DependencyContainer.market_service.override(MarketServiceStub())
+        DependencyContainer.market_service.override(
+            MarketServiceStub(market_credential_service=None)
+        )
         self.resource_dir = os.path.abspath(
             os.path.join(
                 os.path.join(
@@ -32,11 +34,9 @@ class Test(TestBase):
             PortfolioConfiguration(
                 market="BITVAVO",
                 trading_symbol="USDT",
-                api_key="test",
-                secret_key="test"
             )
         )
-        app.container.market_service.override(MarketServiceStub())
+        app.container.market_service.override(MarketServiceStub(None))
         portfolio_configuration_service = app.container\
             .portfolio_configuration_service()
         self.assertIsNotNone(portfolio_configuration_service.get("BITVAVO"))

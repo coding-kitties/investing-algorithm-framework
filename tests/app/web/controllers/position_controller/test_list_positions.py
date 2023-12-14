@@ -27,8 +27,6 @@ class Test(FlaskTestBase):
     portfolio_configurations = [
         PortfolioConfiguration(
             market="BITVAVO",
-            api_key="test",
-            secret_key="test",
             trading_symbol="USDT"
         )
     ]

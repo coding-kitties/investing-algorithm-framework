@@ -5,21 +5,21 @@ from tqdm import tqdm
 
 from investing_algorithm_framework.domain import BacktestProfile, \
     BACKTESTING_INDEX_DATETIME, TimeUnit, BacktestPosition, \
-    TradingDataType, OrderStatus, OperationalException, MarketDataSource
+    TradingDataType, OrderStatus, OperationalException, MarketDataSource, \
+    MarketService
+from .market_data_source_service import MarketDataSourceService
 
 
 class BackTestService:
 
     def __init__(
-            self,
-            market_data_service,
-            market_service,
-            order_service,
-            portfolio_repository,
-            position_repository,
-            performance_service,
+        self,
+        market_data_source_service: MarketDataSourceService,
+        order_service,
+        portfolio_repository,
+        position_repository,
+        performance_service,
     ):
-        self._market_data_service = market_data_service
         self._resource_directory = None
         self._order_service = order_service
         self._portfolio_repository = portfolio_repository
@@ -29,7 +29,8 @@ class BackTestService:
         }
         self._performance_service = performance_service
         self._position_repository = position_repository
-        self._market_service = market_service
+        self._market_data_source_service: MarketDataSourceService \
+            = market_data_source_service
         self._backtest_market_data_sources = []
 
     @property
@@ -59,17 +60,6 @@ class BackTestService:
                 "Start date cannot be greater than end date for backtest"
             )
 
-        for backtest_market_data_source in tqdm(
-            algorithm.get_market_data_sources(),
-            total=len(algorithm.get_market_data_sources()),
-            desc="Preparing backtest market data",
-            colour="GREEN"
-        ):
-            backtest_market_data_source.prepare_data(
-                config=algorithm.config,
-                backtest_start_date=start_date,
-                backtest_end_date=end_date
-            )
 
         schedule = self.generate_schedule(
             strategies=algorithm.strategies,
@@ -100,12 +90,12 @@ class BackTestService:
 
             if isinstance(data_id, MarketDataSource):
                 market_data[data_id.get_identifier()] = \
-                    algorithm.get_market_data_source(data_id.get_identifier())\
-                    .get_data(backtest_index_date=index_date)
+                    self._market_data_source_service.get_data(
+                        data_id.get_identifier()
+                    )
             else:
                 market_data[data_id] = \
-                    algorithm.get_market_data_source(data_id) \
-                        .get_data(backtest_index_date=index_date)
+                    self._market_data_source_service.get_data(data_id)
 
         self._order_service.check_pending_orders()
         strategy.run_strategy(algorithm=algorithm, market_data=market_data)
@@ -217,9 +207,11 @@ class BackTestService:
             for position in positions:
 
                 if position.symbol != portfolio.trading_symbol:
-                    tickers[position.symbol] = self._market_service.get_ticker(
-                        f"{position.symbol}/{portfolio.trading_symbol}"
-                    )
+                    tickers[position.symbol] = self._market_data_source_service \
+                        .get_ticker(
+                            f"{position.symbol}/{portfolio.trading_symbol}",
+                            market=portfolio.market
+                        )
 
             backtest_profile.growth_rate = self._performance_service \
                 .get_growth_rate_of_backtest(
@@ -233,7 +225,6 @@ class BackTestService:
                 self._performance_service.get_average_trade_duration(portfolio.id)
             backtest_profile.average_trade_size = \
                 self._performance_service.get_average_trade_size(portfolio.id)
-
             positions = self._position_repository.get_all({
                 "portfolio": portfolio.id
             })
@@ -265,9 +256,13 @@ class BackTestService:
                         amount_pending=amount_in_pending_orders,
                         total_value_portfolio=backtest_profile.total_value
                     )
-                    ticker = self._market_service.get_ticker(
-                        f"{position.symbol}/{portfolio.trading_symbol}"
-                    )
+                    # Probably not needed
+                    ticker = self._market_data_source_service \
+                        .get_ticker(
+                            symbol=f"{position.symbol}"
+                                   f"/{portfolio.trading_symbol}",
+                            market=portfolio.market
+                        )
                     backtest_position.price = ticker["bid"]
                 backtest_positions.append(backtest_position)
             backtest_profile.positions = backtest_positions
@@ -279,3 +274,10 @@ class BackTestService:
 
     def get_backtest_market_data_sources(self):
         return self._backtest_market_data_sources
+
+    def get_backtest_market_data_source(self, symbol, market):
+
+        for market_data_source in self._backtest_market_data_sources:
+            if market_data_source.symbol == symbol and market_data_source.market == market:
+                return market_data_source
+        raise OperationalException(f"Market data source for symbol {symbol} and market {market} not found")

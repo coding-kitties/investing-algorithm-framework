@@ -56,11 +56,9 @@ class TestCreateApp(TestBase):
             PortfolioConfiguration(
                 market="BITVAVO",
                 trading_symbol="USDT",
-                api_key="test",
-                secret_key="test"
             )
         )
-        app.container.market_service.override(MarketServiceStub())
+        app.container.market_service.override(MarketServiceStub(app.container.market_credential_service()))
         app.initialize()
         self.assertIsNotNone(app)
         self.assertIsNotNone(app._flask_app)

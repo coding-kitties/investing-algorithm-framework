@@ -1,18 +1,15 @@
 import logging
 
-from investing_algorithm_framework.domain import ApiException, \
-    OperationalException
+from investing_algorithm_framework.domain import ApiException
+
 logger = logging.getLogger(__name__)
 
 
 class PortfolioConfigurationService:
 
-    def __init__(
-        self, portfolio_repository, position_repository, market_service
-    ):
+    def __init__(self, portfolio_repository, position_repository):
         self.portfolio_repository = portfolio_repository
         self.position_repository = position_repository
-        self.market_service = market_service
         self.portfolio_configurations = []
 
     def add(self, portfolio_configuration):
@@ -62,11 +59,3 @@ class PortfolioConfigurationService:
 
     def clear(self):
         self.portfolio_configurations = []
-
-    @property
-    def market_service(self):
-        return self._market_service
-
-    @market_service.setter
-    def market_service(self, market_service):
-        self._market_service = market_service

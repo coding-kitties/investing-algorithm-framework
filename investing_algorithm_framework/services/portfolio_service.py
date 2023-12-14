@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 
 from investing_algorithm_framework.domain import OrderSide, OrderStatus, \
-    OperationalException
+    OperationalException, MarketService
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
@@ -13,18 +13,20 @@ class PortfolioService(RepositoryService):
 
     def __init__(
         self,
-        market_service,
+        market_service: MarketService,
+        market_credential_service,
         position_repository,
         order_service,
         portfolio_repository,
         portfolio_configuration_service,
-        portfolio_snapshot_service
+        portfolio_snapshot_service,
     ):
         self.market_service = market_service
         self.position_repository = position_repository
         self.portfolio_configuration_service = portfolio_configuration_service
         self.order_service = order_service
         self.portfolio_snapshot_service = portfolio_snapshot_service
+        self.market_credentials_service = market_credential_service
         super(PortfolioService, self).__init__(portfolio_repository)
 
     def find(self, query_params):
@@ -54,8 +56,9 @@ class PortfolioService(RepositoryService):
             portfolio_configuration = self.portfolio_configuration_service\
                 .get(portfolio.identifier)
 
-            self.market_service.initialize(portfolio_configuration)
-            balances = self.market_service.get_balance()
+            self.market_service.market_data_credentials = \
+                self.market_credentials_service.get_all()
+            balances = self.market_service.get_balance(portfolio.market)
 
             for symbol in balances["free"]:
                 balance = balances["free"][symbol]
@@ -111,7 +114,8 @@ class PortfolioService(RepositoryService):
                 external_orders = self.market_service\
                     .get_orders(
                         f"{position.symbol}/{portfolio.trading_symbol}",
-                        since=portfolio_configuration.track_from
+                        since=portfolio_configuration.track_from,
+                        market=portfolio.market
                     )
 
                 logger.info(
@@ -164,8 +168,6 @@ class PortfolioService(RepositoryService):
     def create_portfolio_from_configuration(self, portfolio_configuration):
         logger.info("Creating portfolios")
 
-        self.market_service.initialize(portfolio_configuration)
-
         if self.repository.exists(
             {"identifier": portfolio_configuration.identifier}
         ):
@@ -173,7 +175,8 @@ class PortfolioService(RepositoryService):
                 {"identifier": portfolio_configuration.identifier}
             )
 
-        balances = self.market_service.get_balance()
+        balances = self.market_service\
+            .get_balance(market=portfolio_configuration.market)
 
         if portfolio_configuration.trading_symbol.upper() not in balances:
             raise OperationalException(

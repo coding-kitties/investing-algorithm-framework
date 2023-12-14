@@ -25,13 +25,13 @@ class TestAppInitialize(TestBase):
         app = create_app(
             config={"test": "test", 'resource_directory': self.resource_dir}
         )
-        app.container.market_service.override(MarketServiceStub())
+        app.container.market_service.override(
+            MarketServiceStub(app.container.market_credential_service())
+        )
         app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BITVAVO",
                 trading_symbol="USDT",
-                api_key="test",
-                secret_key="test"
             )
         )
         app.initialize()
@@ -47,13 +47,11 @@ class TestAppInitialize(TestBase):
             config={"test": "test", 'resource_directory': self.resource_dir},
             web=True
         )
-        app.container.market_service.override(MarketServiceStub())
+        app.container.market_service.override(MarketServiceStub(None))
         app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BITVAVO",
                 trading_symbol="USDT",
-                api_key="test",
-                secret_key="test"
             )
         )
         app.initialize()
@@ -69,13 +67,11 @@ class TestAppInitialize(TestBase):
             config={"test": "test"},
             stateless=True
         )
-        app.container.market_service.override(MarketServiceStub())
+        app.container.market_service.override(MarketServiceStub(None))
         app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BITVAVO",
-                trading_symbol="USDT",
-                api_key="test",
-                secret_key="test"
+                trading_symbol="USDT"
             )
         )
         app.initialize()

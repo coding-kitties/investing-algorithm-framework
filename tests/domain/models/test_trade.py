@@ -77,9 +77,12 @@ class Test(TestCase):
             closed_price=None,
             closed_at=None,
         )
-        ohlcv_data = csv_ohlcv_market_data_source.get_data()
+        ohlcv_data = csv_ohlcv_market_data_source\
+            .get_data(market_credential_service=None)
         current_price = csv_ticker_market_data_source\
-            .get_data(index_datetime=current_datetime)
+            .get_data(
+                index_datetime=current_datetime, market_credential_service=None
+            )
 
         df = pd.DataFrame(
             ohlcv_data,

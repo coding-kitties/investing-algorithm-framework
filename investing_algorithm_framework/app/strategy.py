@@ -44,11 +44,7 @@ class TradingStrategy:
     def run_strategy(self, algorithm, market_data):
         self.apply_strategy(algorithm=algorithm, market_data=market_data)
 
-    def apply_strategy(
-        self,
-        algorithm,
-        market_data,
-    ):
+    def apply_strategy(self, algorithm, market_data):
         if self.decorated:
             self.decorated(algorithm=algorithm, market_data=market_data)
         else:

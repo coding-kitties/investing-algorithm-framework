@@ -1,13 +1,12 @@
 from investing_algorithm_framework.app import App, Algorithm
 from .create_app import create_app
 from investing_algorithm_framework.domain import ApiException, \
-    TradingDataType, OrderBook, Ticker, TradingTimeFrame, OHLCV, OrderType,\
+    TradingDataType, TradingTimeFrame, OrderType,\
     OrderStatus, OrderSide, Config, TimeUnit, TimeInterval, Order, Portfolio, \
-    Position, TimeFrame, BACKTESTING_INDEX_DATETIME
-from investing_algorithm_framework.domain import PortfolioConfiguration, \
-    RESOURCE_DIRECTORY, pretty_print_backtest, Trade, OHLCVMarketDataSource, \
-    OrderBookMarketDataSource, TickerMarketDataSource, \
-    BacktestPortfolioConfiguration
+    Position, TimeFrame, BACKTESTING_INDEX_DATETIME, MarketCredential, \
+    PortfolioConfiguration, RESOURCE_DIRECTORY, pretty_print_backtest, \
+    Trade, OHLCVMarketDataSource, OrderBookMarketDataSource, \
+    TickerMarketDataSource, MarketService
 from investing_algorithm_framework.app import TradingStrategy, \
     StatelessAction, Task
 from investing_algorithm_framework.infrastructure import \
@@ -22,10 +21,7 @@ __all__ = [
     "create_app",
     "ApiException",
     "TradingDataType",
-    "OrderBook",
-    "Ticker",
     "TradingTimeFrame",
-    "OHLCV",
     "OrderType",
     "OrderStatus",
     "OrderSide",
@@ -49,7 +45,8 @@ __all__ = [
     "OHLCVMarketDataSource",
     "OrderBookMarketDataSource",
     "TickerMarketDataSource",
-    "BacktestPortfolioConfiguration",
     "CSVOHLCVMarketDataSource",
     "CSVTickerMarketDataSource",
+    "MarketCredential",
+    "MarketService"
 ]

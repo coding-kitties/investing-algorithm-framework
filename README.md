@@ -27,12 +27,11 @@ import pathlib
 from datetime import datetime, timedelta
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
     RESOURCE_DIRECTORY, TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, \
-    CCXTTickerMarketDataSource
+    CCXTTickerMarketDataSource, MarketCredential
 
 # Define market data sources
-# OHLCV data
 bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
-    identifier="BTC",
+    identifier="BTC-ohlcv",
     market="BITVAVO",
     symbol="BTC/EUR",
     timeframe="2h",
@@ -40,19 +39,23 @@ bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
 )
 # Ticker data for orders, trades and positions
 bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
-    identifier="BTC",
+    identifier="BTC-ticker",
     market="BITVAVO",
     symbol="BTC/EUR",
 )
 app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
 app.add_market_data_source(bitvavo_btc_eur_ticker)
+app.add_market_credential(MarketCredential(
+    market="bitvavo",
+    api_key="<your api key>",
+    secret_key="<your secret key>",
+))
 app.add_portfolio_configuration(
     PortfolioConfiguration(
-        market="BITVAVO",
-        api_key="<your api key>",
-        secret_key="<your secret key>",
-        trading_symbol="EUR"
+        market="bitvavo",
+        trading_symbol="EUR",
+        initial_balance=400
     )
 )
 
@@ -62,12 +65,12 @@ app.add_portfolio_configuration(
     time_unit=TimeUnit.HOUR, 
     interval=2, 
     # Specify market data sources that need to be passed to the strategy
-    market_data_sources=[bitvavo_btc_eur_ohlcv_2h, bitvavo_btc_eur_ticker]
+    market_data_sources=["BTC-ticker", "BTC-ohlcv"]
 )
-def perform_strategy(algorithm: Algorithm, market_data):
+def perform_strategy(algorithm: Algorithm, market_data: dict):
     print(
         f"Performing trading strategy on market " +
-        f"data {market_data[bitvavo_btc_eur_ohlcv_2h.get_identifier()]}"
+        f"data {market_data['BTC-ohlcv'] and market_data['BTC-ticker']}"
     )
 
 if __name__ == "__main__":
@@ -85,19 +88,19 @@ import pathlib
 from datetime import datetime, timedelta
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, pretty_print_backtest, \
-    CCXTTickerMarketDataSource, BacktestPortfolioConfiguration
+    CCXTTickerMarketDataSource, PortfolioConfiguration
 
 # Define market data sources
 bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
-    identifier="BTC",
-    market="BITVAVO",
+    identifier="BTC-ohlcv",
+    market="bitvavo",
     symbol="BTC/EUR",
     timeframe="2h", 
     start_date_func=lambda : datetime.utcnow() - timedelta(days=17) 
 )
 bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
-    identifier="BTC",
-    market="BITVAVO",
+    identifier="BTC-ticker",
+    market="bitvavo",
     symbol="BTC/EUR",
     backtest_timeframe="2h" # We want the ticker data to 
     # be sampled every 2 hours, inline with the strategy interval
@@ -105,24 +108,25 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
 app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
 app.add_market_data_source(bitvavo_btc_eur_ticker)
+app.add_portfolio_configuration(PortfolioConfiguration(
+    initial_balance=400,
+    market="bitvavo",
+    trading_symbol="EUR",
+))
+
 
 @app.strategy(
     time_unit=TimeUnit.HOUR, 
     interval=2, 
-    market_data_sources=[bitvavo_btc_eur_ohlcv_2h]
+    market_data_sources=["BTC-ticker", "BTC-ohlcv"]
 )
-def perform_strategy(algorithm: Algorithm, market_data):
+def perform_strategy(algorithm: Algorithm, market_data: dict):
     print(
         f"Performing trading strategy on market " +
-        f"data {market_data[bitvavo_btc_eur_ohlcv_2h.get_identifier()]}"
+        f"data {market_data['BTC-ohlcv'] and market_data['BTC-ticker']}"
     )
 
 if __name__ == "__main__":
-    app.add_portfolio_configuration(BacktestPortfolioConfiguration(
-        unallocated=400,
-        market="BITVAVO",
-        trading_symbol="EUR",
-    ))
     backtest_report = app.backtest(
         start_date=datetime(2023, 11, 12) - timedelta(days=10),
         end_date=datetime(2023, 11, 12),
@@ -218,13 +222,20 @@ The framework has by default support for [ccxt](https://github.com/ccxt/ccxt).
 This should allow you to connect to a lot of brokers/exchanges.
 
 ```python
-from investing_algorithm_framework import App, PortfolioConfiguration
+from investing_algorithm_framework import App, PortfolioConfiguration, \
+    MarketCredential
 app = App()
+app.add_market_credential(
+    MarketCredential(
+        market="<your market>", 
+        api_key="<your api key>",
+        secret_key="<your secret key>",
+    )
+)
 app.add_portfolio_configuration(
     PortfolioConfiguration(
-        market="BITVAVO", 
-        api_key="xxxx", 
-        secret_key="xxxx", 
+        market="<your market>", 
+        initial_balance=400,
         track_from="01/01/2022",
         trading_symbol="EUR"
     )

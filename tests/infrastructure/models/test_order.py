@@ -28,12 +28,12 @@ class Test(TestBase):
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="binance",
-                api_key="test",
-                secret_key="test",
                 trading_symbol="USDT"
             )
         )
-        self.app.container.market_service.override(MarketServiceStub())
+        self.app.container.market_service.override(
+            MarketServiceStub(self.app.container.market_credential_service())
+        )
         self.app.initialize()
 
     def test_creation(self):

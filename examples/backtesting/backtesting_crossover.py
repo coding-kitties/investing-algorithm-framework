@@ -6,34 +6,34 @@ import pandas as pd
 from investing_algorithm_framework import create_app, TimeUnit, \
     TradingStrategy, RESOURCE_DIRECTORY, pretty_print_backtest, \
     Algorithm, OrderSide, CCXTOHLCVMarketDataSource, \
-    CCXTTickerMarketDataSource, BacktestPortfolioConfiguration
+    CCXTTickerMarketDataSource, PortfolioConfiguration
 
 # Define market data sources
 bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
     identifier="BTC/EUR-ohlcv",
-    market="BITVAVO",
+    market="BINANCE",
     symbol="BTC/EUR",
     timeframe="2h",
     start_date_func=lambda: datetime.utcnow() - timedelta(days=17)
 )
 bitvavo_dot_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
     identifier="DOT/EUR-ohlcv",
-    market="BITVAVO",
+    market="BINANCE",
     symbol="DOT/EUR",
     timeframe="2h",
     start_date_func=lambda: datetime.utcnow() - timedelta(days=17)
 )
 bitvavo_dot_eur_ticker = CCXTTickerMarketDataSource(
     identifier="DOT/EUR-ticker",
-    market="BITVAVO",
+    market="BINANCE",
     symbol="DOT/EUR",
-    backtest_timeframe="30m",
+    backtest_timeframe="2h",
 )
 bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     identifier="BTC/EUR-ticker",
-    market="BITVAVO",
+    market="BINANCE",
     symbol="BTC/EUR",
-    backtest_timeframe="30m",
+    backtest_timeframe="2h",
 )
 
 
@@ -94,10 +94,10 @@ class MyTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 2
     market_data_sources = [
-        bitvavo_btc_eur_ohlcv_2h,
-        bitvavo_dot_eur_ohlcv_2h,
-        bitvavo_btc_eur_ticker,
-        bitvavo_dot_eur_ticker
+        "BTC/EUR-ohlcv",
+        "DOT/EUR-ohlcv",
+        "BTC/EUR-ticker",
+        "DOT/EUR-ticker"
     ]
     symbols = ["BTC/EUR", "DOT/EUR"]
 
@@ -137,20 +137,21 @@ class MyTradingStrategy(TradingStrategy):
 
                 for trade in open_trades:
                     algorithm.close_trade(trade)
-                # algorithm.close_position(target_symbol)
 
 
-app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
+app = create_app(config={RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 app.add_strategy(MyTradingStrategy)
 app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
 app.add_market_data_source(bitvavo_dot_eur_ohlcv_2h)
 app.add_market_data_source(bitvavo_btc_eur_ticker)
 app.add_market_data_source(bitvavo_dot_eur_ticker)
-app.add_portfolio_configuration(BacktestPortfolioConfiguration(
-    market="BITVAVO",
-    trading_symbol="EUR",
-    unallocated=400,
-))
+app.add_portfolio_configuration(
+    PortfolioConfiguration(
+        market="BINANCE",
+        trading_symbol="EUR",
+        initial_balance=400,
+    )
+)
 
 if __name__ == "__main__":
     end_date = datetime(2023, 12, 2)
@@ -158,5 +159,6 @@ if __name__ == "__main__":
     backtest_report = app.backtest(
         start_date=start_date,
         end_date=end_date,
+        pending_order_check_interval="2h",
     )
     pretty_print_backtest(backtest_report)

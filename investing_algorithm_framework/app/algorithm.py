@@ -1,56 +1,14 @@
 import logging
 from typing import List
-from queue import Queue
 
 from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
     Position, Order, Portfolio, OrderType, OrderSide, ApiException, \
-    BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, Trade, \
-    TickerMarketDataSource, OHLCVMarketDataSource, OrderBookMarketDataSource
+    BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, Trade, PeekableQueue, \
+    MarketService
+from investing_algorithm_framework.services import MarketCredentialService, \
+    MarketDataSourceService
 
 logger = logging.getLogger("investing_algorithm_framework")
-
-
-class PeekableQueue:
-    def __init__(self):
-        self.queue = []
-        self.index = 0
-
-    def enqueue(self, item):
-        self.queue.append(item)
-
-    def dequeue(self):
-        if not self.is_empty():
-            return self.queue.pop(0)
-        else:
-            raise IndexError("Queue is empty")
-
-    def peek(self):
-        if not self.is_empty():
-            return self.queue[0]
-        else:
-            raise IndexError("Queue is empty")
-
-    def is_empty(self):
-        return len(self.queue) == 0
-
-    def __len__(self):
-        return len(self.queue)
-
-    def size(self):
-        return len(self.queue)
-
-    def __iter__(self):
-        self.index = 0
-        return self
-
-    def __next__(self):
-        if self.index < len(self.queue):
-            result = self.queue[self.index]
-            self.index += 1
-            return result
-        else:
-            self.index = 0  # Reset index for next iteration
-            raise StopIteration
 
 
 class Algorithm:
@@ -64,16 +22,22 @@ class Algorithm:
         order_service,
         market_service,
         strategy_orchestrator_service,
+        market_credential_service,
+        market_data_source_service
     ):
         self.portfolio_service = portfolio_service
         self.position_service = position_service
         self.order_service = order_service
-        self.market_service = market_service
+        self._market_service: MarketService = market_service
         self.configuration_service = configuration_service
         self.portfolio_configuration_service = portfolio_configuration_service
         self.strategy_orchestrator_service = strategy_orchestrator_service
-        self._market_data_sources = []
+        self._market_data_sources = {}
         self._strategies = []
+        self._market_credential_service: MarketCredentialService \
+            = market_credential_service
+        self._market_data_source_service: MarketDataSourceService \
+            = market_data_source_service
 
     def start(self, number_of_iterations=None, stateless=False):
 
@@ -95,16 +59,16 @@ class Algorithm:
         self.strategy_orchestrator_service.run_pending_jobs()
 
     def create_order(
-            self,
-            target_symbol,
-            price,
-            order_type,
-            order_side,
-            amount,
-            market=None,
-            execute=True,
-            validate=True,
-            sync=True
+        self,
+        target_symbol,
+        price,
+        order_type,
+        order_side,
+        amount,
+        market=None,
+        execute=True,
+        validate=True,
+        sync=True
     ):
         portfolio = self.portfolio_service.find({"market": market})
         order_data = {
@@ -128,18 +92,18 @@ class Algorithm:
         )
 
     def create_limit_order(
-            self,
-            target_symbol,
-            price,
-            order_side,
-            amount=None,
-            percentage_of_portfolio=None,
-            percentage_of_position=None,
-            precision=None,
-            market=None,
-            execute=True,
-            validate=True,
-            sync=True
+        self,
+        target_symbol,
+        price,
+        order_side,
+        amount=None,
+        percentage_of_portfolio=None,
+        percentage_of_position=None,
+        precision=None,
+        market=None,
+        execute=True,
+        validate=True,
+        sync=True
     ):
         portfolio = self.portfolio_service.find({"market": market})
 
@@ -499,10 +463,6 @@ class Algorithm:
         portfolio = self.portfolio_service.find(
             {"market": market, "identifier": identifier}
         )
-        portfolio_config = self.portfolio_configuration_service.find(
-            {"portfolio": portfolio.id}
-        )
-        self.market_service.initialize(portfolio_config)
         position = self.position_service.find(
             {"portfolio": portfolio.id, "symbol": symbol}
         )
@@ -520,10 +480,8 @@ class Algorithm:
             self.order_service.cancel_order(order)
 
         symbol = f"{symbol.upper()}/{portfolio.trading_symbol.upper()}"
-        ticker = self.get_ticker_market_data_source(portfolio.market, symbol)\
-            .get_data(
-                backtest_index_date=self.config.get(BACKTESTING_INDEX_DATETIME)
-            )
+        ticker = self._market_data_source_service\
+            .get_ticker(market=portfolio.market, symbol=symbol)
         self.create_limit_order(
             target_symbol=position.symbol,
             amount=position.get_amount(),
@@ -722,11 +680,8 @@ class Algorithm:
 
             for buy_order in buy_orders:
                 symbol = buy_order.get_symbol()
-                ticker = self.get_ticker_market_data_source(
-                    portfolio.market, symbol
-                ).get_data(
-                    backtest_index_date=self.config
-                    .get(BACKTESTING_INDEX_DATETIME)
+                ticker = self._market_data_source_service.get_ticker(
+                    symbol=symbol, market=portfolio.market
                 )
                 trades.append(
                     Trade(
@@ -828,11 +783,8 @@ class Algorithm:
                 symbol = buy_order.get_symbol()
 
                 try:
-                    ticker = self.get_ticker_market_data_source(
-                        portfolio.market, symbol
-                    ).get_data(
-                        backtest_index_date=self.config
-                        .get(BACKTESTING_INDEX_DATETIME)
+                    ticker = self._market_data_source_service.get_ticker(
+                        symbol=symbol, market=portfolio.market
                     )
                 except Exception as e:
                     logger.error(e)
@@ -888,84 +840,11 @@ class Algorithm:
 
         symbol = f"{order.get_target_symbol().upper()}" \
                  f"/{order.get_trading_symbol().upper()}"
-        ticker = self.get_ticker_market_data_source(portfolio.market, symbol)\
-            .get_data(
-                backtest_index_date=self.config
-                .get(BACKTESTING_INDEX_DATETIME)
-            )
+        ticker = self._market_data_source_service\
+            .get_ticker(symbol=symbol, market=portfolio.market)
         self.create_limit_order(
             target_symbol=order.target_symbol,
             amount=amount,
             order_side=OrderSide.SELL.value,
             price=ticker["bid"],
-        )
-
-    def get_market_data_sources(self):
-        market_data_sources = []
-
-        for key in self._market_data_sources.keys():
-            market_data_sources.append(self._market_data_sources[key])
-
-        return market_data_sources
-
-    def get_market_data_source(self, identifier):
-
-        if identifier in self._market_data_sources:
-            return self._market_data_sources[identifier]
-
-        raise ApiException(
-            f"No market data source found for with identifier {identifier}."
-        )
-
-    def set_market_data_sources(self, market_data_sources):
-        self._market_data_sources = {}
-
-        for market_data_source in market_data_sources:
-            self._market_data_sources[market_data_source.identifier] = \
-                market_data_source
-
-    def get_ticker_market_data_source(self, market, symbol):
-
-        for identifier in self._market_data_sources:
-            market_data_source = self._market_data_sources[identifier]
-
-            if isinstance(market_data_source, TickerMarketDataSource):
-
-                if market_data_source.symbol == symbol \
-                        and market_data_source.market == market:
-                    return market_data_source
-
-        raise ApiException(
-            f"No ticker market data source found for with symbol {symbol} "
-            f"and market {market}."
-        )
-
-    def get_ohlcv_market_data_source(self, market, symbol):
-
-        for market_data_source in self._market_data_sources.values():
-
-            if isinstance(market_data_source, OHLCVMarketDataSource):
-
-                if market_data_source.symbol == symbol \
-                        and market_data_source.market == market:
-                    return market_data_source
-
-        raise ApiException(
-            f"No OHLCV market data source found for with symbol {symbol} "
-            f"and market {market}."
-        )
-
-    def get_order_book_market_data_source(self, market, symbol):
-
-        for market_data_source in self._market_data_sources.values():
-
-            if isinstance(market_data_source, OrderBookMarketDataSource):
-
-                if market_data_source.symbol == symbol \
-                        and market_data_source.market == market:
-                    return market_data_source
-
-        raise ApiException(
-            f"No OHLCV market data source found for with symbol {symbol} "
-            f"and market {market}."
         )

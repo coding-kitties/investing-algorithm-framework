@@ -73,3 +73,6 @@ class Portfolio(BaseModel):
 
     def get_trading_symbol(self):
         return self.trading_symbol
+
+    def get_market(self):
+        return self.market

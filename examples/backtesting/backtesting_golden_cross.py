@@ -6,7 +6,7 @@ import pandas as pd
 from investing_algorithm_framework import create_app, TimeUnit, \
     TradingStrategy, RESOURCE_DIRECTORY, pretty_print_backtest, Algorithm,\
     OrderSide, CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, \
-    BacktestPortfolioConfiguration
+    PortfolioConfiguration
 
 
 # Define market data sources
@@ -137,7 +137,7 @@ class MyTradingStrategy(TradingStrategy):
                     precision=4
                 )
             elif algorithm.has_position(target_symbol) \
-                    and is_death_cross(df, '9', '25'):
+                    and is_death_cross(df, '9', '50'):
                 algorithm.close_position(target_symbol)
 
 
@@ -145,10 +145,10 @@ app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
 app.add_strategy(MyTradingStrategy)
 app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
 app.add_market_data_source(bitvavo_btc_eur_ticker)
-app.add_portfolio_configuration(BacktestPortfolioConfiguration(
+app.add_portfolio_configuration(PortfolioConfiguration(
     market="BITVAVO",
     trading_symbol="EUR",
-    unallocated=400,
+    initial_balance=400,
 ))
 
 
@@ -158,5 +158,6 @@ if __name__ == "__main__":
     backtest_report = app.backtest(
         start_date=start_date,
         end_date=end_date,
+        pending_order_check_interval="2h",
     )
     pretty_print_backtest(backtest_report)

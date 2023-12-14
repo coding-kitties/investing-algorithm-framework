@@ -28,12 +28,10 @@ class Test(TestBase):
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BITVAVO",
-                api_key="test",
-                secret_key="test",
                 trading_symbol="EUR"
             )
         )
-        self.app.container.market_service.override(MarketServiceStub())
+        self.app.container.market_service.override(MarketServiceStub(None))
         self.app.add_market_data_source(CSVTickerMarketDataSource(
             identifier="BTC/EUR-ticker",
             market="BITVAVO",

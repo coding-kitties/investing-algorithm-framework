@@ -4,7 +4,14 @@ from datetime import datetime
 
 class BacktestMarketDataSource(ABC):
 
-    def __init__(self, identifier=None, market=None, symbol=None, start_date=None, end_date=None):
+    def __init__(
+        self,
+        identifier,
+        market,
+        symbol,
+        start_date=None,
+        end_date=None,
+    ):
         self._identifier = identifier
         self._market = market
         self._symbol = symbol
@@ -12,11 +19,18 @@ class BacktestMarketDataSource(ABC):
         self._end_date = end_date
 
     @abstractmethod
-    def prepare_data(self, config, backtest_start_date, backtest_end_date):
+    def prepare_data(
+        self,
+        config,
+        backtest_start_date,
+        backtest_end_date,
+        market_credential_service,
+        **kwargs
+    ):
         pass
 
     @abstractmethod
-    def get_data(self, backtest_index_date, **kwargs):
+    def get_data(self, market_credential_service, backtest_index_date, **kwargs):
         pass
 
     @property
@@ -47,7 +61,7 @@ class MarketDataSource(ABC):
         self,
         identifier,
         market,
-        symbol
+        symbol,
     ):
         self._identifier = identifier
         self._market = market
@@ -78,7 +92,7 @@ class MarketDataSource(ABC):
         return self.symbol
 
     @abstractmethod
-    def get_data(self, **kwargs):
+    def get_data(self, market_credential_service, **kwargs):
         pass
 
     @abstractmethod
@@ -152,10 +166,10 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
 class TickerMarketDataSource(MarketDataSource, ABC):
 
     def __init__(
-            self,
-            identifier,
-            market=None,
-            symbol=None,
+        self,
+        identifier,
+        market=None,
+        symbol=None,
     ):
         super().__init__(
             identifier=identifier,
@@ -167,10 +181,10 @@ class TickerMarketDataSource(MarketDataSource, ABC):
 class OrderBookMarketDataSource(MarketDataSource, ABC):
 
     def __init__(
-            self,
-            identifier,
-            market,
-            symbol,
+        self,
+        identifier,
+        market,
+        symbol,
     ):
         super().__init__(
             identifier=identifier,

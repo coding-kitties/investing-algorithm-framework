@@ -3,13 +3,15 @@ import schedule
 from datetime import datetime
 from investing_algorithm_framework.domain import StoppableThread, TimeUnit, \
     OperationalException, MarketDataSource
+from investing_algorithm_framework.services.market_data_source_service \
+    import MarketDataSourceService
 
 logger = logging.getLogger("investing_algorithm_framework")
 
 
 class StrategyOrchestratorService:
 
-    def __init__(self, market_data_service):
+    def __init__(self, market_data_source_service: MarketDataSourceService):
         self.history = {}
         self._strategies = []
         self._tasks = []
@@ -17,7 +19,8 @@ class StrategyOrchestratorService:
         self.iterations = 0
         self.max_iterations = -1
         self.clear()
-        self.market_data_service = market_data_service
+        self.market_data_source_service: MarketDataSourceService \
+            = market_data_source_service
 
     def cleanup_threads(self):
 
@@ -47,12 +50,12 @@ class StrategyOrchestratorService:
 
                 if isinstance(data_id, MarketDataSource):
                     market_data[data_id.get_identifier()] = \
-                        algorithm.get_market_data_source(
-                            data_id.get_identifier()
-                        ).get_data()
+                        self.market_data_source_service\
+                            .get_data(identifier=data_id.get_identifier())
                 else:
                     market_data[data_id] = \
-                        algorithm.get_market_data_source(data_id).get_data()
+                        self.market_data_source_service \
+                            .get_data(identifier=data_id)
 
         logger.info(f"Running strategy {strategy.worker_id}")
 
