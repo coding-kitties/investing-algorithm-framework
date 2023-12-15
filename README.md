@@ -222,9 +222,9 @@ The framework has by default support for [ccxt](https://github.com/ccxt/ccxt).
 This should allow you to connect to a lot of brokers/exchanges.
 
 ```python
-from investing_algorithm_framework import App, PortfolioConfiguration, \
-    MarketCredential
-app = App()
+from investing_algorithm_framework import PortfolioConfiguration, \
+    MarketCredential, create_app
+app = create_app()
 app.add_market_credential(
     MarketCredential(
         market="<your market>", 
