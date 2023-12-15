@@ -13,8 +13,8 @@ to the app. You can then use the market data sources in your trading strategy.
 """
 # Define your market credential for coinbase
 coinbase_market_credential = MarketCredential(
-    api_key="<coinbase_api_key>",
-    secret_key="<coinbase_secret_key>",
+    api_key="<your_api_key>",
+    secret_key="<your_secret_key>",
     market="coinbase",
 )
 # Define your market data sources for coinbase
@@ -33,16 +33,15 @@ coinbase_btc_eur_ticker = CCXTTickerMarketDataSource(
 
 
 class CoinBaseTradingStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    time_unit = TimeUnit.SECOND
+    interval = 5
     market_data_sources = [
         "BTC/EUR-ohlcv",
         "BTC/EUR-ticker"
     ]
 
     def apply_strategy(self, algorithm, market_data):
-        print(market_data["BTC/EUR-ohlcv"])
-        print(market_data["BTC/EUR-ticker"])
+        pass
 
 
 app = create_app()

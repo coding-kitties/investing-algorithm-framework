@@ -405,8 +405,8 @@ class CCXTTickerBacktestMarketDataSource(
 
 class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
 
-    def get_data(self, **kwargs):
-        market_service = CCXTMarketService(None)
+    def get_data(self, market_credential_service, **kwargs):
+        market_service = CCXTMarketService(market_credential_service)
 
         if self.start_date is None:
             raise OperationalException(

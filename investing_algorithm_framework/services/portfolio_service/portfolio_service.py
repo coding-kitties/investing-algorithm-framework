@@ -168,9 +168,11 @@ class PortfolioService(RepositoryService):
         if self.repository.exists(
             {"identifier": portfolio_configuration.identifier}
         ):
-            return self.repository.find(
+            portfolio = self.repository.find(
                 {"identifier": portfolio_configuration.identifier}
             )
+            self.sync_portfolio(portfolio, portfolio_configuration)
+            return portfolio
 
         balances = self.market_service\
             .get_balance(market=portfolio_configuration.market)
@@ -185,6 +187,19 @@ class PortfolioService(RepositoryService):
             balances[portfolio_configuration.trading_symbol.upper()]
             ["free"]
         )
+
+        if portfolio_configuration.initial_balance is not None and \
+                unallocated < portfolio_configuration.initial_balance:
+            raise OperationalException(
+                f"Insufficient balance on market "
+                f"{portfolio_configuration.market} "
+                f"for trading symbol "
+                f"{portfolio_configuration.trading_symbol}. "
+                f"Portfolio configuration initial balance: "
+                f"{portfolio_configuration.initial_balance} "
+                f"Available balance: {unallocated}"
+            )
+
         creation_data = {
             "unallocated": unallocated,
             "identifier": portfolio_configuration.identifier,
@@ -202,3 +217,32 @@ class PortfolioService(RepositoryService):
             }
         )
         self.create_snapshot(portfolio.id, created_at=portfolio.created_at)
+
+    def sync_portfolio(self, portfolio, portfolio_configuration):
+        balances = self.market_service \
+            .get_balance(market=portfolio_configuration.market)
+
+        if portfolio_configuration.trading_symbol.upper() not in balances:
+            raise OperationalException(
+                f"Trading symbol balance not available "
+                f"in portfolio on market {portfolio_configuration.market}"
+            )
+
+        unallocated = float(
+            balances[portfolio_configuration.trading_symbol.upper()]
+            ["free"]
+        )
+
+        if unallocated < portfolio.unallocated:
+            raise OperationalException(
+                "There seems to be a mismatch between the portfolio of this "
+                "algorithm and the portfolio on the exchange. "
+                f"Please make sure that the available "
+                f"{portfolio.trading_symbol} "
+                f"of your portfolio on the market {portfolio.market} "
+                "matches the portfolio of this algorithm."
+                f"Current portfolio: {portfolio.unallocated} "
+                f"{portfolio.trading_symbol}"
+                f"Available on market: {unallocated} "
+                f"{portfolio.trading_symbol}"
+            )
