@@ -14,8 +14,8 @@ account on bitvavo.
 """
 # Define your market credential for coinbase
 bitvavo_market_credential = MarketCredential(
-    api_key="WaLvaJ89SPUFDGqf",
-    secret_key="DKAHZromFfshQQkEhp1QBzpSJfsY3k3U",
+    api_key="<your_api_key>",
+    secret_key="<your_secret_key>",
     market="bitvavo",
 )
 # Define your market data sources for coinbase

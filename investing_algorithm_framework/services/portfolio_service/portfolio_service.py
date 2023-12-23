@@ -99,7 +99,6 @@ class PortfolioService(RepositoryService):
                             }
                         )
 
-
             for position in self.position_repository.get_all(
                 {"portfolio_id": portfolio.id}
             ):

@@ -7,6 +7,13 @@ from tests.resources import TestBase, MarketServiceStub
 
 class Test(TestBase):
 
+    def count_decimals(self, number):
+        decimal_str = str(number)
+        if '.' in decimal_str:
+            return len(decimal_str.split('.')[1])
+        else:
+            return 0
+
     def setUp(self) -> None:
         self.resource_dir = os.path.abspath(
             os.path.join(

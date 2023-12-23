@@ -153,7 +153,7 @@ class OrderService(RepositoryService):
             if OrderType.LIMIT.equals(order.get_order_type()):
 
                 if OrderSide.BUY.equals(order.get_order_side()):
-                    self.market_service.create_limit_buy_order(
+                    external_order = self.market_service.create_limit_buy_order(
                         target_symbol=order.get_target_symbol(),
                         trading_symbol=order.get_trading_symbol(),
                         amount=order.get_amount(),
@@ -161,33 +161,30 @@ class OrderService(RepositoryService):
                         market=portfolio.get_market()
                     )
                 else:
-                    self.market_service.create_limit_sell_order(
-                        target_symbol=order.get_target_symbol(),
-                        trading_symbol=order.get_trading_symbol(),
-                        amount=order.get_amount(),
-                        price=order.get_price(),
-                        market=portfolio.get_market()
-                    )
+                    external_order = self.market_service\
+                        .create_limit_sell_order(
+                            target_symbol=order.get_target_symbol(),
+                            trading_symbol=order.get_trading_symbol(),
+                            amount=order.get_amount(),
+                            price=order.get_price(),
+                            market=portfolio.get_market()
+                        )
             else:
                 if OrderSide.BUY.equals(order.get_order_side()):
                     raise OperationalException("Market buy order not supported")
                 else:
-                    self.market_service.create_market_sell_order(
-                        target_symbol=order.get_target_symbol(),
-                        trading_symbol=order.get_trading_symbol(),
-                        amount=order.get_amount(),
-                        market=portfolio.get_market()
-                    )
+                    external_order = self.market_service\
+                        .create_market_sell_order(
+                            target_symbol=order.get_target_symbol(),
+                            trading_symbol=order.get_trading_symbol(),
+                            amount=order.get_amount(),
+                            market=portfolio.get_market()
+                        )
 
-            order = self.update(
-                order_id,
-                {
-                    "status": OrderStatus.OPEN.value,
-                    "remaining": order.remaining,
-                    "updated_at": datetime.now()
-                }
-            )
-            return order
+            data = external_order.to_dict()
+            data["status"] = OrderStatus.OPEN.value
+            data["updated_at"] = datetime.now()
+            return self.update(order_id, data)
         except Exception as e:
             logger.error("Error executing order: {}".format(e))
             return self.update(

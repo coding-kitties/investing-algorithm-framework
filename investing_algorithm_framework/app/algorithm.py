@@ -1,4 +1,5 @@
 import logging
+import decimal
 from typing import List
 
 from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
@@ -718,9 +719,22 @@ class Algorithm:
             if order.get_trade_closed_at() is not None
         ]
 
-    def round_down(self, value, decimals):
-        factor = 1 / (10 ** decimals)
-        return (value // factor) * factor
+    def round_down(self, value, amount_of_decimals):
+
+        if self.count_decimals(value) <= amount_of_decimals:
+            return value
+
+        with decimal.localcontext() as ctx:
+            d = decimal.Decimal(value)
+            ctx.rounding = decimal.ROUND_DOWN
+            return float(round(d, amount_of_decimals))
+
+    def count_decimals(self, number):
+        decimal_str = str(number)
+        if '.' in decimal_str:
+            return len(decimal_str.split('.')[1])
+        else:
+            return 0
 
     def get_open_trades(self, target_symbol=None):
         portfolios = self.portfolio_service.get_all()

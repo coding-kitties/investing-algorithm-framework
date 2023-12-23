@@ -84,13 +84,11 @@ class App:
         portfolio_configurations = portfolio_configuration_service.get_all()
         portfolio_service = self.container.portfolio_service()
 
-        print("caiogjieajigoea")
-        print(portfolio_configurations)
         for portfolio_configuration in portfolio_configurations:
             portfolio_service.create_portfolio_from_configuration(
                 portfolio_configuration
             )
-        print("done")
+
     def _initialize_stateless(self):
         configuration_service = self.container.configuration_service()
         configuration_service.config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
