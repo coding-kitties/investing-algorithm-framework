@@ -1,4 +1,5 @@
 from abc import abstractmethod, ABC
+from typing import Callable
 from datetime import datetime
 
 
@@ -30,7 +31,14 @@ class BacktestMarketDataSource(ABC):
         pass
 
     @abstractmethod
-    def get_data(self, market_credential_service, backtest_index_date, **kwargs):
+    def get_data(
+        self,
+        market_credential_service,
+        backtest_index_date,
+        from_time_stamp=None,
+        to_time_stamp=None,
+        **kwargs
+    ):
         pass
 
     @property
@@ -161,6 +169,22 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
     @property
     def end_date_func(self):
         return self._end_date_func
+
+    @end_date.setter
+    def end_date(self, value):
+        self._end_date = value
+
+    @start_date.setter
+    def start_date(self, value):
+        self._start_date = value
+
+    @end_date_func.setter
+    def end_date_func(self, func: Callable):
+        self._end_date_func = func
+
+    @start_date_func.setter
+    def start_date_func(self, func: Callable):
+        self._start_date_func = func
 
 
 class TickerMarketDataSource(MarketDataSource, ABC):
