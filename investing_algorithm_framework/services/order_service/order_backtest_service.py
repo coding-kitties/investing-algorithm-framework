@@ -58,12 +58,12 @@ class OrderBacktestService(OrderService):
             portfolio = self.portfolio_repository.get(position.portfolio_id)
 
             if not self._market_data_source_service\
-                    .is_ohlvc_data_source_present(
-                symbol=symbol,
-                market=portfolio.market,
-                time_frame=self.configuration_service
-                .config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]
-            ):
+                    .is_ohlcv_data_source_present(
+                        symbol=symbol,
+                        market=portfolio.market,
+                        time_frame=self.configuration_service
+                        .config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]
+                    ):
                 raise OperationalException(
                     f"OHLCV data source not found for {symbol} "
                     f"and market {portfolio.market} for order check "
@@ -72,7 +72,7 @@ class OrderBacktestService(OrderService):
                     f"Cannot check pending orders for symbol {symbol} "
                     f"with market {portfolio.market}. Please add a ohlcv data"
                     f"source for {symbol} and market {portfolio.market} with "
-                    f"time frame {config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]}"
+                    f"time frame {config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]} "
                 )
 
             market_data = self._market_data_source_service.get_ohlcv(

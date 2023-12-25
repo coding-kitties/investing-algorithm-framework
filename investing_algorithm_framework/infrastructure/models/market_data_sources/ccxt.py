@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 class CCXTOHLCVBacktestMarketDataSource(
     OHLCVMarketDataSource, BacktestMarketDataSource
 ):
+
     backtest_data_directory = None
     backtest_data_index_date = None
     backtest_data_start_date = None
@@ -49,7 +50,6 @@ class CCXTOHLCVBacktestMarketDataSource(
         config,
         backtest_start_date,
         backtest_end_date,
-        market_credential_service,
         **kwargs
     ):
         # Calculating the backtest data start date
@@ -91,7 +91,7 @@ class CCXTOHLCVBacktestMarketDataSource(
                 )
 
         # Get the OHLCV data from the ccxt market service
-        market_service = CCXTMarketService(market_credential_service)
+        market_service = CCXTMarketService(self.market_credential_service)
         ohlcv = market_service.get_ohlcv(
             symbol=self.symbol,
             time_frame=self.timeframe,
@@ -133,6 +133,7 @@ class CCXTOHLCVBacktestMarketDataSource(
         from_timestamp = backtest_index_date - timedelta(
             minutes=self.total_minutes_timeframe
         )
+        self.backtest_data_index_date = backtest_index_date
 
         if from_timestamp < self.backtest_data_start_date:
             raise OperationalException(
@@ -172,11 +173,18 @@ class CCXTOHLCVBacktestMarketDataSource(
         # Ignore this method for now
         pass
 
+    def empty(self):
+        return False
+
 
 class CCXTTickerBacktestMarketDataSource(
     TickerMarketDataSource, BacktestMarketDataSource
 ):
-    def get_data(self, market_credential_service, **kwargs):
+
+    def empty(self):
+        return False
+
+    def get_data(self, **kwargs):
 
         if "backtest_index_date" not in kwargs:
             raise OperationalException(
@@ -189,7 +197,7 @@ class CCXTTickerBacktestMarketDataSource(
         if file_path is None:
             return self._get_ticker_from_ccxt(
                 backtest_index_date=backtest_index_date,
-                market_credential_service=market_credential_service,
+                market_credential_service=self.market_credential_service,
                 **kwargs
             )
         else:
@@ -220,7 +228,6 @@ class CCXTTickerBacktestMarketDataSource(
         config,
         backtest_start_date,
         backtest_end_date,
-        market_credential_service,
         **kwargs
     ):
         self.backtest_data_start_date = backtest_start_date - timedelta(days=1)
@@ -248,7 +255,7 @@ class CCXTTickerBacktestMarketDataSource(
                 )
 
         # Get the OHLCV data from the ccxt market service
-        market_service = CCXTMarketService(market_credential_service)
+        market_service = CCXTMarketService(self.market_credential_service)
         ohlcv = market_service.get_ohlcv(
             symbol=self.symbol,
             time_frame=self.timeframe,
@@ -405,8 +412,8 @@ class CCXTTickerBacktestMarketDataSource(
 
 class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
 
-    def get_data(self, market_credential_service, **kwargs):
-        market_service = CCXTMarketService(market_credential_service)
+    def get_data(self, **kwargs):
+        market_service = CCXTMarketService(self.market_credential_service)
 
         if self.start_date is None:
             raise OperationalException(
@@ -437,8 +444,8 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
 
 class CCXTOrderBookMarketDataSource(OrderBookMarketDataSource):
 
-    def get_data(self, market_credential_service, **kwargs):
-        market_service = CCXTMarketService(market_credential_service)
+    def get_data(self, **kwargs):
+        market_service = CCXTMarketService(self.market_credential_service)
         return market_service.get_order_book(
             symbol=self.symbol, market=self.market
         )
@@ -463,8 +470,8 @@ class CCXTTickerMarketDataSource(TickerMarketDataSource):
         )
         self._backtest_timeframe = backtest_timeframe
 
-    def get_data(self, market_credential_service, **kwargs):
-        market_service = CCXTMarketService(market_credential_service)
+    def get_data(self, **kwargs):
+        market_service = CCXTMarketService(self.market_credential_service)
 
         if self.market is None:
 

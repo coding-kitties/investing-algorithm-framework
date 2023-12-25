@@ -6,12 +6,12 @@ from datetime import datetime
 class BacktestMarketDataSource(ABC):
 
     def __init__(
-        self,
-        identifier,
-        market,
-        symbol,
-        start_date=None,
-        end_date=None,
+            self,
+            identifier,
+            market,
+            symbol,
+            start_date=None,
+            end_date=None,
     ):
         self._identifier = identifier
         self._market = market
@@ -21,23 +21,21 @@ class BacktestMarketDataSource(ABC):
 
     @abstractmethod
     def prepare_data(
-        self,
-        config,
-        backtest_start_date,
-        backtest_end_date,
-        market_credential_service,
-        **kwargs
+            self,
+            config,
+            backtest_start_date,
+            backtest_end_date,
+            **kwargs
     ):
         pass
 
     @abstractmethod
     def get_data(
-        self,
-        market_credential_service,
-        backtest_index_date,
-        from_time_stamp=None,
-        to_time_stamp=None,
-        **kwargs
+            self,
+            backtest_index_date,
+            from_time_stamp=None,
+            to_time_stamp=None,
+            **kwargs
     ):
         pass
 
@@ -62,18 +60,31 @@ class BacktestMarketDataSource(ABC):
     def get_symbol(self):
         return self.symbol
 
+    @abstractmethod
+    def empty(self):
+        pass
+
+    @property
+    def market_credential_service(self):
+        return self._market_credential_service
+
+    @market_credential_service.setter
+    def market_credential_service(self, value):
+        self._market_credential_service = value
+
 
 class MarketDataSource(ABC):
 
     def __init__(
-        self,
-        identifier,
-        market,
-        symbol,
+            self,
+            identifier,
+            market,
+            symbol,
     ):
         self._identifier = identifier
         self._market = market
         self._symbol = symbol
+        self._market_credential_service = None
 
     def initialize(self, config):
         pass
@@ -100,26 +111,48 @@ class MarketDataSource(ABC):
         return self.symbol
 
     @abstractmethod
-    def get_data(self, market_credential_service, **kwargs):
+    def get_data(
+        self,
+        time_stamp=None,
+        from_time_stamp=None,
+        to_time_stamp=None,
+        **kwargs
+    ):
+        """
+        Get data from the market data source.
+
+        :param time_stamp: The time stamp of the data to get.
+        :param from_time_stamp: The time stamp from which to get data.
+        :param to_time_stamp: The time stamp to which to get data.
+        :param kwargs: Additional arguments.
+        """
         pass
 
     @abstractmethod
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
         pass
 
+    @property
+    def market_credential_service(self):
+        return self._market_credential_service
+
+    @market_credential_service.setter
+    def market_credential_service(self, value):
+        self._market_credential_service = value
+
 
 class OHLCVMarketDataSource(MarketDataSource, ABC):
 
     def __init__(
-        self,
-        identifier,
-        market,
-        symbol,
-        timeframe,
-        start_date=None,
-        start_date_func=None,
-        end_date=None,
-        end_date_func=None,
+            self,
+            identifier,
+            market,
+            symbol,
+            timeframe,
+            start_date=None,
+            start_date_func=None,
+            end_date=None,
+            end_date_func=None,
     ):
         super().__init__(
             identifier=identifier,
@@ -190,10 +223,10 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
 class TickerMarketDataSource(MarketDataSource, ABC):
 
     def __init__(
-        self,
-        identifier,
-        market=None,
-        symbol=None,
+            self,
+            identifier,
+            market=None,
+            symbol=None,
     ):
         super().__init__(
             identifier=identifier,
@@ -205,10 +238,10 @@ class TickerMarketDataSource(MarketDataSource, ABC):
 class OrderBookMarketDataSource(MarketDataSource, ABC):
 
     def __init__(
-        self,
-        identifier,
-        market,
-        symbol,
+            self,
+            identifier,
+            market,
+            symbol,
     ):
         super().__init__(
             identifier=identifier,

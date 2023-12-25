@@ -45,6 +45,8 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
                 desc="Preparing backtest market data",
                 colour="GREEN"
         ):
+            backtest_market_data_source.market_credentials_service = \
+                self._market_credential_service
             backtest_market_data_source.prepare_data(
                 config=configuration_service.get_config(),
                 backtest_start_date=configuration_service
@@ -57,10 +59,11 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
     def get_data(self, identifier):
         for backtest_market_data_source in self._market_data_sources:
             if backtest_market_data_source.identifier == identifier:
+                backtest_market_data_source.market_credentials_service = \
+                    self._market_credential_service
                 return backtest_market_data_source.get_data(
                     backtest_index_date=self._configuration_service
                     .config[BACKTESTING_INDEX_DATETIME],
-                    market_credential_service=self._market_credential_service
                 )
 
         return None
@@ -76,8 +79,9 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
                 f"not found for {symbol} and market {market}"
             )
 
+        market_data_source.market_credentials_service = \
+            self._market_credential_service
         return market_data_source.get_data(
-            market_credential_service=self._market_credential_service,
             backtest_index_date=self._configuration_service
             .config[BACKTESTING_INDEX_DATETIME],
         )
@@ -86,8 +90,9 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
         market_data_source = self.get_order_book_market_data_source(
             symbol=symbol, market=market
         )
+        market_data_source.market_credential_service = \
+            self._market_credential_service
         return market_data_source.get_data(
-            market_credential_service=self._market_credential_service,
             backtest_index_date=self._configuration_service
             .config[BACKTESTING_INDEX_DATETIME],
         )
@@ -98,15 +103,16 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
         market_data_source = self.get_ohlcv_market_data_source(
             symbol=symbol, market=market, time_frame=time_frame
         )
+        market_data_source.market_credential_service = \
+            self._market_credential_service
         return market_data_source.get_data(
             from_timestamp=from_timestamp,
             to_timestamp=to_timestamp,
-            market_credential_service=self._market_credential_service,
             backtest_index_date=self._configuration_service
             .config[BACKTESTING_INDEX_DATETIME],
         )
 
-    def is_ohlvc_data_source_present(self, symbol, time_frame, market):
+    def is_ohlcv_data_source_present(self, symbol, time_frame, market):
         market_data_source = self.get_ohlcv_market_data_source(
             symbol=symbol, market=market, time_frame=time_frame
         )

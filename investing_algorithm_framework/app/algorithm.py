@@ -646,7 +646,7 @@ class Algorithm:
         query_params["status"] = OrderStatus.OPEN.value
         return self.order_service.exists(query_params)
 
-    def has_open_orders(self, target_symbol, identifier=None, market=None):
+    def has_open_orders(self, target_symbol=None, identifier=None, market=None):
         query_params = {}
 
         if identifier is not None:
@@ -661,7 +661,9 @@ class Algorithm:
             )
             query_params["portfolio"] = portfolio.id
 
-        query_params["target_symbol"] = target_symbol
+        if target_symbol is not None:
+            query_params["target_symbol"] = target_symbol
+
         query_params["status"] = OrderStatus.OPEN.value
         return self.order_service.exists(query_params)
 

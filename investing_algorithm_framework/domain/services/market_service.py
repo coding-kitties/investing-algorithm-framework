@@ -112,6 +112,10 @@ class MarketService(ABC):
 
     @property
     def market_credentials(self):
+
+        if self._market_credential_service is None:
+            return []
+
         return self._market_credential_service.get_all()
 
     def get_market_credentials(self):

@@ -1,18 +1,26 @@
 import pandas as pd
 from datetime import datetime
 from investing_algorithm_framework.domain import OHLCVMarketDataSource, \
-    BacktestMarketDataSource, OperationalException, TickerMarketDataSource
+    BacktestMarketDataSource, OperationalException, TickerMarketDataSource, \
+    DATETIME_FORMAT
 
 
 class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
 
+        def empty(self):
+            data = self.get_data(
+                from_time_stamp=self.start_date,
+                to_time_stamp=self.end_date
+            )
+            return len(data) == 0
+
         def __init__(
             self,
-            identifier,
-            market,
-            symbol,
-            timeframe,
             csv_file_path,
+            identifier=None,
+            market=None,
+            symbol=None,
+            timeframe=None,
             start_date=None,
             start_date_func=None,
             end_date=None,
@@ -44,13 +52,28 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
                     f"Missing columns: {missing_columns}"
                 )
 
+            first_row = df.iloc[0]
+            last_row = df.iloc[-1]
+            self._start_date = datetime.strptime(first_row[0], DATETIME_FORMAT)
+            self._end_date = datetime.strptime(last_row[0], DATETIME_FORMAT)
+
         @property
         def csv_file_path(self):
             return self._csv_file_path
 
-        def get_data(self, market_credential_service, **kwargs):
-            to_timestamp = self.end_date
-            from_timestamp = self.start_date
+        def get_data(
+            self,
+            from_time_stamp=None,
+            to_time_stamp=None,
+            **kwargs
+        ):
+
+            if from_time_stamp is None:
+                from_time_stamp = self.start_date
+
+            if to_time_stamp is None:
+                to_time_stamp = self.end_date
+
             df = pd.read_csv(self._csv_file_path)
 
             # Convert the 'Datetime' column to datetime type if
@@ -61,8 +84,9 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
 
             # Filter rows based on the start and end dates
             filtered_df = df[
-                (df['Datetime'] >= from_timestamp)
-                & (df['Datetime'] <= to_timestamp)]
+                (df['Datetime'] >= from_time_stamp)
+                & (df['Datetime'] <= to_time_stamp)
+            ]
 
             # Specify the columns you want in the inner lists
             selected_columns = ["Datetime", "Open", "High", "Low", "Close",
@@ -79,7 +103,6 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
             # to a list of lists
             data_list_of_lists = dataframe[columns].values.tolist()
             return data_list_of_lists
-
 
         def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
             pass
@@ -119,7 +142,7 @@ class CSVTickerMarketDataSource(TickerMarketDataSource):
     def csv_file_path(self):
         return self._csv_file_path
 
-    def get_data(self, market_credential_service, index_datetime=None, **kwargs):
+    def get_data(self, index_datetime=None, **kwargs):
 
         if index_datetime is None:
             index_datetime = datetime.utcnow()
