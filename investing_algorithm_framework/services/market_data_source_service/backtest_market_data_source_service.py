@@ -57,6 +57,7 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
             )
 
     def get_data(self, identifier):
+
         for backtest_market_data_source in self._market_data_sources:
             if backtest_market_data_source.identifier == identifier:
                 backtest_market_data_source.market_credentials_service = \
@@ -66,7 +67,9 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
                     .config[BACKTESTING_INDEX_DATETIME],
                 )
 
-        return None
+        raise OperationalException(
+            f"Backtest market data source not found for {identifier}"
+        )
 
     def get_ticker(self, symbol, market):
         market_data_source = self.get_ticker_market_data_source(
