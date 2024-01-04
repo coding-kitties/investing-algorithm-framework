@@ -864,3 +864,52 @@ class Algorithm:
             order_side=OrderSide.SELL.value,
             price=ticker["bid"],
         )
+
+    def get_number_of_positions(self):
+        """
+        Returns the number of positions that have a positive amount.
+        """
+        return self.position_service.count({"amount_gt": 0})
+
+    def has_trading_symbol_position_available(
+        self,
+        amount_gt=None,
+        amount_gte=None,
+        percentage_of_portfolio=None,
+        market=None
+    ):
+        """
+        Checks if there is a position available for the trading symbol of the
+        portfolio. If the amount_gt or amount_gte parameters are specified,
+        the amount of the position must be greater than the specified amount.
+        If the percentage_of_portfolio parameter is specified, the amount of
+        the position must be greater than the net_size of the
+        portfolio.
+
+        :param amount_gt: The amount of the position must be greater than
+        this amount.
+        :param amount_gte: The amount of the position must be greater than
+        or equal to this amount.
+        :param percentage_of_portfolio: The amount of the position must be
+        greater than the net_size of the portfolio.
+        :param market: The market of the portfolio.
+        :return: True if there is a trading symbol position available with the
+        specified parameters, False otherwise.
+        """
+        portfolio = self.portfolio_service.find({"market": market})
+        position = self.position_service.find(
+            {"portfolio": portfolio.id, "symbol": portfolio.trading_symbol}
+        )
+
+        if amount_gt is not None:
+            return position.get_amount() > amount_gt
+
+        if amount_gte is not None:
+            return position.get_amount() >= amount_gte
+
+        if percentage_of_portfolio is not None:
+            net_size = portfolio.get_net_size()
+            return position.get_amount() >= net_size \
+                * percentage_of_portfolio / 100
+
+        return position.get_amount() > 0
