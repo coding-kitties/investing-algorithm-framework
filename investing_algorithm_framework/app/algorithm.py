@@ -827,7 +827,7 @@ class Algorithm:
 
         return trades
 
-    def close_trade(self, trade, market):
+    def close_trade(self, trade, market=None):
 
         if trade.closed_at is not None:
             raise ApiException("Trade already closed.")
