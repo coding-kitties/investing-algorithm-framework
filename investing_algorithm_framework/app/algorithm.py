@@ -421,11 +421,8 @@ class Algorithm:
         )
         full_symbol = f"{position.symbol.upper()}/" \
                       f"{portfolio.trading_symbol.upper()}"
-        ticker = self.get_ticker_market_data_source(portfolio.market, full_symbol)\
-            .get_data(
-                backtest_index_date=self.config
-                .get(BACKTESTING_INDEX_DATETIME)
-            )
+        ticker = self._market_data_source_service\
+            .get_ticker(market=portfolio.market, symbol=full_symbol)
         total = self.get_unallocated() + self.get_allocated()
         return (position.amount * ticker["bid"] / total) * 100
 
@@ -550,8 +547,8 @@ class Algorithm:
 
                 symbol = f"{position.symbol.upper()}/" \
                          f"{portfolio.trading_symbol.upper()}"
-                ticker = self.get_ticker_market_data_source(
-                    portfolio.market, symbol
+                ticker = self._market_data_source_service.get_ticker(
+                    symbol=symbol, market=portfolio.market,
                 ).get_data(
                     backtest_index_date=self.config
                     .get(BACKTESTING_INDEX_DATETIME)
