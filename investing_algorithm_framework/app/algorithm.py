@@ -421,8 +421,9 @@ class Algorithm:
         )
         full_symbol = f"{position.symbol.upper()}/" \
                       f"{portfolio.trading_symbol.upper()}"
-        ticker = self._market_data_source_service\
-            .get_ticker(market=portfolio.market, symbol=full_symbol)
+        ticker = self._market_data_source_service.get_ticker(
+            symbol=full_symbol, market=market
+        )
         total = self.get_unallocated() + self.get_allocated()
         return (position.amount * ticker["bid"] / total) * 100
 
@@ -478,8 +479,9 @@ class Algorithm:
             self.order_service.cancel_order(order)
 
         symbol = f"{symbol.upper()}/{portfolio.trading_symbol.upper()}"
-        ticker = self._market_data_source_service\
-            .get_ticker(market=portfolio.market, symbol=symbol)
+        ticker = self._market_data_source_service.get_ticker(
+            symbol=symbol, market=market
+        )
         self.create_limit_order(
             target_symbol=position.symbol,
             amount=position.get_amount(),
@@ -548,7 +550,7 @@ class Algorithm:
                 symbol = f"{position.symbol.upper()}/" \
                          f"{portfolio.trading_symbol.upper()}"
                 ticker = self._market_data_source_service.get_ticker(
-                    symbol=symbol, market=portfolio.market,
+                    symbol=symbol, market=market,
                 ).get_data(
                     backtest_index_date=self.config
                     .get(BACKTESTING_INDEX_DATETIME)
@@ -667,7 +669,7 @@ class Algorithm:
     def check_pending_orders(self):
         self.order_service.check_pending_orders()
 
-    def get_trades(self):
+    def get_trades(self, market=None):
         portfolios = self.portfolio_service.get_all()
         trades = []
 
@@ -681,7 +683,7 @@ class Algorithm:
             for buy_order in buy_orders:
                 symbol = buy_order.get_symbol()
                 ticker = self._market_data_source_service.get_ticker(
-                    symbol=symbol, market=portfolio.market
+                    symbol=symbol, market=market
                 )
                 trades.append(
                     Trade(
@@ -735,7 +737,7 @@ class Algorithm:
         else:
             return 0
 
-    def get_open_trades(self, target_symbol=None):
+    def get_open_trades(self, target_symbol=None, market=None):
         portfolios = self.portfolio_service.get_all()
         trades = []
 
@@ -797,7 +799,7 @@ class Algorithm:
 
                 try:
                     ticker = self._market_data_source_service.get_ticker(
-                        symbol=symbol, market=portfolio.market
+                        symbol=symbol, market=market
                     )
                 except Exception as e:
                     logger.error(e)
@@ -825,7 +827,7 @@ class Algorithm:
 
         return trades
 
-    def close_trade(self, trade):
+    def close_trade(self, trade, market):
 
         if trade.closed_at is not None:
             raise ApiException("Trade already closed.")
@@ -853,8 +855,9 @@ class Algorithm:
 
         symbol = f"{order.get_target_symbol().upper()}" \
                  f"/{order.get_trading_symbol().upper()}"
-        ticker = self._market_data_source_service\
-            .get_ticker(symbol=symbol, market=portfolio.market)
+        ticker = self._market_data_source_service.get_ticker(
+            symbol=symbol, market=market
+        )
         self.create_limit_order(
             target_symbol=order.target_symbol,
             amount=amount,

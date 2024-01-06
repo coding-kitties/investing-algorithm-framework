@@ -42,13 +42,23 @@ class TestMarketDataSourceService(TestBase):
         ))
         self.app.initialize()
 
-    def test_create_limit_order(self):
+    def test_get_ticker_market_data_source(self):
         market_data_source_service = self.app.container\
             .market_data_source_service()
         ticker_market_data_source = market_data_source_service\
             .get_ticker_market_data_source(
                 symbol="BTC/EUR",
                 market="BITVAVO"
+            )
+        self.assertIsNotNone(ticker_market_data_source)
+        self.assertEqual("BTC/EUR", ticker_market_data_source.symbol)
+        self.assertEqual("BITVAVO", ticker_market_data_source.market)
+        self.assertTrue(
+            isinstance(ticker_market_data_source, CSVTickerMarketDataSource)
+        )
+        ticker_market_data_source = market_data_source_service \
+            .get_ticker_market_data_source(
+                symbol="BTC/EUR",
             )
         self.assertIsNotNone(ticker_market_data_source)
         self.assertEqual("BTC/EUR", ticker_market_data_source.symbol)
