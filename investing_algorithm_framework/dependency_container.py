@@ -25,7 +25,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         ConfigurationService,
     )
     market_credential_service = providers.ThreadSafeSingleton(
-        MarketCredentialService,
+        MarketCredentialService
     )
     order_repository = providers.Factory(SQLOrderRepository)
     order_fee_repository = providers.Factory(SQLOrderFeeRepository)

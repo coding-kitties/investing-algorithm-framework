@@ -7,10 +7,7 @@ logger = logging.getLogger("investing_algorithm_framework")
 
 class MarketService(ABC):
 
-    def __init__(
-        self,
-        market_credential_service
-    ):
+    def __init__(self, market_credential_service):
         self._market_credential_service = market_credential_service
 
     @abstractmethod
