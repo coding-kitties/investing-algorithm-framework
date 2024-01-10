@@ -551,9 +551,6 @@ class Algorithm:
                          f"{portfolio.trading_symbol.upper()}"
                 ticker = self._market_data_source_service.get_ticker(
                     symbol=symbol, market=market,
-                ).get_data(
-                    backtest_index_date=self.config
-                    .get(BACKTESTING_INDEX_DATETIME)
                 )
                 allocated = allocated + \
                     (position.get_amount() * ticker["bid"])
