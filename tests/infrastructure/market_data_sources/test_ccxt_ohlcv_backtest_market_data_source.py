@@ -108,7 +108,8 @@ class Test(TestCase):
         self.assertEqual(200, data_source.window_size)
         self.assertEqual(csv_file_path, data_source._create_file_path())
 
-    # def test_start_date(self):
+
+# def test_start_date(self):
     #     start_date = datetime(2023, 12, 1)
     #     file_name = "OHLCV_BTC-EUR_BINANCE_15m_2023-12-" \
     #                 "01:00:00_2023-12-25:00:00.csv"

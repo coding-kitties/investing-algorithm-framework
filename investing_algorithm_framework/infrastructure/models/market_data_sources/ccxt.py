@@ -112,7 +112,7 @@ class CCXTOHLCVBacktestMarketDataSource(
             os.mkdir(self.backtest_data_directory)
 
         file_path = self._create_file_path()
-
+        print(self._data_source_exists(file_path))
         if not self._data_source_exists(file_path):
             if not os.path.isfile(file_path):
                 try:
