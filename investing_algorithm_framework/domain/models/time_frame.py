@@ -1,16 +1,24 @@
-from datetime import datetime, timedelta
 from enum import Enum
-
-from dateutil import relativedelta
 
 
 class TimeFrame(Enum):
     CURRENT = "CURRENT"
-    ONE_HOUR = "ONE_HOUR"
-    ONE_DAY = "ONE_DAY"
-    ONE_WEEK = "ONE_WEEK"
-    ONE_MONTH = "ONE_MONTH"
-    ONE_YEAR = "ONE_YEAR"
+    ONE_MINUTE = "1m"
+    TWO_MINUTE = "2m"
+    THREE_MINUTE = "3m"
+    FOUR_MINUTE = "4m"
+    FIVE_MINUTE = "5m"
+    TEN_MINUTE = "10m"
+    FIFTEEN_MINUTE = "15m"
+    THIRTY_MINUTE = "30m"
+    ONE_HOUR = "1H"
+    TWO_HOUR = "2H"
+    FOUR_HOUR = "4H"
+    TWELVE_HOUR = "12H"
+    ONE_DAY = "1D"
+    ONE_WEEK = "1W"
+    ONE_MONTH = "1M"
+    ONE_YEAR = "1Y"
 
     @staticmethod
     def from_string(value: str):
@@ -19,7 +27,16 @@ class TimeFrame(Enum):
 
             for entry in TimeFrame:
 
-                if value.upper() == entry.value:
+                # For hour timeframes compare with and without H
+                if "H" in entry.value:
+
+                    if value == entry.value:
+                        return entry
+
+                    if value == entry.value.replace("H", "h"):
+                        return entry
+
+                if value == entry.value:
                     return entry
 
             raise ValueError(
@@ -50,108 +67,50 @@ class TimeFrame(Enum):
         else:
             return TimeFrame.from_string(other) == self
 
-    def create_time_frame(self, end_datetime=None):
-
-        if end_datetime is None:
-            end_datetime = datetime.utcnow()
-
-        if TimeFrame.ONE_HOUR.equals(self):
-            start_datetime = end_datetime - \
-                             relativedelta.relativedelta(hours=1)
-        elif TimeFrame.ONE_DAY.equals(self):
-            start_datetime = end_datetime - \
-                             relativedelta.relativedelta(hours=24)
-        elif TimeFrame.ONE_WEEK.equals(self):
-            start_datetime = end_datetime - \
-                             relativedelta.relativedelta(days=7)
-        elif TimeFrame.ONE_MONTH.equals(self):
-            start_datetime = \
-                end_datetime - relativedelta.relativedelta(days=28)
-        elif TimeFrame.ONE_YEAR.equals(self):
-            start_datetime = \
-                end_datetime - relativedelta.relativedelta(days=365)
-        else:
-            raise NotImplementedError(
-                f"Timeframe {self.value} not implemented"
-            )
-
-        return start_datetime, end_datetime
-
-    def duration(self):
-        if TimeFrame.ONE_HOUR.equals(self):
-            return relativedelta.relativedelta(hours=1)
-        elif TimeFrame.ONE_DAY.equals(self):
-            return relativedelta.relativedelta(hours=24)
-        elif TimeFrame.ONE_WEEK.equals(self):
-            return relativedelta.relativedelta(days=7)
-        elif TimeFrame.ONE_MONTH.equals(self):
-            return relativedelta.relativedelta(days=28)
-        elif TimeFrame.ONE_YEAR.equals(self):
-            return relativedelta.relativedelta(days=365)
-        else:
-            raise NotImplementedError(
-                f"Timeframe {self.value} not implemented"
-            )
-
     @property
-    def time_interval(self):
-        from investing_algorithm_framework.core.models import TimeInterval
+    def amount_of_minutes(self):
 
-        if TimeFrame.CURRENT.equals(self):
-            return TimeInterval.CURRENT
-        elif TimeFrame.ONE_HOUR.equals(self):
-            return TimeInterval.MINUTES_ONE
-        elif TimeFrame.ONE_DAY.equals(self):
-            return TimeInterval.MINUTES_FIFTEEN
-        elif TimeFrame.ONE_WEEK.equals(self):
-            return TimeInterval.HOURS_ONE
-        elif TimeFrame.ONE_MONTH.equals(self):
-            return TimeInterval.HOURS_FOUR
-        elif TimeFrame.ONE_YEAR.equals(self):
-            return TimeInterval.DAYS_ONE
-        else:
-            raise NotImplementedError(
-                f"Timeframe {self.value} not implemented"
-            )
+        if self.equals(TimeFrame.ONE_MINUTE):
+            return 1
 
-    @property
-    def intervals(self):
-        intervals = []
-        start_datetime, end_datetime = self.create_time_frame()
-        delta = end_datetime - start_datetime
+        if self.equals(TimeFrame.TWO_MINUTE):
+            return 2
 
-        intervals.append(end_datetime)
+        if self.equals(TimeFrame.THREE_MINUTE):
+            return 3
 
-        if TimeFrame.ONE_HOUR.equals(self):
+        if self.equals(TimeFrame.FOUR_MINUTE):
+            return 4
 
-            for i in range(1, int(delta.total_seconds() / 60)):
-                intervals.append(end_datetime - timedelta(minutes=i))
+        if self.equals(TimeFrame.FIVE_MINUTE):
+            return 5
 
-        elif TimeFrame.ONE_DAY.equals(self):
+        if self.equals(TimeFrame.TEN_MINUTE):
+            return 10
 
-            for i in range(1, int((delta.total_seconds() / 60) / 15)):
-                intervals.append(end_datetime - timedelta(minutes=i * 15))
+        if self.equals(TimeFrame.FIFTEEN_MINUTE):
+            return 15
 
-        elif TimeFrame.ONE_WEEK.equals(self):
+        if self.equals(TimeFrame.THIRTY_MINUTE):
+            return 30
 
-            for i in range(1, int((delta.total_seconds() / 60) / 60)):
-                intervals.append(end_datetime - timedelta(hours=i))
+        if self.equals(TimeFrame.ONE_HOUR):
+            return 60
 
-        elif TimeFrame.ONE_MONTH.equals(self):
+        if self.equals(TimeFrame.TWO_HOUR):
+            return 120
 
-            for i in range(1, int(((delta.total_seconds() / 60) / 60) / 4)):
-                intervals.append(end_datetime - timedelta(hours=i * 4))
+        if self.equals(TimeFrame.FOUR_HOUR):
+            return 240
 
-        elif TimeFrame.ONE_YEAR.equals(self):
+        if self.equals(TimeFrame.TWELVE_HOUR):
+            return 720
 
-            for i in range(1, int(delta.days)):
-                intervals.append(
-                    end_datetime - relativedelta.relativedelta(days=i)
-                )
+        if self.equals(TimeFrame.ONE_DAY):
+            return 1440
 
-        else:
-            raise NotImplementedError(
-                f"Timeframe {self.value} not implemented"
-            )
+        if self.equals(TimeFrame.ONE_WEEK):
+            return 10080
 
-        return intervals
+        if self.equals(TimeFrame.ONE_MONTH):
+            return 40320

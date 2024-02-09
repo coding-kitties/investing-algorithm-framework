@@ -57,7 +57,11 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
             )
 
     def get_data(self, identifier):
-
+        """
+        This method is used to get the data for backtesting. It loops
+        over all the backtest market data sources and returns the data
+        for the given identifier (If there is a match).
+        """
         for backtest_market_data_source in self._market_data_sources:
             if backtest_market_data_source.identifier == identifier:
                 backtest_market_data_source.market_credentials_service = \

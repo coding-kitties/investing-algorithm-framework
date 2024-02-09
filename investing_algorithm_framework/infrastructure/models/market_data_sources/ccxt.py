@@ -1,14 +1,16 @@
 import logging
 import os
-import csv
-from datetime import datetime, timedelta
-from investing_algorithm_framework.infrastructure.services import \
-    CCXTMarketService
+from datetime import timedelta
+
+import polars
+
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
     BACKTEST_DATA_DIRECTORY_NAME, DATETIME_FORMAT_BACKTESTING, \
     OperationalException, DATETIME_FORMAT, OHLCVMarketDataSource, \
     BacktestMarketDataSource, OrderBookMarketDataSource, \
-    TickerMarketDataSource
+    TickerMarketDataSource, TimeFrame
+from investing_algorithm_framework.infrastructure.services import \
+    CCXTMarketService
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +18,25 @@ logger = logging.getLogger(__name__)
 class CCXTOHLCVBacktestMarketDataSource(
     OHLCVMarketDataSource, BacktestMarketDataSource
 ):
+    """
+    CCXTOHLCVBacktestMarketDataSource implementation using ccxt to download
+    all data sources.
 
+    This class will determine the start and end date of the data range by
+    taking the backtest start date (e.g. 01-01-2024) and the backtest
+    end date (e.g. 31-12-2024) in combination with the difference between
+    start and end date. The reason for this is that the data source needs
+    to have data on the first run (e.g. an algorithm starting on 01-01-2024 that
+    requires 2h data for the last 17 days will need to have pulled data from
+    15-12-2023)
+
+    To achieve this, a backtest_data_start_date attribute is used. This
+    attribute is indexed on this calculated date.
+    """
     backtest_data_directory = None
-    backtest_data_index_date = None
-    backtest_data_start_date = None
     backtest_data_end_date = None
     total_minutes_timeframe = None
+    column_names = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
 
     def __init__(
         self,
@@ -29,7 +44,8 @@ class CCXTOHLCVBacktestMarketDataSource(
         market,
         symbol,
         timeframe,
-        start_date,
+        start_date=None,
+        window_size=None,
         start_date_func=None,
         end_date_func=None,
         end_date=None,
@@ -43,6 +59,7 @@ class CCXTOHLCVBacktestMarketDataSource(
             start_date_func=start_date_func,
             end_date=end_date,
             end_date_func=end_date_func,
+            window_size=window_size
         )
 
     def prepare_data(
@@ -52,23 +69,39 @@ class CCXTOHLCVBacktestMarketDataSource(
         backtest_end_date,
         **kwargs
     ):
+        """
+        Prepare data implementation of ccxt based ohlcv backtest market
+        data source
+
+        This implementation will check if the data source already exists before
+        pulling all the data. This optimization will prevent downloading
+        of unnecessary resources.
+
+        When downloading the data it will use the ccxt library.
+        """
         # Calculating the backtest data start date
+
         difference = self.end_date - self.start_date
         total_minutes = 0
 
         if difference.days > 0:
             total_minutes += difference.days * 24 * 60
+
         if difference.seconds > 0:
             total_minutes += difference.seconds / 60
 
         self.total_minutes_timeframe = total_minutes
         backtest_data_start_date = \
             backtest_start_date - timedelta(
-                minutes=self.total_minutes_timeframe
+                minutes=(
+                        self.window_size *
+                        TimeFrame.from_string(self.timeframe).amount_of_minutes
+                )
             )
         self.backtest_data_start_date = backtest_data_start_date
         self.backtest_data_index_date = backtest_data_start_date
         self.backtest_data_end_date = backtest_end_date
+
         # Creating the backtest data directory and file
         self.backtest_data_directory = os.path.join(
             config.get(RESOURCE_DIRECTORY),
@@ -80,39 +113,33 @@ class CCXTOHLCVBacktestMarketDataSource(
 
         file_path = self._create_file_path()
 
-        if not os.path.isfile(file_path):
-            try:
-                with open(file_path, 'w') as file:
-                    pass
-            except Exception as e:
-                logger.error(e)
-                raise OperationalException(
-                    f"Could not create backtest data file {file_path}"
-                )
+        if not self._data_source_exists(file_path):
+            if not os.path.isfile(file_path):
+                try:
+                    with open(file_path, 'w') as _:
+                        pass
+                except Exception as e:
+                    logger.error(e)
+                    raise OperationalException(
+                        f"Could not create backtest data file {file_path}"
+                    )
 
-        # Get the OHLCV data from the ccxt market service
-        market_service = CCXTMarketService(self.market_credential_service)
-        ohlcv = market_service.get_ohlcv(
-            symbol=self.symbol,
-            time_frame=self.timeframe,
-            from_timestamp=backtest_data_start_date,
-            to_timestamp=backtest_end_date,
-            market=self.market
-        )
-        self.write_ohlcv_to_file(file_path, ohlcv)
-
-    def write_ohlcv_to_file(self, data_file, data):
-
-        with open(data_file, "w") as file:
-            column_headers = [
-                "Datetime", "Open", "High", "Low", "Close", "Volume"
-            ]
-            writer = csv.writer(file)
-            writer.writerow(column_headers)
-            rows = data
-            writer.writerows(rows)
+            # Get the OHLCV data from the ccxt market service
+            market_service = CCXTMarketService(self.market_credential_service)
+            ohlcv = market_service.get_ohlcv(
+                symbol=self.symbol,
+                time_frame=self.timeframe,
+                from_timestamp=backtest_data_start_date,
+                to_timestamp=backtest_end_date,
+                market=self.market
+            )
+            self.write_data_to_file_path(file_path, ohlcv)
 
     def _create_file_path(self):
+        """
+        Function to create a filename in the following format:
+        OHLCV_{symbol}_{market}_{timeframe}_{start_date}_{end_date}.csv
+        """
         symbol_string = self.symbol.replace("/", "-")
         time_frame_string = self.timeframe.replace("_", "")
         return os.path.join(
@@ -128,6 +155,11 @@ class CCXTOHLCVBacktestMarketDataSource(
         )
 
     def get_data(self, backtest_index_date, **kwargs):
+        """
+        Get data implementation of ccxt based ohlcv backtest market data
+        source. This implementation will use polars to load and filter the
+        data.
+        """
         file_path = self._create_file_path()
         to_timestamp = backtest_index_date
         from_timestamp = backtest_index_date - timedelta(
@@ -147,27 +179,16 @@ class CCXTOHLCVBacktestMarketDataSource(
                 f"backtest data ends at {self.end_date}"
             )
 
-        matching_rows = []
-
-        with open(file_path, 'r') as file:
-            reader = csv.reader(file)
-            next(reader)  # Skip the header row
-
-            for row in reader:
-                row_date = datetime.strptime(row[0], DATETIME_FORMAT)
-
-                if from_timestamp <= row_date <= to_timestamp:
-                    data = [
-                        row_date,
-                        float(row[1]),
-                        float(row[2]),
-                        float(row[3]),
-                        float(row[4]),
-                        float(row[5]),
-                    ]
-                    matching_rows.append(data)
-
-        return matching_rows
+        # Load the csv file and filter out the dates that are not in the
+        # backtest index date range
+        df = polars.read_csv(
+            file_path, columns=self.column_names, separator=","
+        )
+        df = df.filter(
+            (df['Datetime'] >= from_timestamp.strftime(DATETIME_FORMAT))
+            & (df['Datetime'] <= to_timestamp.strftime(DATETIME_FORMAT))
+        )
+        return df
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
         # Ignore this method for now
@@ -176,37 +197,33 @@ class CCXTOHLCVBacktestMarketDataSource(
     def empty(self):
         return False
 
+    @property
+    def file_name(self):
+        return self._create_file_path().split("/")[-1]
+
 
 class CCXTTickerBacktestMarketDataSource(
     TickerMarketDataSource, BacktestMarketDataSource
 ):
+    """
+    CCXTTickerBacktestMarketDataSource implementation using ccxt to download
+    all data sources.
 
-    def empty(self):
-        return False
+    This class will determine the start and end date of the data range by
+    taking the start date of the backtest minus 1 day and the end date of the
+    backtest. The reason for this is that the data source needs
+    to have data on the first run (e.g. an algorithm starting on
+    01-01-2024 that requires ticker data will need to have pulled data from
+    01-01-2024 - amount of minutes of the provided timeframe)
 
-    def get_data(self, **kwargs):
-
-        if "backtest_index_date" not in kwargs:
-            raise OperationalException(
-                "backtest_index_date should be passed as a parameter "
-                "for CCXTTickerBacktestMarketDataSource"
-            )
-
-        file_path = self._create_file_path()
-        backtest_index_date = kwargs["backtest_index_date"]
-        if file_path is None:
-            return self._get_ticker_from_ccxt(
-                backtest_index_date=backtest_index_date,
-                market_credential_service=self.market_credential_service,
-                **kwargs
-            )
-        else:
-            return self._get_ticker_from_file(backtest_index_date)
-
+    To achieve this, a backtest_data_start_date attribute is used. This
+    attribute is indexed on this calculated date.
+    """
     backtest_data_directory = None
     backtest_data_start_date = None
     backtest_data_end_date = None
     timeframe = "15m"
+    column_names = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
 
     def __init__(
         self,
@@ -230,7 +247,19 @@ class CCXTTickerBacktestMarketDataSource(
         backtest_end_date,
         **kwargs
     ):
-        self.backtest_data_start_date = backtest_start_date - timedelta(days=1)
+        """
+        Prepare data implementation of ccxt based ticker backtest market
+        data source
+
+        This implementation will check if the data source already exists before
+        pulling all the data. This optimization will prevent downloading
+        of unnecessary resources.
+
+        When downloading the data it will use the ccxt library.
+        """
+        total_minutes = TimeFrame.from_string(self.timeframe).amount_of_minutes
+        self.backtest_data_start_date = \
+            backtest_start_date - timedelta(minutes=total_minutes)
         self.backtest_data_end_date = backtest_end_date
 
         # Creating the backtest data directory and file
@@ -254,27 +283,28 @@ class CCXTTickerBacktestMarketDataSource(
                     f"Could not create backtest data file {file_path}"
                 )
 
-        # Get the OHLCV data from the ccxt market service
-        market_service = CCXTMarketService(self.market_credential_service)
-        ohlcv = market_service.get_ohlcv(
-            symbol=self.symbol,
-            time_frame=self.timeframe,
-            from_timestamp=self.backtest_data_start_date,
-            to_timestamp=backtest_end_date,
-            market=self.market
-        )
-        self.write_ohlcv_to_file(file_path, ohlcv)
+        # Check if the data source already exists, if not download the data
+        if not self._data_source_exists(file_path):
+            if not os.path.isfile(file_path):
+                try:
+                    with open(file_path, 'w') as _:
+                        pass
+                except Exception as e:
+                    logger.error(e)
+                    raise OperationalException(
+                        f"Could not create backtest data file {file_path}"
+                    )
 
-    def write_ohlcv_to_file(self, data_file, data):
-
-        with open(data_file, "w") as file:
-            column_headers = [
-                "Datetime", "Open", "High", "Low", "Close", "Volume"
-            ]
-            writer = csv.writer(file)
-            writer.writerow(column_headers)
-            rows = data
-            writer.writerows(rows)
+            # Get the OHLCV data from the ccxt market service
+            market_service = CCXTMarketService(self.market_credential_service)
+            ohlcv = market_service.get_ohlcv(
+                symbol=self.symbol,
+                time_frame=self.timeframe,
+                from_timestamp=self.backtest_data_start_date,
+                to_timestamp=backtest_end_date,
+                market=self.market
+            )
+            self.write_data_to_file_path(file_path, ohlcv)
 
     def _create_file_path(self):
 
@@ -294,120 +324,47 @@ class CCXTTickerBacktestMarketDataSource(
             )
         )
 
-    def _get_ticker_from_ccxt(
-        self, market_credential_service, backtest_index_date, **kwargs
-    ):
-        market_service = CCXTMarketService(market_credential_service)
-
-        if self.market is None:
-
-            if "market" not in kwargs:
-                raise OperationalException(
-                    "Either market should be set as an attribute "
-                    "or market should be passed as a parameter for "
-                    "CCXTTickerBacktestMarketDataSource"
-                )
-            else:
-                market = kwargs["market"]
-        else:
-            market = self.market
-
-        if self.symbol is None:
-
-            if "symbol" not in kwargs:
-                raise OperationalException(
-                    "Either symbol shoudl be set as an attribute "
-                    "or symbol should be passed as a parameter for the "
-                    "CCXTTickerBacktestMarketDataSource"
-                )
-            else:
-                symbol = kwargs["symbol"]
-        else:
-            symbol = self.symbol
-
-        ohlcv = market_service.get_ohlcv(
-            symbol=symbol,
-            time_frame="15m",
-            from_timestamp=backtest_index_date - timedelta(minutes=15),
-            to_timestamp=backtest_index_date + timedelta(minutes=15),
-            market=market
-        )
-        return ohlcv[1]
-
-    def _get_ticker_from_file(self, backtest_index_date):
-        file_path = self._create_file_path()
-        to_timestamp = backtest_index_date
-
-        if backtest_index_date < self.backtest_data_start_date:
-            raise OperationalException(
-                f"Cannot get data from {backtest_index_date} as the "
-                f"backtest data starts at {self.backtest_data_start_date}"
-            )
-
-        if backtest_index_date > self.backtest_data_end_date:
-            raise OperationalException(
-                f"Cannot get data to {to_timestamp} as the "
-                f"backtest data ends at {self.backtest_data_end_date}"
-            )
-
-        with open(file_path, 'r') as file:
-            reader = csv.reader(file)
-            next(reader)  # Skip the header row
-            previous_row = None
-
-            for row in reader:
-                row_date = datetime.strptime(row[0], DATETIME_FORMAT)
-
-                if backtest_index_date <= row_date:
-
-                    if backtest_index_date == row_date:
-                        return {
-                            "symbol": self.symbol,
-                            "bid": float(row[4]),
-                            "ask": float(row[4]),
-                            "datetime": row[0],
-                        }
-                    elif previous_row is not None:
-                        return {
-                            "symbol": self.symbol,
-                            "bid": float(previous_row[4]),
-                            "ask": float(previous_row[4]),
-                            "datetime": previous_row[0],
-                        }
-                    else:
-                        raise OperationalException(
-                            f"Could not find ticker data for date "
-                            f"{backtest_index_date}"
-                        )
-                else:
-                    previous_row = row
-
-        if previous_row is not None:
-            difference = backtest_index_date - datetime\
-                .strptime(previous_row[0], DATETIME_FORMAT)
-            difference_in_minutes = difference.days * 24 * 60 + \
-                difference.seconds / 60
-
-            # If the difference is more than 4 hours, we can assume
-            # that the data is not available
-            if difference_in_minutes <= 240:
-                return {
-                    "symbol": self.symbol,
-                    "bid": float(previous_row[3]) + float(previous_row[2]) / 2,
-                    "ask": float(previous_row[3]) + float(previous_row[2]) / 2,
-                    "datetime": previous_row[0],
-                }
-
-        raise OperationalException(
-            f"Could not find {self.symbol} ticker data for date "
-            f"{backtest_index_date}. Please make sure that the selected "
-            f"broker or exchange {self.market} has ticker data"
-            f" available for symbol {self.symbol}"
-        )
-
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
         # Ignore this method for now
         pass
+
+    def empty(self):
+        return False
+
+    def get_data(self, **kwargs):
+        """
+        Get data implementation of ccxt based ticker backtest market data
+        source
+        """
+        if "backtest_index_date" not in kwargs:
+            raise OperationalException(
+                "backtest_index_date should be passed as a parameter "
+                "for CCXTTickerBacktestMarketDataSource"
+            )
+
+        file_path = self._create_file_path()
+        timeframe_minutes = TimeFrame.from_string(self.timeframe).amount_of_minutes
+        backtest_index_date = kwargs["backtest_index_date"]
+        end_date = backtest_index_date + timedelta(minutes=timeframe_minutes)
+
+        # Filter the data based on the backtest index date and the end date
+        df = polars.read_csv(file_path)
+        df = df.filter(
+            (df['Datetime'] >= backtest_index_date
+             .strftime(DATETIME_FORMAT))
+            & (df['Datetime'] <= end_date.strftime(DATETIME_FORMAT))
+        )
+
+        # Take the first row of the dataframe
+        first_row = df.head(1)[0]
+
+        # Calculate the bid and ask price based on the high and low price
+        return {
+            "symbol": self.symbol,
+            "bid": float((first_row["Low"][0]) + float(first_row["High"][0]))/2,
+            "ask": float((first_row["Low"][0]) + float(first_row["High"][0]))/2,
+            "datetime": first_row["Datetime"][0],
+        }
 
 
 class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):

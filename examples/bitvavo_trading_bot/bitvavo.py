@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 from investing_algorithm_framework import MarketCredential, TimeUnit, \
     CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, TradingStrategy, \
     create_app, PortfolioConfiguration
@@ -12,7 +11,7 @@ add a market credential. If your runnning your strategy live,
 you need to add a market credential to the app, that accesses your 
 account on bitvavo.
 """
-# Define your market credential for coinbase
+# Define your market credential for bitvavo
 bitvavo_market_credential = MarketCredential(
     api_key="<your_api_key>",
     secret_key="<your_secret_key>",
@@ -24,7 +23,7 @@ bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
     market="bitvavo",
     symbol="BTC/EUR",
     timeframe="2h",
-    start_date_func=lambda: datetime.utcnow() - timedelta(days=17)
+    window_size=200
 )
 bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     identifier="BTC/EUR-ticker",

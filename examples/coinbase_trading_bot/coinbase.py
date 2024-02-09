@@ -23,7 +23,7 @@ coinbase_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
     market="coinbase",
     symbol="BTC/EUR",
     timeframe="2h",
-    start_date_func=lambda: datetime.utcnow() - timedelta(days=17)
+    window_size=200
 )
 coinbase_btc_eur_ticker = CCXTTickerMarketDataSource(
     identifier="BTC/EUR-ticker",

@@ -25,6 +25,7 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
             start_date_func=None,
             end_date=None,
             end_date_func=None,
+            window_size=None,
         ):
             super().__init__(
                 identifier=identifier,
@@ -35,6 +36,7 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
                 start_date_func=start_date_func,
                 end_date=end_date,
                 end_date_func=end_date_func,
+                window_size=window_size,
             )
             self._csv_file_path = csv_file_path
             self._columns = [

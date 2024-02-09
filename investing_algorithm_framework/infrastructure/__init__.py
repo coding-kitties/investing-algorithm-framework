@@ -34,4 +34,6 @@ __all__ = [
     "CCXTMarketService",
     "CSVOHLCVMarketDataSource",
     "CSVTickerMarketDataSource",
+    "CCXTOHLCVBacktestMarketDataSource",
+    "CCXTOrderBookMarketDataSource",
 ]

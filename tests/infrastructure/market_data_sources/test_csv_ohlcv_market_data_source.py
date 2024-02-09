@@ -31,7 +31,8 @@ class Test(TestCase):
         CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
-                          f"{file_name}"
+                          f"{file_name}",
+            window_size=10
         )
 
     def test_start_date(self):
@@ -41,7 +42,8 @@ class Test(TestCase):
         csv_ohlcv_market_data_source = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
-                          f"{file_name}"
+                          f"{file_name}",
+            window_size=10,
         )
         self.assertEqual(
             start_date,
@@ -55,7 +57,8 @@ class Test(TestCase):
         csv_ohlcv_market_data_source = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
-                          f"{file_name}"
+                          f"{file_name}",
+            window_size=10,
         )
         self.assertEqual(
             end_date,
@@ -69,7 +72,9 @@ class Test(TestCase):
         data_source = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
-                          f"{file_name}"
+                          f"{file_name}",
+            window_size=10,
+            timeframe="15m",
         )
         self.assertFalse(data_source.empty())
         self.assertEqual(start_date, data_source.start_date)
@@ -83,7 +88,9 @@ class Test(TestCase):
         datasource = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
-                          f"{file_name}"
+                          f"{file_name}",
+            window_size=10,
+            timeframe="15m",
         )
         number_of_runs = 0
 
@@ -103,7 +110,9 @@ class Test(TestCase):
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
                           f"{file_name}",
-            identifier="test"
+            identifier="test",
+            window_size=10,
+            timeframe="15m",
         )
         self.assertEqual("test", datasource.get_identifier())
 
@@ -114,7 +123,10 @@ class Test(TestCase):
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
                           f"{file_name}",
-            market="test"
+            market="test",
+            timeframe="15m",
+            start_date=datetime(2023, 12, 1),
+            end_date=datetime(2023, 12, 25),
         )
         self.assertEqual("test", datasource.get_market())
 
@@ -125,7 +137,9 @@ class Test(TestCase):
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
                           f"{file_name}",
-            symbol="BTC/EUR"
+            symbol="BTC/EUR",
+            window_size=10,
+            timeframe="15m",
         )
         self.assertEqual("BTC/EUR", datasource.get_symbol())
 
@@ -136,6 +150,7 @@ class Test(TestCase):
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
                           f"{file_name}",
-            timeframe="15m"
+            timeframe="15m",
+            window_size=10,
         )
         self.assertEqual("15m", datasource.get_timeframe())

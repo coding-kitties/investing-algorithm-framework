@@ -1,7 +1,8 @@
 import logging
 
 from investing_algorithm_framework.domain import BACKTESTING_INDEX_DATETIME, \
-    OrderStatus, BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, OperationalException
+    OrderStatus, BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, \
+    OperationalException, DATETIME_FORMAT
 from investing_algorithm_framework.services.market_data_source_service \
     import BacktestMarketDataSourceService
 from .order_service import OrderService
@@ -75,7 +76,7 @@ class OrderBacktestService(OrderService):
                     f"time frame {config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]} "
                 )
 
-            market_data = self._market_data_source_service.get_ohlcv(
+            df = self._market_data_source_service.get_ohlcv(
                 symbol=symbol,
                 market=portfolio.market,
                 to_timestamp=self.configuration_service.config.get(
@@ -85,12 +86,13 @@ class OrderBacktestService(OrderService):
                 time_frame=self.configuration_service
                 .config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]
             )
-            data_slice = [
-                ohclv for ohclv in market_data
-                if ohclv[0] >= order.get_created_at()
-            ]
 
-            if self.has_executed(order, data_slice):
+            filtered_df = df.filter(
+                (df['Datetime'] >= order.get_created_at()
+                 .strftime(DATETIME_FORMAT))
+            )
+
+            if self.has_executed(order, filtered_df):
                 self.update(
                     order.id,
                     {
@@ -110,8 +112,6 @@ class OrderBacktestService(OrderService):
         if order is not None:
 
             if OrderStatus.OPEN.equals(order.status):
-                portfolio = self.portfolio_repository\
-                    .find({"position": order.position_id})
                 self.update(
                     order.id,
                     {
@@ -122,26 +122,18 @@ class OrderBacktestService(OrderService):
                     }
                 )
 
-    def check_ohclv(self, order, ohclv):
-        data = ohclv
+    def check_ohclv(self, order, data):
 
         if len(data) == 0:
             return False
 
-        lowest_price = None
-        highest_price = None
+        # Find the row with the lowest 'Low' value
+        lowest_price_row = data.filter(data['Low'] == data['Low'].min())
+        lowest_price = lowest_price_row["Low"][0]
 
-        for ohclv in data:
-
-            if lowest_price is None:
-                lowest_price = ohclv[3]
-            else:
-                lowest_price = min(lowest_price, ohclv[3])
-
-            if highest_price is None:
-                highest_price = ohclv[2]
-            else:
-                highest_price = max(highest_price, ohclv[2])
+        # Find the row with the highest 'High' value
+        highest_price_row = data.filter(data['High'] == data['High'].max())
+        highest_price = highest_price_row["High"][0]
 
         if highest_price >= order.get_price() >= lowest_price:
             return True

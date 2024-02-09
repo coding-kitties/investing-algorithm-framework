@@ -144,3 +144,5 @@ lib/
 .Python
 bumpversion.egg-info/
 *.sqlite3
+
+*/backtest_data/
