@@ -294,6 +294,10 @@ If you discover a bug in the framework, please [search our issue tracker](https:
 first. If it hasn't been reported, please [create a new issue](https://github.com/investing-algorithms/investing-algorithm-framework/issues/new).
 
 ### Contributing
+The investing algorithm framework is a community driven project. 
+We welcome you to participate, contribute and together help build 
+the future trading bots developed in pyhton.
+
 Feel like the framework is missing a feature? We welcome your pull requests!
 If you want to contribute to the project roadmap, please take a look at the [project board](https://github.com/coding-kitties/investing-algorithm-framework/projects?query=is%3Aopen).
 You can pick up a task by assigning yourself to it. 
