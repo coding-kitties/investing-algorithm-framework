@@ -83,6 +83,13 @@ app.add_portfolio_configuration(
 def perform_strategy(algorithm: Algorithm, market_data: dict):
     # By default data is passed as polars dataframe https://pola.rs/
     df = market_data["BTC-ohlcv"].to_pandas()
+    ticker_data = market_data["BTC-ticker"]
+    algorithm.create_limit_order(
+        target_symbol="BTC/EUR",
+        order_side="buy",
+        amount=0.01,
+        price=ticker_data["ask"],
+    )
     
 if __name__ == "__main__":
     app.run()
