@@ -98,9 +98,11 @@ class CCXTOHLCVBacktestMarketDataSource(
                         TimeFrame.from_string(self.timeframe).amount_of_minutes
                 )
             )
-        self.backtest_data_start_date = backtest_data_start_date
-        self.backtest_data_index_date = backtest_data_start_date
-        self.backtest_data_end_date = backtest_end_date
+        self.backtest_data_start_date = backtest_data_start_date\
+            .replace(microsecond=0)
+        self.backtest_data_index_date = backtest_data_start_date\
+            .replace(microsecond=0)
+        self.backtest_data_end_date = backtest_end_date.replace(microsecond=0)
 
         # Creating the backtest data directory and file
         self.backtest_data_directory = os.path.join(
@@ -112,7 +114,7 @@ class CCXTOHLCVBacktestMarketDataSource(
             os.mkdir(self.backtest_data_directory)
 
         file_path = self._create_file_path()
-        print(self._data_source_exists(file_path))
+
         if not self._data_source_exists(file_path):
             if not os.path.isfile(file_path):
                 try:
@@ -165,7 +167,9 @@ class CCXTOHLCVBacktestMarketDataSource(
         from_timestamp = backtest_index_date - timedelta(
             minutes=self.total_minutes_timeframe
         )
-        self.backtest_data_index_date = backtest_index_date
+        self.backtest_data_index_date = backtest_index_date\
+            .replace(microsecond=0)
+        from_timestamp = from_timestamp.replace(microsecond=0)
 
         if from_timestamp < self.backtest_data_start_date:
             raise OperationalException(
