@@ -15,7 +15,9 @@ class SQLPositionSnapshot(
     symbol = Column(String)
     amount = Column(Float)
     cost = Column(Float)
-    portfolio_snapshot_id = Column(Integer, ForeignKey('portfolio_snapshots.id'))
+    portfolio_snapshot_id = Column(
+        Integer, ForeignKey('portfolio_snapshots.id')
+    )
     portfolio_snapshot = relationship(
         "SQLPortfolioSnapshot", back_populates="position_snapshots"
     )

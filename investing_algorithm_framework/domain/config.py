@@ -2,7 +2,7 @@ import logging
 import os
 from enum import Enum
 
-from .constants import RESOURCE_DIRECTORY, BACKTEST_DATA_DIRECTORY_NAME
+from .constants import RESOURCE_DIRECTORY
 from .exceptions import OperationalException
 
 logger = logging.getLogger("investing_algorithm_framework")

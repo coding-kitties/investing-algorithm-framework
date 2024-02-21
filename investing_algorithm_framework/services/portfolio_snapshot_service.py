@@ -2,7 +2,6 @@ from datetime import datetime
 
 from investing_algorithm_framework.services.repository_service import \
     RepositoryService
-from investing_algorithm_framework.domain import parse_decimal_to_string
 
 
 class PortfolioSnapshotService(RepositoryService):

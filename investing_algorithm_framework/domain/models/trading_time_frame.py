@@ -209,7 +209,7 @@ class TradingTimeFrame(Enum):
             return 60 * 60 * 1000
 
         if TradingTimeFrame.TWO_HOUR.equals(self):
-            return 2* 60 * 60 * 1000
+            return 2 * 60 * 60 * 1000
 
         if TradingTimeFrame.ONE_DAY.equals(self):
             return 60 * 60 * 24 * 1000

@@ -5,8 +5,7 @@ from tqdm import tqdm
 
 from investing_algorithm_framework.domain import BacktestProfile, \
     BACKTESTING_INDEX_DATETIME, TimeUnit, BacktestPosition, \
-    TradingDataType, OrderStatus, OperationalException, MarketDataSource, \
-    MarketService
+    TradingDataType, OrderStatus, OperationalException, MarketDataSource
 from .market_data_source_service import MarketDataSourceService
 
 
@@ -60,7 +59,6 @@ class BackTestService:
                 "Start date cannot be greater than end date for backtest"
             )
 
-
         schedule = self.generate_schedule(
             strategies=algorithm.strategies,
             start_date=start_date,
@@ -113,7 +111,6 @@ class BackTestService:
             time_unit = strategy.strategy_profile.time_unit
             interval = strategy.strategy_profile.interval
             current_time = start_date
-            # ohlcv_data_index_date = strategy.strategy_profile.backtest_data_index_date
 
             while current_time <= end_date:
                 data.append({
@@ -180,25 +177,30 @@ class BackTestService:
             backtest_profile.number_of_orders = self._order_service.count({
                 "portfolio": portfolio.id
             })
-            backtest_profile.number_of_positions = self._position_repository.count(
-                {
+            backtest_profile.number_of_positions = \
+                self._position_repository.count({
                     "portfolio": portfolio.id,
                     "amount_gt": 0
                 })
-            backtest_profile.percentage_negative_trades = self._performance_service \
-                .get_percentage_negative_trades(portfolio.id)
-            backtest_profile.percentage_positive_trades = self._performance_service \
-                .get_percentage_positive_trades(portfolio.id)
-            backtest_profile.number_of_trades_closed = self._performance_service \
-                .get_number_of_trades_closed(portfolio.id)
-            backtest_profile.number_of_trades_open = self._performance_service \
-                .get_number_of_trades_open(portfolio.id)
+            backtest_profile.percentage_negative_trades = \
+                self._performance_service\
+                    .get_percentage_negative_trades(portfolio.id)
+            backtest_profile.percentage_positive_trades = \
+                self._performance_service\
+                    .get_percentage_positive_trades(portfolio.id)
+            backtest_profile.number_of_trades_closed = \
+                self._performance_service\
+                    .get_number_of_trades_closed(portfolio.id)
+            backtest_profile.number_of_trades_open = \
+                self._performance_service\
+                    .get_number_of_trades_open(portfolio.id)
             backtest_profile.total_cost = portfolio.total_cost
             backtest_profile.total_net_gain = portfolio.total_net_gain
-            backtest_profile.total_net_gain_percentage = self._performance_service \
+            backtest_profile.total_net_gain_percentage = \
+                self._performance_service\
                 .get_total_net_gain_percentage_of_backtest(
-                portfolio.id, backtest_profile
-            )
+                    portfolio.id, backtest_profile
+                )
             positions = self._position_repository.get_all({
                 "portfolio": portfolio.id
             })
@@ -207,22 +209,25 @@ class BackTestService:
             for position in positions:
 
                 if position.symbol != portfolio.trading_symbol:
-                    tickers[position.symbol] = self._market_data_source_service \
-                        .get_ticker(
+                    tickers[position.symbol] = \
+                        self._market_data_source_service.get_ticker(
                             f"{position.symbol}/{portfolio.trading_symbol}",
                             market=portfolio.market
                         )
 
             backtest_profile.growth_rate = self._performance_service \
                 .get_growth_rate_of_backtest(
-                portfolio.id, tickers, backtest_profile
-            )
+                    portfolio.id, tickers, backtest_profile
+                )
             backtest_profile.growth = self._performance_service \
-                .get_growth_of_backtest(portfolio.id, tickers, backtest_profile)
+                .get_growth_of_backtest(
+                    portfolio.id, tickers, backtest_profile
+                )
             backtest_profile.total_value = self._performance_service \
                 .get_total_value(portfolio.id, tickers, backtest_profile)
             backtest_profile.average_trade_duration = \
-                self._performance_service.get_average_trade_duration(portfolio.id)
+                self._performance_service\
+                    .get_average_trade_duration(portfolio.id)
             backtest_profile.average_trade_size = \
                 self._performance_service.get_average_trade_size(portfolio.id)
             positions = self._position_repository.get_all({
@@ -278,6 +283,10 @@ class BackTestService:
     def get_backtest_market_data_source(self, symbol, market):
 
         for market_data_source in self._backtest_market_data_sources:
-            if market_data_source.symbol == symbol and market_data_source.market == market:
+            if market_data_source.symbol == symbol \
+                    and market_data_source.market == market:
                 return market_data_source
-        raise OperationalException(f"Market data source for symbol {symbol} and market {market} not found")
+        raise OperationalException(
+            f"Market data source for "
+            f"symbol {symbol} and market {market} not found"
+        )

@@ -73,7 +73,8 @@ class OrderBacktestService(OrderService):
                     f"Cannot check pending orders for symbol {symbol} "
                     f"with market {portfolio.market}. Please add a ohlcv data"
                     f"source for {symbol} and market {portfolio.market} with "
-                    f"time frame {config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]} "
+                    f"time frame "
+                    f"{config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]} "
                 )
 
             df = self._market_data_source_service.get_ohlcv(

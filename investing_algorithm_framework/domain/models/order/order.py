@@ -146,10 +146,6 @@ class Order(BaseModel):
         self.trade_closed_price = trade_closed_price
 
     def get_trade_closed_amount(self):
-
-        if self.trade_closed_amount is None:
-            return 0
-
         return self.trade_closed_amount
 
     def set_trade_closed_amount(self, trade_closed_amount):
@@ -294,4 +290,9 @@ class Order(BaseModel):
             filled=self.get_filled(),
             remaining=self.get_remaining(),
             cost=self.get_cost(),
+            trade_closed_at=self.get_trade_closed_at(),
+            trade_closed_price=self.get_trade_closed_price(),
+            trade_closed_amount=self.get_trade_closed_amount(),
+            created_at=self.get_created_at(),
+            updated_at=self.get_updated_at(),
         )

@@ -43,7 +43,6 @@ class MarketDataSourceService:
             return ticker_market_data_source.get_data(
                 market_credential_service=self._market_credential_service
             )
-
         return self._market_service.get_ticker(symbol, market)
 
     def get_order_book(self, symbol, market=None):

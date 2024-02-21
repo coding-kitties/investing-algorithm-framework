@@ -123,7 +123,11 @@ class MarketService(ABC):
         if self.market_credentials is None:
             return None
 
+        if market is None:
+            return None
+
         for market_data_credentials in self.market_credentials:
+
             if market_data_credentials.market.lower() == market.lower():
                 return market_data_credentials
 

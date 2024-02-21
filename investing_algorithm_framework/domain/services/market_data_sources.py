@@ -263,8 +263,8 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
                     "end_date or end_date_func must be a datetime object"
                 )
 
-            minutes_diff = (self.end_date - self.start_date)\
-                               .total_seconds() / 60
+            minutes_diff = \
+                (self.end_date - self.start_date).total_seconds() / 60
             windows_size_minutes = TimeFrame.from_string(self.timeframe)\
                 .amount_of_minutes
 
@@ -298,7 +298,8 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
                 return self._start_date
 
             minutes = TimeFrame.from_string(self.timeframe).amount_of_minutes
-            return self.end_date - timedelta(minutes=self.window_size * minutes)
+            return self.end_date - \
+                timedelta(minutes=self.window_size * minutes)
 
         if self._start_date_func is not None:
             return self._start_date_func()

@@ -210,6 +210,12 @@ class Algorithm:
             {"portfolio": portfolio.id, "symbol": trading_symbol}
         ).get_amount()
 
+    def get_total_size(self):
+        """
+        Returns the total size of the portfolio.
+        """
+        return self.get_unallocated() + self.get_allocated()
+
     def reset(self):
         self._workers = []
         self._running_workers = []
@@ -592,9 +598,9 @@ class Algorithm:
             orders = self.order_service.get_all(
                 {"status": OrderStatus.OPEN.value, "portfolio": portfolio.id}
             )
-            unfilled = unfilled \
-                       + sum(
-                [order.get_amount() * order.get_price() for order in orders])
+            unfilled = unfilled + sum(
+                [order.get_amount() * order.get_price() for order in orders]
+            )
 
         return unfilled
 
@@ -642,7 +648,9 @@ class Algorithm:
         query_params["status"] = OrderStatus.OPEN.value
         return self.order_service.exists(query_params)
 
-    def has_open_orders(self, target_symbol=None, identifier=None, market=None):
+    def has_open_orders(
+        self, target_symbol=None, identifier=None, market=None
+    ):
         query_params = {}
 
         if identifier is not None:
@@ -809,13 +817,19 @@ class Algorithm:
                         f"-{buy_order.get_trading_symbol()} "
                         f"for market {portfolio.market}"
                     )
+
+                amount = buy_order.get_filled()
+                closed_amount = buy_order.get_trade_closed_amount()
+
+                if closed_amount is not None:
+                    amount = amount - closed_amount
+
                 trades.append(
                     Trade(
                         buy_order_id=buy_order.id,
                         target_symbol=buy_order.get_target_symbol(),
                         trading_symbol=buy_order.get_trading_symbol(),
-                        amount=buy_order.get_filled()
-                               - buy_order.get_trade_closed_amount(),
+                        amount=amount,
                         open_price=buy_order.get_price(),
                         opened_at=buy_order.get_created_at(),
                         current_price=ticker["bid"]
@@ -838,7 +852,9 @@ class Algorithm:
 
         portfolio = self.portfolio_service\
             .find({"position": order.position_id})
-        position = self.get_position(order.get_target_symbol())
+        position = self.position_service.find(
+            {"portfolio": portfolio.id, "symbol": order.get_target_symbol()}
+        )
         amount = order.get_amount()
 
         if position.get_amount() < amount:

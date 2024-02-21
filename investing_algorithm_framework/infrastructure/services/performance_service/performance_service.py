@@ -89,7 +89,9 @@ class PerformanceService:
         total_number_of_negative_orders = len(negative_orders)
         return total_number_of_negative_orders / total_number_of_orders * 100
 
-    def get_growth_rate_of_backtest(self, portfolio_id, tickers, backtest_profile):
+    def get_growth_rate_of_backtest(
+        self, portfolio_id, tickers, backtest_profile
+    ):
         portfolio = self.portfolio_repository.find({"id": portfolio_id})
         positions = self.position_repository.get_all(
             {"portfolio_id": portfolio.id}
@@ -148,10 +150,12 @@ class PerformanceService:
         current_total_value = allocated + portfolio.unallocated
         return current_total_value - backtest_profile.initial_unallocated
 
-    def get_total_net_gain_percentage_of_backtest(self, portfolio_id, backtest_profile):
+    def get_total_net_gain_percentage_of_backtest(
+        self, portfolio_id, backtest_profile
+    ):
         portfolio = self.portfolio_repository.find({"id": portfolio_id})
         return portfolio.total_net_gain \
-               / backtest_profile.initial_unallocated * 100
+            / backtest_profile.initial_unallocated * 100
 
     def get_total_value(self, portfolio_id, tickers, backtest_profile):
         portfolio = self.portfolio_repository.find({"id": portfolio_id})
@@ -178,7 +182,8 @@ class PerformanceService:
             }
         )
         buy_orders_with_trade_closed = [
-            order for order in buy_orders if order.get_trade_closed_at() != None
+            order for order in buy_orders
+            if order.get_trade_closed_at() is not None
         ]
 
         if len(buy_orders_with_trade_closed) == 0:
@@ -202,7 +207,7 @@ class PerformanceService:
         )
         closed_buy_orders = [
             order for order in buy_orders
-            if order.get_trade_closed_at() != None
+            if order.get_trade_closed_at() is not None
         ]
 
         if len(closed_buy_orders) == 0:

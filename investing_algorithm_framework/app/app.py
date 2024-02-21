@@ -57,6 +57,13 @@ class App:
             self.container.market_credential_service()
 
     def initialize(self):
+        """
+        Method to initialize the app. This method should be called before
+        running the algorithm. It initializes the services and the algorithm
+        and sets up the database if it does not exist.
+
+        :return: None
+        """
 
         if self._web:
             self._initialize_web()
@@ -70,13 +77,21 @@ class App:
             self._initialize_standard()
             setup_sqlalchemy(self)
             create_all_tables()
+
+        # Initialize the algorithm
         self.algorithm = self.container.algorithm()
+
+        # Add strategies
         self.algorithm.add_strategies(self.strategies)
+
+        # Add tasks
         self.algorithm.add_tasks(self.tasks)
 
+        # Initialize all portfolios that are registered
         portfolio_configuration_service = self.container\
             .portfolio_configuration_service()
 
+        # Throw an error if no portfolios are configured
         if portfolio_configuration_service.count() == 0:
             raise OperationalException("No portfolios configured")
 
@@ -85,15 +100,42 @@ class App:
         portfolio_service = self.container.portfolio_service()
 
         for portfolio_configuration in portfolio_configurations:
-            portfolio_service.create_portfolio_from_configuration(
+            # Create portfolio if not exists
+            portfolio = portfolio_service.create_portfolio_from_configuration(
                 portfolio_configuration
             )
+            # Sync all orders from exchange with current order history
+            portfolio_service.sync_portfolio_orders(portfolio)
 
     def _initialize_stateless(self):
+        """
+        Initialize the app for stateless mode by setting the configuration
+        parameters for stateless mode and overriding the services with the
+        stateless services equivalents.
+
+        In stateless mode, sqlalchemy is-setup with an in-memory database.
+
+        Stateless has the following implications:
+        db: in-memory
+        web: False
+        app: Run with stateless action objects
+        algorithm: Run with stateless action objects
+        """
         configuration_service = self.container.configuration_service()
         configuration_service.config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
 
     def _initialize_standard(self):
+        """
+        Initialize the app for standard mode by setting the configuration
+        parameters for standard mode and overriding the services with the
+        standard services equivalents.
+
+        Standard has the following implications:
+        db: sqlite
+        web: False
+        app: Standard
+        algorithm: Standard
+        """
         configuration_service = self.container.configuration_service()
         resource_dir = configuration_service.config[RESOURCE_DIRECTORY]
 
@@ -197,6 +239,9 @@ class App:
             portfolio_snapshot_service=self.container
             .portfolio_snapshot_service(),
         ))
+        market_data_source_service = \
+            self.container.market_data_source_service()
+
         # Override the order service with the backtest order service
         self.container.order_service.override(
             OrderBacktestService(
@@ -209,7 +254,7 @@ class App:
                 portfolio_snapshot_service=self.container
                 .portfolio_snapshot_service(),
                 configuration_service=self.container.configuration_service(),
-                market_data_source_service=self.container.market_data_source_service()
+                market_data_source_service=market_data_source_service
             )
         )
 
@@ -256,14 +301,8 @@ class App:
         self,
         payload: dict = None,
         number_of_iterations: int = None,
-        sync=True
     ):
         self.initialize()
-        portfolio_service = self.container.portfolio_service()
-
-        if sync:
-            portfolio_service.sync_portfolios()
-
         self.algorithm.start(
             number_of_iterations=number_of_iterations,
             stateless=self.stateless
@@ -438,13 +477,6 @@ class App:
     def tasks(self):
         return self._tasks
 
-    def sync_portfolios(self):
-        portfolio_configuration_service = self.container\
-            .portfolio_configuration_service()
-        portfolio_configuration_service.create_portfolios()
-        portfolio_service = self.container.portfolio_service()
-        portfolio_service.sync_portfolios()
-
     def _initialize_web(self):
         configuration_service = self.container.configuration_service()
         resource_dir = configuration_service.config[RESOURCE_DIRECTORY]
@@ -453,9 +485,8 @@ class App:
             configuration_service.config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
         else:
             resource_dir = self._create_resource_directory_if_not_exists()
-            configuration_service.config[DATABASE_DIRECTORY_PATH] = os.path.join(
-                resource_dir, "databases"
-            )
+            configuration_service.config[DATABASE_DIRECTORY_PATH] = \
+                os.path.join(resource_dir, "databases")
             configuration_service.config[DATABASE_NAME] \
                 = "prod-database.sqlite3"
             configuration_service.config[SQLALCHEMY_DATABASE_URI] = \

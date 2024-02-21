@@ -74,16 +74,22 @@ class TradingStrategy:
     def on_trade_stop_loss_triggered(self, algorithm: Algorithm, trade: Trade):
         pass
 
-    def on_trade_trailing_stop_loss_triggered(self, algorithm: Algorithm, trade: Trade):
+    def on_trade_trailing_stop_loss_triggered(
+        self, algorithm: Algorithm, trade: Trade
+    ):
         pass
 
-    def on_trade_take_profit_triggered(self, algorithm: Algorithm, trade: Trade):
+    def on_trade_take_profit_triggered(
+        self, algorithm: Algorithm, trade: Trade
+    ):
         pass
 
     def on_trade_stop_loss_updated(self, algorithm: Algorithm, trade: Trade):
         pass
 
-    def on_trade_trailing_stop_loss_updated(self, algorithm: Algorithm, trade: Trade):
+    def on_trade_trailing_stop_loss_updated(
+        self, algorithm: Algorithm, trade: Trade
+    ):
         pass
 
     def on_trade_take_profit_updated(self, algorithm: Algorithm, trade: Trade):
@@ -92,9 +98,10 @@ class TradingStrategy:
     def on_trade_stop_loss_created(self, algorithm: Algorithm, trade: Trade):
         pass
 
-    def on_trade_trailing_stop_loss_created(self, algorithm: Algorithm, trade: Trade):
+    def on_trade_trailing_stop_loss_created(
+        self, algorithm: Algorithm, trade: Trade
+    ):
         pass
 
     def on_trade_take_profit_created(self, algorithm: Algorithm, trade: Trade):
         pass
-

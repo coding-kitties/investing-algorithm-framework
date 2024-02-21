@@ -26,9 +26,9 @@ class CCXTOHLCVBacktestMarketDataSource(
     taking the backtest start date (e.g. 01-01-2024) and the backtest
     end date (e.g. 31-12-2024) in combination with the difference between
     start and end date. The reason for this is that the data source needs
-    to have data on the first run (e.g. an algorithm starting on 01-01-2024 that
-    requires 2h data for the last 17 days will need to have pulled data from
-    15-12-2023)
+    to have data on the first run (e.g. an algorithm starting on
+    01-01-2024 that requires 2h data for the last 17 days will
+    need to have pulled data from 15-12-2023)
 
     To achieve this, a backtest_data_start_date attribute is used. This
     attribute is indexed on this calculated date.
@@ -144,6 +144,10 @@ class CCXTOHLCVBacktestMarketDataSource(
         """
         symbol_string = self.symbol.replace("/", "-")
         time_frame_string = self.timeframe.replace("_", "")
+        backtest_data_start_date = \
+            self.backtest_data_start_date.strftime(DATETIME_FORMAT_BACKTESTING)
+        backtest_data_end_date = \
+            self.backtest_data_end_date.strftime(DATETIME_FORMAT_BACKTESTING)
         return os.path.join(
             self.backtest_data_directory,
             os.path.join(
@@ -151,8 +155,8 @@ class CCXTOHLCVBacktestMarketDataSource(
                 f"{symbol_string}_"
                 f"{self.market}_"
                 f"{time_frame_string}_"
-                f"{self.backtest_data_start_date.strftime(DATETIME_FORMAT_BACKTESTING)}_"
-                f"{self.backtest_data_end_date.strftime(DATETIME_FORMAT_BACKTESTING)}.csv"
+                f"{backtest_data_start_date}_"
+                f"{backtest_data_end_date}.csv"
             )
         )
 
@@ -317,14 +321,18 @@ class CCXTTickerBacktestMarketDataSource(
 
         symbol_string = self.symbol.replace("/", "-")
         market_string = self.market.replace("/", "-")
+        backtest_data_start_date = \
+            self.backtest_data_start_date.strftime(DATETIME_FORMAT_BACKTESTING)
+        backtest_data_end_date = \
+            self.backtest_data_end_date.strftime(DATETIME_FORMAT_BACKTESTING)
         return os.path.join(
             self.backtest_data_directory,
             os.path.join(
                 f"TICKER_"
                 f"{symbol_string}_"
                 f"{market_string}_"
-                f"{self.backtest_data_start_date.strftime(DATETIME_FORMAT_BACKTESTING)}_"
-                f"{self.backtest_data_end_date.strftime(DATETIME_FORMAT_BACKTESTING)}.csv"
+                f"{backtest_data_start_date}_"
+                f"{backtest_data_end_date}.csv"
             )
         )
 
@@ -347,7 +355,8 @@ class CCXTTickerBacktestMarketDataSource(
             )
 
         file_path = self._create_file_path()
-        timeframe_minutes = TimeFrame.from_string(self.timeframe).amount_of_minutes
+        timeframe_minutes = TimeFrame.from_string(self.timeframe)\
+            .amount_of_minutes
         backtest_index_date = kwargs["backtest_index_date"]
         end_date = backtest_index_date + timedelta(minutes=timeframe_minutes)
 
@@ -356,17 +365,24 @@ class CCXTTickerBacktestMarketDataSource(
         df = df.filter(
             (df['Datetime'] >= backtest_index_date
              .strftime(DATETIME_FORMAT))
-            & (df['Datetime'] <= end_date.strftime(DATETIME_FORMAT))
         )
 
-        # Take the first row of the dataframe
         first_row = df.head(1)[0]
+
+        if first_row["Datetime"][0] > end_date.strftime(DATETIME_FORMAT):
+            logger.warn(
+                f"No ticker data available for the given backtest "
+                f"index date {backtest_index_date} and symbol {self.symbol} "
+                f"and market {self.market}"
+            )
 
         # Calculate the bid and ask price based on the high and low price
         return {
             "symbol": self.symbol,
-            "bid": float((first_row["Low"][0]) + float(first_row["High"][0]))/2,
-            "ask": float((first_row["Low"][0]) + float(first_row["High"][0]))/2,
+            "bid": float((first_row["Low"][0])
+                         + float(first_row["High"][0]))/2,
+            "ask": float((first_row["Low"][0])
+                         + float(first_row["High"][0]))/2,
             "datetime": first_row["Datetime"][0],
         }
 

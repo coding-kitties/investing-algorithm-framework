@@ -89,7 +89,6 @@ class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
         if "total_revenue" in data:
             self.total_revenue = data.pop("total_revenue")
 
-
         if "total_trade_volume" in data:
             self.total_trade_volume = data.pop("total_trade_volume")
 

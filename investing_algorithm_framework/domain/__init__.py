@@ -2,9 +2,8 @@ from .config import Config, Environment
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, \
     PortfolioConfiguration, Portfolio, Position, Order, \
-    OrderFee, BacktestProfile, PositionSnapshot, \
-    PortfolioSnapshot, StrategyProfile, BacktestPosition, Trade, \
-    MarketCredential
+    OrderFee, BacktestProfile, PortfolioSnapshot, StrategyProfile, \
+    BacktestPosition, Trade, MarketCredential
 from .exceptions import OperationalException, ApiException, \
     PermissionDeniedApiException, ImproperlyConfigured
 from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \

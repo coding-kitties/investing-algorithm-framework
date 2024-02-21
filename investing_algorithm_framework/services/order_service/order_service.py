@@ -103,7 +103,8 @@ class OrderService(RepositoryService):
                     self.order_fee_repository.create(order_fee_data)
 
         new_order = self.order_repository.update(object_id, data)
-        filled_difference = new_order.get_filled() - previous_order.get_filled()
+        filled_difference = new_order.get_filled() \
+            - previous_order.get_filled()
 
         if filled_difference:
 
@@ -153,13 +154,14 @@ class OrderService(RepositoryService):
             if OrderType.LIMIT.equals(order.get_order_type()):
 
                 if OrderSide.BUY.equals(order.get_order_side()):
-                    external_order = self.market_service.create_limit_buy_order(
-                        target_symbol=order.get_target_symbol(),
-                        trading_symbol=order.get_trading_symbol(),
-                        amount=order.get_amount(),
-                        price=order.get_price(),
-                        market=portfolio.get_market()
-                    )
+                    external_order = self.market_service\
+                        .create_limit_buy_order(
+                            target_symbol=order.get_target_symbol(),
+                            trading_symbol=order.get_trading_symbol(),
+                            amount=order.get_amount(),
+                            price=order.get_price(),
+                            market=portfolio.get_market()
+                        )
                 else:
                     external_order = self.market_service\
                         .create_limit_sell_order(
@@ -171,7 +173,9 @@ class OrderService(RepositoryService):
                         )
             else:
                 if OrderSide.BUY.equals(order.get_order_side()):
-                    raise OperationalException("Market buy order not supported")
+                    raise OperationalException(
+                        "Market buy order not supported"
+                    )
                 else:
                     external_order = self.market_service\
                         .create_market_sell_order(
@@ -278,7 +282,8 @@ class OrderService(RepositoryService):
 
             if amount < total_price:
                 raise OperationalException(
-                    f"Order total: {total_price} {portfolio.trading_symbol}, is "
+                    f"Order total: {total_price} "
+                    f"{portfolio.trading_symbol}, is "
                     f"larger then unallocated size: {portfolio.unallocated} "
                     f"{portfolio.trading_symbol} of the portfolio"
                 )
@@ -657,7 +662,7 @@ class OrderService(RepositoryService):
                 remaining = amount_to_close - to_be_closed
                 cost = buy_order.get_price() * to_be_closed
                 net_gain = (sell_order.get_price() - buy_order.get_price()) \
-                           * to_be_closed
+                    * to_be_closed
                 amount_to_close = remaining
                 self.order_repository.update(
                     buy_order.id,
@@ -671,7 +676,7 @@ class OrderService(RepositoryService):
             else:
                 to_be_closed = amount_to_close
                 net_gain = (sell_order.get_price() - buy_order.get_price()) \
-                           * to_be_closed
+                    * to_be_closed
                 cost = buy_order.get_price() * amount_to_close
                 self.order_repository.update(
                     buy_order.id,
@@ -695,7 +700,7 @@ class OrderService(RepositoryService):
             portfolio.id,
             {
                 "total_net_gain": portfolio.get_total_net_gain()
-                                  + total_net_gain,
+                + total_net_gain,
                 "total_cost": portfolio.get_total_cost() - total_cost,
                 "net_size": portfolio.get_net_size() + total_net_gain
             }

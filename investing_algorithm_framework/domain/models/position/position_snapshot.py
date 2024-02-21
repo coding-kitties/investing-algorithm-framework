@@ -1,6 +1,4 @@
 from investing_algorithm_framework.domain.models.base_model import BaseModel
-from investing_algorithm_framework.domain.decimal_parsing import \
-    parse_string_to_decimal
 
 
 class PositionSnapshot(BaseModel):
