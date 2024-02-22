@@ -81,14 +81,15 @@ jobs:
       # install your root project, if required
       #----------------------------------------------
       - name: Install library
-        run: poetry install --no-interaction
+        run: |
+          pip install setuptools
+          poetry install --no-interaction
       #----------------------------------------------
       #    add matrix specifics and run test suite
       #----------------------------------------------
       - name: Run tests
         run: |
           source .venv/bin/activate
-          pip install setuptools
           coverage run -m unittest discover -s tests
 #      #----------------------------------------------
 #      #             upload coverage stats
