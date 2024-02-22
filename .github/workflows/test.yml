@@ -55,6 +55,12 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       #----------------------------------------------
+      #  -----  install distutils if needed  -----
+      #----------------------------------------------
+      - name: Install distutils on Ubuntu
+        if: matrix.os == 'ubuntu-latest'
+        run: sudo apt-get install python${{ matrix.python-version }}-distutils
+      #----------------------------------------------
       #  -----  install & configure poetry  -----
       #----------------------------------------------
       - name: Install Poetry
