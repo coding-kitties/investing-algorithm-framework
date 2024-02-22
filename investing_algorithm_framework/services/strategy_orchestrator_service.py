@@ -110,7 +110,6 @@ class StrategyOrchestratorService:
         self.max_iterations = number_of_iterations
 
         for strategy in self.strategies:
-
             if TimeUnit.SECOND.equals(strategy.time_unit):
                 schedule.every(strategy.interval)\
                     .seconds.do(self.run_strategy, strategy, algorithm)
@@ -122,7 +121,6 @@ class StrategyOrchestratorService:
                     .hours.do(self.run_strategy, strategy, algorithm)
 
         for task in self.tasks:
-            
             if TimeUnit.SECOND.equals(task.time_unit):
                 schedule.every(task.interval)\
                     .seconds.do(self.run_task, task, algorithm)

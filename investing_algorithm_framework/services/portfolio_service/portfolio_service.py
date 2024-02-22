@@ -10,6 +10,11 @@ logger = logging.getLogger("investing_algorithm_framework")
 
 
 class PortfolioService(RepositoryService):
+    """
+    Service to manage portfolios. This service will sync the portfolios with
+    the exchange balances and orders. It will also create portfolios based on
+    the portfolio configurations registered by the user
+    """
 
     def __init__(
         self,
@@ -48,100 +53,6 @@ class PortfolioService(RepositoryService):
         self.create_snapshot(portfolio.id, created_at=portfolio.created_at)
         return portfolio
 
-    def sync_portfolios(self):
-
-        for portfolio in self.get_all():
-            portfolio_configuration = self.portfolio_configuration_service\
-                .get(portfolio.identifier)
-            balances = self.market_service.get_balance(portfolio.market)
-
-            for symbol in balances["free"]:
-                balance = balances["free"][symbol]
-                logger.info(f"Syncing {symbol} balance")
-
-                if self.position_repository.exists(
-                    {"portfolio_id": portfolio.id, "symbol": symbol}
-                ):
-                    position = self.position_repository.find(
-                        {
-                            "portfolio_id": portfolio.id,
-                            "symbol": symbol
-                        }
-                    )
-                    self.position_repository.update(
-                        position.id,
-                        {"amount": balance}
-                    )
-                else:
-                    self.position_repository.create(
-                        {
-                            "symbol": symbol,
-                            "amount": balance,
-                            "portfolio_id": portfolio.id
-                        }
-                    )
-
-                if symbol == portfolio.trading_symbol:
-                    if portfolio.unallocated != balance:
-                        logger.info(
-                            "Updating unallocated balance "
-                            f"from {portfolio.unallocated} "
-                            f"to {balance}"
-                        )
-                        difference = balance - portfolio.get_unallocated()
-                        self.update(
-                            portfolio.id,
-                            {
-                                "unallocated": portfolio.get_unallocated()
-                                + difference,
-                                "net_size": portfolio.get_net_size()
-                                + difference
-                            }
-                        )
-
-            for position in self.position_repository.get_all(
-                {"portfolio_id": portfolio.id}
-            ):
-                if position.symbol == portfolio.trading_symbol:
-                    continue
-
-                logger.info(f"Syncing {position.symbol} orders")
-
-                external_orders = self.market_service\
-                    .get_orders(
-                        f"{position.symbol}/{portfolio.trading_symbol}",
-                        since=portfolio_configuration.track_from,
-                        market=portfolio.market
-                    )
-
-                logger.info(
-                    f"Found {len(external_orders)} external orders "
-                    f"for position {position.symbol}"
-                )
-
-                for external_order in external_orders:
-
-                    if self.order_service.exists(
-                        {"external_id": external_order.external_id}
-                    ):
-                        logger.info("Updating existing order")
-                        order = self.order_service.find(
-                            {"external_id": external_order.external_id}
-                        )
-                        self.order_service.update(
-                            order.id, external_order.to_dict()
-                        )
-                    else:
-                        logger.info(
-                            "Creating new order based on external order"
-                        )
-                        data = external_order.to_dict()
-                        data["position_id"] = position.id
-                        data["portfolio_id"] = portfolio.id
-                        self.order_service.create(
-                            data, execute=False, validate=False, sync=False
-                        )
-
     def create_snapshot(self, portfolio_id, created_at=None):
 
         if created_at is None:
@@ -162,17 +73,35 @@ class PortfolioService(RepositoryService):
         )
 
     def create_portfolio_from_configuration(self, portfolio_configuration):
+        """
+        Method to create a portfolio based on a portfolio configuration.
+        This method will create a portfolio based on the configuration
+        provided. If the portfolio already exists, it will be returned.
+
+        If the portfolio does not exist, it will be created. If the
+        portfolio does not exist, the unallocated balance of the portfolio
+        will be checked. If the unallocated balance of the portfolio is less
+        than the initial balance of the portfolio configuration, an
+        OperationalException will be raised.
+        """
         logger.info("Creating portfolios")
 
+        # Check if the portfolio already exists
+        # If the portfolio already exists, return the portfolio after checking
+        # the unallocated balance of the portfolio on the exchange
         if self.repository.exists(
             {"identifier": portfolio_configuration.identifier}
         ):
             portfolio = self.repository.find(
                 {"identifier": portfolio_configuration.identifier}
             )
-            self.sync_portfolio(portfolio, portfolio_configuration)
+            self.check_portfolio_unallocated_availability(
+                portfolio, portfolio_configuration
+            )
             return portfolio
 
+        # If the portfolio does not exist, create the portfolio
+        # Get the unallocated balance of the portfolio from the exchange
         balances = self.market_service\
             .get_balance(market=portfolio_configuration.market)
 
@@ -187,6 +116,8 @@ class PortfolioService(RepositoryService):
             ["free"]
         )
 
+        # If the unallocated balance of the portfolio is less than the initial
+        # balance of the portfolio configuration, raise an OperationalException
         if portfolio_configuration.initial_balance is not None and \
                 unallocated < portfolio_configuration.initial_balance:
             raise OperationalException(
@@ -216,22 +147,37 @@ class PortfolioService(RepositoryService):
             }
         )
         self.create_snapshot(portfolio.id, created_at=portfolio.created_at)
+        return portfolio
 
-    def sync_portfolio(self, portfolio, portfolio_configuration):
+    def check_portfolio_unallocated_availability(
+        self, portfolio, portfolio_configuration
+    ):
+        """
+        Method to check if the unallocated balance of the portfolio
+        matches the available balance on the exchange.
+
+        if the unallocated balance of the portfolio does not match the
+        available balance on the exchange, an OperationalException will be
+        raised.
+        """
         balances = self.market_service \
             .get_balance(market=portfolio_configuration.market)
 
+        # Make sure that the trading symbol is available in the balances
         if portfolio_configuration.trading_symbol.upper() not in balances:
             raise OperationalException(
                 f"Trading symbol balance not available "
                 f"in portfolio on market {portfolio_configuration.market}"
             )
 
+        # Get the unallocated balance of the portfolio
         unallocated = float(
             balances[portfolio_configuration.trading_symbol.upper()]
             ["free"]
         )
 
+        # If the unallocated balance of the portfolio is less than the
+        # available balance on the exchange, raise an OperationalException
         if unallocated < portfolio.unallocated:
             raise OperationalException(
                 "There seems to be a mismatch between the portfolio of this "
@@ -245,3 +191,95 @@ class PortfolioService(RepositoryService):
                 f"Available on market: {unallocated} "
                 f"{portfolio.trading_symbol}"
             )
+
+    def sync_portfolio_orders(self, portfolio):
+        """
+        Function to sync all local orders with the orders on the exchange.
+        This function will retrieve all orders from the exchange and
+        update the portfolio balances and positions accordingly.
+
+        First all orders are retrieved from the exchange and updated in the
+        database. If the order does not exist in the database, it will be
+        created and treated as a new order.
+
+        When an order is closed on the exchange, the order will be updated
+        in the database to closed. We will also then update the portfolio
+        and position balances accordingly.
+
+        If the order exists, we will check if the filled amount of the order
+        has changed. If the filled amount has changed, we will update the
+        order in the database and update the portfolio and position balances
+
+        if the status of an existing order has changed, we will update the
+        order in the database and update the portfolio and position balances
+
+        During the syncing of the orders, new orders are not executed. They
+        are only created in the database. This is to prevent the algorithm
+        from executing orders that are already executed on the exchange.
+        """
+
+        portfolio_configuration = self.portfolio_configuration_service \
+            .get(portfolio.identifier)
+        balances = self.market_service.get_balance(portfolio.market)
+        positions = []
+
+        for symbol in balances["free"]:
+            positions.append(symbol)
+
+        for position in positions:
+            logger.info(f"Syncing {position} orders")
+            external_orders = self.market_service \
+                .get_orders(
+                    symbol=f"{position}/{portfolio.trading_symbol}",
+                    since=portfolio_configuration.track_from,
+                    market=portfolio.market
+                )
+
+            if external_orders is None:
+                continue
+
+            logger.info(
+                f"Found {len(external_orders)} external orders "
+                f"for position {position}"
+            )
+
+            ordered_order_list = sorted(
+                external_orders, key=lambda x: x.created_at
+            )
+
+            for external_order in ordered_order_list:
+                if self.order_service.exists(
+                        {"external_id": external_order.external_id}
+                ):
+                    logger.info("Updating existing order")
+                    order = self.order_service.find(
+                        {"external_id": external_order.external_id}
+                    )
+                    self.order_service.update(
+                        order.id, external_order.to_dict()
+                    )
+                else:
+                    data = external_order.to_dict()
+                    data["portfolio_id"] = portfolio.id
+                    data.pop("trade_closed_at", None)
+                    data.pop("trade_closed_price", None)
+                    data.pop("trade_closed_amount", None)
+
+                    new_order_data = {
+                        "portfolio_id": portfolio.id,
+                        "target_symbol": position,
+                        "trading_symbol": portfolio.trading_symbol,
+                        "amount": external_order.amount,
+                        "price": external_order.price,
+                        "order_side": external_order.order_side,
+                        "order_type": external_order.order_type,
+                        "external_id": external_order.external_id,
+                    }
+
+                    new_order = self.order_service.create(
+                        new_order_data, execute=False, validate=False,
+                    )
+
+                    self.order_service.update(
+                        new_order.id, external_order.to_dict()
+                    )

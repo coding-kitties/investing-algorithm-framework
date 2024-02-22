@@ -35,7 +35,7 @@ class Test(TestBase):
         self.app.initialize()
 
     def test_has_open_buy_orders(self):
-        self.app.run(number_of_iterations=1, sync=False)
+        self.app.run(number_of_iterations=1)
         trading_symbol_position = self.app.algorithm.get_position("USDT")
         self.assertEqual(Decimal(1000), trading_symbol_position.get_amount())
         self.assertFalse(self.app.algorithm.position_exists(symbol="BTC"))

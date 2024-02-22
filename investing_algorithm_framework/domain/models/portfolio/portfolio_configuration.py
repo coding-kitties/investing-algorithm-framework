@@ -57,7 +57,7 @@ class PortfolioConfiguration(BaseModel):
 
     @property
     def has_initial_balance(self):
-        return self._initial_balance != None
+        return self._initial_balance is not None
 
     def __repr__(self):
         return self.repr(

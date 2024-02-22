@@ -20,7 +20,8 @@ class PositionService(RepositoryService):
     def sync_positions(self, portfolio):
         self._market_service.market_data_credentials = \
             self._market_credentials_service.get_all()
-        balances = self._market_service.get_balance(market=portfolio.get_market())
+        balances = self._market_service\
+            .get_balance(market=portfolio.get_market())
 
         # Get trading symbol position
         trading_symbol_position = balances[portfolio.get_trading_symbol()]

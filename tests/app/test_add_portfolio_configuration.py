@@ -40,6 +40,6 @@ class Test(TestBase):
         portfolio_configuration_service = app.container\
             .portfolio_configuration_service()
         self.assertIsNotNone(portfolio_configuration_service.get("BITVAVO"))
-        app.run(number_of_iterations=1, sync=False)
+        app.run(number_of_iterations=1)
         self.assertEqual(app.algorithm.portfolio_service.count(), 1)
         self.assertEqual(app.algorithm.get_unallocated(), 1000)

@@ -34,7 +34,7 @@ class Test(TestBase):
         self.app.initialize()
 
     def test_get_position(self):
-        self.app.run(number_of_iterations=1, sync=False)
+        self.app.run(number_of_iterations=1)
         trading_symbol_position = self.app.algorithm.get_position("USDT")
         self.assertEqual(1000, trading_symbol_position.get_amount())
         self.assertFalse(self.app.algorithm.position_exists(symbol="BTC"))
@@ -57,7 +57,7 @@ class Test(TestBase):
         self.assertTrue(self.app.algorithm.position_exists("BTC"))
 
     def test_position_exists_with_amount_gt(self):
-        self.app.run(number_of_iterations=1, sync=False)
+        self.app.run(number_of_iterations=1)
         trading_symbol_position = self.app.algorithm.get_position("USDT")
         self.assertEqual(1000, int(trading_symbol_position.get_amount()))
         self.assertFalse(self.app.algorithm.position_exists(symbol="BTC"))
@@ -78,7 +78,7 @@ class Test(TestBase):
         )
 
     def test_position_exists_with_amount_gte(self):
-        self.app.run(number_of_iterations=1, sync=False)
+        self.app.run(number_of_iterations=1)
         trading_symbol_position = self.app.algorithm.get_position("USDT")
         self.assertEqual(1000, int(trading_symbol_position.get_amount()))
         self.assertFalse(self.app.algorithm.position_exists(symbol="BTC"))
@@ -99,7 +99,7 @@ class Test(TestBase):
         )
 
     def test_position_exists_with_amount_lt(self):
-        self.app.run(number_of_iterations=1, sync=False)
+        self.app.run(number_of_iterations=1)
         trading_symbol_position = self.app.algorithm.get_position("USDT")
         self.assertEqual(1000, int(trading_symbol_position.get_amount()))
         self.assertFalse(self.app.algorithm.position_exists(symbol="BTC"))
@@ -120,7 +120,7 @@ class Test(TestBase):
         )
 
     def test_position_exists_with_amount_lte(self):
-        self.app.run(number_of_iterations=1, sync=False)
+        self.app.run(number_of_iterations=1)
         trading_symbol_position = self.app.algorithm.get_position("USDT")
         self.assertEqual(1000, int(trading_symbol_position.get_amount()))
         self.assertFalse(self.app.algorithm.position_exists(symbol="BTC"))

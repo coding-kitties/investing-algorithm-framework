@@ -1,7 +1,7 @@
 from investing_algorithm_framework.app import App, Algorithm
 from .create_app import create_app
 from investing_algorithm_framework.domain import ApiException, \
-    TradingDataType, TradingTimeFrame, OrderType,\
+    TradingDataType, TradingTimeFrame, OrderType, \
     OrderStatus, OrderSide, Config, TimeUnit, TimeInterval, Order, Portfolio, \
     Position, TimeFrame, BACKTESTING_INDEX_DATETIME, MarketCredential, \
     PortfolioConfiguration, RESOURCE_DIRECTORY, pretty_print_backtest, \

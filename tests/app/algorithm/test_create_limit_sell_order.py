@@ -34,7 +34,7 @@ class Test(TestBase):
         self.app.initialize()
 
     def test_create_limit_sell_order(self):
-        self.app.run(number_of_iterations=1, sync=False)
+        self.app.run(number_of_iterations=1)
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
@@ -65,7 +65,7 @@ class Test(TestBase):
         self.assertEqual(20, order.get_amount())
 
     def test_create_limit_sell_order_with_percentage_position(self):
-        self.app.run(number_of_iterations=1, sync=False)
+        self.app.run(number_of_iterations=1)
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,

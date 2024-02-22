@@ -46,6 +46,13 @@ class Trade(BaseModel):
         return self._trading_symbol
 
     @property
+    def symbol(self):
+        return f"{self.target_symbol}/{self.trading_symbol}"
+
+    def get_symbol(self):
+        return f"{self.target_symbol}/{self.trading_symbol}"
+
+    @property
     def amount(self):
         return self._amount
 

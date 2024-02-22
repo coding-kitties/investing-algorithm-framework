@@ -58,7 +58,7 @@ class Test(TestBase):
         self.app.add_strategy(StrategyTwo)
 
     def test_default(self):
-        self.app.run(number_of_iterations=2, sync=False)
+        self.app.run(number_of_iterations=2)
         self.assertFalse(self.app.running)
         strategy_orchestrator_service = self.app \
             .algorithm.strategy_orchestrator_service
@@ -66,7 +66,7 @@ class Test(TestBase):
         self.assertTrue(strategy_orchestrator_service.has_run("StrategyTwo"))
 
     def test_web(self):
-        self.app.run(number_of_iterations=2, sync=False)
+        self.app.run(number_of_iterations=2)
         self.assertFalse(self.app.running)
         strategy_orchestrator_service = self.app \
             .algorithm.strategy_orchestrator_service
@@ -77,7 +77,6 @@ class Test(TestBase):
         self.app.run(
             number_of_iterations=2,
             payload={"ACTION": "RUN_STRATEGY"},
-            sync=False
         )
         strategy_orchestrator_service = self.app\
             .algorithm.strategy_orchestrator_service

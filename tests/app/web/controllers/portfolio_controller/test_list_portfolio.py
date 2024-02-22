@@ -37,7 +37,7 @@ class Test(FlaskTestBase):
 
     def test_list_portfolios(self):
         order_repository = self.iaf_app.container.order_repository()
-        self.iaf_app.run(number_of_iterations=1, sync=False)
+        self.iaf_app.run(number_of_iterations=1)
         self.assertEqual(1, order_repository.count())
         response = self.client.get("api/portfolios")
         data = json.loads(response.data.decode())

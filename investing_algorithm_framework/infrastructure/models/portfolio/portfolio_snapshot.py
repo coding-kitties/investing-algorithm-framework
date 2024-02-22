@@ -27,5 +27,3 @@ class SQLPortfolioSnapshot(
         lazy="dynamic",
         cascade="all,delete",
     )
-
-
