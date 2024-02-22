@@ -235,6 +235,9 @@ class PortfolioService(RepositoryService):
                     market=portfolio.market
                 )
 
+            if external_orders is None:
+                continue
+
             logger.info(
                 f"Found {len(external_orders)} external orders "
                 f"for position {position}"

@@ -55,7 +55,7 @@ class Test(TestBase):
         order_service = self.app.container.order_service()
         trading_symbol_position = position_service.find({"symbol": "EUR"})
         self.assertEqual(990, trading_symbol_position.get_amount())
-        self.app.run(number_of_iterations=1, sync=False)
+        self.app.run(number_of_iterations=1)
         trading_symbol_position = position_service.find({"symbol": "EUR"})
         self.assertEqual(990, trading_symbol_position.get_amount())
         self.app.algorithm.create_market_order(

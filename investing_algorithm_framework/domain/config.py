@@ -166,11 +166,12 @@ class Config(dict):
     def from_dict(dictionary):
         config = Config()
 
-        for attribute_key in dictionary:
+        if dictionary is not None:
+            for attribute_key in dictionary:
 
-            if attribute_key:
-                config.set(attribute_key, dictionary[attribute_key])
-                config[attribute_key] = dictionary[attribute_key]
+                if attribute_key:
+                    config.set(attribute_key, dictionary[attribute_key])
+                    config[attribute_key] = dictionary[attribute_key]
 
         return config
 

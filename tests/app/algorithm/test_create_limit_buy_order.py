@@ -41,7 +41,7 @@ class Test(TestBase):
         self.app.initialize()
 
     def test_create_limit_buy_order(self):
-        self.app.run(number_of_iterations=1, sync=False)
+        self.app.run(number_of_iterations=1)
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             amount=1,

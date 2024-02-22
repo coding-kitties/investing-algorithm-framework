@@ -35,7 +35,7 @@ class Test(TestBase):
         )
 
     def test_get_all(self):
-        self.app.run(number_of_iterations=1, sync=False)
+        self.app.run(number_of_iterations=1)
         order_service = self.app.container.order_service()
         portfolio_service = self.app.container.portfolio_service()
         position_service = self.app.container.position_service()

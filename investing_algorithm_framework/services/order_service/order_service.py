@@ -654,8 +654,13 @@ class OrderService(RepositoryService):
 
         while amount_to_close > 0 and not order_queue.empty():
             buy_order = order_queue.get()
-            available_to_close = buy_order.get_filled() \
-                - buy_order.get_trade_closed_amount()
+            closed_amount = buy_order.get_trade_closed_amount()
+
+            # Check if the order has been closed
+            if closed_amount is None:
+                closed_amount = 0
+
+            available_to_close = buy_order.get_filled() - closed_amount
 
             if amount_to_close >= available_to_close:
                 to_be_closed = available_to_close
@@ -678,11 +683,15 @@ class OrderService(RepositoryService):
                 net_gain = (sell_order.get_price() - buy_order.get_price()) \
                     * to_be_closed
                 cost = buy_order.get_price() * amount_to_close
+                closed_amount = buy_order.get_trade_closed_amount()
+
+                if closed_amount is None:
+                    closed_amount = 0
+
                 self.order_repository.update(
                     buy_order.id,
                     {
-                        "trade_closed_amount":
-                            buy_order.get_trade_closed_amount() + to_be_closed,
+                        "trade_closed_amount": closed_amount + to_be_closed,
                         "trade_closed_price": sell_order.get_price(),
                         "net_gain": buy_order.get_net_gain() + net_gain
                     }

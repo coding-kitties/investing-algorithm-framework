@@ -56,7 +56,7 @@ class Test(TestBase):
     def test_check_order_status(self):
         order_repository = self.app.container.order_repository()
         position_repository = self.app.container.position_repository()
-        self.app.run(number_of_iterations=1, sync=False)
+        self.app.run(number_of_iterations=1)
         self.assertEqual(1, order_repository.count())
         self.assertEqual(2, position_repository.count())
         self.app.algorithm.order_service.check_pending_orders()

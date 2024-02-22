@@ -3,7 +3,7 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, \
     PortfolioConfiguration, Portfolio, Position, Order, \
     OrderFee, BacktestProfile, PortfolioSnapshot, StrategyProfile, \
-    BacktestPosition, Trade, MarketCredential
+    BacktestPosition, Trade, MarketCredential, PositionSnapshot
 from .exceptions import OperationalException, ApiException, \
     PermissionDeniedApiException, ImproperlyConfigured
 from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
@@ -94,5 +94,6 @@ __all__ = [
     "MarketService",
     "PeekableQueue",
     "BACKTESTING_END_DATE",
-    "BACKTESTING_PENDING_ORDER_CHECK_INTERVAL"
+    "BACKTESTING_PENDING_ORDER_CHECK_INTERVAL",
+    "PositionSnapshot"
 ]

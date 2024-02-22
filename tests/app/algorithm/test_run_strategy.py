@@ -53,7 +53,7 @@ class Test(TestBase):
         )
         app.add_strategy(StrategyOne)
         app.add_strategy(StrategyTwo)
-        app.run(number_of_iterations=2, sync=False)
+        app.run(number_of_iterations=2)
         self.assertFalse(app.running)
         strategy_orchestration_service = app.algorithm\
             .strategy_orchestrator_service
@@ -75,7 +75,7 @@ class Test(TestBase):
         def run_strategy(algorithm, market_data):
             pass
 
-        app.run(number_of_iterations=1, sync=False)
+        app.run(number_of_iterations=1)
         strategy_orchestration_service = app.algorithm\
             .strategy_orchestrator_service
         self.assertTrue(strategy_orchestration_service.has_run("run_strategy"))
@@ -95,7 +95,6 @@ class Test(TestBase):
         app.run(
             number_of_iterations=2,
             payload={"ACTION": "RUN_STRATEGY"},
-            sync=False
         )
         strategy_orchestration_service = app.algorithm\
             .strategy_orchestrator_service
