@@ -88,6 +88,7 @@ jobs:
       - name: Run tests
         run: |
           source .venv/bin/activate
+          pip install setuptools
           coverage run -m unittest discover -s tests
 #      #----------------------------------------------
 #      #             upload coverage stats
