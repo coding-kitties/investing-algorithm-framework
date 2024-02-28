@@ -9,7 +9,7 @@
 ###### Sponsors
 <p align="left">
 <a href="https://finterion.com">
-  <img alt="Finterion" src="https://logicfunds-web-app-images.s3.eu-central-1.amazonaws.com/finterion.png" width="200px" />
+  <img alt="Finterion" src="static/sponsors/finterion.png" width="200px" />
 </a>
 </p>
 
