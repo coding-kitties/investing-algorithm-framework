@@ -17,7 +17,7 @@ class SQLPortfolioRepository(Repository):
             query = query.filter_by(id=id_query_param)
 
         if market_query_param:
-            query = query.filter_by(market=market_query_param)
+            query = query.filter_by(market=market_query_param.upper())
 
         if identifier_query_param:
             query = query.filter_by(identifier=identifier_query_param.lower())

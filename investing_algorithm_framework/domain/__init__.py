@@ -2,7 +2,7 @@ from .config import Config, Environment
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, \
     PortfolioConfiguration, Portfolio, Position, Order, \
-    OrderFee, BacktestProfile, PortfolioSnapshot, StrategyProfile, \
+    OrderFee, BacktestReport, PortfolioSnapshot, StrategyProfile, \
     BacktestPosition, Trade, MarketCredential, PositionSnapshot
 from .exceptions import OperationalException, ApiException, \
     PermissionDeniedApiException, ImproperlyConfigured
@@ -70,7 +70,7 @@ __all__ = [
     "OrderFee",
     "parse_decimal_to_string",
     "parse_string_to_decimal",
-    "BacktestProfile",
+    "BacktestReport",
     "pretty_print_backtest",
     "DATETIME_FORMAT_BACKTESTING",
     "BACKTESTING_FLAG",

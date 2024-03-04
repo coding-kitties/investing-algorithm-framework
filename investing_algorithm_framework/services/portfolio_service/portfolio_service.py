@@ -220,6 +220,7 @@ class PortfolioService(RepositoryService):
 
         portfolio_configuration = self.portfolio_configuration_service \
             .get(portfolio.identifier)
+
         balances = self.market_service.get_balance(portfolio.market)
         positions = []
 
@@ -249,7 +250,7 @@ class PortfolioService(RepositoryService):
 
             for external_order in ordered_order_list:
                 if self.order_service.exists(
-                        {"external_id": external_order.external_id}
+                    {"external_id": external_order.external_id}
                 ):
                     logger.info("Updating existing order")
                     order = self.order_service.find(
@@ -259,6 +260,7 @@ class PortfolioService(RepositoryService):
                         order.id, external_order.to_dict()
                     )
                 else:
+                    logger.info("Creating new order, based on external order")
                     data = external_order.to_dict()
                     data["portfolio_id"] = portfolio.id
                     data.pop("trade_closed_at", None)

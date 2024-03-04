@@ -7,11 +7,13 @@ class TradingStrategy:
     time_unit: str = None
     interval: int = None
     worker_id: str = None
+    strategy_id: str = None
     decorated = None
     market_data_sources = None
 
     def __init__(
         self,
+        strategy_id=None,
         time_unit=None,
         interval=None,
         market_data_sources=None,
@@ -40,6 +42,9 @@ class TradingStrategy:
             self.worker_id = decorated.__name__
         else:
             self.worker_id = self.__class__.__name__
+
+        if strategy_id is not None:
+            self.strategy_id = strategy_id
 
     def run_strategy(self, algorithm, market_data):
         self.apply_strategy(algorithm=algorithm, market_data=market_data)
@@ -105,3 +110,11 @@ class TradingStrategy:
 
     def on_trade_take_profit_created(self, algorithm: Algorithm, trade: Trade):
         pass
+
+    @property
+    def strategy_identifier(self):
+
+        if self.strategy_id is not None:
+            return self.strategy_id
+
+        return self.worker_id

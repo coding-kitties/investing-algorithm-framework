@@ -1,5 +1,6 @@
-from .base_model import BaseModel
-from .time_unit import TimeUnit
+from datetime import datetime
+from investing_algorithm_framework.domain.models.base_model import BaseModel
+from investing_algorithm_framework.domain.models.time_unit import TimeUnit
 
 
 class BacktestPosition(BaseModel):
@@ -97,10 +98,11 @@ class BacktestPosition(BaseModel):
         return self.value / self._total_value_portfolio * 100
 
 
-class BacktestProfile(BaseModel):
+class BacktestReport(BaseModel):
 
     def __init__(
         self,
+        identifier=None,
         portfolio_id=None,
         initial_unallocated=0.0,
         interval=None,
@@ -132,8 +134,10 @@ class BacktestProfile(BaseModel):
         positions=None,
         average_trade_duration=0,
         average_trade_size=0.0,
-        trades=None
+        trades=None,
+        created_at: datetime = None
     ):
+        self._identifier = identifier
         self._portfolio_id = portfolio_id
         self._interval = interval
         self._time_unit = time_unit
@@ -169,6 +173,15 @@ class BacktestProfile(BaseModel):
         self._average_trade_duration = average_trade_duration
         self._average_trade_size = average_trade_size
         self._trades = trades
+        self._created_at: datetime = created_at
+
+    @property
+    def identifier(self):
+        return self._identifier
+
+    @property
+    def created_at(self):
+        return self._created_at
 
     @property
     def portfolio_id(self):
@@ -454,3 +467,38 @@ class BacktestProfile(BaseModel):
             time_unit=self.time_unit,
             interval=self.interval
         )
+
+    def to_dict(self):
+        return {
+            "portfolio_id": self.portfolio_id,
+            "interval": self.interval,
+            "time_unit": self.time_unit,
+            "backtest_start_date_data": self.backtest_start_date_data,
+            "backtest_start_date": self.backtest_start_date,
+            "backtest_end_date": self.backtest_end_date,
+            "backtest_index_date": self.backtest_index_date,
+            "number_of_runs": self.number_of_runs,
+            "trading_time_frame": self.trading_time_frame,
+            "trading_time_frame_start_date": self.trading_time_frame_start_date,
+            "symbols": self.symbols,
+            "market": self.market,
+            "number_of_days": self.number_of_days,
+            "number_of_orders": self.number_of_orders,
+            "number_of_positions": self.number_of_positions,
+            "market_data_file": self.market_data_file,
+            "percentage_positive_trades": self.percentage_positive_trades,
+            "percentage_negative_trades": self.percentage_negative_trades,
+            "number_of_trades_closed": self.number_of_trades_closed,
+            "number_of_trades_open": self.number_of_trades_open,
+            "total_cost": self.total_cost,
+            "growth_rate": self.growth_rate,
+            "growth": self.growth,
+            "initial_unallocated": self.initial_unallocated,
+            "trading_symbol": self.trading_symbol,
+            "total_net_gain_percentage": self.total_net_gain_percentage,
+            "total_net_gain": self.total_net_gain,
+            "backtest_data_index_date": self.backtest_data_index_date,
+            "total_value": self.total_value,
+            "average_trade_duration": self.average_trade_duration,
+            "average_trade_size": self.average_trade_size,
+        }

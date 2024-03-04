@@ -6,6 +6,20 @@ from investing_algorithm_framework.domain import MarketService
 
 
 class MarketServiceStub(MarketService):
+    _orders = []
+
+    def __init__(self, market_credential_service):
+        super().__init__(market_credential_service)
+        self._market_credential_service = market_credential_service
+        self._orders = []
+
+    @property
+    def orders(self):
+        return self._orders
+
+    @orders.setter
+    def orders(self, value):
+        self._orders = value
 
     def initialize(self, portfolio_configuration):
         pass
@@ -20,7 +34,12 @@ class MarketServiceStub(MarketService):
         pass
 
     def get_orders(self, symbol, market, since: datetime = None):
-        pass
+        selection = []
+
+        for order in self.orders:
+            if order.get_symbol() == symbol:
+                selection.append(order)
+        return selection
 
     def cancel_order(self, order_id, market):
         pass
@@ -47,11 +66,6 @@ class MarketServiceStub(MarketService):
         self, symbols, time_frame, from_timestamp, market, to_timestamp=None
     ):
         pass
-
-    def __init__(self, market_credential_service):
-        super().__init__(market_credential_service)
-        self._get_market_data_called = False
-        self._get_market_data_return_value = None
 
     def create_market_sell_order(
         self,

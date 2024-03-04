@@ -7,9 +7,9 @@ from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPositionSnapshotRepository, PerformanceService, CCXTMarketService
 from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, StrategyOrchestratorService, \
-    PortfolioConfigurationService, MarketDataSourceService, BackTestService, \
+    PortfolioConfigurationService, MarketDataSourceService, BacktestService, \
     ConfigurationService, PortfolioSnapshotService, PositionSnapshotService, \
-    MarketCredentialService
+    MarketCredentialService, TradeService, BacktestReportWriterService
 
 
 def setup_dependency_container(app, modules=None, packages=None):
@@ -88,6 +88,13 @@ class DependencyContainer(containers.DeclarativeContainer):
         portfolio_configuration_service=portfolio_configuration_service,
         portfolio_snapshot_service=portfolio_snapshot_service,
     )
+    trade_service = providers.Factory(
+        TradeService,
+        portfolio_service=portfolio_service,
+        order_service=order_service,
+        market_data_source_service=market_data_source_service,
+        position_service=position_service,
+    )
     strategy_orchestrator_service = providers.Factory(
         StrategyOrchestratorService,
         market_data_source_service=market_data_source_service
@@ -99,12 +106,15 @@ class DependencyContainer(containers.DeclarativeContainer):
         portfolio_repository=portfolio_repository
     )
     backtest_service = providers.Factory(
-        BackTestService,
+        BacktestService,
         order_service=order_service,
         portfolio_repository=portfolio_repository,
         performance_service=performance_service,
         position_repository=position_repository,
         market_data_source_service=market_data_source_service,
+    )
+    backtest_report_writer_service = providers.Factory(
+        BacktestReportWriterService,
     )
     algorithm = providers.Factory(
         Algorithm,
@@ -117,4 +127,5 @@ class DependencyContainer(containers.DeclarativeContainer):
         market_credential_service=market_credential_service,
         market_data_source_service=market_data_source_service,
         market_service=market_service,
+        trade_service=trade_service,
     )
