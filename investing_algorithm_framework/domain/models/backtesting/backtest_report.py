@@ -479,7 +479,8 @@ class BacktestReport(BaseModel):
             "backtest_index_date": self.backtest_index_date,
             "number_of_runs": self.number_of_runs,
             "trading_time_frame": self.trading_time_frame,
-            "trading_time_frame_start_date": self.trading_time_frame_start_date,
+            "trading_time_frame_start_date":
+                self.trading_time_frame_start_date,
             "symbols": self.symbols,
             "market": self.market,
             "number_of_days": self.number_of_days,

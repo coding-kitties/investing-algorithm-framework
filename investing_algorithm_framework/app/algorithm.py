@@ -1,15 +1,14 @@
-import logging
 import decimal
+import logging
 from typing import List
 
 from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
     Position, Order, Portfolio, OrderType, OrderSide, ApiException, \
-    BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, Trade, PeekableQueue, \
-    MarketService
+    BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, MarketService
 from investing_algorithm_framework.services import MarketCredentialService, \
     MarketDataSourceService, PortfolioService, PositionService, TradeService, \
     OrderService, ConfigurationService, StrategyOrchestratorService, \
-    PortfolioSnapshotService, PortfolioConfigurationService
+    PortfolioConfigurationService
 
 logger = logging.getLogger("investing_algorithm_framework")
 

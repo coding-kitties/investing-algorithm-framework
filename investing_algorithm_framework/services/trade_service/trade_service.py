@@ -167,7 +167,7 @@ class TradeService:
 
         return trades
 
-    def get_closed_trades(self, portfolio_id = None) -> List[Trade]:
+    def get_closed_trades(self, portfolio_id=None) -> List[Trade]:
         """
         Get closed trades method
 

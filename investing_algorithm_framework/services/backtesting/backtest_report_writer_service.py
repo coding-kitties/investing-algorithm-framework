@@ -1,7 +1,8 @@
 import os
 import csv
 
-from investing_algorithm_framework.domain import BacktestReport, DATETIME_FORMAT
+from investing_algorithm_framework.domain import BacktestReport, \
+    DATETIME_FORMAT
 
 
 class BacktestReportWriterService:
