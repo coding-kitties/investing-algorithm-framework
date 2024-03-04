@@ -250,6 +250,42 @@ class Order(BaseModel):
         }
 
     @staticmethod
+    def from_dict(data: dict):
+        created_at = data.get("created_at", None)
+        updated_at = data.get("updated_at", None)
+        symbol = data.get("symbol", None)
+
+        if symbol is not None:
+            target_symbol = symbol.split("/")[0]
+            trading_symbol = symbol.split("/")[1]
+        else:
+            target_symbol = data.get("target_symbol", None)
+            trading_symbol = data.get("trading_symbol", None)
+
+        if created_at is not None:
+            created_at = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+        if updated_at is not None:
+            updated_at = datetime.strptime(updated_at, "%Y-%m-%dT%H:%M:%S.%fZ")
+
+        return Order(
+            external_id=data.get("id", None),
+            target_symbol=target_symbol,
+            trading_symbol=trading_symbol,
+            price=data.get("price", None),
+            amount=data.get("amount", None),
+            status=data.get("status", None),
+            order_type=data.get("order_type", None),
+            order_side=data.get("order_side", None),
+            filled=data.get("filled", None),
+            remaining=data.get("remaining", None),
+            cost=data.get("cost", None),
+            fee=data.get("fee", None),
+            created_at=created_at,
+            updated_at=updated_at
+        )
+
+    @staticmethod
     def from_ccxt_order(ccxt_order):
         status = OrderStatus.from_value(ccxt_order["status"])
         target_symbol = ccxt_order.get("symbol").split("/")[0]

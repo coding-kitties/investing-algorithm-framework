@@ -46,7 +46,6 @@ class FlaskTestBase(FlaskTestCase):
 
         self.iaf_app.container.market_service.override(MarketServiceStub(None))
         self.iaf_app.initialize()
-        # self.app.create_portfolios()
         return self.iaf_app._flask_app
 
     def tearDown(self) -> None:

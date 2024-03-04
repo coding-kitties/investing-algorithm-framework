@@ -3,13 +3,14 @@ from datetime import datetime, timedelta
 import pandas as pd
 from tqdm import tqdm
 
-from investing_algorithm_framework.domain import BacktestProfile, \
+from investing_algorithm_framework.domain import BacktestReport, \
     BACKTESTING_INDEX_DATETIME, TimeUnit, BacktestPosition, \
     TradingDataType, OrderStatus, OperationalException, MarketDataSource
-from .market_data_source_service import MarketDataSourceService
+from investing_algorithm_framework.services.market_data_source_service import \
+    MarketDataSourceService
 
 
-class BackTestService:
+class BacktestService:
 
     def __init__(
         self,
@@ -40,7 +41,7 @@ class BackTestService:
     def resource_directory(self, resource_directory):
         self._resource_directory = resource_directory
 
-    def backtest(self, algorithm, start_date, end_date=None):
+    def backtest(self, algorithm, start_date, end_date=None) -> BacktestReport:
         strategy_profiles = []
         portfolios = self._portfolio_repository.get_all()
         initial_unallocated = 0
@@ -84,16 +85,18 @@ class BackTestService:
         algorithm.config[BACKTESTING_INDEX_DATETIME] = index_date
         market_data = {}
 
-        for data_id in strategy.strategy_profile.market_data_sources:
+        if strategy.strategy_profile.market_data_sources is not None:
 
-            if isinstance(data_id, MarketDataSource):
-                market_data[data_id.get_identifier()] = \
-                    self._market_data_source_service.get_data(
-                        data_id.get_identifier()
-                    )
-            else:
-                market_data[data_id] = \
-                    self._market_data_source_service.get_data(data_id)
+            for data_id in strategy.strategy_profile.market_data_sources:
+
+                if isinstance(data_id, MarketDataSource):
+                    market_data[data_id.get_identifier()] = \
+                        self._market_data_source_service.get_data(
+                            data_id.get_identifier()
+                        )
+                else:
+                    market_data[data_id] = \
+                        self._market_data_source_service.get_data(data_id)
 
         self._order_service.check_pending_orders()
         strategy.run_strategy(algorithm=algorithm, market_data=market_data)
@@ -109,6 +112,13 @@ class BackTestService:
         for strategy in strategies:
             id = strategy.strategy_profile.strategy_id
             time_unit = strategy.strategy_profile.time_unit
+
+            # Check if time_unit is None
+            if time_unit is None:
+                raise OperationalException(
+                    "Time unit not set for strategy instance"
+                )
+
             interval = strategy.strategy_profile.interval
             current_time = start_date
 
@@ -116,21 +126,16 @@ class BackTestService:
                 data.append({
                     "id": id,
                     'run_time': current_time,
-                    # 'ohlcv_data_index_date': ohlcv_data_index_date
                 })
 
                 if TimeUnit.SECOND.equals(time_unit):
                     current_time += timedelta(seconds=interval)
-                    # ohlcv_data_index_date += timedelta(seconds=interval)
                 elif TimeUnit.MINUTE.equals(time_unit):
                     current_time += timedelta(minutes=interval)
-                    # ohlcv_data_index_date += timedelta(minutes=interval)
                 elif TimeUnit.HOUR.equals(time_unit):
                     current_time += timedelta(hours=interval)
-                    # ohlcv_data_index_date += timedelta(hours=interval)
                 elif TimeUnit.DAY.equals(time_unit):
                     current_time += timedelta(days=interval)
-                    # ohlcv_data_index_date += timedelta(days=interval)
                 else:
                     raise ValueError(f"Unsupported time unit: {time_unit}")
 
@@ -162,15 +167,33 @@ class BackTestService:
         start_date,
         end_date,
         initial_unallocated=0
-    ):
-        for portfolio in self._portfolio_repository.get_all():
+    ) -> BacktestReport:
+        """
+        Create a backtest report for the given algorithm. This function
+        will create a backtest report for the given algorithm and return
+        the backtest report instance.
 
-            backtest_profile = BacktestProfile(
+        It will calculate various performance metrics for the backtest.
+
+        :param algorithm: The algorithm to create the backtest report for
+        :param number_of_runs: The number of runs
+        :param start_date: The start date of the backtest
+        :param end_date: The end date of the backtest
+        :param initial_unallocated: The initial unallocated amount
+        :return: The backtest report instance of BacktestReport
+        """
+        for portfolio in self._portfolio_repository.get_all():
+            ids = [strategy.strategy_id for strategy in algorithm.strategies]
+            identifier = '_'.join(ids)
+
+            backtest_profile = BacktestReport(
+                identifier=identifier,
                 backtest_index_date=start_date,
                 backtest_start_date=start_date,
                 backtest_end_date=end_date,
                 initial_unallocated=initial_unallocated,
                 trading_symbol=portfolio.trading_symbol,
+                created_at=datetime.utcnow(),
             )
             backtest_profile.number_of_runs = number_of_runs
             backtest_profile.number_of_days = (end_date - start_date).days

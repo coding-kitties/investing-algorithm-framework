@@ -8,9 +8,10 @@ from .strategy_orchestrator_service import StrategyOrchestratorService
 from .portfolio_configuration_service import PortfolioConfigurationService
 from .market_data_source_service import MarketDataSourceService, \
     BacktestMarketDataSourceService
-from .backtest_service import BackTestService
+from .backtesting import BacktestService, BacktestReportWriterService
 from .configuration_service import ConfigurationService
 from .market_credential_service import MarketCredentialService
+from .trade_service import TradeService
 
 
 __all__ = [
@@ -21,12 +22,14 @@ __all__ = [
     "PositionService",
     "PortfolioConfigurationService",
     "MarketDataSourceService",
-    "BackTestService",
+    "BacktestService",
+    "BacktestReportWriterService",
     "OrderBacktestService",
     "ConfigurationService",
     "PortfolioSnapshotService",
     "PositionSnapshotService",
     "MarketCredentialService",
     "BacktestMarketDataSourceService",
-    "BacktestPortfolioService"
+    "BacktestPortfolioService",
+    "TradeService"
 ]

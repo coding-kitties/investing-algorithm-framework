@@ -40,21 +40,23 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
             configuration_service
 
         for backtest_market_data_source in tqdm(
-                market_data_sources,
-                total=len(self._market_data_sources),
-                desc="Preparing backtest market data",
-                colour="GREEN"
+            market_data_sources,
+            total=len(self._market_data_sources),
+            desc="Preparing backtest market data",
+            colour="GREEN"
         ):
-            backtest_market_data_source.market_credentials_service = \
-                self._market_credential_service
-            backtest_market_data_source.prepare_data(
-                config=configuration_service.get_config(),
-                backtest_start_date=configuration_service
-                .get_config()[BACKTESTING_START_DATE],
-                backtest_end_date=configuration_service
-                .get_config()[BACKTESTING_END_DATE],
-                market_credential_service=self._market_credential_service
-            )
+
+            if backtest_market_data_source is not None:
+                backtest_market_data_source.market_credentials_service = \
+                    self._market_credential_service
+                backtest_market_data_source.prepare_data(
+                    config=configuration_service.get_config(),
+                    backtest_start_date=configuration_service
+                    .get_config()[BACKTESTING_START_DATE],
+                    backtest_end_date=configuration_service
+                    .get_config()[BACKTESTING_END_DATE],
+                    market_credential_service=self._market_credential_service
+                )
 
     def get_data(self, identifier):
         """

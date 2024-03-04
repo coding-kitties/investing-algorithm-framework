@@ -633,6 +633,11 @@ class OrderService(RepositoryService):
         )
 
     def _close_trades(self, amount_to_close, sell_order):
+        """
+        Close trades for an executed sell order.
+
+        This method will c
+        """
         matching_buy_orders = self.order_repository.get_all(
             {
                 "position": sell_order.position_id,

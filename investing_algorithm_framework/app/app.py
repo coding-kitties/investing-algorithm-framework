@@ -17,7 +17,7 @@ from investing_algorithm_framework.app.web import create_flask_app
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
     SQLALCHEMY_DATABASE_URI, OperationalException, BACKTESTING_FLAG, \
-    BACKTESTING_START_DATE, MarketService, BACKTESTING_END_DATE, \
+    BACKTESTING_START_DATE, BACKTESTING_END_DATE, \
     BACKTESTING_PENDING_ORDER_CHECK_INTERVAL
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables
@@ -40,7 +40,6 @@ class App:
         self._strategies = []
         self._tasks = []
         self._configuration_service = None
-        self._market_service: MarketService = None
         self._market_data_source_service: MarketDataSourceService = None
         self._market_credential_service: MarketCredentialService = None
 
@@ -50,7 +49,6 @@ class App:
 
     def initialize_services(self):
         self._configuration_service = self.container.configuration_service()
-        self._market_service = self.container.market_service()
         self._market_data_source_service = \
             self.container.market_data_source_service()
         self._market_credential_service = \
@@ -559,7 +557,11 @@ class App:
         return self.algorithm.get_portfolio_configurations()
 
     def backtest(
-        self, start_date, end_date, pending_order_check_interval='1h'
+        self,
+        start_date,
+        end_date,
+        pending_order_check_interval='1h',
+        output_directory=None
     ):
         logger.info("Initializing backtest")
 
@@ -578,6 +580,19 @@ class App:
         report = backtest_service.backtest(
             self.algorithm, start_date, end_date
         )
+        backtest_report_writer_service = self.container\
+            .backtest_report_writer_service()
+
+        if output_directory is None:
+            output_directory = os.path.join(
+                self.config.get(RESOURCE_DIRECTORY),
+                "backtest_reports"
+            )
+
+        backtest_report_writer_service.write_report_to_csv(
+            report=report, output_directory=output_directory
+        )
+
         return report
 
     def add_market_data_source(self, market_data_source):
