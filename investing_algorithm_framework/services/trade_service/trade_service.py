@@ -2,6 +2,8 @@ import logging
 from typing import List
 from investing_algorithm_framework.domain import OrderStatus, OrderSide, \
     Trade, PeekableQueue, ApiException
+from investing_algorithm_framework.services import \
+    OrderService, PortfolioService, PositionService, MarketDataSourceService
 
 logger = logging.getLogger(__name__)
 
@@ -18,10 +20,11 @@ class TradeService:
         position_service,
         market_data_source_service
     ):
-        self.portfolio_service = portfolio_service
-        self.order_service = order_service
-        self.market_data_source_service = market_data_source_service
-        self.position_service = position_service
+        self.portfolio_service: PortfolioService = portfolio_service
+        self.order_service: OrderService = order_service
+        self.market_data_source_service: MarketDataSourceService = \
+            market_data_source_service
+        self.position_service: PositionService = position_service
 
     def get_open_trades(self, target_symbol=None, market=None) -> List[Trade]:
         """
@@ -233,11 +236,15 @@ class TradeService:
         ticker = self.market_data_source_service.get_ticker(
             symbol=symbol, market=market
         )
-        self.order_service.create_limit_order(
-            target_symbol=order.target_symbol,
-            amount=amount,
-            order_side=OrderSide.SELL.value,
-            price=ticker["bid"],
+        self.order_service.create(
+            {
+                "portfolio_id": portfolio.id,
+                "trading_symbol": order.get_trading_symbol(),
+                "target_symbol": order.get_target_symbol(),
+                "amount": amount,
+                "order_side": OrderSide.SELL.value,
+                "price": ticker["bid"]
+            }
         )
 
     def count(self, query_params=None) -> int:
