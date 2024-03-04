@@ -1,7 +1,7 @@
 import logging
 from typing import List
 from investing_algorithm_framework.domain import OrderStatus, OrderSide, \
-    Trade, PeekableQueue, ApiException
+    Trade, PeekableQueue, ApiException, OrderType
 from investing_algorithm_framework.services import \
     OrderService, PortfolioService, PositionService, MarketDataSourceService
 
@@ -243,6 +243,7 @@ class TradeService:
                 "target_symbol": order.get_target_symbol(),
                 "amount": amount,
                 "order_side": OrderSide.SELL.value,
+                "order_type": OrderType.LIMIT.value,
                 "price": ticker["bid"]
             }
         )
