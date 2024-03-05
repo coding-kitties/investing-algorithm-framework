@@ -184,7 +184,16 @@ class BacktestService:
         """
         for portfolio in self._portfolio_repository.get_all():
             ids = [strategy.strategy_id for strategy in algorithm.strategies]
-            identifier = '_'.join(ids)
+
+            # Check if strategy_id is None
+            if None in ids:
+                # Remove None from ids
+                ids = [x for x in ids if x is not None]
+
+            if len(ids) != 0:
+                identifier = '_'.join(ids)
+            else:
+                identifier = None
 
             backtest_profile = BacktestReport(
                 identifier=identifier,

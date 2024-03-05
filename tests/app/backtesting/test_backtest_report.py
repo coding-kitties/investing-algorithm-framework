@@ -63,3 +63,34 @@ class Test(TestBase):
                 )
             )
         )
+
+    def test_report_csv_creation_without_strategy_identifier(self):
+        app = create_app(
+            config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
+        )
+        strategy = TestStrategy()
+        strategy.strategy_id = None
+        app.add_strategy(strategy)
+        app.add_portfolio_configuration(
+            PortfolioConfiguration(
+                market="bitvavo",
+                trading_symbol="EUR",
+                initial_balance=1000
+            )
+        )
+        report = app.backtest(
+            start_date=datetime.utcnow() - timedelta(days=1),
+            end_date=datetime.utcnow(),
+        )
+
+        # Check if the backtest report exists
+        self.assertTrue(
+            os.path.isfile(
+                os.path.join(
+                    self.resource_dir,
+                    "backtest_reports",
+                    f"report"
+                    f"_{report.created_at.strftime(DATETIME_FORMAT)}.csv"
+                )
+            )
+        )

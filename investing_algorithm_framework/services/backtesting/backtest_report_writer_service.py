@@ -22,11 +22,18 @@ class BacktestReportWriterService:
         if not os.path.exists(output_directory):
             os.makedirs(output_directory)
 
-        csv_file_path = os.path.join(
-            output_directory,
-            f"report_{report.identifier}_"
-            f"{report.created_at.strftime(DATETIME_FORMAT)}.csv"
-        )
+        if report.identifier is None:
+            csv_file_path = os.path.join(
+                output_directory,
+                f"report_"
+                f"{report.created_at.strftime(DATETIME_FORMAT)}.csv"
+            )
+        else:
+            csv_file_path = os.path.join(
+                output_directory,
+                f"report_{report.identifier}_"
+                f"{report.created_at.strftime(DATETIME_FORMAT)}.csv"
+            )
         report_dict = report.to_dict()
 
         with open(csv_file_path, 'w', newline='') as csv_file:
