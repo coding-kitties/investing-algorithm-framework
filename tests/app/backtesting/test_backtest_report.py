@@ -17,7 +17,9 @@ class TestStrategy(TradingStrategy):
 
 
 class Test(TestBase):
-
+    """
+    Collection of tests for backtest report operations
+    """
     def setUp(self) -> None:
         self.resource_dir = os.path.abspath(
             os.path.join(
@@ -36,6 +38,9 @@ class Test(TestBase):
         )
 
     def test_report_csv_creation(self):
+        """
+        Test if the backtest report is created as a CSV file
+        """
         app = create_app(
             config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
         )
@@ -65,6 +70,10 @@ class Test(TestBase):
         )
 
     def test_report_csv_creation_without_strategy_identifier(self):
+        """
+        Test if the backtest report is created as a CSV file
+        when the strategy does not have an identifier
+        """
         app = create_app(
             config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
         )
@@ -90,6 +99,88 @@ class Test(TestBase):
                     self.resource_dir,
                     "backtest_reports",
                     f"report"
+                    f"_{report.created_at.strftime(DATETIME_FORMAT)}.csv"
+                )
+            )
+        )
+
+    def test_report_csv_creation_with_multiple_strategies(self):
+        """
+        Test if the backtest report is created as a CSV file
+        when there are multiple strategies
+        """
+        app = create_app(
+            config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
+        )
+        strategy = TestStrategy()
+        strategy.strategy_id = None
+
+        @app.strategy()
+        def run_strategy(algorithm, market_data):
+            pass
+
+        app.add_strategy(strategy)
+        app.add_portfolio_configuration(
+            PortfolioConfiguration(
+                market="bitvavo",
+                trading_symbol="EUR",
+                initial_balance=1000
+            )
+        )
+
+        self.assertEqual(2, len(app.strategies))
+        report = app.backtest(
+            start_date=datetime.utcnow() - timedelta(days=1),
+            end_date=datetime.utcnow(),
+        )
+
+        # Check if the backtest report exists
+        self.assertTrue(
+            os.path.isfile(
+                os.path.join(
+                    self.resource_dir,
+                    "backtest_reports",
+                    f"report"
+                    f"_{report.created_at.strftime(DATETIME_FORMAT)}.csv"
+                )
+            )
+        )
+
+    def test_report_csv_creation_with_multiple_strategies_with_id(self):
+        """
+        Test if the backtest report is created as a CSV file
+        when there are multiple strategies with identifiers
+        """
+        app = create_app(
+            config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
+        )
+
+        @app.strategy()
+        def run_strategy(algorithm, market_data):
+            pass
+
+        app.add_strategy(TestStrategy)
+        app.add_portfolio_configuration(
+            PortfolioConfiguration(
+                market="bitvavo",
+                trading_symbol="EUR",
+                initial_balance=1000
+            )
+        )
+
+        self.assertEqual(2, len(app.strategies))
+        report = app.backtest(
+            start_date=datetime.utcnow() - timedelta(days=1),
+            end_date=datetime.utcnow(),
+        )
+
+        # Check if the backtest report exists
+        self.assertTrue(
+            os.path.isfile(
+                os.path.join(
+                    self.resource_dir,
+                    "backtest_reports",
+                    f"report_{report.identifier}"
                     f"_{report.created_at.strftime(DATETIME_FORMAT)}.csv"
                 )
             )
