@@ -1,6 +1,7 @@
 import os
 
-from investing_algorithm_framework import create_app, PortfolioConfiguration
+from investing_algorithm_framework import create_app, PortfolioConfiguration, \
+    MarketCredential, Algorithm
 from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI
 from tests.resources import TestBase, MarketServiceStub
 
@@ -34,6 +35,15 @@ class TestAppInitialize(TestBase):
                 trading_symbol="USDT",
             )
         )
+        algorithm = Algorithm()
+        app.add_algorithm(algorithm)
+        app.add_market_credential(
+            MarketCredential(
+                market="BITVAVO",
+                api_key="api_key",
+                secret_key="secret_key"
+            )
+        )
         app.initialize()
         self.assertIsNotNone(app.config)
         self.assertIsNone(app._flask_app)
@@ -54,6 +64,15 @@ class TestAppInitialize(TestBase):
                 trading_symbol="USDT",
             )
         )
+        algorithm = Algorithm()
+        app.add_algorithm(algorithm)
+        app.add_market_credential(
+            MarketCredential(
+                market="BITVAVO",
+                api_key="api_key",
+                secret_key="secret_key"
+            )
+        )
         app.initialize()
         self.assertIsNotNone(app.config)
         self.assertIsNotNone(app._flask_app)
@@ -72,6 +91,15 @@ class TestAppInitialize(TestBase):
             PortfolioConfiguration(
                 market="BITVAVO",
                 trading_symbol="USDT"
+            )
+        )
+        algorithm = Algorithm()
+        app.add_algorithm(algorithm)
+        app.add_market_credential(
+            MarketCredential(
+                market="BITVAVO",
+                api_key="api_key",
+                secret_key="secret_key"
             )
         )
         app.initialize()

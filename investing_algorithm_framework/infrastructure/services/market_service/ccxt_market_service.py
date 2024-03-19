@@ -187,7 +187,11 @@ class CCXTMarketService(MarketService):
             return exchange.fetchBalance()
         except Exception as e:
             logger.exception(e)
-            raise OperationalException(str(e))
+            raise OperationalException(
+                f"Please make sure you have "
+                f"registered a valid market credential "
+                f"9object to the app: {str(e)}"
+            )
 
     def create_limit_buy_order(
         self,
@@ -403,3 +407,12 @@ class CCXTMarketService(MarketService):
                 logger.error(f"Could not retrieve ohlcv data for {symbol}")
 
         return ohlcvs
+
+    def get_symbols(self, market):
+        """
+        Get all available symbols for a given market
+        """
+        market_credential = self.get_market_credential(market)
+        exchange = self.initialize_exchange(market, market_credential)
+        market_information = exchange.load_markets()
+        return list(market_information.keys())

@@ -17,35 +17,35 @@ class MarketService(ABC):
         target_symbol: str,
         trading_symbol: str,
     ):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def get_ticker(self, symbol, market):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def get_tickers(self, symbols, market):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def get_order_book(self, symbol, market):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def get_order_books(self, symbols, market):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def get_order(self, order, market):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def get_orders(self, symbol, market, since: datetime = None):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def get_balance(self, market):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def create_limit_buy_order(
@@ -56,7 +56,7 @@ class MarketService(ABC):
         price: float,
         market
     ):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def create_limit_sell_order(
@@ -67,7 +67,7 @@ class MarketService(ABC):
         price: float,
         market
     ):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def create_market_sell_order(
@@ -77,35 +77,35 @@ class MarketService(ABC):
         amount: float,
         market
     ):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def cancel_order(self, order, market):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def get_open_orders(
         self, market, target_symbol: str = None, trading_symbol: str = None
     ):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def get_closed_orders(
         self, market, target_symbol: str = None, trading_symbol: str = None
     ):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def get_ohlcv(
         self, symbol, time_frame, from_timestamp, market, to_timestamp=None
     ):
-        pass
+        raise NotImplementedError()
 
     @abstractmethod
     def get_ohlcvs(
         self, symbols, time_frame, from_timestamp, market, to_timestamp=None
     ):
-        pass
+        raise NotImplementedError()
 
     @property
     def market_credentials(self):
@@ -132,3 +132,10 @@ class MarketService(ABC):
                 return market_data_credentials
 
         return None
+    
+    @abstractmethod
+    def get_symbols(self, market):
+        """
+        Get all available symbols for a market
+        """
+        raise NotImplementedError()

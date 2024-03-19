@@ -10,6 +10,26 @@ logger = logging.getLogger("investing_algorithm_framework")
 
 
 class StrategyOrchestratorService:
+    """
+    Service that orchestrates the execution of strategies and tasks
+
+    Attributes:
+    - history: dict
+        A dictionary that keeps track of the last time a strategy or task was
+        run
+    - _strategies: list
+        A list of strategies
+    - _tasks: list
+        A list of tasks
+    - threads: list
+        A list of threads that are currently running
+    - iterations: int
+        The number of iterations that have been run
+    - max_iterations: int
+        The maximum number of iterations that can be run
+    - market_data_source_service: MarketDataSourceService
+        The service that provides market data
+    """
 
     def __init__(self, market_data_source_service: MarketDataSourceService):
         self.history = {}
@@ -107,6 +127,10 @@ class StrategyOrchestratorService:
         self.history[task.worker_id] = {"last_run": datetime.utcnow()}
 
     def start(self, algorithm, number_of_iterations=None):
+        """
+        F
+
+        """
         self.max_iterations = number_of_iterations
 
         for strategy in self.strategies:

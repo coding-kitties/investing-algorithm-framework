@@ -1,7 +1,8 @@
 import os
 
-from investing_algorithm_framework import create_app, TradingStrategy, TimeUnit, \
-    PortfolioConfiguration, RESOURCE_DIRECTORY
+from investing_algorithm_framework import create_app, TradingStrategy, \
+    TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
+    Algorithm, MarketCredential
 from tests.resources import TestBase, random_string, MarketServiceStub
 
 
@@ -51,8 +52,17 @@ class Test(TestBase):
                 trading_symbol="USDT",
             )
         )
-        app.add_strategy(StrategyOne)
-        app.add_strategy(StrategyTwo)
+        app.add_market_credential(
+            MarketCredential(
+                market="BINANCE",
+                api_key=random_string(10),
+                secret_key=random_string(10)
+            )
+        )
+        algorithm = Algorithm()
+        algorithm.add_strategy(StrategyOne)
+        algorithm.add_strategy(StrategyTwo)
+        app.add_algorithm(algorithm)
         app.run(number_of_iterations=2)
         self.assertFalse(app.running)
         strategy_orchestration_service = app.algorithm\
@@ -70,11 +80,20 @@ class Test(TestBase):
                 trading_symbol="USDT",
             )
         )
+        app.add_market_credential(
+            MarketCredential(
+                market="BINANCE",
+                api_key=random_string(10),
+                secret_key=random_string(10)
+            )
+        )
+        algorithm = Algorithm()
 
-        @app.strategy(time_unit=TimeUnit.SECOND, interval=1)
+        @algorithm.strategy(time_unit=TimeUnit.SECOND, interval=1)
         def run_strategy(algorithm, market_data):
             pass
 
+        app.add_algorithm(algorithm)
         app.run(number_of_iterations=1)
         strategy_orchestration_service = app.algorithm\
             .strategy_orchestrator_service
@@ -90,8 +109,17 @@ class Test(TestBase):
                 trading_symbol="EUR"
             )
         )
-        app.add_strategy(StrategyOne)
-        app.add_strategy(StrategyTwo)
+        app.add_market_credential(
+            MarketCredential(
+                market="BITVAVO",
+                api_key=random_string(10),
+                secret_key=random_string(10)
+            )
+        )
+        algorithm = Algorithm()
+        algorithm.add_strategy(StrategyOne)
+        algorithm.add_strategy(StrategyTwo)
+        app.add_algorithm(algorithm)
         app.run(
             number_of_iterations=2,
             payload={"ACTION": "RUN_STRATEGY"},

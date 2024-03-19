@@ -77,6 +77,10 @@ class Trade(BaseModel):
         return self.amount * self.open_price
 
     @property
+    def status(self):
+        return "CLOSED" if self.closed_at else "OPEN"
+
+    @property
     def net_gain(self):
 
         if self.closed_at is None:
@@ -165,6 +169,7 @@ class Trade(BaseModel):
         return self.repr(
             target_symbol=self.target_symbol,
             trading_symbol=self.trading_symbol,
+            status=self.status,
             amount=self.amount,
             open_price=self.open_price,
             current_price=self.current_price,

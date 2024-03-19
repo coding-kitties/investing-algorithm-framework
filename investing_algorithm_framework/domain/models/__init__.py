@@ -9,7 +9,7 @@ from .portfolio import PortfolioConfiguration, Portfolio, PortfolioSnapshot
 from .position import Position, PositionSnapshot
 from .backtesting import BacktestReport, BacktestPosition
 from .strategy_profile import StrategyProfile
-from .trade import Trade
+from .trade import Trade, TradeStatus
 
 __all__ = [
     "OrderStatus",
@@ -31,5 +31,6 @@ __all__ = [
     "StrategyProfile",
     "BacktestPosition",
     "Trade",
-    "MarketCredential"
+    "MarketCredential",
+    "TradeStatus",
 ]

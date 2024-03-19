@@ -1,13 +1,14 @@
 from investing_algorithm_framework import MarketCredential, TimeUnit, \
     CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, TradingStrategy, \
-    create_app, PortfolioConfiguration
+    create_app, PortfolioConfiguration, Algorithm
 
 """
-Bitvavo market data sources example. Bitvavo does not requires you 
-to have an API key and secret key to access their market data
+Bitvavo trading bot example with market data sources of bitvavo. 
+Bitvavo does not requires you to have an API key and secret key to access 
+their market data
 
 If you just want to backtest your strategy, you don't need to 
-add a market credential. If your runnning your strategy live,
+add a market credential. If your running your strategy live,
 you need to add a market credential to the app, that accesses your 
 account on bitvavo.
 """
@@ -31,6 +32,9 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     symbol="BTC/EUR",
 )
 
+# Create an algorithm and link your trading strategy to it
+algorithm = Algorithm()
+
 
 class BitvavoTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
@@ -44,17 +48,23 @@ class BitvavoTradingStrategy(TradingStrategy):
         print(market_data["BTC/EUR-ohlcv"])
         print(market_data["BTC/EUR-ticker"])
 
+algorithm.add_strategy(BitvavoTradingStrategy)
 
+# Create an app and add the market data sources and market credentials to it
 app = create_app()
 app.add_market_credential(bitvavo_market_credential)
 app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
 app.add_market_data_source(bitvavo_btc_eur_ticker)
-app.add_strategy(BitvavoTradingStrategy)
-app.add_portfolio_configuration(PortfolioConfiguration(
-    initial_balance=1000,
-    trading_symbol="EUR",
-    market="bitvavo"
-))
+
+# Register your algorithm and portfolio configuration to the app
+app.add_algorithm(algorithm)
+app.add_portfolio_configuration(
+    PortfolioConfiguration(
+        initial_balance=1000,
+        trading_symbol="EUR",
+        market="bitvavo"
+    )
+)
 
 if __name__ == "__main__":
     app.run()

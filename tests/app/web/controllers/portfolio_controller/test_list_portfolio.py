@@ -5,24 +5,6 @@ from investing_algorithm_framework import TradingStrategy, \
 from tests.resources import FlaskTestBase
 
 
-class StrategyOne(TradingStrategy):
-    time_unit = TimeUnit.SECOND
-    interval = 1
-
-    def apply_strategy(
-        self,
-        algorithm,
-        market_data,
-    ):
-        algorithm.create_order(
-            target_symbol="BTC",
-            amount=1,
-            price=10,
-            order_side="BUY",
-            order_type="LIMIT",
-        )
-
-
 class Test(FlaskTestBase):
     portfolio_configurations = [
         PortfolioConfiguration(
@@ -33,7 +15,6 @@ class Test(FlaskTestBase):
 
     def setUp(self) -> None:
         super(Test, self).setUp()
-        self.iaf_app.add_strategy(StrategyOne)
 
     def test_list_portfolios(self):
         order_repository = self.iaf_app.container.order_repository()

@@ -2,7 +2,7 @@ import os
 from decimal import Decimal
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration
+    PortfolioConfiguration, Algorithm, MarketCredential
 from tests.resources import TestBase, MarketServiceStub
 
 
@@ -32,6 +32,14 @@ class Test(TestBase):
             )
         )
         self.app.container.market_service.override(MarketServiceStub(None))
+        self.app.add_algorithm(Algorithm())
+        self.app.add_market_credential(
+            MarketCredential(
+                market="binance",
+                api_key="api_key",
+                secret_key="secret_key"
+            )
+        )
         self.app.initialize()
 
     def test_has_open_buy_orders(self):

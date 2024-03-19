@@ -7,6 +7,8 @@ from investing_algorithm_framework.domain import MarketService
 
 class MarketServiceStub(MarketService):
     _orders = []
+    _ohlcv = []
+    _symbols = []
 
     def __init__(self, market_credential_service):
         super().__init__(market_credential_service)
@@ -20,6 +22,14 @@ class MarketServiceStub(MarketService):
     @orders.setter
     def orders(self, value):
         self._orders = value
+
+    @property
+    def symbols(self):
+        return self._orders
+
+    @symbols.setter
+    def symbols(self, value):
+        self._symbols = value
 
     def initialize(self, portfolio_configuration):
         pass
@@ -198,7 +208,7 @@ class MarketServiceStub(MarketService):
             'id': 'e8f8a3f7-0930-4778-a102-5145ed7e7873',
             'clientOrderId': None,
             'timestamp': 1674386553394,
-            'datetime': '2023-01-22T11:22:33.394Z',
+            'datetime': '2023-01-22 11:22:33.394',
             'lastTradeTimestamp': 1674386553405,
             'symbol': f'{symbol}',
             'order_type': 'market',
@@ -276,3 +286,6 @@ class MarketServiceStub(MarketService):
             "baseVolume": 1002.04119,
             "quoteVolume": 25151537.655228
         }
+
+    def get_symbols(self, market):
+        return self._symbols

@@ -1,7 +1,7 @@
 import logging
 from typing import List
 from investing_algorithm_framework.domain import OrderStatus, OrderSide, \
-    Trade, PeekableQueue, ApiException, OrderType
+    Trade, PeekableQueue, ApiException, OrderType, TradeStatus
 from investing_algorithm_framework.services import \
     OrderService, PortfolioService, PositionService, MarketDataSourceService
 
@@ -256,36 +256,43 @@ class TradeService:
         :return: int representing the count
         """
 
-        if query_params is None:
-            query_params = {}
-        else:
-            query_param_keys = query_params.keys()
+        portfolios = self.portfolio_service.get_all()
+        trades = []
 
-            # Check if there are only allowed query parameters
-            if not all(
-                key in ["portfolio_id", "target_symbol", "status"]
-                for key in query_param_keys
-            ):
-                raise ApiException("Invalid trade query parameters")
+        for portfolio in portfolios:
+            buy_orders = self.order_service.get_all({
+                "status": OrderStatus.CLOSED.value,
+                "order_side": OrderSide.BUY.value,
+                "portfolio_id": portfolio.id
+            })
 
-        query_params["order_side"] = OrderSide.BUY.value
-        status = query_params.get("status")
+            for buy_order in buy_orders:
+                trades.append(
+                    Trade(
+                        buy_order_id=buy_order.id,
+                        target_symbol=buy_order.get_target_symbol(),
+                        trading_symbol=buy_order.get_trading_symbol(),
+                        amount=buy_order.get_amount(),
+                        open_price=buy_order.get_price(),
+                        closed_price=buy_order.get_trade_closed_price(),
+                        closed_at=buy_order.get_trade_closed_at(),
+                        opened_at=buy_order.get_created_at(),
+                    )
+                )
 
-        if status is not None:
-            query_params.pop("status")
+            if query_params is not None:
+                if "status" in query_params:
 
-        buy_orders = self.order_service.get_all(query_params)
+                    trade_status = TradeStatus.from_value(query_params["status"])
 
-        if status is not None:
-            if status == OrderStatus.CLOSED.value:
-                buy_orders = [
-                    buy_order for buy_order in buy_orders
-                    if buy_order.get_trade_closed_at() is not None
-                ]
-            else:
-                buy_orders = [
-                    buy_order for buy_order in buy_orders
-                    if buy_order.get_trade_closed_at() is None
-                ]
+                    if trade_status == TradeStatus.OPEN:
+                        trades = [
+                            trade for trade in trades if trade.closed_at is None
+                        ]
+                    else:
+                        trades = [
+                            trade for trade in trades
+                            if trade.closed_at is not None
+                        ]
 
-        return len(buy_orders)
+        return len(trades)

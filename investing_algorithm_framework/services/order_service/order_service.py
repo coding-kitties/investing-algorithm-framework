@@ -360,6 +360,7 @@ class OrderService(RepositoryService):
                 "symbol": portfolio.trading_symbol
             }
         )
+
         self.portfolio_repository.update(
             portfolio.id, {"unallocated": portfolio.get_unallocated() - size}
         )

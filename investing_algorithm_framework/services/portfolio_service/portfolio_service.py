@@ -2,7 +2,7 @@ import logging
 from datetime import datetime
 
 from investing_algorithm_framework.domain import OrderSide, OrderStatus, \
-    OperationalException, MarketService
+    OperationalException, MarketService, MarketCredentialService
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
@@ -19,12 +19,14 @@ class PortfolioService(RepositoryService):
     def __init__(
         self,
         market_service: MarketService,
+        market_credential_service: MarketCredentialService,
         position_repository,
         order_service,
         portfolio_repository,
         portfolio_configuration_service,
         portfolio_snapshot_service,
     ):
+        self.market_credential_service = market_credential_service
         self.market_service = market_service
         self.position_repository = position_repository
         self.portfolio_configuration_service = portfolio_configuration_service
@@ -85,6 +87,18 @@ class PortfolioService(RepositoryService):
         OperationalException will be raised.
         """
         logger.info("Creating portfolios")
+
+        # Check if there is a market credential for the portfolio configuration
+        market_credential = self.market_credential_service.get(
+            portfolio_configuration.market
+        )
+
+        if market_credential is None:
+            raise OperationalException(
+                f"No market credential found for market "
+                f"{portfolio_configuration.market}. Cannot "
+                f"initialize portfolio configuration."
+            )
 
         # Check if the portfolio already exists
         # If the portfolio already exists, return the portfolio after checking
@@ -221,67 +235,92 @@ class PortfolioService(RepositoryService):
         portfolio_configuration = self.portfolio_configuration_service \
             .get(portfolio.identifier)
 
-        balances = self.market_service.get_balance(portfolio.market)
-        positions = []
+        # Get all available symbols for the market and check if
+        # there are orders
+        available_symbols = self.market_service.get_symbols(
+            market=portfolio.market
+        )
 
-        for symbol in balances["free"]:
-            positions.append(symbol)
+        for symbol in available_symbols:
+            orders = self.market_service.get_orders(
+                symbol=symbol,
+                since=portfolio_configuration.track_from,
+                market=portfolio.market
+            )
 
-        for position in positions:
-            logger.info(f"Syncing {position} orders")
-            external_orders = self.market_service \
-                .get_orders(
-                    symbol=f"{position}/{portfolio.trading_symbol}",
-                    since=portfolio_configuration.track_from,
-                    market=portfolio.market
+            if orders is not None and len(orders) > 0:
+                # Order the list of orders by created_at
+                ordered_external_order_list = sorted(
+                    orders, key=lambda x: x.created_at
                 )
 
-            if external_orders is None:
-                continue
-
-            logger.info(
-                f"Found {len(external_orders)} external orders "
-                f"for position {position}"
-            )
-
-            ordered_order_list = sorted(
-                external_orders, key=lambda x: x.created_at
-            )
-
-            for external_order in ordered_order_list:
-                if self.order_service.exists(
-                    {"external_id": external_order.external_id}
-                ):
-                    logger.info("Updating existing order")
-                    order = self.order_service.find(
+                for external_order in ordered_external_order_list:
+                    if self.order_service.exists(
                         {"external_id": external_order.external_id}
-                    )
-                    self.order_service.update(
-                        order.id, external_order.to_dict()
-                    )
-                else:
-                    logger.info("Creating new order, based on external order")
-                    data = external_order.to_dict()
-                    data["portfolio_id"] = portfolio.id
-                    data.pop("trade_closed_at", None)
-                    data.pop("trade_closed_price", None)
-                    data.pop("trade_closed_amount", None)
+                    ):
+                        logger.info("Updating existing order")
+                        order = self.order_service.find(
+                            {"external_id": external_order.external_id}
+                        )
+                        self.order_service.update(
+                            order.id, external_order.to_dict()
+                        )
+                    else:
+                        logger.info(
+                            "Creating new order, based on external order"
+                        )
+                        data = external_order.to_dict()
+                        data["portfolio_id"] = portfolio.id
+                        data.pop("trade_closed_at", None)
+                        data.pop("trade_closed_price", None)
+                        data.pop("trade_closed_amount", None)
 
-                    new_order_data = {
-                        "portfolio_id": portfolio.id,
-                        "target_symbol": position,
-                        "trading_symbol": portfolio.trading_symbol,
-                        "amount": external_order.amount,
-                        "price": external_order.price,
-                        "order_side": external_order.order_side,
-                        "order_type": external_order.order_type,
-                        "external_id": external_order.external_id,
-                    }
+                        # Create the new order
+                        new_order_data = {
+                            "portfolio_id": portfolio.id,
+                            "target_symbol": external_order.target_symbol,
+                            "trading_symbol": portfolio.trading_symbol,
+                            "amount": external_order.amount,
+                            "price": external_order.price,
+                            "order_side": external_order.order_side,
+                            "order_type": external_order.order_type,
+                            "external_id": external_order.external_id,
+                        }
+                        new_order = self.order_service.create(
+                            new_order_data, execute=False, validate=False,
+                        )
 
-                    new_order = self.order_service.create(
-                        new_order_data, execute=False, validate=False,
-                    )
+                        # Update the order to its current status
+                        self.order_service.update(
+                            new_order.id, external_order.to_dict()
+                        )
 
-                    self.order_service.update(
-                        new_order.id, external_order.to_dict()
-                    )
+
+        # balances = self.market_service.get_balance(portfolio.market)
+        # positions = []
+        #
+        # for symbol in balances["free"]:
+        #     positions.append(symbol)
+        #
+        # for position in positions:
+        #     logger.info(f"Syncing {position} orders")
+        #     external_orders = self.market_service \
+        #         .get_orders(
+        #             symbol=f"{position}/{portfolio.trading_symbol}",
+        #             since=portfolio_configuration.track_from,
+        #             market=portfolio.market
+        #         )
+        #
+        #     if external_orders is None:
+        #         continue
+        #
+        #     logger.info(
+        #         f"Found {len(external_orders)} external orders "
+        #         f"for position {position}"
+        #     )
+        #
+        #     ordered_order_list = sorted(
+        #         external_orders, key=lambda x: x.created_at
+        #     )
+
+

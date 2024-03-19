@@ -1,3 +1,3 @@
-from .market_service import MarketServiceStub
+from .market_service_stub import MarketServiceStub
 
 __all__ = ["MarketServiceStub"]

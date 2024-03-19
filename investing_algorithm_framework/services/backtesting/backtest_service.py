@@ -11,7 +11,9 @@ from investing_algorithm_framework.services.market_data_source_service import \
 
 
 class BacktestService:
-
+    """
+    Service that facilitates backtests for algorithm objects.
+    """
     def __init__(
         self,
         market_data_source_service: MarketDataSourceService,
@@ -41,7 +43,25 @@ class BacktestService:
     def resource_directory(self, resource_directory):
         self._resource_directory = resource_directory
 
-    def backtest(self, algorithm, start_date, end_date=None) -> BacktestReport:
+    def run_backtest(
+        self, algorithm, start_date, end_date=None
+    ) -> BacktestReport:
+        """
+        Run a backtest for the given algorithm. This function will run
+        a backtest for the given algorithm and return a backtest report.
+
+        A schedule is generated for the given algorithm and the strategies
+        are run for each date in the schedule.
+
+        Also all backtest data is downloaded (if not already downloaded) and
+        the backtest is run for each date in the schedule.
+
+        :param algorithm: The algorithm to run the backtest for
+        :param start_date: The start date of the backtest
+        :param end_date: The end date of the backtest
+
+        :return: The backtest report instance of BacktestReport
+        """
         strategy_profiles = []
         portfolios = self._portfolio_repository.get_all()
         initial_unallocated = 0
@@ -76,10 +96,33 @@ class BacktestService:
                 strategy=algorithm.get_strategy(strategy_profile.strategy_id),
                 index_date=index,
             )
-
         return self.create_backtest_report(
             algorithm, len(schedule), start_date, end_date, initial_unallocated
         )
+
+    def run_backtests(self, algorithms, start_date, end_date=None):
+        """
+        Run backtests for the given algorithms. This function will run
+        backtests for the given algorithms and return a list of backtest
+        reports.
+
+        :param algorithms: The algorithms to run the backtests for
+        :param start_date: The start date of the backtests
+        :param end_date: The end date of the backtests
+        :return: A list of backtest reports
+        """
+        backtest_reports = []
+
+        for algorithm in algorithms:
+            backtest_reports.append(
+                self.run_backtest(
+                    algorithm=algorithm,
+                    start_date=start_date,
+                    end_date=end_date
+                )
+            )
+
+        return backtest_reports
 
     def run_backtest_for_profile(self, algorithm, strategy, index_date):
         algorithm.config[BACKTESTING_INDEX_DATETIME] = index_date
@@ -112,13 +155,6 @@ class BacktestService:
         for strategy in strategies:
             id = strategy.strategy_profile.strategy_id
             time_unit = strategy.strategy_profile.time_unit
-
-            # Check if time_unit is None
-            if time_unit is None:
-                raise OperationalException(
-                    "Time unit not set for strategy instance"
-                )
-
             interval = strategy.strategy_profile.interval
             current_time = start_date
 

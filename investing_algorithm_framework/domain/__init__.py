@@ -1,7 +1,7 @@
 from .config import Config, Environment
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, \
-    PortfolioConfiguration, Portfolio, Position, Order, \
+    PortfolioConfiguration, Portfolio, Position, Order, TradeStatus, \
     OrderFee, BacktestReport, PortfolioSnapshot, StrategyProfile, \
     BacktestPosition, Trade, MarketCredential, PositionSnapshot
 from .exceptions import OperationalException, ApiException, \
@@ -24,7 +24,7 @@ from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
 from .utils.backtesting import pretty_print_backtest
 from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
     OHLCVMarketDataSource, BacktestMarketDataSource, MarketDataSource, \
-    MarketService
+    MarketService, MarketCredentialService
 from .data_structures import PeekableQueue
 
 __all__ = [
@@ -95,5 +95,7 @@ __all__ = [
     "PeekableQueue",
     "BACKTESTING_END_DATE",
     "BACKTESTING_PENDING_ORDER_CHECK_INTERVAL",
-    "PositionSnapshot"
+    "PositionSnapshot",
+    "MarketCredentialService",
+    "TradeStatus",
 ]

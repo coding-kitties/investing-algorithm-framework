@@ -3,6 +3,7 @@ from datetime import datetime
 
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
+from investing_algorithm_framework.domain.constants import CCXT_DATETIME_FORMAT
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.order import OrderStatus, \
     OrderType, OrderSide
@@ -290,7 +291,6 @@ class Order(BaseModel):
         status = OrderStatus.from_value(ccxt_order["status"])
         target_symbol = ccxt_order.get("symbol").split("/")[0]
         trading_symbol = ccxt_order.get("symbol").split("/")[1]
-
         return Order(
             external_id=ccxt_order.get("id", None),
             target_symbol=target_symbol,
@@ -305,7 +305,7 @@ class Order(BaseModel):
             cost=ccxt_order.get("cost", None),
             fee=OrderFee.from_ccxt_fee(ccxt_order.get("fee", None)),
             created_at=datetime.strptime(
-                ccxt_order.get("datetime", None), "%Y-%m-%dT%H:%M:%S.%fZ"
+                ccxt_order.get("datetime", None), CCXT_DATETIME_FORMAT
             )
         )
 

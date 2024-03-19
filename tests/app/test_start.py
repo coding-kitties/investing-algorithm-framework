@@ -1,7 +1,8 @@
 import os
 
-from investing_algorithm_framework import create_app, TradingStrategy, TimeUnit, \
-    RESOURCE_DIRECTORY, PortfolioConfiguration
+from investing_algorithm_framework import create_app, TradingStrategy, \
+    TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration, Algorithm, \
+    MarketCredential
 from tests.resources import TestBase, MarketServiceStub
 
 
@@ -54,8 +55,17 @@ class Test(TestBase):
             )
         )
         self.app.container.market_service.override(MarketServiceStub(None))
-        self.app.add_strategy(StrategyOne)
-        self.app.add_strategy(StrategyTwo)
+        algorithm = Algorithm()
+        algorithm.add_strategy(StrategyOne)
+        algorithm.add_strategy(StrategyTwo)
+        self.app.add_algorithm(algorithm)
+        self.app.add_market_credential(
+            MarketCredential(
+                market="BITVAVO",
+                api_key="api_key",
+                secret_key="secret_key"
+            )
+        )
 
     def test_default(self):
         self.app.run(number_of_iterations=2)

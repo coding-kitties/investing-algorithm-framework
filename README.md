@@ -13,7 +13,6 @@
 </a>
 </p>
 
-
 # [Investing Algorithm Framework](https://github.com/coding-kitties/investing-algorithm-framework)
 
 The Investing Algorithm Framework is a Python tool that enables swift and 
@@ -31,14 +30,11 @@ Features:
 * Stateless running for cloud function deployments
 * Polars dataframes support out of the box for fast data processing [pola.rs](https://pola.rs/)
 
-
-
 ## Example implementation
 The following algorithm connects to binance and buys BTC every 5 seconds. 
 It also exposes an REST API that allows you to interact with the algorithm.
 ```python
 import pathlib
-from datetime import datetime, timedelta
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
     RESOURCE_DIRECTORY, TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, \
     CCXTTickerMarketDataSource, MarketCredential
@@ -58,6 +54,8 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     symbol="BTC/EUR",
 )
 app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
+algorithm = Algorithm()
+
 app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
 app.add_market_data_source(bitvavo_btc_eur_ticker)
 app.add_market_credential(MarketCredential(
@@ -72,8 +70,9 @@ app.add_portfolio_configuration(
         initial_balance=400
     )
 )
+app.add_algorithm(algorithm)
 
-@app.strategy(
+@algorithm.strategy(
     # Run every two hours
     time_unit=TimeUnit.HOUR, 
     interval=2, 
@@ -81,9 +80,15 @@ app.add_portfolio_configuration(
     market_data_sources=["BTC-ticker", "BTC-ohlcv"]
 )
 def perform_strategy(algorithm: Algorithm, market_data: dict):
-    # By default data is passed as polars dataframe https://pola.rs/
-    df = market_data["BTC-ohlcv"].to_pandas()
+    # By default ohlcv data is passed as polars df in the form of
+    # {"<identifier>": <dataframe>}  https://pola.rs/, 
+    # call to_pandas() to convert to pandas
+    polars_df = market_data["BTC-ohlcv"]  
+    print(f"I have access to {len(polars_df)} candles of ohlcv data")
+
+    # Ticker data is passed as {"<identifier>": <ticker dict>}
     ticker_data = market_data["BTC-ticker"]
+    
     algorithm.create_limit_order(
         target_symbol="BTC/EUR",
         order_side="buy",
@@ -257,7 +262,8 @@ app.add_portfolio_configuration(
 ```
 
 ## Performance
-We continiously are working on improving the performance of the framework.
+We are continuously working on improving the performance of the framework. If
+you have any suggestions, please let us know.
 
 ## Download
 You can download the framework with pypi.

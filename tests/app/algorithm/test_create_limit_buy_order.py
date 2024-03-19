@@ -1,7 +1,7 @@
 import os
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, OrderStatus
+    PortfolioConfiguration, OrderStatus, Algorithm, MarketCredential
 from tests.resources import TestBase, MarketServiceStub
 
 
@@ -38,6 +38,15 @@ class Test(TestBase):
             )
         )
         self.app.container.market_service.override(MarketServiceStub(None))
+        algorithm = Algorithm()
+        self.app.add_algorithm(algorithm)
+        self.app.add_market_credential(
+            MarketCredential(
+                market="binance",
+                api_key="api_key",
+                secret_key="secret_key"
+            )
+        )
         self.app.initialize()
 
     def test_create_limit_buy_order(self):

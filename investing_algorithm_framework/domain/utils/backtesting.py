@@ -1,6 +1,21 @@
 from tabulate import tabulate
 
 
+def evaluate_backtest_reports(reports):
+    metrics = {}
+
+    # Get the report with the largest profit
+    metrics["pro"]
+
+    largest_profit = 0
+
+    for report in reports:
+        if report.total_net_gain > largest_profit:
+            largest_profit = report.total_net_gain
+            largest_profit = report.identifier
+
+
+
 def print_number_of_runs(report):
 
     if report.number_of_runs == 1:
