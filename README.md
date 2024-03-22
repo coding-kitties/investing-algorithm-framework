@@ -107,7 +107,7 @@ if __name__ == "__main__":
 The framework also supports backtesting and performing backtest experiments. After 
 a backtest, you can print a report that shows the performance of your trading bot.
 
-To run a single backtest You can use the example code that can be found [here](./examples/backtest).
+To run a single backtest you can use the example code that can be found [here](./examples/backtest).
 
 ### Backtesting report
 You can use the ```pretty_print_backtest``` function to print a backtest report.
