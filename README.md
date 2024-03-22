@@ -23,8 +23,8 @@ portfolio management, and order execution.
 Features: 
 * Order execution
 * Broker and exchange connections through [ccxt](https://github.com/ccxt/ccxt)
-* Backtesting and performance analysis reports [example](./examples/backtesting)
-* Backtest experiments to optimize your trading strategy [example](./examples/backtesting/backtest_experiments)
+* Backtesting and performance analysis reports [example](./examples/backtest)
+* Backtest experiments to optimize your trading strategy [example](./examples/backtest_experiments)
 * Portfolio management
 * Web API for interacting with your deployed trading bot
 * Data persistence through sqlite db or an in-memory db
