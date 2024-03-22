@@ -271,7 +271,7 @@ first. If it hasn't been reported, please [create a new issue](https://github.co
 ### Contributing
 The investing algorithm framework is a community driven project. 
 We welcome you to participate, contribute and together help build 
-the future trading bots developed in pyhton.
+the future trading bots developed in python.
 
 Feel like the framework is missing a feature? We welcome your pull requests!
 If you want to contribute to the project roadmap, please take a look at the [project board](https://github.com/coding-kitties/investing-algorithm-framework/projects?query=is%3Aopen).
