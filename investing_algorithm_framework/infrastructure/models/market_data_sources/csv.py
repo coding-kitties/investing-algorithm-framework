@@ -84,7 +84,7 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
         # it's not already
         if 'Datetime' in df.columns and pd.api.types.is_string_dtype(
                 df['Datetime']):
-            df['Datetime'] = pd.to_datetime(df['Datetime'])
+            df['Datetime'] = pd.to_datetime(df['Datetime'], utc=True)
 
         # Filter rows based on the start and end dates
         filtered_df = df[
@@ -157,7 +157,7 @@ class CSVTickerMarketDataSource(TickerMarketDataSource):
         # it's not already
         if 'Datetime' in df.columns and pd.api.types.is_string_dtype(
                 df['Datetime']):
-            df['Datetime'] = pd.to_datetime(df['Datetime'])
+            df['Datetime'] = pd.to_datetime(df['Datetime'], utc=True)
 
         # Filter rows based on the start and end dates
         filtered_df = df[(df['Datetime'] <= index_datetime)]
