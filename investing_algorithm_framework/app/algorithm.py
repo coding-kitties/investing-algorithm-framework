@@ -4,9 +4,9 @@ from typing import List
 import inspect
 
 from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
-    Position, Order, Portfolio, OrderType, OrderSide, ApiException, \
+    Position, Order, Portfolio, OrderType, OrderSide, \
     BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, MarketService, TimeUnit, \
-    OperationalException
+    OperationalException, random_string
 from investing_algorithm_framework.services import MarketCredentialService, \
     MarketDataSourceService, PortfolioService, PositionService, TradeService, \
     OrderService, ConfigurationService, StrategyOrchestratorService, \
@@ -18,7 +18,17 @@ logger = logging.getLogger("investing_algorithm_framework")
 
 class Algorithm:
 
-    def __init__(self):
+    def __init__(self, name=None, description=None):
+        self._name = name
+
+        if name is None:
+            self._name = f"algorithm_{random_string(10)}"
+
+        self._description = None
+
+        if description is not None:
+            self._description = description
+
         self._strategies = []
         self._tasks = []
         self.portfolio_service: PortfolioService
@@ -76,6 +86,19 @@ class Algorithm:
                 algorithm=self,
                 number_of_iterations=number_of_iterations
             )
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def identifier(self):
+        """
+        Function to get a config instance. This allows users when
+        having access to the algorithm instance also to read the
+        configs of the app.
+        """
+        return self.configuration_service.config
 
     @property
     def config(self):
@@ -170,7 +193,7 @@ class Algorithm:
 
         if percentage_of_portfolio is not None:
             if not OrderSide.BUY.equals(order_side):
-                raise ApiException(
+                raise OperationalException(
                     "Percentage of portfolio is only supported for BUY orders."
                 )
 
@@ -182,7 +205,7 @@ class Algorithm:
         elif percentage_of_position is not None:
 
             if not OrderSide.SELL.equals(order_side):
-                raise ApiException(
+                raise OperationalException(
                     "Percentage of position is only supported for SELL orders."
                 )
 
@@ -375,7 +398,7 @@ class Algorithm:
         portfolios = self.portfolio_service.get_all(query_params)
 
         if not portfolios:
-            raise ApiException("No portfolio found.")
+            raise OperationalException("No portfolio found.")
 
         portfolio = portfolios[0]
         return self.position_service.get_all(
@@ -394,7 +417,7 @@ class Algorithm:
         portfolios = self.portfolio_service.get_all(query_params)
 
         if not portfolios:
-            raise ApiException("No portfolio found.")
+            raise OperationalException("No portfolio found.")
 
         portfolio = portfolios[0]
 
@@ -402,7 +425,7 @@ class Algorithm:
             return self.position_service.find(
                 {"portfolio": portfolio.id, "symbol": symbol}
             )
-        except ApiException:
+        except OperationalException:
             return None
 
     def has_position(
@@ -415,14 +438,32 @@ class Algorithm:
         amount_lt=None,
         amount_lte=None
     ):
+        """
+        Function to check if a position exists. This function will return
+        True if a position exists, False otherwise. This function will check
+        if the amount > 0 condition by default.
+
+        param symbol: The symbol of the asset
+        param market: The market of the asset
+        param identifier: The identifier of the portfolio
+        param amount_gt: The amount of the asset must be greater than this
+        param amount_gte: The amount of the asset must be greater than
+        or equal to this
+        param amount_lt: The amount of the asset must be less than this
+        param amount_lte: The amount of the asset must be less than
+        or equal to this
+
+        return: True if a position exists, False otherwise
+        """
+
         return self.position_exists(
-            symbol,
-            market,
-            identifier,
-            amount_gt,
-            amount_gte,
-            amount_lt,
-            amount_lte
+            symbol=symbol,
+            market=market,
+            identifier=identifier,
+            amount_gt=amount_gt,
+            amount_gte=amount_gte,
+            amount_lt=amount_lt,
+            amount_lte=amount_lte
         )
 
     def position_exists(
@@ -435,6 +476,35 @@ class Algorithm:
             amount_lt=None,
             amount_lte=None
     ) -> bool:
+        """
+        Function to check if a position exists. This function will return
+        True if a position exists, False otherwise. This function will
+        not check the amount > 0 condition by default. If you want to
+        check if a position exists with an amount greater than 0, you
+        can use the amount_gt parameter. If you want to check if a
+        position exists with an amount greater than or equal to a
+        certain amount, you can use the amount_gte parameter. If you
+        want to check if a position exists with an amount less than a
+        certain amount, you can use the amount_lt parameter. If you want
+        to check if a position exists with an amount less than or equal
+        to a certain amount, you can use the amount_lte parameter.
+
+        It is not recommended to use this method directly because it can
+        have adverse effects on the algorithm. It is recommended to use
+        the has_position method instead.
+
+        param symbol: The symbol of the asset
+        param market: The market of the asset
+        param identifier: The identifier of the portfolio
+        param amount_gt: The amount of the asset must be greater than this
+        param amount_gte: The amount of the asset must be greater than
+        or equal to this
+        param amount_lt: The amount of the asset must be less than this
+        param amount_lte: The amount of the asset must be less than
+        or equal to this
+
+        return: True if a position exists, False otherwise
+        """
         query_params = {}
 
         if market is not None:
@@ -479,7 +549,7 @@ class Algorithm:
         portfolios = self.portfolio_service.get_all(query_params)
 
         if not portfolios:
-            raise ApiException("No portfolio found.")
+            raise OperationalException("No portfolio found.")
 
         portfolio = portfolios[0]
         position = self.position_service.find(
@@ -515,7 +585,7 @@ class Algorithm:
         portfolios = self.portfolio_service.get_all(query_params)
 
         if not portfolios:
-            raise ApiException("No portfolio found.")
+            raise OperationalException("No portfolio found.")
 
         portfolio = portfolios[0]
         position = self.position_service.find(
@@ -647,7 +717,7 @@ class Algorithm:
 
         if self.portfolio_configuration_service.count() > 1 \
                 and identifier is None and market is None:
-            raise ApiException(
+            raise OperationalException(
                 "Multiple portfolios found. Please specify a "
                 "portfolio identifier."
             )
@@ -698,7 +768,7 @@ class Algorithm:
 
         if self.portfolio_configuration_service.count() > 1 \
                 and identifier is None and market is None:
-            raise ApiException(
+            raise OperationalException(
                 "Multiple portfolios found. Please specify a "
                 "portfolio identifier."
             )

@@ -66,7 +66,7 @@ class Test(TestBase):
                 os.path.join(
                     self.resource_dir,
                     "backtest_reports",
-                    f"report_{report.identifier}"
+                    f"report_{report.name}"
                     f"_{report.created_at.strftime(DATETIME_FORMAT)}.csv"
                 )
             )
@@ -103,7 +103,7 @@ class Test(TestBase):
                 os.path.join(
                     self.resource_dir,
                     "backtest_reports",
-                    f"report"
+                    f"report_{report.name}"
                     f"_{report.created_at.strftime(DATETIME_FORMAT)}.csv"
                 )
             )
@@ -147,7 +147,7 @@ class Test(TestBase):
                 os.path.join(
                     self.resource_dir,
                     "backtest_reports",
-                    f"report"
+                    f"report_{report.name}"
                     f"_{report.created_at.strftime(DATETIME_FORMAT)}.csv"
                 )
             )
@@ -189,7 +189,7 @@ class Test(TestBase):
                 os.path.join(
                     self.resource_dir,
                     "backtest_reports",
-                    f"report_{report.identifier}"
+                    f"report_{report.name}"
                     f"_{report.created_at.strftime(DATETIME_FORMAT)}.csv"
                 )
             )

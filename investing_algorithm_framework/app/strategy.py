@@ -59,7 +59,6 @@ class TradingStrategy:
                 f"Interval not set for strategy instance {self.strategy_id}"
             )
 
-
     def run_strategy(self, algorithm, market_data):
         self.apply_strategy(algorithm=algorithm, market_data=market_data)
 

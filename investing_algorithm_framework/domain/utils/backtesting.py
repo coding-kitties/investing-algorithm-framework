@@ -1,19 +1,123 @@
+import os
+from typing import List
 from tabulate import tabulate
+from investing_algorithm_framework.domain.models.backtesting import \
+    BacktestReportsEvaluation, BacktestReport
+from investing_algorithm_framework.domain.exceptions import \
+    OperationalException
+from .csv import load_csv_into_dict
 
 
-def evaluate_backtest_reports(reports):
-    metrics = {}
+def is_positive(number) -> bool:
+    """
+    Check if a number is positive.
 
-    # Get the report with the largest profit
-    metrics["pro"]
+    param number: The number
+    :return: True if the number is positive, False otherwise
+    """
+    number = float(number)
+    return number > 0
 
-    largest_profit = 0
 
-    for report in reports:
-        if report.total_net_gain > largest_profit:
-            largest_profit = report.total_net_gain
-            largest_profit = report.identifier
+def pretty_print_backtest_reports_evaluation(
+    backtest_reports_evaluation: BacktestReportsEvaluation,
+    precision=4
+) -> None:
+    """
+    Pretty print the backtest reports evaluation to the console.
+    """
+    print("====================Backtests report evaluation===================")
+    profit = backtest_reports_evaluation.profit_order[0].total_net_gain
+    profit_percentage = backtest_reports_evaluation\
+        .profit_order[0].total_net_gain_percentage
 
+    if is_positive(profit):
+        print(
+            f"* Most profitable: "
+            f"{backtest_reports_evaluation.profit_order[0].name} with "
+            f"a profit "
+            f"of + {profit:.{precision}} {profit_percentage:.{precision}}%"
+        )
+    else:
+        print(
+            f"* Most profitable: "
+            f"{backtest_reports_evaluation.profit_order[0].name} with "
+            f"a profit "
+            f"of {profit:.{precision}} {profit_percentage:.{precision}}%"
+        )
+    print("Top 3 most profitable:")
+    for report in backtest_reports_evaluation.profit_order[:3]:
+        profit = report.total_net_gain
+        profit_percentage = report.total_net_gain_percentage
+        trading_symbol = report.trading_symbol
+
+        if is_positive(report.total_net_gain):
+            print(
+                f"* {report.name} with a profit "
+                f"of +{profit:.{precision}} "
+                f"{trading_symbol} "
+                f"{profit_percentage:.{precision}}%"
+            )
+        else:
+            print(
+                f"* {report.name} with a profit of "
+                f"{report.total_net_gain:.{precision}} "
+                f"{trading_symbol} "
+                f"{profit_percentage:.{precision}}%"
+            )
+
+    profit = backtest_reports_evaluation.profit_order[-1].total_net_gain
+    profit_percentage = backtest_reports_evaluation\
+        .profit_order[-1].total_net_gain_percentage
+
+    print(
+        f"* Least profitable: "
+        f"{backtest_reports_evaluation.profit_order[-1].name} with a loss "
+        f"of {profit:.{precision}} "
+        f"{backtest_reports_evaluation.profit_order[0].trading_symbol} "
+        f"{profit_percentage:.{precision}}%"
+    )
+    print("Top 3 least profitable:")
+
+    for report in backtest_reports_evaluation.profit_order[-3:]:
+        profit = report.total_net_gain
+        profit_percentage = report.total_net_gain_percentage
+        trading_symbol = report.trading_symbol
+        if is_positive(profit):
+            print(
+                f"* {report.name} with a profit of +{profit:.{precision}} "
+                f"{trading_symbol} "
+                f"{profit_percentage:.{precision}}%"
+            )
+        else:
+            print(
+                f"* {report.name} with a profit of {profit:.{precision}} "
+                f"{trading_symbol} "
+                f"{profit_percentage:.{precision}}%"
+            )
+
+    print("==================================================================")
+    growth = backtest_reports_evaluation.growth_order[0].growth
+    growth_percentage = backtest_reports_evaluation.growth_order[0].growth_rate
+
+    if is_positive(growth):
+        print(
+            f"* Largest growth: "
+            f"{backtest_reports_evaluation.growth_order[0].name} with a "
+            f"growth "
+            f"of +{growth:.{precision}} "
+            f"{backtest_reports_evaluation.profit_order[0].trading_symbol} "
+            f"{growth_percentage:.{precision}}%"
+        )
+    else:
+        print(
+            f"* Largest growth: "
+            f"{backtest_reports_evaluation.growth_order[0].name} with a "
+            f"growth "
+            f"of {growth:.{precision}} "
+            f"{backtest_reports_evaluation.profit_order[0].trading_symbol} "
+            f"{growth_percentage:.{precision}}%"
+        )
 
 
 def print_number_of_runs(report):
@@ -28,6 +132,14 @@ def print_number_of_runs(report):
 def pretty_print_backtest(
     backtest_report, show_positions=True, show_trades=True, precision=4
 ):
+    """
+    Pretty print the backtest report to the console.
+
+    :param backtest_report: The backtest report
+    :param show_positions: Show the positions
+    :param show_trades: Show the trades
+    :param precision: The precision of the numbers
+    """
     print("====================Backtest report===============================")
     print(f"* Start date: {backtest_report.backtest_start_date}")
     print(f"* End date: {backtest_report.backtest_end_date}")
@@ -54,42 +166,38 @@ def pretty_print_backtest(
         position_table = {}
         position_table["Position"] = [
             position.symbol for position in backtest_report.positions
-            if position.amount > 0 or position.amount_pending > 0
         ]
         position_table["Amount"] = [
             f"{position.amount:.{precision}f}" for position in
             backtest_report.positions
-            if position.amount > 0 or position.amount_pending > 0
         ]
-        position_table["Pending amount"] = [
-            f"{position.amount_pending:.{precision}f}"
+        position_table["Pending buy amount"] = [
+            f"{position.amount_pending_buy:.{precision}f}"
             for position in backtest_report.positions
-            if position.amount > 0 or position.amount_pending > 0
+        ]
+        position_table["Pending sell amount"] = [
+            f"{position.amount_pending_sell:.{precision}f}"
+            for position in backtest_report.positions
         ]
         position_table[f"Cost ({backtest_report.trading_symbol})"] = [
             f"{position.cost:.{precision}f}"
             for position in backtest_report.positions
-            if position.amount > 0 or position.amount_pending > 0
         ]
         position_table[f"Value ({backtest_report.trading_symbol})"] = [
             f"{position.value:.{precision}f}"
             for position in backtest_report.positions
-            if position.amount > 0 or position.amount_pending > 0
         ]
         position_table["Percentage of portfolio"] = [
             f"{position.percentage_of_portfolio:.{precision}f}%"
             for position in backtest_report.positions
-            if position.amount > 0 or position.amount_pending > 0
         ]
         position_table[f"Growth ({backtest_report.trading_symbol})"] = [
             f"{position.growth:.{precision}f}"
             for position in backtest_report.positions
-            if position.amount > 0 or position.amount_pending > 0
         ]
         position_table["Growth_rate"] = [
             f"{position.growth_rate:.{precision}f}%"
             for position in backtest_report.positions
-            if position.amount > 0 or position.amount_pending > 0
         ]
         print(
             tabulate(position_table, headers="keys", tablefmt="rounded_grid")
@@ -145,3 +253,31 @@ def pretty_print_backtest(
         ]
         print(tabulate(trades_table, headers="keys", tablefmt="rounded_grid"))
     print("==================================================================")
+
+
+def load_backtest_reports(folder_path: str) -> List[BacktestReport]:
+    """
+    Load backtest reports from a folder.
+
+    param folder_path: The folder path
+    :return: The backtest reports
+    """
+    backtest_reports = []
+
+    if not os.path.exists(folder_path):
+        raise OperationalException(f"Folder {folder_path} does not exist")
+
+    list_of_files = os.listdir(folder_path)
+
+    if not list_of_files:
+        raise OperationalException(f"Folder {folder_path} is empty")
+
+    for file in list_of_files:
+        if not file.endswith(".csv"):
+            continue
+        file_path = os.path.join(folder_path, file)
+        data = load_csv_into_dict(file_path)
+        report = BacktestReport.from_dict(data)
+        backtest_reports.append(report)
+
+    return backtest_reports

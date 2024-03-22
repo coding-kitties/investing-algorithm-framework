@@ -1,5 +1,4 @@
 import logging
-import logging
 import os
 import shutil
 import threading
@@ -7,7 +6,9 @@ from datetime import datetime
 from distutils.sysconfig import get_python_lib
 from time import sleep
 from typing import List
+import inspect
 
+from abc import abstractmethod
 from flask import Flask
 
 from investing_algorithm_framework.app.algorithm import Algorithm
@@ -28,6 +29,13 @@ from investing_algorithm_framework.services import OrderBacktestService, \
 logger = logging.getLogger("investing_algorithm_framework")
 
 
+class AppHook:
+
+    @abstractmethod
+    def on_run(self, app, algorithm: Algorithm):
+        raise NotImplementedError()
+
+
 class App:
 
     def __init__(self, stateless=False, web=False):
@@ -41,6 +49,8 @@ class App:
         self._configuration_service = None
         self._market_data_source_service: MarketDataSourceService = None
         self._market_credential_service: MarketCredentialService = None
+        self._on_initialize_hooks = []
+        self._on_after_initialize_hooks = []
 
     def add_algorithm(self, algorithm: Algorithm) -> None:
         """
@@ -83,18 +93,18 @@ class App:
 
         self.algorithm.initialize_services(
             configuration_service=self.container.configuration_service(),
-            market_data_source_service=self.container\
-                .market_data_source_service(),
-            market_credential_service=self.container\
-                .market_credential_service(),
+            market_data_source_service=self.container
+            .market_data_source_service(),
+            market_credential_service=self.container
+            .market_credential_service(),
             portfolio_service=self.container.portfolio_service(),
             position_service=self.container.position_service(),
             order_service=self.container.order_service(),
-            portfolio_configuration_service=self.container\
-                .portfolio_configuration_service(),
+            portfolio_configuration_service=self.container
+            .portfolio_configuration_service(),
             market_service=self.container.market_service(),
-            strategy_orchestrator_service=self.container\
-                .strategy_orchestrator_service(),
+            strategy_orchestrator_service=self.container
+            .strategy_orchestrator_service(),
             trade_service=self.container.trade_service(),
         )
 
@@ -230,7 +240,8 @@ class App:
                     market_service=self.container.market_service(),
                     market_credential_service=self.container
                     .market_credential_service(),
-                    configuration_service=self.container.configuration_service(),
+                    configuration_service=self.container
+                    .configuration_service(),
                 )
             )
 
@@ -238,7 +249,7 @@ class App:
         self.container.portfolio_service.override(
             BacktestPortfolioService(
                 market_credential_service=self.container
-                    .market_credential_service(),
+                .market_credential_service(),
                 market_service=self.container.market_service(),
                 position_repository=self.container.position_repository(),
                 order_service=self.container.order_service(),
@@ -305,21 +316,23 @@ class App:
         setup_sqlalchemy(self)
         create_all_tables()
 
+        strategy_orchestrator_service = \
+            self.container.strategy_orchestrator_service()
+        market_credential_service = self.container.market_credential_service()
+        market_data_source_service = \
+            self.container.market_data_source_service()
         # Initialize all services in the algorithm
         algorithm.initialize_services(
             configuration_service=self.container.configuration_service(),
-            portfolio_configuration_service=self.container \
-                .portfolio_configuration_service(),
+            portfolio_configuration_service=self.container
+            .portfolio_configuration_service(),
             portfolio_service=self.container.portfolio_service(),
-            position_service=self.container.portfolio_service(),
+            position_service=self.container.position_service(),
             order_service=self.container.order_service(),
             market_service=self.container.market_service(),
-            strategy_orchestrator_service=
-            self.container.strategy_orchestrator_service(),
-            market_credential_service=
-            self.container.market_credential_service(),
-            market_data_source_service=
-            self.container.market_data_source_service(),
+            strategy_orchestrator_service=strategy_orchestrator_service,
+            market_credential_service=market_credential_service,
+            market_data_source_service=market_data_source_service,
             trade_service=self.container.trade_service(),
         )
 
@@ -376,7 +389,17 @@ class App:
         algorithm for
         :return: None
         """
+
+        # Run all on_initialize hooks
+        for hook in self._on_after_initialize_hooks:
+            hook.on_run(self, self.algorithm)
+
         self.initialize()
+
+        # Run all on_initialize hooks
+        for hook in self._on_initialize_hooks:
+            hook.on_run(self, self.algorithm)
+
         self.algorithm.start(
             number_of_iterations=number_of_iterations,
             stateless=self.stateless
@@ -587,7 +610,7 @@ class App:
         """
         logger.info("Initializing backtest")
         self.algorithm = algorithm
-        
+
         if end_date is None:
             end_date = datetime.utcnow()
 
@@ -680,7 +703,6 @@ class App:
             backtest_report_writer_service.write_report_to_csv(
                 report=report, output_directory=output_directory
             )
-
             reports.append(report)
 
         return reports
@@ -690,3 +712,25 @@ class App:
 
     def add_market_credential(self, market_credential):
         self._market_credential_service.add(market_credential)
+
+    def on_initialize(self, app_hook: AppHook):
+        """
+        Function to add a hook that runs when the app is initialized. The hook
+        should be an instance of AppHook.
+        """
+
+        if inspect.isclass(app_hook):
+            app_hook = app_hook()
+
+        self._on_initialize_hooks.append(app_hook)
+
+    def after_initialize(self, app_hook: AppHook):
+        """
+        Function to add a hook that runs after the app is initialized. The hook
+        should be an instance of AppHook.
+        """
+
+        if inspect.isclass(app_hook):
+            app_hook = app_hook()
+
+        self._on_after_initialize_hooks.append(app_hook)

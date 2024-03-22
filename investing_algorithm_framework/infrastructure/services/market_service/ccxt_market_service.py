@@ -3,6 +3,8 @@ from datetime import datetime
 from time import sleep
 
 import ccxt
+from dateutil import parser
+from dateutil.tz import gettz
 
 from investing_algorithm_framework.domain import OperationalException, Order, \
     CCXT_DATETIME_FORMAT, MarketService
@@ -11,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 
 class CCXTMarketService(MarketService):
+    """
+    Market service implementation using the CCXT library
+    """
     msec = 1000
     minute = 60 * msec
 
@@ -190,7 +195,7 @@ class CCXTMarketService(MarketService):
             raise OperationalException(
                 f"Please make sure you have "
                 f"registered a valid market credential "
-                f"9object to the app: {str(e)}"
+                f"object to the app: {str(e)}"
             )
 
     def create_limit_buy_order(
@@ -368,11 +373,14 @@ class CCXTMarketService(MarketService):
                 from_time_stamp = to_timestamp
 
             for candle in ohlcv:
-                datetime_stamp = datetime.strptime(
-                    exchange.iso8601(candle[0]), CCXT_DATETIME_FORMAT
+                datetime_stamp = parser.parse(
+                    exchange.iso8601(candle[0]),
+                    tzinfos={"UTC": gettz("UTC")}
+
                 )
-                to_timestamp_datetime = datetime.strptime(
-                    exchange.iso8601(to_timestamp), CCXT_DATETIME_FORMAT
+                to_timestamp_datetime = parser.parse(
+                    exchange.iso8601(to_timestamp),
+                    tzinfos={"UTC": gettz("UTC")}
                 )
 
                 if datetime_stamp <= to_timestamp_datetime:

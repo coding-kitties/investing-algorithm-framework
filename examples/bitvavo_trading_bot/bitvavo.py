@@ -32,9 +32,6 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     symbol="BTC/EUR",
 )
 
-# Create an algorithm and link your trading strategy to it
-algorithm = Algorithm()
-
 
 class BitvavoTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
@@ -48,6 +45,8 @@ class BitvavoTradingStrategy(TradingStrategy):
         print(market_data["BTC/EUR-ohlcv"])
         print(market_data["BTC/EUR-ticker"])
 
+# Create an algorithm and link your trading strategy to it
+algorithm = Algorithm()
 algorithm.add_strategy(BitvavoTradingStrategy)
 
 # Create an app and add the market data sources and market credentials to it

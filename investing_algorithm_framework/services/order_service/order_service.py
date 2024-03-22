@@ -3,7 +3,7 @@ from datetime import datetime
 from queue import PriorityQueue
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
-    OperationalException, OrderStatus, MarketService
+    OperationalException, OrderStatus, MarketService, Order
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
@@ -33,7 +33,7 @@ class OrderService(RepositoryService):
         self.portfolio_snapshot_service = portfolio_snapshot_service
         self.market_credential_service = market_credential_service
 
-    def create(self, data, execute=True, validate=True, sync=True):
+    def create(self, data, execute=True, validate=True, sync=True) -> Order:
         portfolio_id = data["portfolio_id"]
         portfolio = self.portfolio_repository.get(portfolio_id)
 
@@ -403,6 +403,7 @@ class OrderService(RepositoryService):
 
         # Update position
         position = self.position_repository.get(current_order.position_id)
+
         self.position_repository.update(
             position.id,
             {

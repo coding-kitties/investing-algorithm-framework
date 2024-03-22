@@ -294,33 +294,3 @@ class PortfolioService(RepositoryService):
                         self.order_service.update(
                             new_order.id, external_order.to_dict()
                         )
-
-
-        # balances = self.market_service.get_balance(portfolio.market)
-        # positions = []
-        #
-        # for symbol in balances["free"]:
-        #     positions.append(symbol)
-        #
-        # for position in positions:
-        #     logger.info(f"Syncing {position} orders")
-        #     external_orders = self.market_service \
-        #         .get_orders(
-        #             symbol=f"{position}/{portfolio.trading_symbol}",
-        #             since=portfolio_configuration.track_from,
-        #             market=portfolio.market
-        #         )
-        #
-        #     if external_orders is None:
-        #         continue
-        #
-        #     logger.info(
-        #         f"Found {len(external_orders)} external orders "
-        #         f"for position {position}"
-        #     )
-        #
-        #     ordered_order_list = sorted(
-        #         external_orders, key=lambda x: x.created_at
-        #     )
-
-

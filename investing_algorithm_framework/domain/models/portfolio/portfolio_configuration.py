@@ -1,7 +1,8 @@
-from datetime import datetime
-from investing_algorithm_framework.domain.models.base_model import BaseModel
+from dateutil.parser import parse
+
 from investing_algorithm_framework.domain.exceptions import \
     ImproperlyConfigured
+from investing_algorithm_framework.domain.models.base_model import BaseModel
 
 
 class PortfolioConfiguration(BaseModel):
@@ -24,7 +25,7 @@ class PortfolioConfiguration(BaseModel):
             self._identifier = market.lower()
 
         if track_from:
-            self._track_from = datetime.strptime(track_from, "%d/%m/%Y")
+            self._track_from = parse(track_from)
 
         if self.trading_symbol is None:
             raise ImproperlyConfigured(

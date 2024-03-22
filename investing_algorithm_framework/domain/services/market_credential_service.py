@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Union, List, Optional
+from typing import List, Optional
+
 from investing_algorithm_framework.domain import MarketCredential
 
 

@@ -1,8 +1,10 @@
-import pandas as pd
 from datetime import datetime
+
+import pandas as pd
+from dateutil.parser import parse
+
 from investing_algorithm_framework.domain import OHLCVMarketDataSource, \
-    BacktestMarketDataSource, OperationalException, TickerMarketDataSource, \
-    DATETIME_FORMAT
+    BacktestMarketDataSource, OperationalException, TickerMarketDataSource
 
 
 class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
@@ -56,8 +58,8 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
 
         first_row = df.iloc[0]
         last_row = df.iloc[-1]
-        self._start_date = datetime.strptime(first_row[0], DATETIME_FORMAT)
-        self._end_date = datetime.strptime(last_row[0], DATETIME_FORMAT)
+        self._start_date = parse(first_row[0])
+        self._end_date = parse(last_row[0])
 
     @property
     def csv_file_path(self):

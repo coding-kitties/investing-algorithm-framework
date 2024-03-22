@@ -5,7 +5,8 @@ from tqdm import tqdm
 
 from investing_algorithm_framework.domain import BacktestReport, \
     BACKTESTING_INDEX_DATETIME, TimeUnit, BacktestPosition, \
-    TradingDataType, OrderStatus, OperationalException, MarketDataSource
+    TradingDataType, OrderStatus, OperationalException, MarketDataSource, \
+    OrderSide
 from investing_algorithm_framework.services.market_data_source_service import \
     MarketDataSourceService
 
@@ -53,7 +54,7 @@ class BacktestService:
         A schedule is generated for the given algorithm and the strategies
         are run for each date in the schedule.
 
-        Also all backtest data is downloaded (if not already downloaded) and
+        Also, all backtest data is downloaded (if not already downloaded) and
         the backtest is run for each date in the schedule.
 
         :param algorithm: The algorithm to run the backtest for
@@ -86,8 +87,12 @@ class BacktestService:
             end_date=end_date
         )
 
-        for index, row in tqdm(schedule.iterrows(), total=len(schedule),
-                               desc="Running backtests", colour="GREEN"):
+        for index, row in tqdm(
+            schedule.iterrows(),
+            total=len(schedule),
+            desc=f"Running backtests {algorithm.name}",
+            colour="GREEN"
+        ):
             strategy_profile = self.get_strategy_from_strategy_profiles(
                 strategy_profiles, row['id']
             )
@@ -226,13 +231,9 @@ class BacktestService:
                 # Remove None from ids
                 ids = [x for x in ids if x is not None]
 
-            if len(ids) != 0:
-                identifier = '_'.join(ids)
-            else:
-                identifier = None
-
             backtest_profile = BacktestReport(
-                identifier=identifier,
+                name=algorithm.name,
+                strategy_identifiers=ids,
                 backtest_index_date=start_date,
                 backtest_start_date=start_date,
                 backtest_end_date=end_date,
@@ -277,7 +278,9 @@ class BacktestService:
             for position in positions:
 
                 if position.symbol != portfolio.trading_symbol:
-                    tickers[position.symbol] = \
+                    ticker_symbol = \
+                        f"{position.symbol}/{portfolio.trading_symbol}"
+                    tickers[ticker_symbol] = \
                         self._market_data_source_service.get_ticker(
                             f"{position.symbol}/{portfolio.trading_symbol}",
                             market=portfolio.market
@@ -313,22 +316,35 @@ class BacktestService:
                     )
                     backtest_position.price = 1
                 else:
-                    pending_orders = self._order_service.get_all({
+                    pending_buy_orders = self._order_service.get_all({
                         "portfolio": portfolio.id,
                         "target_symbol": position.symbol,
-                        "status": OrderStatus.OPEN.value
+                        "status": OrderStatus.OPEN.value,
+                        "order_side": OrderSide.BUY.value
                     })
+                    amount_in_pending_buy_orders = 0
 
-                    amount_in_pending_orders = 0
+                    for order in pending_buy_orders:
+                        amount_in_pending_buy_orders += order.amount
 
-                    for order in pending_orders:
-                        amount_in_pending_orders += order.amount
+                    pending_sell_orders = self._order_service.get_all({
+                        "portfolio": portfolio.id,
+                        "target_symbol": position.symbol,
+                        "status": OrderStatus.OPEN.value,
+                        "order_side": OrderSide.SELL.value
+                    })
+                    amount_in_pending_sell_orders = 0
+
+                    for order in pending_sell_orders:
+                        amount_in_pending_sell_orders += order.amount
 
                     backtest_position = BacktestPosition(
                         position,
-                        amount_pending=amount_in_pending_orders,
+                        amount_pending_buy=amount_in_pending_buy_orders,
+                        amount_pending_sell=amount_in_pending_sell_orders,
                         total_value_portfolio=backtest_profile.total_value
                     )
+
                     # Probably not needed
                     ticker = self._market_data_source_service \
                         .get_ticker(

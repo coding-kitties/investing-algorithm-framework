@@ -1,5 +1,5 @@
 import logging
-from abc import ABC
+from abc import ABC, abstractmethod
 from typing import Callable
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -125,8 +125,9 @@ class Repository(ABC):
 
             return match
 
+    @abstractmethod
     def _apply_query_params(self, db, query, query_params):
-        return query
+        raise NotImplementedError()
 
     def apply_query_params(self, db, query, query_params):
 
@@ -137,7 +138,6 @@ class Repository(ABC):
         return query
 
     def exists(self, query_params):
-
         with Session() as db:
             try:
                 query = db.query(self.base_class)

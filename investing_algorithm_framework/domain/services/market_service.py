@@ -132,7 +132,7 @@ class MarketService(ABC):
                 return market_data_credentials
 
         return None
-    
+
     @abstractmethod
     def get_symbols(self, market):
         """

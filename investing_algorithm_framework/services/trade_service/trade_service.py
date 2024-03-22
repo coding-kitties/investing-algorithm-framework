@@ -1,7 +1,9 @@
 import logging
 from typing import List
+
 from investing_algorithm_framework.domain import OrderStatus, OrderSide, \
-    Trade, PeekableQueue, ApiException, OrderType, TradeStatus
+    Trade, PeekableQueue, OrderType, TradeStatus, \
+    OperationalException
 from investing_algorithm_framework.services import \
     OrderService, PortfolioService, PositionService, MarketDataSourceService
 
@@ -100,7 +102,7 @@ class TradeService:
                     )
                 except Exception as e:
                     logger.error(e)
-                    raise ApiException(
+                    raise OperationalException(
                         f"Error getting ticker data for "
                         f"trade {buy_order.get_target_symbol()}"
                         f"-{buy_order.get_trading_symbol()}. Make sure you "
@@ -196,22 +198,24 @@ class TradeService:
             if order.get_trade_closed_at() is not None
         ]
 
-    def close_trade(self, trade, market=None):
+    def close_trade(self, trade, market=None) -> None:
         """
         Close trade method
 
-        :param trade: Trade object
-        :param market: str representing the market
+        param trade: Trade object
+        param market: str representing the market
+        raises OperationalException: if trade is already closed
+        or if the buy order belonging to the trade has no amount
 
-        :raises ApiException: if trade is already closed
+        return: None
         """
         if trade.closed_at is not None:
-            raise ApiException("Trade already closed.")
+            raise OperationalException("Trade already closed.")
 
         order = self.order_service.get(trade.buy_order_id)
 
         if order.get_filled() <= 0:
-            raise ApiException(
+            raise OperationalException(
                 "Buy order belonging to the trade has no amount."
             )
 
@@ -231,8 +235,7 @@ class TradeService:
             )
             amount = position.get_amount()
 
-        symbol = f"{order.get_target_symbol().upper()}" \
-                 f"/{order.get_trading_symbol().upper()}"
+        symbol = order.get_symbol()
         ticker = self.market_data_source_service.get_ticker(
             symbol=symbol, market=market
         )
@@ -244,7 +247,7 @@ class TradeService:
                 "amount": amount,
                 "order_side": OrderSide.SELL.value,
                 "order_type": OrderType.LIMIT.value,
-                "price": ticker["bid"]
+                "price": ticker["bid"],
             }
         )
 
@@ -283,11 +286,13 @@ class TradeService:
             if query_params is not None:
                 if "status" in query_params:
 
-                    trade_status = TradeStatus.from_value(query_params["status"])
+                    trade_status = TradeStatus\
+                        .from_value(query_params["status"])
 
                     if trade_status == TradeStatus.OPEN:
                         trades = [
-                            trade for trade in trades if trade.closed_at is None
+                            trade for trade in trades
+                            if trade.closed_at is None
                         ]
                     else:
                         trades = [
