@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime
+from dateutil.tz import tzutc
 from queue import PriorityQueue
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
@@ -139,7 +140,7 @@ class OrderService(RepositoryService):
         if "updated_at" in data:
             created_at = data["updated_at"]
         else:
-            created_at = datetime.now()
+            created_at = datetime.now(tz=tzutc())
 
         self.create_snapshot(portfolio.id, created_at=created_at)
         return new_order
@@ -187,7 +188,7 @@ class OrderService(RepositoryService):
 
             data = external_order.to_dict()
             data["status"] = OrderStatus.OPEN.value
-            data["updated_at"] = datetime.now()
+            data["updated_at"] = datetime.now(tz=tzutc())
             return self.update(order_id, data)
         except Exception as e:
             logger.error("Error executing order: {}".format(e))
@@ -195,7 +196,7 @@ class OrderService(RepositoryService):
                 order_id,
                 {
                     "status": OrderStatus.REJECTED.value,
-                    "updated_at": datetime.now()
+                    "updated_at": datetime.now(tz=tzutc())
                 }
             )
 
@@ -744,7 +745,7 @@ class OrderService(RepositoryService):
     def create_snapshot(self, portfolio_id, created_at=None):
 
         if created_at is None:
-            created_at = datetime.utcnow()
+            created_at = datetime.now(tz=tzutc())
 
         portfolio = self.portfolio_repository.get(portfolio_id)
         pending_orders = self.get_all(

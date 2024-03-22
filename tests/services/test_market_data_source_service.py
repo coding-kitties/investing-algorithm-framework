@@ -38,7 +38,7 @@ class TestMarketDataSourceService(TestBase):
             csv_file_path=os.path.join(
                 self.resource_dir,
                 "market_data_sources",
-                "TICKER_BTC-EUR_BITVAVO_2021-06-02:00:00_2021-06-26:00:00.csv"
+                "TICKER_BTC-EUR_BINANCE_2023-08-23:22:00_2023-12-02:00:00.csv"
             )
         ))
         algorithm = Algorithm()

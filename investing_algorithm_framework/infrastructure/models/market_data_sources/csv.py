@@ -151,6 +151,7 @@ class CSVTickerMarketDataSource(TickerMarketDataSource):
         if index_datetime is None:
             index_datetime = datetime.utcnow()
 
+        index_datetime = pd.to_datetime(index_datetime, utc=True)
         df = pd.read_csv(self._csv_file_path)
 
         # Convert the 'Datetime' column to datetime type if
@@ -161,6 +162,10 @@ class CSVTickerMarketDataSource(TickerMarketDataSource):
 
         # Filter rows based on the start and end dates
         filtered_df = df[(df['Datetime'] <= index_datetime)]
+
+        if len(filtered_df) == 0:
+            return None
+
         last_row = filtered_df.iloc[-1]
         return {
             "symbol": self.symbol,
