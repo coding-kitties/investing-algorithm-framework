@@ -1,8 +1,10 @@
 import logging
 
+import pandas as pd
+
 from investing_algorithm_framework.domain import BACKTESTING_INDEX_DATETIME, \
     OrderStatus, BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, \
-    OperationalException, DATETIME_FORMAT
+    OperationalException, OrderSide, Order
 from investing_algorithm_framework.services.market_data_source_service \
     import BacktestMarketDataSourceService
 from .order_service import OrderService
@@ -33,6 +35,14 @@ class OrderBacktestService(OrderService):
         self.configuration_service = configuration_service
         self._market_data_source_service: BacktestMarketDataSourceService = \
             market_data_source_service
+
+    def create(self, data, execute=True, validate=True, sync=True) -> Order:
+        # Make sure the created_at is set to the current backtest time
+        data["created_at"] = self.configuration_service\
+            .config[BACKTESTING_INDEX_DATETIME]
+        # Call super to have standard behavior
+        return super(OrderBacktestService, self)\
+            .create(data, execute, validate, sync)
 
     def execute_order(self, order_id, portfolio):
         order = self.get(order_id)
@@ -88,12 +98,14 @@ class OrderBacktestService(OrderService):
                 .config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]
             )
 
-            filtered_df = df.filter(
-                (df['Datetime'] >= order.get_created_at()
-                 .strftime(DATETIME_FORMAT))
-            )
+            # Convert polaris df to pandas df
+            df = df.to_pandas()
 
-            if self.has_executed(order, filtered_df):
+            # Convert the 'Datetime' column to pandas Timestamp
+            df["Datetime"] = pd.to_datetime(df["Datetime"])
+            df.set_index("Datetime", inplace=True)
+
+            if self.has_executed(order, df):
                 self.update(
                     order.id,
                     {
@@ -123,26 +135,52 @@ class OrderBacktestService(OrderService):
                     }
                 )
 
-    def check_ohclv(self, order, data):
+    def has_executed(self, order, ohlcv_data_frame):
+        """
+        Check if the order has executed based on the OHLCV data.
 
-        if len(data) == 0:
-            return False
+        A buy order is executed if the low price drops below or equals the
+        order price. Example: If the order price is 1000 and the low price
+        drops below or equals 1000, the order is executed. This simulates the
+        situation where a buyer is willing to pay a higher price than the
+        the lowest price in the ohlcv data.
 
-        # Find the row with the lowest 'Low' value
-        lowest_price_row = data.filter(data['Low'] == data['Low'].min())
-        lowest_price = lowest_price_row["Low"][0]
+        A sell order is executed if the high price goes above or equals the
+        order price. Example: If the order price is 1000 and the high price
+        goes above or equals 1000, the order is executed. This simulates the
+        situation where a seller is willing to accept a higher price for its
+        sell order.
 
-        # Find the row with the highest 'High' value
-        highest_price_row = data.filter(data['High'] == data['High'].max())
-        highest_price = highest_price_row["High"][0]
+        :param order: Order object
+        :param ohlcv_data_frame: OHLCV data frame
+        :return: True if the order has executed, False otherwise
+        """
 
-        if highest_price >= order.get_price() >= lowest_price:
-            return True
+        # Extract attributes from the order object
+        created_at = order.get_created_at()
+        order_side = order.get_order_side()
+        order_price = order.get_price()
 
+        # Convert 'created_at' to pandas Timestamp for easier comparison
+        created_at = pd.Timestamp(created_at, tz='UTC')
+
+        # Filter OHLCV data after the order creation time
+        ohlcv_data_after_order = ohlcv_data_frame.loc[created_at:]
+
+        # print(ohlcv_data_frame)
+        # print(ohlcv_data_after_order)
+        # Check if the order execution conditions are met
+        if OrderSide.BUY.equals(order_side):
+            # Check if the low price drops below or equals the order price
+            if (ohlcv_data_after_order['Low'] <= order_price).any():
+                return True
+        elif OrderSide.SELL.equals(order_side):
+            # Check if the high price goes above or equals the order price
+            if (ohlcv_data_after_order['High'] >= order_price).any():
+                return True
+
+        # If conditions are not met, return False
         return False
-
-    def has_executed(self, order, ohclv):
-        return self.check_ohclv(order, ohclv)
 
     def create_snapshot(self, portfolio_id, created_at=None):
 

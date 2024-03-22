@@ -1,7 +1,6 @@
-from datetime import datetime, timedelta
 from investing_algorithm_framework import MarketCredential, TimeUnit, \
     CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, TradingStrategy, \
-    create_app, PortfolioConfiguration
+    create_app, PortfolioConfiguration, Algorithm
 
 """
 Coinbase market data sources example. Coinbase requires you to have an API key
@@ -44,11 +43,14 @@ class CoinBaseTradingStrategy(TradingStrategy):
         pass
 
 
+algorithm = Algorithm()
+algorithm.add_strategy(CoinBaseTradingStrategy)
+
 app = create_app()
+app.add_algorithm(algorithm)
 app.add_market_credential(coinbase_market_credential)
 app.add_market_data_source(coinbase_btc_eur_ohlcv_2h)
 app.add_market_data_source(coinbase_btc_eur_ticker)
-app.add_strategy(CoinBaseTradingStrategy)
 app.add_portfolio_configuration(PortfolioConfiguration(
     initial_balance=1000,
     trading_symbol="EUR",

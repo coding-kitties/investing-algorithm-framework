@@ -1,9 +1,9 @@
+from investing_algorithm_framework import PortfolioConfiguration, Order, \
+    MarketCredential
+from investing_algorithm_framework.services import PortfolioService, \
+    OrderService
 from tests.resources import FlaskTestBase
 from tests.resources import MarketServiceStub
-
-from investing_algorithm_framework.services import PortfolioService, \
-    MarketCredentialService
-from investing_algorithm_framework import PortfolioConfiguration, Order
 
 
 class TestPortfolioService(FlaskTestBase):
@@ -12,6 +12,13 @@ class TestPortfolioService(FlaskTestBase):
             market="binance",
             trading_symbol="EUR",
             initial_balance=1000,
+        )
+    ]
+    market_credentials = [
+        MarketCredential(
+            market="binance",
+            api_key="api_key",
+            secret_key="secret_key",
         )
     ]
 
@@ -71,6 +78,24 @@ class TestPortfolioService(FlaskTestBase):
                     "remaining": 0,
                 },
             ),
+            Order.from_dict(
+                {
+                    "id": "49394",
+                    "side": "buy",
+                    "symbol": "ETH/EUR",
+                    "amount": 10,
+                    "price": 10.0,
+                    "status": "OPEN",
+                    "order_type": "limit",
+                    "order_side": "buy",
+                    "created_at": "2023-08-08T14:40:56.626362Z",
+                    "filled": 0,
+                    "remaining": 0,
+                },
+            ),
+        ]
+        market_service_stub.symbols = [
+            "BTC/EUR", "DOT/EUR", "ADA/EUR", "ETH/EUR"
         ]
         portfolio_service.market_service = market_service_stub
         portfolio = portfolio_service.find({"market": "binance"})
@@ -78,9 +103,9 @@ class TestPortfolioService(FlaskTestBase):
 
         # Check that the portfolio has the correct amount of orders
         order_service = self.iaf_app.container.order_service()
-        self.assertEqual(3, order_service.count())
+        self.assertEqual(4, order_service.count())
         self.assertEqual(
-            3, order_service.count({"portfolio": portfolio.id})
+            4, order_service.count({"portfolio": portfolio.id})
         )
         self.assertEqual(
             2, order_service.count({"target_symbol": "BTC"})
@@ -91,7 +116,11 @@ class TestPortfolioService(FlaskTestBase):
         self.assertEqual(
             1, order_service.count({"target_symbol": "DOT"})
         )
+        self.assertEqual(
+            1, order_service.count({"target_symbol": "ETH"})
+        )
 
+        # Check that the portfolio has the correct amount of trades
         trade_service = self.iaf_app.container.trade_service()
         self.assertEqual(2, trade_service.count())
         self.assertEqual(
@@ -104,3 +133,38 @@ class TestPortfolioService(FlaskTestBase):
                 {"portfolio_id": portfolio.id, "status": "OPEN"}
             )
         )
+
+        # Check if all positions are made
+        position_service = self.iaf_app.container.position_service()
+        self.assertEqual(4, position_service.count())
+
+        # Check if btc position exists
+        btc_position = position_service.find(
+            {"portfolio_id": portfolio.id, "symbol": "BTC"}
+        )
+        self.assertEqual(0, btc_position.amount)
+
+        # Check if dot position exists
+        dot_position = position_service.find(
+            {"portfolio_id": portfolio.id, "symbol": "DOT"}
+        )
+        self.assertEqual(10, dot_position.amount)
+
+        # Check if eth position exists, but has amount set to 0
+        eth_position = position_service.find(
+            {"portfolio_id": portfolio.id, "symbol": "ETH"}
+        )
+        self.assertEqual(0, eth_position.amount)
+
+        # Check if eur position exists
+        eur_position = position_service.find(
+            {"portfolio_id": portfolio.id, "symbol": "EUR"}
+        )
+        self.assertEqual(900, eur_position.amount)
+
+        # Check that there is the correct amount of pending orders
+        order_service: OrderService = self.iaf_app.container.order_service()
+        self.assertEqual(1, order_service.count({"status": "OPEN"}))
+        pending_orders = self.iaf_app.algorithm.get_pending_orders()
+        self.assertEqual(1, len(pending_orders))
+        self.assertEqual(10, pending_orders[0].amount)

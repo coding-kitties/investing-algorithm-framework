@@ -1,7 +1,8 @@
 import os
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, CSVTickerMarketDataSource
+    PortfolioConfiguration, CSVTickerMarketDataSource, MarketCredential, \
+    Algorithm
 from tests.resources import TestBase, MarketServiceStub
 
 
@@ -37,9 +38,18 @@ class TestMarketDataSourceService(TestBase):
             csv_file_path=os.path.join(
                 self.resource_dir,
                 "market_data_sources",
-                "TICKER_BTC-EUR_BITVAVO_2021-06-02:00:00_2021-06-26:00:00.csv"
+                "TICKER_BTC-EUR_BINANCE_2023-08-23:22:00_2023-12-02:00:00.csv"
             )
         ))
+        algorithm = Algorithm()
+        self.app.add_algorithm(algorithm)
+        self.app.add_market_credential(
+            MarketCredential(
+                market="binance",
+                api_key="api_key",
+                secret_key="secret_key",
+            )
+        )
         self.app.initialize()
 
     def test_get_ticker_market_data_source(self):

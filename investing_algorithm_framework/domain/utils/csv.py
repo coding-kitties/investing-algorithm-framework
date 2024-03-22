@@ -80,3 +80,25 @@ def remove_row(csv_path: str, row_index: int) -> None:
             index += 1
 
     shutil.move(temp_file, csv_path)
+
+
+def load_csv_into_dict(file_path) -> Dict:
+    """
+      Load a CSV file into a dictionary.
+
+      Args:
+          file_path (str): Path to the CSV file.
+
+      Returns:
+          dict: Dictionary containing the data loaded from the CSV file.
+      """
+    data_dict = {}
+
+    with open(file_path, 'r', newline='', encoding='utf-8') as csvfile:
+        csv_reader = csv.DictReader(csvfile)
+
+        for row in csv_reader:
+            for key, value in row.items():
+                data_dict[key] = value
+
+    return data_dict

@@ -1,6 +1,6 @@
 import os
 from investing_algorithm_framework import create_app, Config, \
-    PortfolioConfiguration
+    PortfolioConfiguration, Algorithm, MarketCredential
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY
 from tests.resources import TestBase, MarketServiceStub
 
@@ -52,10 +52,26 @@ class TestCreateApp(TestBase):
         app = create_app(
             web=True, config={RESOURCE_DIRECTORY: self.resource_dir}
         )
+        algorithm = Algorithm()
+        app.add_algorithm(algorithm)
+        app.add_market_credential(
+            MarketCredential(
+                market="BINANCE",
+                secret_key="secret_key",
+                api_key="api_key"
+            )
+        )
         app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BITVAVO",
                 trading_symbol="USDT",
+            )
+        )
+        app.add_market_credential(
+            MarketCredential(
+                market="BITVAVO",
+                api_key="api_key",
+                secret_key="secret_key"
             )
         )
         app.container.market_service.override(MarketServiceStub(app.container.market_credential_service()))
@@ -65,4 +81,3 @@ class TestCreateApp(TestBase):
         self.assertIsNotNone(app.container)
         self.assertIsNotNone(app.config)
         self.assertIsNotNone(app.algorithm)
-

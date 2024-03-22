@@ -19,6 +19,10 @@ def setup_dependency_container(app, modules=None, packages=None):
 
 
 class DependencyContainer(containers.DeclarativeContainer):
+    """
+    Dependency container for the app. It is responsible for managing the
+    dependencies of the app.
+    """
     config = providers.Configuration()
     wiring_config = containers.WiringConfiguration()
     configuration_service = providers.ThreadSafeSingleton(
@@ -81,6 +85,7 @@ class DependencyContainer(containers.DeclarativeContainer):
     )
     portfolio_service = providers.Factory(
         PortfolioService,
+        market_credential_service=market_credential_service,
         market_service=market_service,
         position_repository=position_repository,
         order_service=order_service,

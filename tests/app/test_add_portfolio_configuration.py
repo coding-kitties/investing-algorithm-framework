@@ -1,7 +1,7 @@
 import os
 
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    RESOURCE_DIRECTORY
+    RESOURCE_DIRECTORY, Algorithm, MarketCredential
 from investing_algorithm_framework.dependency_container import \
     DependencyContainer
 from tests.resources import TestBase, MarketServiceStub
@@ -34,6 +34,15 @@ class Test(TestBase):
             PortfolioConfiguration(
                 market="BITVAVO",
                 trading_symbol="USDT",
+            )
+        )
+        algorithm = Algorithm()
+        app.add_algorithm(algorithm)
+        app.add_market_credential(
+            MarketCredential(
+                market="BITVAVO",
+                api_key="api_key",
+                secret_key="secret_key"
             )
         )
         app.container.market_service.override(MarketServiceStub(None))

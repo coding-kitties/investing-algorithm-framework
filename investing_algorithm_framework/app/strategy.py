@@ -1,6 +1,7 @@
 from investing_algorithm_framework.domain import \
     TimeUnit, StrategyProfile, Trade
 from .algorithm import Algorithm
+from investing_algorithm_framework.domain import OperationalException
 
 
 class TradingStrategy:
@@ -45,6 +46,18 @@ class TradingStrategy:
 
         if strategy_id is not None:
             self.strategy_id = strategy_id
+
+        # Check if time_unit is None
+        if self.time_unit is None:
+            raise OperationalException(
+                f"Time unit not set for strategy instance {self.strategy_id}"
+            )
+
+        # Check if interval is None
+        if self.interval is None:
+            raise OperationalException(
+                f"Interval not set for strategy instance {self.strategy_id}"
+            )
 
     def run_strategy(self, algorithm, market_data):
         self.apply_strategy(algorithm=algorithm, market_data=market_data)

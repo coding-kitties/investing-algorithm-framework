@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 from unittest import TestCase
+from dateutil.tz import tzutc
 import pandas as pd
 import os
 
@@ -29,7 +30,7 @@ class Test(TestCase):
         self.assertEqual(trade.opened_at, trade_opened_at)
 
     def test_stop_loss_manual(self):
-        current_datetime = datetime(2021, 6, 20, 00, 00, 0)
+        current_datetime = datetime(2023, 8, 26, 00, 00, 0, tzinfo=tzutc())
         resource_dir = os.path.abspath(
             os.path.join(
                 os.path.join(
@@ -54,7 +55,8 @@ class Test(TestCase):
             end_date=current_datetime,
             csv_file_path=f"{resource_dir}/"
                           "market_data_sources/"
-                          "OHLCV_BTC-EUR_15m_2021-05-17:00:00_2021-06-26:00:00.csv"
+                          "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07:07"
+                          ":59_2023-12-02:00:00.csv"
         )
         csv_ticker_market_data_source = CSVTickerMarketDataSource(
             identifier="BTC",
@@ -62,10 +64,10 @@ class Test(TestCase):
             symbol="BTC/EUR",
             csv_file_path=f"{resource_dir}"
                           "/market_data_sources/"
-                          "TICKER_BTC-EUR_BITVAVO_2021-06-02:00"
-                          ":00_2021-06-26:00:00.csv"
+                          "TICKER_BTC-EUR_BINANCE_2023-08"
+                          "-23:22:00_2023-12-02:00:00.csv"
         )
-        trade_opened_at = datetime(2021, 6, 17, 12, 0, 0)
+        trade_opened_at = datetime(2023, 8, 17, 12, 0, 0, tzinfo=tzutc())
         open_price = 32589
         trade = Trade(
             buy_order_id=1,

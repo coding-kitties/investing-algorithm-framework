@@ -1,5 +1,7 @@
 import logging
-from datetime import datetime
+
+from dateutil.parser import parse
+from dateutil.tz import gettz
 
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
@@ -263,10 +265,10 @@ class Order(BaseModel):
             trading_symbol = data.get("trading_symbol", None)
 
         if created_at is not None:
-            created_at = datetime.strptime(created_at, "%Y-%m-%dT%H:%M:%S.%fZ")
+            created_at = parse(created_at)
 
         if updated_at is not None:
-            updated_at = datetime.strptime(updated_at, "%Y-%m-%dT%H:%M:%S.%fZ")
+            updated_at = parse(updated_at)
 
         return Order(
             external_id=data.get("id", None),
@@ -290,7 +292,6 @@ class Order(BaseModel):
         status = OrderStatus.from_value(ccxt_order["status"])
         target_symbol = ccxt_order.get("symbol").split("/")[0]
         trading_symbol = ccxt_order.get("symbol").split("/")[1]
-
         return Order(
             external_id=ccxt_order.get("id", None),
             target_symbol=target_symbol,
@@ -304,8 +305,9 @@ class Order(BaseModel):
             remaining=ccxt_order.get("remaining", None),
             cost=ccxt_order.get("cost", None),
             fee=OrderFee.from_ccxt_fee(ccxt_order.get("fee", None)),
-            created_at=datetime.strptime(
-                ccxt_order.get("datetime", None), "%Y-%m-%dT%H:%M:%S.%fZ"
+            created_at=parse(
+                ccxt_order.get("datetime", None),
+                tzinfos={"UTC": gettz("UTC")}
             )
         )
 

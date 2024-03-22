@@ -2,7 +2,7 @@ import os
 from decimal import Decimal
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration
+    PortfolioConfiguration, Algorithm, MarketCredential
 from tests.resources import TestBase, MarketServiceStub
 
 
@@ -31,6 +31,15 @@ class TestOrderService(TestBase):
         self.app.container.market_service.override(
             MarketServiceStub(self.app.container.market_credential_service())
         )
+        algorithm = Algorithm()
+        self.app.add_algorithm(algorithm)
+        self.app.add_market_credential(
+            MarketCredential(
+                market="binance",
+                api_key="api_key",
+                secret_key="secret_key",
+            )
+        )
         self.app.initialize()
 
     def test_create_limit_order(self):
@@ -49,8 +58,14 @@ class TestOrderService(TestBase):
         )
         self.assertEqual(1, order_service.count())
         self.assertEqual(2004.5303357979318, order.amount)
-        self.assertEqual(order.filled, None)
-        self.assertEqual(order.remaining, 2004.5303357979318)
+        self.assertEqual(0, order.get_filled())
+        self.assertEqual(2004.5303357979318, order.get_remaining())
+        self.assertEqual(0.24262, order.get_price())
+        self.assertEqual("ADA", order.get_target_symbol())
+        self.assertEqual("USDT", order.get_trading_symbol())
+        self.assertEqual("BUY", order.get_order_side())
+        self.assertEqual("LIMIT", order.get_order_type())
+        self.assertEqual("CREATED", order.get_status())
 
     def test_update_order(self):
         order_service = self.app.container.order_service()
@@ -83,10 +98,86 @@ class TestOrderService(TestBase):
         self.assertEqual(position.amount, 2004.5303357979318)
 
     def test_create_limit_buy_order(self):
-        pass
+        order_service = self.app.container.order_service()
+        order = order_service.create(
+            {
+                "target_symbol": "ADA",
+                "trading_symbol": "USDT",
+                "amount": 2004.5303357979318,
+                "order_side": "BUY",
+                "price": 0.24262,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CREATED",
+            }
+        )
+        self.assertEqual(1, order_service.count())
+        self.assertEqual(2004.5303357979318, order.amount)
+        self.assertEqual(0, order.get_filled())
+        self.assertEqual(2004.5303357979318, order.get_remaining())
+        self.assertEqual(0.24262, order.get_price())
+        self.assertEqual("ADA", order.get_target_symbol())
+        self.assertEqual("USDT", order.get_trading_symbol())
+        self.assertEqual("BUY", order.get_order_side())
+        self.assertEqual("LIMIT", order.get_order_type())
+        self.assertEqual("CREATED", order.get_status())
 
     def test_create_limit_sell_order(self):
-        pass
+        order_service = self.app.container.order_service()
+        order = order_service.create(
+            {
+                "target_symbol": "ADA",
+                "trading_symbol": "USDT",
+                "amount": 2004.5303357979318,
+                "order_side": "BUY",
+                "price": 0.24262,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CREATED",
+            }
+        )
+        self.assertEqual(1, order_service.count())
+        self.assertEqual(2004.5303357979318, order.amount)
+        self.assertEqual(0, order.get_filled())
+        self.assertEqual(2004.5303357979318, order.get_remaining())
+        self.assertEqual(0.24262, order.get_price())
+        self.assertEqual("ADA", order.get_target_symbol())
+        self.assertEqual("USDT", order.get_trading_symbol())
+        self.assertEqual("BUY", order.get_order_side())
+        self.assertEqual("LIMIT", order.get_order_type())
+        self.assertEqual("CREATED", order.get_status())
+
+        order_service.update(
+            order.id,
+            {
+                "status": "CLOSED",
+                "filled": 2004.5303357979318,
+                "remaining": Decimal('0'),
+            }
+        )
+
+        order = order_service.create(
+            {
+                "target_symbol": "ADA",
+                "trading_symbol": "USDT",
+                "amount": 2004.5303357979318,
+                "order_side": "SELL",
+                "price": 0.24262,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CREATED",
+            }
+        )
+        self.assertEqual(2, order_service.count())
+        self.assertEqual(2004.5303357979318, order.amount)
+        self.assertEqual(0, order.get_filled())
+        self.assertEqual(2004.5303357979318, order.get_remaining())
+        self.assertEqual(0.24262, order.get_price())
+        self.assertEqual("ADA", order.get_target_symbol())
+        self.assertEqual("USDT", order.get_trading_symbol())
+        self.assertEqual("SELL", order.get_order_side())
+        self.assertEqual("LIMIT", order.get_order_type())
+        self.assertEqual("CREATED", order.get_status())
 
     def test_update_buy_order_with_successful_order(self):
         pass

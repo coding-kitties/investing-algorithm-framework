@@ -1,7 +1,9 @@
 import logging
 from typing import List
+
 from investing_algorithm_framework.domain import OrderStatus, OrderSide, \
-    Trade, PeekableQueue, ApiException, OrderType
+    Trade, PeekableQueue, OrderType, TradeStatus, \
+    OperationalException
 from investing_algorithm_framework.services import \
     OrderService, PortfolioService, PositionService, MarketDataSourceService
 
@@ -100,7 +102,7 @@ class TradeService:
                     )
                 except Exception as e:
                     logger.error(e)
-                    raise ApiException(
+                    raise OperationalException(
                         f"Error getting ticker data for "
                         f"trade {buy_order.get_target_symbol()}"
                         f"-{buy_order.get_trading_symbol()}. Make sure you "
@@ -196,22 +198,24 @@ class TradeService:
             if order.get_trade_closed_at() is not None
         ]
 
-    def close_trade(self, trade, market=None):
+    def close_trade(self, trade, market=None) -> None:
         """
         Close trade method
 
-        :param trade: Trade object
-        :param market: str representing the market
+        param trade: Trade object
+        param market: str representing the market
+        raises OperationalException: if trade is already closed
+        or if the buy order belonging to the trade has no amount
 
-        :raises ApiException: if trade is already closed
+        return: None
         """
         if trade.closed_at is not None:
-            raise ApiException("Trade already closed.")
+            raise OperationalException("Trade already closed.")
 
         order = self.order_service.get(trade.buy_order_id)
 
         if order.get_filled() <= 0:
-            raise ApiException(
+            raise OperationalException(
                 "Buy order belonging to the trade has no amount."
             )
 
@@ -231,8 +235,7 @@ class TradeService:
             )
             amount = position.get_amount()
 
-        symbol = f"{order.get_target_symbol().upper()}" \
-                 f"/{order.get_trading_symbol().upper()}"
+        symbol = order.get_symbol()
         ticker = self.market_data_source_service.get_ticker(
             symbol=symbol, market=market
         )
@@ -244,7 +247,7 @@ class TradeService:
                 "amount": amount,
                 "order_side": OrderSide.SELL.value,
                 "order_type": OrderType.LIMIT.value,
-                "price": ticker["bid"]
+                "price": ticker["bid"],
             }
         )
 
@@ -256,36 +259,45 @@ class TradeService:
         :return: int representing the count
         """
 
-        if query_params is None:
-            query_params = {}
-        else:
-            query_param_keys = query_params.keys()
+        portfolios = self.portfolio_service.get_all()
+        trades = []
 
-            # Check if there are only allowed query parameters
-            if not all(
-                key in ["portfolio_id", "target_symbol", "status"]
-                for key in query_param_keys
-            ):
-                raise ApiException("Invalid trade query parameters")
+        for portfolio in portfolios:
+            buy_orders = self.order_service.get_all({
+                "status": OrderStatus.CLOSED.value,
+                "order_side": OrderSide.BUY.value,
+                "portfolio_id": portfolio.id
+            })
 
-        query_params["order_side"] = OrderSide.BUY.value
-        status = query_params.get("status")
+            for buy_order in buy_orders:
+                trades.append(
+                    Trade(
+                        buy_order_id=buy_order.id,
+                        target_symbol=buy_order.get_target_symbol(),
+                        trading_symbol=buy_order.get_trading_symbol(),
+                        amount=buy_order.get_amount(),
+                        open_price=buy_order.get_price(),
+                        closed_price=buy_order.get_trade_closed_price(),
+                        closed_at=buy_order.get_trade_closed_at(),
+                        opened_at=buy_order.get_created_at(),
+                    )
+                )
 
-        if status is not None:
-            query_params.pop("status")
+            if query_params is not None:
+                if "status" in query_params:
 
-        buy_orders = self.order_service.get_all(query_params)
+                    trade_status = TradeStatus\
+                        .from_value(query_params["status"])
 
-        if status is not None:
-            if status == OrderStatus.CLOSED.value:
-                buy_orders = [
-                    buy_order for buy_order in buy_orders
-                    if buy_order.get_trade_closed_at() is not None
-                ]
-            else:
-                buy_orders = [
-                    buy_order for buy_order in buy_orders
-                    if buy_order.get_trade_closed_at() is None
-                ]
+                    if trade_status == TradeStatus.OPEN:
+                        trades = [
+                            trade for trade in trades
+                            if trade.closed_at is None
+                        ]
+                    else:
+                        trades = [
+                            trade for trade in trades
+                            if trade.closed_at is not None
+                        ]
 
-        return len(buy_orders)
+        return len(trades)

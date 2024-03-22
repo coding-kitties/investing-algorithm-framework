@@ -1,8 +1,10 @@
-import pandas as pd
 from datetime import datetime
+
+import pandas as pd
+from dateutil.parser import parse
+
 from investing_algorithm_framework.domain import OHLCVMarketDataSource, \
-    BacktestMarketDataSource, OperationalException, TickerMarketDataSource, \
-    DATETIME_FORMAT
+    BacktestMarketDataSource, OperationalException, TickerMarketDataSource
 
 
 class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
@@ -56,8 +58,8 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
 
         first_row = df.iloc[0]
         last_row = df.iloc[-1]
-        self._start_date = datetime.strptime(first_row[0], DATETIME_FORMAT)
-        self._end_date = datetime.strptime(last_row[0], DATETIME_FORMAT)
+        self._start_date = parse(first_row[0])
+        self._end_date = parse(last_row[0])
 
     @property
     def csv_file_path(self):
@@ -82,7 +84,7 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
         # it's not already
         if 'Datetime' in df.columns and pd.api.types.is_string_dtype(
                 df['Datetime']):
-            df['Datetime'] = pd.to_datetime(df['Datetime'])
+            df['Datetime'] = pd.to_datetime(df['Datetime'], utc=True)
 
         # Filter rows based on the start and end dates
         filtered_df = df[
@@ -149,16 +151,21 @@ class CSVTickerMarketDataSource(TickerMarketDataSource):
         if index_datetime is None:
             index_datetime = datetime.utcnow()
 
+        index_datetime = pd.to_datetime(index_datetime, utc=True)
         df = pd.read_csv(self._csv_file_path)
 
         # Convert the 'Datetime' column to datetime type if
         # it's not already
         if 'Datetime' in df.columns and pd.api.types.is_string_dtype(
                 df['Datetime']):
-            df['Datetime'] = pd.to_datetime(df['Datetime'])
+            df['Datetime'] = pd.to_datetime(df['Datetime'], utc=True)
 
         # Filter rows based on the start and end dates
         filtered_df = df[(df['Datetime'] <= index_datetime)]
+
+        if len(filtered_df) == 0:
+            return None
+
         last_row = filtered_df.iloc[-1]
         return {
             "symbol": self.symbol,

@@ -7,9 +7,10 @@ from .trading_data_types import TradingDataType
 from .trading_time_frame import TradingTimeFrame
 from .portfolio import PortfolioConfiguration, Portfolio, PortfolioSnapshot
 from .position import Position, PositionSnapshot
-from .backtesting import BacktestReport, BacktestPosition
+from .backtesting import BacktestReport, BacktestPosition, \
+    BacktestReportsEvaluation
 from .strategy_profile import StrategyProfile
-from .trade import Trade
+from .trade import Trade, TradeStatus
 
 __all__ = [
     "OrderStatus",
@@ -31,5 +32,7 @@ __all__ = [
     "StrategyProfile",
     "BacktestPosition",
     "Trade",
-    "MarketCredential"
+    "MarketCredential",
+    "TradeStatus",
+    "BacktestReportsEvaluation",
 ]

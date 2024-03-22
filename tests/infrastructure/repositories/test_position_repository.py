@@ -1,7 +1,7 @@
 import os
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration
+    PortfolioConfiguration, Algorithm, MarketCredential
 from tests.resources import TestBase, MarketServiceStub
 
 
@@ -24,6 +24,15 @@ class Test(TestBase):
             )
         )
         self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+        algorithm = Algorithm()
+        self.app.add_algorithm(algorithm)
+        self.app.add_market_credential(
+            MarketCredential(
+                market="BINANCE",
+                api_key="api_key",
+                secret_key="secret_key"
+            )
+        )
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BINANCE",

@@ -1,9 +1,10 @@
 from .config import Config, Environment
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, \
-    PortfolioConfiguration, Portfolio, Position, Order, \
+    PortfolioConfiguration, Portfolio, Position, Order, TradeStatus, \
     OrderFee, BacktestReport, PortfolioSnapshot, StrategyProfile, \
-    BacktestPosition, Trade, MarketCredential, PositionSnapshot
+    BacktestPosition, Trade, MarketCredential, PositionSnapshot, \
+    BacktestReportsEvaluation
 from .exceptions import OperationalException, ApiException, \
     PermissionDeniedApiException, ImproperlyConfigured
 from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
@@ -13,18 +14,19 @@ from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
     BACKTESTING_INDEX_DATETIME, BACKTESTING_START_DATE, CCXT_DATETIME_FORMAT, \
     BACKTEST_DATA_DIRECTORY_NAME, TICKER_DATA_TYPE, OHLCV_DATA_TYPE, \
     CURRENT_UTC_DATETIME, BACKTESTING_END_DATE, \
+    CCXT_DATETIME_FORMAT_WITH_TIMEZONE, \
     BACKTESTING_PENDING_ORDER_CHECK_INTERVAL
 from .singleton import Singleton
 from .utils import random_string, append_dict_as_row_to_csv, \
     add_column_headers_to_csv, get_total_amount_of_rows, \
-    csv_to_list, StoppableThread
+    csv_to_list, StoppableThread, pretty_print_backtest_reports_evaluation, \
+    pretty_print_backtest, load_csv_into_dict, load_backtest_reports
 from .strategy import Strategy
 from .stateless_actions import StatelessActions
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
-from .utils.backtesting import pretty_print_backtest
 from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
     OHLCVMarketDataSource, BacktestMarketDataSource, MarketDataSource, \
-    MarketService
+    MarketService, MarketCredentialService
 from .data_structures import PeekableQueue
 
 __all__ = [
@@ -95,5 +97,12 @@ __all__ = [
     "PeekableQueue",
     "BACKTESTING_END_DATE",
     "BACKTESTING_PENDING_ORDER_CHECK_INTERVAL",
-    "PositionSnapshot"
+    "PositionSnapshot",
+    "MarketCredentialService",
+    "TradeStatus",
+    "CCXT_DATETIME_FORMAT_WITH_TIMEZONE",
+    "pretty_print_backtest_reports_evaluation",
+    "BacktestReportsEvaluation",
+    "load_csv_into_dict",
+    "load_backtest_reports",
 ]

@@ -3,110 +3,16 @@ from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.time_unit import TimeUnit
 
 
-class BacktestPosition(BaseModel):
-
-    def __init__(
-        self,
-        position,
-        trading_symbol=False,
-        amount_pending=0.0,
-        total_value_portfolio=0.0
-    ):
-        self._symbol = position.symbol
-        self._amount = position.amount
-        self._cost = position.cost
-        self._price = 0.0
-        self._trading_symbol = trading_symbol
-        self._amount_pending = amount_pending
-        self._total_value_portfolio = total_value_portfolio
-
-    @property
-    def price(self):
-        return self._price
-
-    @price.setter
-    def price(self, value):
-        self._price = value
-
-    @property
-    def cost(self):
-
-        if self._trading_symbol:
-            return self.amount
-
-        return self._cost
-
-    @property
-    def value(self):
-
-        if self._trading_symbol:
-            return self.amount
-
-        return self._price * self.amount
-
-    @property
-    def growth(self):
-
-        if self._amount == 0:
-            return 0.0
-
-        if self._trading_symbol:
-            return 0.0
-
-        return self.value - self.cost
-
-    @property
-    def growth_rate(self):
-
-        if self._trading_symbol:
-            return 0.0
-
-        if self.cost == 0:
-            return 0.0
-
-        return self.growth / self.cost * 100
-
-    @property
-    def symbol(self):
-        return self._symbol
-
-    @property
-    def amount(self):
-        return self._amount
-
-    @property
-    def amount_pending(self):
-        return self._amount_pending
-
-    @amount_pending.setter
-    def amount_pending(self, value):
-        self._amount_pending = value
-
-    @property
-    def percentage_of_portfolio(self):
-
-        if self._total_value_portfolio == 0:
-            return 0.0
-
-        return self.value / self._total_value_portfolio * 100
-
-    def get_percentage_of_portfolio(self):
-
-        if self._total_value_portfolio == 0:
-            return 0.0
-
-        return self.value / self._total_value_portfolio * 100
-
-
 class BacktestReport(BaseModel):
 
     def __init__(
         self,
-        identifier=None,
-        portfolio_id=None,
-        initial_unallocated=0.0,
-        interval=None,
+        name=None,
         time_unit=None,
+        interval=0,
+        strategy_identifiers=None,
+        initial_unallocated=0.0,
+        number_of_runs=0,
         backtest_start_date_data=None,
         backtest_data_index_date=None,
         backtest_start_date=None,
@@ -127,9 +33,9 @@ class BacktestReport(BaseModel):
         total_cost=0.0,
         trading_symbol=None,
         total_net_gain_percentage=0.0,
-        total_net_gain=0,
+        total_net_gain=0.0,
         growth_rate=0.0,
-        growth=0,
+        growth=0.0,
         total_value=0.0,
         positions=None,
         average_trade_duration=0,
@@ -137,15 +43,13 @@ class BacktestReport(BaseModel):
         trades=None,
         created_at: datetime = None
     ):
-        self._identifier = identifier
-        self._portfolio_id = portfolio_id
-        self._interval = interval
-        self._time_unit = time_unit
+        self._name = name
+        self._strategy_identifiers = strategy_identifiers
         self._backtest_start_date_data = backtest_start_date_data
         self._backtest_start_date = backtest_start_date
         self._backtest_end_date = backtest_end_date
         self._backtest_index_date = backtest_index_date
-        self._number_of_runs = 0
+        self._number_of_runs = number_of_runs
         self._trading_time_frame = trading_time_frame
         self._trading_time_frame_start_date = trading_time_frame_start_date
         self._symbols = symbols
@@ -159,25 +63,29 @@ class BacktestReport(BaseModel):
         self._number_of_trades_closed = number_of_trades_closed
         self._number_of_trades_open = number_of_trades_open
         self._total_cost = total_cost
-        self._growth_rate = 0.0
-        self._growth = 0.0
+        self._growth_rate = growth_rate
+        self._growth = growth
         self._initial_unallocated = initial_unallocated
         self._trading_symbol = trading_symbol
         self._total_net_gain_percentage = total_net_gain_percentage
         self._total_net_gain = total_net_gain
         self._backtest_data_index_date = backtest_data_index_date
-        self._growth_rate = growth_rate
-        self._growth = growth
         self._total_value = total_value
         self.positions = positions
         self._average_trade_duration = average_trade_duration
         self._average_trade_size = average_trade_size
         self._trades = trades
         self._created_at: datetime = created_at
+        self._interval = interval
+        self._time_unit = time_unit
 
     @property
-    def identifier(self):
-        return self._identifier
+    def name(self):
+        return self._name
+
+    @property
+    def strategy_identifiers(self):
+        return self._strategy_identifiers
 
     @property
     def created_at(self):
@@ -190,22 +98,6 @@ class BacktestReport(BaseModel):
     @portfolio_id.setter
     def portfolio_id(self, portfolio_id):
         self._portfolio_id = portfolio_id
-
-    @property
-    def interval(self):
-        return self._interval
-
-    @interval.setter
-    def interval(self, value):
-        self._interval = value
-
-    @property
-    def time_unit(self):
-        return self._time_unit
-
-    @time_unit.setter
-    def time_unit(self, value):
-        self._time_unit = value
 
     @property
     def symbols(self):
@@ -447,6 +339,22 @@ class BacktestReport(BaseModel):
     def trades(self, value):
         self._trades = value
 
+    @property
+    def interval(self):
+        return self._interval
+
+    @interval.setter
+    def interval(self, value):
+        self._interval = value
+
+    @property
+    def time_unit(self):
+        return self._time_unit
+
+    @time_unit.setter
+    def time_unit(self, value):
+        self._time_unit = value
+
     def get_runs_per_day(self):
 
         if self.time_unit is None:
@@ -460,27 +368,24 @@ class BacktestReport(BaseModel):
 
     def __repr__(self):
         return self.repr(
+            name=self.name,
             start_date=self.backtest_start_date,
             end_date=self.backtest_end_date,
             backtest_index_date=self.backtest_index_date,
             start_date_data=self.backtest_start_date_data,
-            time_unit=self.time_unit,
-            interval=self.interval
         )
 
     def to_dict(self):
+        """
+        Convert the backtest report to a dictionary. So it can be
+        saved to a file.
+        """
         return {
-            "portfolio_id": self.portfolio_id,
-            "interval": self.interval,
-            "time_unit": self.time_unit,
-            "backtest_start_date_data": self.backtest_start_date_data,
+            "name": self.name,
+            "strategy_identifiers": self.strategy_identifiers,
             "backtest_start_date": self.backtest_start_date,
             "backtest_end_date": self.backtest_end_date,
-            "backtest_index_date": self.backtest_index_date,
             "number_of_runs": self.number_of_runs,
-            "trading_time_frame": self.trading_time_frame,
-            "trading_time_frame_start_date":
-                self.trading_time_frame_start_date,
             "symbols": self.symbols,
             "market": self.market,
             "number_of_days": self.number_of_days,
@@ -503,3 +408,37 @@ class BacktestReport(BaseModel):
             "average_trade_duration": self.average_trade_duration,
             "average_trade_size": self.average_trade_size,
         }
+
+    @staticmethod
+    def from_dict(data):
+        """
+        Factory method to create a backtest report from a dictionary.
+        """
+        return BacktestReport(
+            name=data["name"],
+            strategy_identifiers=data["strategy_identifiers"],
+            backtest_start_date=data["backtest_start_date"],
+            backtest_end_date=data["backtest_end_date"],
+            number_of_runs=data["number_of_runs"],
+            symbols=data["symbols"],
+            market=data["market"],
+            number_of_days=data["number_of_days"],
+            number_of_orders=data["number_of_orders"],
+            number_of_positions=data["number_of_positions"],
+            market_data_file=data["market_data_file"],
+            percentage_positive_trades=data["percentage_positive_trades"],
+            percentage_negative_trades=data["percentage_negative_trades"],
+            number_of_trades_closed=data["number_of_trades_closed"],
+            number_of_trades_open=data["number_of_trades_open"],
+            total_cost=float(data["total_cost"]),
+            growth_rate=float(data["growth_rate"]),
+            growth=float(data["growth"]),
+            initial_unallocated=float(data["initial_unallocated"]),
+            trading_symbol=data["trading_symbol"],
+            total_net_gain_percentage=float(data["total_net_gain_percentage"]),
+            total_net_gain=float(data["total_net_gain"]),
+            backtest_data_index_date=data["backtest_data_index_date"],
+            total_value=float(data["total_value"]),
+            average_trade_duration=data["average_trade_duration"],
+            average_trade_size=float(data["average_trade_size"]),
+        )

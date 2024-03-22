@@ -3,7 +3,20 @@ from investing_algorithm_framework.domain.models.base_model import BaseModel
 
 
 class Trade(BaseModel):
+    """
+    Trade model
 
+    A trade is a combination of a buy and sell order that has been opened or
+    closed.
+
+    A trade is considered opened when a buy order is executed and there is
+    no corresponding sell order. A trade is considered closed when a sell
+    order is executed and the amount of the sell order is equal or larger
+    to the amount of the buy order.
+
+    A single sell order can close multiple buy orders. Also, a single
+    buy order can be closed by multiple sell orders.
+    """
     def __init__(
         self,
         buy_order_id,
@@ -56,6 +69,9 @@ class Trade(BaseModel):
     def amount(self):
         return self._amount
 
+    def get_amount(self):
+        return self.amount
+
     @property
     def open_price(self):
         return self._open_price
@@ -75,6 +91,10 @@ class Trade(BaseModel):
     @property
     def size(self):
         return self.amount * self.open_price
+
+    @property
+    def status(self):
+        return "CLOSED" if self.closed_at else "OPEN"
 
     @property
     def net_gain(self):
@@ -165,6 +185,7 @@ class Trade(BaseModel):
         return self.repr(
             target_symbol=self.target_symbol,
             trading_symbol=self.trading_symbol,
+            status=self.status,
             amount=self.amount,
             open_price=self.open_price,
             current_price=self.current_price,
