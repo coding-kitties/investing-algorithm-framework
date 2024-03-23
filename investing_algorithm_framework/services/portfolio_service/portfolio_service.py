@@ -2,9 +2,11 @@ import logging
 from datetime import datetime
 
 from investing_algorithm_framework.domain import OrderSide, OrderStatus, \
-    OperationalException, MarketService, MarketCredentialService
+    OperationalException, MarketService, MarketCredentialService, SYMBOLS
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
+from investing_algorithm_framework.services.configuration_service import \
+    ConfigurationService
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -18,6 +20,7 @@ class PortfolioService(RepositoryService):
 
     def __init__(
         self,
+        configuration_service: ConfigurationService,
         market_service: MarketService,
         market_credential_service: MarketCredentialService,
         position_repository,
@@ -26,6 +29,7 @@ class PortfolioService(RepositoryService):
         portfolio_configuration_service,
         portfolio_snapshot_service,
     ):
+        self.configuration_service = configuration_service
         self.market_credential_service = market_credential_service
         self.market_service = market_service
         self.position_repository = position_repository
@@ -235,12 +239,24 @@ class PortfolioService(RepositoryService):
         portfolio_configuration = self.portfolio_configuration_service \
             .get(portfolio.identifier)
 
-        # Get all available symbols for the market and check if
-        # there are orders
-        available_symbols = self.market_service.get_symbols(
-            market=portfolio.market
-        )
+        # Check if the symbols param in the configuration is set
+        config = self.configuration_service.config
 
+        if SYMBOLS in config and config[SYMBOLS] is not None:
+            available_symbols = config[SYMBOLS]
+
+            if not isinstance(available_symbols, list):
+                raise OperationalException(
+                    "The symbols configuration should be a list of strings"
+                )
+        else:
+            # if not, get all available symbols for the market and check if
+            # there are orders
+            available_symbols = self.market_service.get_symbols(
+                market=portfolio.market
+            )
+
+        # Check if there are orders for the available symbols
         for symbol in available_symbols:
             orders = self.market_service.get_orders(
                 symbol=symbol,

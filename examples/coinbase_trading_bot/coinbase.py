@@ -1,6 +1,7 @@
+import os
 from investing_algorithm_framework import MarketCredential, TimeUnit, \
     CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, TradingStrategy, \
-    create_app, PortfolioConfiguration, Algorithm
+    create_app, PortfolioConfiguration, Algorithm, SYMBOLS, RESOURCE_DIRECTORY
 
 """
 Coinbase market data sources example. Coinbase requires you to have an API key
@@ -42,11 +43,15 @@ class CoinBaseTradingStrategy(TradingStrategy):
     def apply_strategy(self, algorithm, market_data):
         pass
 
+config = {
+    SYMBOLS: ["BTC/EUR"],
+    RESOURCE_DIRECTORY: os.path.join(os.path.dirname(__file__), "resources")
+}
 
 algorithm = Algorithm()
 algorithm.add_strategy(CoinBaseTradingStrategy)
 
-app = create_app()
+app = create_app(config=config)
 app.add_algorithm(algorithm)
 app.add_market_credential(coinbase_market_credential)
 app.add_market_data_source(coinbase_btc_eur_ohlcv_2h)

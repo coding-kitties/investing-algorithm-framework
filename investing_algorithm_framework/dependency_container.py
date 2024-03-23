@@ -85,6 +85,7 @@ class DependencyContainer(containers.DeclarativeContainer):
     )
     portfolio_service = providers.Factory(
         PortfolioService,
+        configuration_service=configuration_service,
         market_credential_service=market_credential_service,
         market_service=market_service,
         position_repository=position_repository,

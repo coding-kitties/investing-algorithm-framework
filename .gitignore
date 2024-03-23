@@ -145,5 +145,6 @@ lib/
 bumpversion.egg-info/
 *.sqlite3
 
-*/backtest_data/
+**/backtest_data/*
 */backtest_reports/
+**/backtest_reports/*

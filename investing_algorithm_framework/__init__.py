@@ -5,7 +5,7 @@ from investing_algorithm_framework.domain import ApiException, \
     OrderStatus, OrderSide, Config, TimeUnit, TimeInterval, Order, Portfolio, \
     Position, TimeFrame, BACKTESTING_INDEX_DATETIME, MarketCredential, \
     PortfolioConfiguration, RESOURCE_DIRECTORY, pretty_print_backtest, \
-    Trade, OHLCVMarketDataSource, OrderBookMarketDataSource, \
+    Trade, OHLCVMarketDataSource, OrderBookMarketDataSource, SYMBOLS, \
     TickerMarketDataSource, MarketService, BacktestReportsEvaluation, \
     pretty_print_backtest_reports_evaluation, load_backtest_reports
 from investing_algorithm_framework.app import TradingStrategy, \
@@ -55,4 +55,5 @@ __all__ = [
     "pretty_print_backtest_reports_evaluation",
     "BacktestReportsEvaluation",
     "load_backtest_reports",
+    "SYMBOLS"
 ]

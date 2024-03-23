@@ -1,6 +1,7 @@
+import os
 from investing_algorithm_framework import MarketCredential, TimeUnit, \
     CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, TradingStrategy, \
-    create_app, PortfolioConfiguration, Algorithm
+    create_app, PortfolioConfiguration, Algorithm, SYMBOLS, RESOURCE_DIRECTORY
 
 """
 Bitvavo trading bot example with market data sources of bitvavo. 
@@ -45,12 +46,18 @@ class BitvavoTradingStrategy(TradingStrategy):
         print(market_data["BTC/EUR-ohlcv"])
         print(market_data["BTC/EUR-ticker"])
 
+
+config = {
+    SYMBOLS: ["BTC/EUR"],
+    RESOURCE_DIRECTORY: os.path.join(os.path.dirname(__file__), "resources")
+}
+
 # Create an algorithm and link your trading strategy to it
 algorithm = Algorithm()
 algorithm.add_strategy(BitvavoTradingStrategy)
 
 # Create an app and add the market data sources and market credentials to it
-app = create_app()
+app = create_app(config=config)
 app.add_market_credential(bitvavo_market_credential)
 app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
 app.add_market_data_source(bitvavo_btc_eur_ticker)

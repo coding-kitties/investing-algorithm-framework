@@ -248,6 +248,7 @@ class App:
         # Override the portfolio service with the backtest portfolio service
         self.container.portfolio_service.override(
             BacktestPortfolioService(
+                configuration_service=self.container.configuration_service(),
                 market_credential_service=self.container
                 .market_credential_service(),
                 market_service=self.container.market_service(),

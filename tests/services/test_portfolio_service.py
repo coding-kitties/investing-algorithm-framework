@@ -168,3 +168,149 @@ class TestPortfolioService(FlaskTestBase):
         pending_orders = self.iaf_app.algorithm.get_pending_orders()
         self.assertEqual(1, len(pending_orders))
         self.assertEqual(10, pending_orders[0].amount)
+
+    def test_sync_portfolio_orders_with_symbols_config(self):
+        """
+        Test that the portfolio service can sync existing orders with
+        symbols configuration in the app config.
+
+        The test should make sure that the portfolio service can sync
+        existing orders from the market service to the order service. It
+        should also only sync orders that are in the symbols configuration
+        in the app config.
+        """
+        configuration_service = self.iaf_app.container.configuration_service()
+        configuration_service.config["SYMBOLS"] = ["BTC/EUR", "DOT/EUR"]
+        portfolio_service: PortfolioService \
+            = self.iaf_app.container.portfolio_service()
+        market_service_stub = MarketServiceStub(None)
+        market_service_stub.orders = [
+            Order.from_dict(
+                {
+                    "id": "1323",
+                    "side": "buy",
+                    "symbol": "BTC/EUR",
+                    "amount": 10,
+                    "price": 10.0,
+                    "status": "CLOSED",
+                    "order_type": "limit",
+                    "order_side": "buy",
+                    "created_at": "2023-08-08T14:40:56.626362Z",
+                    "filled": 10,
+                    "remaining": 0,
+                },
+            ),
+            Order.from_dict(
+                {
+                    "id": "2332",
+                    "side": "sell",
+                    "symbol": "BTC/EUR",
+                    "amount": 10,
+                    "price": 20.0,
+                    "status": "CLOSED",
+                    "order_type": "limit",
+                    "order_side": "sell",
+                    "created_at": "2023-08-10T14:40:56.626362Z",
+                    "filled": 10,
+                    "remaining": 0,
+                },
+            ),
+            Order.from_dict(
+                {
+                    "id": "14354",
+                    "side": "buy",
+                    "symbol": "DOT/EUR",
+                    "amount": 10,
+                    "price": 10.0,
+                    "status": "CLOSED",
+                    "order_type": "limit",
+                    "order_side": "buy",
+                    "created_at": "2023-09-22T14:40:56.626362Z",
+                    "filled": 10,
+                    "remaining": 0,
+                },
+            ),
+            Order.from_dict(
+                {
+                    "id": "49394",
+                    "side": "buy",
+                    "symbol": "ETH/EUR",
+                    "amount": 10,
+                    "price": 10.0,
+                    "status": "OPEN",
+                    "order_type": "limit",
+                    "order_side": "buy",
+                    "created_at": "2023-08-08T14:40:56.626362Z",
+                    "filled": 0,
+                    "remaining": 0,
+                },
+            ),
+        ]
+        market_service_stub.symbols = [
+            "BTC/EUR", "DOT/EUR", "ADA/EUR", "ETH/EUR"
+        ]
+        portfolio_service.market_service = market_service_stub
+        portfolio = portfolio_service.find({"market": "binance"})
+        portfolio_service.sync_portfolio_orders(portfolio)
+
+        # Check that the portfolio has the correct amount of orders
+        order_service = self.iaf_app.container.order_service()
+        self.assertEqual(3, order_service.count())
+        self.assertEqual(
+            3, order_service.count({"portfolio": portfolio.id})
+        )
+        self.assertEqual(
+            2, order_service.count({"target_symbol": "BTC"})
+        )
+        self.assertEqual(
+            0, order_service.count({"portfolio_id": 2321})
+        )
+        self.assertEqual(
+            1, order_service.count({"target_symbol": "DOT"})
+        )
+        self.assertEqual(
+            0, order_service.count({"target_symbol": "ETH"})
+        )
+
+        # Check that the portfolio has the correct amount of trades
+        trade_service = self.iaf_app.container.trade_service()
+        self.assertEqual(2, trade_service.count())
+        self.assertEqual(
+            1, trade_service.count(
+                {"portfolio_id": portfolio.id, "status": "CLOSED"}
+            )
+        )
+        self.assertEqual(
+            1, trade_service.count(
+                {"portfolio_id": portfolio.id, "status": "OPEN"}
+            )
+        )
+
+        # Check if all positions are made
+        position_service = self.iaf_app.container.position_service()
+        self.assertEqual(3, position_service.count())
+
+        # Check if btc position exists
+        btc_position = position_service.find(
+            {"portfolio_id": portfolio.id, "symbol": "BTC"}
+        )
+        self.assertEqual(0, btc_position.amount)
+
+        # Check if dot position exists
+        dot_position = position_service.find(
+            {"portfolio_id": portfolio.id, "symbol": "DOT"}
+        )
+        self.assertEqual(10, dot_position.amount)
+
+        # Check if eur position exists
+        eur_position = position_service.find(
+            {"portfolio_id": portfolio.id, "symbol": "EUR"}
+        )
+        self.assertEqual(1000, eur_position.amount)
+
+        # Check that there is the correct amount of pending orders
+        order_service: OrderService = self.iaf_app.container.order_service()
+        self.assertEqual(0, order_service.count({"status": "OPEN"}))
+        pending_orders = self.iaf_app.algorithm.get_pending_orders()
+        self.assertEqual(0, len(pending_orders))
+

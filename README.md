@@ -38,7 +38,13 @@ It also exposes an REST API that allows you to interact with the algorithm.
 import pathlib
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
     RESOURCE_DIRECTORY, TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, \
-    CCXTTickerMarketDataSource, MarketCredential
+    CCXTTickerMarketDataSource, MarketCredential, SYMBOLS
+
+# Define resource directory and the symbols you want to trade
+config = {
+    RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()
+    SYMBOLS: ["BTC/EUR"]
+}
 
 # Define market data sources
 bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
@@ -54,7 +60,7 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     market="BITVAVO",
     symbol="BTC/EUR",
 )
-app = create_app({RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()})
+app = create_app(config=config)
 algorithm = Algorithm()
 
 app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)

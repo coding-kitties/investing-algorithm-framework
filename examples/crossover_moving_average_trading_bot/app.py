@@ -1,8 +1,11 @@
 import pathlib
 
-from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY
+from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
+    SYMBOLS
 
-app = create_app(
-    config={RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()}
-)
+config = {
+    SYMBOLS: ["BTC/EUR"],
+    RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()
+}
+app = create_app(config=config)
 
