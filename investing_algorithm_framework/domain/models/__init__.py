@@ -11,6 +11,7 @@ from .backtesting import BacktestReport, BacktestPosition, \
     BacktestReportsEvaluation
 from .strategy_profile import StrategyProfile
 from .trade import Trade, TradeStatus
+from .app_mode import AppMode
 
 __all__ = [
     "OrderStatus",
@@ -35,4 +36,5 @@ __all__ = [
     "MarketCredential",
     "TradeStatus",
     "BacktestReportsEvaluation",
+    "AppMode"
 ]

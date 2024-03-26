@@ -83,6 +83,9 @@ class Order(BaseModel):
         self.trailing_stop_loss_percentage = trailing_stop_loss_percentage
         self._available_amount = self.filled
 
+    def get_id(self):
+        return self.id
+
     def get_external_id(self):
         return self.external_id
 

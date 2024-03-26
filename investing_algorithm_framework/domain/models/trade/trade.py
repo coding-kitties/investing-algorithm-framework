@@ -132,6 +132,9 @@ class Trade(BaseModel):
     @property
     def value(self):
 
+        if self.closed_at is not None:
+            return self.amount * self.closed_price
+
         if self.current_price is None:
             return None
 

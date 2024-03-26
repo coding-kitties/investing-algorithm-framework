@@ -39,6 +39,14 @@ class Position(BaseModel):
     def set_portfolio_id(self, portfolio_id):
         self.portfolio_id = portfolio_id
 
+    def to_dict(self):
+        return {
+            "symbol": self.symbol,
+            "amount": self.amount,
+            "cost": self.cost,
+            "portfolio_id": self.portfolio_id,
+        }
+
     def __repr__(self):
         return self.repr(
             symbol=self.symbol,

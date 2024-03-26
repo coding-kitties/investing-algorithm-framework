@@ -34,7 +34,7 @@ class Test(TestBase):
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="binance",
-                trading_symbol="USDT"
+                trading_symbol="EUR"
             )
         )
         self.app.container.market_service.override(MarketServiceStub(None))

@@ -19,7 +19,8 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
     SQLALCHEMY_DATABASE_URI, OperationalException, BACKTESTING_FLAG, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, BacktestReport, \
-    BACKTESTING_PENDING_ORDER_CHECK_INTERVAL
+    BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, APP_MODE, MarketCredential, \
+    AppMode
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables
 from investing_algorithm_framework.services import OrderBacktestService, \
@@ -78,7 +79,7 @@ class App:
     def algorithm(self, algorithm: Algorithm) -> None:
         self._algorithm = algorithm
 
-    def initialize(self):
+    def initialize(self, sync=False):
         """
         Method to initialize the app. This method should be called before
         running the algorithm. It initializes the services and the algorithm
@@ -108,11 +109,18 @@ class App:
             trade_service=self.container.trade_service(),
         )
 
-        if self._web:
+        if self._stateless:
+            self.config[APP_MODE] = AppMode.STATELESS.value
+        elif self._web:
+            self.config[APP_MODE] = AppMode.WEB.value
+        else:
+            self.config[APP_MODE] = AppMode.DEFAULT.value
+
+        if AppMode.WEB.from_value(self.config[APP_MODE]):
             self._initialize_web()
             setup_sqlalchemy(self)
             create_all_tables()
-        elif self._stateless:
+        elif AppMode.STATELESS.from_value(self.config[APP_MODE]):
             self._initialize_stateless()
             setup_sqlalchemy(self)
             create_all_tables()
@@ -122,24 +130,61 @@ class App:
             create_all_tables()
 
         # Initialize all portfolios that are registered
-        portfolio_configuration_service = self.container\
+        portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
 
         # Throw an error if no portfolios are configured
         if portfolio_configuration_service.count() == 0:
             raise OperationalException("No portfolios configured")
 
-        # Create all portfolios
-        portfolio_configurations = portfolio_configuration_service.get_all()
+        # Check if all portfolios are configured
         portfolio_service = self.container.portfolio_service()
+        synced_portfolios = []
 
-        for portfolio_configuration in portfolio_configurations:
-            # Create portfolio if not exists
-            portfolio = portfolio_service.create_portfolio_from_configuration(
-                portfolio_configuration
-            )
-            # Sync all orders from exchange with current order history
-            portfolio_service.sync_portfolio_orders(portfolio)
+        for portfolio_configuration \
+                in portfolio_configuration_service.get_all():
+
+            if not portfolio_service.exists(
+                {"identifier": portfolio_configuration.identifier}
+            ):
+                portfolio = portfolio_service.create_portfolio_from_configuration(
+                    portfolio_configuration
+                )
+                self.sync(portfolio)
+                synced_portfolios.append(portfolio)
+
+        if sync:
+            portfolios = portfolio_service.get_all()
+
+            for portfolio in portfolios:
+
+                if portfolio not in synced_portfolios:
+                    self.sync(portfolio)
+
+
+
+
+    def sync(self, portfolio):
+        """
+        Sync the portfolio with the exchange. This method should be called
+        before running the algorithm. It syncs the portfolio with the
+        exchange by syncing the unallocated balance, positions, orders, and
+        trades.
+        """
+        portfolio_sync_service = self.container.portfolio_sync_service()
+
+        # Sync unallocated balance
+        portfolio_sync_service.sync_unallocated(portfolio)
+
+        # Sync all positions from exchange with current
+        # position history
+        portfolio_sync_service.sync_positions(portfolio)
+
+        # Sync all orders from exchange with current order history
+        portfolio_sync_service.sync_orders(portfolio)
+
+        # Sync all trades from exchange with current trade history
+        portfolio_sync_service.sync_trades(portfolio)
 
     def _initialize_stateless(self):
         """
@@ -213,7 +258,7 @@ class App:
         configuration_service.config[BACKTESTING_START_DATE] = \
             backtest_start_date
         configuration_service.config[BACKTESTING_END_DATE] = backtest_end_date
-        configuration_service.config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]\
+        configuration_service.config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL] \
             = pending_order_check_interval
 
         # Create resource dir if not exits
@@ -226,7 +271,7 @@ class App:
         # backtest_market_data_sources = []
         market_data_source_service: MarketDataSourceService = \
             self.container.market_data_source_service()
-        market_data_sources = market_data_source_service\
+        market_data_sources = market_data_source_service \
             .get_market_data_sources()
 
         if market_data_sources is not None:
@@ -252,7 +297,7 @@ class App:
                 market_credential_service=self.container
                 .market_credential_service(),
                 market_service=self.container.market_service(),
-                position_repository=self.container.position_repository(),
+                position_service=self.container.position_service(),
                 order_service=self.container.order_service(),
                 portfolio_repository=self.container.portfolio_repository(),
                 portfolio_configuration_service=self.container
@@ -263,7 +308,7 @@ class App:
         )
 
         # Override the order service with the backtest order service
-        market_data_source_service = self.container\
+        market_data_source_service = self.container \
             .market_data_source_service()
         self.container.order_service.override(
             OrderBacktestService(
@@ -290,6 +335,24 @@ class App:
 
         if portfolio_configuration_service.count() == 0:
             raise OperationalException("No portfolios configured")
+
+    def _initialize_algorithm(self):
+        self.algorithm.initialize_services(
+            configuration_service=self.container.configuration_service(),
+            portfolio_configuration_service=self.container
+            .portfolio_configuration_service(),
+            portfolio_service=self.container.portfolio_service(),
+            position_service=self.container.position_service(),
+            order_service=self.container.order_service(),
+            market_service=self.container.market_service(),
+            strategy_orchestrator_service=self.container
+            .strategy_orchestrator_service(),
+            market_credential_service=self.container
+            .market_credential_service(),
+            market_data_source_service=self.container
+            .market_data_source_service(),
+            trade_service=self.container.trade_service(),
+        )
 
     def _initialize_algorithm_for_backtest(self, algorithm):
         configuration_service = self.container.configuration_service()
@@ -322,6 +385,7 @@ class App:
         market_credential_service = self.container.market_credential_service()
         market_data_source_service = \
             self.container.market_data_source_service()
+
         # Initialize all services in the algorithm
         algorithm.initialize_services(
             configuration_service=self.container.configuration_service(),
@@ -365,9 +429,10 @@ class App:
                 shutil.copy(management_commands_template, destination)
 
     def run(
-        self,
-        payload: dict = None,
-        number_of_iterations: int = None,
+            self,
+            payload: dict = None,
+            number_of_iterations: int = None,
+            sync=False
     ):
         """
         Entry point to run the application. This method should be called to
@@ -406,13 +471,13 @@ class App:
             stateless=self.stateless
         )
 
-        if self.stateless:
+        if AppMode.STATELESS.equals(self.config[APP_MODE]):
             logger.info("Running stateless")
             action_handler = ActionHandler.of(payload)
             return action_handler.handle(
                 payload=payload, algorithm=self.algorithm
             )
-        elif self._web:
+        elif AppMode.WEB.equals(self.config[APP_MODE]):
             logger.info("Running web")
             flask_thread = threading.Thread(
                 name='Web App',
@@ -462,7 +527,7 @@ class App:
         self.algorithm.reset()
 
     def add_portfolio_configuration(self, portfolio_configuration):
-        portfolio_configuration_service = self.container\
+        portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
         portfolio_configuration_service.add(portfolio_configuration)
 
@@ -490,10 +555,10 @@ class App:
                 time_unit=time_unit,
                 interval=interval,
             )
-            self.add_task(task)
+            self.algorithm.add_task(task)
         else:
             def wrapper(f):
-                self.add_task(
+                self.algorithm.add_task(
                     Task(
                         decorated=f,
                         time_unit=time_unit,
@@ -505,6 +570,19 @@ class App:
             return wrapper
 
     def _initialize_web(self):
+        """
+        Initialize the app for web mode by setting the configuration
+        parameters for web mode and overriding the services with the
+        web services equivalents.
+
+        Web has the following implications:
+        - db
+            - sqlite
+        - services
+            - Flask app
+            - Investing Algorithm Framework App
+            - Algorithm
+        """
         configuration_service = self.container.configuration_service()
         resource_dir = configuration_service.config[RESOURCE_DIRECTORY]
 
@@ -559,7 +637,7 @@ class App:
             return
 
         configuration_service = self.container.configuration_service()
-        database_dir = configuration_service.config\
+        database_dir = configuration_service.config \
             .get(DATABASE_DIRECTORY_PATH, None)
 
         if database_dir is None:
@@ -589,12 +667,12 @@ class App:
         return self.algorithm.get_portfolio_configurations()
 
     def run_backtest(
-        self,
-        algorithm,
-        start_date,
-        end_date,
-        pending_order_check_interval='1h',
-        output_directory=None
+            self,
+            algorithm,
+            start_date,
+            end_date,
+            pending_order_check_interval='1h',
+            output_directory=None
     ) -> BacktestReport:
         """
         Run a backtest for an algorithm. This method should be called when
@@ -633,7 +711,7 @@ class App:
         report = backtest_service.run_backtest(
             algorithm=self.algorithm, start_date=start_date, end_date=end_date
         )
-        backtest_report_writer_service = self.container\
+        backtest_report_writer_service = self.container \
             .backtest_report_writer_service()
 
         if output_directory is None:
@@ -649,12 +727,12 @@ class App:
         return report
 
     def run_backtests(
-        self,
-        algorithms,
-        start_date,
-        end_date,
-        pending_order_check_interval='1h',
-        output_directory=None
+            self,
+            algorithms,
+            start_date,
+            end_date,
+            pending_order_check_interval='1h',
+            output_directory=None
     ) -> List[BacktestReport]:
         """
         Run a backtest for a set algorithm. This method should be called when
@@ -692,7 +770,7 @@ class App:
             report = backtest_service.run_backtest(
                 algorithm=algorithm, start_date=start_date, end_date=end_date
             )
-            backtest_report_writer_service = self.container\
+            backtest_report_writer_service = self.container \
                 .backtest_report_writer_service()
 
             if output_directory is None:
@@ -711,7 +789,8 @@ class App:
     def add_market_data_source(self, market_data_source):
         self._market_data_source_service.add(market_data_source)
 
-    def add_market_credential(self, market_credential):
+    def add_market_credential(self, market_credential: MarketCredential):
+        market_credential.market = market_credential.market.upper()
         self._market_credential_service.add(market_credential)
 
     def on_initialize(self, app_hook: AppHook):

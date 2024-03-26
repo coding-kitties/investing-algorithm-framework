@@ -24,6 +24,10 @@ class OrderFee(BaseModel):
 
     @staticmethod
     def from_ccxt_fee(ccxt_fee):
+
+        if ccxt_fee is None:
+            return None
+
         return OrderFee(
             currency=ccxt_fee.get('currency'),
             cost=ccxt_fee.get('cost'),

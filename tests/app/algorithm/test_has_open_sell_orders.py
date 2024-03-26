@@ -1,49 +1,32 @@
 import os
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, MarketCredential, Algorithm
+    PortfolioConfiguration, MarketCredential, Algorithm, SYMBOLS
 from tests.resources import TestBase, MarketServiceStub
 
 
 class Test(TestBase):
-
-    def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.join(
-                            os.path.realpath(__file__),
-                            os.pardir
-                        ),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="binance",
+            trading_symbol="EUR",
+            initial_balance=1000,
         )
-        self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        self.app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="binance",
-                trading_symbol="USDT"
-            )
+    ]
+    market_credentials = [
+        MarketCredential(
+            market="binance",
+            api_key="api_key",
+            secret_key="secret_key",
         )
-        self.app.container.market_service.override(MarketServiceStub(None))
-        self.app.add_algorithm(Algorithm())
-        self.app.add_market_credential(
-            MarketCredential(
-                market="binance",
-                api_key="api_key",
-                secret_key="secret_key"
-            )
-        )
-        self.app.initialize()
+    ]
+    external_available_symbols = ["BTC/EUR", "DOT/EUR", "ADA/EUR", "ETH/EUR"]
+    external_balances = {
+        "EUR": 1000,
+    }
 
     def test_has_open_sell_orders(self):
-        self.app.run(number_of_iterations=1)
-        trading_symbol_position = self.app.algorithm.get_position("USDT")
+        trading_symbol_position = self.app.algorithm.get_position("EUR")
         self.assertEqual(1000, trading_symbol_position.get_amount())
         self.assertFalse(self.app.algorithm.position_exists(symbol="BTC"))
         self.app.algorithm.create_limit_order(

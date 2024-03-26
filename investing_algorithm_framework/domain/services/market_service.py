@@ -44,7 +44,7 @@ class MarketService(ABC):
         raise NotImplementedError()
 
     @abstractmethod
-    def get_balance(self, market):
+    def get_balance(self, market) -> dict[str, float]:
         raise NotImplementedError()
 
     @abstractmethod

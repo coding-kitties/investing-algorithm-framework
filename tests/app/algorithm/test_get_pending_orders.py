@@ -1,17 +1,14 @@
 from investing_algorithm_framework import PortfolioConfiguration, Order, \
-    MarketCredential
-from investing_algorithm_framework.services import PortfolioService, \
-    OrderService
-from tests.resources import FlaskTestBase
-from tests.resources import MarketServiceStub
+    MarketCredential, SYMBOLS
+from investing_algorithm_framework.services import PortfolioService
+from tests.resources import TestBase
 
 
-class TestPortfolioService(FlaskTestBase):
+class TestPortfolioService(TestBase):
     portfolio_configurations = [
         PortfolioConfiguration(
             market="binance",
             trading_symbol="EUR",
-            initial_balance=1000,
         )
     ]
     market_credentials = [
@@ -21,6 +18,61 @@ class TestPortfolioService(FlaskTestBase):
             secret_key="secret_key",
         )
     ]
+    external_orders = [
+        Order.from_dict(
+            {
+                "id": "1323",
+                "side": "buy",
+                "symbol": "BTC/EUR",
+                "amount": 10,
+                "price": 10.0,
+                "status": "CLOSED",
+                "order_type": "limit",
+                "order_side": "buy",
+                "created_at": "2023-08-08T14:40:56.626362Z",
+                "filled": 10,
+                "remaining": 0,
+            },
+        ),
+        Order.from_dict(
+            {
+                "id": "14354",
+                "side": "buy",
+                "symbol": "DOT/EUR",
+                "amount": 10,
+                "price": 10.0,
+                "status": "OPEN",
+                "order_type": "limit",
+                "order_side": "buy",
+                "created_at": "2023-09-22T14:40:56.626362Z",
+                "filled": 0,
+                "remaining": 0,
+            },
+        ),
+        Order.from_dict(
+            {
+                "id": "49394",
+                "side": "buy",
+                "symbol": "ETH/EUR",
+                "amount": 10,
+                "price": 10.0,
+                "status": "OPEN",
+                "order_type": "limit",
+                "order_side": "buy",
+                "created_at": "2023-08-08T14:40:56.626362Z",
+                "filled": 0,
+                "remaining": 0,
+            },
+        ),
+    ]
+    external_available_symbols = [
+        "BTC/EUR", "DOT/EUR", "ADA/EUR", "ETH/EUR"
+    ]
+    external_balances = {
+        "EUR": 700,
+        "BTC": 10,
+    }
+    config = {SYMBOLS: ["BTC/EUR", "DOT/EUR", "ETH/EUR", "ADA/EUR"]}
 
     def test_get_pending_orders(self):
         """
@@ -30,64 +82,11 @@ class TestPortfolioService(FlaskTestBase):
         existing orders from the market service to the order service.
         """
         portfolio_service: PortfolioService \
-            = self.iaf_app.container.portfolio_service()
-        market_service_stub = MarketServiceStub(None)
-        market_service_stub.orders = [
-            Order.from_dict(
-                {
-                    "id": "1323",
-                    "side": "buy",
-                    "symbol": "BTC/EUR",
-                    "amount": 10,
-                    "price": 10.0,
-                    "status": "CLOSED",
-                    "order_type": "limit",
-                    "order_side": "buy",
-                    "created_at": "2023-08-08T14:40:56.626362Z",
-                    "filled": 10,
-                    "remaining": 0,
-                },
-            ),
-            Order.from_dict(
-                {
-                    "id": "14354",
-                    "side": "buy",
-                    "symbol": "DOT/EUR",
-                    "amount": 10,
-                    "price": 10.0,
-                    "status": "OPEN",
-                    "order_type": "limit",
-                    "order_side": "buy",
-                    "created_at": "2023-09-22T14:40:56.626362Z",
-                    "filled": 0,
-                    "remaining": 0,
-                },
-            ),
-            Order.from_dict(
-                {
-                    "id": "49394",
-                    "side": "buy",
-                    "symbol": "ETH/EUR",
-                    "amount": 10,
-                    "price": 10.0,
-                    "status": "OPEN",
-                    "order_type": "limit",
-                    "order_side": "buy",
-                    "created_at": "2023-08-08T14:40:56.626362Z",
-                    "filled": 0,
-                    "remaining": 0,
-                },
-            ),
-        ]
-        market_service_stub.symbols = [
-            "BTC/EUR", "DOT/EUR", "ADA/EUR", "ETH/EUR"
-        ]
-        portfolio_service.market_service = market_service_stub
+            = self.app.container.portfolio_service()
         portfolio = portfolio_service.find({"market": "binance"})
-        portfolio_service.sync_portfolio_orders(portfolio)
 
         # Check that the portfolio has the correct amount of orders
-        order_service = self.iaf_app.container.order_service()
+        order_service = self.app.container.order_service()
         self.assertEqual(3, order_service.count())
         self.assertEqual(
             3, order_service.count({"portfolio": portfolio.id})
@@ -106,7 +105,7 @@ class TestPortfolioService(FlaskTestBase):
         )
 
         # Check that the portfolio has the correct amount of trades
-        trade_service = self.iaf_app.container.trade_service()
+        trade_service = self.app.container.trade_service()
         self.assertEqual(1, trade_service.count())
         self.assertEqual(
             1, trade_service.count(
@@ -115,8 +114,8 @@ class TestPortfolioService(FlaskTestBase):
         )
 
         # Check if all positions are made
-        position_service = self.iaf_app.container.position_service()
-        self.assertEqual(4, position_service.count())
+        position_service = self.app.container.position_service()
+        self.assertEqual(5, position_service.count())
 
         # Check if btc position exists
         btc_position = position_service.find(
@@ -142,13 +141,13 @@ class TestPortfolioService(FlaskTestBase):
         )
         self.assertEqual(700, eur_position.amount)
 
-        pending_orders = self.iaf_app.algorithm.get_pending_orders()
+        pending_orders = self.app.algorithm.get_pending_orders()
         self.assertEqual(2, len(pending_orders))
 
-        pending_order = self.iaf_app.algorithm\
+        pending_order = self.app.algorithm\
             .get_pending_orders(target_symbol="ETH")[0]
 
-        order_service = self.iaf_app.container.order_service()
+        order_service = self.app.container.order_service()
         order_service.update(
             pending_order.id,
             {
@@ -158,5 +157,5 @@ class TestPortfolioService(FlaskTestBase):
             }
         )
 
-        pending_orders = self.iaf_app.algorithm.get_pending_orders()
+        pending_orders = self.app.algorithm.get_pending_orders()
         self.assertEqual(1, len(pending_orders))

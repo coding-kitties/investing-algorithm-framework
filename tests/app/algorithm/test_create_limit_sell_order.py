@@ -6,40 +6,22 @@ from tests.resources import TestBase, MarketServiceStub
 
 
 class Test(TestBase):
-
-    def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.join(
-                            os.path.realpath(__file__),
-                            os.pardir
-                        ),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="BITVAVO",
+            trading_symbol="EUR"
         )
-        self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        self.app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="binance",
-                trading_symbol="USDT"
-            )
+    ]
+    market_credentials = [
+        MarketCredential(
+            market="BITVAVO",
+            api_key="api_key",
+            secret_key="secret_key"
         )
-        self.app.container.market_service.override(MarketServiceStub(None))
-        self.app.add_algorithm(Algorithm())
-        self.app.add_market_credential(
-            MarketCredential(
-                market="binance",
-                api_key="api_key",
-                secret_key="secret_key"
-            )
-        )
-        self.app.initialize()
+    ]
+    external_balances = {
+        "EUR": 1000
+    }
 
     def test_create_limit_sell_order(self):
         self.app.run(number_of_iterations=1)

@@ -17,6 +17,10 @@ class MarketCredential:
     def market(self):
         return self._market
 
+    @market.setter
+    def market(self, market):
+        self._market = market
+
     @property
     def api_key(self):
         return self._api_key
@@ -24,3 +28,8 @@ class MarketCredential:
     @property
     def secret_key(self):
         return self._secret_key
+
+    def __repr__(self):
+        return f"MarketCredential(" \
+               f"{self.market}, {self.api_key}, {self.secret_key}" \
+               f")"

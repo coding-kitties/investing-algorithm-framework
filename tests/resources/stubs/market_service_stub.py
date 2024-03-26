@@ -8,7 +8,16 @@ from investing_algorithm_framework.domain import MarketService
 class MarketServiceStub(MarketService):
     _orders = []
     _ohlcv = []
-    _symbols = []
+    _symbols = [
+        'BTC/EUR',
+        'ETH/EUR',
+        'ADA/EUR',
+        'BNB/EUR',
+        "KSM/EUR",
+    ]
+    _balances = {
+        'EUR': 1000,
+    }
 
     def __init__(self, market_credential_service):
         super().__init__(market_credential_service)
@@ -24,8 +33,16 @@ class MarketServiceStub(MarketService):
         self._orders = value
 
     @property
+    def balances(self) -> dict[str, float]:
+        return self._balances
+
+    @balances.setter
+    def balances(self, value: dict[str, float]):
+        self._balances = value
+
+    @property
     def symbols(self):
-        return self._orders
+        return self._symbols
 
     @symbols.setter
     def symbols(self, value):
@@ -46,10 +63,12 @@ class MarketServiceStub(MarketService):
     def get_orders(self, symbol, market, since: datetime = None):
         selection = []
 
-        for order in self.orders:
-            if order.get_symbol() == symbol:
-                selection.append(order)
-        return selection
+        if self.orders is not None:
+            for order in self.orders:
+
+                if order.get_symbol().upper() == symbol.upper():
+                    selection.append(order)
+            return selection
 
     def cancel_order(self, order_id, market):
         pass
@@ -131,43 +150,8 @@ class MarketServiceStub(MarketService):
             trading_symbol=trading_symbol,
         )
 
-    def get_balance(self, market):
-        return {
-            'info': [
-                {'symbol': 'USDT', 'available': '1000', 'inOrder': '0'},
-                {'symbol': 'BTC', 'available': '0.0013795', 'inOrder': '0'},
-                {'symbol': 'DOT', 'available': '16', 'inOrder': '0'},
-                {'symbol': 'EUR', 'available': '1000', 'inOrder': '0'},
-                {'symbol': 'KSM', 'available': '2.98923511', 'inOrder': '0'},
-            ],
-            'timestamp': None,
-            'datetime': None,
-            'BTC': {'free': 0.0013795, 'used': 0.0, 'total': 0.0013795},
-            'DOT': {'free': 16.0, 'used': 0.0, 'total': 16.0},
-            'EUR': {'free': 1000, 'used': 0.0, 'total': 500.22},
-            'KSM': {'free': 2.98923511, 'used': 0.0, 'total': 2.98923511},
-            'USDT': {'free': 1000, 'used': 0.0, 'total': 200},
-            'free': {
-                'BTC': 0.0013795,
-                'DOT': 16.0, 'EUR': 500.22,
-                'KSM': 2.98923511,
-                'USDT': 1000
-            },
-            'used': {
-                'BTC': 0.0,
-                'DOT': 0.0,
-                'EUR': 0.0,
-                'KSM': 0.0,
-                'USDT': 0.0
-            },
-            'total': {
-                'BTC': 0.0013795,
-                'DOT': 16.0,
-                'EUR': 500.22,
-                'KSM': 2.98923511,
-                'USDT': 1000
-            }
-        }
+    def get_balance(self, market) -> dict[str, float]:
+        return self._balances
 
     def get_order(self, order, market):
         symbol = f"{order.target_symbol.upper()}/{order.trading_symbol.upper()}"

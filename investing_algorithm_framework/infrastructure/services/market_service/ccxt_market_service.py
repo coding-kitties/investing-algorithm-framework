@@ -189,7 +189,7 @@ class CCXTMarketService(MarketService):
             )
 
         try:
-            return exchange.fetchBalance()
+            return exchange.fetchBalance()["free"]
         except Exception as e:
             logger.exception(e)
             raise OperationalException(

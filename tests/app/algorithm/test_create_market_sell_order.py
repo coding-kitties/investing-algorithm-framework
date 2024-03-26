@@ -1,48 +1,29 @@
-import os
-
-from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, OrderType, OrderSide, \
-    OrderStatus, Algorithm, MarketCredential
-from tests.resources import TestBase, MarketServiceStub
+from investing_algorithm_framework import PortfolioConfiguration, OrderType, OrderSide, \
+    OrderStatus, MarketCredential
+from tests.resources import TestBase
 
 
 class Test(TestBase):
+    external_balances = {
+        "EUR": 1000
+    }
+    external_available_symbols = ["BTC/EUR"]
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="BITVAVO",
+            trading_symbol="EUR"
+        )
+    ]
+    market_credentials = [
+        MarketCredential(
+            market="bitvavo",
+            api_key="api_key",
+            secret_key="secret_key"
+        )
+    ]
 
-    def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.join(
-                            os.path.realpath(__file__),
-                            os.pardir
-                        ),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
-        )
-        self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        self.app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="BITVAVO",
-                trading_symbol="EUR"
-            )
-        )
-        self.app.container.market_service.override(MarketServiceStub(None))
-        self.app.add_algorithm(Algorithm())
-        self.app.add_market_credential(
-            MarketCredential(
-                market="bitvavo",
-                api_key="api_key",
-                secret_key="secret_key"
-            )
-        )
-        self.app.initialize()
-        portfolio_service = self.app.container.portfolio_service()
-        portfolio = portfolio_service.find({"market": "BITVAVO"})
+    def test_create_market_sell_order(self):
+        portfolio = self.app.algorithm.get_portfolio()
         order_service = self.app.container.order_service()
         order_service.create(
             {
@@ -56,16 +37,15 @@ class Test(TestBase):
                 "trading_symbol": portfolio.trading_symbol,
             },
         )
-        order_service.check_pending_orders()
-
-    def test_create_market_sell_order(self):
         position_service = self.app.container.position_service()
         order_service = self.app.container.order_service()
         trading_symbol_position = position_service.find({"symbol": "EUR"})
         self.assertEqual(990, trading_symbol_position.get_amount())
-        self.app.run(number_of_iterations=1)
+        self.app.run(number_of_iterations=1, sync=False)
         trading_symbol_position = position_service.find({"symbol": "EUR"})
         self.assertEqual(990, trading_symbol_position.get_amount())
+        btc_position = position_service.find({"symbol": "BTC"})
+        self.assertEqual(1, btc_position.get_amount())
         self.app.algorithm.create_market_order(
             target_symbol="BTC",
             amount=1,
@@ -73,8 +53,10 @@ class Test(TestBase):
         )
         btc_position = position_service.find({"symbol": "BTC"})
         self.assertEqual(0, btc_position.get_amount())
-        order_service.check_pending_orders()
-        btc_position = position_service.find({"symbol": "BTC"})
-        trading_symbol_position = position_service.find({"symbol": "EUR"})
-        self.assertEqual(0, btc_position.get_amount())
-        self.assertEqual(990, trading_symbol_position.get_amount())
+        market_sell_order = order_service.find(
+            {"target_symbol": "BTC", "order_side": "SELL"}
+        )
+        self.assertIsNotNone(market_sell_order)
+        self.assertEqual(OrderStatus.CREATED.value, market_sell_order.status)
+        self.assertEqual(1, market_sell_order.amount)
+        self.assertEqual(None, market_sell_order.price)

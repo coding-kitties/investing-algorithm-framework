@@ -6,6 +6,22 @@ from tests.resources import TestBase, MarketServiceStub
 
 
 class Test(TestBase):
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="BITVAVO",
+            trading_symbol="EUR"
+        )
+    ]
+    market_credentials = [
+        MarketCredential(
+            market="BITVAVO",
+            api_key="api_key",
+            secret_key="secret_key"
+        )
+    ]
+    external_balances = {
+        "EUR": 1000
+    }
 
     def count_decimals(self, number):
         decimal_str = str(number)
@@ -13,41 +29,6 @@ class Test(TestBase):
             return len(decimal_str.split('.')[1])
         else:
             return 0
-
-    def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.join(
-                            os.path.realpath(__file__),
-                            os.pardir
-                        ),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
-        )
-        self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        self.app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="binance",
-                trading_symbol="USDT"
-            )
-        )
-        self.app.container.market_service.override(MarketServiceStub(None))
-        algorithm = Algorithm()
-        self.app.add_algorithm(algorithm)
-        self.app.add_market_credential(
-            MarketCredential(
-                market="binance",
-                api_key="api_key",
-                secret_key="secret_key"
-            )
-        )
-        self.app.initialize()
 
     def test_create_limit_buy_order(self):
         self.app.run(number_of_iterations=1)

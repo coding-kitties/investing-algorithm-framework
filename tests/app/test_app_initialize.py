@@ -1,4 +1,5 @@
 import os
+from unittest import TestCase
 
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
     MarketCredential, Algorithm
@@ -6,7 +7,7 @@ from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI
 from tests.resources import TestBase, MarketServiceStub
 
 
-class TestAppInitialize(TestBase):
+class TestAppInitialize(TestCase):
 
     def setUp(self) -> None:
         self.resource_dir = os.path.abspath(

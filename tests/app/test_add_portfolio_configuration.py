@@ -1,54 +1,37 @@
 import os
+from unittest import TestCase
 
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
     RESOURCE_DIRECTORY, Algorithm, MarketCredential
 from investing_algorithm_framework.dependency_container import \
     DependencyContainer
-from tests.resources import TestBase, MarketServiceStub
+from tests.resources import MarketServiceStub, TestBase
 
 
 class Test(TestBase):
-
-    def setUp(self) -> None:
-        DependencyContainer.market_service.override(
-            MarketServiceStub(market_credential_service=None)
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="BITVAVO",
+            trading_symbol="EUR"
         )
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.realpath(__file__),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
+    ]
+    market_credentials = [
+        MarketCredential(
+            market="BITVAVO",
+            api_key="api_key",
+            secret_key="secret_key"
         )
+    ]
+    external_balances = {
+        "EUR": 1000,
+    }
 
     def test_add(self):
-        app = create_app(
-            config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
-        )
-        app.add_portfolio_configuration(
+        self.app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BITVAVO",
-                trading_symbol="USDT",
+                trading_symbol="EUR",
             )
         )
-        algorithm = Algorithm()
-        app.add_algorithm(algorithm)
-        app.add_market_credential(
-            MarketCredential(
-                market="BITVAVO",
-                api_key="api_key",
-                secret_key="secret_key"
-            )
-        )
-        app.container.market_service.override(MarketServiceStub(None))
-        portfolio_configuration_service = app.container\
-            .portfolio_configuration_service()
-        self.assertIsNotNone(portfolio_configuration_service.get("BITVAVO"))
-        app.run(number_of_iterations=1)
-        self.assertEqual(app.algorithm.portfolio_service.count(), 1)
-        self.assertEqual(app.algorithm.get_unallocated(), 1000)
+        self.assertEqual(1, self.app.algorithm.portfolio_service.count())
+        self.assertEqual(1000, self.app.algorithm.get_unallocated())

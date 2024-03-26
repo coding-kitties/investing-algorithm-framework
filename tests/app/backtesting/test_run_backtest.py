@@ -1,4 +1,5 @@
 import os
+from unittest import TestCase
 from datetime import datetime, timedelta
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
@@ -16,7 +17,7 @@ class TestStrategy(TradingStrategy):
         pass
 
 
-class Test(TestBase):
+class Test(TestCase):
     """
     Collection of tests for backtest report operations
     """

@@ -53,9 +53,9 @@ class CrossOverStrategy(TradingStrategy):
         "DOT/EUR-ticker"
     ]
     symbols = ["BTC/EUR", "DOT/EUR"]
-    fast = 9
-    slow = 50
-    trend = 100
+    fast = 21
+    slow = 75
+    trend = 150
 
     def apply_strategy(self, algorithm: Algorithm, market_data):
 
@@ -67,9 +67,9 @@ class CrossOverStrategy(TradingStrategy):
 
             df = market_data[f"{symbol}-ohlcv"]
             ticker_data = market_data[f"{symbol}-ticker"]
-            fast = ti.sma(df['Close'].to_numpy(), 9)
-            slow = ti.sma(df['Close'].to_numpy(), 50)
-            trend = ti.sma(df['Close'].to_numpy(), 100)
+            fast = ti.sma(df['Close'].to_numpy(), self.fast)
+            slow = ti.sma(df['Close'].to_numpy(), self.slow)
+            trend = ti.sma(df['Close'].to_numpy(), self.trend)
             price = ticker_data['bid']
 
             if not algorithm.has_position(target_symbol) \

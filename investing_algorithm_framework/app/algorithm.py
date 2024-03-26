@@ -727,12 +727,17 @@ class Algorithm:
                 .get_all()
 
         else:
-            query_params = {
-                "market": market,
-                "identifier": identifier
-            }
-            portfolio_configurations = [self.portfolio_configuration_service
-                                        .find(query_params)]
+            query_params = {"market": market, "identifier": identifier}
+            portfolio_configuration = self.portfolio_configuration_service \
+                .find(query_params)
+
+            if not portfolio_configuration:
+                raise OperationalException("No portfolio found.")
+
+            portfolio_configurations = [portfolio_configuration]
+
+        if len(portfolio_configurations) == 0:
+            raise OperationalException("No portfolio found.")
 
         portfolios = []
 

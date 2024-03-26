@@ -6,7 +6,7 @@ class MarketCredentialService:
     _market_credentials = {}
 
     def add(self, market_data_credential: MarketCredential):
-        self._market_credentials[market_data_credential.market.lower()] \
+        self._market_credentials[market_data_credential.market.upper()] \
             = market_data_credential
 
     def add_all(self, market_data_credentials: List[MarketCredential]):
@@ -15,10 +15,10 @@ class MarketCredentialService:
 
     def get(self, market) -> Union[MarketCredential, None]:
 
-        if market.lower() not in self._market_credentials:
+        if market.upper() not in self._market_credentials:
             return None
 
-        return self._market_credentials[market]
+        return self._market_credentials[market.upper()]
 
     def get_all(self) -> List[MarketCredential]:
         return list(self._market_credentials.values())

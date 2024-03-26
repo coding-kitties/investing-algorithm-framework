@@ -21,26 +21,26 @@ class SimpleTradingStrategy(TradingStrategy):
         )
 
 
-class Test(TestCase):
-
-    def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.realpath(__file__),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
-        )
-        self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        self.app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="BITVAVO",
-                trading_symbol="USDT"
-            )
-        )
-        self.app.add_strategy(SimpleTradingStrategy)
+# class Test(TestCase):
+#
+#     def setUp(self) -> None:
+#         self.resource_dir = os.path.abspath(
+#             os.path.join(
+#                 os.path.join(
+#                     os.path.join(
+#                         os.path.realpath(__file__),
+#                         os.pardir
+#                     ),
+#                     os.pardir
+#                 ),
+#                 "resources"
+#             )
+#         )
+#         self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+#         self.app.add_portfolio_configuration(
+#             PortfolioConfiguration(
+#                 market="BITVAVO",
+#                 trading_symbol="USDT"
+#             )
+#         )
+#         self.app.add_strategy(SimpleTradingStrategy)

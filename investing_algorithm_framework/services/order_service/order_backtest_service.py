@@ -167,8 +167,6 @@ class OrderBacktestService(OrderService):
         # Filter OHLCV data after the order creation time
         ohlcv_data_after_order = ohlcv_data_frame.loc[created_at:]
 
-        # print(ohlcv_data_frame)
-        # print(ohlcv_data_after_order)
         # Check if the order execution conditions are met
         if OrderSide.BUY.equals(order_side):
             # Check if the low price drops below or equals the order price

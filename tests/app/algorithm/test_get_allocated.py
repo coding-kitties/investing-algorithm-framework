@@ -25,45 +25,35 @@ class StrategyOne(TradingStrategy):
 
 
 class Test(TestBase):
-
-    def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.join(
-                            os.path.realpath(__file__),
-                            os.pardir
-                        ),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
+    external_balances = {
+        "EUR": 1000
+    }
+    external_available_symbols = ["BTC/EUR"]
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="BITVAVO",
+            trading_symbol="EUR"
         )
-        self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        self.app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="BINANCE",
-                trading_symbol="USDT"
-            )
+    ]
+    market_credentials = [
+        MarketCredential(
+            market="bitvavo",
+            api_key="api_key",
+            secret_key="secret_key"
         )
-        self.app.container.market_service.override(MarketServiceStub(None))
-        self.app.add_market_credential(
-            MarketCredential(
-                market="binance",
-                api_key="api_key",
-                secret_key="secret_key"
-            )
-        )
-        algorithm = Algorithm()
-        algorithm.add_strategy(StrategyOne)
-        self.app.add_algorithm(algorithm)
+    ]
 
     def test_get_allocated(self):
         self.app.run(number_of_iterations=1)
         order_service = self.app.container.order_service()
+        self.app.algorithm.create_limit_order(
+            target_symbol="BTC",
+            amount=1,
+            price=10,
+            order_side="BUY",
+        )
+        self.assertEqual(1, order_service.count())
         order_service.check_pending_orders()
         self.assertNotEqual(0, self.app.algorithm.get_allocated())
-        self.assertNotEqual(0, self.app.algorithm.get_allocated("BINANCE"))
+        self.assertNotEqual(0, self.app.algorithm.get_allocated("BITVAVO"))
+        self.assertNotEqual(0, self.app.algorithm.get_allocated("bitvavo"))

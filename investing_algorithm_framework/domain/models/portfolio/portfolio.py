@@ -44,6 +44,9 @@ class Portfolio(BaseModel):
             market=self.market,
         )
 
+    def get_identifier(self):
+        return self.identifier
+
     def get_unallocated(self):
         return self.unallocated
 
@@ -76,3 +79,13 @@ class Portfolio(BaseModel):
 
     def get_market(self):
         return self.market
+
+    @staticmethod
+    def from_portfolio_configuration(portfolio_configuration):
+        return Portfolio(
+            identifier=portfolio_configuration.identifier,
+            trading_symbol=portfolio_configuration.trading_symbol,
+            unallocated=portfolio_configuration.initial_balance,
+            net_size=portfolio_configuration.initial_balance,
+            market=portfolio_configuration.market
+        )

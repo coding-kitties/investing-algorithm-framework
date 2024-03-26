@@ -1,11 +1,14 @@
 import logging
 from typing import List
+from queue import PriorityQueue
 
 from investing_algorithm_framework.domain import OrderStatus, OrderSide, \
     Trade, PeekableQueue, OrderType, TradeStatus, \
-    OperationalException
-from investing_algorithm_framework.services import \
-    OrderService, PortfolioService, PositionService, MarketDataSourceService
+    OperationalException, Order
+from investing_algorithm_framework.services.position_service import \
+    PositionService
+from investing_algorithm_framework.services.market_data_source_service import \
+    MarketDataSourceService
 
 logger = logging.getLogger(__name__)
 
@@ -17,13 +20,13 @@ class TradeService:
 
     def __init__(
         self,
-        portfolio_service,
+        portfolio_repository,
         order_service,
         position_service,
         market_data_source_service
     ):
-        self.portfolio_service: PortfolioService = portfolio_service
-        self.order_service: OrderService = order_service
+        self.portfolio_repository = portfolio_repository
+        self.order_service = order_service
         self.market_data_source_service: MarketDataSourceService = \
             market_data_source_service
         self.position_service: PositionService = position_service
@@ -37,7 +40,7 @@ class TradeService:
         :return: list of Trade objects
         """
 
-        portfolios = self.portfolio_service.get_all()
+        portfolios = self.portfolio_repository.get_all()
         trades = []
 
         for portfolio in portfolios:
@@ -141,7 +144,7 @@ class TradeService:
         :return: list of Trade objects
         """
 
-        portfolios = self.portfolio_service.get_all()
+        portfolios = self.portfolio_repository.get_all()
         trades = []
 
         for portfolio in portfolios:
@@ -219,7 +222,7 @@ class TradeService:
                 "Buy order belonging to the trade has no amount."
             )
 
-        portfolio = self.portfolio_service\
+        portfolio = self.portfolio_repository\
             .find({"position": order.position_id})
         position = self.position_service.find(
             {"portfolio": portfolio.id, "symbol": order.get_target_symbol()}
@@ -259,7 +262,7 @@ class TradeService:
         :return: int representing the count
         """
 
-        portfolios = self.portfolio_service.get_all()
+        portfolios = self.portfolio_repository.get_all()
         trades = []
 
         for portfolio in portfolios:
@@ -301,3 +304,96 @@ class TradeService:
                         ]
 
         return len(trades)
+
+    def close_trades(self, sell_order: Order, amount_to_close: float) -> None:
+        """
+        Close trades method
+
+        :param sell_order: Order object representing the sell order
+        :param amount_to_close: float representing the amount to close
+        :return: None
+        """
+        logger.info(
+            f"Closing trades for sell order {sell_order.get_id()} "
+            f"amount to close: {amount_to_close}"
+        )
+
+        matching_buy_orders = self.order_service.get_all(
+            {
+                "position": sell_order.position_id,
+                "order_side": OrderSide.BUY.value,
+                "status": OrderStatus.CLOSED.value,
+                "order_by_created_at_asc": True
+            }
+        )
+        matching_buy_orders = [
+            buy_order for buy_order in matching_buy_orders
+            if buy_order.get_trade_closed_at() is None
+        ]
+        order_queue = PriorityQueue()
+
+        for order in matching_buy_orders:
+            order_queue.put(order)
+
+        total_net_gain = 0
+        total_cost = 0
+
+        while amount_to_close > 0 and not order_queue.empty():
+            buy_order = order_queue.get()
+            closed_amount = buy_order.get_trade_closed_amount()
+
+            # Check if the order has been closed
+            if closed_amount is None:
+                closed_amount = 0
+
+            available_to_close = buy_order.get_filled() - closed_amount
+
+            if amount_to_close >= available_to_close:
+                to_be_closed = available_to_close
+                remaining = amount_to_close - to_be_closed
+                cost = buy_order.get_price() * to_be_closed
+                net_gain = (sell_order.get_price() - buy_order.get_price()) \
+                           * to_be_closed
+                amount_to_close = remaining
+                self.order_service.repository.update(
+                    buy_order.id,
+                    {
+                        "trade_closed_amount": buy_order.get_filled(),
+                        "trade_closed_at": sell_order.get_updated_at(),
+                        "trade_closed_price": sell_order.get_price(),
+                        "net_gain": buy_order.get_net_gain() + net_gain
+                    }
+                )
+            else:
+                to_be_closed = amount_to_close
+                net_gain = (sell_order.get_price() - buy_order.get_price()) \
+                           * to_be_closed
+                cost = buy_order.get_price() * amount_to_close
+                closed_amount = buy_order.get_trade_closed_amount()
+
+                if closed_amount is None:
+                    closed_amount = 0
+
+                self.order_service.repository.update(
+                    buy_order.id,
+                    {
+                        "trade_closed_amount": closed_amount + to_be_closed,
+                        "trade_closed_price": sell_order.get_price(),
+                        "net_gain": buy_order.get_net_gain() + net_gain
+                    }
+                )
+                amount_to_close = 0
+
+            total_net_gain += net_gain
+            total_cost += cost
+
+        # Update the sell order
+        self.order_service.repository.update(
+            sell_order.get_id(),
+            {
+                "trade_closed_amount": sell_order.get_filled(),
+                "trade_closed_at": sell_order.get_updated_at(),
+                "trade_closed_price": sell_order.get_price(),
+                "net_gain": sell_order.get_net_gain() + total_net_gain
+            }
+        )

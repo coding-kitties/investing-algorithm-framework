@@ -1,9 +1,10 @@
 import os
+from unittest import TestCase
 
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
     Algorithm, MarketCredential
-from tests.resources import TestBase, random_string, MarketServiceStub
+from tests.resources import random_string, MarketServiceStub
 
 
 class StrategyOne(TradingStrategy):
@@ -22,7 +23,25 @@ class StrategyTwo(TradingStrategy):
         pass
 
 
-class Test(TestBase):
+class Test(TestCase):
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="binance",
+            trading_symbol="EUR",
+            initial_balance=1000,
+        )
+    ]
+    market_credentials = [
+        MarketCredential(
+            market="binance",
+            api_key="api_key",
+            secret_key="secret_key",
+        )
+    ]
+    external_available_symbols = ["BTC/EUR", "DOT/EUR", "ADA/EUR", "ETH/EUR"]
+    external_balances = {
+        "EUR": 1000,
+    }
 
     def setUp(self) -> None:
         super(Test, self).setUp()
@@ -49,7 +68,7 @@ class Test(TestBase):
         app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BINANCE",
-                trading_symbol="USDT",
+                trading_symbol="EUR",
             )
         )
         app.add_market_credential(
@@ -77,7 +96,7 @@ class Test(TestBase):
         app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BINANCE",
-                trading_symbol="USDT",
+                trading_symbol="EUR",
             )
         )
         app.add_market_credential(

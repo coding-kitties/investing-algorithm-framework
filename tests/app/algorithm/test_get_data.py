@@ -53,7 +53,7 @@
 #                 market="bitvavo",
 #                 api_key="test",
 #                 secret_key="test",
-#                 trading_symbol="USDT"
+#                 trading_symbol="EUR"
 #             )
 #         )
 #         self.app.container.market_service.override(MarketServiceStub(None))

@@ -3,9 +3,7 @@ from datetime import datetime, timedelta
 from algorithms import create_algorithm
 from app import app
 from investing_algorithm_framework import PortfolioConfiguration, \
-    pretty_print_backtest_reports_evaluation, BacktestReportsEvaluation, \
-    load_backtest_reports
-
+    pretty_print_backtest_reports_evaluation, BacktestReportsEvaluation
 
 if __name__ == "__main__":
     end_date = datetime(2023, 12, 2)
@@ -152,11 +150,6 @@ if __name__ == "__main__":
         start_date=start_date,
         end_date=end_date,
         pending_order_check_interval="2h",
-    )
-    evaluation = BacktestReportsEvaluation(reports)
-    pretty_print_backtest_reports_evaluation(evaluation)
-    reports = load_backtest_reports(
-        "backtest_reports"
     )
     evaluation = BacktestReportsEvaluation(reports)
     pretty_print_backtest_reports_evaluation(evaluation)

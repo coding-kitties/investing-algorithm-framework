@@ -28,6 +28,42 @@ class StrategyOne(TradingStrategy):
 
 
 class TestBase(TestCase):
+    portfolio_configurations = []
+    config = {}
+    algorithm = Algorithm()
+    external_balances = {}
+    external_orders = []
+    external_available_symbols = []
+    market_credentials = []
+    market_service = MarketServiceStub(None)
+    initialize = True
+
+    def setUp(self) -> None:
+        self.resource_directory = os.path.dirname(__file__)
+        config = self.config
+        config[RESOURCE_DIRECTORY] = self.resource_directory
+        self.app: App = create_app(config=config)
+        self.market_service.symbols = self.external_available_symbols
+        self.market_service.balances = self.external_balances
+        self.market_service.orders = self.external_orders
+        self.app.container.market_service.override(self.market_service)
+
+        if self.initialize:
+
+            if len(self.portfolio_configurations) > 0:
+                for portfolio_configuration in self.portfolio_configurations:
+                    self.app.add_portfolio_configuration(
+                        portfolio_configuration
+                    )
+
+                self.app.add_algorithm(self.algorithm)
+
+                # Add all market credentials
+                if len(self.market_credentials) > 0:
+                    for market_credential in self.market_credentials:
+                        self.app.add_market_credential(market_credential)
+
+                self.app.initialize()
 
     def tearDown(self) -> None:
         database_path = os.path.join(

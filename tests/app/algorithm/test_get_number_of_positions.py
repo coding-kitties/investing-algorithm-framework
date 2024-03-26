@@ -1,49 +1,31 @@
-import os
 from decimal import Decimal
 
-from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, Algorithm, MarketCredential
-from tests.resources import TestBase, MarketServiceStub
+from investing_algorithm_framework import PortfolioConfiguration, \
+    MarketCredential
+from tests.resources import TestBase
 
 
 class Test(TestBase):
-
-    def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.join(
-                            os.path.realpath(__file__),
-                            os.pardir
-                        ),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
+    external_balances = {
+        "EUR": 1000
+    }
+    external_available_symbols = ["BTC/EUR"]
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="BITVAVO",
+            trading_symbol="EUR"
         )
-        self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        self.app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="binance",
-                trading_symbol="USDT"
-            )
+    ]
+    market_credentials = [
+        MarketCredential(
+            market="bitvavo",
+            api_key="api_key",
+            secret_key="secret_key"
         )
-        self.app.add_algorithm(Algorithm())
-        self.app.add_market_credential(
-            MarketCredential(
-                market="binance",
-                secret_key="secret_key",
-                api_key="api_key"
-            )
-        )
-        self.app.container.market_service.override(MarketServiceStub(None))
-        self.app.initialize()
+    ]
 
     def test_get_number_of_positions(self):
-        trading_symbol_position = self.app.algorithm.get_position("USDT")
+        trading_symbol_position = self.app.algorithm.get_position("EUR")
         self.assertEqual(1, self.app.algorithm.get_number_of_positions())
         self.assertEqual(Decimal(1000), trading_symbol_position.get_amount())
         self.app.algorithm.create_limit_order(

@@ -30,6 +30,12 @@ class SQLOrderRepository(Repository):
         trading_symbol_query_param = self.get_query_param(
             "trading_symbol", query_params
         )
+        order_by_created_at_asc = self.get_query_param(
+            "order_by_created_at_asc", query_params
+        )
+        order_by_created_at_desc = self.get_query_param(
+            "order_by_created_at_desc", query_params
+        )
 
         if portfolio_query_param is not None:
             portfolio = db.query(SQLPortfolio).filter_by(
@@ -81,5 +87,9 @@ class SQLOrderRepository(Repository):
                 SQLOrder.trading_symbol == trading_symbol_query_param
             )
 
-        query = query.order_by(SQLOrder.created_at.desc())
+        if order_by_created_at_asc:
+            query = query.order_by(SQLOrder.created_at.asc())
+        else:
+            query = query.order_by(SQLOrder.created_at.desc())
+
         return query
