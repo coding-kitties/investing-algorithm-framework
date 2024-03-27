@@ -173,7 +173,7 @@ class CCXTMarketService(MarketService):
                 logger.exception(e)
                 raise OperationalException("Could not retrieve orders")
 
-    def get_balance(self, market):
+    def get_balance(self, market) -> Dict[str, float]:
         market_credential = self.get_market_credential(market)
 
         if market_credential is None:
