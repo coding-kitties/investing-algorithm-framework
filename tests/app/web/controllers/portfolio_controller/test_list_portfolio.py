@@ -1,7 +1,7 @@
 import json
 
-from investing_algorithm_framework import TradingStrategy, \
-    TimeUnit, PortfolioConfiguration
+from investing_algorithm_framework import MarketCredential, \
+    PortfolioConfiguration
 from tests.resources import FlaskTestBase
 
 
@@ -9,14 +9,27 @@ class Test(FlaskTestBase):
     portfolio_configurations = [
         PortfolioConfiguration(
             market="BITVAVO",
-            trading_symbol="USDT"
+            trading_symbol="EUR"
         )
     ]
-
-    def setUp(self) -> None:
-        super(Test, self).setUp()
+    market_credentials = [
+        MarketCredential(
+            market="BITVAVO",
+            api_key="",
+            secret_key=""
+        )
+    ]
+    external_balances = {
+        "EUR": 1000
+    }
 
     def test_list_portfolios(self):
+        self.iaf_app.algorithm.create_limit_order(
+            target_symbol="KSM",
+            price=10,
+            amount=10,
+            order_side="BUY"
+        )
         order_repository = self.iaf_app.container.order_repository()
         self.iaf_app.run(number_of_iterations=1)
         self.assertEqual(1, order_repository.count())

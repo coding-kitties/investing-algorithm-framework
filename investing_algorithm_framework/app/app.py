@@ -109,12 +109,13 @@ class App:
             trade_service=self.container.trade_service(),
         )
 
-        if self._stateless:
-            self.config[APP_MODE] = AppMode.STATELESS.value
-        elif self._web:
-            self.config[APP_MODE] = AppMode.WEB.value
-        else:
-            self.config[APP_MODE] = AppMode.DEFAULT.value
+        if APP_MODE not in self.config:
+            if self._stateless:
+                self.config[APP_MODE] = AppMode.STATELESS.value
+            elif self._web:
+                self.config[APP_MODE] = AppMode.WEB.value
+            else:
+                self.config[APP_MODE] = AppMode.DEFAULT.value
 
         if AppMode.WEB.from_value(self.config[APP_MODE]):
             self._initialize_web()
@@ -460,7 +461,7 @@ class App:
         for hook in self._on_after_initialize_hooks:
             hook.on_run(self, self.algorithm)
 
-        self.initialize()
+        self.initialize(sync=sync)
 
         # Run all on_initialize hooks
         for hook in self._on_initialize_hooks:

@@ -1,53 +1,34 @@
-import os
 from decimal import Decimal
 
-from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, Algorithm, MarketCredential
-from tests.resources import TestBase, MarketServiceStub
+from investing_algorithm_framework import PortfolioConfiguration, \
+    MarketCredential
+from tests.resources import TestBase
 
 
 class TestOrderService(TestBase):
-
-    def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.realpath(__file__),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
+    market_credentials = [
+        MarketCredential(
+            market="binance",
+            api_key="api_key",
+            secret_key="secret_key",
         )
-        self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        self.app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="binance",
-                trading_symbol="USDT"
-            )
+    ]
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="binance",
+            trading_symbol="EUR"
         )
-        self.app.container.market_service.override(
-            MarketServiceStub(self.app.container.market_credential_service())
-        )
-        algorithm = Algorithm()
-        self.app.add_algorithm(algorithm)
-        self.app.add_market_credential(
-            MarketCredential(
-                market="binance",
-                api_key="api_key",
-                secret_key="secret_key",
-            )
-        )
-        self.app.initialize()
+    ]
+    external_balances = {
+        "EUR": 1000
+    }
 
     def test_create_limit_order(self):
         order_service = self.app.container.order_service()
         order = order_service.create(
             {
                 "target_symbol": "ADA",
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "amount": 2004.5303357979318,
                 "order_side": "BUY",
                 "price": 0.24262,
@@ -62,7 +43,7 @@ class TestOrderService(TestBase):
         self.assertEqual(2004.5303357979318, order.get_remaining())
         self.assertEqual(0.24262, order.get_price())
         self.assertEqual("ADA", order.get_target_symbol())
-        self.assertEqual("USDT", order.get_trading_symbol())
+        self.assertEqual("EUR", order.get_trading_symbol())
         self.assertEqual("BUY", order.get_order_side())
         self.assertEqual("LIMIT", order.get_order_type())
         self.assertEqual("CREATED", order.get_status())
@@ -72,7 +53,7 @@ class TestOrderService(TestBase):
         order = order_service.create(
             {
                 "target_symbol": "ADA",
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "amount": 2004.5303357979318,
                 "order_side": "BUY",
                 "price": 0.24262,
@@ -102,7 +83,7 @@ class TestOrderService(TestBase):
         order = order_service.create(
             {
                 "target_symbol": "ADA",
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "amount": 2004.5303357979318,
                 "order_side": "BUY",
                 "price": 0.24262,
@@ -117,7 +98,7 @@ class TestOrderService(TestBase):
         self.assertEqual(2004.5303357979318, order.get_remaining())
         self.assertEqual(0.24262, order.get_price())
         self.assertEqual("ADA", order.get_target_symbol())
-        self.assertEqual("USDT", order.get_trading_symbol())
+        self.assertEqual("EUR", order.get_trading_symbol())
         self.assertEqual("BUY", order.get_order_side())
         self.assertEqual("LIMIT", order.get_order_type())
         self.assertEqual("CREATED", order.get_status())
@@ -127,7 +108,7 @@ class TestOrderService(TestBase):
         order = order_service.create(
             {
                 "target_symbol": "ADA",
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "amount": 2004.5303357979318,
                 "order_side": "BUY",
                 "price": 0.24262,
@@ -142,7 +123,7 @@ class TestOrderService(TestBase):
         self.assertEqual(2004.5303357979318, order.get_remaining())
         self.assertEqual(0.24262, order.get_price())
         self.assertEqual("ADA", order.get_target_symbol())
-        self.assertEqual("USDT", order.get_trading_symbol())
+        self.assertEqual("EUR", order.get_trading_symbol())
         self.assertEqual("BUY", order.get_order_side())
         self.assertEqual("LIMIT", order.get_order_type())
         self.assertEqual("CREATED", order.get_status())
@@ -159,7 +140,7 @@ class TestOrderService(TestBase):
         order = order_service.create(
             {
                 "target_symbol": "ADA",
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "amount": 2004.5303357979318,
                 "order_side": "SELL",
                 "price": 0.24262,
@@ -174,7 +155,7 @@ class TestOrderService(TestBase):
         self.assertEqual(2004.5303357979318, order.get_remaining())
         self.assertEqual(0.24262, order.get_price())
         self.assertEqual("ADA", order.get_target_symbol())
-        self.assertEqual("USDT", order.get_trading_symbol())
+        self.assertEqual("EUR", order.get_trading_symbol())
         self.assertEqual("SELL", order.get_order_side())
         self.assertEqual("LIMIT", order.get_order_type())
         self.assertEqual("CREATED", order.get_status())
@@ -193,7 +174,7 @@ class TestOrderService(TestBase):
         buy_order_one = order_service.create(
             {
                 "target_symbol": "ADA",
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "amount": 5,
                 "order_side": "BUY",
                 "price": 0.24262,
@@ -213,7 +194,7 @@ class TestOrderService(TestBase):
         buy_order_two = order_service.create(
             {
                 "target_symbol": "ADA",
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "amount": 5,
                 "order_side": "BUY",
                 "price": 0.24262,
@@ -233,7 +214,7 @@ class TestOrderService(TestBase):
         sell_order_one = order_service.create(
             {
                 "target_symbol": "ADA",
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "amount": 2.5,
                 "order_side": "SELL",
                 "price": 0.24262,
@@ -265,7 +246,7 @@ class TestOrderService(TestBase):
         sell_order_two = order_service.create(
             {
                 "target_symbol": "ADA",
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "amount": 5,
                 "order_side": "SELL",
                 "price": 0.24262,
@@ -315,7 +296,7 @@ class TestOrderService(TestBase):
         buy_order = order_service.create(
             {
                 "target_symbol": "ADA",
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "amount": 1000,
                 "order_side": "BUY",
                 "price": 0.2,
@@ -340,7 +321,7 @@ class TestOrderService(TestBase):
         sell_order = order_service.create(
             {
                 "target_symbol": "ADA",
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "amount": 1000,
                 "order_side": "SELL",
                 "price": 0.3,
@@ -373,7 +354,7 @@ class TestOrderService(TestBase):
         buy_order = order_service.create(
             {
                 "target_symbol": "ADA",
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "amount": 1000,
                 "order_side": "BUY",
                 "price": 0.2,
@@ -398,7 +379,7 @@ class TestOrderService(TestBase):
         sell_order = order_service.create(
             {
                 "target_symbol": "ADA",
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "amount": 1000,
                 "order_side": "SELL",
                 "price": 0.1,

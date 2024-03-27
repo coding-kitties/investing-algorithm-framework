@@ -1,11 +1,12 @@
 from investing_algorithm_framework import create_app
+from unittest import TestCase
 from investing_algorithm_framework.domain import BACKTEST_DATA_DIRECTORY_NAME
 from tests.resources import random_string, TestBase
 
 TEST_VALUE = random_string(10)
 
 
-class TestConfig(TestBase):
+class TestConfig(TestCase):
     ATTRIBUTE_ONE = "ATTRIBUTE_ONE"
 
     def test_config(self):

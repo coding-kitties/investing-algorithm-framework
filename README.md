@@ -40,8 +40,9 @@ from investing_algorithm_framework import create_app, PortfolioConfiguration, \
     RESOURCE_DIRECTORY, TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, \
     CCXTTickerMarketDataSource, MarketCredential, SYMBOLS
 
-# Define the symbols you want to trade for optimization, otherwise it will
-# check all available symbols on the market
+# Define the symbols you want to trade for optimization, otherwise the 
+# algorithm will check if you have orders and balances on all available 
+# symbols on the market
 symbols = ["BTC/EUR"]
 
 # Define resource directory and the symbols you want to trade
@@ -100,16 +101,25 @@ def perform_strategy(algorithm: Algorithm, market_data: dict):
 
     # Ticker data is passed as {"<identifier>": <ticker dict>}
     ticker_data = market_data["BTC-ticker"]
-    order = algorithm.create_limit_order(
+    unallocated_balance = algorithm.get_unallocated()
+    positions = algorithm.get_positions()
+    trades = algorithm.get_trades()
+    open_trades = algorithm.get_open_trades()
+    closed_trades = algorithm.get_closed_trades()
+    
+    # Create a buy oder 
+    algorithm.create_limit_order(
         target_symbol="BTC/EUR",
         order_side="buy",
         amount=0.01,
         price=ticker_data["ask"],
     )
-    positions = algorithm.get_positions()
-    trades = algorithm.get_trades()
-    open_trades = algorithm.get_open_trades()
-    closed_trades = algorithm.get_closed_trades()
+    
+    # Close a trade
+    algorithm.close_trade(trades[0].id)
+    
+    # Close a position
+    algorithm.close_position(positions[0].get_symbol())
     
 if __name__ == "__main__":
     app.run()

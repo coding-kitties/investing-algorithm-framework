@@ -1,7 +1,8 @@
 import logging
+from typing import Dict
 from datetime import datetime
 from time import sleep
-
+import polars as pl
 import ccxt
 from dateutil import parser
 from dateutil.tz import gettz
@@ -341,7 +342,7 @@ class CCXTMarketService(MarketService):
 
     def get_ohlcv(
         self, symbol, time_frame, from_timestamp, market, to_timestamp=None
-    ):
+    ) -> pl.DataFrame:
         market_credential = self.get_market_credential(market)
         exchange = self.initialize_exchange(market, market_credential)
 
@@ -388,7 +389,15 @@ class CCXTMarketService(MarketService):
 
             sleep(exchange.rateLimit / 1000)
 
-        return data
+        # Predefined column names
+        col_names = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
+
+        # Combine the Series into a DataFrame with given column names
+        df = pl.DataFrame(data)
+
+        # Assign column names after DataFrame creation
+        df.columns = col_names
+        return df
 
     def get_ohlcvs(
         self,
@@ -397,7 +406,7 @@ class CCXTMarketService(MarketService):
         from_timestamp,
         market,
         to_timestamp=None
-    ):
+    ) -> Dict[str, pl.DataFrame]:
         ohlcvs = {}
 
         for symbol in symbols:

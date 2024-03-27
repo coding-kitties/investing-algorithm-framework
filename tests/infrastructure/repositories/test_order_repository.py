@@ -1,47 +1,24 @@
-import os
-
-from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, MarketCredential, Algorithm
-from tests.resources import TestBase, MarketServiceStub
+from investing_algorithm_framework import PortfolioConfiguration, MarketCredential
+from tests.resources import TestBase
 
 
 class Test(TestBase):
-
-    def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.join(
-                            os.path.realpath(__file__),
-                            os.pardir
-                        ),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
+    market_credentials = [
+        MarketCredential(
+            market="BINANCE",
+            api_key="api_key",
+            secret_key="secret_key",
         )
-        self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        self.app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="BINANCE",
-                trading_symbol="USDT"
-            )
+    ]
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="BINANCE",
+            trading_symbol="EUR"
         )
-        self.app.container.market_service.override(
-            MarketServiceStub(self.app.container.market_credential_service())
-        )
-        algorithm = Algorithm()
-        self.app.add_algorithm(algorithm)
-        self.app.add_market_credential(
-            MarketCredential(
-                market="BINANCE",
-                api_key="api_key",
-                secret_key="secret_key",
-            )
-        )
+    ]
+    external_balances = {
+        "EUR": 1000,
+    }
 
     def test_get_all(self):
         self.app.run(number_of_iterations=1)
@@ -53,7 +30,7 @@ class Test(TestBase):
                 "portfolio_id": 1,
                 "target_symbol": "BTC",
                 "amount": 1,
-                "trading_symbol": "USDT",
+                "trading_symbol": "EUR",
                 "price": 10,
                 "order_side": "BUY",
                 "order_type": "LIMIT",

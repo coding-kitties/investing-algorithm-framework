@@ -370,7 +370,7 @@ class CCXTTickerBacktestMarketDataSource(
         first_row = df.head(1)[0]
 
         if first_row["Datetime"][0] > end_date.strftime(DATETIME_FORMAT):
-            logger.warn(
+            logger.warning(
                 f"No ticker data available for the given backtest "
                 f"index date {backtest_index_date} and symbol {self.symbol} "
                 f"and market {self.market}"

@@ -1,7 +1,8 @@
 import logging
+from typing import Dict
 from abc import ABC, abstractmethod
 from datetime import datetime
-
+from polars import DataFrame
 logger = logging.getLogger("investing_algorithm_framework")
 
 
@@ -98,13 +99,13 @@ class MarketService(ABC):
     @abstractmethod
     def get_ohlcv(
         self, symbol, time_frame, from_timestamp, market, to_timestamp=None
-    ):
+    ) -> DataFrame:
         raise NotImplementedError()
 
     @abstractmethod
     def get_ohlcvs(
         self, symbols, time_frame, from_timestamp, market, to_timestamp=None
-    ):
+    ) -> Dict[str, DataFrame]:
         raise NotImplementedError()
 
     @property

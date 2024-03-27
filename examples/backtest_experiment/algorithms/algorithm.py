@@ -1,6 +1,8 @@
 from investing_algorithm_framework import Algorithm, TradingStrategy, \
-    TimeUnit, OrderSide
+    TimeUnit, OrderSide, DATETIME_FORMAT
 import tulipy as ti
+import polars as pl
+
 
 def is_below_trend(fast_series, slow_series):
     return fast_series[-1] < slow_series[-1]
@@ -39,10 +41,11 @@ class Strategy(TradingStrategy):
     ]
     symbols = ["BTC/EUR", "DOT/EUR"]
 
-    def __init__(self, fast, slow, trend):
+    def __init__(self, fast, slow, trend, stop_loss_percentage=4):
         self.fast = fast
         self.slow = slow
         self.trend = trend
+        self.stop_loss_percentage = stop_loss_percentage
         super().__init__()
 
     def apply_strategy(self, algorithm: Algorithm, market_data):
@@ -81,17 +84,35 @@ class Strategy(TradingStrategy):
                 for trade in open_trades:
                     algorithm.close_trade(trade)
 
+            # Checking manual stop losses
+            open_trades = algorithm.get_open_trades(target_symbol)
+
+            for open_trade in open_trades:
+                filtered_df = df.filter(
+                    pl.col('Datetime') >= open_trade.opened_at.strftime(DATETIME_FORMAT)
+                )
+                close_prices = filtered_df['Close'].to_numpy()
+                current_price = market_data[f"{symbol}-ticker"]
+
+                if open_trade.is_manual_stop_loss_trigger(
+                        prices=close_prices,
+                        current_price=current_price["bid"],
+                        stop_loss_percentage=self.stop_loss_percentage
+                ):
+                    algorithm.close_trade(open_trade)
+
 
 def create_algorithm(
     name,
     description,
     fast,
     slow,
-    trend
+    trend,
+    stop_loss_percentage
 ) -> Algorithm:
     algorithm = Algorithm(
         name=name,
         description=description
     )
-    algorithm.add_strategy(Strategy(fast, slow, trend))
+    algorithm.add_strategy(Strategy(fast, slow, trend, stop_loss_percentage))
     return algorithm

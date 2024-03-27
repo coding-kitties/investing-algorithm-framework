@@ -3,7 +3,7 @@ from tests.resources import TestBase
 
 from investing_algorithm_framework import PortfolioConfiguration, Algorithm, \
     MarketCredential, OperationalException, RESERVED_BALANCES, APP_MODE, \
-    Order, SYMBOLS
+    Order, SYMBOLS, AppMode
 
 
 class Test(TestBase):
@@ -185,8 +185,9 @@ class Test(TestBase):
         )
         self.market_service.balances = {"EUR": 1200}
         self.app.add_algorithm(Algorithm())
-        self.app._stateless = True
-        self.app._web = False
+        configuration_service = self.app.container.configuration_service()
+        configuration_service.config[APP_MODE] = AppMode.STATELESS.value
+        self.app.config[APP_MODE] = AppMode.STATELESS.value
         self.app.initialize()
 
         configuration_service = self.app.container.configuration_service()
@@ -267,7 +268,7 @@ class Test(TestBase):
         }
         self.app.add_algorithm(Algorithm())
         configuration_service = self.app.container.configuration_service()
-        configuration_service.config[APP_MODE] = "STATELESS"
+        configuration_service.config[APP_MODE] = AppMode.DEFAULT.value
         configuration_service.config[RESERVED_BALANCES] = {
             "BTC": 0.5,
             "ETH": 1,
@@ -279,12 +280,10 @@ class Test(TestBase):
         portfolio = self.app.container.portfolio_service() \
             .find({"identifier": "test"})
         self.assertEqual(500, portfolio.unallocated)
-        self.assertFalse(
-            self.app.container.position_service().exists({
-                "symbol": "BTC",
-                "portfolio_id": portfolio.id,
-            })
+        btc_position = self.app.container.position_service().find(
+            {"symbol": "BTC", "portfolio_id": portfolio.id}
         )
+        self.assertEqual(0, btc_position.amount)
         eth_position = self.app.container.position_service().find(
             {"symbol": "ETH", "portfolio_id": portfolio.id}
         )
@@ -333,7 +332,8 @@ class Test(TestBase):
         4. Check if the portfolio still has the 1000eu
         """
         configuration_service = self.app.container.configuration_service()
-        configuration_service.config[SYMBOLS] = ["KSM"]
+        configuration_service.config[SYMBOLS] = ["KSM/EUR"]
+        self.market_service.symbols = ["KSM/EUR"]
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
                 identifier="test",
@@ -476,8 +476,8 @@ class Test(TestBase):
         4. Check if the portfolio still has the 1000eu
         """
         configuration_service = self.app.container.configuration_service()
-        configuration_service.config[SYMBOLS] = ["KSM"]
-
+        configuration_service.config[SYMBOLS] = ["KSM/EUR"]
+        self.market_service.symbols = ["KSM/EUR"]
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
                 identifier="test",
@@ -586,7 +586,7 @@ class Test(TestBase):
     def test_sync_trades(self):
         configuration_service = self.app.container.configuration_service()
         configuration_service.config[SYMBOLS] = ["KSM/EUR"]
-
+        self.market_service.symbols = ["KSM/EUR"]
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
                 identifier="test",
@@ -715,6 +715,7 @@ class Test(TestBase):
     def test_sync_trades_stateless(self):
         configuration_service = self.app.container.configuration_service()
         configuration_service.config[SYMBOLS] = ["KSM/EUR"]
+        self.market_service.symbols = ["KSM/EUR"]
         configuration_service.config[APP_MODE] = "STATELESS"
 
         self.app.add_portfolio_configuration(
