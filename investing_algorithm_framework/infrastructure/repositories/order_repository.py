@@ -33,9 +33,6 @@ class SQLOrderRepository(Repository):
         order_by_created_at_asc = self.get_query_param(
             "order_by_created_at_asc", query_params
         )
-        order_by_created_at_desc = self.get_query_param(
-            "order_by_created_at_desc", query_params
-        )
 
         if portfolio_query_param is not None:
             portfolio = db.query(SQLPortfolio).filter_by(

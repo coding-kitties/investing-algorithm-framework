@@ -31,5 +31,4 @@ class MarketCredential:
 
     def __repr__(self):
         return f"MarketCredential(" \
-               f"{self.market}, {self.api_key}, {self.secret_key}" \
-               f")"
+               f"{self.market}, {self.api_key}, {self.secret_key}"

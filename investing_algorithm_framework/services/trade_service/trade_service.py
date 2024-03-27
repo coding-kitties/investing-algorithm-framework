@@ -353,7 +353,7 @@ class TradeService:
                 remaining = amount_to_close - to_be_closed
                 cost = buy_order.get_price() * to_be_closed
                 net_gain = (sell_order.get_price() - buy_order.get_price()) \
-                           * to_be_closed
+                    * to_be_closed
                 amount_to_close = remaining
                 self.order_service.repository.update(
                     buy_order.id,
@@ -367,7 +367,7 @@ class TradeService:
             else:
                 to_be_closed = amount_to_close
                 net_gain = (sell_order.get_price() - buy_order.get_price()) \
-                           * to_be_closed
+                    * to_be_closed
                 cost = buy_order.get_price() * amount_to_close
                 closed_amount = buy_order.get_trade_closed_amount()
 

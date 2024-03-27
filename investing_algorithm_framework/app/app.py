@@ -148,9 +148,10 @@ class App:
             if not portfolio_service.exists(
                 {"identifier": portfolio_configuration.identifier}
             ):
-                portfolio = portfolio_service.create_portfolio_from_configuration(
-                    portfolio_configuration
-                )
+                portfolio = portfolio_service\
+                    .create_portfolio_from_configuration(
+                        portfolio_configuration
+                    )
                 self.sync(portfolio)
                 synced_portfolios.append(portfolio)
 
@@ -161,9 +162,6 @@ class App:
 
                 if portfolio not in synced_portfolios:
                     self.sync(portfolio)
-
-
-
 
     def sync(self, portfolio):
         """
@@ -259,8 +257,9 @@ class App:
         configuration_service.config[BACKTESTING_START_DATE] = \
             backtest_start_date
         configuration_service.config[BACKTESTING_END_DATE] = backtest_end_date
-        configuration_service.config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL] \
-            = pending_order_check_interval
+        configuration_service.config[
+            BACKTESTING_PENDING_ORDER_CHECK_INTERVAL
+        ] = pending_order_check_interval
 
         # Create resource dir if not exits
         self._create_resource_directory_if_not_exists()

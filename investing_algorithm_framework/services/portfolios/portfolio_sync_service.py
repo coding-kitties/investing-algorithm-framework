@@ -11,16 +11,17 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
     """
     Service to sync the portfolio with the exchange.
     """
+
     def __init__(
-        self,
-        trade_service: TradeService,
-        configuration_service,
-        order_repository,
-        position_repository,
-        portfolio_repository,
-        portfolio_configuration_service,
-        market_credential_service,
-        market_service
+            self,
+            trade_service: TradeService,
+            configuration_service,
+            order_repository,
+            position_repository,
+            portfolio_repository,
+            portfolio_configuration_service,
+            market_credential_service,
+            market_service
     ):
         self.trade_service = trade_service
         self.configuration_service = configuration_service
@@ -88,11 +89,10 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
 
             unallocated = unallocated - reserved_unallocated
 
-            if portfolio.unallocated is not None and\
+            if portfolio.unallocated is not None and \
                     unallocated != portfolio.unallocated:
 
                 if unallocated < portfolio.unallocated:
-
                     raise OperationalException(
                         "There seems to be a mismatch between "
                         "the portfolio configuration and the balances on"
@@ -112,12 +112,12 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
                 # create the portfolio with the initial balance
                 if unallocated > portfolio.unallocated and \
                         not self.portfolio_repository.exists(
-                    {"identifier": portfolio.identifier}
-                ):
+                            {"identifier": portfolio.identifier}
+                        ):
                     unallocated = portfolio.unallocated
 
         if not self.portfolio_repository.exists(
-            {"identifier": portfolio.identifier}
+                {"identifier": portfolio.identifier}
         ):
             create_data = {
                 "identifier": portfolio.get_identifier(),
@@ -138,7 +138,8 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
 
     def sync_positions(self, portfolio):
         """
-        Method to sync the portfolio balances with the balances on the exchange.
+        Method to sync the portfolio balances with the balances
+        on the exchange.
         This method will retrieve the balances from the exchange and update
         the portfolio balances accordingly.
 
@@ -249,14 +250,14 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
                 if portfolio_configuration.track_from is not None:
                     ordered_external_order_list = [
                         order for order in ordered_external_order_list
-                        if order.created_at >=
-                           portfolio_configuration.track_from
+                        if order.created_at >= portfolio_configuration
+                        .track_from
                     ]
 
                 for external_order in ordered_external_order_list:
 
                     if self.order_repository.exists(
-                        {"external_id": external_order.external_id}
+                            {"external_id": external_order.external_id}
                     ):
                         logger.info("Updating existing order")
                         order = self.order_repository.find(
