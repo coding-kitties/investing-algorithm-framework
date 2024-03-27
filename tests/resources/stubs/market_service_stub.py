@@ -1,3 +1,4 @@
+from typing import Dict
 from datetime import datetime
 from random import randint
 
@@ -33,11 +34,11 @@ class MarketServiceStub(MarketService):
         self._orders = value
 
     @property
-    def balances(self) -> dict[str, float]:
+    def balances(self) -> Dict[str, float]:
         return self._balances
 
     @balances.setter
-    def balances(self, value: dict[str, float]):
+    def balances(self, value: Dict[str, float]):
         self._balances = value
 
     @property
@@ -150,7 +151,7 @@ class MarketServiceStub(MarketService):
             trading_symbol=trading_symbol,
         )
 
-    def get_balance(self, market) -> dict[str, float]:
+    def get_balance(self, market) -> Dict[str, float]:
         return self._balances
 
     def get_order(self, order, market):
