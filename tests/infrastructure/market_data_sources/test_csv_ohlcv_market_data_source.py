@@ -1,11 +1,12 @@
 import os
 from datetime import datetime, timedelta
-
+from polars import DataFrame
 from dateutil.tz import tzutc
 from unittest import TestCase
 
 from investing_algorithm_framework.infrastructure import \
     CSVOHLCVMarketDataSource
+from investing_algorithm_framework.domain import OperationalException
 
 
 class Test(TestCase):
@@ -36,6 +37,18 @@ class Test(TestCase):
                           f"{file_name}",
             window_size=10
         )
+
+    def test_throw_exception_when_missing_column_names_columns(self):
+        file_name = "OHLCV_BTC-EUR_BINANCE_2h_NO_COLUMNS_2023-" \
+                    "08-07:07:59_2023-12-02:00:00.csv"
+
+        with self.assertRaises(OperationalException):
+            CSVOHLCVMarketDataSource(
+                csv_file_path=f"{self.resource_dir}/"
+                              "market_data_sources_for_testing/"
+                              f"{file_name}",
+                window_size=10
+            )
 
     def test_start_date(self):
         start_date = datetime(2023, 8, 7, 8, 0, tzinfo=tzutc())
@@ -101,6 +114,7 @@ class Test(TestCase):
             datasource.start_date = datasource.start_date + timedelta(days=1)
             datasource.end_date = datasource.end_date + timedelta(days=1)
             self.assertTrue(len(data) > 0)
+            self.assertTrue(isinstance(data, DataFrame))
             number_of_runs += 1
 
         self.assertTrue(number_of_runs > 0)

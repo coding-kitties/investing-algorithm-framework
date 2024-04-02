@@ -1,12 +1,12 @@
+import os
 from datetime import datetime, timedelta
 from unittest import TestCase
-from dateutil.tz import tzutc
-import pandas as pd
-import os
 
-from investing_algorithm_framework.domain import Trade
+from dateutil.tz import tzutc
+
 from investing_algorithm_framework import CSVOHLCVMarketDataSource, \
     CSVTickerMarketDataSource
+from investing_algorithm_framework.domain import Trade
 
 
 class Test(TestCase):
@@ -29,7 +29,7 @@ class Test(TestCase):
         self.assertEqual(trade.open_price, 19822.0)
         self.assertEqual(trade.opened_at, trade_opened_at)
 
-    def test_stop_loss_manual(self):
+    def test_stop_loss_manual_with_dataframe(self):
         current_datetime = datetime(2023, 8, 26, 00, 00, 0, tzinfo=tzutc())
         resource_dir = os.path.abspath(
             os.path.join(
@@ -54,7 +54,7 @@ class Test(TestCase):
             start_date=current_datetime - timedelta(days=17),
             end_date=current_datetime,
             csv_file_path=f"{resource_dir}/"
-                          "market_data_sources/"
+                          "market_data_sources_for_testing/"
                           "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07:07"
                           ":59_2023-12-02:00:00.csv"
         )
@@ -63,7 +63,7 @@ class Test(TestCase):
             market="BITVAVO",
             symbol="BTC/EUR",
             csv_file_path=f"{resource_dir}"
-                          "/market_data_sources/"
+                          "/market_data_sources_for_testing/"
                           "TICKER_BTC-EUR_BINANCE_2023-08"
                           "-23:22:00_2023-12-02:00:00.csv"
         )
@@ -79,21 +79,99 @@ class Test(TestCase):
             closed_price=None,
             closed_at=None,
         )
-        ohlcv_data = csv_ohlcv_market_data_source\
+        ohlcv_data = csv_ohlcv_market_data_source \
             .get_data(market_credential_service=None)
-        current_price = csv_ticker_market_data_source\
+        current_price = csv_ticker_market_data_source \
             .get_data(
                 index_datetime=current_datetime, market_credential_service=None
             )
-
-        df = pd.DataFrame(
-            ohlcv_data,
-            columns=['Date', 'Open', 'High', 'Low', 'Close', 'Volume']
+        self.assertTrue(
+            trade.is_manual_stop_loss_trigger(
+                current_price=current_price["bid"],
+                ohlcv_df=ohlcv_data,
+                stop_loss_percentage=2
+            )
         )
-        filtered_df = df[df['Date'] <= trade.opened_at]
-        close_prices = filtered_df['Close'].tolist()
+        current_datetime = datetime(2023, 11, 21, tzinfo=tzutc())
+        ohlcv_data = csv_ohlcv_market_data_source \
+            .get_data(
+                market_credential_service=None,
+                from_time_stamp=trade_opened_at,
+                to_time_stamp=current_datetime
+            )
+        current_price = csv_ticker_market_data_source \
+            .get_data(
+                index_datetime=current_datetime, market_credential_service=None
+            )
+        open_price = 35679.63
+        trade = Trade(
+            buy_order_id=1,
+            target_symbol="BTC",
+            trading_symbol="EUR",
+            amount=1,
+            open_price=open_price,
+            opened_at=trade_opened_at,
+            closed_price=None,
+            closed_at=None,
+        )
+        self.assertFalse(
+            trade.is_manual_stop_loss_trigger(
+                current_price=current_price["bid"],
+                ohlcv_df=ohlcv_data,
+                stop_loss_percentage=10
+            )
+        )
+        self.assertTrue(
+            trade.is_manual_stop_loss_trigger(
+                current_price=current_price["bid"],
+                ohlcv_df=ohlcv_data,
+                stop_loss_percentage=2
+            )
+        )
+
+    def test_stop_loss_manual_trade(self):
+        trade = Trade(
+            buy_order_id=1,
+            target_symbol='BTC',
+            trading_symbol='USDT',
+            amount=10,
+            open_price=100,
+            opened_at=datetime(2021, 1, 1),
+        )
         self.assertTrue(trade.is_manual_stop_loss_trigger(
-            current_price=current_price["bid"],
-            prices=close_prices,
-            stop_loss_percentage=2
+            current_price=101, prices=[100, 110, 80], stop_loss_percentage=2
         ))
+        self.assertFalse(trade.is_manual_stop_loss_trigger(
+            current_price=101, prices=[100, 110, 80], stop_loss_percentage=20
+        ))
+
+        # Test if the stop loss is triggered when the price
+        # is lower than the open price
+        self.assertTrue(
+            trade.is_manual_stop_loss_trigger(
+                current_price=80,
+                prices=[100, 110, 80],
+                stop_loss_percentage=2
+            )
+        )
+        self.assertFalse(
+            trade.is_manual_stop_loss_trigger(
+                current_price=99,
+                prices=[100, 110, 80],
+                stop_loss_percentage=2
+            )
+        )
+        self.assertFalse(
+            trade.is_manual_stop_loss_trigger(
+                current_price=90,
+                prices=[100, 110, 80],
+                stop_loss_percentage=20
+            )
+        )
+        self.assertTrue(
+            trade.is_manual_stop_loss_trigger(
+                current_price=80,
+                prices=[100, 110, 80],
+                stop_loss_percentage=20
+            )
+        )

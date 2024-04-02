@@ -1,10 +1,9 @@
 import os
 from decimal import Decimal
 
-from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, CSVTickerMarketDataSource, Algorithm, \
-    MarketCredential, OperationalException
-from tests.resources import TestBase, MarketServiceStub
+from investing_algorithm_framework import PortfolioConfiguration, \
+    CSVTickerMarketDataSource, MarketCredential, OperationalException
+from tests.resources import TestBase, RandomPriceMarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -24,6 +23,11 @@ class Test(TestBase):
     external_balances = {
         "EUR": 1000
     }
+    market_data_source_service = RandomPriceMarketDataSourceServiceStub(
+        None,
+        None,
+        None
+    )
 
     def setUp(self) -> None:
         super().setUp()
@@ -37,6 +41,7 @@ class Test(TestBase):
                 "TICKER_BTC-EUR_BINANCE_2023-08-23:22:00_2023-12-02:00:00.csv"
             )
         ))
+
 
     def test_close_trade(self):
         trading_symbol_position = self.app.algorithm.get_position("EUR")

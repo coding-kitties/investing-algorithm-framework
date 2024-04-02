@@ -1,10 +1,14 @@
 from datetime import datetime
+import polars
+import logging
 
-import pandas as pd
 from dateutil.parser import parse
 
 from investing_algorithm_framework.domain import OHLCVMarketDataSource, \
-    BacktestMarketDataSource, OperationalException, TickerMarketDataSource
+    BacktestMarketDataSource, OperationalException, TickerMarketDataSource, \
+    DATETIME_FORMAT
+
+logger = logging.getLogger(__name__)
 
 
 class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
@@ -44,8 +48,9 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
         self._columns = [
             "Datetime", "Open", "High", "Low", "Close", "Volume"
         ]
-        df = pd.read_csv(self._csv_file_path)
+        df = polars.read_csv(csv_file_path)
 
+        # Check if all column names are in the csv file
         if not all(column in df.columns for column in self._columns):
             # Identify missing columns
             missing_columns = [column for column in self._columns if
@@ -56,10 +61,10 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
                 f"Missing columns: {missing_columns}"
             )
 
-        first_row = df.iloc[0]
-        last_row = df.iloc[-1]
-        self._start_date = parse(first_row[0])
-        self._end_date = parse(last_row[0])
+        first_row = df.head(1)
+        last_row = df.tail(1)
+        self._start_date = parse(first_row["Datetime"][0])
+        self._end_date = parse(last_row["Datetime"][0])
 
     @property
     def csv_file_path(self):
@@ -67,40 +72,25 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
 
     def get_data(
         self,
-        from_time_stamp=None,
-        to_time_stamp=None,
+        from_timestamp=None,
+        to_timestamp=None,
         **kwargs
     ):
 
-        if from_time_stamp is None:
-            from_time_stamp = self.start_date
+        if from_timestamp is None:
+            from_timestamp = self.start_date
 
-        if to_time_stamp is None:
-            to_time_stamp = self.end_date
+        if to_timestamp is None:
+            to_timestamp = self.end_date
 
-        df = pd.read_csv(self._csv_file_path)
-
-        # Convert the 'Datetime' column to datetime type if
-        # it's not already
-        if 'Datetime' in df.columns and pd.api.types.is_string_dtype(
-                df['Datetime']):
-            df['Datetime'] = pd.to_datetime(df['Datetime'], utc=True)
-
-        # Filter rows based on the start and end dates
-        filtered_df = df[
-            (df['Datetime'] >= from_time_stamp)
-            & (df['Datetime'] <= to_time_stamp)
-        ]
-
-        # Specify the columns you want in the inner lists
-        selected_columns = ["Datetime", "Open", "High", "Low", "Close",
-                            "Volume"]
-
-        # Convert DataFrame to a list of lists with selected columns
-        filtered_list_of_lists = \
-            self.dataframe_to_list_of_lists(filtered_df, selected_columns)
-
-        return filtered_list_of_lists
+        df = polars.read_csv(
+            self.csv_file_path, columns=self._columns, separator=","
+        )
+        df = df.filter(
+            (df['Datetime'] >= from_timestamp.strftime(DATETIME_FORMAT))
+            & (df['Datetime'] <= to_timestamp.strftime(DATETIME_FORMAT))
+        )
+        return df
 
     def dataframe_to_list_of_lists(self, dataframe, columns):
         # Extract selected columns from DataFrame and convert
@@ -130,7 +120,7 @@ class CSVTickerMarketDataSource(TickerMarketDataSource):
         self._columns = [
             "Datetime", "Open", "High", "Low", "Close", "Volume"
         ]
-        df = pd.read_csv(self._csv_file_path)
+        df = polars.read_csv(self._csv_file_path)
 
         if not all(column in df.columns for column in self._columns):
             # Identify missing columns
@@ -151,27 +141,30 @@ class CSVTickerMarketDataSource(TickerMarketDataSource):
         if index_datetime is None:
             index_datetime = datetime.utcnow()
 
-        index_datetime = pd.to_datetime(index_datetime, utc=True)
-        df = pd.read_csv(self._csv_file_path)
+        # Filter the data based on the backtest index date and the end date
+        df = polars.read_csv(self._csv_file_path)
+        df = df.filter(
+            (df['Datetime'] >= index_datetime
+             .strftime(DATETIME_FORMAT))
+        )
 
-        # Convert the 'Datetime' column to datetime type if
-        # it's not already
-        if 'Datetime' in df.columns and pd.api.types.is_string_dtype(
-                df['Datetime']):
-            df['Datetime'] = pd.to_datetime(df['Datetime'], utc=True)
+        # Check if the dataframe is empty
+        if df.shape[0] == 0:
+            raise OperationalException(
+                f"No ticker data found for {self.symbol} "
+                f"at {index_datetime}"
+            )
 
-        # Filter rows based on the start and end dates
-        filtered_df = df[(df['Datetime'] <= index_datetime)]
+        first_row = df.head(1)[0]
 
-        if len(filtered_df) == 0:
-            return None
-
-        last_row = filtered_df.iloc[-1]
+        # Calculate the bid and ask price based on the high and low price
         return {
             "symbol": self.symbol,
-            "bid": (float(last_row[3]) + float(last_row[2])) / 2,
-            "ask": (float(last_row[3]) + float(last_row[2])) / 2,
-            "datetime": last_row[0],
+            "bid": float((first_row["Low"][0])
+                         + float(first_row["High"][0])) / 2,
+            "ask": float((first_row["Low"][0])
+                         + float(first_row["High"][0])) / 2,
+            "datetime": first_row["Datetime"][0],
         }
 
     def dataframe_to_list_of_lists(self, dataframe, columns):

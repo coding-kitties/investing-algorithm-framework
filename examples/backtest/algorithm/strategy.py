@@ -56,6 +56,7 @@ class CrossOverStrategy(TradingStrategy):
     fast = 21
     slow = 75
     trend = 150
+    stop_loss_percentage = 7
 
     def apply_strategy(self, algorithm: Algorithm, market_data):
 
@@ -84,7 +85,7 @@ class CrossOverStrategy(TradingStrategy):
                 )
 
             if algorithm.has_position(target_symbol) \
-                    and is_below_trend(fast, slow):
+                and is_below_trend(fast, slow):
 
                 open_trades = algorithm.get_open_trades(
                     target_symbol=target_symbol
@@ -92,3 +93,14 @@ class CrossOverStrategy(TradingStrategy):
 
                 for trade in open_trades:
                     algorithm.close_trade(trade)
+
+            # Checking manual stop losses
+            open_trades = algorithm.get_open_trades(target_symbol)
+
+            for open_trade in open_trades:
+                if open_trade.is_manual_stop_loss_trigger(
+                    ohlcv_df=df,
+                    current_price=market_data[f"{symbol}-ticker"]["bid"],
+                    stop_loss_percentage=self.stop_loss_percentage
+                ):
+                    algorithm.close_trade(open_trade)

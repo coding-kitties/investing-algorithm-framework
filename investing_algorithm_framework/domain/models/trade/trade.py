@@ -1,5 +1,11 @@
+from typing import List
+from polars import DataFrame
+import polars as pl
 from datetime import datetime
 from investing_algorithm_framework.domain.models.base_model import BaseModel
+from investing_algorithm_framework.domain.exceptions import \
+    OperationalException
+from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
 
 
 class Trade(BaseModel):
@@ -164,22 +170,51 @@ class Trade(BaseModel):
         return self.absolute_change
 
     def is_manual_stop_loss_trigger(
-        self, current_price, prices, stop_loss_percentage
+        self,
+        current_price,
+        stop_loss_percentage,
+        prices: List[float] = None,
+        ohlcv_df: DataFrame = None
     ):
-        # Stop loss is triggered when the current price is lower than the
-        # calculated stop loss price. The stop loss price is calculated by
-        # taking the highest price of the given range. If the highest price
-        # is lower than the open price, the stop loss price is calculated by
-        # taking the open price and subtracting the stop loss percentage.
-        # If the highest price is higher than the open price, the stop loss
-        # price is calculated by taking the open price and adding the stop
-        # loss percentage.
+        """
+        Function to check if the stop loss is triggered for a given trade.
+
+        You can use either the prices list or the ohlcv_df DataFrame to
+        calculate the stop loss. The dataframe needs to be a Polars
+        DataFrame with the following columns: "Datetime" and "Close".
+
+        You can use the default CCXTOHLCVMarketDataSource to get the ohlcv_df
+        DataFrame.
+
+        Stop loss is triggered when the current price is lower than the
+        calculated stop loss price. The stop loss price is calculated by
+        taking the highest price of the given range. If the highest price
+        is lower than the open price, the stop loss price is calculated by
+        taking the open price and subtracting the stop loss percentage.
+        If the highest price is higher than the open price, the stop loss
+        price is calculated by taking the open price and adding the stop
+        loss percentage.
+        """
+
+        if prices is None and ohlcv_df is None:
+            raise OperationalException(
+                "Either prices or a polars ohlcv dataframe must be provided"
+            )
 
         if current_price < self.open_price:
             stop_loss_price = self.open_price * \
                               (1 - stop_loss_percentage / 100)
             return current_price <= stop_loss_price
         else:
+            # If dataframes are provided, we use the dataframe to calculate
+            # the stop loss price
+            if ohlcv_df is not None:
+                filtered_df = ohlcv_df.filter(
+                    pl.col('Datetime') >= self.opened_at.strftime(
+                        DATETIME_FORMAT
+                    )
+                )
+                prices = filtered_df['Close'].to_numpy()
             highest_price = max(prices)
             stop_loss_price = highest_price * (1 - stop_loss_percentage / 100)
             return current_price <= stop_loss_price

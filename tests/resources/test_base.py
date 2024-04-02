@@ -36,6 +36,7 @@ class TestBase(TestCase):
     external_available_symbols = []
     market_credentials = []
     market_service = MarketServiceStub(None)
+    market_data_source_service = None
     initialize = True
     resource_directory = os.path.dirname(__file__)
 
@@ -49,6 +50,10 @@ class TestBase(TestCase):
         self.market_service.balances = self.external_balances
         self.market_service.orders = self.external_orders
         self.app.container.market_service.override(self.market_service)
+
+        if self.market_data_source_service is not None:
+            self.app.container.market_data_source_service\
+                .override(self.market_data_source_service)
 
         if len(self.portfolio_configurations) > 0:
             for portfolio_configuration in self.portfolio_configurations:

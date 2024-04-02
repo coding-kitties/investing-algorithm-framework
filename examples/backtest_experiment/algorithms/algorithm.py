@@ -1,7 +1,7 @@
-from investing_algorithm_framework import Algorithm, TradingStrategy, \
-    TimeUnit, OrderSide, DATETIME_FORMAT
 import tulipy as ti
-import polars as pl
+
+from investing_algorithm_framework import Algorithm, TradingStrategy, \
+    TimeUnit, OrderSide
 
 
 def is_below_trend(fast_series, slow_series):
@@ -88,16 +88,10 @@ class Strategy(TradingStrategy):
             open_trades = algorithm.get_open_trades(target_symbol)
 
             for open_trade in open_trades:
-                filtered_df = df.filter(
-                    pl.col('Datetime') >= open_trade.opened_at.strftime(DATETIME_FORMAT)
-                )
-                close_prices = filtered_df['Close'].to_numpy()
-                current_price = market_data[f"{symbol}-ticker"]
-
                 if open_trade.is_manual_stop_loss_trigger(
-                        prices=close_prices,
-                        current_price=current_price["bid"],
-                        stop_loss_percentage=self.stop_loss_percentage
+                    ohlcv_df=df,
+                    current_price=market_data[f"{symbol}-ticker"]["bid"],
+                    stop_loss_percentage=self.stop_loss_percentage
                 ):
                     algorithm.close_trade(open_trade)
 

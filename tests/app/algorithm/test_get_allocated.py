@@ -1,9 +1,6 @@
-import os
-
-from investing_algorithm_framework import create_app, \
-    TradingStrategy, TimeUnit, RESOURCE_DIRECTORY, MarketCredential, \
-    PortfolioConfiguration, Algorithm
-from tests.resources import TestBase, MarketServiceStub
+from investing_algorithm_framework import TradingStrategy, TimeUnit, \
+    MarketCredential, PortfolioConfiguration
+from tests.resources import TestBase, RandomPriceMarketDataSourceServiceStub
 
 
 class StrategyOne(TradingStrategy):
@@ -44,6 +41,13 @@ class Test(TestBase):
     ]
 
     def test_get_allocated(self):
+        self.app.container.market_data_source_service.override(
+            RandomPriceMarketDataSourceServiceStub(
+                None,
+                None,
+                None
+            )
+        )
         self.app.run(number_of_iterations=1)
         order_service = self.app.container.order_service()
         self.app.algorithm.create_limit_order(
@@ -57,3 +61,4 @@ class Test(TestBase):
         self.assertNotEqual(0, self.app.algorithm.get_allocated())
         self.assertNotEqual(0, self.app.algorithm.get_allocated("BITVAVO"))
         self.assertNotEqual(0, self.app.algorithm.get_allocated("bitvavo"))
+

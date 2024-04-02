@@ -98,22 +98,14 @@ class TradeService:
 
             for buy_order in buy_orders_queue:
                 symbol = buy_order.get_symbol()
-
+                current_price = buy_order.get_price()
                 try:
                     ticker = self.market_data_source_service.get_ticker(
                         symbol=symbol, market=market
                     )
+                    current_price = ticker["bid"]
                 except Exception as e:
                     logger.error(e)
-                    raise OperationalException(
-                        f"Error getting ticker data for "
-                        f"trade {buy_order.get_target_symbol()}"
-                        f"-{buy_order.get_trading_symbol()}. Make sure you "
-                        f"have registered a ticker market data source for "
-                        f"{buy_order.get_target_symbol()}"
-                        f"-{buy_order.get_trading_symbol()} "
-                        f"for market {portfolio.market}"
-                    )
 
                 amount = buy_order.get_filled()
                 closed_amount = buy_order.get_trade_closed_amount()
@@ -129,7 +121,7 @@ class TradeService:
                         amount=amount,
                         open_price=buy_order.get_price(),
                         opened_at=buy_order.get_created_at(),
-                        current_price=ticker["bid"]
+                        current_price=current_price
                     )
                 )
 
@@ -156,9 +148,15 @@ class TradeService:
 
             for buy_order in buy_orders:
                 symbol = buy_order.get_symbol()
-                ticker = self.market_data_source_service.get_ticker(
-                    symbol=symbol, market=market
-                )
+                current_price = buy_order.get_price()
+                try:
+                    ticker = self.market_data_source_service.get_ticker(
+                        symbol=symbol, market=market
+                    )
+                    current_price = ticker["bid"]
+                except Exception as e:
+                    logger.error(e)
+
                 trades.append(
                     Trade(
                         buy_order_id=buy_order.id,
@@ -169,7 +167,7 @@ class TradeService:
                         closed_price=buy_order.get_trade_closed_price(),
                         closed_at=buy_order.get_trade_closed_at(),
                         opened_at=buy_order.get_created_at(),
-                        current_price=ticker["bid"]
+                        current_price=current_price
                     )
                 )
 

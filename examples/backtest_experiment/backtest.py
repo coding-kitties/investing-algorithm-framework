@@ -1,3 +1,4 @@
+import json
 from datetime import datetime, timedelta
 
 from algorithms import create_algorithm
@@ -8,6 +9,13 @@ from investing_algorithm_framework import PortfolioConfiguration, \
 if __name__ == "__main__":
     end_date = datetime(2023, 12, 2)
     start_date = end_date - timedelta(days=100)
+    json = json.load(open("configuration.json"))
+    algorithms = []
+
+    # Create the algorithms with the configuration json
+    for configuration in json:
+        algorithms.append(create_algorithm(**configuration))
+
     # Add a portfolio configuration of 400 euro initial balance
     app.add_portfolio_configuration(
         PortfolioConfiguration(
@@ -16,155 +24,8 @@ if __name__ == "__main__":
             initial_balance=400,
         )
     )
-
-    # Run the backtest for each algorithm
     reports = app.run_backtests(
-        algorithms=[
-            create_algorithm(
-                name="9-50-100",
-                description="9-50-100",
-                fast=9,
-                slow=50,
-                trend=100,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="10-50-100",
-                description="10-50-100",
-                fast=10,
-                slow=50,
-                trend=100,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="11-50-100",
-                description="11-50-100",
-                fast=11,
-                slow=50,
-                trend=100,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="9-75-150",
-                description="9-75-150",
-                fast=9,
-                slow=75,
-                trend=150,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="10-75-150",
-                description="10-75-150",
-                fast=10,
-                slow=75,
-                trend=150,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="11-75-150",
-                description="11-75-150",
-                fast=11,
-                slow=75,
-                trend=150,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="20-75-150",
-                description="20-75-150",
-                fast=20,
-                slow=75,
-                trend=150,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="21-75-150",
-                description="21-75-150",
-                fast=21,
-                slow=75,
-                trend=150,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="22-75-150",
-                description="22-75-150",
-                fast=22,
-                slow=75,
-                trend=150,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="23-75-150",
-                description="23-75-150",
-                fast=23,
-                slow=75,
-                trend=150,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="24-75-150",
-                description="24-75-150",
-                fast=24,
-                slow=75,
-                trend=150,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="25-75-150",
-                description="25-75-150",
-                fast=25,
-                slow=75,
-                trend=150,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="20-75-200",
-                description="20-75-200",
-                fast=20,
-                slow=75,
-                trend=200,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="21-75-200",
-                description="24-75-200",
-                fast=24,
-                slow=75,
-                trend=200,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="22-75-200",
-                description="24-75-200",
-                fast=24,
-                slow=75,
-                trend=200,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="23-75-200",
-                description="24-75-200",
-                fast=24,
-                slow=75,
-                trend=200,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="24-75-200",
-                description="24-75-200",
-                fast=24,
-                slow=75,
-                trend=200,
-                stop_loss_percentage=7
-            ),
-            create_algorithm(
-                name="25-75-150",
-                description="25-75-200",
-                fast=25,
-                slow=75,
-                trend=200,
-                stop_loss_percentage=7
-            ),
-        ],
+        algorithms=algorithms,
         start_date=start_date,
         end_date=end_date,
         pending_order_check_interval="2h",
