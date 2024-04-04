@@ -68,7 +68,7 @@ class BacktestMarketDataSource(ABC):
                 return False
 
             return True
-        except Exception as e:
+        except Exception:
             return False
 
     def write_data_to_file_path(self, data_file, data):
