@@ -1,7 +1,6 @@
 import logging
 
 from dateutil.parser import parse
-from dateutil.tz import gettz
 
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
@@ -308,10 +307,7 @@ class Order(BaseModel):
             remaining=ccxt_order.get("remaining", None),
             cost=ccxt_order.get("cost", None),
             fee=OrderFee.from_ccxt_fee(ccxt_order.get("fee", None)),
-            created_at=parse(
-                ccxt_order.get("datetime", None),
-                tzinfos={"UTC": gettz("UTC")}
-            )
+            created_at=parse(ccxt_order.get("datetime", None))
         )
 
     def __repr__(self):

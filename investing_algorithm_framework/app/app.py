@@ -279,6 +279,10 @@ class App:
                 market_data_source.to_backtest_market_data_source()
                 for market_data_source in market_data_sources
             ]
+
+            for market_data_source in backtest_market_data_sources:
+                market_data_source.config = self.config
+
             self.container.market_data_source_service.override(
                 BacktestMarketDataSourceService(
                     market_data_sources=backtest_market_data_sources,
@@ -787,6 +791,7 @@ class App:
         return reports
 
     def add_market_data_source(self, market_data_source):
+        market_data_source.config = self.config
         self._market_data_source_service.add(market_data_source)
 
     def add_market_credential(self, market_credential: MarketCredential):

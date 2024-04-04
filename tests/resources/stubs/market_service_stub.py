@@ -20,8 +20,11 @@ class MarketServiceStub(MarketService):
         'EUR': 1000,
     }
 
-    def __init__(self, market_credential_service):
-        super().__init__(market_credential_service)
+    def __init__(self, config, market_credential_service):
+        super().__init__(
+            market_credential_service=market_credential_service,
+            config=config
+        )
         self._market_credential_service = market_credential_service
         self._orders = []
 

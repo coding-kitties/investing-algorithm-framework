@@ -77,6 +77,7 @@ class Config(dict):
     SQLITE_INITIALIZED = False
     BACKTEST_DATA_DIRECTORY_NAME = "backtest_data"
     SYMBOLS = None
+    DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
     def __init__(self, resource_directory=None):
         super().__init__()

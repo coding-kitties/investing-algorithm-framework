@@ -49,6 +49,7 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
             if backtest_market_data_source is not None:
                 backtest_market_data_source.market_credentials_service = \
                     self._market_credential_service
+
                 backtest_market_data_source.prepare_data(
                     config=configuration_service.get_config(),
                     backtest_start_date=configuration_service

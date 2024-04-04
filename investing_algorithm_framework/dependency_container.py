@@ -68,6 +68,7 @@ class DependencyContainer(containers.DeclarativeContainer):
     )
     order_service = providers.Factory(
         OrderService,
+        configuration_service=configuration_service,
         order_repository=order_repository,
         order_fee_repository=order_fee_repository,
         portfolio_repository=portfolio_repository,
@@ -125,6 +126,7 @@ class DependencyContainer(containers.DeclarativeContainer):
     )
     backtest_service = providers.Factory(
         BacktestService,
+        configuration_service=configuration_service,
         order_service=order_service,
         portfolio_repository=portfolio_repository,
         performance_service=performance_service,

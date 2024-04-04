@@ -22,6 +22,7 @@ class BacktestService:
         portfolio_repository,
         position_repository,
         performance_service,
+        configuration_service
     ):
         self._resource_directory = None
         self._order_service = order_service
@@ -35,6 +36,7 @@ class BacktestService:
         self._market_data_source_service: MarketDataSourceService \
             = market_data_source_service
         self._backtest_market_data_sources = []
+        self._configuration_service = configuration_service
 
     @property
     def resource_directory(self):
@@ -66,6 +68,8 @@ class BacktestService:
         strategy_profiles = []
         portfolios = self._portfolio_repository.get_all()
         initial_unallocated = 0
+        config = self._configuration_service.config
+        datetime_format = config.get("DATETIME_FORMAT")
 
         for portfolio in portfolios:
             initial_unallocated += portfolio.unallocated
@@ -96,10 +100,11 @@ class BacktestService:
             strategy_profile = self.get_strategy_from_strategy_profiles(
                 strategy_profiles, row['id']
             )
+            index_date = datetime.strptime(str(index), datetime_format)
             self.run_backtest_for_profile(
                 algorithm=algorithm,
                 strategy=algorithm.get_strategy(strategy_profile.strategy_id),
-                index_date=index,
+                index_date=index_date,
             )
         return self.create_backtest_report(
             algorithm, len(schedule), start_date, end_date, initial_unallocated

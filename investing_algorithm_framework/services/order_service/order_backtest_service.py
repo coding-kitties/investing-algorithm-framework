@@ -161,9 +161,6 @@ class OrderBacktestService(OrderService):
         order_side = order.get_order_side()
         order_price = order.get_price()
 
-        # Convert 'created_at' to pandas Timestamp for easier comparison
-        created_at = pd.Timestamp(created_at, tz='UTC')
-
         # Filter OHLCV data after the order creation time
         ohlcv_data_after_order = ohlcv_data_frame.loc[created_at:]
 

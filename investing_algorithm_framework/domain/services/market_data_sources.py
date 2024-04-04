@@ -34,6 +34,14 @@ class BacktestMarketDataSource(ABC):
         self._backtest_data_start_date = backtest_data_start_date
         self._backtest_data_index_date = backtest_data_index_date
 
+    @property
+    def config(self):
+        return self._config
+
+    @config.setter
+    def config(self, value):
+        self._config = value
+
     def _data_source_exists(self, file_path):
         """
         Function to check if the data source exists.
@@ -61,8 +69,6 @@ class BacktestMarketDataSource(ABC):
 
             return True
         except Exception as e:
-            logger.error(f"Error reading {file_path}")
-            logger.error(e)
             return False
 
     def write_data_to_file_path(self, data_file, data):
@@ -151,10 +157,10 @@ class BacktestMarketDataSource(ABC):
 class MarketDataSource(ABC):
 
     def __init__(
-            self,
-            identifier,
-            market,
-            symbol,
+        self,
+        identifier,
+        market,
+        symbol,
     ):
         self._identifier = identifier
         self._market = market
@@ -167,6 +173,14 @@ class MarketDataSource(ABC):
     @property
     def identifier(self):
         return self._identifier
+
+    @property
+    def config(self):
+        return self._config
+
+    @config.setter
+    def config(self, value):
+        self._config = value
 
     def get_identifier(self):
         return self.identifier

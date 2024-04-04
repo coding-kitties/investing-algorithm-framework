@@ -71,7 +71,7 @@ class CrossOverStrategy(TradingStrategy):
             fast = ti.sma(df['Close'].to_numpy(), self.fast)
             slow = ti.sma(df['Close'].to_numpy(), self.slow)
             trend = ti.sma(df['Close'].to_numpy(), self.trend)
-            price = ticker_data['bid']
+            price = ticker_data["bid"]
 
             if not algorithm.has_position(target_symbol) \
                     and is_crossover(fast, slow) \

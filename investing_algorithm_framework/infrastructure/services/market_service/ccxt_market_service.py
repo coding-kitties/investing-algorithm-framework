@@ -1,14 +1,14 @@
 import logging
-from typing import Dict
 from datetime import datetime
 from time import sleep
-import polars as pl
+from typing import Dict
+
 import ccxt
+import polars as pl
 from dateutil import parser
-from dateutil.tz import gettz
 
 from investing_algorithm_framework.domain import OperationalException, Order, \
-    CCXT_DATETIME_FORMAT, MarketService
+    MarketService
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +19,19 @@ class CCXTMarketService(MarketService):
     """
     msec = 1000
     minute = 60 * msec
+
+    def __init__(self, market_credential_service):
+        super(CCXTMarketService, self).__init__(
+            market_credential_service=market_credential_service,
+        )
+
+    @property
+    def config(self):
+        return self._config
+
+    @config.setter
+    def config(self, config):
+        self._config = config
 
     def initialize_exchange(self, market, market_credential):
         market = market.lower()
@@ -149,6 +162,7 @@ class CCXTMarketService(MarketService):
     def get_orders(self, symbol, market, since: datetime = None):
         market_credential = self.get_market_credential(market)
         exchange = self.initialize_exchange(market, market_credential)
+        datetime_format = self.config["DATETIME_FORMAT"]
 
         if not exchange.has['fetchOrders']:
             raise OperationalException(
@@ -157,7 +171,7 @@ class CCXTMarketService(MarketService):
             )
 
         if since is not None:
-            since = exchange.parse8601(since.strftime(":%Y-%m-%d %H:%M:%S"))
+            since = exchange.parse8601(datetime_format)
 
             try:
                 ccxt_orders = exchange.fetchOrders(symbol, since=since)
@@ -343,6 +357,7 @@ class CCXTMarketService(MarketService):
     def get_ohlcv(
         self, symbol, time_frame, from_timestamp, market, to_timestamp=None
     ) -> pl.DataFrame:
+        datetime_format = self.config["DATETIME_FORMAT"]
         market_credential = self.get_market_credential(market)
         exchange = self.initialize_exchange(market, market_credential)
 
@@ -353,14 +368,14 @@ class CCXTMarketService(MarketService):
             )
 
         from_time_stamp = exchange.parse8601(
-            from_timestamp.strftime(CCXT_DATETIME_FORMAT)
+            from_timestamp.strftime(datetime_format)
         )
 
         if to_timestamp is None:
             to_timestamp = exchange.milliseconds()
         else:
             to_timestamp = exchange.parse8601(
-                to_timestamp.strftime(CCXT_DATETIME_FORMAT)
+                to_timestamp.strftime(datetime_format)
             )
         data = []
 
@@ -374,17 +389,16 @@ class CCXTMarketService(MarketService):
                 from_time_stamp = to_timestamp
 
             for candle in ohlcv:
-                datetime_stamp = parser.parse(
-                    exchange.iso8601(candle[0]),
-                    tzinfos={"UTC": gettz("UTC")}
+                datetime_stamp = parser.parse(exchange.iso8601(candle[0]))
 
-                )
                 to_timestamp_datetime = parser.parse(
                     exchange.iso8601(to_timestamp),
-                    tzinfos={"UTC": gettz("UTC")}
                 )
 
                 if datetime_stamp <= to_timestamp_datetime:
+                    datetime_stamp = datetime_stamp\
+                        .strftime(datetime_format)
+
                     data.append([datetime_stamp] + candle[1:])
 
             sleep(exchange.rateLimit / 1000)

@@ -15,6 +15,7 @@ class OrderService(RepositoryService):
 
     def __init__(
         self,
+        configuration_service,
         order_repository,
         order_fee_repository,
         market_service: MarketService,
@@ -25,6 +26,7 @@ class OrderService(RepositoryService):
         market_credential_service
     ):
         super(OrderService, self).__init__(order_repository)
+        self.configuration_service = configuration_service
         self.order_repository = order_repository
         self.order_fee_repository = order_fee_repository
         self.market_service: MarketService = market_service

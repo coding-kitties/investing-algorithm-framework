@@ -1,8 +1,10 @@
 import logging
+import logging
 import os
 from datetime import timedelta
 
 import polars
+from dateutil import parser
 
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
     BACKTEST_DATA_DIRECTORY_NAME, DATETIME_FORMAT_BACKTESTING, \
@@ -59,7 +61,7 @@ class CCXTOHLCVBacktestMarketDataSource(
             start_date_func=start_date_func,
             end_date=end_date,
             end_date_func=end_date_func,
-            window_size=window_size
+            window_size=window_size,
         )
 
     def prepare_data(
@@ -80,7 +82,6 @@ class CCXTOHLCVBacktestMarketDataSource(
         When downloading the data it will use the ccxt library.
         """
         # Calculating the backtest data start date
-
         difference = self.end_date - self.start_date
         total_minutes = 0
 
@@ -127,7 +128,10 @@ class CCXTOHLCVBacktestMarketDataSource(
                     )
 
             # Get the OHLCV data from the ccxt market service
-            market_service = CCXTMarketService(self.market_credential_service)
+            market_service = CCXTMarketService(
+                market_credential_service=self.market_credential_service,
+            )
+            market_service.config = config
             ohlcv = market_service.get_ohlcv(
                 symbol=self.symbol,
                 time_frame=self.timeframe,
@@ -171,6 +175,7 @@ class CCXTOHLCVBacktestMarketDataSource(
         from_timestamp = backtest_index_date - timedelta(
             minutes=self.total_minutes_timeframe
         )
+        datetime_format = self._config["DATETIME_FORMAT"]
         self.backtest_data_index_date = backtest_index_date\
             .replace(microsecond=0)
         from_timestamp = from_timestamp.replace(microsecond=0)
@@ -193,8 +198,8 @@ class CCXTOHLCVBacktestMarketDataSource(
             file_path, columns=self.column_names, separator=","
         )
         df = df.filter(
-            (df['Datetime'] >= from_timestamp.strftime(DATETIME_FORMAT))
-            & (df['Datetime'] <= to_timestamp.strftime(DATETIME_FORMAT))
+            (df['Datetime'] >= from_timestamp.strftime(datetime_format))
+            & (df['Datetime'] <= to_timestamp.strftime(datetime_format))
         )
         return df
 
@@ -208,6 +213,9 @@ class CCXTOHLCVBacktestMarketDataSource(
     @property
     def file_name(self):
         return self._create_file_path().split("/")[-1]
+
+    def write_data_to_file_path(self, data_file, data: polars.DataFrame):
+        data.write_csv(data_file)
 
 
 class CCXTTickerBacktestMarketDataSource(
@@ -304,7 +312,10 @@ class CCXTTickerBacktestMarketDataSource(
                     )
 
             # Get the OHLCV data from the ccxt market service
-            market_service = CCXTMarketService(self.market_credential_service)
+            market_service = CCXTMarketService(
+                market_credential_service=self.market_credential_service
+            )
+            market_service.config = config
             ohlcv = market_service.get_ohlcv(
                 symbol=self.symbol,
                 time_frame=self.timeframe,
@@ -363,13 +374,12 @@ class CCXTTickerBacktestMarketDataSource(
         # Filter the data based on the backtest index date and the end date
         df = polars.read_csv(file_path)
         df = df.filter(
-            (df['Datetime'] >= backtest_index_date
-             .strftime(DATETIME_FORMAT))
+            (df['Datetime'] >= backtest_index_date.strftime(DATETIME_FORMAT))
         )
-
         first_row = df.head(1)[0]
+        first_row_datetime = parser.parse(first_row["Datetime"][0])
 
-        if first_row["Datetime"][0] > end_date.strftime(DATETIME_FORMAT):
+        if first_row_datetime > end_date:
             logger.warning(
                 f"No ticker data available for the given backtest "
                 f"index date {backtest_index_date} and symbol {self.symbol} "
@@ -386,12 +396,17 @@ class CCXTTickerBacktestMarketDataSource(
             "datetime": first_row["Datetime"][0],
         }
 
+    def write_data_to_file_path(self, data_file, data: polars.DataFrame):
+        data.write_csv(data_file)
+
 
 class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
 
     def get_data(self, **kwargs):
-        market_service = CCXTMarketService(self.market_credential_service)
-
+        market_service = CCXTMarketService(
+            market_credential_service=self.market_credential_service,
+        )
+        market_service.config = self.config
         if self.start_date is None:
             raise OperationalException(
                 "Either start_date or start_date_func should be set "
@@ -422,7 +437,10 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
 class CCXTOrderBookMarketDataSource(OrderBookMarketDataSource):
 
     def get_data(self, **kwargs):
-        market_service = CCXTMarketService(self.market_credential_service)
+        market_service = CCXTMarketService(
+            market_credential_service=self.market_credential_service
+        )
+        market_service.config = self.config
         return market_service.get_order_book(
             symbol=self.symbol, market=self.market
         )
@@ -438,7 +456,8 @@ class CCXTTickerMarketDataSource(TickerMarketDataSource):
         identifier,
         market,
         symbol=None,
-        backtest_timeframe=None
+        backtest_timeframe=None,
+
     ):
         super().__init__(
             identifier=identifier,
@@ -448,7 +467,10 @@ class CCXTTickerMarketDataSource(TickerMarketDataSource):
         self._backtest_timeframe = backtest_timeframe
 
     def get_data(self, **kwargs):
-        market_service = CCXTMarketService(self.market_credential_service)
+        market_service = CCXTMarketService(
+            market_credential_service=self.market_credential_service
+        )
+        market_service.config = self.config
 
         if self.market is None:
 
