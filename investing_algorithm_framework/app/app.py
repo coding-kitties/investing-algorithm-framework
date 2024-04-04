@@ -278,10 +278,12 @@ class App:
             backtest_market_data_sources = [
                 market_data_source.to_backtest_market_data_source()
                 for market_data_source in market_data_sources
+                if market_data_source is not None
             ]
 
             for market_data_source in backtest_market_data_sources:
-                market_data_source.config = self.config
+                if market_data_source is not None:
+                    market_data_source.config = self.config
 
             self.container.market_data_source_service.override(
                 BacktestMarketDataSourceService(

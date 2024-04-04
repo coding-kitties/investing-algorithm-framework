@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-
+from dateutil import parser
 import pandas as pd
 from tqdm import tqdm
 
@@ -68,8 +68,6 @@ class BacktestService:
         strategy_profiles = []
         portfolios = self._portfolio_repository.get_all()
         initial_unallocated = 0
-        config = self._configuration_service.config
-        datetime_format = config.get("DATETIME_FORMAT")
 
         for portfolio in portfolios:
             initial_unallocated += portfolio.unallocated
@@ -100,7 +98,7 @@ class BacktestService:
             strategy_profile = self.get_strategy_from_strategy_profiles(
                 strategy_profiles, row['id']
             )
-            index_date = datetime.strptime(str(index), datetime_format)
+            index_date = parser.parse(str(index))
             self.run_backtest_for_profile(
                 algorithm=algorithm,
                 strategy=algorithm.get_strategy(strategy_profile.strategy_id),

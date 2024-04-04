@@ -63,6 +63,13 @@ class Test(TestCase):
                 initial_balance=1000
             )
         )
+        start_date = datetime.utcnow() - timedelta(days=1)
+        end_date = datetime.utcnow()
+        app._initialize_app_for_backtest(
+            backtest_start_date=start_date,
+            backtest_end_date=end_date,
+            pending_order_check_interval='2h'
+        )
         reports = app.run_backtests(
             algorithms=[algorithm_one, algorithm_two, algorithm_three],
             start_date=datetime.utcnow() - timedelta(days=1),

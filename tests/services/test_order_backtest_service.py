@@ -513,7 +513,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24262,
                 "Close": 0.24262,
                 "Volume": 0.24262,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             }
         ]
         ohlcv_df = pd.DataFrame(
@@ -532,7 +532,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             }
         ]
         ohlcv_df = pd.DataFrame(
@@ -552,7 +552,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24362,
                 "Close": 0.24362,
                 "Volume": 0.24362,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             }
         ]
         ohlcv_df = pd.DataFrame(
@@ -572,7 +572,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24462,
                 "Close": 0.24462,
                 "Volume": 0.24462,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             },
             {
                 "Open": 0.24300,
@@ -580,7 +580,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24300,
                 "Close": 0.24300,
                 "Volume": 0.24300,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             }
         ]
         ohlcv_df = pd.DataFrame(
@@ -599,7 +599,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             },
             {
                 "Open": 0.24200,
@@ -607,7 +607,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24200,
                 "Close": 0.24200,
                 "Volume": 0.24200,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             },
             {
                 "Open": 0.24300,
@@ -615,7 +615,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24300,
                 "Close": 0.24300,
                 "Volume": 0.24300,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             }
         ]
         ohlcv_df = pd.DataFrame(
@@ -688,7 +688,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24262,
                 "Close": 0.24262,
                 "Volume": 0.24262,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             }
         ]
         ohlcv_df = pd.DataFrame(
@@ -707,7 +707,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24362,
                 "Close": 0.24362,
                 "Volume": 0.24362,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             }
         ]
         ohlcv_df = pd.DataFrame(
@@ -727,7 +727,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             }
         ]
         ohlcv_df = pd.DataFrame(
@@ -747,7 +747,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             },
             {
                 "Open": 0.24000,
@@ -755,7 +755,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24000,
                 "Close": 0.24000,
                 "Volume": 0.24000,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             }
         ]
         ohlcv_df = pd.DataFrame(
@@ -774,7 +774,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24300,
                 "Close": 0.24300,
                 "Volume": 0.24300,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             },
             {
                 "Open": 0.24162,
@@ -782,7 +782,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             },
             {
                 "Open": 0.24000,
@@ -790,7 +790,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24000,
                 "Close": 0.24000,
                 "Volume": 0.24000,
-                "Timestamp": datetime.now(tz=tzutc())
+                "Timestamp": datetime.now()
             }
         ]
         ohlcv_df = pd.DataFrame(
