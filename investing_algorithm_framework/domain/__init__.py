@@ -26,7 +26,8 @@ from .stateless_actions import StatelessActions
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
 from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
     OHLCVMarketDataSource, BacktestMarketDataSource, MarketDataSource, \
-    MarketService, MarketCredentialService, AbstractPortfolioSyncService
+    MarketService, MarketCredentialService, AbstractPortfolioSyncService, \
+    RoundingService
 from .data_structures import PeekableQueue
 
 __all__ = [
@@ -109,5 +110,6 @@ __all__ = [
     "RESERVED_BALANCES",
     "AbstractPortfolioSyncService",
     "APP_MODE",
-    "AppMode"
+    "AppMode",
+    "RoundingService",
 ]

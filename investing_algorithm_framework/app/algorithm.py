@@ -1,12 +1,11 @@
-import decimal
+import inspect
 import logging
 from typing import List
-import inspect
 
 from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
     Position, Order, Portfolio, OrderType, OrderSide, \
     BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, MarketService, TimeUnit, \
-    OperationalException, random_string
+    OperationalException, random_string, RoundingService
 from investing_algorithm_framework.services import MarketCredentialService, \
     MarketDataSourceService, PortfolioService, PositionService, TradeService, \
     OrderService, ConfigurationService, StrategyOrchestratorService, \
@@ -218,7 +217,7 @@ class Algorithm:
             amount = position.get_amount() * (percentage_of_position / 100)
 
         if precision is not None:
-            amount = self.round_down(amount, precision)
+            amount = RoundingService.round_down(amount, precision)
 
         order_data = {
             "target_symbol": target_symbol,
@@ -594,7 +593,9 @@ class Algorithm:
         net_size = portfolio.get_net_size()
         return (position.cost / net_size) * 100
 
-    def close_position(self, symbol, market=None, identifier=None):
+    def close_position(
+        self, symbol, market=None, identifier=None, precision=None
+    ):
         portfolio = self.portfolio_service.find(
             {"market": market, "identifier": identifier}
         )
@@ -623,6 +624,7 @@ class Algorithm:
             amount=position.get_amount(),
             order_side=OrderSide.SELL.value,
             price=ticker["bid"],
+            precision=precision,
         )
 
     def add_strategies(self, strategies):
@@ -886,28 +888,13 @@ class Algorithm:
     def get_closed_trades(self):
         return self.trade_service.get_closed_trades()
 
-    def round_down(self, value, amount_of_decimals):
-
-        if self.count_decimals(value) <= amount_of_decimals:
-            return value
-
-        with decimal.localcontext() as ctx:
-            d = decimal.Decimal(value)
-            ctx.rounding = decimal.ROUND_DOWN
-            return float(round(d, amount_of_decimals))
-
-    def count_decimals(self, number):
-        decimal_str = str(number)
-        if '.' in decimal_str:
-            return len(decimal_str.split('.')[1])
-        else:
-            return 0
-
     def get_open_trades(self, target_symbol=None, market=None):
         return self.trade_service.get_open_trades(target_symbol, market)
 
-    def close_trade(self, trade, market=None):
-        self.trade_service.close_trade(trade, market)
+    def close_trade(self, trade, market=None, precision=None) -> None:
+        self.trade_service.close_trade(
+            trade=trade, market=market, precision=precision
+        )
 
     def get_number_of_positions(self):
         """

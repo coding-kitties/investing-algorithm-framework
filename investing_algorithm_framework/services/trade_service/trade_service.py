@@ -1,14 +1,14 @@
 import logging
-from typing import List
 from queue import PriorityQueue
+from typing import List
 
 from investing_algorithm_framework.domain import OrderStatus, OrderSide, \
     Trade, PeekableQueue, OrderType, TradeStatus, \
-    OperationalException, Order
-from investing_algorithm_framework.services.position_service import \
-    PositionService
+    OperationalException, Order, RoundingService
 from investing_algorithm_framework.services.market_data_source_service import \
     MarketDataSourceService
+from investing_algorithm_framework.services.position_service import \
+    PositionService
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +199,7 @@ class TradeService:
             if order.get_trade_closed_at() is not None
         ]
 
-    def close_trade(self, trade, market=None) -> None:
+    def close_trade(self, trade, market=None, precision=None) -> None:
         """
         Close trade method
 
@@ -210,6 +210,7 @@ class TradeService:
 
         return: None
         """
+
         if trade.closed_at is not None:
             raise OperationalException("Trade already closed.")
 
@@ -226,6 +227,9 @@ class TradeService:
             {"portfolio": portfolio.id, "symbol": order.get_target_symbol()}
         )
         amount = order.get_amount()
+
+        if precision is not None:
+            amount = RoundingService.round_down(amount, precision)
 
         if position.get_amount() < amount:
             logger.warning(
