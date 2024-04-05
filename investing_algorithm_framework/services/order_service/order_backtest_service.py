@@ -1,6 +1,5 @@
 import logging
 
-import pandas as pd
 import polars as pl
 
 from investing_algorithm_framework.domain import BACKTESTING_INDEX_DATETIME, \
@@ -98,13 +97,6 @@ class OrderBacktestService(OrderService):
                 time_frame=self.configuration_service
                 .config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]
             )
-
-            # Convert polaris df to pandas df
-            df = df.to_pandas()
-
-            # Convert the 'Datetime' column to pandas Timestamp
-            df["Datetime"] = pd.to_datetime(df["Datetime"])
-            df.set_index("Datetime", inplace=True)
 
             if self.has_executed(order, df):
                 self.update(
