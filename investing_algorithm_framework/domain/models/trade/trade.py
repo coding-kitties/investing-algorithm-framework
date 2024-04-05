@@ -209,12 +209,21 @@ class Trade(BaseModel):
             # If dataframes are provided, we use the dataframe to calculate
             # the stop loss price
             if ohlcv_df is not None:
-                filtered_df = ohlcv_df.filter(
-                    pl.col('Datetime') >= self.opened_at.strftime(
-                        DATETIME_FORMAT
+                column_type = ohlcv_df['Datetime'].dtype
+
+                if isinstance(column_type, pl.Datetime):
+                    filtered_df = ohlcv_df.filter(
+                        pl.col('Datetime') >= self.opened_at
                     )
-                )
+                else:
+                    filtered_df = ohlcv_df.filter(
+                        pl.col('Datetime') >= self.opened_at.strftime(
+                            DATETIME_FORMAT
+                        )
+                    )
+
                 prices = filtered_df['Close'].to_numpy()
+
             highest_price = max(prices)
             stop_loss_price = highest_price * (1 - stop_loss_percentage / 100)
             return current_price <= stop_loss_price

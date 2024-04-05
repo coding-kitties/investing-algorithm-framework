@@ -1,14 +1,14 @@
-import os
-import pandas as pd
-from decimal import Decimal
 from datetime import datetime
-from dateutil.tz import tzutc
-from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, Algorithm, MarketCredential, \
+from decimal import Decimal
+
+import polars as pl
+
+from investing_algorithm_framework import PortfolioConfiguration, \
+    MarketCredential, \
     BACKTESTING_INDEX_DATETIME
 from investing_algorithm_framework.services import \
     BacktestMarketDataSourceService, OrderBacktestService
-from tests.resources import TestBase, MarketServiceStub
+from tests.resources import TestBase
 
 
 class TestOrderBacktestService(TestBase):
@@ -513,14 +513,10 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24262,
                 "Close": 0.24262,
                 "Volume": 0.24262,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             }
         ]
-        ohlcv_df = pd.DataFrame(
-            ohclv,
-            columns=["Open", "High", "Low", "Close", "Volume", "Timestamp"]
-        )
-        ohlcv_df.set_index("Timestamp", inplace=True)
+        ohlcv_df = pl.DataFrame(ohclv)
         self.assertTrue(order_service.has_executed(order, ohlcv_df))
 
         # Check with ohlcv data with a single row that is lower than the
@@ -532,15 +528,10 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             }
         ]
-        ohlcv_df = pd.DataFrame(
-            ohclv,
-            columns=["Open", "High", "Low", "Close", "Volume", "Timestamp"]
-        )
-        # Set the datetime object as the index (timestamp column)
-        ohlcv_df.set_index("Timestamp", inplace=True)
+        ohlcv_df = pl.DataFrame(ohclv)
         self.assertTrue(order_service.has_executed(order, ohlcv_df))
 
         # Check with ohlcv data with a single row that is higher than the
@@ -552,15 +543,10 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24362,
                 "Close": 0.24362,
                 "Volume": 0.24362,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             }
         ]
-        ohlcv_df = pd.DataFrame(
-            ohclv,
-            columns=["Open", "High", "Low", "Close", "Volume", "Timestamp"]
-        )
-        # Set the datetime object as the index (timestamp column)
-        ohlcv_df.set_index("Timestamp", inplace=True)
+        ohlcv_df = pl.DataFrame(ohclv)
         self.assertFalse(order_service.has_executed(order, ohlcv_df))
 
         # Check with multiple rows with all rows having a price higher than
@@ -572,7 +558,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24462,
                 "Close": 0.24462,
                 "Volume": 0.24462,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             },
             {
                 "Open": 0.24300,
@@ -580,14 +566,10 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24300,
                 "Close": 0.24300,
                 "Volume": 0.24300,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             }
         ]
-        ohlcv_df = pd.DataFrame(
-            ohclv,
-            columns=["Open", "High", "Low", "Close", "Volume", "Timestamp"]
-        )
-        ohlcv_df.set_index("Timestamp", inplace=True)
+        ohlcv_df = pl.DataFrame(ohclv)
         self.assertFalse(order_service.has_executed(order, ohlcv_df))
 
         # Check with multiple rows with the first row have a price lower than
@@ -599,7 +581,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             },
             {
                 "Open": 0.24200,
@@ -607,7 +589,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24200,
                 "Close": 0.24200,
                 "Volume": 0.24200,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             },
             {
                 "Open": 0.24300,
@@ -615,15 +597,10 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24300,
                 "Close": 0.24300,
                 "Volume": 0.24300,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             }
         ]
-        ohlcv_df = pd.DataFrame(
-            ohclv,
-            columns=["Open", "High", "Low", "Close", "Volume", "Timestamp"]
-        )
-        # Set the datetime object as the index (timestamp column)
-        ohlcv_df.set_index("Timestamp", inplace=True)
+        ohlcv_df = pl.DataFrame(ohclv)
         self.assertTrue(order_service.has_executed(order, ohlcv_df))
 
     def test_has_executed_sell_order(self):
@@ -688,14 +665,10 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24262,
                 "Close": 0.24262,
                 "Volume": 0.24262,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             }
         ]
-        ohlcv_df = pd.DataFrame(
-            ohclv,
-            columns=["Open", "High", "Low", "Close", "Volume", "Timestamp"]
-        )
-        ohlcv_df.set_index("Timestamp", inplace=True)
+        ohlcv_df = pl.DataFrame(ohclv)
         self.assertTrue(order_service.has_executed(sell_order, ohlcv_df))
 
         # Check with ohlcv data with a single row that has higher price then
@@ -707,15 +680,10 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24362,
                 "Close": 0.24362,
                 "Volume": 0.24362,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             }
         ]
-        ohlcv_df = pd.DataFrame(
-            ohclv,
-            columns=["Open", "High", "Low", "Close", "Volume", "Timestamp"]
-        )
-        # Set the datetime object as the index (timestamp column)
-        ohlcv_df.set_index("Timestamp", inplace=True)
+        ohlcv_df = pl.DataFrame(ohclv)
         self.assertTrue(order_service.has_executed(sell_order, ohlcv_df))
 
         # Check with ohlcv data with a single row that has lower price then
@@ -727,15 +695,10 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             }
         ]
-        ohlcv_df = pd.DataFrame(
-            ohclv,
-            columns=["Open", "High", "Low", "Close", "Volume", "Timestamp"]
-        )
-        # Set the datetime object as the index (timestamp column)
-        ohlcv_df.set_index("Timestamp", inplace=True)
+        ohlcv_df = pl.DataFrame(ohclv)
         self.assertFalse(order_service.has_executed(sell_order, ohlcv_df))
 
         # Check with multiple rows with all rows having a price lower than
@@ -747,7 +710,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             },
             {
                 "Open": 0.24000,
@@ -755,14 +718,10 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24000,
                 "Close": 0.24000,
                 "Volume": 0.24000,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             }
         ]
-        ohlcv_df = pd.DataFrame(
-            ohclv,
-            columns=["Open", "High", "Low", "Close", "Volume", "Timestamp"]
-        )
-        ohlcv_df.set_index("Timestamp", inplace=True)
+        ohlcv_df = pl.DataFrame(ohclv)
         self.assertFalse(order_service.has_executed(sell_order, ohlcv_df))
 
         # Check with multiple rows with the first row have a price higher than
@@ -774,7 +733,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24300,
                 "Close": 0.24300,
                 "Volume": 0.24300,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             },
             {
                 "Open": 0.24162,
@@ -782,7 +741,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             },
             {
                 "Open": 0.24000,
@@ -790,13 +749,8 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24000,
                 "Close": 0.24000,
                 "Volume": 0.24000,
-                "Timestamp": datetime.now()
+                "Datetime": datetime.now()
             }
         ]
-        ohlcv_df = pd.DataFrame(
-            ohclv,
-            columns=["Open", "High", "Low", "Close", "Volume", "Timestamp"]
-        )
-        # Set the datetime object as the index (timestamp column)
-        ohlcv_df.set_index("Timestamp", inplace=True)
+        ohlcv_df = pl.DataFrame(ohclv)
         self.assertTrue(order_service.has_executed(sell_order, ohlcv_df))

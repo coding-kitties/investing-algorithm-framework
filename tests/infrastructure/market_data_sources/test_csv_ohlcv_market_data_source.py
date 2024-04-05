@@ -31,11 +31,16 @@ class Test(TestCase):
     def test_right_columns(self):
         file_name = "OHLCV_BTC-EUR_BINANCE" \
                     "_2h_2023-08-07:07:59_2023-12-02:00:00.csv"
-        CSVOHLCVMarketDataSource(
+        data_source = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
                           f"{file_name}",
             window_size=10
+        )
+        df = data_source \
+            .get_data(datetime(year=2023, month=12, day=17, hour=0, minute=0))
+        self.assertEqual(
+            ["Datetime", "Open", "High", "Low", "Close", "Volume"], df.columns
         )
 
     def test_throw_exception_when_missing_column_names_columns(self):
@@ -114,6 +119,7 @@ class Test(TestCase):
             datasource.start_date = datasource.start_date + timedelta(days=1)
             datasource.end_date = datasource.end_date + timedelta(days=1)
             self.assertTrue(len(data) > 0)
+            self.assertAlmostEqual(10, len(data), 2)
             self.assertTrue(isinstance(data, DataFrame))
             number_of_runs += 1
 
@@ -170,3 +176,6 @@ class Test(TestCase):
             window_size=10,
         )
         self.assertEqual("15m", datasource.get_timeframe())
+
+    def test_get_data(self):
+        pass

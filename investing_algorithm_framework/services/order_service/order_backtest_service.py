@@ -1,6 +1,8 @@
+import datetime
 import logging
 
 import pandas as pd
+import polars as pl
 
 from investing_algorithm_framework.domain import BACKTESTING_INDEX_DATETIME, \
     OrderStatus, BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, \
@@ -160,9 +162,18 @@ class OrderBacktestService(OrderService):
         created_at = order.get_created_at()
         order_side = order.get_order_side()
         order_price = order.get_price()
+        column_type = ohlcv_data_frame['Datetime'].dtype
 
-        # Filter OHLCV data after the order creation time
-        ohlcv_data_after_order = ohlcv_data_frame.loc[created_at:]
+        if isinstance(column_type, pl.Datetime):
+            ohlcv_data_after_order = ohlcv_data_frame.filter(
+                pl.col('Datetime') >= created_at
+            )
+        else:
+            ohlcv_data_after_order = ohlcv_data_frame.filter(
+                pl.col('Datetime') >= created_at.strftime(
+                    self.configuration_service.config["DATETIME_FORMAT"]
+                )
+            )
 
         # Check if the order execution conditions are met
         if OrderSide.BUY.equals(order_side):

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from unittest import TestCase
 
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
-    BACKTEST_DATA_DIRECTORY_NAME
+    BACKTEST_DATA_DIRECTORY_NAME, DATETIME_FORMAT
 from investing_algorithm_framework.infrastructure import \
     CCXTOHLCVBacktestMarketDataSource
 
@@ -97,6 +97,9 @@ class Test(TestCase):
             timeframe="15m",
             window_size=200
         )
+        data_source.config = {
+            "DATETIME_FORMAT": DATETIME_FORMAT
+        }
         data_source.prepare_data(
             config={
                 RESOURCE_DIRECTORY: self.resource_dir,
@@ -107,7 +110,11 @@ class Test(TestCase):
         )
         self.assertEqual(200, data_source.window_size)
         self.assertEqual(csv_file_path, data_source._create_file_path())
-
+        df = data_source\
+            .get_data(datetime(year=2023, month=12, day=17, hour=0, minute=0))
+        self.assertEqual(
+            ["Datetime", "Open", "High", "Low", "Close", "Volume"], df.columns
+        )
 
 # def test_start_date(self):
     #     start_date = datetime(2023, 12, 1)
@@ -151,26 +158,7 @@ class Test(TestCase):
     #     data_source.start_date = datetime(2023, 12, 25)
     #     data_source.end_date = datetime(2023, 12, 16)
     #     self.assertTrue(data_source.empty())
-    #
-    # def test_get_data(self):
-    #     file_name = "OHLCV_BTC-EUR_BINANCE_15m_2023-12-" \
-    #                 "01:00:00_2023-12-25:00:00.csv"
-    #     datasource = CSVOHLCVMarketDataSource(
-    #         csv_file_path=f"{self.resource_dir}/"
-    #                       "market_data_sources/"
-    #                       f"{file_name}"
-    #     )
-    #     number_of_runs = 0
-    #
-    #     while not datasource.empty():
-    #         data = datasource.get_data()
-    #         datasource.start_date = datasource.start_date + timedelta(days=1)
-    #         datasource.end_date = datasource.end_date + timedelta(days=1)
-    #         self.assertTrue(len(data) > 0)
-    #         number_of_runs += 1
-    #
-    #     self.assertTrue(number_of_runs > 0)
-    #
+
     # def test_get_identifier(self):
     #     file_name = "OHLCV_BTC-EUR_BINANCE_15m_2023-12-" \
     #                 "01:00:00_2023-12-25:00:00.csv"
@@ -214,3 +202,4 @@ class Test(TestCase):
     #         timeframe="15m"
     #     )
     #     self.assertEqual("15m", datasource.get_timeframe())
+
