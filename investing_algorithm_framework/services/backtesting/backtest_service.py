@@ -92,7 +92,7 @@ class BacktestService:
         for index, row in tqdm(
             schedule.iterrows(),
             total=len(schedule),
-            desc=f"Running backtests {algorithm.name}",
+            desc=f"Running backtest for algorithm with name {algorithm.name}",
             colour="GREEN"
         ):
             strategy_profile = self.get_strategy_from_strategy_profiles(

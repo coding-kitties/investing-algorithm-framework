@@ -213,7 +213,7 @@ class BacktestReport(BaseModel):
 
     @property
     def percentage_positive_trades(self):
-        return self._percentage_positive_trades
+        return float(self._percentage_positive_trades)
 
     @percentage_positive_trades.setter
     def percentage_positive_trades(self, value):
@@ -221,7 +221,7 @@ class BacktestReport(BaseModel):
 
     @property
     def percentage_negative_trades(self):
-        return self._percentage_negative_trades
+        return float(self._percentage_negative_trades)
 
     @percentage_negative_trades.setter
     def percentage_negative_trades(self, value):

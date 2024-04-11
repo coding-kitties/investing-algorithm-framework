@@ -26,8 +26,14 @@ if __name__ == "__main__":
     )
     reports = app.run_backtests(
         algorithms=algorithms,
-        start_date=start_date,
-        end_date=end_date,
+        date_ranges=[
+            (datetime(2023, 7, 2),
+             datetime(2023, 7, 2) + timedelta(days=200)),
+            (datetime(2022, 7, 2),
+             datetime(2022, 7, 2) + timedelta(days=200)),
+            (datetime(2024, 1, 1),
+             datetime(2024, 1, 1) + timedelta(days=100)),
+        ],
         pending_order_check_interval="2h",
     )
     evaluation = BacktestReportsEvaluation(reports)

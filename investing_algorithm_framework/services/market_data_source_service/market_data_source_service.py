@@ -85,7 +85,7 @@ class MarketDataSourceService:
         )
 
     def get_data(self, identifier):
-
+        print(self._market_data_sources)
         for market_data_source in self._market_data_sources:
             if market_data_source.get_identifier() == identifier:
                 return market_data_source.get_data(

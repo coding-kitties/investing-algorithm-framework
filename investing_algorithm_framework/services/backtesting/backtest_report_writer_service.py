@@ -21,11 +21,14 @@ class BacktestReportWriterService:
 
         if not os.path.exists(output_directory):
             os.makedirs(output_directory)
-
+        backtest_start_date = report.backtest_start_date.strftime(DATETIME_FORMAT)
+        backtest_end_date = report.backtest_end_date.strftime(DATETIME_FORMAT)
+        created_at = report.created_at.strftime(DATETIME_FORMAT)
         csv_file_path = os.path.join(
             output_directory,
-            f"report_{report.name}"
-            f"_{report.created_at.strftime(DATETIME_FORMAT)}.csv"
+            f"report_{report.name}_backtest_start_date_"
+            f"{backtest_start_date}_backtest_end_date_"
+            f"{backtest_end_date}_created_at_{created_at}.csv"
         )
         report_dict = report.to_dict()
 

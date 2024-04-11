@@ -5,7 +5,7 @@ import threading
 from datetime import datetime
 from distutils.sysconfig import get_python_lib
 from time import sleep
-from typing import List
+from typing import List, Optional, Tuple
 import inspect
 
 from abc import abstractmethod
@@ -28,6 +28,9 @@ from investing_algorithm_framework.services import OrderBacktestService, \
     MarketDataSourceService, MarketCredentialService
 
 logger = logging.getLogger("investing_algorithm_framework")
+COLOR_RESET = '\033[0m'
+COLOR_GREEN = '\033[92m'
+COLOR_YELLOW = '\033[93m'
 
 
 class AppHook:
@@ -236,7 +239,8 @@ class App:
         self,
         backtest_start_date,
         backtest_end_date,
-        pending_order_check_interval
+        pending_order_check_interval,
+        market_data_sources,
     ) -> None:
         """
         Initialize the app for backtesting by setting the configuration
@@ -267,12 +271,6 @@ class App:
         # Override the MarketDataSourceService service with the backtest
         # market data source service equivalent. Additionally, convert the
         # market data sources to backtest market data sources
-        # market_data_sources = self.get_market_data_sources()
-        # backtest_market_data_sources = []
-        market_data_source_service: MarketDataSourceService = \
-            self.container.market_data_source_service()
-        market_data_sources = market_data_source_service \
-            .get_market_data_sources()
 
         if market_data_sources is not None:
             backtest_market_data_sources = [
@@ -435,10 +433,10 @@ class App:
                 shutil.copy(management_commands_template, destination)
 
     def run(
-            self,
-            payload: dict = None,
-            number_of_iterations: int = None,
-            sync=False
+        self,
+        payload: dict = None,
+        number_of_iterations: int = None,
+        sync=False
     ):
         """
         Entry point to run the application. This method should be called to
@@ -673,12 +671,12 @@ class App:
         return self.algorithm.get_portfolio_configurations()
 
     def run_backtest(
-            self,
-            algorithm,
-            start_date,
-            end_date,
-            pending_order_check_interval='1h',
-            output_directory=None
+        self,
+        algorithm,
+        start_date,
+        end_date,
+        pending_order_check_interval='1h',
+        output_directory=None
     ) -> BacktestReport:
         """
         Run a backtest for an algorithm. This method should be called when
@@ -699,10 +697,14 @@ class App:
         if end_date is None:
             end_date = datetime.utcnow()
 
+        market_data_sources = self._market_data_source_service\
+            .get_market_data_sources()
+
         self._initialize_app_for_backtest(
             backtest_start_date=start_date,
             backtest_end_date=end_date,
-            pending_order_check_interval=pending_order_check_interval
+            pending_order_check_interval=pending_order_check_interval,
+            market_data_sources=market_data_sources
         )
 
         self._initialize_algorithm_for_backtest(
@@ -733,12 +735,13 @@ class App:
         return report
 
     def run_backtests(
-            self,
-            algorithms,
-            start_date,
-            end_date,
-            pending_order_check_interval='1h',
-            output_directory=None
+        self,
+        algorithms,
+        start_date: Optional[datetime] = None,
+        end_date: Optional[datetime] = None,
+        date_ranges: Optional[Tuple[datetime, datetime]] = None,
+        pending_order_check_interval='1h',
+        output_directory=None
     ) -> List[BacktestReport]:
         """
         Run a backtest for a set algorithm. This method should be called when
@@ -749,6 +752,8 @@ class App:
         :param start_date: The start date of the backtest
         :param end_date: The end date of the backtest
         :param pending_order_check_interval: The interval at which to check
+        :param date_ranges: The date ranges to run the backtests for (list of
+        tuples of start and end dates)
         pending orders
         :param output_directory: The directory to write the backtest report to
         :return: List of BacktestReport intances
@@ -756,39 +761,60 @@ class App:
         logger.info("Initializing backtests")
         reports = []
 
-        if end_date is None:
-            end_date = datetime.utcnow()
+        if start_date is not None:
 
-        self._initialize_app_for_backtest(
-            backtest_start_date=start_date,
-            backtest_end_date=end_date,
-            pending_order_check_interval=pending_order_check_interval
-        )
+            if end_date is None:
+                end_date = datetime.utcnow()
 
-        for algorithm in algorithms:
-            self._initialize_algorithm_for_backtest(algorithm)
-            backtest_service = self.container.backtest_service()
-            backtest_service.resource_directory = self.config.get(
-                RESOURCE_DIRECTORY
+            date_ranges = [(start_date, end_date)]
+        else:
+            if date_ranges is None:
+                raise OperationalException("No date ranges specified")
+
+        market_data_sources = self._market_data_source_service\
+            .get_market_data_sources()
+
+        for date_range in date_ranges:
+            start_date, end_date = date_range
+            self._initialize_app_for_backtest(
+                backtest_start_date=start_date,
+                backtest_end_date=end_date,
+                pending_order_check_interval=pending_order_check_interval,
+                market_data_sources=market_data_sources
             )
 
-            # Run the backtest with the backtest_service and collect the report
-            report = backtest_service.run_backtest(
-                algorithm=algorithm, start_date=start_date, end_date=end_date
+            print(
+                f"{COLOR_YELLOW}Running backtests for date "
+                f"range:{COLOR_RESET} {COLOR_GREEN}{start_date} - {end_date} for a "
+                f"total of {len(algorithms)} algorithms.{COLOR_RESET}"
             )
-            backtest_report_writer_service = self.container \
-                .backtest_report_writer_service()
-
-            if output_directory is None:
-                output_directory = os.path.join(
-                    self.config.get(RESOURCE_DIRECTORY),
-                    "backtest_reports"
+            for algorithm in algorithms:
+                self._initialize_algorithm_for_backtest(algorithm)
+                backtest_service = self.container.backtest_service()
+                backtest_service.resource_directory = self.config.get(
+                    RESOURCE_DIRECTORY
                 )
 
-            backtest_report_writer_service.write_report_to_csv(
-                report=report, output_directory=output_directory
-            )
-            reports.append(report)
+                # Run the backtest with the backtest_service
+                # and collect the report
+                report = backtest_service.run_backtest(
+                    algorithm=algorithm,
+                    start_date=start_date,
+                    end_date=end_date
+                )
+                backtest_report_writer_service = self.container \
+                    .backtest_report_writer_service()
+
+                if output_directory is None:
+                    output_directory = os.path.join(
+                        self.config.get(RESOURCE_DIRECTORY),
+                        "backtest_reports"
+                    )
+
+                backtest_report_writer_service.write_report_to_csv(
+                    report=report, output_directory=output_directory
+                )
+                reports.append(report)
 
         return reports
 
