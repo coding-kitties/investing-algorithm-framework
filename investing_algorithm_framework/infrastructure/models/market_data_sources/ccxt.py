@@ -1,6 +1,8 @@
 import logging
 import os
 from datetime import timedelta
+import pandas as pd
+from dateutil import parser
 
 import polars
 from dateutil import parser
@@ -368,22 +370,24 @@ class CCXTTickerBacktestMarketDataSource(
         timeframe_minutes = TimeFrame.from_string(self.timeframe)\
             .amount_of_minutes
         backtest_index_date = kwargs["backtest_index_date"]
-        end_date = backtest_index_date + timedelta(minutes=timeframe_minutes)
 
         # Filter the data based on the backtest index date and the end date
         df = polars.read_csv(file_path)
-        df = df.filter(
+        filtered_df = df.filter(
             (df['Datetime'] >= backtest_index_date.strftime(DATETIME_FORMAT))
         )
-        first_row = df.head(1)[0]
-        first_row_datetime = parser.parse(first_row["Datetime"][0])
 
-        if first_row_datetime > end_date:
-            logger.warning(
-                f"No ticker data available for the given backtest "
-                f"index date {backtest_index_date} and symbol {self.symbol} "
-                f"and market {self.market}"
+        # If nothing is found, get all dates before the index date
+        if len(filtered_df) == 0:
+            filtered_df = df.filter(
+                (df['Datetime'] <= backtest_index_date.strftime(
+                    DATETIME_FORMAT))
             )
+            first_row = filtered_df.tail(1)[0]
+        else:
+            first_row = filtered_df.head(1)[0]
+
+        first_row_datetime = parser.parse(first_row["Datetime"][0])
 
         # Calculate the bid and ask price based on the high and low price
         return {
@@ -392,7 +396,7 @@ class CCXTTickerBacktestMarketDataSource(
                          + float(first_row["High"][0]))/2,
             "ask": float((first_row["Low"][0])
                          + float(first_row["High"][0]))/2,
-            "datetime": first_row["Datetime"][0],
+            "datetime": first_row_datetime,
         }
 
     def write_data_to_file_path(self, data_file, data: polars.DataFrame):
