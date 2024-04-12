@@ -1,8 +1,10 @@
 import logging
-from typing import Dict
 from abc import ABC, abstractmethod
 from datetime import datetime
+from typing import Dict
+
 from polars import DataFrame
+
 logger = logging.getLogger("investing_algorithm_framework")
 
 

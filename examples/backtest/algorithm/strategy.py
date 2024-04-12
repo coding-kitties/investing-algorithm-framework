@@ -1,7 +1,7 @@
 import tulipy as ti
 
 from investing_algorithm_framework import TimeUnit, TradingStrategy, \
-    Algorithm, OrderSide, BACKTESTING_INDEX_DATETIME
+    Algorithm, OrderSide
 
 """
 This strategy is based on the golden cross strategy. It will buy when the

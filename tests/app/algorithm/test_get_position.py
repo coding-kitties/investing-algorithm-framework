@@ -1,9 +1,8 @@
-import os
 from decimal import Decimal
 
-from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, Algorithm, MarketCredential
-from tests.resources import TestBase, MarketServiceStub
+from investing_algorithm_framework import PortfolioConfiguration, \
+    MarketCredential
+from tests.resources import TestBase
 
 
 class Test(TestBase):

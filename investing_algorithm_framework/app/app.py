@@ -1,14 +1,14 @@
+import inspect
 import logging
 import os
 import shutil
 import threading
+from abc import abstractmethod
 from datetime import datetime
 from distutils.sysconfig import get_python_lib
 from time import sleep
 from typing import List, Optional, Tuple
-import inspect
 
-from abc import abstractmethod
 from flask import Flask
 
 from investing_algorithm_framework.app.algorithm import Algorithm

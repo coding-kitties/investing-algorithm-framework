@@ -1,8 +1,8 @@
-import os
 import csv
+import os
 
 from investing_algorithm_framework.domain import BacktestReport, \
-    DATETIME_FORMAT
+    DATETIME_FORMAT_BACKTESTING
 
 
 class BacktestReportWriterService:
@@ -21,9 +21,11 @@ class BacktestReportWriterService:
 
         if not os.path.exists(output_directory):
             os.makedirs(output_directory)
-        backtest_start_date = report.backtest_start_date.strftime(DATETIME_FORMAT)
-        backtest_end_date = report.backtest_end_date.strftime(DATETIME_FORMAT)
-        created_at = report.created_at.strftime(DATETIME_FORMAT)
+        backtest_start_date = report.backtest_start_date\
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        backtest_end_date = report.backtest_end_date\
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        created_at = report.created_at.strftime(DATETIME_FORMAT_BACKTESTING)
         csv_file_path = os.path.join(
             output_directory,
             f"report_{report.name}_backtest_start_date_"

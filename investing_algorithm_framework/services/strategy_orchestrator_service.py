@@ -1,6 +1,8 @@
 import logging
-import schedule
 from datetime import datetime
+
+import schedule
+
 from investing_algorithm_framework.domain import StoppableThread, TimeUnit, \
     OperationalException, MarketDataSource
 from investing_algorithm_framework.services.market_data_source_service \

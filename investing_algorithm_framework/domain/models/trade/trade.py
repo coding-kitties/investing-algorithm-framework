@@ -1,11 +1,13 @@
-from typing import List
-from polars import DataFrame
-import polars as pl
 from datetime import datetime
-from investing_algorithm_framework.domain.models.base_model import BaseModel
+from typing import List
+
+import polars as pl
+from polars import DataFrame
+
+from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
-from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
+from investing_algorithm_framework.domain.models.base_model import BaseModel
 
 
 class Trade(BaseModel):

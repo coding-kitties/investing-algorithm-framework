@@ -1,12 +1,14 @@
 import os
-from typing import List, Tuple
-from tabulate import tabulate
 from datetime import datetime
-from investing_algorithm_framework.domain.models.backtesting import \
-    BacktestReportsEvaluation, BacktestReport
+from typing import List, Tuple
+
+from tabulate import tabulate
+
+from investing_algorithm_framework.domain import DATETIME_FORMAT
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
-from investing_algorithm_framework.domain import DATETIME_FORMAT
+from investing_algorithm_framework.domain.models.backtesting import \
+    BacktestReportsEvaluation, BacktestReport
 from .csv import load_csv_into_dict
 
 COLOR_RED = '\033[91m'

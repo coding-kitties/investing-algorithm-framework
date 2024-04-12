@@ -1,4 +1,5 @@
 import json
+
 from investing_algorithm_framework.app.stateless.action_handlers \
     .action_handler_strategy import ActionHandlerStrategy
 

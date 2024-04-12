@@ -1,13 +1,11 @@
 from datetime import datetime, timedelta
 
-from investing_algorithm_framework import PortfolioConfiguration, \
-    pretty_print_backtest
-
-from app import app
 from algorithm.algorithm import algorithm
 from algorithm.data_sources import bitvavo_btc_eur_ohlcv_2h, \
     bitvavo_dot_eur_ohlcv_2h, bitvavo_dot_eur_ticker, bitvavo_btc_eur_ticker
-
+from app import app
+from investing_algorithm_framework import PortfolioConfiguration, \
+    pretty_print_backtest
 
 app.add_algorithm(algorithm)
 app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)

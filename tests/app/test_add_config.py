@@ -1,7 +1,7 @@
 import os
 from unittest import TestCase
+
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY
-from tests.resources import TestBase
 
 
 class Test(TestCase):

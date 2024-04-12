@@ -1,12 +1,13 @@
 import os
 from datetime import datetime, timedelta
-from polars import DataFrame
-from dateutil.tz import tzutc
 from unittest import TestCase
 
+from dateutil.tz import tzutc
+from polars import DataFrame
+
+from investing_algorithm_framework.domain import OperationalException
 from investing_algorithm_framework.infrastructure import \
     CSVOHLCVMarketDataSource
-from investing_algorithm_framework.domain import OperationalException
 
 
 class Test(TestCase):

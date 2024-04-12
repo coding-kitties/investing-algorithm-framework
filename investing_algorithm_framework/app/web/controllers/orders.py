@@ -1,9 +1,10 @@
 import logging
 
-from flask import Blueprint, request
 from dependency_injector.wiring import inject, Provide
-from investing_algorithm_framework.app.web.schemas import OrderSerializer
+from flask import Blueprint, request
+
 from investing_algorithm_framework.app.web.responses import create_response
+from investing_algorithm_framework.app.web.schemas import OrderSerializer
 from investing_algorithm_framework.dependency_container import \
     DependencyContainer
 

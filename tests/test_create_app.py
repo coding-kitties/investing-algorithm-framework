@@ -1,9 +1,10 @@
 import os
 from unittest import TestCase
+
 from investing_algorithm_framework import create_app, Config, \
     PortfolioConfiguration, Algorithm, MarketCredential
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY
-from tests.resources import TestBase, MarketServiceStub
+from tests.resources import MarketServiceStub
 
 
 class TestCreateApp(TestCase):

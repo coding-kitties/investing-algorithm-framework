@@ -1,7 +1,4 @@
-import os
-from unittest import TestCase
-from investing_algorithm_framework import TradingStrategy, Algorithm, \
-    PortfolioConfiguration, create_app, RESOURCE_DIRECTORY
+from investing_algorithm_framework import TradingStrategy, Algorithm
 
 
 class SimpleTradingStrategy(TradingStrategy):

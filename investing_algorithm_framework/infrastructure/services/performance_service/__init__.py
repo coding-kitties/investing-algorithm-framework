@@ -1,5 +1,5 @@
-from .performance_service import PerformanceService
 from .backtest_performance_service import BacktestPerformanceService
+from .performance_service import PerformanceService
 
 __all__ = [
     "PerformanceService",

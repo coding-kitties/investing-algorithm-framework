@@ -1,7 +1,8 @@
-from investing_algorithm_framework import create_app
 from unittest import TestCase
+
+from investing_algorithm_framework import create_app
 from investing_algorithm_framework.domain import BACKTEST_DATA_DIRECTORY_NAME
-from tests.resources import random_string, TestBase
+from tests.resources import random_string
 
 TEST_VALUE = random_string(10)
 

@@ -1,7 +1,7 @@
-from investing_algorithm_framework.app.web.controllers.portfolio \
-    import blueprint as portfolio_blueprint
 from investing_algorithm_framework.app.web.controllers.orders import \
     blueprint as orders_blueprint
+from investing_algorithm_framework.app.web.controllers.portfolio \
+    import blueprint as portfolio_blueprint
 from investing_algorithm_framework.app.web.controllers.positions import \
     blueprint as positions_blueprint
 

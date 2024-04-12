@@ -1,7 +1,7 @@
 import os
-from datetime import datetime
+
 from investing_algorithm_framework import PortfolioConfiguration, \
-    CSVTickerMarketDataSource, MarketCredential, BACKTESTING_INDEX_DATETIME
+    CSVTickerMarketDataSource, MarketCredential
 from tests.resources import TestBase
 
 

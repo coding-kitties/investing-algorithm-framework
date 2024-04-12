@@ -1,9 +1,9 @@
 from datetime import datetime
-from tests.resources import TestBase
 
 from investing_algorithm_framework import PortfolioConfiguration, Algorithm, \
     MarketCredential, OperationalException, RESERVED_BALANCES, APP_MODE, \
     Order, SYMBOLS, AppMode
+from tests.resources import TestBase
 
 
 class Test(TestBase):

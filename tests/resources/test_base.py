@@ -5,7 +5,7 @@ from unittest import TestCase
 from flask_testing import TestCase as FlaskTestCase
 
 from investing_algorithm_framework import create_app, Algorithm, App, \
-    MarketCredential, TradingStrategy, TimeUnit
+    TradingStrategy, TimeUnit
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY
 from investing_algorithm_framework.infrastructure.database import Session
 from tests.resources.stubs import MarketServiceStub

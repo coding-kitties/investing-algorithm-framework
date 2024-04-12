@@ -1,5 +1,5 @@
-from investing_algorithm_framework import MarketCredential
 from app import app
+from investing_algorithm_framework import MarketCredential
 
 # Configure your market credentials here
 bitvavo_market_credential = MarketCredential(

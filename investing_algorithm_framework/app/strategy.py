@@ -1,7 +1,7 @@
+from investing_algorithm_framework.domain import OperationalException
 from investing_algorithm_framework.domain import \
     TimeUnit, StrategyProfile, Trade
 from .algorithm import Algorithm
-from investing_algorithm_framework.domain import OperationalException
 
 
 class TradingStrategy:

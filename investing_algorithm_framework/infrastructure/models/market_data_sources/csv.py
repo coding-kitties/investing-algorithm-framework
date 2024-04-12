@@ -1,7 +1,7 @@
-from datetime import datetime
-import polars
 import logging
+from datetime import datetime
 
+import polars
 from dateutil.parser import parse
 
 from investing_algorithm_framework.domain import OHLCVMarketDataSource, \

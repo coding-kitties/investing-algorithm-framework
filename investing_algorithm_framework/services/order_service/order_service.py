@@ -1,7 +1,8 @@
 import logging
 from datetime import datetime
-from dateutil.tz import tzutc
 from queue import PriorityQueue
+
+from dateutil.tz import tzutc
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
     OperationalException, OrderStatus, MarketService, Order

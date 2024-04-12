@@ -1,8 +1,6 @@
 import logging
 import os
 from datetime import timedelta
-import pandas as pd
-from dateutil import parser
 
 import polars
 from dateutil import parser

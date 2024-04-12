@@ -1,6 +1,6 @@
+import csv
 import logging
 import os
-import csv
 from abc import abstractmethod, ABC
 from datetime import datetime, timedelta
 from typing import Callable

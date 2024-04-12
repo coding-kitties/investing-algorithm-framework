@@ -1,4 +1,5 @@
 import os
+
 from investing_algorithm_framework import MarketCredential, TimeUnit, \
     CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, TradingStrategy, \
     create_app, PortfolioConfiguration, Algorithm, SYMBOLS, RESOURCE_DIRECTORY

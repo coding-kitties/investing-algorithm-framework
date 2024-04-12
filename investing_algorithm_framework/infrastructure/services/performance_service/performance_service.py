@@ -1,4 +1,5 @@
 import logging
+
 from investing_algorithm_framework.domain import OrderStatus, OrderSide
 
 logger = logging.getLogger(__name__)

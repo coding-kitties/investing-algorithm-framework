@@ -1,5 +1,5 @@
-from enum import Enum
 from datetime import timedelta, datetime
+from enum import Enum
 
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException

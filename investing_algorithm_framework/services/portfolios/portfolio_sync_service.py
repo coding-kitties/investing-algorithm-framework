@@ -1,4 +1,5 @@
 import logging
+
 from investing_algorithm_framework.domain import OperationalException, \
     AbstractPortfolioSyncService, RESERVED_BALANCES, APP_MODE, SYMBOLS, \
     OrderSide, AppMode

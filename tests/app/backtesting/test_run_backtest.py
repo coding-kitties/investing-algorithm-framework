@@ -1,11 +1,10 @@
 import os
-from unittest import TestCase
 from datetime import datetime, timedelta
+from unittest import TestCase
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm
-from investing_algorithm_framework.domain import DATETIME_FORMAT
-from tests.resources import TestBase
+from investing_algorithm_framework.domain import DATETIME_FORMAT_BACKTESTING
 
 
 class TestStrategy(TradingStrategy):
@@ -60,18 +59,17 @@ class Test(TestCase):
             start_date=datetime.utcnow() - timedelta(days=1),
             end_date=datetime.utcnow(),
         )
-
-        # Check if the backtest report exists
-        self.assertTrue(
-            os.path.isfile(
-                os.path.join(
-                    self.resource_dir,
-                    "backtest_reports",
-                    f"report_{report.name}"
-                    f"_{report.created_at.strftime(DATETIME_FORMAT)}.csv"
-                )
+        csv_file_path = os.path.join(
+            self.resource_dir,
+            os.path.join(
+                "backtest_reports",
+                f"report_{report.name}_backtest_start_date_"
+                f"{report.backtest_start_date.strftime(DATETIME_FORMAT_BACKTESTING)}_backtest_end_date_"
+                f"{report.backtest_end_date.strftime(DATETIME_FORMAT_BACKTESTING)}_created_at_{report.created_at.strftime(DATETIME_FORMAT_BACKTESTING)}.csv"
             )
         )
+        # Check if the backtest report exists
+        self.assertTrue(os.path.isfile(csv_file_path))
 
     def test_report_csv_creation_without_strategy_identifier(self):
         """
@@ -98,17 +96,17 @@ class Test(TestCase):
             end_date=datetime.utcnow(),
         )
 
-        # Check if the backtest report exists
-        self.assertTrue(
-            os.path.isfile(
-                os.path.join(
-                    self.resource_dir,
-                    "backtest_reports",
-                    f"report_{report.name}"
-                    f"_{report.created_at.strftime(DATETIME_FORMAT)}.csv"
-                )
+        csv_file_path = os.path.join(
+            self.resource_dir,
+            os.path.join(
+                "backtest_reports",
+                f"report_{report.name}_backtest_start_date_"
+                f"{report.backtest_start_date.strftime(DATETIME_FORMAT_BACKTESTING)}_backtest_end_date_"
+                f"{report.backtest_end_date.strftime(DATETIME_FORMAT_BACKTESTING)}_created_at_{report.created_at.strftime(DATETIME_FORMAT_BACKTESTING)}.csv"
             )
         )
+        # Check if the backtest report exists
+        self.assertTrue(os.path.isfile(csv_file_path))
 
     def test_report_csv_creation_with_multiple_strategies(self):
         """
@@ -141,18 +139,17 @@ class Test(TestCase):
             start_date=datetime.utcnow() - timedelta(days=1),
             end_date=datetime.utcnow(),
         )
-
-        # Check if the backtest report exists
-        self.assertTrue(
-            os.path.isfile(
-                os.path.join(
-                    self.resource_dir,
-                    "backtest_reports",
-                    f"report_{report.name}"
-                    f"_{report.created_at.strftime(DATETIME_FORMAT)}.csv"
-                )
+        csv_file_path = os.path.join(
+            self.resource_dir,
+            os.path.join(
+                "backtest_reports",
+                f"report_{report.name}_backtest_start_date_"
+                f"{report.backtest_start_date.strftime(DATETIME_FORMAT_BACKTESTING)}_backtest_end_date_"
+                f"{report.backtest_end_date.strftime(DATETIME_FORMAT_BACKTESTING)}_created_at_{report.created_at.strftime(DATETIME_FORMAT_BACKTESTING)}.csv"
             )
         )
+        # Check if the backtest report exists
+        self.assertTrue(os.path.isfile(csv_file_path))
 
     def test_report_csv_creation_with_multiple_strategies_with_id(self):
         """
@@ -184,14 +181,15 @@ class Test(TestCase):
             end_date=datetime.utcnow(),
         )
 
-        # Check if the backtest report exists
-        self.assertTrue(
-            os.path.isfile(
-                os.path.join(
-                    self.resource_dir,
-                    "backtest_reports",
-                    f"report_{report.name}"
-                    f"_{report.created_at.strftime(DATETIME_FORMAT)}.csv"
-                )
+        csv_file_path = os.path.join(
+            self.resource_dir,
+            os.path.join(
+                "backtest_reports",
+                f"report_{report.name}_backtest_start_date_"
+                f"{report.backtest_start_date.strftime(DATETIME_FORMAT_BACKTESTING)}_backtest_end_date_"
+                f"{report.backtest_end_date.strftime(DATETIME_FORMAT_BACKTESTING)}_created_at_{report.created_at.strftime(DATETIME_FORMAT_BACKTESTING)}.csv"
             )
         )
+
+        # Check if the backtest report exists
+        self.assertTrue(os.path.isfile(csv_file_path))

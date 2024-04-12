@@ -1,6 +1,7 @@
-from investing_algorithm_framework.services import MarketDataSourceService
-from random import randint
 from datetime import datetime
+from random import randint
+
+from investing_algorithm_framework.services import MarketDataSourceService
 
 
 class RandomPriceMarketDataSourceServiceStub(MarketDataSourceService):

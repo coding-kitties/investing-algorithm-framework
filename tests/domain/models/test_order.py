@@ -1,5 +1,6 @@
 from datetime import datetime
 from unittest import TestCase
+
 from investing_algorithm_framework.domain import Order
 
 

@@ -1,4 +1,5 @@
 from marshmallow import Schema, fields
+
 from investing_algorithm_framework.dependency_container import \
     DependencyContainer
 

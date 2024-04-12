@@ -1,4 +1,5 @@
 from typing import List
+
 from tqdm import tqdm
 
 from investing_algorithm_framework.domain import MarketService, \

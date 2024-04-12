@@ -1,9 +1,8 @@
 import os
 
-from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, CSVTickerMarketDataSource, MarketCredential, \
-    Algorithm
-from tests.resources import TestBase, MarketServiceStub
+from investing_algorithm_framework import PortfolioConfiguration, \
+    CSVTickerMarketDataSource, MarketCredential
+from tests.resources import TestBase
 
 
 class Test(TestBase):

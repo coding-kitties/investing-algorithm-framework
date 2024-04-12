@@ -1,4 +1,5 @@
 from typing import Union, List
+
 from investing_algorithm_framework.domain import MarketCredential
 
 

@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest import TestCase
 
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \

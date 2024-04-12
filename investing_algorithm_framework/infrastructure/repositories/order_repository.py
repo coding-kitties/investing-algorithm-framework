@@ -1,9 +1,8 @@
-from .repository import Repository
-
-from investing_algorithm_framework.infrastructure.models import SQLOrder, \
-    SQLPosition, SQLPortfolio
 from investing_algorithm_framework.domain import OrderStatus, OrderType, \
     OrderSide
+from investing_algorithm_framework.infrastructure.models import SQLOrder, \
+    SQLPosition, SQLPortfolio
+from .repository import Repository
 
 
 class SQLOrderRepository(Repository):

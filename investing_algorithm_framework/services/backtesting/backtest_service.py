@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
-from dateutil import parser
+
 import pandas as pd
+from dateutil import parser
 from tqdm import tqdm
 
 from investing_algorithm_framework.domain import BacktestReport, \

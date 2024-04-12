@@ -1,5 +1,6 @@
-from typing import List, Dict, Tuple
 from datetime import datetime
+from typing import List, Dict, Tuple
+
 from .backtest_report import BacktestReport
 
 

@@ -1,7 +1,7 @@
-from tests.resources import TestBase
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential, APP_MODE, AppMode, StatelessAction, create_app
 from tests.resources import MarketServiceStub
+from tests.resources import TestBase
 
 
 class Test(TestBase):

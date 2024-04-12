@@ -1,6 +1,6 @@
-from typing import Dict
 from datetime import datetime
 from random import randint
+from typing import Dict
 
 from investing_algorithm_framework import OrderStatus, Order
 from investing_algorithm_framework.domain import MarketService
