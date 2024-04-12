@@ -17,8 +17,10 @@ COLOR_RESET = '\033[0m'
 COLOR_GREEN = '\033[92m'
 COLOR_YELLOW = '\033[93m'
 
+
 def print_tables_side_by_side(*tables, spacing: int = 3):
-    string_tables_split = [tabulate(t, headers="firstrow").splitlines() for t in tables]
+    string_tables_split = [tabulate(t, headers="firstrow")
+                           .splitlines() for t in tables]
     spacing_str = " " * spacing
 
     num_lines = max(map(len, string_tables_split))
@@ -63,7 +65,8 @@ def pretty_print_profit_evaluation(
         report.name for report in profits[:number_of_reports]
     ]
     profit_table["Profit"] = [
-        f"{report.total_net_gain:.{precision}f} {report.trading_symbol}" for report in profits[:number_of_reports]
+        f"{report.total_net_gain:.{precision}f} {report.trading_symbol}"
+        for report in profits[:number_of_reports]
     ]
     profit_table["Profit percentage"] = [
         f"{report.total_net_gain_percentage:.{precision}f}%" for report in profits[:number_of_reports]

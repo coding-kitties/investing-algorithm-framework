@@ -5,8 +5,12 @@ from dateutil.parser import parse
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
 from investing_algorithm_framework.domain.models.base_model import BaseModel
-from investing_algorithm_framework.domain.models.order import OrderStatus, \
-    OrderType, OrderSide
+from investing_algorithm_framework.domain.models.order.order_status import \
+    OrderStatus
+from investing_algorithm_framework.domain.models.order.order_type import \
+    OrderType
+from investing_algorithm_framework.domain.models.order.order_side import \
+    OrderSide
 from investing_algorithm_framework.domain.models.order.order_fee import \
     OrderFee
 

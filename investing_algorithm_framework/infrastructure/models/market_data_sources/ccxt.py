@@ -365,8 +365,6 @@ class CCXTTickerBacktestMarketDataSource(
             )
 
         file_path = self._create_file_path()
-        timeframe_minutes = TimeFrame.from_string(self.timeframe)\
-            .amount_of_minutes
         backtest_index_date = kwargs["backtest_index_date"]
 
         # Filter the data based on the backtest index date and the end date
