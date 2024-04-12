@@ -237,7 +237,7 @@ class CCXTTickerBacktestMarketDataSource(
     backtest_data_directory = None
     backtest_data_start_date = None
     backtest_data_end_date = None
-    timeframe = "15m"
+    timeframe = None
     column_names = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
 
     def __init__(
@@ -245,15 +245,22 @@ class CCXTTickerBacktestMarketDataSource(
         identifier,
         market,
         symbol=None,
-        timeframe="15m",
+        timeframe=None,
     ):
         super().__init__(
             identifier=identifier,
             market=market,
             symbol=symbol,
         )
+
         if timeframe is not None:
             self.timeframe = timeframe
+
+        if self.timeframe is None:
+            raise OperationalException(
+                "timeframe should be set for "
+                "CCXTTickerBacktestMarketDataSource"
+            )
 
     def prepare_data(
         self,

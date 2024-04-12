@@ -30,6 +30,5 @@ if __name__ == "__main__":
         algorithm=algorithm,
         start_date=start_date,
         end_date=end_date,
-        pending_order_check_interval="2h",
     )
     pretty_print_backtest(backtest_report)

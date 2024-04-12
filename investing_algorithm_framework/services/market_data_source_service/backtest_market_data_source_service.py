@@ -109,7 +109,12 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
         )
 
     def get_ohlcv(
-        self, symbol, from_timestamp, market, time_frame, to_timestamp=None
+        self,
+        symbol,
+        from_timestamp,
+        time_frame=None,
+        market=None,
+        to_timestamp=None
     ):
         market_data_source = self.get_ohlcv_market_data_source(
             symbol=symbol, market=market, time_frame=time_frame

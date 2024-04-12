@@ -60,6 +60,10 @@ class TradingStrategy:
             )
 
     def run_strategy(self, algorithm, market_data):
+        # Check pending orders before running the strategy
+        algorithm.check_pending_orders()
+
+        # Run user defined strategy
         self.apply_strategy(algorithm=algorithm, market_data=market_data)
 
     def apply_strategy(self, algorithm, market_data):

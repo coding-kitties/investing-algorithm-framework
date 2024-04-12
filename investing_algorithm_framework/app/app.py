@@ -239,8 +239,8 @@ class App:
         self,
         backtest_start_date,
         backtest_end_date,
-        pending_order_check_interval,
         market_data_sources,
+        pending_order_check_interval=None,
     ) -> None:
         """
         Initialize the app for backtesting by setting the configuration
@@ -261,9 +261,11 @@ class App:
         configuration_service.config[BACKTESTING_START_DATE] = \
             backtest_start_date
         configuration_service.config[BACKTESTING_END_DATE] = backtest_end_date
-        configuration_service.config[
-            BACKTESTING_PENDING_ORDER_CHECK_INTERVAL
-        ] = pending_order_check_interval
+
+        if pending_order_check_interval is not None:
+            configuration_service.config[
+                BACKTESTING_PENDING_ORDER_CHECK_INTERVAL
+            ] = pending_order_check_interval
 
         # Create resource dir if not exits
         self._create_resource_directory_if_not_exists()
@@ -498,7 +500,6 @@ class App:
             while self.algorithm.running:
                 if number_of_iterations_since_last_orders_check == 30:
                     logger.info("Checking pending orders")
-                    self.algorithm.check_pending_orders()
                     number_of_iterations_since_last_orders_check = 1
 
                 self.algorithm.run_jobs()
@@ -675,7 +676,7 @@ class App:
         algorithm,
         start_date,
         end_date,
-        pending_order_check_interval='1h',
+        pending_order_check_interval=None,
         output_directory=None
     ) -> BacktestReport:
         """
@@ -740,7 +741,7 @@ class App:
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         date_ranges: Optional[Tuple[datetime, datetime]] = None,
-        pending_order_check_interval='1h',
+        pending_order_check_interval=None,
         output_directory=None
     ) -> List[BacktestReport]:
         """

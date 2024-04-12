@@ -150,7 +150,7 @@ class BacktestService:
                     market_data[data_id] = \
                         self._market_data_source_service.get_data(data_id)
 
-        self._order_service.check_pending_orders()
+        # self._order_service.check_pending_orders()
         strategy.run_strategy(algorithm=algorithm, market_data=market_data)
 
     def generate_schedule(
