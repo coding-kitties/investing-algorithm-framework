@@ -76,8 +76,6 @@ class CrossOverStrategy(TradingStrategy):
             if not algorithm.has_position(target_symbol) \
                     and is_crossover(fast, slow) \
                     and is_above_trend(fast, trend):
-                print(f"opening trade on {algorithm.config['BACKTESTING_INDEX_DATETIME']} with price {price}")
-
                 algorithm.create_limit_order(
                     target_symbol=target_symbol,
                     order_side=OrderSide.BUY,
@@ -88,7 +86,6 @@ class CrossOverStrategy(TradingStrategy):
 
             if algorithm.has_position(target_symbol) \
                 and is_below_trend(fast, slow):
-                print(f"closing trade on {algorithm.config['BACKTESTING_INDEX_DATETIME']} with price {price}")
                 open_trades = algorithm.get_open_trades(
                     target_symbol=target_symbol
                 )
@@ -105,5 +102,4 @@ class CrossOverStrategy(TradingStrategy):
                     current_price=market_data[f"{symbol}-ticker"]["bid"],
                     stop_loss_percentage=self.stop_loss_percentage
                 ):
-                    print(f"stop los triggered on {algorithm.config['BACKTESTING_INDEX_DATETIME']} with price {price} ")
                     algorithm.close_trade(open_trade)
