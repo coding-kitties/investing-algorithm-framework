@@ -2,6 +2,7 @@ from datetime import datetime
 
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.time_unit import TimeUnit
+from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
 
 
 class BacktestReport(BaseModel):
@@ -18,7 +19,6 @@ class BacktestReport(BaseModel):
         backtest_data_index_date=None,
         backtest_start_date=None,
         backtest_end_date=None,
-        backtest_index_date=None,
         trading_time_frame=None,
         trading_time_frame_start_date=None,
         symbols=None,
@@ -42,14 +42,15 @@ class BacktestReport(BaseModel):
         average_trade_duration=0,
         average_trade_size=0.0,
         trades=None,
-        created_at: datetime = None
+        orders=None,
+        created_at: datetime = None,
+        context=None,
     ):
         self._name = name
         self._strategy_identifiers = strategy_identifiers
         self._backtest_start_date_data = backtest_start_date_data
         self._backtest_start_date = backtest_start_date
         self._backtest_end_date = backtest_end_date
-        self._backtest_index_date = backtest_index_date
         self._number_of_runs = number_of_runs
         self._trading_time_frame = trading_time_frame
         self._trading_time_frame_start_date = trading_time_frame_start_date
@@ -72,13 +73,15 @@ class BacktestReport(BaseModel):
         self._total_net_gain = total_net_gain
         self._backtest_data_index_date = backtest_data_index_date
         self._total_value = total_value
-        self.positions = positions
+        self._positions = positions
+        self._orders = orders
         self._average_trade_duration = average_trade_duration
         self._average_trade_size = average_trade_size
         self._trades = trades
         self._created_at: datetime = created_at
         self._interval = interval
         self._time_unit = time_unit
+        self._context = context
 
     @property
     def name(self):
@@ -115,10 +118,6 @@ class BacktestReport(BaseModel):
     @property
     def backtest_end_date(self):
         return self._backtest_end_date
-
-    @property
-    def backtest_index_date(self):
-        return self._backtest_index_date
 
     @property
     def trading_time_frame(self):
@@ -159,10 +158,6 @@ class BacktestReport(BaseModel):
     @backtest_end_date.setter
     def backtest_end_date(self, value):
         self._backtest_end_date = value
-
-    @backtest_index_date.setter
-    def backtest_index_date(self, value):
-        self._backtest_index_date = value
 
     @number_of_runs.setter
     def number_of_runs(self, value):
@@ -317,6 +312,14 @@ class BacktestReport(BaseModel):
         self._positions = value
 
     @property
+    def orders(self):
+        return self._orders
+
+    @orders.setter
+    def orders(self, value):
+        self._orders = value
+
+    @property
     def average_trade_duration(self):
         return self._average_trade_duration
 
@@ -349,6 +352,14 @@ class BacktestReport(BaseModel):
         self._interval = value
 
     @property
+    def context(self):
+        return self._context
+
+    @context.setter
+    def context(self, value):
+        self._context = value
+
+    @property
     def time_unit(self):
         return self._time_unit
 
@@ -372,7 +383,6 @@ class BacktestReport(BaseModel):
             name=self.name,
             start_date=self.backtest_start_date,
             end_date=self.backtest_end_date,
-            backtest_index_date=self.backtest_index_date,
             start_date_data=self.backtest_start_date_data,
         )
 
@@ -383,9 +393,12 @@ class BacktestReport(BaseModel):
         """
         return {
             "name": self.name,
+            "context": self.context if self.context is not None else {},
             "strategy_identifiers": self.strategy_identifiers,
-            "backtest_start_date": self.backtest_start_date,
-            "backtest_end_date": self.backtest_end_date,
+            "backtest_start_date": self.backtest_start_date
+            .strftime(DATETIME_FORMAT),
+            "backtest_end_date": self.backtest_end_date
+            .strftime(DATETIME_FORMAT),
             "number_of_runs": self.number_of_runs,
             "symbols": self.symbols,
             "market": self.market,
@@ -404,10 +417,16 @@ class BacktestReport(BaseModel):
             "trading_symbol": self.trading_symbol,
             "total_net_gain_percentage": self.total_net_gain_percentage,
             "total_net_gain": self.total_net_gain,
-            "backtest_data_index_date": self.backtest_data_index_date,
             "total_value": self.total_value,
             "average_trade_duration": self.average_trade_duration,
             "average_trade_size": self.average_trade_size,
+            "positions": [position.to_dict() for position in self.positions],
+            "trades": [trade.to_dict() for trade in self.trades],
+            "orders": [
+                order.to_dict(datetime_format=DATETIME_FORMAT)
+                for order in self.orders
+            ],
+            "created_at": self.created_at.strftime(DATETIME_FORMAT),
         }
 
     @staticmethod
@@ -438,7 +457,6 @@ class BacktestReport(BaseModel):
             trading_symbol=data["trading_symbol"],
             total_net_gain_percentage=float(data["total_net_gain_percentage"]),
             total_net_gain=float(data["total_net_gain"]),
-            backtest_data_index_date=data["backtest_data_index_date"],
             total_value=float(data["total_value"]),
             average_trade_duration=data["average_trade_duration"],
             average_trade_size=float(data["average_trade_size"]),

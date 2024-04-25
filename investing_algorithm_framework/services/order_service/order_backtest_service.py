@@ -17,7 +17,6 @@ class OrderBacktestService(OrderService):
     def __init__(
         self,
         order_repository,
-        order_fee_repository,
         position_repository,
         portfolio_repository,
         portfolio_configuration_service,
@@ -27,7 +26,6 @@ class OrderBacktestService(OrderService):
     ):
         super(OrderService, self).__init__(order_repository)
         self.order_repository = order_repository
-        self.order_fee_repository = order_fee_repository
         self.position_repository = position_repository
         self.portfolio_repository = portfolio_repository
         self.portfolio_configuration_service = portfolio_configuration_service

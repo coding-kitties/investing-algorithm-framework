@@ -18,7 +18,6 @@ class OrderService(RepositoryService):
         self,
         configuration_service,
         order_repository,
-        order_fee_repository,
         market_service: MarketService,
         position_repository,
         portfolio_repository,
@@ -29,7 +28,6 @@ class OrderService(RepositoryService):
         super(OrderService, self).__init__(order_repository)
         self.configuration_service = configuration_service
         self.order_repository = order_repository
-        self.order_fee_repository = order_fee_repository
         self.market_service: MarketService = market_service
         self.position_repository = position_repository
         self.portfolio_repository = portfolio_repository
@@ -44,11 +42,6 @@ class OrderService(RepositoryService):
         if validate:
             self.validate_order(data, portfolio)
 
-        order_fee = None
-
-        if "fee" in data:
-            order_fee = data.pop("fee")
-
         del data["portfolio_id"]
         symbol = data["target_symbol"]
 
@@ -61,10 +54,6 @@ class OrderService(RepositoryService):
         data["status"] = OrderStatus.CREATED.value
         order = self.order_repository.create(data)
         order_id = order.id
-
-        if order_fee:
-            order_fee["order_id"] = order_id
-            self.order_fee_repository.create(order_fee)
 
         if sync:
             if OrderSide.BUY.equals(order.get_order_side()):
@@ -92,20 +81,6 @@ class OrderService(RepositoryService):
         portfolio = self.portfolio_repository.get(
             trading_symbol_position.portfolio_id
         )
-
-        if "fee" in data:
-            order_fee_data = data.pop("fee")
-
-            if order_fee_data is not None:
-                if self.order_fee_repository.exists({"order_id": object_id}):
-                    order_fee = self.order_fee_repository\
-                        .find({"order_id": object_id})
-                    self.order_fee_repository\
-                        .update(order_fee.id, order_fee_data)
-                else:
-                    order_fee_data["order_id"] = object_id
-                    self.order_fee_repository.create(order_fee_data)
-
         new_order = self.order_repository.update(object_id, data)
         filled_difference = new_order.get_filled() \
             - previous_order.get_filled()
@@ -147,9 +122,6 @@ class OrderService(RepositoryService):
 
         self.create_snapshot(portfolio.id, created_at=created_at)
         return new_order
-
-    def get_order_fee(self, order_id):
-        return self.order_fee_repository.find({"order": order_id})
 
     def execute_order(self, order_id, portfolio):
         order = self.get(order_id)

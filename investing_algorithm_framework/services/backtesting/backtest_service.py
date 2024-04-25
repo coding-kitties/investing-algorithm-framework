@@ -238,7 +238,6 @@ class BacktestService:
             backtest_profile = BacktestReport(
                 name=algorithm.name,
                 strategy_identifiers=ids,
-                backtest_index_date=start_date,
                 backtest_start_date=start_date,
                 backtest_end_date=end_date,
                 initial_unallocated=initial_unallocated,
@@ -275,6 +274,9 @@ class BacktestService:
                     portfolio.id, backtest_profile
                 )
             positions = self._position_repository.get_all({
+                "portfolio": portfolio.id
+            })
+            orders = self._order_service.get_all({
                 "portfolio": portfolio.id
             })
             tickers = {}
@@ -360,6 +362,7 @@ class BacktestService:
                 backtest_positions.append(backtest_position)
             backtest_profile.positions = backtest_positions
             backtest_profile.trades = algorithm.get_trades()
+            backtest_profile.orders = orders
             return backtest_profile
 
     def set_backtest_market_data_sources(self, market_data_sources):

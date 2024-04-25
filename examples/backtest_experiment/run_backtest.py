@@ -1,14 +1,29 @@
 import json
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from algorithms import create_algorithm
 from app import app
 from investing_algorithm_framework import PortfolioConfiguration, \
-    pretty_print_backtest_reports_evaluation, BacktestReportsEvaluation
+    pretty_print_backtest_reports_evaluation, BacktestReportsEvaluation, \
+    BacktestDateRange
 
 if __name__ == "__main__":
-    end_date = datetime(2023, 12, 2)
-    start_date = end_date - timedelta(days=100)
+    down_turn_date_range = BacktestDateRange(
+        start_date=datetime(2021, 12, 21),
+        end_date=datetime(2022, 6, 20),
+        name="down_turn"
+    )
+    up_turn_date_range = BacktestDateRange(
+        start_date=datetime(2022, 12, 20),
+        end_date=datetime(2023, 6, 1),
+        name="up_turn"
+    )
+    sideways_date_range = BacktestDateRange(
+        start_date=datetime(2022, 6, 10),
+        end_date=datetime(2023, 1, 10),
+        name="sideways"
+    )
+
     json = json.load(open("configuration.json"))
     algorithms = []
 
@@ -27,12 +42,9 @@ if __name__ == "__main__":
     reports = app.run_backtests(
         algorithms=algorithms,
         date_ranges=[
-            (datetime(2023, 7, 2),
-             datetime(2023, 7, 2) + timedelta(days=200)),
-            (datetime(2022, 7, 2),
-             datetime(2022, 7, 2) + timedelta(days=200)),
-            (datetime(2024, 1, 1),
-             datetime(2024, 1, 1) + timedelta(days=100)),
+            down_turn_date_range,
+            up_turn_date_range,
+            sideways_date_range
         ],
         pending_order_check_interval="2h",
     )

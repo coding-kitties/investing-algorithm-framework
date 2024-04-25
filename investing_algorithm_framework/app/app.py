@@ -20,7 +20,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     SQLALCHEMY_DATABASE_URI, OperationalException, BACKTESTING_FLAG, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, BacktestReport, \
     BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, APP_MODE, MarketCredential, \
-    AppMode
+    AppMode, BacktestDateRange
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables
 from investing_algorithm_framework.services import OrderBacktestService, \
@@ -319,7 +319,6 @@ class App:
         self.container.order_service.override(
             OrderBacktestService(
                 order_repository=self.container.order_repository(),
-                order_fee_repository=self.container.order_fee_repository(),
                 position_repository=self.container.position_repository(),
                 portfolio_repository=self.container.portfolio_repository(),
                 portfolio_configuration_service=self.container
@@ -729,7 +728,7 @@ class App:
                 "backtest_reports"
             )
 
-        backtest_report_writer_service.write_report_to_csv(
+        backtest_report_writer_service.write_report_to_json(
             report=report, output_directory=output_directory
         )
 
@@ -740,7 +739,7 @@ class App:
         algorithms,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        date_ranges: Optional[Tuple[datetime, datetime]] = None,
+        date_ranges: Optional[List[BacktestDateRange]] = None,
         pending_order_check_interval=None,
         output_directory=None
     ) -> List[BacktestReport]:
@@ -754,7 +753,7 @@ class App:
         :param end_date: The end date of the backtest
         :param pending_order_check_interval: The interval at which to check
         :param date_ranges: The date ranges to run the backtests for (list of
-        tuples of start and end dates)
+        BacktestDateRange instances representing a start and end date)
         pending orders
         :param output_directory: The directory to write the backtest report to
         :return: List of BacktestReport intances
@@ -767,7 +766,9 @@ class App:
             if end_date is None:
                 end_date = datetime.utcnow()
 
-            date_ranges = [(start_date, end_date)]
+            date_ranges = [
+                BacktestDateRange(start_date=start_date, end_date=end_date)
+            ]
         else:
             if date_ranges is None:
                 raise OperationalException("No date ranges specified")
@@ -776,7 +777,9 @@ class App:
             .get_market_data_sources()
 
         for date_range in date_ranges:
-            start_date, end_date = date_range
+            date_range: BacktestDateRange = date_range
+            start_date = date_range.start_date
+            end_date = date_range.end_date
             self._initialize_app_for_backtest(
                 backtest_start_date=start_date,
                 backtest_end_date=end_date,
@@ -804,6 +807,11 @@ class App:
                     start_date=start_date,
                     end_date=end_date
                 )
+
+                # Add date range name to report if present
+                if date_range.name is not None:
+                    report.date_range_name = date_range.name
+
                 backtest_report_writer_service = self.container \
                     .backtest_report_writer_service()
 
@@ -813,7 +821,7 @@ class App:
                         "backtest_reports"
                     )
 
-                backtest_report_writer_service.write_report_to_csv(
+                backtest_report_writer_service.write_report_to_json(
                     report=report, output_directory=output_directory
                 )
                 reports.append(report)

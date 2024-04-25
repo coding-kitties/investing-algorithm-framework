@@ -5,7 +5,7 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.domain import OrderType, \
-    OrderSide, Order, OrderStatus, OrderFee
+    OrderSide, Order, OrderStatus
 from investing_algorithm_framework.infrastructure.database import SQLBaseModel
 from investing_algorithm_framework.infrastructure.models.model_extension \
     import SQLAlchemyModelExtension
@@ -35,12 +35,9 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     trade_closed_price = Column(Float, default=None)
     trade_closed_amount = Column(Float, default=None)
     net_gain = Column(Float, default=0)
-    fee = relationship(
-        "SQLOrderFee",
-        uselist=False,
-        back_populates="order",
-        cascade="all, delete"
-    )
+    order_fee = Column(Float, default=None)
+    order_fee_currency = Column(String)
+    order_fee_rate = Column(Float, default=None)
     _available_amount = None
 
     def update(self, data):
@@ -101,9 +98,23 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
 
     @staticmethod
     def from_ccxt_order(ccxt_order):
+        """
+        Create an Order object from a CCXT order object
+        :param ccxt_order: CCXT order object
+        """
         status = OrderStatus.from_value(ccxt_order["status"])
         target_symbol = ccxt_order.get("symbol").split("/")[0]
         trading_symbol = ccxt_order.get("symbol").split("/")[1]
+        ccxt_fee = ccxt_order.get("fee", None)
+        order_fee = None
+        order_fee_rate = None
+        order_fee_currency = None
+
+        if ccxt_fee is not None:
+            order_fee = ccxt_fee.get("cost", None)
+            order_fee_rate = ccxt_fee.get("rate", None)
+            order_fee_currency = ccxt_fee.get("currency", None)
+
         return Order(
             external_id=ccxt_order.get("id", None),
             target_symbol=target_symbol,
@@ -116,7 +127,9 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
             filled=ccxt_order.get("filled", None),
             remaining=ccxt_order.get("remaining", None),
             cost=ccxt_order.get("cost", None),
-            fee=OrderFee.from_ccxt_fee(ccxt_order.get("fee", None)),
+            order_fee=order_fee,
+            order_fee_rate=order_fee_rate,
+            order_fee_currency=order_fee_currency,
             created_at=ccxt_order.get("datetime", None),
         )
 

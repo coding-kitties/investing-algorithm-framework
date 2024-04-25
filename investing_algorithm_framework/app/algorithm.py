@@ -1,8 +1,8 @@
 import inspect
 import logging
-from typing import List
+from typing import List, Dict
 
-from investing_algorithm_framework.domain import OrderStatus, OrderFee, \
+from investing_algorithm_framework.domain import OrderStatus, \
     Position, Order, Portfolio, OrderType, OrderSide, \
     BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, MarketService, TimeUnit, \
     OperationalException, random_string, RoundingService
@@ -16,8 +16,22 @@ logger = logging.getLogger("investing_algorithm_framework")
 
 
 class Algorithm:
+    """
+    Class to represent an algorithm. An algorithm is a collection of
+    strategies that are executed in a specific order. The algorithm
+    class is responsible for managing the strategies and executing
+    them in the correct order.
 
-    def __init__(self, name=None, description=None):
+    :param name: The name of the algorithm
+    :param description: The description of the algorithm
+    :param context: The context of the algorithm, for backtest references
+    """
+    def __init__(
+        self,
+        name: str = None,
+        description: str = None,
+        context: Dict[str, str] = None
+    ):
         self._name = name
 
         if name is None:
@@ -27,6 +41,21 @@ class Algorithm:
 
         if description is not None:
             self._description = description
+
+        self._context = context
+
+        if self.context is None:
+            self._context = {}
+
+        # Check if the context is a dictionary with only string,
+        # float or int values
+        for key, value in self.context.items():
+            if not isinstance(key, str) or \
+                    not isinstance(value, (str, float, int)):
+                raise OperationalException(
+                    "The context of the algorithm must be a dictionary with "
+                    "only string, float or int values."
+                )
 
         self._strategies = []
         self._tasks = []
@@ -107,6 +136,20 @@ class Algorithm:
         configs of the app.
         """
         return self.configuration_service.config
+
+    @property
+    def description(self):
+        """
+        Function to get the description of the algorithm
+        """
+        return self._description
+
+    @property
+    def context(self):
+        """
+        Function to get the context of the algorithm
+        """
+        return self._context
 
     @property
     def running(self) -> bool:
@@ -361,9 +404,6 @@ class Algorithm:
                 "order_side": order_side
             }
         )
-
-    def get_order_fee(self, order_id) -> OrderFee:
-        return self.order_service.get_order_fee(order_id)
 
     def get_positions(
         self,

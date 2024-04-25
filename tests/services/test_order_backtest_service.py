@@ -62,7 +62,6 @@ class TestOrderBacktestService(TestBase):
         self.app.container.order_service.override(
             OrderBacktestService(
                 order_repository=self.app.container.order_repository(),
-                order_fee_repository=self.app.container.order_fee_repository(),
                 position_repository=self.app.container.position_repository(),
                 portfolio_repository=self.app.container.portfolio_repository(),
                 portfolio_configuration_service=self.app.container\

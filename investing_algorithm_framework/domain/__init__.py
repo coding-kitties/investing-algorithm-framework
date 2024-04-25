@@ -15,9 +15,9 @@ from .exceptions import OperationalException, ApiException, \
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, \
     PortfolioConfiguration, Portfolio, Position, Order, TradeStatus, \
-    OrderFee, BacktestReport, PortfolioSnapshot, StrategyProfile, \
+    BacktestReport, PortfolioSnapshot, StrategyProfile, \
     BacktestPosition, Trade, MarketCredential, PositionSnapshot, \
-    BacktestReportsEvaluation, AppMode
+    BacktestReportsEvaluation, AppMode, BacktestDateRange
 from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
     OHLCVMarketDataSource, BacktestMarketDataSource, MarketDataSource, \
     MarketService, MarketCredentialService, AbstractPortfolioSyncService, \
@@ -26,7 +26,7 @@ from .singleton import Singleton
 from .stateless_actions import StatelessActions
 from .strategy import Strategy
 from .utils import random_string, append_dict_as_row_to_csv, \
-    add_column_headers_to_csv, get_total_amount_of_rows, \
+    add_column_headers_to_csv, get_total_amount_of_rows, load_backtest_report,\
     csv_to_list, StoppableThread, pretty_print_backtest_reports_evaluation, \
     pretty_print_backtest, load_csv_into_dict, load_backtest_reports
 
@@ -70,7 +70,6 @@ __all__ = [
     "Strategy",
     "DATETIME_FORMAT",
     "StatelessActions",
-    "OrderFee",
     "parse_decimal_to_string",
     "parse_string_to_decimal",
     "BacktestReport",
@@ -112,4 +111,6 @@ __all__ = [
     "APP_MODE",
     "AppMode",
     "RoundingService",
+    "BacktestDateRange",
+    "load_backtest_report",
 ]

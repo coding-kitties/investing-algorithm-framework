@@ -1,8 +1,8 @@
 from .app_mode import AppMode
 from .backtesting import BacktestReport, BacktestPosition, \
-    BacktestReportsEvaluation
+    BacktestReportsEvaluation, BacktestDateRange
 from .market import MarketCredential
-from .order import OrderStatus, OrderSide, OrderType, Order, OrderFee
+from .order import OrderStatus, OrderSide, OrderType, Order
 from .portfolio import PortfolioConfiguration, Portfolio, PortfolioSnapshot
 from .position import Position, PositionSnapshot
 from .strategy_profile import StrategyProfile
@@ -26,7 +26,6 @@ __all__ = [
     "PortfolioConfiguration",
     "Position",
     "Portfolio",
-    "OrderFee",
     "BacktestReport",
     "PositionSnapshot",
     "PortfolioSnapshot",
@@ -36,5 +35,6 @@ __all__ = [
     "MarketCredential",
     "TradeStatus",
     "BacktestReportsEvaluation",
-    "AppMode"
+    "AppMode",
+    "BacktestDateRange"
 ]

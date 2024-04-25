@@ -1,4 +1,5 @@
 import os
+import json
 from datetime import datetime
 from typing import List, Tuple
 
@@ -462,6 +463,26 @@ def pretty_print_backtest(
         print(tabulate(trades_table, headers="keys", tablefmt="rounded_grid"))
 
 
+def load_backtest_report(file_path: str) -> BacktestReport:
+    """
+    Load a backtest report from a file.
+
+    param file_path: The file path
+    :return: The backtest report
+    """
+
+    if not os.path.isfile(file_path):
+        raise OperationalException("File does not exist")
+
+    if not file_path.endswith(".json"):
+        raise OperationalException("File is not a json file")
+
+    with open(file_path, 'r') as json_file:
+        data = json.load(json_file)
+
+    return BacktestReport.from_dict(data)
+
+
 def load_backtest_reports(folder_path: str) -> List[BacktestReport]:
     """
     Load backtest reports from a folder.
@@ -480,11 +501,10 @@ def load_backtest_reports(folder_path: str) -> List[BacktestReport]:
         raise OperationalException(f"Folder {folder_path} is empty")
 
     for file in list_of_files:
-        if not file.endswith(".csv"):
+        if not file.endswith(".json"):
             continue
         file_path = os.path.join(folder_path, file)
-        data = load_csv_into_dict(file_path)
-        report = BacktestReport.from_dict(data)
+        report = load_backtest_report(file_path)
         backtest_reports.append(report)
 
     return backtest_reports
