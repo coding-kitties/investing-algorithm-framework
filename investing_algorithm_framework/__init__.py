@@ -9,7 +9,7 @@ from investing_algorithm_framework.domain import ApiException, \
     Trade, OHLCVMarketDataSource, OrderBookMarketDataSource, SYMBOLS, \
     TickerMarketDataSource, MarketService, BacktestReportsEvaluation, \
     pretty_print_backtest_reports_evaluation, load_backtest_reports, \
-    RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT,\
+    RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT, \
     load_backtest_report, BacktestDateRange
 from investing_algorithm_framework.infrastructure import \
     CCXTOrderBookMarketDataSource, CCXTOHLCVMarketDataSource, \

@@ -239,8 +239,10 @@ class Trade(BaseModel):
             "open_price": self.open_price,
             "current_price": self.current_price,
             "closed_price": self.closed_price,
-            "opened_at": self.opened_at.strftime(DATETIME_FORMAT) if self.opened_at else None,
-            "closed_at": self.closed_at.strftime(DATETIME_FORMAT) if self.closed_at else None,
+            "opened_at": self.opened_at.strftime(DATETIME_FORMAT)
+            if self.opened_at else None,
+            "closed_at": self.closed_at.strftime(DATETIME_FORMAT)
+            if self.closed_at else None,
             "change": self.percentage_change,
             "absolute_change": self.absolute_change,
         }

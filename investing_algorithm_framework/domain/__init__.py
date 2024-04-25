@@ -26,7 +26,8 @@ from .singleton import Singleton
 from .stateless_actions import StatelessActions
 from .strategy import Strategy
 from .utils import random_string, append_dict_as_row_to_csv, \
-    add_column_headers_to_csv, get_total_amount_of_rows, load_backtest_report,\
+    add_column_headers_to_csv, get_total_amount_of_rows, \
+    load_backtest_report, \
     csv_to_list, StoppableThread, pretty_print_backtest_reports_evaluation, \
     pretty_print_backtest, load_csv_into_dict, load_backtest_reports
 

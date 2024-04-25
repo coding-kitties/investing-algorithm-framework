@@ -7,7 +7,7 @@ from abc import abstractmethod
 from datetime import datetime
 from distutils.sysconfig import get_python_lib
 from time import sleep
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from flask import Flask
 

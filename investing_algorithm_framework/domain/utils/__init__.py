@@ -17,5 +17,6 @@ __all__ = [
     'pretty_print_backtest',
     'pretty_print_backtest_reports_evaluation',
     'load_csv_into_dict',
+    'load_backtest_report',
     'load_backtest_reports',
 ]
