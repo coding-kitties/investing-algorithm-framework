@@ -8,7 +8,7 @@ import polars as pl
 from dateutil import parser
 
 from investing_algorithm_framework.domain import OperationalException, Order, \
-    MarketService
+    MarketService, DATETIME_FORMAT, TimeFrame
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +142,6 @@ class CCXTMarketService(MarketService):
     def get_order(self, order, market):
         market_credential = self.get_market_credential(market)
         exchange = self.initialize_exchange(market, market_credential)
-
         symbol = f"{order.target_symbol.upper()}/" \
                  f"{order.trading_symbol.upper()}"
 
@@ -242,12 +241,12 @@ class CCXTMarketService(MarketService):
             raise OperationalException("Could not create limit buy order")
 
     def create_limit_sell_order(
-            self,
-            target_symbol: str,
-            trading_symbol: str,
-            amount: float,
-            price: float,
-            market
+        self,
+        target_symbol: str,
+        trading_symbol: str,
+        amount: float,
+        price: float,
+        market
     ):
         market_credential = self.get_market_credential(market)
         exchange = self.initialize_exchange(market, market_credential)
@@ -357,7 +356,12 @@ class CCXTMarketService(MarketService):
     def get_ohlcv(
         self, symbol, time_frame, from_timestamp, market, to_timestamp=None
     ) -> pl.DataFrame:
-        datetime_format = self.config["DATETIME_FORMAT"]
+        time_frame = TimeFrame.from_value(time_frame).value
+
+        if self.config is not None:
+            datetime_format = self.config["DATETIME_FORMAT"]
+        else:
+            datetime_format = DATETIME_FORMAT
         market_credential = self.get_market_credential(market)
         exchange = self.initialize_exchange(market, market_credential)
 
@@ -422,6 +426,7 @@ class CCXTMarketService(MarketService):
         to_timestamp=None
     ) -> Dict[str, pl.DataFrame]:
         ohlcvs = {}
+        time_frame = TimeFrame.from_value(time_frame).value
 
         for symbol in symbols:
 

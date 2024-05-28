@@ -12,6 +12,15 @@ class MarketService(ABC):
 
     def __init__(self, market_credential_service):
         self._market_credential_service = market_credential_service
+        self._config = None
+
+    @property
+    def config(self):
+        return self._config
+
+    @config.setter
+    def config(self, value):
+        self._config = value
 
     @abstractmethod
     def pair_exists(

@@ -1,23 +1,24 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import polars
 from dateutil.parser import parse
 
 from investing_algorithm_framework.domain import OHLCVMarketDataSource, \
     BacktestMarketDataSource, OperationalException, TickerMarketDataSource, \
-    DATETIME_FORMAT
+    DATETIME_FORMAT, TimeFrame
 
 logger = logging.getLogger(__name__)
 
 
 class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
+    """
+    Implementation of a OHLCV data source that reads OHLCV data from a csv file.
+    Market data source that reads OHLCV data from a csv file.
+    """
 
-    def empty(self):
-        data = self.get_data(
-            from_time_stamp=self.start_date,
-            to_time_stamp=self.end_date
-        )
+    def empty(self, start_date, end_date):
+        data = self.get_data(start_date=start_date, end_date=end_date)
         return len(data) == 0
 
     def __init__(
@@ -27,10 +28,6 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
         market=None,
         symbol=None,
         timeframe=None,
-        start_date=None,
-        start_date_func=None,
-        end_date=None,
-        end_date_func=None,
         window_size=None,
     ):
         super().__init__(
@@ -38,10 +35,6 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
             market=market,
             symbol=symbol,
             timeframe=timeframe,
-            start_date=start_date,
-            start_date_func=start_date_func,
-            end_date=end_date,
-            end_date_func=end_date_func,
             window_size=window_size,
         )
         self._csv_file_path = csv_file_path
@@ -63,32 +56,65 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
 
         first_row = df.head(1)
         last_row = df.tail(1)
-        self._start_date = parse(first_row["Datetime"][0])
-        self._end_date = parse(last_row["Datetime"][0])
+        self._start_date_data_source = parse(first_row["Datetime"][0])
+        self._end_date_data_source = parse(last_row["Datetime"][0])
 
     @property
     def csv_file_path(self):
         return self._csv_file_path
 
-    def get_data(
-        self,
-        from_timestamp=None,
-        to_timestamp=None,
-        **kwargs
-    ):
+    def get_data(self, **kwargs):
+        """
+        Get the data from the csv file. The data can be filtered by
+        the start_date and end_date in the kwargs. backtest_index_date
+        can also be provided to filter the data, where this will be used
+        as start_date.
+        """
+        start_date = kwargs.get("start_date")
+        end_date = kwargs.get("end_date")
+        backtest_index_date = kwargs.get("backtest_index_date")
 
-        if from_timestamp is None:
-            from_timestamp = self.start_date
+        if start_date is None \
+                and end_date is None \
+                and backtest_index_date is None:
+            return polars.read_csv(
+                self.csv_file_path, columns=self._columns, separator=","
+            )
 
-        if to_timestamp is None:
-            to_timestamp = self.end_date
+        if backtest_index_date is not None:
+            end_date = backtest_index_date
+            start_date = self.create_start_date(
+                end_date, self.timeframe, self.window_size
+            )
+        else:
+            if start_date is None:
+                start_date = self.create_start_date(
+                    end_date, self.timeframe, self.window_size
+                )
+
+            if end_date is None:
+                end_date = self.create_end_date(
+                    start_date, self.timeframe, self.window_size
+                )
+
+        if start_date > self._start_date_data_source:
+            raise OperationalException(
+                f"Start date {start_date} is before the start date "
+                f"of the data source {self._start_date_data_source}"
+            )
+
+        if end_date < self._end_date_data_source:
+            raise OperationalException(
+                f"End date {end_date} is after the end date "
+                f"of the data source {self._end_date_data_source}"
+            )
 
         df = polars.read_csv(
             self.csv_file_path, columns=self._columns, separator=","
         )
         df = df.filter(
-            (df['Datetime'] >= from_timestamp.strftime(DATETIME_FORMAT))
-            & (df['Datetime'] <= to_timestamp.strftime(DATETIME_FORMAT))
+            (df['Datetime'] >= start_date.strftime(DATETIME_FORMAT))
+            & (df['Datetime'] <= end_date.strftime(DATETIME_FORMAT))
         )
         return df
 

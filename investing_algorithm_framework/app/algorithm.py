@@ -22,17 +22,23 @@ class Algorithm:
     class is responsible for managing the strategies and executing
     them in the correct order.
 
-    :param name: The name of the algorithm
-    :param description: The description of the algorithm
-    :param context: The context of the algorithm, for backtest references
+    :param (optional) name: The name of the algorithm
+    :param (optional) description: The description of the algorithm
+    :param (optional) context: The context of the algorithm, for backtest references
+    :param (optional) strategy: A single strategy to add to the algorithm
+    :param (optional) data_sources: The list of data sources to
+    add to the algorithm
     """
     def __init__(
         self,
         name: str = None,
         description: str = None,
-        context: Dict[str, str] = None
+        context: Dict = None,
+        strategy=None,
+        data_sources=None
     ):
         self._name = name
+        self._context = {}
 
         if name is None:
             self._name = f"algorithm_{random_string(10)}"
@@ -42,20 +48,8 @@ class Algorithm:
         if description is not None:
             self._description = description
 
-        self._context = context
-
-        if self.context is None:
-            self._context = {}
-
-        # Check if the context is a dictionary with only string,
-        # float or int values
-        for key, value in self.context.items():
-            if not isinstance(key, str) or \
-                    not isinstance(value, (str, float, int)):
-                raise OperationalException(
-                    "The context of the algorithm must be a dictionary with "
-                    "only string, float or int values."
-                )
+        if context is not None:
+            self.add_context(context)
 
         self._strategies = []
         self._tasks = []
@@ -66,11 +60,17 @@ class Algorithm:
         self.configuration_service: ConfigurationService
         self.portfolio_configuration_service: PortfolioConfigurationService
         self.strategy_orchestrator_service: StrategyOrchestratorService
-        self._market_data_sources = {}
+        self._data_sources = {}
         self._strategies = []
         self._market_credential_service: MarketCredentialService
         self._market_data_source_service: MarketDataSourceService
         self.trade_service: TradeService
+
+        if strategy is not None:
+            self.add_strategy(strategy)
+
+        if data_sources is not None:
+            self.add_data_sources(data_sources)
 
     def initialize_services(
         self,
@@ -95,7 +95,7 @@ class Algorithm:
             = portfolio_configuration_service
         self.strategy_orchestrator_service: StrategyOrchestratorService \
             = strategy_orchestrator_service
-        self._market_data_sources = {}
+        self._data_sources = {}
         self._market_credential_service: MarketCredentialService \
             = market_credential_service
         self._market_data_source_service: MarketDataSourceService \
@@ -118,6 +118,10 @@ class Algorithm:
     @property
     def name(self):
         return self._name
+
+    @property
+    def data_sources(self):
+        return self._data_sources
 
     @property
     def identifier(self):
@@ -150,6 +154,19 @@ class Algorithm:
         Function to get the context of the algorithm
         """
         return self._context
+
+    def add_context(self, context: Dict):
+        # Check if the context is a dictionary with only string,
+        # float or int values
+        for key, value in self.context.items():
+            if not isinstance(key, str) or \
+                    not isinstance(value, (str, float, int)):
+                raise OperationalException(
+                    "The context for an algorithm must be a dictionary with "
+                    "only string, float or int values."
+                )
+
+        self._context = context
 
     @property
     def running(self) -> bool:
@@ -739,6 +756,9 @@ class Algorithm:
                 "with the same id in the algorithm"
             )
 
+        if strategy.market_data_sources is not None:
+            self.add_data_sources(strategy.market_data_sources)
+
         self._strategies.append(strategy)
 
     @property
@@ -1028,6 +1048,9 @@ class Algorithm:
             )
 
         self._tasks.append(task)
+
+    def add_data_sources(self, data_sources):
+        self._data_sources = data_sources
 
     @property
     def tasks(self):
