@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "investing-algorithm-framework"
-version = "v3.5.2"
+version = "v3.6.0"
 description = "A framework for creating trading bots"
 authors = ["MDUYN"]
 readme = "README.md"
