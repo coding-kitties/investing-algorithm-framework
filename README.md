@@ -21,11 +21,11 @@ components for creating algorithms, including data provisioning,
 portfolio management, and order execution.
 
 Features: 
-* Order execution
+* Order execution and tracking
 * Broker and exchange connections through [ccxt](https://github.com/ccxt/ccxt)
-* Backtesting and performance analysis reports [example](./examples/backtest)
-* Backtest experiments to optimize your trading strategy [example](./examples/backtest_experiment)
-* Portfolio management
+* Backtesting and performance analysis reports [example](./examples/backtest_example)
+* Backtesting multiple algorithms with different backtest date ranges [example](./examples/backtests_example)
+* Portfolio management and tracking
 * Web API for interacting with your deployed trading bot
 * Data persistence through sqlite db or an in-memory db
 * Stateless running for cloud function deployments
@@ -68,9 +68,6 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
 )
 app = create_app(config=config)
 algorithm = Algorithm()
-
-app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
-app.add_market_data_source(bitvavo_btc_eur_ticker)
 app.add_market_credential(MarketCredential(
     market="bitvavo",
     api_key="<your api key>",
@@ -90,7 +87,7 @@ app.add_algorithm(algorithm)
     time_unit=TimeUnit.HOUR, 
     interval=2, 
     # Specify market data sources that need to be passed to the strategy
-    market_data_sources=["BTC-ticker", "BTC-ohlcv"]
+    market_data_sources=[bitvavo_btc_eur_ticker, bitvavo_btc_eur_ohlcv_2h]
 )
 def perform_strategy(algorithm: Algorithm, market_data: dict):
     # By default, ohlcv data is passed as polars df in the form of
