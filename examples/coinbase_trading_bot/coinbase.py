@@ -36,10 +36,7 @@ coinbase_btc_eur_ticker = CCXTTickerMarketDataSource(
 class CoinBaseTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.SECOND
     interval = 5
-    market_data_sources = [
-        "BTC/EUR-ohlcv",
-        "BTC/EUR-ticker"
-    ]
+    market_data_sources = [coinbase_btc_eur_ticker, coinbase_btc_eur_ohlcv_2h]
 
     def apply_strategy(self, algorithm, market_data):
         pass
