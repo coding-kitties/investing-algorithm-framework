@@ -46,5 +46,6 @@ class Test(TestBase):
             2, position_service.count({"portfolio": portfolio.id})
         )
         self.assertEqual(
-            0, position_service.count({"portfolio": f"{portfolio.identifier}aeokgopge"})
+            0, position_service
+            .count({"portfolio": f"{portfolio.identifier}aeokgopge"})
         )

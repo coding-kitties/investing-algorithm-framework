@@ -1,8 +1,8 @@
 # import os
 # from datetime import datetime, timedelta
-# from investing_algorithm_framework import create_app, TradingStrategy, TimeUnit, \
-#     RESOURCE_DIRECTORY, PortfolioConfiguration, TradingDataType, \
-#     TradingTimeFrame
+# from investing_algorithm_framework import create_app,
+# TradingStrategy, TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration,
+# TradingDataType, TradingTimeFrame
 # from tests.resources import TestBase, MarketServiceStub
 #
 #

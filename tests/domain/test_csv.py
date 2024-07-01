@@ -4,9 +4,10 @@
 # from unittest import TestCase
 #
 # from tests.resources.utils import random_string
-# from investing_algorithm_framework.utils.csv import remove_row, csv_to_list, \
+# from investing_algorithm_framework.utils.csv import remove_row, csv_to_list,\
 #     append_dict_as_row_to_csv, get_total_amount_of_rows
-# from investing_algorithm_framework.core.exceptions import OperationalException
+# from investing_algorithm_framework.core.exceptions
+# import OperationalException
 #
 #
 # class Test(TestCase):
@@ -18,7 +19,8 @@
 #
 #         records = 200
 #         fieldnames = ['id', 'name', 'age', 'city']
-#         names = ['Deepak', 'Sangeeta', 'Geetika', 'Anubhav', 'Sahil', 'Akshay']
+#         names = ['Deepak', 'Sangeeta',
+#         'Geetika', 'Anubhav', 'Sahil', 'Akshay']
 #         cities = ['Delhi', 'Kolkata', 'Chennai', 'Mumbai']
 #
 #         # Open file in append mode
