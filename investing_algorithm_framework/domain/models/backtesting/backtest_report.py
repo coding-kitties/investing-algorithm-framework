@@ -1,14 +1,15 @@
-from logging import getLogger
 from datetime import datetime
-from pandas import DataFrame, to_datetime, DatetimeIndex
+from logging import getLogger
 
-from investing_algorithm_framework.domain.models.base_model import BaseModel
-from investing_algorithm_framework.domain.models.time_unit import TimeUnit
-from investing_algorithm_framework.domain.models\
-    .backtesting.backtest_date_range import BacktestDateRange
+from pandas import DataFrame
+
 from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
 from investing_algorithm_framework.domain.metrics import \
     get_price_efficiency_ratio
+from investing_algorithm_framework.domain.models \
+    .backtesting.backtest_date_range import BacktestDateRange
+from investing_algorithm_framework.domain.models.base_model import BaseModel
+from investing_algorithm_framework.domain.models.time_unit import TimeUnit
 
 logger = getLogger(__name__)
 
@@ -96,7 +97,6 @@ class BacktestReport(BaseModel):
         self._number_of_days = \
             (self.backtest_date_range.end_date
              - self.backtest_date_range.start_date).days
-
 
     @property
     def name(self):
@@ -551,7 +551,7 @@ class BacktestReport(BaseModel):
         """
         self._traces = value
 
-    def get_trace(self, symbol, strategy_id = None):
+    def get_trace(self, symbol, strategy_id=None):
         """
         Get the trace for a given symbol. If a strategy_id is provided,
         it will return the trace for that strategy.

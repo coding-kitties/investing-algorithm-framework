@@ -13,7 +13,6 @@ def create_rsi_graph(data: pd.DataFrame):
     if not isinstance(data.index, pd.DatetimeIndex):
         raise ValueError("The index of the data should be of type datetime")
 
-
     # Check if the 'RSI' column exists
     if 'RSI' not in data.columns:
         raise ValueError("The data should have a 'RSI' column")
@@ -64,6 +63,7 @@ def create_prices_graph(
         name=graph_name
     )
 
+
 def create_adx_graph(data: pd.DataFrame):
     """
     Create a graph for the ADX metric.
@@ -86,6 +86,7 @@ def create_adx_graph(data: pd.DataFrame):
         line=dict(color="green", width=1),
         name="ADX"
     )
+
 
 def create_di_plus_graph(data: pd.DataFrame):
     """
@@ -110,6 +111,7 @@ def create_di_plus_graph(data: pd.DataFrame):
         name="+DI"
     )
 
+
 def create_di_minus_graph(data: pd.DataFrame):
     """
     Create a graph for the DI- metric.
@@ -133,6 +135,7 @@ def create_di_minus_graph(data: pd.DataFrame):
         name="-DI"
     )
 
+
 def create_di_plus_di_minus_crossover_graph(data: pd.DataFrame):
     """
     Create a graph for the DI- and DI+ crossover.
@@ -147,7 +150,8 @@ def create_di_plus_di_minus_crossover_graph(data: pd.DataFrame):
         raise ValueError("The data should have a '-DI' and '+DI' column")
 
     # Get all crossover indexes
-    crossover_index = data[(data['+DI'] < data['-DI']) & (data['+DI'].shift(1) > data['-DI'].shift(1))].index
+    crossover_index = data[(data['+DI'] < data['-DI']) &
+                           (data['+DI'].shift(1) > data['-DI'].shift(1))].index
 
     # Use .loc to get the corresponding 'Close' values
     crossover_close_values = data.loc[crossover_index, '+DI']
@@ -170,7 +174,6 @@ def create_ema_graph(data: pd.DataFrame, key, color="blue"):
     if key not in data.columns:
         raise ValueError(f"The data should have a {key} column")
 
-
     return go.Scatter(
         x=data.index,
         y=data[key],
@@ -179,6 +182,7 @@ def create_ema_graph(data: pd.DataFrame, key, color="blue"):
         name=key
     )
 
+
 def create_crossover_graph(data: pd.DataFrame, key_one, key_two, color="blue"):
     # Check if the index is of type datetime
     if not isinstance(data.index, pd.DatetimeIndex):
@@ -186,10 +190,14 @@ def create_crossover_graph(data: pd.DataFrame, key_one, key_two, color="blue"):
 
     # Check if the key columns exist
     if key_one not in data.columns or key_two not in data.columns:
-        raise ValueError(f"The data should have a {key_one} and {key_two} column")
+        raise ValueError(f"The data should have a {key_one} "
+                         f"and {key_two} column")
 
     # Get all crossover indexes
-    crossover_index = data[(data[key_one] <= data[key_two]) & (data[key_one].shift(1) >= data[key_two].shift(1))].index
+    crossover_index = data[
+        (data[key_one] <= data[key_two]) &
+        (data[key_one].shift(1) >= data[key_two].shift(1))
+    ].index
 
     # Use .loc to get the corresponding 'Close' values
     crossover_close_values = data.loc[crossover_index, key_one]
@@ -202,7 +210,8 @@ def create_crossover_graph(data: pd.DataFrame, key_one, key_two, color="blue"):
         name=f'{key_one} {key_two} Crossover'
     )
 
-def create_peaks_chart(data: pd.DataFrame, key="Close", order = 5):
+
+def create_peaks_chart(data: pd.DataFrame, key="Close", order=5):
 
     # Check if the index is of type datetime
     if not isinstance(data.index, pd.DatetimeIndex):
@@ -220,17 +229,8 @@ def create_peaks_chart(data: pd.DataFrame, key="Close", order = 5):
     ll_close_index = data[data[f'{key}_lows'] == 1].index
     hl_close_index = data[data[f'{key}_lows'] == -1].index
 
-    # Subtract for each index 10 hours
-    # hh_close_index = hh_close_index - pd.Timedelta(hours=2 * order)
-    # lh_close_index = lh_close_index - pd.Timedelta(hours=2 * order)
-    # ll_close_index = ll_close_index - pd.Timedelta(hours=2 * order)
-    # hl_close_index = hl_close_index - pd.Timedelta(hours=2 * order)
-    # hh_close_index = hh_close_index
-    # lh_close_index = lh_close_index
-    # ll_close_index = ll_close_index
-    # hl_close_index = hl_close_index
-
-    # Use .loc to get the corresponding 'Close' values if the index is in the DataFrame
+    # Use .loc to get the corresponding 'Close' values if
+    # the index is in the DataFrame
     hh_close_values = data.loc[hh_close_index, key]
     lh_close_values = data.loc[lh_close_index, key]
     ll_close_values = data.loc[ll_close_index, key]
@@ -276,13 +276,18 @@ def create_peaks_chart(data: pd.DataFrame, key="Close", order = 5):
     return higher_high_graph, lower_high_graph, lower_lows_graph, higher_lows
 
 
-def create_bullish_divergence_chart(data: pd.DataFrame, key_one, key_two, color = 'red'):
+def create_bullish_divergence_chart(
+    data: pd.DataFrame, key_one, key_two, color='red'
+):
     """
-    A bullish divergence occurs when the "<key_one>_lows" makes a new low but the "<key_two>_lows" makes a higher low.
+    A bullish divergence occurs when the "<key_one>_lows" makes
+    a new low but the "<key_two>_lows" makes a higher low.
 
-    For example, if the RSI makes a new low but the close price makes a higher low, then we have a bullish divergence.
+    For example, if the RSI makes a new low but the close price
+    makes a higher low, then we have a bullish divergence.
     """
-    divergence_index = data[(data[f'{key_one}_lows'] == -1) & (data[f'{key_two}_lows'] == 1)].index
+    divergence_index = data[(data[f'{key_one}_lows'] == -1)
+                            & (data[f'{key_two}_lows'] == 1)].index
     divergence_close_values = data.loc[divergence_index, 'Close']
 
     return go.Scatter(
@@ -294,15 +299,20 @@ def create_bullish_divergence_chart(data: pd.DataFrame, key_one, key_two, color 
     )
 
 
-def create_bearish_divergence_chart(data: pd.DataFrame, key_one, key_two, color = 'red'):
+def create_bearish_divergence_chart(
+    data: pd.DataFrame, key_one, key_two, color='red'
+):
     """
-    A bearish divergence occurs when the "<key_one>_highs" makes a new high but the "<key_two>_highs" makes a lower high.
+    A bearish divergence occurs when the "<key_one>_highs" makes a
+    new high but the "<key_two>_highs" makes a lower high.
 
-    For example, if the RSI makes a new high but the close price makes a lower high, then we have a bearish divergence.
+    For example, if the RSI makes a new high but the close price makes
+    a lower high, then we have a bearish divergence.
     """
 
     # Add divergence charts
-    divergence_index = data[(data[f'{key_one}_highs'] == -1) & (data[f'{key_two}_highs'] == 1)].index
+    divergence_index = data[(data[f'{key_one}_highs'] == -1)
+                            & (data[f'{key_two}_highs'] == 1)].index
     divergence_close_values = data.loc[divergence_index, 'Close']
 
     return go.Scatter(
@@ -315,12 +325,14 @@ def create_bearish_divergence_chart(data: pd.DataFrame, key_one, key_two, color 
 
 
 def create_entry_graph(data: pd.DataFrame):
-
-
-    # Iterate over each row in the DataFrame and check if there is a bullish divergence between the RSI and the close price
-    # and if there is a crossover between the DI+ and DI- for the last 12 hours (6 candles)
+    # Iterate over each row in the DataFrame and check if there is a
+    # bullish divergence between the RSI and the close price
+    # and if there is a crossover between the DI+ and DI- for
+    # the last 12 hours (6 candles)
     # Get all crossover indexes
-    crossover_index = data[(data['+DI'] <= data['-DI']) & (data['+DI'].shift(1) >= data['-DI'].shift(1))].index
+    crossover_index = data[(data['+DI'] <= data['-DI']) &
+                           (data['+DI'].shift(1) >= data['-DI'].shift(1))]\
+        .index
     data['di_crossover'] = 0
     data.loc[crossover_index, 'di_crossover'] = 1
 
@@ -330,11 +342,19 @@ def create_entry_graph(data: pd.DataFrame):
 
         if row.di_crossover == 1:
             match = False
-            # Check if there was a bullish divergence between the RSI and the close price in the last 2 days
-            rsi_window = data.loc[row.Index - pd.Timedelta(days=2):row.Index, 'RSI_lows']
-            close_window = data.loc[row.Index - pd.Timedelta(days=2):row.Index, 'Close_lows']
+            # Check if there was a bullish divergence between
+            # the RSI and the close price in the last 2 days
+            rsi_window = data.loc[
+                         row.Index - pd.Timedelta(days=2):row.Index,
+                         'RSI_lows'
+                         ]
+            close_window = data.loc[
+                           row.Index - pd.Timedelta(days=2):row.Index,
+                           'Close_lows'
+                           ]
 
-            # Go over each row and check if there is a bullish divergence between the RSI and the close price
+            # Go over each row and check if there is a bullish
+            # divergence between the RSI and the close price
             for rsi_row, close_row in zip(rsi_window, close_window):
 
                 if rsi_row == -1 and close_row == 1:
@@ -344,30 +364,13 @@ def create_entry_graph(data: pd.DataFrame):
 
             if not match:
                 # Check if the RSI had decreased
-                rsi_window = data.loc[row.Index - pd.Timedelta(days=1):row.Index, 'RSI']
+                rsi_window = data.loc[
+                             row.Index - pd.Timedelta(days=1):row.Index, 'RSI'
+                             ]
                 rsi_diff = rsi_window.diff().mean()
 
                 if rsi_diff < -2:
                     entry_indexes.append(row.Index)
-
-        # If ema 50 <
-
-            # # Check if there is a bullish divergence between the RSI and the close price
-            # if row.Close_lows == 1 and row.RSI_lows == -1:
-            #
-            # # Check if there is a crossover in the last 12 hours
-            # crossovers = data.loc[row.Index - pd.Timedelta(hours=12):row.Index, 'di_crossover']
-            #
-            # if crossovers.sum() > 0:
-            #     entry_indexes.append(row.Index)
-
-            # adx_window = data.loc[row.Index - pd.Timedelta(hours=4):row.Index, 'ADX']
-            # rsi_window = data.loc[row.Index - pd.Timedelta(hours=4):row.Index, 'RSI']
-            # adx_diff = adx_window.diff().mean()
-            # rsi_diff = rsi_window.diff().mean()
-            #
-            # if adx_diff > -2 and adx_diff < 0:
-            #     entry_indexes.append(row.Index)
 
     entry_close_values = data.loc[entry_indexes, 'Close']
     return go.Scatter(

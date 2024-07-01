@@ -59,4 +59,3 @@ def create_trade_exit_markers_chart(df, trades: List[Trade]):
         mode='markers',
         name='Sell'
     )
-

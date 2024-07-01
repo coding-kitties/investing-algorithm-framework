@@ -55,4 +55,3 @@ def get_price_efficiency_ratio(data: DataFrame):
 
     # Calculate Efficiency Ratio
     return net_price_change / sum_absolute_changes
-

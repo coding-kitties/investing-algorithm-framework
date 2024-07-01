@@ -801,7 +801,8 @@ class App:
 
             print(
                 f"{COLOR_YELLOW}Running backtests for date "
-                f"range:{COLOR_RESET} {COLOR_GREEN}{date_range.name} {date_range.start_date} - "
+                f"range:{COLOR_RESET} {COLOR_GREEN}{date_range.name} "
+                f"{date_range.start_date} - "
                 f"{date_range.end_date} for a "
                 f"total of {len(algorithms)} algorithms.{COLOR_RESET}"
             )

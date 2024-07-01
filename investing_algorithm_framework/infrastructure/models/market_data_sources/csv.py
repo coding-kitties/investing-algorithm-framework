@@ -1,25 +1,27 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import polars
 from dateutil.parser import parse
 
 from investing_algorithm_framework.domain import OHLCVMarketDataSource, \
     BacktestMarketDataSource, OperationalException, TickerMarketDataSource, \
-    DATETIME_FORMAT, TimeFrame
+    DATETIME_FORMAT
 
 logger = logging.getLogger(__name__)
 
 
 class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
     """
-    Implementation of a OHLCV data source that reads OHLCV data from a csv file.
-    Market data source that reads OHLCV data from a csv file.
+    Implementation of a OHLCV data source that reads OHLCV data
+    from a csv file. Market data source that reads OHLCV data from a csv file.
     """
 
     def empty(self, start_date, end_date=None):
         if end_date is None:
-            end_date = self.create_end_date(start_date, self.timeframe, self.window_size)
+            end_date = self.create_end_date(
+                start_date, self.timeframe, self.window_size
+            )
         data = self.get_data(start_date=start_date, end_date=end_date)
         return len(data) == 0
 

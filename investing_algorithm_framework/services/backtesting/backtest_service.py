@@ -282,8 +282,8 @@ class BacktestService:
             backtest_report.total_net_gain_percentage = \
                 self._performance_service \
                     .get_total_net_gain_percentage_of_backtest(
-                    portfolio.id, backtest_report
-                )
+                        portfolio.id, backtest_report
+                    )
             positions = self._position_repository.get_all({
                 "portfolio": portfolio.id
             })
@@ -298,18 +298,18 @@ class BacktestService:
                     ticker_symbol = \
                         f"{position.symbol}/{portfolio.trading_symbol}"
 
-                    if not self._market_data_source_service \
-                        .has_ticker_market_data_source(
-                            symbol=ticker_symbol, market=portfolio.market
-                        ):
+                    if not self._market_data_source_service\
+                            .has_ticker_market_data_source(
+                                symbol=ticker_symbol, market=portfolio.market
+                            ):
                         raise OperationalException(
                             f"Ticker market data source for "
-                            f"symbol {ticker_symbol} "
-                            f"and market {portfolio.market} not found, please "
-                            f"make sure you register a ticker market "
-                            f"data source for this symbol and market "
-                            f"in backtest mode. Otherwise, the backtest report" 
-                            " cannot be generated."
+                            f"symbol {ticker_symbol} and market "
+                            f"{portfolio.market} not found, please make "
+                            f"sure you register a ticker market data "
+                            f"source for this symbol and market in "
+                            f"backtest mode. Otherwise, the backtest "
+                            f"report cannot be generated."
                         )
                     tickers[ticker_symbol] = \
                         self._market_data_source_service.get_ticker(
@@ -319,12 +319,12 @@ class BacktestService:
 
             backtest_report.growth_rate = self._performance_service \
                 .get_growth_rate_of_backtest(
-                portfolio.id, tickers, backtest_report
-            )
+                    portfolio.id, tickers, backtest_report
+                )
             backtest_report.growth = self._performance_service \
                 .get_growth_of_backtest(
-                portfolio.id, tickers, backtest_report
-            )
+                    portfolio.id, tickers, backtest_report
+                )
             backtest_report.total_value = self._performance_service \
                 .get_total_value(portfolio.id, tickers, backtest_report)
             backtest_report.average_trade_duration = \
@@ -379,10 +379,10 @@ class BacktestService:
                     # Probably not needed
                     ticker = self._market_data_source_service \
                         .get_ticker(
-                        symbol=f"{position.symbol}"
-                               f"/{portfolio.trading_symbol}",
-                        market=portfolio.market
-                    )
+                            symbol=f"{position.symbol}"
+                                   f"/{portfolio.trading_symbol}",
+                            market=portfolio.market
+                        )
                     backtest_position.price = ticker["bid"]
                 backtest_positions.append(backtest_position)
             backtest_report.positions = backtest_positions
@@ -436,10 +436,9 @@ class BacktestService:
                             symbol=symbol
                         ):
                     raise OperationalException(
-                            f"Ticker market data source for "
-                            f"symbol {symbol} not found, please "
-                            f"make sure you register a ticker market "
-                            f"data source for this symbol "
-                            f"in backtest mode. Otherwise, the backtest report" 
-                            " cannot be generated."
-                        )
+                        f"Ticker market data source for symbol {symbol} not "
+                        f"found, please make sure you register a ticker "
+                        f"market data source for this symbol in backtest "
+                        f"mode. Otherwise, the backtest report "
+                        f"cannot be generated."
+                    )
