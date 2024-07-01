@@ -38,10 +38,7 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
 class BitvavoTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 2
-    market_data_sources = [
-        "BTC/EUR-ohlcv",
-        "BTC/EUR-ticker"
-    ]
+    market_data_sources = [bitvavo_btc_eur_ohlcv_2h, bitvavo_btc_eur_ticker]
 
     def apply_strategy(self, algorithm, market_data):
         print(market_data["BTC/EUR-ohlcv"])
