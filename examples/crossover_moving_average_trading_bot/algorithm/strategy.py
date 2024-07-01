@@ -2,6 +2,9 @@ import tulipy as ti
 
 from investing_algorithm_framework import TimeUnit, TradingStrategy, \
     Algorithm, OrderSide
+from .data_sources import bitvavo_btc_eur_ohlcv_2h, bitvavo_btc_eur_ticker, \
+    bitvavo_dot_eur_ticker, bitvavo_dot_eur_ohlcv_2h
+
 
 """
 This strategy is based on the golden cross strategy. It will buy when the
@@ -49,10 +52,10 @@ class CrossOverStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 2
     market_data_sources = [
-        "BTC/EUR-ohlcv",
-        "DOT/EUR-ohlcv",
-        "BTC/EUR-ticker",
-        "DOT/EUR-ticker"
+        bitvavo_dot_eur_ticker,
+        bitvavo_dot_eur_ohlcv_2h,
+        bitvavo_btc_eur_ticker,
+        bitvavo_btc_eur_ohlcv_2h
     ]
     symbols = ["BTC/EUR", "DOT/EUR"]
 
