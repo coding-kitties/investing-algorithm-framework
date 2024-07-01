@@ -30,6 +30,8 @@ from .utils import random_string, append_dict_as_row_to_csv, \
     load_backtest_report, \
     csv_to_list, StoppableThread, pretty_print_backtest_reports_evaluation, \
     pretty_print_backtest, load_csv_into_dict, load_backtest_reports
+from .graphs import create_prices_graph, create_ema_graph, create_rsi_graph
+from .metrics import get_price_efficiency_ratio
 
 __all__ = [
     'Config',
@@ -114,4 +116,8 @@ __all__ = [
     "RoundingService",
     "BacktestDateRange",
     "load_backtest_report",
+    "create_prices_graph",
+    "create_ema_graph",
+    "create_rsi_graph",
+    "get_price_efficiency_ratio"
 ]

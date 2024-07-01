@@ -1,14 +1,23 @@
+from logging import getLogger
 from datetime import datetime
-from pandas import DataFrame
+from pandas import DataFrame, to_datetime, DatetimeIndex
 
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.time_unit import TimeUnit
 from investing_algorithm_framework.domain.models\
     .backtesting.backtest_date_range import BacktestDateRange
 from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
+from investing_algorithm_framework.domain.metrics import \
+    get_price_efficiency_ratio
+
+logger = getLogger(__name__)
 
 
 class BacktestReport(BaseModel):
+    """
+    Class that represents a backtest report. The backtest report
+    contains information about the backtest.
+    """
 
     def __init__(
         self,
@@ -45,13 +54,14 @@ class BacktestReport(BaseModel):
         created_at: datetime = None,
         context=None,
     ):
+        self._traces = {}
+        self.metrics = {}
         self._name = name
         self._strategy_identifiers = strategy_identifiers
         self.backtest_date_range = backtest_date_range
         self._number_of_runs = number_of_runs
         self._trading_time_frame = trading_time_frame
         self._trading_time_frame_start_date = trading_time_frame_start_date
-        self._symbols = symbols
         self._market = market
         self._number_of_orders = number_of_orders
         self._number_of_positions = number_of_positions
@@ -77,9 +87,16 @@ class BacktestReport(BaseModel):
         self._interval = interval
         self._time_unit = time_unit
         self._context = context
+
+        self._symbols = symbols
+
+        if self._symbols is None:
+            self._symbols = []
+
         self._number_of_days = \
             (self.backtest_date_range.end_date
              - self.backtest_date_range.start_date).days
+
 
     @property
     def name(self):
@@ -485,3 +502,79 @@ class BacktestReport(BaseModel):
 
     def get_trading_symbol(self) -> str:
         return self.trading_symbol
+
+    def add_symbol(self, symbol):
+
+        if symbol not in self.symbols:
+            self.symbols.append(symbol)
+
+    def calculate_metrics(self):
+        """
+        Parent method to calculate all metrics.
+
+        returns:
+            None
+        """
+        if self.traces is not None:
+            self.metrics['efficiency_ratio'] = {}
+
+            for strategy_id in self.traces:
+                entries = self.traces[strategy_id]
+
+                if entries is None:
+                    continue
+
+                for symbol in entries:
+
+                    self.metrics['efficiency_ratio'][symbol] = \
+                        get_price_efficiency_ratio(
+                            self.traces[strategy_id][symbol]
+                        )
+
+    @property
+    def traces(self):
+        """
+        Get the traces of the backtest report.
+        """
+        return self._traces
+
+    @traces.setter
+    def traces(self, value):
+        """
+        Set the traces of the backtest report.
+
+        Args:
+            value (dict): The traces of the backtest report.
+
+        returns:
+            None
+        """
+        self._traces = value
+
+    def get_trace(self, symbol, strategy_id = None):
+        """
+        Get the trace for a given symbol. If a strategy_id is provided,
+        it will return the trace for that strategy.
+
+        Args:
+            symbol (str): The symbol
+            strategy_id (str): The
+        """
+
+        if strategy_id is None:
+
+            for strategy_id, trace in self.traces.items():
+
+                if symbol in trace:
+                    return trace[symbol]
+
+        else:
+            if strategy_id in self.traces:
+                return self.traces[strategy_id][symbol]
+
+            else:
+                raise ValueError(
+                    f"Trace {symbol} for strategy {strategy_id} not found"
+                )
+
+        return None
