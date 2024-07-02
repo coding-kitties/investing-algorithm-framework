@@ -57,7 +57,7 @@ class Test(TestCase):
         data_source.prepare_data(
             config={
                 RESOURCE_DIRECTORY: self.resource_dir,
-                BACKTEST_DATA_DIRECTORY_NAME: "market_data_sources"
+                BACKTEST_DATA_DIRECTORY_NAME: "market_data_sources_for_testing"
             },
             backtest_start_date=datetime(2023, 12, 17, 00, 00),
             backtest_end_date=datetime(2023, 12, 25, 00, 00),
@@ -77,7 +77,7 @@ class Test(TestCase):
         data_source.prepare_data(
             config={
                 RESOURCE_DIRECTORY: self.resource_dir,
-                BACKTEST_DATA_DIRECTORY_NAME: "market_data_sources"
+                BACKTEST_DATA_DIRECTORY_NAME: "market_data_sources_for_testing"
             },
             backtest_start_date=datetime(2023, 12, 17, 00, 00),
             backtest_end_date=datetime(2023, 12, 25, 00, 00),
@@ -88,7 +88,7 @@ class Test(TestCase):
     def test_right_columns(self):
         correct_file_name = \
             "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14:21:45_2023-12-25:00:00.csv"
-        csv_file_path = f"{self.resource_dir}/market_data_sources" \
+        csv_file_path = f"{self.resource_dir}/market_data_sources_for_testing"\
                         f"/{correct_file_name}"
         data_source = CCXTOHLCVBacktestMarketDataSource(
             identifier="OHLCV_BTC_EUR_BINANCE_15m",
@@ -101,7 +101,7 @@ class Test(TestCase):
         data_source.prepare_data(
             config={
                 RESOURCE_DIRECTORY: self.resource_dir,
-                BACKTEST_DATA_DIRECTORY_NAME: "market_data_sources"
+                BACKTEST_DATA_DIRECTORY_NAME: "market_data_sources_for_testing"
             },
             backtest_start_date=datetime(2023, 12, 17, 00, 00),
             backtest_end_date=datetime(2023, 12, 25, 00, 00),
