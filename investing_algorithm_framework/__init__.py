@@ -10,12 +10,15 @@ from investing_algorithm_framework.domain import ApiException, \
     TickerMarketDataSource, MarketService, BacktestReportsEvaluation, \
     pretty_print_backtest_reports_evaluation, load_backtest_reports, \
     RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT, \
-    load_backtest_report, BacktestDateRange
+    load_backtest_report, BacktestDateRange, create_ema_graph, \
+    create_prices_graph, create_rsi_graph, get_price_efficiency_ratio
 from investing_algorithm_framework.infrastructure import \
     CCXTOrderBookMarketDataSource, CCXTOHLCVMarketDataSource, \
     CCXTTickerMarketDataSource, CSVOHLCVMarketDataSource, \
     CSVTickerMarketDataSource
 from .create_app import create_app
+from investing_algorithm_framework.services import \
+    create_trade_exit_markers_chart, create_trade_entry_markers_chart
 
 __all__ = [
     "Algorithm",
@@ -64,4 +67,10 @@ __all__ = [
     "DATETIME_FORMAT",
     "load_backtest_report",
     "BacktestDateRange",
+    "create_trade_exit_markers_chart",
+    "create_trade_entry_markers_chart",
+    "create_ema_graph",
+    "create_prices_graph",
+    "create_rsi_graph",
+    "get_price_efficiency_ratio"
 ]

@@ -1,7 +1,7 @@
 from decimal import Decimal
 
-from investing_algorithm_framework import PortfolioConfiguration, OrderStatus, \
-    MarketCredential
+from investing_algorithm_framework import PortfolioConfiguration, \
+    OrderStatus, MarketCredential
 from tests.resources import TestBase
 
 

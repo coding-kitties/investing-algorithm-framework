@@ -1,7 +1,8 @@
+import datetime
 import logging
 import os
 from datetime import timedelta
-
+from dateutil.parser import parse
 import polars
 from dateutil import parser
 
@@ -45,23 +46,18 @@ class CCXTOHLCVBacktestMarketDataSource(
         market,
         symbol,
         timeframe,
-        start_date=None,
         window_size=None,
-        start_date_func=None,
-        end_date_func=None,
-        end_date=None,
     ):
         super().__init__(
             identifier=identifier,
             market=market,
             symbol=symbol,
             timeframe=timeframe,
-            start_date=start_date,
-            start_date_func=start_date_func,
-            end_date=end_date,
-            end_date_func=end_date_func,
             window_size=window_size,
         )
+        self.data = None
+        self._start_date_data_source = None
+        self._end_date_data_source = None
 
     def prepare_data(
         self,
@@ -81,21 +77,11 @@ class CCXTOHLCVBacktestMarketDataSource(
         When downloading the data it will use the ccxt library.
         """
         # Calculating the backtest data start date
-        difference = self.end_date - self.start_date
-        total_minutes = 0
-
-        if difference.days > 0:
-            total_minutes += difference.days * 24 * 60
-
-        if difference.seconds > 0:
-            total_minutes += difference.seconds / 60
-
-        self.total_minutes_timeframe = total_minutes
         backtest_data_start_date = \
             backtest_start_date - timedelta(
                 minutes=(
-                        self.window_size *
-                        TimeFrame.from_string(self.timeframe).amount_of_minutes
+                    (self.window_size + 1) *
+                    TimeFrame.from_value(self.timeframe).amount_of_minutes
                 )
             )
         self.backtest_data_start_date = backtest_data_start_date\
@@ -133,12 +119,22 @@ class CCXTOHLCVBacktestMarketDataSource(
             market_service.config = config
             ohlcv = market_service.get_ohlcv(
                 symbol=self.symbol,
-                time_frame=self.timeframe,
+                time_frame=self.timeframe.value,
                 from_timestamp=backtest_data_start_date,
                 to_timestamp=backtest_end_date,
                 market=self.market
             )
             self.write_data_to_file_path(file_path, ohlcv)
+
+        self.load_data()
+
+    def load_data(self):
+        file_path = self._create_file_path()
+        self.data = polars.read_csv(file_path)
+        first_row = self.data.head(1)
+        last_row = self.data.tail(1)
+        self._start_date_data_source = parse(first_row["Datetime"][0])
+        self._end_date_data_source = parse(last_row["Datetime"][0])
 
     def _create_file_path(self):
         """
@@ -146,7 +142,7 @@ class CCXTOHLCVBacktestMarketDataSource(
         OHLCV_{symbol}_{market}_{timeframe}_{start_date}_{end_date}.csv
         """
         symbol_string = self.symbol.replace("/", "-")
-        time_frame_string = self.timeframe.replace("_", "")
+        time_frame_string = self.timeframe.value.replace("_", "")
         backtest_data_start_date = \
             self.backtest_data_start_date.strftime(DATETIME_FORMAT_BACKTESTING)
         backtest_data_end_date = \
@@ -163,44 +159,57 @@ class CCXTOHLCVBacktestMarketDataSource(
             )
         )
 
-    def get_data(self, backtest_index_date, **kwargs):
+    def get_data(self, **kwargs):
         """
         Get data implementation of ccxt based ohlcv backtest market data
         source. This implementation will use polars to load and filter the
         data.
         """
-        file_path = self._create_file_path()
-        to_timestamp = backtest_index_date
-        from_timestamp = backtest_index_date - timedelta(
-            minutes=self.total_minutes_timeframe
-        )
-        datetime_format = self._config["DATETIME_FORMAT"]
-        self.backtest_data_index_date = backtest_index_date\
-            .replace(microsecond=0)
-        from_timestamp = from_timestamp.replace(microsecond=0)
+        start_date = kwargs.get("start_date")
+        end_date = kwargs.get("end_date")
+        backtest_index_date = kwargs.get("backtest_index_date")
 
-        if from_timestamp < self.backtest_data_start_date:
+        if self.data is None:
+            self.load_data()
+
+        if start_date is None \
+                and end_date is None \
+                and backtest_index_date is None:
+            return self.data
+
+        if backtest_index_date is not None:
+            end_date = backtest_index_date
+            start_date = self.create_start_date(
+                end_date, self.timeframe, self.window_size
+            )
+        else:
+            if start_date is None:
+                start_date = self.create_start_date(
+                    end_date, self.timeframe, self.window_size
+                )
+
+            if end_date is None:
+                end_date = self.create_end_date(
+                    start_date, self.timeframe, self.window_size
+                )
+
+        if start_date < self._start_date_data_source:
             raise OperationalException(
-                f"Cannot get data from {from_timestamp} as the "
-                f"backtest data starts at {self.start_date}"
+                f"Start date {start_date} is before the start date "
+                f"of the data source {self._start_date_data_source}"
             )
 
-        if to_timestamp > self.backtest_data_end_date:
+        if end_date > self._end_date_data_source:
             raise OperationalException(
-                f"Cannot get data to {to_timestamp} as the "
-                f"backtest data ends at {self.end_date}"
+                f"End date {end_date} is after the end date "
+                f"of the data source {self._end_date_data_source}"
             )
 
-        # Load the csv file and filter out the dates that are not in the
-        # backtest index date range
-        df = polars.read_csv(
-            file_path, columns=self.column_names, separator=","
+        selection = self.data.filter(
+            (self.data['Datetime'] >= start_date.strftime(DATETIME_FORMAT))
+            & (self.data['Datetime'] <= end_date.strftime(DATETIME_FORMAT))
         )
-        df = df.filter(
-            (df['Datetime'] >= from_timestamp.strftime(datetime_format))
-            & (df['Datetime'] <= to_timestamp.strftime(datetime_format))
-        )
-        return df
+        return selection
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
         # Ignore this method for now
@@ -407,23 +416,62 @@ class CCXTTickerBacktestMarketDataSource(
 
 
 class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
+    """
+    CCXTOHLCVMarketDataSource implementation of OHLCVMarketDataSource using
+    ccxt to download all ohlcv data sources.
+    """
 
     def get_data(self, **kwargs):
+        """
+        Implementation of get_data for CCXTOHLCVMarketDataSource.
+        This implementation uses the CCXTMarketService to get the OHLCV data.
+
+        In the kwargs, the start_date should be set as a datetime object.
+
+        returns a polars.DataFrame with the OHLCV data
+        """
         market_service = CCXTMarketService(
             market_credential_service=self.market_credential_service,
         )
-        market_service.config = self.config
-        if self.start_date is None:
+
+        # Add config if present
+        if self.config is not None:
+            market_service.config = self.config
+
+        if "start_date" in kwargs:
+            start_date = kwargs["start_date"]
+
+            if not isinstance(start_date, datetime.datetime):
+                raise OperationalException(
+                    "start_date should be a datetime object"
+                )
+        else:
             raise OperationalException(
-                "Either start_date or start_date_func should be set "
-                "for OHLCVMarketDataSource"
+                "start_date should be set for CCXTOHLCVMarketDataSource"
+            )
+
+        if "end_date" not in kwargs:
+            end_date = self.create_end_date(
+                start_date, self.timeframe, self.window_size
+            )
+        else:
+            end_date = kwargs["end_date"]
+
+            if not isinstance(end_date, datetime.datetime):
+                raise OperationalException(
+                    "end_date should be a datetime object"
+                )
+
+        if not isinstance(start_date, datetime.datetime):
+            raise OperationalException(
+                "start_date should be a datetime object"
             )
 
         return market_service.get_ohlcv(
             symbol=self.symbol,
             time_frame=self.timeframe,
-            from_timestamp=self.start_date,
-            to_timestamp=self.end_date,
+            from_timestamp=start_date,
+            to_timestamp=end_date,
             market=self.market
         )
 
@@ -432,11 +480,8 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
             identifier=self.identifier,
             market=self.market,
             symbol=self.symbol,
-            start_date=self.start_date,
-            start_date_func=self.start_date_func,
-            end_date=self.end_date,
-            end_date_func=self.end_date_func,
             timeframe=self.timeframe,
+            window_size=self.window_size
         )
 
 

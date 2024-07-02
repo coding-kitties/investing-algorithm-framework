@@ -1,6 +1,6 @@
 import os
 from unittest import TestCase
-
+from datetime import datetime
 from investing_algorithm_framework import load_backtest_report
 
 
@@ -28,17 +28,20 @@ class Test(TestCase):
             self.resource_dir,
             "backtest_reports_for_testing",
             "report_9-50-100_backtest_start_date_2021-12-21:00:00_"
-            "backtest_end_date_2022-06-20:00:00_created_at_2024-04-25:13:52.json"
+            "backtest_end_date_2022-06-20:00:00"
+            "_created_at_2024-04-25:13:52.json"
         )
         report = load_backtest_report(path)
         self.assertEqual(
             report.name, "9-50-100"
         )
         self.assertEqual(
-            "2021-12-21 00:00:00", report.backtest_start_date
+            datetime(year=2021, month=12, day=21),
+            report.backtest_start_date
         )
         self.assertEqual(
-            "2022-06-20 00:00:00", report.backtest_end_date
+            datetime(year=2022, month=6, day=20),
+            report.backtest_end_date
         )
         self.assertEqual(10.713880999999981, report.total_net_gain)
         self.assertEqual(2.6784702499999753, report.growth_rate)

@@ -4,7 +4,6 @@ import os
 import shutil
 import threading
 from abc import abstractmethod
-from datetime import datetime
 from distutils.sysconfig import get_python_lib
 from time import sleep
 from typing import List, Optional
@@ -43,16 +42,18 @@ class AppHook:
 class App:
 
     def __init__(self, stateless=False, web=False):
-        self._flask_app: Flask = None
+        self._flask_app: Optional[Flask] = None
         self.container = None
         self._stateless = stateless
         self._web = web
-        self._algorithm: Algorithm = None
+        self._algorithm: Optional[Algorithm] = None
         self._started = False
         self._tasks = []
         self._configuration_service = None
-        self._market_data_source_service: MarketDataSourceService = None
-        self._market_credential_service: MarketCredentialService = None
+        self._market_data_source_service: \
+            Optional[MarketDataSourceService] = None
+        self._market_credential_service: \
+            Optional[MarketCredentialService] = None
         self._on_initialize_hooks = []
         self._on_after_initialize_hooks = []
 
@@ -94,6 +95,12 @@ class App:
         """
         if self.algorithm is None:
             raise OperationalException("No algorithm registered")
+
+        # Check if the algorithm has data sources registered
+        if len(self.algorithm.data_sources) == 0:
+
+            for data_source in self.algorithm.data_sources:
+                self.add_market_data_source(data_source)
 
         self.algorithm.initialize_services(
             configuration_service=self.container.configuration_service(),
@@ -237,9 +244,7 @@ class App:
 
     def _initialize_app_for_backtest(
         self,
-        backtest_start_date,
-        backtest_end_date,
-        market_data_sources,
+        backtest_date_range: BacktestDateRange,
         pending_order_check_interval=None,
     ) -> None:
         """
@@ -249,18 +254,20 @@ class App:
         before running a backtest or a set of backtests and should be called
         once.
 
-        :param backtest_start_date: The start date of the backtest
-        :param backtest_end_date: The end date of the backtest
-        :param pending_order_check_interval: The interval at which to check
-        pending orders (e.g. 1h, 1d, 1w)
-        :return: None
+        Args:
+            backtest_date_range: instance of BacktestDateRange
+            pending_order_check_interval: The interval at which to check
+            pending orders (e.g. 1h, 1d, 1w)
+
+        Return None
         """
         # Set all config vars for backtesting
         configuration_service = self.container.configuration_service()
         configuration_service.config[BACKTESTING_FLAG] = True
         configuration_service.config[BACKTESTING_START_DATE] = \
-            backtest_start_date
-        configuration_service.config[BACKTESTING_END_DATE] = backtest_end_date
+            backtest_date_range.start_date
+        configuration_service.config[BACKTESTING_END_DATE] = \
+            backtest_date_range.end_date
 
         if pending_order_check_interval is not None:
             configuration_service.config[
@@ -270,9 +277,66 @@ class App:
         # Create resource dir if not exits
         self._create_resource_directory_if_not_exists()
 
-        # Override the MarketDataSourceService service with the backtest
-        # market data source service equivalent. Additionally, convert the
-        # market data sources to backtest market data sources
+    def _create_backtest_database_if_not_exists(self):
+        """
+        Create the backtest database if it does not exist. This method
+        should be called before running a backtest for an algorithm.
+        It creates the database if it does not exist.
+
+        Args:
+            None
+
+        Returns
+            None
+        """
+        configuration_service = self.container.configuration_service()
+        resource_dir = configuration_service.config[RESOURCE_DIRECTORY]
+
+        # Create the database if not exists
+        configuration_service.config[DATABASE_DIRECTORY_PATH] = \
+            os.path.join(resource_dir, "databases")
+        configuration_service.config[DATABASE_NAME] = \
+            "backtest-database.sqlite3"
+        database_path = os.path.join(
+            configuration_service.config[DATABASE_DIRECTORY_PATH],
+            configuration_service.config[DATABASE_NAME]
+        )
+
+        if os.path.exists(database_path):
+            os.remove(database_path)
+
+        configuration_service.config[SQLALCHEMY_DATABASE_URI] = \
+            "sqlite:///" + os.path.join(
+                configuration_service.config[DATABASE_DIRECTORY_PATH],
+                configuration_service.config[DATABASE_NAME]
+            )
+        self._create_database_if_not_exists()
+        setup_sqlalchemy(self)
+        create_all_tables()
+
+    def _initialize_backtest_data_sources(self, algorithm):
+        """
+        Initialize the backtest data sources for the algorithm. This method
+        should be called before running a backtest. It initializes the
+        backtest data sources for the algorithm. It takes all registered
+        data sources and converts them to backtest equivalents
+
+        Args:
+            algorithm: The algorithm to initialize for backtesting
+
+        Returns
+            None
+        """
+
+        market_data_sources = self._market_data_source_service \
+            .get_market_data_sources()
+        backtest_market_data_sources = []
+
+        if algorithm.data_sources is not None \
+                and len(algorithm.data_sources) > 0:
+
+            for data_source in algorithm.data_sources:
+                self.add_market_data_source(data_source)
 
         if market_data_sources is not None:
             backtest_market_data_sources = [
@@ -285,16 +349,36 @@ class App:
                 if market_data_source is not None:
                     market_data_source.config = self.config
 
-            self.container.market_data_source_service.override(
-                BacktestMarketDataSourceService(
-                    market_data_sources=backtest_market_data_sources,
-                    market_service=self.container.market_service(),
-                    market_credential_service=self.container
-                    .market_credential_service(),
-                    configuration_service=self.container
-                    .configuration_service(),
-                )
+        # Override the market data source service with the backtest market
+        # data source service
+        self.container.market_data_source_service.override(
+            BacktestMarketDataSourceService(
+                market_data_sources=backtest_market_data_sources,
+                market_service=self.container.market_service(),
+                market_credential_service=self.container
+                .market_credential_service(),
+                configuration_service=self.container
+                .configuration_service(),
             )
+        )
+
+        # Set all data sources to the algorithm
+        algorithm.add_data_sources(backtest_market_data_sources)
+
+    def _initialize_algorithm_for_backtest(self, algorithm):
+        """
+        Function to initialize the algorithm for backtesting. This method
+        should be called before running a backtest. It initializes the
+        all data sources to backtest data sources and overrides the services
+        with the backtest services equivalents.
+
+        Args:
+            algorithm: The algorithm to initialize for backtesting
+
+        Return None
+        """
+        self._create_backtest_database_if_not_exists()
+        self._initialize_backtest_data_sources(algorithm)
 
         # Override the portfolio service with the backtest portfolio service
         self.container.portfolio_service.override(
@@ -341,56 +425,11 @@ class App:
         if portfolio_configuration_service.count() == 0:
             raise OperationalException("No portfolios configured")
 
-    def _initialize_algorithm(self):
-        self.algorithm.initialize_services(
-            configuration_service=self.container.configuration_service(),
-            portfolio_configuration_service=self.container
-            .portfolio_configuration_service(),
-            portfolio_service=self.container.portfolio_service(),
-            position_service=self.container.position_service(),
-            order_service=self.container.order_service(),
-            market_service=self.container.market_service(),
-            strategy_orchestrator_service=self.container
-            .strategy_orchestrator_service(),
-            market_credential_service=self.container
-            .market_credential_service(),
-            market_data_source_service=self.container
-            .market_data_source_service(),
-            trade_service=self.container.trade_service(),
-        )
-
-    def _initialize_algorithm_for_backtest(self, algorithm):
-        configuration_service = self.container.configuration_service()
-        resource_dir = configuration_service.config[RESOURCE_DIRECTORY]
-
-        # Create the database if not exists
-        configuration_service.config[DATABASE_DIRECTORY_PATH] = \
-            os.path.join(resource_dir, "databases")
-        configuration_service.config[DATABASE_NAME] = \
-            "backtest-database.sqlite3"
-        database_path = os.path.join(
-            configuration_service.config[DATABASE_DIRECTORY_PATH],
-            configuration_service.config[DATABASE_NAME]
-        )
-
-        if os.path.exists(database_path):
-            os.remove(database_path)
-
-        configuration_service.config[SQLALCHEMY_DATABASE_URI] = \
-            "sqlite:///" + os.path.join(
-                configuration_service.config[DATABASE_DIRECTORY_PATH],
-                configuration_service.config[DATABASE_NAME]
-            )
-        self._create_database_if_not_exists()
-        setup_sqlalchemy(self)
-        create_all_tables()
-
         strategy_orchestrator_service = \
             self.container.strategy_orchestrator_service()
         market_credential_service = self.container.market_credential_service()
         market_data_source_service = \
             self.container.market_data_source_service()
-
         # Initialize all services in the algorithm
         algorithm.initialize_services(
             configuration_service=self.container.configuration_service(),
@@ -449,16 +488,19 @@ class App:
         raises an OperationalException. Then it initializes the algorithm
         with the services and the configuration.
 
-        After the algorithm is initialized, it initializes the app and starts
-        the algorithm. If the app is running in stateless mode, it handles the
+        If the app is running in stateless mode, it handles the
         payload. If the app is running in web mode, it starts the web app in a
         separate thread.
 
-        :param payload: The payload to handle if the app is running in
-        stateless mode
-        :param number_of_iterations: The number of iterations to run the
-        algorithm for
-        :return: None
+        Args:
+            payload: The payload to handle if the app is running in
+            stateless mode
+            number_of_iterations: The number of iterations to run the
+            algorithm for
+            sync: Whether to sync the portfolio with the exchange
+
+        Returns:
+            None
         """
 
         # Run all on_initialize hooks
@@ -623,10 +665,9 @@ class App:
                 "A resource directory is required for running a backtest."
             )
 
-        if not os.path.exists(resource_dir):
+        if not os.path.isdir(resource_dir):
             try:
                 os.makedirs(resource_dir)
-                open(resource_dir, 'w').close()
             except OSError as e:
                 logger.error(e)
                 raise OperationalException(
@@ -673,8 +714,7 @@ class App:
     def run_backtest(
         self,
         algorithm,
-        start_date,
-        end_date,
+        backtest_date_range: BacktestDateRange,
         pending_order_check_interval=None,
         output_directory=None
     ) -> BacktestReport:
@@ -682,29 +722,24 @@ class App:
         Run a backtest for an algorithm. This method should be called when
         running a backtest.
 
-        :param algorithm: The algorithm to run a backtest for (instance of
-        Algorithm)
-        :param start_date: The start date of the backtest
-        :param end_date: The end date of the backtest
-        :param pending_order_check_interval: The interval at which to check
-        pending orders
-        :param output_directory: The directory to write the backtest report to
-        :return: Instance of BacktestReport
+        Args:
+            algorithm: The algorithm to run a backtest for (instance of
+                Algorithm)
+            backtest_date_range: The date range to run the backtest for
+                (instance of BacktestDateRange)
+            pending_order_check_interval: The interval at which to check
+                pending orders
+            output_directory: The directory to write the backtest report to
+
+        Returns:
+            Instance of BacktestReport
         """
         logger.info("Initializing backtest")
         self.algorithm = algorithm
 
-        if end_date is None:
-            end_date = datetime.utcnow()
-
-        market_data_sources = self._market_data_source_service\
-            .get_market_data_sources()
-
         self._initialize_app_for_backtest(
-            backtest_start_date=start_date,
-            backtest_end_date=end_date,
+            backtest_date_range=backtest_date_range,
             pending_order_check_interval=pending_order_check_interval,
-            market_data_sources=market_data_sources
         )
 
         self._initialize_algorithm_for_backtest(
@@ -717,7 +752,7 @@ class App:
 
         # Run the backtest with the backtest_service and collect the report
         report = backtest_service.run_backtest(
-            algorithm=self.algorithm, start_date=start_date, end_date=end_date
+            algorithm=self.algorithm, backtest_date_range=backtest_date_range
         )
         backtest_report_writer_service = self.container \
             .backtest_report_writer_service()
@@ -737,9 +772,7 @@ class App:
     def run_backtests(
         self,
         algorithms,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        date_ranges: Optional[List[BacktestDateRange]] = None,
+        date_ranges: List[BacktestDateRange] = None,
         pending_order_check_interval=None,
         output_directory=None
     ) -> List[BacktestReport]:
@@ -749,8 +782,6 @@ class App:
 
         :param algorithms: The algorithms to run backtests for (list of
         Algorithm instances)
-        :param start_date: The start date of the backtest
-        :param end_date: The end date of the backtest
         :param pending_order_check_interval: The interval at which to check
         :param date_ranges: The date ranges to run the backtests for (list of
         BacktestDateRange instances representing a start and end date)
@@ -761,36 +792,18 @@ class App:
         logger.info("Initializing backtests")
         reports = []
 
-        if start_date is not None:
-
-            if end_date is None:
-                end_date = datetime.utcnow()
-
-            date_ranges = [
-                BacktestDateRange(start_date=start_date, end_date=end_date)
-            ]
-        else:
-            if date_ranges is None:
-                raise OperationalException("No date ranges specified")
-
-        market_data_sources = self._market_data_source_service\
-            .get_market_data_sources()
-
         for date_range in date_ranges:
             date_range: BacktestDateRange = date_range
-            start_date = date_range.start_date
-            end_date = date_range.end_date
             self._initialize_app_for_backtest(
-                backtest_start_date=start_date,
-                backtest_end_date=end_date,
+                backtest_date_range=date_range,
                 pending_order_check_interval=pending_order_check_interval,
-                market_data_sources=market_data_sources
             )
 
             print(
                 f"{COLOR_YELLOW}Running backtests for date "
-                f"range:{COLOR_RESET} {COLOR_GREEN}{start_date} - "
-                f"{end_date} for a "
+                f"range:{COLOR_RESET} {COLOR_GREEN}{date_range.name} "
+                f"{date_range.start_date} - "
+                f"{date_range.end_date} for a "
                 f"total of {len(algorithms)} algorithms.{COLOR_RESET}"
             )
             for algorithm in algorithms:
@@ -803,9 +816,7 @@ class App:
                 # Run the backtest with the backtest_service
                 # and collect the report
                 report = backtest_service.run_backtest(
-                    algorithm=algorithm,
-                    start_date=start_date,
-                    end_date=end_date
+                    algorithm=algorithm, backtest_date_range=date_range
                 )
 
                 # Add date range name to report if present

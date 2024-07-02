@@ -29,11 +29,4 @@ class Test(TestCase):
         reports = load_backtest_reports(path)
         evaluation = BacktestReportsEvaluation(reports)
         self.assertEqual(len(evaluation.backtest_reports), 6)
-        first_backtest_report = evaluation.backtest_reports[0]
-        time_frame = (
-            first_backtest_report.backtest_start_date,
-            first_backtest_report.backtest_end_date
-        )
-        self.assertEqual(
-            "10-50-100", evaluation.profit_order[time_frame][0].name
-        )
+        self.assertEqual("10-50-100", evaluation.profit_order[0].name)

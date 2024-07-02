@@ -1,5 +1,5 @@
-from investing_algorithm_framework import PortfolioConfiguration, OrderStatus, \
-    MarketCredential
+from investing_algorithm_framework import PortfolioConfiguration, \
+    OrderStatus, MarketCredential
 from tests.resources import TestBase
 
 
@@ -38,7 +38,10 @@ class Test(TestBase):
         )
         order_repository = self.app.container.order_repository()
         self.assertEqual(
-            1, order_repository.count({"order_type": "LIMIT", "order_side": "BUY"})
+            1,
+            order_repository.count(
+                {"order_type": "LIMIT", "order_side": "BUY"}
+            )
         )
         order = order_repository.find({"target_symbol": "BTC"})
         self.assertEqual(OrderStatus.OPEN.value, order.status)
@@ -53,7 +56,8 @@ class Test(TestBase):
         )
         order_repository = self.app.container.order_repository()
         self.assertEqual(
-            1, order_repository.count({"order_type": "LIMIT", "order_side": "BUY"})
+            1, order_repository
+            .count({"order_type": "LIMIT", "order_side": "BUY"})
         )
         order = order_repository.find({"target_symbol": "BTC"})
         self.assertEqual(OrderStatus.OPEN.value, order.status)

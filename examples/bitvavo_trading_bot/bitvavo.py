@@ -5,15 +5,15 @@ from investing_algorithm_framework import MarketCredential, TimeUnit, \
     create_app, PortfolioConfiguration, Algorithm, SYMBOLS, RESOURCE_DIRECTORY
 
 """
-Bitvavo trading bot example with market data sources of bitvavo. 
+Bitvavo trading bot example with market data sources of bitvavo.
 Bitvavo does not requires you to have an API key and secret key to access 
-their market data
-
-If you just want to backtest your strategy, you don't need to 
-add a market credential. If your running your strategy live,
+their market data. If you just want to backtest your strategy, 
+you don't need to add a market credential. If your running your strategy live,
 you need to add a market credential to the app, that accesses your 
 account on bitvavo.
 """
+
+
 # Define your market credential for bitvavo
 bitvavo_market_credential = MarketCredential(
     api_key="<your_api_key>",
@@ -38,10 +38,7 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
 class BitvavoTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 2
-    market_data_sources = [
-        "BTC/EUR-ohlcv",
-        "BTC/EUR-ticker"
-    ]
+    market_data_sources = [bitvavo_btc_eur_ohlcv_2h, bitvavo_btc_eur_ticker]
 
     def apply_strategy(self, algorithm, market_data):
         print(market_data["BTC/EUR-ohlcv"])
@@ -75,4 +72,3 @@ app.add_portfolio_configuration(
 
 if __name__ == "__main__":
     app.run()
-

@@ -3,7 +3,8 @@ from datetime import datetime, timedelta
 from unittest import TestCase
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm
+    TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm, \
+    BacktestDateRange
 from investing_algorithm_framework.services import BacktestReportWriterService
 
 
@@ -54,11 +55,11 @@ class Test(TestCase):
                 initial_balance=1000
             )
         )
-        report = app.run_backtest(
-            algorithm,
+        backtest_date_range = BacktestDateRange(
             start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow(),
+            end_date=datetime.utcnow()
         )
+        report = app.run_backtest(algorithm, backtest_date_range)
         file_path = BacktestReportWriterService.create_report_name(
             report, os.path.join(self.resource_dir, "backtest_reports")
         )
@@ -86,10 +87,12 @@ class Test(TestCase):
                 initial_balance=1000
             )
         )
-        report = app.run_backtest(
-            algorithm=algorithm,
+        backtest_date_range = BacktestDateRange(
             start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow(),
+            end_date=datetime.utcnow()
+        )
+        report = app.run_backtest(
+            algorithm=algorithm, backtest_date_range=backtest_date_range
         )
         file_path = BacktestReportWriterService.create_report_name(
             report, os.path.join(self.resource_dir, "backtest_reports")
@@ -123,16 +126,19 @@ class Test(TestCase):
         )
 
         self.assertEqual(2, len(algorithm.strategies))
-        report = app.run_backtest(
-            algorithm=algorithm,
+        backtest_date_range = BacktestDateRange(
             start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow(),
+            end_date=datetime.utcnow()
+        )
+        report = app.run_backtest(
+            algorithm=algorithm, backtest_date_range=backtest_date_range
         )
         file_path = BacktestReportWriterService.create_report_name(
             report, os.path.join(self.resource_dir, "backtest_reports")
         )
         # Check if the backtest report exists
         self.assertTrue(os.path.isfile(file_path))
+
     def test_report_csv_creation_with_multiple_strategies_with_id(self):
         """
         Test if the backtest report is created as a CSV file
@@ -157,10 +163,13 @@ class Test(TestCase):
         )
 
         self.assertEqual(2, len(algorithm.strategies))
+        backtest_date_range = BacktestDateRange(
+            start_date=datetime.utcnow() - timedelta(days=1),
+            end_date=datetime.utcnow()
+        )
         report = app.run_backtest(
             algorithm=algorithm,
-            start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow(),
+            backtest_date_range=backtest_date_range
         )
         file_path = BacktestReportWriterService.create_report_name(
             report, os.path.join(self.resource_dir, "backtest_reports")

@@ -95,7 +95,8 @@ class Test(TestBase):
         self.assertIsNone(trade.closed_at)
         self.assertEqual(
             0,
-            len(self.app.algorithm.get_orders(order_side="SELL", status="OPEN"))
+            len(self.app.algorithm
+                .get_orders(order_side="SELL", status="OPEN"))
         )
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",

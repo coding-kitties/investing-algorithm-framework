@@ -61,4 +61,3 @@ class Test(TestBase):
         self.assertNotEqual(0, self.app.algorithm.get_allocated())
         self.assertNotEqual(0, self.app.algorithm.get_allocated("BITVAVO"))
         self.assertNotEqual(0, self.app.algorithm.get_allocated("bitvavo"))
-

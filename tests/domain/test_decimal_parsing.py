@@ -14,5 +14,5 @@ class Test(TestCase):
         self.assertEqual(string_value, '97.17312522036036245646')
 
     def test_string_to_decimal(self):
-        value = parse_string_to_decimal('97.17312522036036245646')
-        value = parse_string_to_decimal('2004.5303357979318')
+        parse_string_to_decimal('97.17312522036036245646')
+        parse_string_to_decimal('2004.5303357979318')

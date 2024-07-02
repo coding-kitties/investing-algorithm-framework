@@ -160,8 +160,12 @@
 #         self.assertIsNotNone(position_b)
 #         self.assertIsNotNone(position_c)
 #
-#         self.assertEqual(self.TARGET_SYMBOL_B, position_b.get_target_symbol())
-#         self.assertEqual(self.TARGET_SYMBOL_C, position_c.get_target_symbol())
+#         self.assertEqual(
+#               self.TARGET_SYMBOL_B, position_b.get_target_symbol()
+#         )
+#         self.assertEqual(
+#               self.TARGET_SYMBOL_C, position_c.get_target_symbol()
+#         )
 #
 #     def test_get_positions(self):
 #         portfolio_manager = self.algo_app.algorithm \
@@ -337,7 +341,8 @@
 #                     "trading_symbol": "usdt",
 #                     "amount": 4,
 #                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
-#                     "initial_price": self.get_price(self.TARGET_SYMBOL_A).price,
+#                     "initial_price": self
+#                     .get_price(self.TARGET_SYMBOL_A).price,
 #                     "status": OrderStatus.CLOSED.value,
 #                     "order_side": OrderSide.BUY.value,
 #                     "order_type": OrderType.LIMIT.value
@@ -363,7 +368,8 @@
 #                     "amount": 4,
 #                     "price": self.get_price(self.TARGET_SYMBOL_A).price,
 #                     "status": OrderStatus.CLOSED.value,
-#                     "initial_price": self.get_price(self.TARGET_SYMBOL_A).price,
+#                     "initial_price": self
+#                     .get_price(self.TARGET_SYMBOL_A).price,
 #                     "order_side": OrderSide.BUY.value,
 #                     "order_type": OrderType.LIMIT.value
 #                 }

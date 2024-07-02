@@ -44,7 +44,7 @@ class Test(TestCase):
         and the end date is the backtest end date.
         """
         correct_file_name = \
-            "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14:22:00_2023-12-25:00:00.csv"
+            "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14:21:45_2023-12-25:00:00.csv"
         data_source = CCXTOHLCVBacktestMarketDataSource(
             identifier="OHLCV_BTC_EUR_BINANCE_15m",
             market="BINANCE",
@@ -57,7 +57,7 @@ class Test(TestCase):
         data_source.prepare_data(
             config={
                 RESOURCE_DIRECTORY: self.resource_dir,
-                BACKTEST_DATA_DIRECTORY_NAME: "market_data_sources"
+                BACKTEST_DATA_DIRECTORY_NAME: "market_data_sources_for_testing"
             },
             backtest_start_date=datetime(2023, 12, 17, 00, 00),
             backtest_end_date=datetime(2023, 12, 25, 00, 00),
@@ -66,7 +66,7 @@ class Test(TestCase):
 
     def test_window_size(self):
         correct_file_name = \
-            "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14:22:00_2023-12-25:00:00.csv"
+            "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14:21:45_2023-12-25:00:00.csv"
         data_source = CCXTOHLCVBacktestMarketDataSource(
             identifier="OHLCV_BTC_EUR_BINANCE_15m",
             market="BINANCE",
@@ -77,7 +77,7 @@ class Test(TestCase):
         data_source.prepare_data(
             config={
                 RESOURCE_DIRECTORY: self.resource_dir,
-                BACKTEST_DATA_DIRECTORY_NAME: "market_data_sources"
+                BACKTEST_DATA_DIRECTORY_NAME: "market_data_sources_for_testing"
             },
             backtest_start_date=datetime(2023, 12, 17, 00, 00),
             backtest_end_date=datetime(2023, 12, 25, 00, 00),
@@ -87,8 +87,8 @@ class Test(TestCase):
 
     def test_right_columns(self):
         correct_file_name = \
-            "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14:22:00_2023-12-25:00:00.csv"
-        csv_file_path = f"{self.resource_dir}/market_data_sources" \
+            "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14:21:45_2023-12-25:00:00.csv"
+        csv_file_path = f"{self.resource_dir}/market_data_sources_for_testing"\
                         f"/{correct_file_name}"
         data_source = CCXTOHLCVBacktestMarketDataSource(
             identifier="OHLCV_BTC_EUR_BINANCE_15m",
@@ -97,13 +97,11 @@ class Test(TestCase):
             timeframe="15m",
             window_size=200
         )
-        data_source.config = {
-            "DATETIME_FORMAT": DATETIME_FORMAT
-        }
+        data_source.config = {"DATETIME_FORMAT": DATETIME_FORMAT}
         data_source.prepare_data(
             config={
                 RESOURCE_DIRECTORY: self.resource_dir,
-                BACKTEST_DATA_DIRECTORY_NAME: "market_data_sources"
+                BACKTEST_DATA_DIRECTORY_NAME: "market_data_sources_for_testing"
             },
             backtest_start_date=datetime(2023, 12, 17, 00, 00),
             backtest_end_date=datetime(2023, 12, 25, 00, 00),
@@ -111,95 +109,11 @@ class Test(TestCase):
         self.assertEqual(200, data_source.window_size)
         self.assertEqual(csv_file_path, data_source._create_file_path())
         df = data_source\
-            .get_data(datetime(year=2023, month=12, day=17, hour=0, minute=0))
+            .get_data(
+                start_date=datetime(
+                    year=2023, month=12, day=17, hour=0, minute=0
+                )
+            )
         self.assertEqual(
             ["Datetime", "Open", "High", "Low", "Close", "Volume"], df.columns
         )
-
-# def test_start_date(self):
-    #     start_date = datetime(2023, 12, 1)
-    #     file_name = "OHLCV_BTC-EUR_BINANCE_15m_2023-12-" \
-    #                 "01:00:00_2023-12-25:00:00.csv"
-    #     csv_ohlcv_market_data_source = CSVOHLCVMarketDataSource(
-    #         csv_file_path=f"{self.resource_dir}/"
-    #                       "market_data_sources/"
-    #                       f"{file_name}"
-    #     )
-    #     self.assertEqual(
-    #         start_date,
-    #         csv_ohlcv_market_data_source.start_date.replace(microsecond=0),
-    #     )
-    #
-    # def test_end_date(self):
-    #     end_date = datetime(2023, 12, 25)
-    #     file_name = "OHLCV_BTC-EUR_BINANCE_15m_2023-12-" \
-    #                 "01:00:00_2023-12-25:00:00.csv"
-    #     csv_ohlcv_market_data_source = CSVOHLCVMarketDataSource(
-    #         csv_file_path=f"{self.resource_dir}/"
-    #                       "market_data_sources/"
-    #                       f"{file_name}"
-    #     )
-    #     self.assertEqual(
-    #         end_date,
-    #         csv_ohlcv_market_data_source.end_date.replace(microsecond=0),
-    #     )
-    #
-    # def test_empty(self):
-    #     start_date = datetime(2023, 12, 1)
-    #     file_name = "OHLCV_BTC-EUR_BINANCE_15m_2023-12-" \
-    #                 "01:00:00_2023-12-25:00:00.csv"
-    #     data_source = CSVOHLCVMarketDataSource(
-    #         csv_file_path=f"{self.resource_dir}/"
-    #                       "market_data_sources/"
-    #                       f"{file_name}"
-    #     )
-    #     self.assertFalse(data_source.empty())
-    #     self.assertEqual(start_date, data_source.start_date)
-    #     data_source.start_date = datetime(2023, 12, 25)
-    #     data_source.end_date = datetime(2023, 12, 16)
-    #     self.assertTrue(data_source.empty())
-
-    # def test_get_identifier(self):
-    #     file_name = "OHLCV_BTC-EUR_BINANCE_15m_2023-12-" \
-    #                 "01:00:00_2023-12-25:00:00.csv"
-    #     datasource = CSVOHLCVMarketDataSource(
-    #         csv_file_path=f"{self.resource_dir}/"
-    #                       "market_data_sources/"
-    #                       f"{file_name}",
-    #         identifier="test"
-    #     )
-    #     self.assertEqual("test", datasource.get_identifier())
-    #
-    # def test_get_market(self):
-    #     file_name = "OHLCV_BTC-EUR_BINANCE_15m_2023-12-" \
-    #                 "01:00:00_2023-12-25:00:00.csv"
-    #     datasource = CSVOHLCVMarketDataSource(
-    #         csv_file_path=f"{self.resource_dir}/"
-    #                       "market_data_sources/"
-    #                       f"{file_name}",
-    #         market="test"
-    #     )
-    #     self.assertEqual("test", datasource.get_market())
-    #
-    # def test_get_symbol(self):
-    #     file_name = "OHLCV_BTC-EUR_BINANCE_15m_2023-12-" \
-    #                 "01:00:00_2023-12-25:00:00.csv"
-    #     datasource = CSVOHLCVMarketDataSource(
-    #         csv_file_path=f"{self.resource_dir}/"
-    #                       "market_data_sources/"
-    #                       f"{file_name}",
-    #         symbol="BTC/EUR"
-    #     )
-    #     self.assertEqual("BTC/EUR", datasource.get_symbol())
-    #
-    # def test_get_timeframe(self):
-    #     file_name = "OHLCV_BTC-EUR_BINANCE_15m_2023-12-" \
-    #                 "01:00:00_2023-12-25:00:00.csv"
-    #     datasource = CSVOHLCVMarketDataSource(
-    #         csv_file_path=f"{self.resource_dir}/"
-    #                       "market_data_sources/"
-    #                       f"{file_name}",
-    #         timeframe="15m"
-    #     )
-    #     self.assertEqual("15m", datasource.get_timeframe())
-

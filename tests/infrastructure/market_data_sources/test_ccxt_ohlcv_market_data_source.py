@@ -1,5 +1,4 @@
 import os
-from datetime import datetime, timedelta
 from unittest import TestCase
 
 from investing_algorithm_framework.infrastructure import \
@@ -35,35 +34,6 @@ class Test(TestCase):
         )
         self.assertEqual(200, ccxt_ohlcv_market_data_source.window_size)
 
-    def test_start_date(self):
-        current_datetime = datetime.utcnow()
-        ccxt_ohlcv_market_data_source = CCXTOHLCVMarketDataSource(
-            identifier="BTC/EUR",
-            window_size=200,
-            timeframe="15m",
-            market="BITVAVO",
-            symbol="BTC/EUR",
-        )
-        self.assertEqual(
-            (current_datetime - timedelta(minutes=200 * 15))
-            .strftime("%Y-%m-%d %H:%M"),
-            ccxt_ohlcv_market_data_source.start_date.strftime("%Y-%m-%d %H:%M")
-        )
-
-    def test_end_date(self):
-        current_datetime = datetime.utcnow()
-        ccxt_ohlcv_market_data_source = CCXTOHLCVMarketDataSource(
-            identifier="BTC/EUR",
-            window_size=200,
-            timeframe="15m",
-            market="BITVAVO",
-            symbol="BTC/EUR",
-        )
-        self.assertEqual(
-            current_datetime.strftime("%Y-%m-%d %H:%M"),
-            ccxt_ohlcv_market_data_source.end_date.strftime("%Y-%m-%d %H:%M")
-        )
-
     def test_get_market(self):
         ccxt_ohlcv_market_data_source = CCXTOHLCVMarketDataSource(
             identifier="BTC/EUR",
@@ -92,4 +62,4 @@ class Test(TestCase):
             market="BITVAVO",
             symbol="BTC/EUR",
         )
-        self.assertEqual("15m", ccxt_ohlcv_market_data_source.timeframe)
+        self.assertEqual("15m", ccxt_ohlcv_market_data_source.timeframe.value)

@@ -2,7 +2,7 @@ from typing import List
 
 from investing_algorithm_framework.domain import MarketService, \
     MarketDataSource, OHLCVMarketDataSource, TickerMarketDataSource, \
-    OrderBookMarketDataSource
+    OrderBookMarketDataSource, TimeFrame
 from investing_algorithm_framework.services.market_credential_service \
     import MarketCredentialService
 
@@ -113,6 +113,9 @@ class MarketDataSourceService:
         self, symbol, time_frame=None, market=None
     ):
 
+        if time_frame is not None:
+            time_frame = TimeFrame.from_value(time_frame)
+
         if self.market_data_sources is not None:
 
             for market_data_source in self._market_data_sources:
@@ -169,7 +172,18 @@ class MarketDataSourceService:
         self._market_data_sources = market_data_sources
 
     def add(self, market_data_source):
+
+        # Check if there is already a market data source with the same
+        # identifier
+        for existing_market_data_source in self._market_data_sources:
+            if existing_market_data_source.get_identifier() == \
+                    market_data_source.get_identifier():
+                return
+
         self._market_data_sources.append(market_data_source)
 
     def get_market_data_sources(self):
         return self._market_data_sources
+
+    def has_ticker_market_data_source(self, symbol, market=None):
+        return self.get_ticker_market_data_source(symbol, market) is not None
