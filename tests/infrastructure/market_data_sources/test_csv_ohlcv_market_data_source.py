@@ -71,7 +71,8 @@ class Test(TestCase):
         )
         self.assertEqual(
             start_date,
-            csv_ohlcv_market_data_source.start_date.replace(microsecond=0),
+            csv_ohlcv_market_data_source._start_date_data_source
+            .replace(microsecond=0),
         )
 
     def test_start_date_with_window_size(self):
@@ -95,27 +96,6 @@ class Test(TestCase):
             first_date.strftime(DATETIME_FORMAT)
         )
 
-    def test_start_date_with_backtest_index_date(self):
-        start_date = datetime(2023, 8, 7, 8, 0, tzinfo=tzutc())
-        file_name = "OHLCV_BTC-EUR_BINANCE" \
-                    "_2h_2023-08-07:07:59_2023-12-02:00:00.csv"
-        csv_ohlcv_market_data_source = CSVOHLCVMarketDataSource(
-            csv_file_path=f"{self.resource_dir}/"
-                          "market_data_sources/"
-                          f"{file_name}",
-            window_size=10,
-            timeframe=TimeFrame.TWO_HOUR,
-        )
-        data = csv_ohlcv_market_data_source.get_data(
-            backtest_index_date=datetime(2023, 8, 7, 8, 0, tzinfo=tzutc())
-        )
-        self.assertEqual(10, len(data))
-        first_date = parser.parse(data["Datetime"][0])
-        self.assertEqual(
-            start_date.strftime(DATETIME_FORMAT),
-            first_date.strftime(DATETIME_FORMAT)
-        )
-
     def test_end_date(self):
         end_date = datetime(2023, 12, 2, 0, 0, tzinfo=tzutc())
         file_name = "OHLCV_BTC-EUR_BINANCE" \
@@ -127,7 +107,8 @@ class Test(TestCase):
         )
         self.assertEqual(
             end_date,
-            csv_ohlcv_market_data_source.end_date.replace(microsecond=0),
+            csv_ohlcv_market_data_source
+            ._end_date_data_source.replace(microsecond=0),
         )
 
     def test_empty(self):
@@ -145,21 +126,22 @@ class Test(TestCase):
         self.assertFalse(data_source.empty(start_date, end_date))
 
     def test_get_data(self):
-        file_name = "OHLCV_BTC-EUR_BINANCE" \
-                    "_2h_2023-08-07:07:59_2023-12-02:00:00.csv"
+        file_name = \
+            "OHLCV_BTC-EUR_BITVAVO_2h_2023-07-21:14:00_2024-06-07:10:00.csv"
         datasource = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
-                          "market_data_sources/"
+                          "market_data_sources_for_testing/"
                           f"{file_name}",
             window_size=200,
             timeframe="2h",
         )
         number_of_runs = 0
-        backtest_index_date = datasource.start_date
+        backtest_index_date = datasource._start_date_data_source
 
-        while not datasource.empty():
-            data = datasource.get_data(backtest_index_date=backtest_index_date)
-            backtest_index_date = parser.parse(data["Datetime"][-1])
+        while not datasource.empty(start_date=backtest_index_date):
+            data = datasource.get_data(start_date=backtest_index_date)
+            backtest_index_date = \
+                backtest_index_date + timedelta(hours=2 * 200)
             self.assertTrue(len(data) > 0)
             self.assertTrue(isinstance(data, DataFrame))
             number_of_runs += 1
@@ -214,4 +196,4 @@ class Test(TestCase):
             timeframe="2h",
             window_size=10,
         )
-        self.assertEqual("2h", datasource.get_timeframe())
+        self.assertEqual(TimeFrame.TWO_HOUR, datasource.get_timeframe())

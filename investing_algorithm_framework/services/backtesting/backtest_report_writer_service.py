@@ -1,6 +1,5 @@
-import csv
-import os
 import json
+import os
 
 from investing_algorithm_framework.domain import BacktestReport, \
     DATETIME_FORMAT_BACKTESTING

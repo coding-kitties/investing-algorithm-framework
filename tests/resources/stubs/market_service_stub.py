@@ -157,7 +157,8 @@ class MarketServiceStub(MarketService):
         return self._balances
 
     def get_order(self, order, market):
-        symbol = f"{order.target_symbol.upper()}/{order.trading_symbol.upper()}"
+        symbol = f"{order.target_symbol.upper()}" \
+                 f"/{order.trading_symbol.upper()}"
         order_data = {
             'info': {
                 'orderId': 'e8f8a3f7-0930-4778-a102-5145ed7e7873',
@@ -228,7 +229,8 @@ class MarketServiceStub(MarketService):
                     'id': '16d3b5b7-a460-472b-ab6d-964b890f7d03',
                     'symbol': 'DOT/EUR', 'timestamp': 1674386553405,
                     'datetime': '2023-01-22T11:22:33.405Z', 'order': None,
-                    'order_type': None, 'order_side': None, 'takerOrMaker': 'taker',
+                    'order_type': None, 'order_side': None,
+                    'takerOrMaker': 'taker',
                     'price': 5.7915, 'amount': 2.99863309,
                     'cost': 17.366583540735,
                     'fee': {'cost': 0.043416459265, 'currency': 'EUR'},

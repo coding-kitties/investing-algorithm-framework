@@ -24,7 +24,8 @@ class Algorithm:
 
     :param (optional) name: The name of the algorithm
     :param (optional) description: The description of the algorithm
-    :param (optional) context: The context of the algorithm, for backtest references
+    :param (optional) context: The context of the algorithm,
+    for backtest references
     :param (optional) strategy: A single strategy to add to the algorithm
     :param (optional) data_sources: The list of data sources to
     add to the algorithm

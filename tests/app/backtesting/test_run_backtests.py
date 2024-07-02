@@ -3,9 +3,9 @@ from datetime import datetime, timedelta
 from unittest import TestCase
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm
+    TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm, \
+    BacktestDateRange
 from investing_algorithm_framework.services import BacktestReportWriterService
-from investing_algorithm_framework.domain import DATETIME_FORMAT_BACKTESTING
 
 
 class TestStrategy(TradingStrategy):
@@ -65,16 +65,17 @@ class Test(TestCase):
         )
         start_date = datetime.utcnow() - timedelta(days=1)
         end_date = datetime.utcnow()
+        backtest_date_range = BacktestDateRange(
+            start_date=start_date,
+            end_date=end_date
+        )
         app._initialize_app_for_backtest(
-            backtest_start_date=start_date,
-            backtest_end_date=end_date,
+            backtest_date_range=backtest_date_range,
             pending_order_check_interval='2h',
-            market_data_sources=[]
         )
         reports = app.run_backtests(
             algorithms=[algorithm_one, algorithm_two, algorithm_three],
-            start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow(),
+            date_ranges=[backtest_date_range]
         )
 
         # Check if the backtest reports exist

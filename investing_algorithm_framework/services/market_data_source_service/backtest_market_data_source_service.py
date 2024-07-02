@@ -35,8 +35,13 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
             market_data_sources=None,
             market_credential_service=market_credential_service,
         )
-        self._market_data_sources: List[BacktestMarketDataSource] \
-            = market_data_sources
+        self.market_data_sources = []
+
+        # Add all market data sources to the list
+        if market_data_sources is not None:
+            for market_data_source in market_data_sources:
+                self.add(market_data_source)
+
         self._configuration_service: ConfigurationService = \
             configuration_service
 
@@ -50,7 +55,6 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
             if backtest_market_data_source is not None:
                 backtest_market_data_source.market_credentials_service = \
                     self._market_credential_service
-
                 backtest_market_data_source.prepare_data(
                     config=configuration_service.get_config(),
                     backtest_start_date=configuration_service
@@ -133,3 +137,14 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
             symbol=symbol, market=market, time_frame=time_frame
         )
         return market_data_source is not None
+
+    def add(self, market_data_source):
+
+        # Check if there is already a market data source with the same
+        # identifier
+        for existing_market_data_source in self._market_data_sources:
+            if existing_market_data_source.get_identifier() == \
+                    market_data_source.get_identifier():
+                return
+
+        self._market_data_sources.append(market_data_source)

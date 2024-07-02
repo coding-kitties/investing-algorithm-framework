@@ -1,4 +1,5 @@
-from investing_algorithm_framework import PortfolioConfiguration, MarketCredential
+from investing_algorithm_framework import PortfolioConfiguration, \
+    MarketCredential
 from tests.resources import TestBase
 
 
