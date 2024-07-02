@@ -269,11 +269,11 @@ class CCXTMarketService(MarketService):
             raise OperationalException("Could not create limit sell order")
 
     def create_market_sell_order(
-            self,
-            target_symbol: str,
-            trading_symbol: str,
-            amount: float,
-            market
+        self,
+        target_symbol: str,
+        trading_symbol: str,
+        amount: float,
+        market
     ):
         market_credential = self.get_market_credential(market)
         exchange = self.initialize_exchange(market, market_credential)
@@ -358,10 +358,11 @@ class CCXTMarketService(MarketService):
     ) -> pl.DataFrame:
         time_frame = TimeFrame.from_value(time_frame).value
 
-        if self.config is not None:
+        if self.config is not None and "DATETIME_FORMAT" in self.config:
             datetime_format = self.config["DATETIME_FORMAT"]
         else:
             datetime_format = DATETIME_FORMAT
+
         market_credential = self.get_market_credential(market)
         exchange = self.initialize_exchange(market, market_credential)
 

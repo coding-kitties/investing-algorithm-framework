@@ -23,8 +23,8 @@ class Test(TestBase):
             secret_key="secret_key"
         )
     ]
-    
-    def setUp(self) -> None:    
+
+    def setUp(self) -> None:
         super(Test, self).setUp()
         self.app.add_market_data_source(CSVTickerMarketDataSource(
             identifier="BTC/EUR-ticker",

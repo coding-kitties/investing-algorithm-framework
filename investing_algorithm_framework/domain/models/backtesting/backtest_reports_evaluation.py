@@ -179,7 +179,8 @@ class BacktestReportsEvaluation:
 
         for algorithm in ordered_reports:
             profit_score += sum(
-                [report.total_net_gain for report in ordered_reports[algorithm]]
+                [report.total_net_gain for
+                 report in ordered_reports[algorithm]]
             )
             growth_score += sum(
                 [report.growth for report in
@@ -215,7 +216,8 @@ class BacktestReportsEvaluation:
 
         if name is not None:
             return [
-                report for report in self.backtest_reports if report.name == name
+                report for report in self.backtest_reports
+                if report.name == name
             ]
 
         if backtest_date_range is not None:
@@ -234,7 +236,8 @@ class BacktestReportsEvaluation:
         reports = self.get_reports(name, backtest_date_range)
 
         if len(reports) == 0:
-            raise OperationalException("No matches for given name and date range")
+            raise OperationalException(
+                "No matches for given name and date range"
+            )
 
         return reports[0]
-

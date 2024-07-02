@@ -145,6 +145,67 @@ def pretty_print_date_ranges(date_ranges: List[BacktestDateRange]) -> None:
             print(f"{COLOR_GREEN}{start_date} - {end_date}{COLOR_RESET}")
 
 
+def pretty_print_price_efficiency(reports, precision=4):
+    """
+    Pretty print the price efficiency of the backtest reports evaluation
+    to the console.
+    """
+    # Get all symbols of the reports
+    print(f"{COLOR_YELLOW}Price noise{COLOR_RESET}")
+    rows = []
+
+    for report in reports:
+
+        if report.metrics is not None and "efficiency_ratio" in report.metrics:
+            price_efficiency = report.metrics["efficiency_ratio"]
+
+            for symbol in price_efficiency:
+                row = {}
+                row["Symbol"] = symbol
+                row["Efficiency ratio / Noise"] = f"{price_efficiency[symbol]:.{precision}f}"
+                row["Date"] = f"{report.backtest_start_date} - {report.backtest_end_date}"
+
+
+
+
+                if report.backtest_date_range.name is not None:
+                    row["Date"] = f"{report.backtest_date_range.name} " \
+                                  f"{report.backtest_date_range.start_date}" \
+                                  f" - {report.backtest_date_range.end_date}"
+                else:
+                    row["Date"] = f"{report.backtest_start_date} - " \
+                                   f"{report.backtest_end_date}"
+
+                rows.append(row)
+
+    # Remove all duplicate rows with the same symbol and date range
+    unique_rows = []
+
+    # Initialize an empty set to track unique (symbol, date) pairs
+    seen = set()
+    # Initialize a list to store the filtered dictionaries
+    filtered_data = []
+
+    # Iterate through each dictionary in the list
+    for entry in rows:
+        # Extract the (symbol, date) pair
+        pair = (entry["Symbol"], entry["Date"])
+        # Check if the pair is already in the set
+        if pair not in seen:
+            # If not, add the pair to the set and
+            # the entry to the filtered list
+            seen.add(pair)
+            filtered_data.append(entry)
+
+    print(
+        tabulate(
+            filtered_data,
+            headers="keys",
+            tablefmt="rounded_grid"
+        )
+    )
+
+
 def pretty_print_most_profitable(
     evaluation: BacktestReportsEvaluation,
     backtest_date_range: BacktestDateRange,
@@ -196,7 +257,6 @@ def pretty_print_backtest_reports_evaluation(
     most_profitable = backtest_reports_evaluation.get_profit_order(backtest_date_range)[0]
     most_growth = backtest_reports_evaluation.get_growth_order(backtest_date_range)[0]
 
-
     ascii_art = f"""
               :%%%#+-          .=*#%%%      {COLOR_GREEN}Backtest reports evaluation{COLOR_RESET}
               *%%%%%%%+------=*%%%%%%%-     {COLOR_GREEN}---------------------------{COLOR_RESET}
@@ -229,6 +289,7 @@ def pretty_print_backtest_reports_evaluation(
         pretty_print_date_ranges(backtest_reports_evaluation.get_date_ranges())
         print("")
 
+    pretty_print_price_efficiency(reports, precision=precision)
     print(f"{COLOR_YELLOW}All profits ordered{COLOR_RESET}")
     pretty_print_profit_evaluation(
         backtest_reports_evaluation.get_profit_order(backtest_date_range), precision
@@ -284,6 +345,7 @@ def pretty_print_backtest(
         """
 
     print(ascii_art)
+    pretty_print_price_efficiency([backtest_report], precision=precision)
 
     if show_positions:
         print(f"{COLOR_YELLOW}Positions overview{COLOR_RESET}")

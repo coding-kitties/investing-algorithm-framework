@@ -42,7 +42,6 @@ class Test(TestBase):
             )
         ))
 
-
     def test_close_trade(self):
         trading_symbol_position = self.app.algorithm.get_position("EUR")
         self.assertEqual(1000, trading_symbol_position.get_amount())

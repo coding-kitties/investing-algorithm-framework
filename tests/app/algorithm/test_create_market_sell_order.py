@@ -1,5 +1,5 @@
-from investing_algorithm_framework import PortfolioConfiguration, OrderType, OrderSide, \
-    OrderStatus, MarketCredential
+from investing_algorithm_framework import PortfolioConfiguration, \
+    OrderType, OrderSide, OrderStatus, MarketCredential
 from tests.resources import TestBase
 
 

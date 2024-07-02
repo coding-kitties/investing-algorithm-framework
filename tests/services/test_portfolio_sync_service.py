@@ -164,9 +164,10 @@ class Test(TestBase):
     def test_sync_unallocated_with_stateless(self):
         """
         Test to sync the unallocated amount with initial load set to false.
-        This means that if the available balance is less than the initial balance
-        of the portfolio configuration, the unallocated balance should be set to the
-        available balance. It should not raise an OperationalException.
+        This means that if the available balance is less than the
+        initial balance of the portfolio configuration, the
+        unallocated balance should be set to the  available balance. It
+        should not raise an OperationalException.
         """
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(

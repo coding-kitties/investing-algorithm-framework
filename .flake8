@@ -1,0 +1,4 @@
+[flake8]
+exclude =
+    investing_algorithm_framework/domain/utils/backtesting.py
+    examples

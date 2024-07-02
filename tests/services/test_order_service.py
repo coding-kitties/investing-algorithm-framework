@@ -169,7 +169,7 @@ class TestOrderService(TestBase):
     def test_update_sell_order_with_successful_order(self):
         pass
 
-    def test_update_sell_order_with_successful_order_filled_and_closing_partial_buy_orders(self):
+    def test_update_sell_order_closing_partial_buy_orders(self):
         order_service = self.app.container.order_service()
         buy_order_one = order_service.create(
             {
