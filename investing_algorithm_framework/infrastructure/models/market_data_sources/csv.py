@@ -88,6 +88,9 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
         end_date = kwargs.get("end_date")
         backtest_index_date = kwargs.get("backtest_index_date")
 
+        if "window_size" in kwargs:
+            self.window_size = kwargs["window_size"]
+
         if start_date is None \
                 and end_date is None \
                 and backtest_index_date is None:
@@ -97,11 +100,27 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
 
         if backtest_index_date is not None:
             end_date = backtest_index_date
+
+            if self.window_size is None:
+                raise OperationalException(
+                    "Either end_date or window_size "
+                    "should be passed as a "
+                    "parameter for CCXTOHLCVMarketDataSource"
+                )
+
             start_date = self.create_start_date(
                 end_date, self.timeframe, self.window_size
             )
         else:
             if start_date is None:
+
+                if self.window_size is None:
+                    raise OperationalException(
+                        "Either end_date or window_size "
+                        "should be passed as a "
+                        "parameter for CCXTOHLCVMarketDataSource"
+                    )
+
                 start_date = self.create_start_date(
                     end_date, self.timeframe, self.window_size
                 )
@@ -110,20 +129,6 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
                 end_date = self.create_end_date(
                     start_date, self.timeframe, self.window_size
                 )
-
-        # # Check if start or end date are out of range with
-        # # the dates of the datasource.
-        # if self._start_date_data_source > start_date:
-        #     raise OperationalException(
-        #         f"Given start date {start_date} is before the start date "
-        #         f"of the data source {self._start_date_data_source}"
-        #     )
-        #
-        # if self._end_date_data_source < end_date:
-        #     raise OperationalException(
-        #         f"End date {end_date} is after the end date "
-        #         f"of the data source {self._end_date_data_source}"
-        #     )
 
         df = polars.read_csv(
             self.csv_file_path, columns=self._columns, separator=","

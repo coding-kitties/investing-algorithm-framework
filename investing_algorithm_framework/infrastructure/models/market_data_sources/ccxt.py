@@ -438,6 +438,9 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
         if self.config is not None:
             market_service.config = self.config
 
+        if "window_size" in kwargs:
+            self.window_size = kwargs["window_size"]
+
         if "start_date" in kwargs:
             start_date = kwargs["start_date"]
 
@@ -451,6 +454,14 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
             )
 
         if "end_date" not in kwargs:
+
+            if self.window_size is None:
+                raise OperationalException(
+                    "Either end_date or window_size "
+                    "should be passed as a "
+                    "parameter for CCXTOHLCVMarketDataSource"
+                )
+
             end_date = self.create_end_date(
                 start_date, self.timeframe, self.window_size
             )
