@@ -9,8 +9,9 @@ Coinbase market data sources example. Coinbase requires you to have an API key
 and secret key to access their market data. You can create them here:
 https://www.coinbase.com/settings/api
 
-You need to add a market credential to the app, and then add market data sources
-to the app. You can then use the market data sources in your trading strategy.
+You need to add a market credential to the app, and then add market 
+data sources to the app. You can then use the market data 
+sources in your trading strategy.
 """
 # Define your market credential for coinbase
 coinbase_market_credential = MarketCredential(
@@ -41,14 +42,13 @@ class CoinBaseTradingStrategy(TradingStrategy):
     def apply_strategy(self, algorithm, market_data):
         pass
 
+
 config = {
     SYMBOLS: ["BTC/EUR"],
     RESOURCE_DIRECTORY: os.path.join(os.path.dirname(__file__), "resources")
 }
-
 algorithm = Algorithm()
 algorithm.add_strategy(CoinBaseTradingStrategy)
-
 app = create_app(config=config)
 app.add_algorithm(algorithm)
 app.add_market_credential(coinbase_market_credential)
@@ -62,4 +62,3 @@ app.add_portfolio_configuration(PortfolioConfiguration(
 
 if __name__ == "__main__":
     app.run()
-
