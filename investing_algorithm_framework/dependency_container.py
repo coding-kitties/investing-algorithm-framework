@@ -3,7 +3,7 @@ from dependency_injector import containers, providers
 from investing_algorithm_framework.app.algorithm import Algorithm
 from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPositionRepository, SQLPortfolioRepository, \
-    SQLOrderFeeRepository, SQLPortfolioSnapshotRepository, \
+    SQLPortfolioSnapshotRepository, \
     SQLPositionSnapshotRepository, PerformanceService, CCXTMarketService
 from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, StrategyOrchestratorService, \
@@ -33,7 +33,6 @@ class DependencyContainer(containers.DeclarativeContainer):
         MarketCredentialService
     )
     order_repository = providers.Factory(SQLOrderRepository)
-    order_fee_repository = providers.Factory(SQLOrderFeeRepository)
     position_repository = providers.Factory(SQLPositionRepository)
     portfolio_repository = providers.Factory(SQLPortfolioRepository)
     position_snapshot_repository = providers.Factory(
@@ -70,7 +69,6 @@ class DependencyContainer(containers.DeclarativeContainer):
         OrderService,
         configuration_service=configuration_service,
         order_repository=order_repository,
-        order_fee_repository=order_fee_repository,
         portfolio_repository=portfolio_repository,
         position_repository=position_repository,
         market_service=market_service,

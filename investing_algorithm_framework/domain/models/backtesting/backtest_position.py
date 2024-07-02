@@ -104,3 +104,17 @@ class BacktestPosition(BaseModel):
             return 0.0
 
         return self.value / self._total_value_portfolio * 100
+
+    def to_dict(self):
+        return {
+            "symbol": self.symbol,
+            "amount": self.amount,
+            "cost": self.cost,
+            "price": self.price,
+            "value": self.value,
+            "growth": self.growth,
+            "growth_rate": self.growth_rate,
+            "amount_pending_buy": self.amount_pending_buy,
+            "amount_pending_sell": self.amount_pending_sell,
+            "percentage_of_portfolio": self.percentage_of_portfolio
+        }

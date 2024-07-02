@@ -1,4 +1,5 @@
-from .backtesting import BacktestService, BacktestReportWriterService
+from .backtesting import BacktestService, BacktestReportWriterService, \
+    create_trade_exit_markers_chart, create_trade_entry_markers_chart
 from .configuration_service import ConfigurationService
 from .market_credential_service import MarketCredentialService
 from .market_data_source_service import MarketDataSourceService, \
@@ -31,5 +32,7 @@ __all__ = [
     "MarketCredentialService",
     "BacktestMarketDataSourceService",
     "BacktestPortfolioService",
-    "TradeService"
+    "TradeService",
+    "create_trade_entry_markers_chart",
+    "create_trade_exit_markers_chart"
 ]

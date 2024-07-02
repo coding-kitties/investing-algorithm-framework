@@ -1,4 +1,5 @@
-# from investing_algorithm_framework.core.exceptions import OperationalException
+# from investing_algorithm_framework.core.exceptions import
+# OperationalException
 # from investing_algorithm_framework.core.models import OrderSide, OrderStatus
 # from investing_algorithm_framework.core.models import OrderType
 # from tests.resources import TestBase, TestOrderAndPositionsObjectsMixin

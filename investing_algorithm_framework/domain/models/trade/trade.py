@@ -230,6 +230,23 @@ class Trade(BaseModel):
             stop_loss_price = highest_price * (1 - stop_loss_percentage / 100)
             return current_price <= stop_loss_price
 
+    def to_dict(self):
+        return {
+            "target_symbol": self.target_symbol,
+            "trading_symbol": self.trading_symbol,
+            "status": self.status,
+            "amount": self.amount,
+            "open_price": self.open_price,
+            "current_price": self.current_price,
+            "closed_price": self.closed_price,
+            "opened_at": self.opened_at.strftime(DATETIME_FORMAT)
+            if self.opened_at else None,
+            "closed_at": self.closed_at.strftime(DATETIME_FORMAT)
+            if self.closed_at else None,
+            "change": self.percentage_change,
+            "absolute_change": self.absolute_change,
+        }
+
     def __repr__(self):
         return self.repr(
             target_symbol=self.target_symbol,

@@ -3,7 +3,6 @@ import logging
 import os
 from abc import abstractmethod, ABC
 from datetime import datetime, timedelta
-from typing import Callable
 
 import polars
 
@@ -21,16 +20,12 @@ class BacktestMarketDataSource(ABC):
         identifier,
         market,
         symbol,
-        start_date=None,
-        end_date=None,
         backtest_data_start_date=None,
         backtest_data_index_date=None,
     ):
         self._identifier = identifier
         self._market = market
         self._symbol = symbol
-        self._start_date = start_date
-        self._end_date = end_date
         self._backtest_data_start_date = backtest_data_start_date
         self._backtest_data_index_date = backtest_data_index_date
 
@@ -95,13 +90,17 @@ class BacktestMarketDataSource(ABC):
         pass
 
     @abstractmethod
-    def get_data(
-        self,
-        backtest_index_date,
-        from_time_stamp=None,
-        to_time_stamp=None,
-        **kwargs
-    ):
+    def get_data(self, **kwargs):
+        """
+        Get data from the market data source.
+        :param kwargs: Additional arguments to get the data. Common arguments
+        - start_date: datetime
+        - end_date: datetime
+        - timeframe: str
+        - backtest_start_date: datetime
+        - backtest_end_date: datetime
+        - backtest_data_index_date: datetime
+        """
         pass
 
     @property
@@ -166,13 +165,7 @@ class MarketDataSource(ABC):
         self._market = market
         self._symbol = symbol
         self._market_credential_service = None
-
-    def initialize(self, config):
-        pass
-
-    @property
-    def identifier(self):
-        return self._identifier
+        self._config = None
 
     @property
     def config(self):
@@ -181,6 +174,13 @@ class MarketDataSource(ABC):
     @config.setter
     def config(self, value):
         self._config = value
+
+    def initialize(self, config):
+        pass
+
+    @property
+    def identifier(self):
+        return self._identifier
 
     def get_identifier(self):
         return self.identifier
@@ -200,20 +200,15 @@ class MarketDataSource(ABC):
         return self.symbol
 
     @abstractmethod
-    def get_data(
-        self,
-        time_stamp=None,
-        from_time_stamp=None,
-        to_time_stamp=None,
-        **kwargs
-    ):
+    def get_data(self, **kwargs):
         """
         Get data from the market data source.
+        :param kwargs: Additional arguments to get the data. Common arguments
+        - start_date: datetime
+        - end_date: datetime
+        - timeframe: str
 
-        :param time_stamp: The time stamp of the data to get.
-        :param from_time_stamp: The time stamp from which to get data.
-        :param to_time_stamp: The time stamp to which to get data.
-        :param kwargs: Additional arguments.
+        :return: Object with the data
         """
         pass
 
@@ -241,10 +236,6 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
         symbol,
         timeframe,
         window_size=None,
-        start_date=None,
-        start_date_func=None,
-        end_date=None,
-        end_date_func=None,
     ):
         super().__init__(
             identifier=identifier,
@@ -252,37 +243,9 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
             symbol=symbol,
         )
         self._window_size = window_size
-        self._timeframe = timeframe
-        self._start_date = start_date
-        self._start_date_func = start_date_func
-        self._end_date = end_date
-        self._end_date_func = end_date_func
-        self.initialize_window_size()
 
-    def initialize_window_size(self):
-        """
-        Method to determine the window size of ohlcv market data source
-        """
-        if self._window_size is None:
-            start_date = self.start_date
-            end_date = self.end_date
-
-            if not isinstance(start_date, datetime):
-                raise OperationalException(
-                    "start_date or start_date_func must be a datetime object"
-                )
-
-            if not isinstance(end_date, datetime):
-                raise OperationalException(
-                    "end_date or end_date_func must be a datetime object"
-                )
-
-            minutes_diff = \
-                (self.end_date - self.start_date).total_seconds() / 60
-            windows_size_minutes = TimeFrame.from_string(self.timeframe)\
-                .amount_of_minutes
-
-            self._window_size = minutes_diff / windows_size_minutes
+        if timeframe is not None:
+            self._timeframe = TimeFrame.from_value(timeframe)
 
     @property
     def timeframe(self):
@@ -291,81 +254,64 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
     def get_timeframe(self):
         return self.timeframe
 
-    @property
-    def start_date(self):
-        """
-        Get the start date of the market data source.
+    def create_start_date(self, end_date, timeframe, window_size):
+        minutes = TimeFrame.from_value(timeframe).amount_of_minutes
+        return end_date - timedelta(minutes=window_size * minutes)
 
-        if window_size is not None and the start date is,
-        the start date will be calculated based on the end date
-        and the window size.
-
-        If the start date is not None, the start date will be returned.
-
-        If the start date function is not None, the start date function will
-        be called and the result will be returned.
-        """
-
-        if self.window_size is not None:
-
-            if self._start_date is not None:
-                return self._start_date
-
-            minutes = TimeFrame.from_string(self.timeframe).amount_of_minutes
-            return self.end_date - \
-                timedelta(minutes=self.window_size * minutes)
-
-        if self._start_date_func is not None:
-            return self._start_date_func()
-        else:
-            return self._start_date
-
-    def get_start_date(self):
-        return self.start_date
-
-    @property
-    def start_date_func(self):
-        return self._start_date_func
-
-    @property
-    def end_date(self):
-
-        if self._end_date_func is not None:
-            return self._end_date_func()
-        elif self._end_date is not None:
-            return self._end_date
-        else:
-            return datetime.utcnow()
-
-    def get_end_date(self):
-        return self.end_date
-
-    @property
-    def end_date_func(self):
-        return self._end_date_func
-
-    @end_date.setter
-    def end_date(self, value):
-        self._end_date = value
-
-    @start_date.setter
-    def start_date(self, value):
-        self._start_date = value
-
-    @end_date_func.setter
-    def end_date_func(self, func: Callable):
-        self._end_date_func = func
-
-    @start_date_func.setter
-    def start_date_func(self, func: Callable):
-        self._start_date_func = func
+    def create_end_date(self, start_date, timeframe, window_size):
+        minutes = TimeFrame.from_value(timeframe).amount_of_minutes
+        return start_date + timedelta(minutes=window_size * minutes)
 
     @property
     def window_size(self):
         return self._window_size
 
+    def get_date_ranges(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        window_size: int,
+        timeframe
+    ):
+        """
+        Function to get the date ranges of the market data source based
+        on the window size and the timeframe. The date ranges
+        will be calculated based on the start date and the end date.
+        """
+
+        if start_date > end_date:
+            raise OperationalException(
+                "Start date must be before end date"
+            )
+
+        timeframe = TimeFrame.from_value(timeframe)
+        new_end_date = start_date + timedelta(
+            minutes=window_size * timeframe.amount_of_minutes
+        )
+        ranges = [(start_date, new_end_date)]
+        start_date = new_end_date
+
+        if new_end_date > end_date:
+            return [(start_date, end_date)]
+
+        while start_date < end_date:
+            new_end_date = start_date + timedelta(
+                minutes=self.window_size * timeframe.amount_of_minutes
+            )
+
+            if new_end_date > end_date:
+                new_end_date = end_date
+
+            ranges.append((start_date, new_end_date))
+            start_date = new_end_date
+
+        return ranges
+
 
 class TickerMarketDataSource(MarketDataSource, ABC):
+    """
+    Abstract class for ticker market data sources.
+    """
 
     def __init__(
             self,
@@ -381,6 +327,9 @@ class TickerMarketDataSource(MarketDataSource, ABC):
 
 
 class OrderBookMarketDataSource(MarketDataSource, ABC):
+    """
+    Abstract class for order book market data sources.
+    """
 
     def __init__(
             self,

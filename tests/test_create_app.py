@@ -76,7 +76,9 @@ class TestCreateApp(TestCase):
                 secret_key="secret_key"
             )
         )
-        app.container.market_service.override(MarketServiceStub(app.container.market_credential_service()))
+        app.container.market_service.override(
+            MarketServiceStub(app.container.market_credential_service())
+        )
         app.initialize()
         self.assertIsNotNone(app)
         self.assertIsNotNone(app._flask_app)

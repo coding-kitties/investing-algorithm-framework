@@ -7,7 +7,7 @@ from tqdm import tqdm
 from investing_algorithm_framework.domain import BacktestReport, \
     BACKTESTING_INDEX_DATETIME, TimeUnit, BacktestPosition, \
     TradingDataType, OrderStatus, OperationalException, MarketDataSource, \
-    OrderSide
+    OrderSide, SYMBOLS, BacktestDateRange
 from investing_algorithm_framework.services.market_data_source_service import \
     MarketDataSourceService
 
@@ -16,14 +16,15 @@ class BacktestService:
     """
     Service that facilitates backtests for algorithm objects.
     """
+
     def __init__(
-        self,
-        market_data_source_service: MarketDataSourceService,
-        order_service,
-        portfolio_repository,
-        position_repository,
-        performance_service,
-        configuration_service
+            self,
+            market_data_source_service: MarketDataSourceService,
+            order_service,
+            portfolio_repository,
+            position_repository,
+            performance_service,
+            configuration_service
     ):
         self._resource_directory = None
         self._order_service = order_service
@@ -48,7 +49,7 @@ class BacktestService:
         self._resource_directory = resource_directory
 
     def run_backtest(
-        self, algorithm, start_date, end_date=None
+        self, algorithm, backtest_date_range: BacktestDateRange
     ) -> BacktestReport:
         """
         Run a backtest for the given algorithm. This function will run
@@ -60,11 +61,14 @@ class BacktestService:
         Also, all backtest data is downloaded (if not already downloaded) and
         the backtest is run for each date in the schedule.
 
-        :param algorithm: The algorithm to run the backtest for
-        :param start_date: The start date of the backtest
-        :param end_date: The end date of the backtest
+        At the end of the run all traces
 
-        :return: The backtest report instance of BacktestReport
+        Args:
+            algorithm: The algorithm to run the backtest for
+            backtest_date_range: The backtest date range
+
+        return:
+            BacktestReport: The backtest report
         """
         strategy_profiles = []
         portfolios = self._portfolio_repository.get_all()
@@ -76,18 +80,13 @@ class BacktestService:
         for strategy in algorithm.strategies:
             strategy_profiles.append(strategy.strategy_profile)
 
-        if end_date is None:
-            end_date = datetime.utcnow()
-
-        if start_date > end_date:
-            raise OperationalException(
-                "Start date cannot be greater than end date for backtest"
-            )
+        # Check if required market data sources are registered
+        self._check_if_required_market_data_sources_are_registered()
 
         schedule = self.generate_schedule(
             strategies=algorithm.strategies,
-            start_date=start_date,
-            end_date=end_date
+            start_date=backtest_date_range.start_date,
+            end_date=backtest_date_range.end_date
         )
 
         for index, row in tqdm(
@@ -106,18 +105,19 @@ class BacktestService:
                 index_date=index_date,
             )
         return self.create_backtest_report(
-            algorithm, len(schedule), start_date, end_date, initial_unallocated
+            algorithm, len(schedule), backtest_date_range, initial_unallocated
         )
 
-    def run_backtests(self, algorithms, start_date, end_date=None):
+    def run_backtests(
+        self, algorithms, backtest_date_range: BacktestDateRange
+    ):
         """
         Run backtests for the given algorithms. This function will run
         backtests for the given algorithms and return a list of backtest
         reports.
 
         :param algorithms: The algorithms to run the backtests for
-        :param start_date: The start date of the backtests
-        :param end_date: The end date of the backtests
+        :param backtest_date_range: The backtest date range of the backtests
         :return: A list of backtest reports
         """
         backtest_reports = []
@@ -126,8 +126,7 @@ class BacktestService:
             backtest_reports.append(
                 self.run_backtest(
                     algorithm=algorithm,
-                    start_date=start_date,
-                    end_date=end_date
+                    backtest_date_range=backtest_date_range
                 )
             )
 
@@ -150,15 +149,25 @@ class BacktestService:
                     market_data[data_id] = \
                         self._market_data_source_service.get_data(data_id)
 
-        # self._order_service.check_pending_orders()
+        strategy.context = algorithm.context
         strategy.run_strategy(algorithm=algorithm, market_data=market_data)
 
     def generate_schedule(
-        self,
-        strategies,
-        start_date,
-        end_date
-    ):
+        self, strategies, start_date, end_date
+    ) -> pd.DataFrame:
+        """
+        Generate a schedule for the given strategies. This function will
+        calculate when the strategies should run based on the given start
+        and end date. The schedule will be stored in a pandas DataFrame.
+
+        Args:
+            strategies: The strategies to generate the schedule for
+            start_date: The start date of the schedule
+            end_date: The end date of the schedule
+
+        Returns:
+            pd.DataFrame: The schedule DataFrame
+        """
         data = []
 
         for strategy in strategies:
@@ -209,8 +218,7 @@ class BacktestService:
         self,
         algorithm,
         number_of_runs,
-        start_date,
-        end_date,
+        backtest_date_range: BacktestDateRange,
         initial_unallocated=0
     ) -> BacktestReport:
         """
@@ -219,14 +227,19 @@ class BacktestService:
         the backtest report instance.
 
         It will calculate various performance metrics for the backtest.
+        Also, it will add all traces to the backtest report. The traces
+        are collected from each strategy that was run during the backtest.
 
-        :param algorithm: The algorithm to create the backtest report for
-        :param number_of_runs: The number of runs
-        :param start_date: The start date of the backtest
-        :param end_date: The end date of the backtest
-        :param initial_unallocated: The initial unallocated amount
-        :return: The backtest report instance of BacktestReport
+        Args:
+            algorithm: The algorithm to create the backtest report for
+            number_of_runs: The number of runs
+            backtest_date_range: The backtest date range of the backtest
+            initial_unallocated: The initial unallocated amount
+
+        Returns:
+            BacktestReport: The backtest report instance of BacktestReport
         """
+
         for portfolio in self._portfolio_repository.get_all():
             ids = [strategy.strategy_id for strategy in algorithm.strategies]
 
@@ -235,46 +248,46 @@ class BacktestService:
                 # Remove None from ids
                 ids = [x for x in ids if x is not None]
 
-            backtest_profile = BacktestReport(
+            backtest_report = BacktestReport(
                 name=algorithm.name,
                 strategy_identifiers=ids,
-                backtest_index_date=start_date,
-                backtest_start_date=start_date,
-                backtest_end_date=end_date,
+                backtest_date_range=backtest_date_range,
                 initial_unallocated=initial_unallocated,
                 trading_symbol=portfolio.trading_symbol,
                 created_at=datetime.utcnow(),
             )
-            backtest_profile.number_of_runs = number_of_runs
-            backtest_profile.number_of_days = (end_date - start_date).days
-            backtest_profile.number_of_orders = self._order_service.count({
+            backtest_report.number_of_runs = number_of_runs
+            backtest_report.number_of_orders = self._order_service.count({
                 "portfolio": portfolio.id
             })
-            backtest_profile.number_of_positions = \
+            backtest_report.number_of_positions = \
                 self._position_repository.count({
                     "portfolio": portfolio.id,
                     "amount_gt": 0
                 })
-            backtest_profile.percentage_negative_trades = \
-                self._performance_service\
+            backtest_report.percentage_negative_trades = \
+                self._performance_service \
                     .get_percentage_negative_trades(portfolio.id)
-            backtest_profile.percentage_positive_trades = \
-                self._performance_service\
+            backtest_report.percentage_positive_trades = \
+                self._performance_service \
                     .get_percentage_positive_trades(portfolio.id)
-            backtest_profile.number_of_trades_closed = \
-                self._performance_service\
+            backtest_report.number_of_trades_closed = \
+                self._performance_service \
                     .get_number_of_trades_closed(portfolio.id)
-            backtest_profile.number_of_trades_open = \
-                self._performance_service\
+            backtest_report.number_of_trades_open = \
+                self._performance_service \
                     .get_number_of_trades_open(portfolio.id)
-            backtest_profile.total_cost = portfolio.total_cost
-            backtest_profile.total_net_gain = portfolio.total_net_gain
-            backtest_profile.total_net_gain_percentage = \
-                self._performance_service\
-                .get_total_net_gain_percentage_of_backtest(
-                    portfolio.id, backtest_profile
-                )
+            backtest_report.total_cost = portfolio.total_cost
+            backtest_report.total_net_gain = portfolio.total_net_gain
+            backtest_report.total_net_gain_percentage = \
+                self._performance_service \
+                    .get_total_net_gain_percentage_of_backtest(
+                        portfolio.id, backtest_report
+                    )
             positions = self._position_repository.get_all({
+                "portfolio": portfolio.id
+            })
+            orders = self._order_service.get_all({
                 "portfolio": portfolio.id
             })
             tickers = {}
@@ -284,26 +297,40 @@ class BacktestService:
                 if position.symbol != portfolio.trading_symbol:
                     ticker_symbol = \
                         f"{position.symbol}/{portfolio.trading_symbol}"
+
+                    if not self._market_data_source_service\
+                            .has_ticker_market_data_source(
+                                symbol=ticker_symbol, market=portfolio.market
+                            ):
+                        raise OperationalException(
+                            f"Ticker market data source for "
+                            f"symbol {ticker_symbol} and market "
+                            f"{portfolio.market} not found, please make "
+                            f"sure you register a ticker market data "
+                            f"source for this symbol and market in "
+                            f"backtest mode. Otherwise, the backtest "
+                            f"report cannot be generated."
+                        )
                     tickers[ticker_symbol] = \
                         self._market_data_source_service.get_ticker(
                             f"{position.symbol}/{portfolio.trading_symbol}",
                             market=portfolio.market
                         )
 
-            backtest_profile.growth_rate = self._performance_service \
+            backtest_report.growth_rate = self._performance_service \
                 .get_growth_rate_of_backtest(
-                    portfolio.id, tickers, backtest_profile
+                    portfolio.id, tickers, backtest_report
                 )
-            backtest_profile.growth = self._performance_service \
+            backtest_report.growth = self._performance_service \
                 .get_growth_of_backtest(
-                    portfolio.id, tickers, backtest_profile
+                    portfolio.id, tickers, backtest_report
                 )
-            backtest_profile.total_value = self._performance_service \
-                .get_total_value(portfolio.id, tickers, backtest_profile)
-            backtest_profile.average_trade_duration = \
-                self._performance_service\
+            backtest_report.total_value = self._performance_service \
+                .get_total_value(portfolio.id, tickers, backtest_report)
+            backtest_report.average_trade_duration = \
+                self._performance_service \
                     .get_average_trade_duration(portfolio.id)
-            backtest_profile.average_trade_size = \
+            backtest_report.average_trade_size = \
                 self._performance_service.get_average_trade_size(portfolio.id)
             positions = self._position_repository.get_all({
                 "portfolio": portfolio.id
@@ -316,7 +343,7 @@ class BacktestService:
                     backtest_position = BacktestPosition(
                         position,
                         trading_symbol=True,
-                        total_value_portfolio=backtest_profile.total_value
+                        total_value_portfolio=backtest_report.total_value
                     )
                     backtest_position.price = 1
                 else:
@@ -346,7 +373,7 @@ class BacktestService:
                         position,
                         amount_pending_buy=amount_in_pending_buy_orders,
                         amount_pending_sell=amount_in_pending_sell_orders,
-                        total_value_portfolio=backtest_profile.total_value
+                        total_value_portfolio=backtest_report.total_value
                     )
 
                     # Probably not needed
@@ -358,9 +385,22 @@ class BacktestService:
                         )
                     backtest_position.price = ticker["bid"]
                 backtest_positions.append(backtest_position)
-            backtest_profile.positions = backtest_positions
-            backtest_profile.trades = algorithm.get_trades()
-            return backtest_profile
+            backtest_report.positions = backtest_positions
+            backtest_report.trades = algorithm.get_trades()
+            backtest_report.orders = orders
+            backtest_report.context = algorithm.context
+            traces = {}
+
+            # Add traces to the backtest report
+            for strategy in algorithm.strategies:
+                strategy_traces = strategy.get_traces()
+                traces[strategy.strategy_id] = strategy_traces
+
+            backtest_report.traces = traces
+
+            # Calculate metrics for the backtest report
+            backtest_report.calculate_metrics()
+            return backtest_report
 
     def set_backtest_market_data_sources(self, market_data_sources):
         self._backtest_market_data_sources = market_data_sources
@@ -378,3 +418,27 @@ class BacktestService:
             f"Market data source for "
             f"symbol {symbol} and market {market} not found"
         )
+
+    def _check_if_required_market_data_sources_are_registered(self):
+        """
+        Check if the required market data sources are registered.
+
+        It will iterate over all registered symbols and markets and check
+        if a ticker market data source is registered for the symbol and market.
+        """
+        symbols = self._configuration_service.config[SYMBOLS]
+
+        if symbols is not None:
+
+            for symbol in symbols:
+                if not self._market_data_source_service\
+                        .has_ticker_market_data_source(
+                            symbol=symbol
+                        ):
+                    raise OperationalException(
+                        f"Ticker market data source for symbol {symbol} not "
+                        f"found, please make sure you register a ticker "
+                        f"market data source for this symbol in backtest "
+                        f"mode. Otherwise, the backtest report "
+                        f"cannot be generated."
+                    )

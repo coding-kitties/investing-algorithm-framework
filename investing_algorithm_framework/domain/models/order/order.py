@@ -5,20 +5,20 @@ from dateutil.parser import parse
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
 from investing_algorithm_framework.domain.models.base_model import BaseModel
+from investing_algorithm_framework.domain.models.order.order_side import \
+    OrderSide
 from investing_algorithm_framework.domain.models.order.order_status import \
     OrderStatus
 from investing_algorithm_framework.domain.models.order.order_type import \
     OrderType
-from investing_algorithm_framework.domain.models.order.order_side import \
-    OrderSide
-from investing_algorithm_framework.domain.models.order.order_fee import \
-    OrderFee
 
 logger = logging.getLogger("investing_algorithm_framework")
 
 
 class Order(BaseModel):
-
+    """
+    Order model class to represent an order of the trading bot
+    """
     def __init__(
         self,
         order_type,
@@ -40,10 +40,9 @@ class Order(BaseModel):
         cost=None,
         fee=None,
         position_id=None,
-        stop_loss=None,
-        stop_loss_percentage=None,
-        trailing_stop_loss=None,
-        trailing_stop_loss_percentage=None,
+        order_fee=None,
+        order_fee_currency=None,
+        order_fee_rate=None
     ):
         if target_symbol is None:
             raise OperationalException("Target symbol is not specified")
@@ -80,11 +79,10 @@ class Order(BaseModel):
         self.remaining = remaining
         self.cost = cost
         self.fee = fee
-        self.stop_loss = stop_loss
-        self.stop_loss_percentage = stop_loss_percentage
-        self.trailing_stop_loss = trailing_stop_loss
-        self.trailing_stop_loss_percentage = trailing_stop_loss_percentage
         self._available_amount = self.filled
+        self.order_fee = order_fee
+        self.order_fee_currency = order_fee_currency
+        self.order_fee_rate = order_fee_rate
 
     def get_id(self):
         return self.id
@@ -106,6 +104,24 @@ class Order(BaseModel):
 
     def set_price(self, price):
         self.price = price
+
+    def get_order_fee_currency(self):
+        return self.order_fee_currency
+
+    def set_order_fee_currency(self, order_fee_currency):
+        self.order_fee_currency = order_fee_currency
+
+    def get_order_fee_rate(self):
+        return self.order_fee_rate
+
+    def set_order_fee_rate(self, order_fee_rate):
+        self.order_fee_rate = order_fee_rate
+
+    def get_order_fee(self):
+        return self.order_fee
+
+    def set_order_fee(self, order_fee):
+        self.order_fee = order_fee
 
     def get_order_size(self):
         return self.order_side
@@ -232,7 +248,20 @@ class Order(BaseModel):
     def available_amount(self, available_amount):
         self.set_available_amount(available_amount)
 
-    def to_dict(self):
+    def to_dict(self, datetime_format=None):
+
+        if datetime_format is not None:
+            created_at = self.created_at.strftime(datetime_format) \
+                if self.created_at else None
+            updated_at = self.updated_at.strftime(datetime_format) \
+                if self.updated_at else None
+            trade_closed_at = self.trade_closed_at.strftime(datetime_format) \
+                if self.trade_closed_at else None
+        else:
+            created_at = self.created_at
+            updated_at = self.updated_at
+            trade_closed_at = self.trade_closed_at
+
         return {
             "external_id": self.external_id,
             "target_symbol": self.target_symbol,
@@ -243,18 +272,16 @@ class Order(BaseModel):
             "price": self.price,
             "amount": self.amount,
             "net_gain": self.net_gain,
-            "trade_closed_at": self.trade_closed_at,
+            "trade_closed_at": trade_closed_at,
             "trade_closed_price": self.trade_closed_price,
-            "created_at": self.created_at,
-            "updated_at": self.updated_at,
+            "created_at": created_at,
+            "updated_at": updated_at,
             "filled": self.filled,
             "remaining": self.remaining,
             "cost": self.cost,
-            "fee": self.fee.to_dict() if self.fee is not None else None,
-            "stop_loss": self.stop_loss,
-            "stop_loss_percentage": self.stop_loss_percentage,
-            "trailing_stop_loss": self.trailing_stop_loss,
-            "trailing_stop_loss_percentage": self.trailing_stop_loss_percentage
+            "order_fee_currency": self.order_fee_currency,
+            "order_fee_rate": self.order_fee_rate,
+            "order_fee": self.order_fee,
         }
 
     @staticmethod
@@ -290,14 +317,32 @@ class Order(BaseModel):
             cost=data.get("cost", None),
             fee=data.get("fee", None),
             created_at=created_at,
-            updated_at=updated_at
+            updated_at=updated_at,
+            order_fee=data.get("order_fee", None),
+            order_fee_currency=data.get("order_fee_currency", None),
+            order_fee_rate=data.get("order_fee_rate", None),
         )
 
     @staticmethod
     def from_ccxt_order(ccxt_order):
+        """
+        Create an Order object from a ccxt order object
+        :param ccxt_order: ccxt order object
+        :return: Order object
+        """
         status = OrderStatus.from_value(ccxt_order["status"])
         target_symbol = ccxt_order.get("symbol").split("/")[0]
         trading_symbol = ccxt_order.get("symbol").split("/")[1]
+        ccxt_fee = ccxt_order.get("fee", None)
+        order_fee = None
+        order_fee_currency = None
+        order_fee_rate = None
+
+        if ccxt_fee is not None:
+            order_fee = ccxt_fee.get("cost", None)
+            order_fee_currency = ccxt_fee.get("currency", None)
+            order_fee_rate = ccxt_fee.get("rate", None)
+
         return Order(
             external_id=ccxt_order.get("id", None),
             target_symbol=target_symbol,
@@ -310,7 +355,9 @@ class Order(BaseModel):
             filled=ccxt_order.get("filled", None),
             remaining=ccxt_order.get("remaining", None),
             cost=ccxt_order.get("cost", None),
-            fee=OrderFee.from_ccxt_fee(ccxt_order.get("fee", None)),
+            order_fee=order_fee,
+            order_fee_currency=order_fee_currency,
+            order_fee_rate=order_fee_rate,
             created_at=parse(ccxt_order.get("datetime", None))
         )
 

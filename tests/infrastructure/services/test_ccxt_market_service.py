@@ -16,5 +16,6 @@
 #         self.start_algorithm()
 #
 #     def test(self) -> None:
-#         market_service = self.algo_app.algorithm.get_market_service("binance")
+#         market_service = self.algo_app.algorithm
+#         .get_market_service("binance")
 #         self.assertIsNotNone(market_service.exchange_class)

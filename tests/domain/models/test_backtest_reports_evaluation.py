@@ -28,15 +28,5 @@ class Test(TestCase):
         path = os.path.join(self.resource_dir, "backtest_reports_for_testing")
         reports = load_backtest_reports(path)
         evaluation = BacktestReportsEvaluation(reports)
-        self.assertEqual(len(evaluation.backtest_reports), 27)
-        first_backtest_report = evaluation.backtest_reports[0]
-        time_frame = (
-            first_backtest_report.backtest_start_date,
-            first_backtest_report.backtest_end_date
-        )
-        self.assertEqual(evaluation.profit_order[time_frame][0].name, "22-75-150")
-        self.assertEqual(evaluation.profit_order[time_frame][1].name, "23-75-150")
-        self.assertEqual(evaluation.profit_order[time_frame][2].name, "21-75-150")
-        self.assertEqual(evaluation.growth_order[time_frame][0].name, "22-75-150")
-        self.assertEqual(evaluation.growth_order[time_frame][1].name, "23-75-150")
-        self.assertEqual(evaluation.growth_order[time_frame][2].name, "25-75-150")
+        self.assertEqual(len(evaluation.backtest_reports), 6)
+        self.assertEqual("10-50-100", evaluation.profit_order[0].name)

@@ -62,15 +62,14 @@ class TestOrderBacktestService(TestBase):
         self.app.container.order_service.override(
             OrderBacktestService(
                 order_repository=self.app.container.order_repository(),
-                order_fee_repository=self.app.container.order_fee_repository(),
                 position_repository=self.app.container.position_repository(),
                 portfolio_repository=self.app.container.portfolio_repository(),
-                portfolio_configuration_service=self.app.container\
-                    .portfolio_configuration_service(),
-                portfolio_snapshot_service=self.app.container\
-                    .portfolio_snapshot_service(),
-                configuration_service=self.app.container.\
-                    configuration_service(),
+                portfolio_configuration_service=self.app.container.
+                portfolio_configuration_service(),
+                portfolio_snapshot_service=self.app.container.
+                portfolio_snapshot_service(),
+                configuration_service=self.app.container.
+                configuration_service(),
                 market_data_source_service=backtest_market_data_source_service
             )
         )
@@ -231,7 +230,7 @@ class TestOrderBacktestService(TestBase):
     def test_update_sell_order_with_successful_order(self):
         pass
 
-    def test_update_sell_order_with_successful_order_filled_and_closing_partial_buy_orders(self):
+    def test_update_closing_partial_buy_orders(self):
         order_service = self.app.container.order_service()
         config = self.app.config
         config[BACKTESTING_INDEX_DATETIME] = datetime.utcnow()

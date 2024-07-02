@@ -41,4 +41,3 @@ class Test(TestCase):
         self.assertEqual(
             order.get_created_at(), datetime(2017, 8, 17, 12, 42, 48)
         )
-
