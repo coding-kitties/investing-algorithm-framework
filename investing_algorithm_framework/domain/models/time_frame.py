@@ -36,6 +36,15 @@ class TimeFrame(Enum):
                     if value == entry.value.replace("H", "h"):
                         return entry
 
+                # For hour timeframes compare with and without H
+                if "d" in entry.value:
+
+                    if value == entry.value:
+                        return entry
+
+                    if value == entry.value.replace("d", "D"):
+                        return entry
+
                 if value == entry.value:
                     return entry
 

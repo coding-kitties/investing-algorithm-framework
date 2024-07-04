@@ -356,7 +356,6 @@ class CCXTMarketService(MarketService):
     def get_ohlcv(
         self, symbol, time_frame, from_timestamp, market, to_timestamp=None
     ) -> pl.DataFrame:
-        time_frame = TimeFrame.from_value(time_frame).value
 
         if self.config is not None and "DATETIME_FORMAT" in self.config:
             datetime_format = self.config["DATETIME_FORMAT"]
@@ -414,6 +413,10 @@ class CCXTMarketService(MarketService):
         # Combine the Series into a DataFrame with given column names
         df = pl.DataFrame(data)
 
+        # Check if width is 0
+        if len(df) == 0:
+            return df
+
         # Assign column names after DataFrame creation
         df.columns = col_names
         return df
@@ -427,7 +430,6 @@ class CCXTMarketService(MarketService):
         to_timestamp=None
     ) -> Dict[str, pl.DataFrame]:
         ohlcvs = {}
-        time_frame = TimeFrame.from_value(time_frame).value
 
         for symbol in symbols:
 

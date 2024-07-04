@@ -243,9 +243,7 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
             symbol=symbol,
         )
         self._window_size = window_size
-
-        if timeframe is not None:
-            self._timeframe = TimeFrame.from_value(timeframe)
+        self._timeframe = timeframe
 
     @property
     def timeframe(self):
@@ -265,6 +263,16 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
     @property
     def window_size(self):
         return self._window_size
+
+    @window_size.setter
+    def window_size(self, value):
+
+        if not isinstance(value, int):
+            raise OperationalException(
+                "Window size must be an integer"
+            )
+
+        self._window_size = value
 
     def get_date_ranges(
         self,

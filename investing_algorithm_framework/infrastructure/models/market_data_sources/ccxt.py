@@ -119,7 +119,7 @@ class CCXTOHLCVBacktestMarketDataSource(
             market_service.config = config
             ohlcv = market_service.get_ohlcv(
                 symbol=self.symbol,
-                time_frame=self.timeframe.value,
+                time_frame=self.timeframe,
                 from_timestamp=backtest_data_start_date,
                 to_timestamp=backtest_end_date,
                 market=self.market
@@ -142,7 +142,7 @@ class CCXTOHLCVBacktestMarketDataSource(
         OHLCV_{symbol}_{market}_{timeframe}_{start_date}_{end_date}.csv
         """
         symbol_string = self.symbol.replace("/", "-")
-        time_frame_string = self.timeframe.value.replace("_", "")
+        time_frame_string = self.timeframe.replace("_", "")
         backtest_data_start_date = \
             self.backtest_data_start_date.strftime(DATETIME_FORMAT_BACKTESTING)
         backtest_data_end_date = \
