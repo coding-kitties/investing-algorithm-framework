@@ -62,4 +62,4 @@ class Test(TestCase):
             market="BITVAVO",
             symbol="BTC/EUR",
         )
-        self.assertEqual("15m", ccxt_ohlcv_market_data_source.timeframe.value)
+        self.assertEqual("15m", ccxt_ohlcv_market_data_source.timeframe)

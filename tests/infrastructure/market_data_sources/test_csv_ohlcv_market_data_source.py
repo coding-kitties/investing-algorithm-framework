@@ -196,4 +196,4 @@ class Test(TestCase):
             timeframe="2h",
             window_size=10,
         )
-        self.assertEqual(TimeFrame.TWO_HOUR, datasource.get_timeframe())
+        self.assertTrue(TimeFrame.TWO_HOUR.equals(datasource.get_timeframe()))
