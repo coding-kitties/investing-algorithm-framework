@@ -356,6 +356,20 @@ class CCXTMarketService(MarketService):
     def get_ohlcv(
         self, symbol, time_frame, from_timestamp, market, to_timestamp=None
     ) -> pl.DataFrame:
+        """
+        Function to retrieve ohlcv data for a symbol, time frame and market
+
+        Args:
+            symbol: The symbol to retrieve ohlcv data for
+            time_frame: The time frame to retrieve ohlcv data for
+            from_timestamp: The start date to retrieve ohlcv data from
+            market: The market to retrieve ohlcv data from
+            to_timestamp: The end date to retrieve ohlcv data to
+
+        Returns:
+            DataFrame: The ohlcv data for the symbol, time frame and market
+            in polars DataFrame format
+        """
 
         if self.config is not None and "DATETIME_FORMAT" in self.config:
             datetime_format = self.config["DATETIME_FORMAT"]
@@ -413,8 +427,8 @@ class CCXTMarketService(MarketService):
         # Combine the Series into a DataFrame with given column names
         df = pl.DataFrame(data)
 
-        # Check if width is 0
-        if len(df) == 0:
+        # Check if DataFrame is empty (either rows or columns)
+        if df.shape[0] == 0 or df.shape[1] == 0:
             return df
 
         # Assign column names after DataFrame creation
