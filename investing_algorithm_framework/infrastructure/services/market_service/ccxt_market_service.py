@@ -8,7 +8,7 @@ import polars as pl
 from dateutil import parser
 
 from investing_algorithm_framework.domain import OperationalException, Order, \
-    MarketService, DATETIME_FORMAT, TimeFrame
+    MarketService, DATETIME_FORMAT
 
 logger = logging.getLogger(__name__)
 
