@@ -87,7 +87,7 @@
 #         for root, dirs, files in os.walk(path):
 #             for file in files:
 #                 zipfile.write(os.path.join(root, file),
-#                               os.path.relpath(os.path.join(root, file), path))
+#                 os.path.relpath(os.path.join(root, file), path))
 
 #     shutil.make_archive('myfunctionapp', 'zip', 'myfunctionapp/')
 
