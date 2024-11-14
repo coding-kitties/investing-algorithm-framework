@@ -17,8 +17,6 @@ from investing_algorithm_framework.infrastructure import \
     CCXTTickerMarketDataSource, CSVOHLCVMarketDataSource, \
     CSVTickerMarketDataSource
 from .create_app import create_app
-from investing_algorithm_framework.services import \
-    create_trade_exit_markers_chart, create_trade_entry_markers_chart
 
 __all__ = [
     "Algorithm",
