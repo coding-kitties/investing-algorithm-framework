@@ -4,16 +4,18 @@ from azure.identity import DefaultAzureCredential
 from azure.mgmt.resource import ResourceManagementClient
 from azure.mgmt.storage import StorageManagementClient
 from azure.mgmt.web import WebSiteManagementClient
-from zipfile import ZipFile
 import shutil
+
 
 def deploy_to_azure_functions(azure_credentials_json, azure_function_path):
     """
     This function deploys a Python function app to Azure Functions.
 
     Parameters:
-        - azure_credentials_json (str): Path to the Azure credentials JSON file.
-        - azure_function_path (str): Path to the Python function app directory.
+        - azure_credentials_json (str): Path to the Azure credentials
+        JSON file.
+        - azure_function_path (str): Path to the Python function
+        app directory.
 
     Returns:
         None
@@ -28,7 +30,6 @@ def deploy_to_azure_functions(azure_credentials_json, azure_function_path):
     LOCATION = "eastus"
     STORAGE_ACCOUNT_NAME = "mystorageaccount123"
     FUNCTION_APP_NAME = "my-python-function-app"
-    APP_SERVICE_PLAN_NAME = "myAppServicePlan"
 
     # Authenticate using DefaultAzureCredential
     credential = DefaultAzureCredential()
@@ -56,13 +57,22 @@ def deploy_to_azure_functions(azure_credentials_json, azure_function_path):
     # Create Function App (with a Consumption Plan)
     site_config = {
         "location": LOCATION,
-        "server_farm_id": f"/subscriptions/{SUBSCRIPTION_ID}/resourceGroups/{RESOURCE_GROUP_NAME}/providers/Microsoft.Web/serverfarms/{APP_SERVICE_PLAN_NAME}",
+        "server_farm_id": f"/subscriptions/{SUBSCRIPTION_ID}" +
+        "/resourceGroups" +
+        "/{RESOURCE_GROUP_NAME}/providers/Microsoft.Web/" +
+        "serverfarms/{APP_SERVICE_PLAN_NAME}",
         "reserved": True,  # This is necessary for Linux-based function apps
         "site_config": {
             "app_settings": [
-                {"name": "FUNCTIONS_WORKER_RUNTIME", "value": "python"},
-                {"name": "AzureWebJobsStorage",
-                 "value": f"DefaultEndpointsProtocol=https;AccountName={STORAGE_ACCOUNT_NAME};AccountKey=<account_key>"},
+                {
+                    "name": "FUNCTIONS_WORKER_RUNTIME", "value": "python"
+                },
+                {
+                    "name": "AzureWebJobsStorage",
+                    "value": "DefaultEndpointsProtocol=https;" + \
+                    f"AccountName={STORAGE_ACCOUNT_NAME}" + \
+                    ";AccountKey=account_key>",
+                }
             ]
         },
         "kind": "functionapp",

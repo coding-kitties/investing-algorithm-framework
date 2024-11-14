@@ -1,13 +1,22 @@
 from datetime import datetime
 from typing import Union
 
+
 class DateRange:
     """
-    DateRange class. This class is used to define a date range and the name of the range.
-    Also, it can be used to store trading metadata such as classification of the trend (Up or Down).
+    DateRange class. This class is used to define a date range and the name of
+    the range. Also, it can be used to store trading metadata such as
+    classification of the trend (Up or Down).
     """
 
-    def __init__(self, start_date: datetime, end_date: datetime, name: str, up_trend: bool = False, down_trend: bool = False):
+    def __init__(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        name: str,
+        up_trend: bool = False,
+        down_trend: bool = False
+    ):
         self.start_date = start_date
         self.end_date = end_date
         self.name = name
@@ -21,7 +30,7 @@ class DateRange:
             return True
         else:
             return None
-        
+
     @up_trend.setter
     def up_trend(self, value: bool):
         self._up_trend = value
@@ -33,13 +42,15 @@ class DateRange:
             return True
         else:
             return None
-    
+
     @down_trend.setter
     def down_trend(self, value: bool):
         self._down_trend = value
-    
+
     def __str__(self):
         return f"DateRange({self.start_date}, {self.end_date}, {self.name})"
-    
+
     def __repr__(self):
-        return f"DateRange(Name:  {self.name} Start date: {self.start_date} End date: {self.end_date})"
+        return f"DateRange(Name: {self.name} " + \
+            f"Start date: {self.start_date} " + \
+            f"End date: {self.end_date})"

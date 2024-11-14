@@ -56,7 +56,7 @@ class PandasOHLCVBacktestMarketDataSource(
             )
 
         if not self.dataframe.columns == \
-            ["Datetime", "Open", "High", "Low", "Close", "Volume"]:
+                ["Datetime", "Open", "High", "Low", "Close", "Volume"]:
             raise OperationalException(
                 "Provided dataframe does not have all required columns. "
                 "Your pandas dataframe should have the following columns: "
@@ -150,17 +150,17 @@ class PandasOHLCVMarketDataSource(OHLCVMarketDataSource):
             )
 
         # Slice the pandas dataframe object
-        return self.dataframe[ "Datetime" >= start_date]
-
+        return self.dataframe["Datetime" >= start_date]
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
-        return CCXTOHLCVBacktestMarketDataSource(
-            identifier=self.identifier,
-            market=self.market,
-            symbol=self.symbol,
-            time_frame=self.time_frame,
-            window_size=self.window_size
-        )
+        # return CCXTOHLCVBacktestMarketDataSource(
+        #     identifier=self.identifier,
+        #     market=self.market,
+        #     symbol=self.symbol,
+        #     time_frame=self.time_frame,
+        #     window_size=self.window_size
+        # )
+        return None
 
     def _validate_dataframe_with_ohlcv_structure(self):
         """
@@ -174,7 +174,7 @@ class PandasOHLCVMarketDataSource(OHLCVMarketDataSource):
             )
 
         if not self.dataframe.columns == \
-            ["Datetime", "Open", "High", "Low", "Close", "Volume"]:
+                ["Datetime", "Open", "High", "Low", "Close", "Volume"]:
             raise OperationalException(
                 "Provided dataframe does not have all required columns. "
                 "Your pandas dataframe should have the following columns: "

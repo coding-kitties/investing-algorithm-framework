@@ -1,16 +1,16 @@
 import importlib.util
 
 if importlib.util.find_spec("scipy") is None \
-    or importlib.util.find_spec("tulipy") is None \
-    or importlib.util.find_spec("numpy") is None \
-    or importlib.util.find_spec("collections") is None:
+        or importlib.util.find_spec("tulipy") is None \
+        or importlib.util.find_spec("numpy") is None \
+        or importlib.util.find_spec("collections") is None:
     raise ImportError("You have not installed the the indicators package")
 
 
 from scipy.signal import argrelextrema
 from collections import deque
-import tulipy as tp
 import numpy as np
+
 
 def get_higher_lows(data: np.array, order=5, K=2):
     '''
@@ -40,6 +40,7 @@ def get_higher_lows(data: np.array, order=5, K=2):
             extrema.append(ex_deque.copy())
 
     return extrema
+
 
 def get_lower_highs(data: np.array, order=5, K=2):
     '''
@@ -72,6 +73,7 @@ def get_lower_highs(data: np.array, order=5, K=2):
 
     return extrema
 
+
 def get_higher_highs(data: np.array, order=5, K=None):
     '''
     Finds consecutive higher highs in price pattern.
@@ -83,11 +85,11 @@ def get_higher_highs(data: np.array, order=5, K=None):
     # Get highs
     high_idx = argrelextrema(data, np.greater_equal, order=order)[0]
     highs = data[high_idx]
-    
+
     # Ensure consecutive highs are higher than previous highs
     extrema = []
     ex_deque = deque(maxlen=K)
-    
+
     for i, idx in enumerate(high_idx):
 
         if i == 0:
@@ -104,6 +106,7 @@ def get_higher_highs(data: np.array, order=5, K=None):
     idx = np.array([i[-1] + order for i in extrema])
     idx = idx[np.where(idx < len(data))]
     return idx
+
 
 def get_lower_lows(data: np.array, order=5, K=2):
     '''
@@ -151,6 +154,7 @@ def get_lower_lows(data: np.array, order=5, K=2):
 
     return extrema
 
+
 def get_higher_high_index(data: np.array, order=5, K=2):
     # extrema = get_higher_highs(data, order, K)
     # idx = np.array([i[-1] + order for i in extrema])
@@ -163,15 +167,18 @@ def get_lower_highs_index(data: np.array, order=5, K=2):
     idx = np.array([i[-1] + order for i in extrema])
     return idx[np.where(idx < len(data))]
 
+
 def get_lower_lows_index(data: np.array, order=5, K=2):
     extrema = get_lower_lows(data, order, K)
     idx = np.array([i[-1] + order for i in extrema])
     return idx[np.where(idx < len(data))]
 
+
 def get_higher_lows_index(data: np.array, order=5, K=2):
     extrema = get_higher_lows(data, order, K)
     idx = np.array([i[-1] + order for i in extrema])
     return idx[np.where(idx < len(data))]
+
 
 def get_peaks(data, key, order=5, k=None):
     """

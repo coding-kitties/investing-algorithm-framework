@@ -288,7 +288,8 @@ class CCXTTickerBacktestMarketDataSource(
 
         When downloading the data it will use the ccxt library.
         """
-        total_minutes = TimeFrame.from_string(self.time_frame).amount_of_minutes
+        total_minutes = TimeFrame.from_string(self.time_frame)\
+            .amount_of_minutes
         self.backtest_data_start_date = \
             backtest_start_date - timedelta(minutes=total_minutes)
         self.backtest_data_end_date = backtest_end_date
@@ -427,14 +428,20 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
         This implementation uses the CCXTMarketService to get the OHLCV data.
 
         Parameters:
-            window_size: int (optional) - the total amount of candle sticks that need to be returned
-            start_date: datetime (optional) - the start date of the data. The first candle stick should close to this date.
-            end_date: datetime (optional) - the end date of the data. The last candle stick should close to this date.
-            storage_path: string (optional) - the storage path specifies the directory where the data is written to or read from.
-                If set the data provider will write all its downloaded data to this location. Also, it will check if the 
-                data already exists at the storage location. If this is the case it will return this.
+            window_size: int (optional) - the total amount of candle
+            sticks that need to be returned
+            start_date: datetime (optional) - the start date of the data. The
+            first candle stick should close to this date.
+            end_date: datetime (optional) - the end date of the data. The last
+            candle stick should close to this date.
+            storage_path: string (optional) - the storage path specifies the
+            directory where the data is written to or read from.
+                If set the data provider will write all its downloaded data
+                to this location. Also, it will check if the
+                data already exists at the storage location. If this is the
+                case it will return this.
 
-        Returns 
+        Returns
             polars.DataFrame with the OHLCV data
         """
         market_service = CCXTMarketService(
@@ -484,12 +491,12 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
             raise OperationalException(
                 "start_date should be a datetime object"
             )
-        
+
         if "storage_path" in kwargs:
             storage_path = kwargs["storage_path"]
         else:
             storage_path = self.get_storage_path()
-        
+
         data = None
 
         if storage_path is not None:
@@ -524,7 +531,7 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
                 to_timestamp=end_date,
                 market=self.market
             )
-            
+
         return data
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
@@ -549,12 +556,13 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
         Function to get data from the storage path:
 
         Parameters:
-            storage_path: string - the storage path where the data should be in.
+            storage_path: string - the storage path where the
+            data should be in.
 
         Return:
             Polars dataframe.
         """
-        
+
         if not os.path.isdir(storage_path):
             return None
 
@@ -563,7 +571,7 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
 
         for filename in os.listdir(storage_path):
             path = os.path.join(storage_path, filename)
-            
+
             if os.path.isfile(path) or path.split('.')[-1] != ".csv":
                 continue
 
@@ -574,12 +582,12 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
             file_name_end_date = self.get_file_name_end_date(path)
 
             if file_name_symbol == symbol \
-                and file_name_market == market \
-                and file_name_time_frame == time_frame \
-                and file_name_start_date >= from_timestamp \
-                and file_name_end_date <= to_timestamp:
+                    and file_name_market == market \
+                    and file_name_time_frame == time_frame \
+                    and file_name_start_date >= from_timestamp \
+                    and file_name_end_date <= to_timestamp:
                 return polars.read_csv(path)
-        
+
         return None
 
     def write_data_to_storage(
@@ -596,8 +604,10 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
         Function to write data to the storage path:
 
         Parameters:
-            data: polars.DataFrame - the data that should be written to the storage path.
-            storage_path: string - the storage path where the data should be written to.
+            data: polars.DataFrame - the data that should be written to the
+                storage path.
+            storage_path: string - the storage path where the data should
+                be written to.
             symbol: string - the symbol of the data.
             time_frame: string - the time_frame of the data.
             from_timestamp: datetime - the start date of the data.
@@ -607,10 +617,10 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
         Return:
             None
         """
-        
+
         if not os.path.isdir(storage_path):
             os.mkdir(storage_path)
-        
+
         file_path = self.create_storage_file_path(
             storage_path=storage_path,
             symbol=symbol,
@@ -622,7 +632,7 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
 
         if os.path.isfile(file_path):
             return
-        
+
         else:
             try:
                 with open(file_path, 'w') as _:
@@ -632,7 +642,7 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
                 raise OperationalException(
                     f"Could not create data file {file_path}"
                 )
-            
+
             data.write_csv(file_path)
 
 

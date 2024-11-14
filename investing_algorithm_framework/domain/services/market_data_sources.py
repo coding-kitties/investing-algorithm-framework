@@ -160,7 +160,7 @@ class MarketDataSource(ABC):
         identifier,
         market,
         symbol,
-        storage_path = None
+        storage_path=None
     ):
         self._identifier = identifier
         self._market = market
@@ -200,11 +200,11 @@ class MarketDataSource(ABC):
 
     def get_symbol(self):
         return self.symbol
-    
+
     @property
     def storage_path(self):
         return self._storage_path
-    
+
     def get_storage_path(self):
         return self.storage_path
 
@@ -236,29 +236,32 @@ class MarketDataSource(ABC):
     @staticmethod
     def get_file_name_symbol(file_path):
         """
-        Static function that extracts the symbol from a give data filepath, given that the 
-        data file path is in the format 
-        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_{time_frame}_{START_DATETIME}_{END_DATETIME}.csv
+        Static function that extracts the symbol from a give data filepath,
+        given that the data file path is in the format
+        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_
+        {time_frame}_{START_DATETIME}_{END_DATETIME}.csv
 
         Parameters:
-            file_path: str - the given file path of the data storage file
+            file_path: str - the given file path of
+            the data storage file
 
         Returns:
             string representing the symbol
         """
         parts = file_path.split("_")
-        
+
         if len(parts) < 6:
             return None
-        
+
         return "".join([parts[1], '/', parts[2]])
-    
+
     @staticmethod
     def get_file_name_time_frame(file_path):
         """
-        Static function that extracts the time_frame from a give data filepath, given that the 
-        data file path is in the format 
-        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_{time_frame}_{START_DATETIME}_{END_DATETIME}.csv
+        Static function that extracts the time_frame from a give data filepath,
+        given that the data file path is in the format
+        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_
+        {time_frame}_{START_DATETIME}_{END_DATETIME}.csv
 
         Parameters:
             file_path: str - the given file path of the data storage file
@@ -267,18 +270,19 @@ class MarketDataSource(ABC):
             string representing the time_frame
         """
         parts = file_path.split("_")
-        
+
         if len(parts) < 6:
             return None
-        
+
         return TimeFrame.from_string(parts[4])
-    
+
     @staticmethod
     def get_file_name_market(file_path):
         """
-        Static function that extracts the time_frame from a give data filepath, given that the 
-        data file path is in the format 
-        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_{time_frame}_{START_DATETIME}_{END_DATETIME}.csv
+        Static function that extracts the time_frame from a give data filepath,
+        given that the data file path is in the format
+        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}
+        _{time_frame}_{START_DATETIME}_{END_DATETIME}.csv
 
         Parameters:
             file_path: str - the given file path of the data storage file
@@ -287,18 +291,19 @@ class MarketDataSource(ABC):
             string representing the market
         """
         parts = file_path.split("_")
-        
+
         if len(parts) < 6:
             return None
-        
+
         return TimeFrame.from_string(parts[3])
-    
+
     @staticmethod
     def get_file_name_start_datetime(file_path):
         """
-        Static function that extracts the time_frame from a give data filepath, given that the 
-        data file path is in the format 
-        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_{time_frame}_{START_DATETIME}_{END_DATETIME}.csv
+        Static function that extracts the time_frame from a give data filepath,
+        given that the data file path is in the format
+        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_
+        {time_frame}_{START_DATETIME}_{END_DATETIME}.csv
 
         Parameters:
             file_path: str - the given file path of the data storage file
@@ -307,18 +312,20 @@ class MarketDataSource(ABC):
             string representing the start datetime
         """
         parts = file_path.split("_")
-        
+
         if len(parts) < 6:
             return None
-        
+
         return TimeFrame.from_string(parts[5])
-    
+
     @staticmethod
     def get_file_name_end_datetime(file_path):
         """
-        Static function that extracts the time_frame from a give data filepath, given that the 
-        data file path is in the format 
-        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_{time_frame}_{START_DATETIME}_{END_DATETIME}.csv
+        Static function that extracts the time_frame
+        from a give data filepath, given that the data file
+        path is in the format
+        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_
+        {time_frame}_{START_DATETIME}_{END_DATETIME}.csv
 
         Parameters:
             file_path: str - the given file path of the data storage file
@@ -327,12 +334,12 @@ class MarketDataSource(ABC):
             string representing the end datetime
         """
         parts = file_path.split("_")
-        
+
         if len(parts) < 6:
             return None
-        
+
         return TimeFrame.from_string(parts[6])
-    
+
     @staticmethod
     def create_storage_file_path(
         storage_path,
@@ -362,10 +369,11 @@ class MarketDataSource(ABC):
         target_symbol, trading_symbol = symbol.split('/')
         path = os.path.join(
             storage_path,
-            f"{data_type}_{target_symbol}_{trading_symbol}_{market}_{time_frame}_{start_datetime}_{end_datetime}.csv"
+            f"{data_type}_{target_symbol}_{trading_symbol}_{market}_" +
+            f"{time_frame}_{start_datetime}_{end_datetime}.csv"
         )
-        print(path)
         return path
+
 
 class OHLCVMarketDataSource(MarketDataSource, ABC):
     """
