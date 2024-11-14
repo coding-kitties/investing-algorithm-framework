@@ -61,7 +61,7 @@ bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
     identifier="BTC-ohlcv",
     market="BITVAVO",
     symbol="BTC/EUR",
-    timeframe="2h",
+    time_frame="2h",
     window_size=200
 )
 # Ticker data for orders, trades and positions
