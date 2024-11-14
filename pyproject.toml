@@ -26,12 +26,6 @@ jupyter = "^1.0.0"
 
 [tool.poetry.extras]
 metrics = ["numpy", "scipy"]
-deploy = [
-    "azure-identity >= 1.6.0",
-    "azure-mgmt-resource >= 23.1.1",
-    "azure-mgmt-storage >= 21.2.1",
-    "azure.mgmt.web >= 7.3.1"
-]
 
 [tool.poetry.group.test.dependencies]
 coverage= "7.4.2"
