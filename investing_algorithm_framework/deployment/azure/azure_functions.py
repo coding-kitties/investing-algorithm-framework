@@ -69,8 +69,8 @@ def deploy_to_azure_functions(azure_credentials_json, azure_function_path):
                 },
                 {
                     "name": "AzureWebJobsStorage",
-                    "value": "DefaultEndpointsProtocol=https;" + \
-                    f"AccountName={STORAGE_ACCOUNT_NAME}" + \
+                    "value": "DefaultEndpointsProtocol=https;" +
+                    f"AccountName={STORAGE_ACCOUNT_NAME}" +
                     ";AccountKey=account_key>",
                 }
             ]
