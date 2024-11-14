@@ -63,6 +63,42 @@ def create_prices_graph(
         name=graph_name
     )
 
+def create_line_graph(
+    data: pd.DataFrame,
+    data_key="Close",
+    graph_name="Line",
+    color="blue",
+    line_width=1
+):
+    """
+    Create a graph for the close prices. By default, the key is set to 'Close'.
+
+    Args:
+        data (pd.DataFrame): The data to plot
+        data_key (str): The key to use for the prices
+        graph_name (str): The name of the graph
+        color (str): The color of the graph
+        line_width (int): The width of the line
+
+    Returns:
+        go.Scatter: The Plotly graph object
+    """
+
+    # Check if the index is of type datetime
+    if not isinstance(data.index, pd.DatetimeIndex):
+        raise ValueError("The index of the data should be of type datetime")
+    
+    # Check if the data key column exists
+    if data_key not in data.columns:
+        raise ValueError(f"The data should have a '{data_key}' column")
+
+    return go.Scatter(
+        x=data.index,
+        y=data[data_key],
+        mode='lines',
+        line=dict(color=color, width=line_width),
+        name=graph_name
+    )
 
 def create_adx_graph(data: pd.DataFrame):
     """

@@ -96,7 +96,7 @@ class BacktestMarketDataSource(ABC):
         :param kwargs: Additional arguments to get the data. Common arguments
         - start_date: datetime
         - end_date: datetime
-        - timeframe: str
+        - time_frame: str
         - backtest_start_date: datetime
         - backtest_end_date: datetime
         - backtest_data_index_date: datetime
@@ -160,12 +160,14 @@ class MarketDataSource(ABC):
         identifier,
         market,
         symbol,
+        storage_path = None
     ):
         self._identifier = identifier
         self._market = market
         self._symbol = symbol
         self._market_credential_service = None
         self._config = None
+        self._storage_path = storage_path
 
     @property
     def config(self):
@@ -198,6 +200,13 @@ class MarketDataSource(ABC):
 
     def get_symbol(self):
         return self.symbol
+    
+    @property
+    def storage_path(self):
+        return self._storage_path
+    
+    def get_storage_path(self):
+        return self.storage_path
 
     @abstractmethod
     def get_data(self, **kwargs):
@@ -206,7 +215,7 @@ class MarketDataSource(ABC):
         :param kwargs: Additional arguments to get the data. Common arguments
         - start_date: datetime
         - end_date: datetime
-        - timeframe: str
+        - time_frame: str
 
         :return: Object with the data
         """
@@ -224,6 +233,139 @@ class MarketDataSource(ABC):
     def market_credential_service(self, value):
         self._market_credential_service = value
 
+    @staticmethod
+    def get_file_name_symbol(file_path):
+        """
+        Static function that extracts the symbol from a give data filepath, given that the 
+        data file path is in the format 
+        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_{time_frame}_{START_DATETIME}_{END_DATETIME}.csv
+
+        Parameters:
+            file_path: str - the given file path of the data storage file
+
+        Returns:
+            string representing the symbol
+        """
+        parts = file_path.split("_")
+        
+        if len(parts) < 6:
+            return None
+        
+        return "".join([parts[1], '/', parts[2]])
+    
+    @staticmethod
+    def get_file_name_time_frame(file_path):
+        """
+        Static function that extracts the time_frame from a give data filepath, given that the 
+        data file path is in the format 
+        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_{time_frame}_{START_DATETIME}_{END_DATETIME}.csv
+
+        Parameters:
+            file_path: str - the given file path of the data storage file
+
+        Returns:
+            string representing the time_frame
+        """
+        parts = file_path.split("_")
+        
+        if len(parts) < 6:
+            return None
+        
+        return TimeFrame.from_string(parts[4])
+    
+    @staticmethod
+    def get_file_name_market(file_path):
+        """
+        Static function that extracts the time_frame from a give data filepath, given that the 
+        data file path is in the format 
+        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_{time_frame}_{START_DATETIME}_{END_DATETIME}.csv
+
+        Parameters:
+            file_path: str - the given file path of the data storage file
+
+        Returns:
+            string representing the market
+        """
+        parts = file_path.split("_")
+        
+        if len(parts) < 6:
+            return None
+        
+        return TimeFrame.from_string(parts[3])
+    
+    @staticmethod
+    def get_file_name_start_datetime(file_path):
+        """
+        Static function that extracts the time_frame from a give data filepath, given that the 
+        data file path is in the format 
+        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_{time_frame}_{START_DATETIME}_{END_DATETIME}.csv
+
+        Parameters:
+            file_path: str - the given file path of the data storage file
+
+        Returns:
+            string representing the start datetime
+        """
+        parts = file_path.split("_")
+        
+        if len(parts) < 6:
+            return None
+        
+        return TimeFrame.from_string(parts[5])
+    
+    @staticmethod
+    def get_file_name_end_datetime(file_path):
+        """
+        Static function that extracts the time_frame from a give data filepath, given that the 
+        data file path is in the format 
+        {DATA_TYPE}_{TARGET_SYMBOL}_{TRADING_SYMBOL}_{MARKET}_{time_frame}_{START_DATETIME}_{END_DATETIME}.csv
+
+        Parameters:
+            file_path: str - the given file path of the data storage file
+
+        Returns:
+            string representing the end datetime
+        """
+        parts = file_path.split("_")
+        
+        if len(parts) < 6:
+            return None
+        
+        return TimeFrame.from_string(parts[6])
+    
+    @staticmethod
+    def create_storage_file_path(
+        storage_path,
+        data_type,
+        symbol,
+        market,
+        time_frame,
+        start_datetime,
+        end_datetime,
+    ):
+        """
+        Static function that creates a storage file path given the parameters
+
+        Parameters:
+            storage_path: str - the storage path of the data storage file
+            data_type: str - the type of data
+            symbol: str - the asset symbol
+            market: str - the market
+            time_frame: str - the time_frame
+            start_datetime: datetime - the start datetime
+            end_datetime: datetime - the end datetime
+
+        Returns:
+            string representing the storage file path
+        """
+
+        target_symbol, trading_symbol = symbol.split('/')
+        path = os.path.join(
+            storage_path,
+            f"{data_type}_{target_symbol}_{trading_symbol}_{market}_{time_frame}_{start_datetime}_{end_datetime}.csv"
+        )
+        print(path)
+        return path
 
 class OHLCVMarketDataSource(MarketDataSource, ABC):
     """
@@ -234,30 +376,32 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
         identifier,
         market,
         symbol,
-        timeframe,
+        time_frame,
         window_size=None,
+        storage_path=None,
     ):
         super().__init__(
             identifier=identifier,
             market=market,
             symbol=symbol,
+            storage_path=storage_path
         )
         self._window_size = window_size
-        self._timeframe = timeframe
+        self._time_frame = time_frame
 
     @property
-    def timeframe(self):
-        return self._timeframe
+    def time_frame(self):
+        return self._time_frame
 
-    def get_timeframe(self):
-        return self.timeframe
+    def get_time_frame(self):
+        return self.time_frame
 
-    def create_start_date(self, end_date, timeframe, window_size):
-        minutes = TimeFrame.from_value(timeframe).amount_of_minutes
+    def create_start_date(self, end_date, time_frame, window_size):
+        minutes = TimeFrame.from_value(time_frame).amount_of_minutes
         return end_date - timedelta(minutes=window_size * minutes)
 
-    def create_end_date(self, start_date, timeframe, window_size):
-        minutes = TimeFrame.from_value(timeframe).amount_of_minutes
+    def create_end_date(self, start_date, time_frame, window_size):
+        minutes = TimeFrame.from_value(time_frame).amount_of_minutes
         return start_date + timedelta(minutes=window_size * minutes)
 
     @property
@@ -279,11 +423,11 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
         start_date: datetime,
         end_date: datetime,
         window_size: int,
-        timeframe
+        time_frame
     ):
         """
         Function to get the date ranges of the market data source based
-        on the window size and the timeframe. The date ranges
+        on the window size and the time_frame. The date ranges
         will be calculated based on the start date and the end date.
         """
 
@@ -292,9 +436,9 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
                 "Start date must be before end date"
             )
 
-        timeframe = TimeFrame.from_value(timeframe)
+        time_frame = TimeFrame.from_value(time_frame)
         new_end_date = start_date + timedelta(
-            minutes=window_size * timeframe.amount_of_minutes
+            minutes=window_size * time_frame.amount_of_minutes
         )
         ranges = [(start_date, new_end_date)]
         start_date = new_end_date
@@ -304,7 +448,7 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
 
         while start_date < end_date:
             new_end_date = start_date + timedelta(
-                minutes=self.window_size * timeframe.amount_of_minutes
+                minutes=self.window_size * time_frame.amount_of_minutes
             )
 
             if new_end_date > end_date:

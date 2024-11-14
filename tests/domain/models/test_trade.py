@@ -57,7 +57,7 @@ class Test(TestCase):
             identifier="BTC",
             market="BITVAVO",
             symbol="BTC/EUR",
-            timeframe="15m",
+            time_frame="15m",
             csv_file_path=f"{resource_dir}/"
                           "market_data_sources_for_testing/"
                           "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07:07"

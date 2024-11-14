@@ -9,9 +9,8 @@ from .data_sources import bitvavo_btc_eur_ohlcv_2h, bitvavo_btc_eur_ticker, \
 This strategy is based on the golden cross strategy. It will buy when the
 fast moving average crosses the slow moving average from below. It will sell
 when the fast moving average crosses the slow moving average from above.
-
-The strategy will also check if the fast moving average is above the trend
-moving average. If it is not above the trend moving average it will not buy.
+The strategy will also check if the fast moving average is above the trend 
+moving average. If it is not above the trend moving average it will not buy. 
 
 It uses tulipy indicators to calculate the metrics. You need to 
 install this library in your environment to run this strategy.
@@ -19,6 +18,8 @@ You can find instructions on how to install tulipy here:
 https://tulipindicators.org/ or go directly to the pypi page:
 https://pypi.org/project/tulipy/
 """
+
+
 def is_below_trend(fast_series, slow_series):
     return fast_series[-1] < slow_series[-1]
 
@@ -87,7 +88,7 @@ class CrossOverStrategy(TradingStrategy):
                 )
 
             if algorithm.has_position(target_symbol) \
-                and is_below_trend(fast, slow):
+                    and is_below_trend(fast, slow):
                 open_trades = algorithm.get_open_trades(
                     target_symbol=target_symbol
                 )

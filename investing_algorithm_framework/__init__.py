@@ -11,7 +11,8 @@ from investing_algorithm_framework.domain import ApiException, \
     pretty_print_backtest_reports_evaluation, load_backtest_reports, \
     RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT, \
     load_backtest_report, BacktestDateRange, create_ema_graph, \
-    create_prices_graph, create_rsi_graph, get_price_efficiency_ratio
+    create_prices_graph, create_rsi_graph, get_price_efficiency_ratio, \
+    create_line_graph, convert_polars_to_pandas, DateRange
 from investing_algorithm_framework.infrastructure import \
     CCXTOrderBookMarketDataSource, CCXTOHLCVMarketDataSource, \
     CCXTTickerMarketDataSource, CSVOHLCVMarketDataSource, \
@@ -72,5 +73,8 @@ __all__ = [
     "create_ema_graph",
     "create_prices_graph",
     "create_rsi_graph",
-    "get_price_efficiency_ratio"
+    "get_price_efficiency_ratio",
+    "create_line_graph",
+    "convert_polars_to_pandas",
+    "DateRange"
 ]
