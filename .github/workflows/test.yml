@@ -92,7 +92,7 @@ jobs:
       #----------------------------------------------
       - name: Install library
         run: |
-          poetry install --no-interaction
+          poetry install --no-interaction --extras indicators
       #----------------------------------------------
       #    add matrix specifics and run test suite
       #----------------------------------------------
