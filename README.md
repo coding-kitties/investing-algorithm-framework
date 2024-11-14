@@ -51,7 +51,7 @@ symbols = ["BTC/EUR"]
 
 # Define resource directory and the symbols you want to trade
 config = {
-    RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()
+    RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve(),
     SYMBOLS: symbols
 }
 
