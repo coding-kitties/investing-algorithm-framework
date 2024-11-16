@@ -2,10 +2,8 @@ import importlib.util
 
 if importlib.util.find_spec("scipy") is None \
         or importlib.util.find_spec("tulipy") is None \
-        or importlib.util.find_spec("numpy") is None \
-        or importlib.util.find_spec("collections") is None:
-    raise ImportError("You have not installed the the indicators package")
-
+        or importlib.util.find_spec("numpy") is None:
+    raise ImportError("You have not installed the indicators package")
 
 from scipy.signal import argrelextrema
 from collections import deque
@@ -114,21 +112,23 @@ def get_lower_lows(data: np.array, order=5, K=2):
     Must not be exceeded within the number of periods indicated by the width
     parameter for the value to be confirmed.
 
-    params:
+    Parameters:
 
-    order : int, optional
-    How many points on each side to use for the comparison
-    to consider ``comparator(n, n+x)`` to be True.
+        order (optional): int -  How many points on each 
+            side to use for the comparison to 
+            consider ``comparator(n, n+x)`` to be True.
+        K (optional): int -  How many consecutive lows need 
+            to be lower. This means that for a given low, 
+            the next K lows must be lower than the k lows 
+            before. So say K=2, then the low at index i must 
+            be lower than the low at index i-2 and i-1. If this
+            condition is met, then the low at index i is considered a
+            lower low. If the condition is not met, then the low at
+            index i is not considered a lower low.
 
-    K : int, optional
-    How many consecutive lows need to be lower. This means that for
-    a given low, the next
-    K lows must be lower than the k lows before. So say K=2, then
-    the low at index i must be lower than the low at
-    index i-2 and i-1. If this
-    condition is met, then the low at index i is considered a
-    lower low. If the condition is not met, then the low at
-    index i is not considered a lower low.
+    Returns:
+        extrema: list - A list of lists containing the indices of the 
+            consecutive lower lows in the data array.
     '''
     # Get lows
     low_idx = argrelextrema(data, np.less, order=order)[0]

@@ -9,10 +9,9 @@ from investing_algorithm_framework.domain import OperationalException, \
 
 if importlib.util.find_spec("scipy") is None \
         or importlib.util.find_spec("tulipy") is None \
-        or importlib.util.find_spec("numpy") is None \
-        or importlib.util.find_spec("collections") is None:
+        or importlib.util.find_spec("numpy") is None:
     raise ImportError(
-        "You have not installed the the indicators package"
+        "You have not installed the indicators package"
     )
 
 """

@@ -6,7 +6,7 @@ authors = ["MDUYN"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.8.1"
+python = ">=3.10"
 wrapt = "^1.16.0"
 Flask = "^2.3.2"
 Flask-Migrate = "^2.6.0"
