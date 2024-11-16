@@ -114,20 +114,20 @@ def get_lower_lows(data: np.array, order=5, K=2):
 
     Parameters:
 
-        order (optional): int -  How many points on each 
-            side to use for the comparison to 
+        order (optional): int -  How many points on each
+            side to use for the comparison to
             consider ``comparator(n, n+x)`` to be True.
-        K (optional): int -  How many consecutive lows need 
-            to be lower. This means that for a given low, 
-            the next K lows must be lower than the k lows 
-            before. So say K=2, then the low at index i must 
+        K (optional): int -  How many consecutive lows need
+            to be lower. This means that for a given low,
+            the next K lows must be lower than the k lows
+            before. So say K=2, then the low at index i must
             be lower than the low at index i-2 and i-1. If this
             condition is met, then the low at index i is considered a
             lower low. If the condition is not met, then the low at
             index i is not considered a lower low.
 
     Returns:
-        extrema: list - A list of lists containing the indices of the 
+        extrema: list - A list of lists containing the indices of the
             consecutive lower lows in the data array.
     '''
     # Get lows
