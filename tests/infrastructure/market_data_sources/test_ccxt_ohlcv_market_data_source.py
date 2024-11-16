@@ -28,7 +28,7 @@ class Test(TestCase):
         ccxt_ohlcv_market_data_source = CCXTOHLCVMarketDataSource(
             identifier="BTC/EUR",
             window_size=200,
-            timeframe="15m",
+            time_frame="15m",
             market="BITVAVO",
             symbol="BTC/EUR",
         )
@@ -38,7 +38,7 @@ class Test(TestCase):
         ccxt_ohlcv_market_data_source = CCXTOHLCVMarketDataSource(
             identifier="BTC/EUR",
             window_size=200,
-            timeframe="15m",
+            time_frame="15m",
             market="BITVAVO",
             symbol="BTC/EUR",
         )
@@ -48,7 +48,7 @@ class Test(TestCase):
         ccxt_ohlcv_market_data_source = CCXTOHLCVMarketDataSource(
             identifier="BTC/EUR",
             window_size=200,
-            timeframe="15m",
+            time_frame="15m",
             market="BITVAVO",
             symbol="BTC/EUR",
         )
@@ -58,8 +58,8 @@ class Test(TestCase):
         ccxt_ohlcv_market_data_source = CCXTOHLCVMarketDataSource(
             identifier="BTC/EUR",
             window_size=200,
-            timeframe="15m",
+            time_frame="15m",
             market="BITVAVO",
             symbol="BTC/EUR",
         )
-        self.assertEqual("15m", ccxt_ohlcv_market_data_source.timeframe)
+        self.assertEqual("15m", ccxt_ohlcv_market_data_source.get_time_frame())

@@ -17,7 +17,7 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     PortfolioConfiguration, Portfolio, Position, Order, TradeStatus, \
     BacktestReport, PortfolioSnapshot, StrategyProfile, \
     BacktestPosition, Trade, MarketCredential, PositionSnapshot, \
-    BacktestReportsEvaluation, AppMode, BacktestDateRange
+    BacktestReportsEvaluation, AppMode, BacktestDateRange, DateRange
 from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
     OHLCVMarketDataSource, BacktestMarketDataSource, MarketDataSource, \
     MarketService, MarketCredentialService, AbstractPortfolioSyncService, \
@@ -27,10 +27,9 @@ from .stateless_actions import StatelessActions
 from .strategy import Strategy
 from .utils import random_string, append_dict_as_row_to_csv, \
     add_column_headers_to_csv, get_total_amount_of_rows, \
-    load_backtest_report, \
+    load_backtest_report, convert_polars_to_pandas, \
     csv_to_list, StoppableThread, pretty_print_backtest_reports_evaluation, \
     pretty_print_backtest, load_csv_into_dict, load_backtest_reports
-from .graphs import create_prices_graph, create_ema_graph, create_rsi_graph
 from .metrics import get_price_efficiency_ratio
 
 __all__ = [
@@ -116,8 +115,7 @@ __all__ = [
     "RoundingService",
     "BacktestDateRange",
     "load_backtest_report",
-    "create_prices_graph",
-    "create_ema_graph",
-    "create_rsi_graph",
-    "get_price_efficiency_ratio"
+    "get_price_efficiency_ratio",
+    "convert_polars_to_pandas",
+    "DateRange"
 ]

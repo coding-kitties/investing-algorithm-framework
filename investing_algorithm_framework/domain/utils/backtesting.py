@@ -345,7 +345,7 @@ def pretty_print_backtest(
         """
 
     print(ascii_art)
-    pretty_print_price_efficiency([backtest_report], precision=precision)
+    # pretty_print_price_efficiency([backtest_report], precision=precision)
 
     if show_positions:
         print(f"{COLOR_YELLOW}Positions overview{COLOR_RESET}")

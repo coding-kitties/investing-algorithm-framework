@@ -20,8 +20,9 @@ You can find instructions on how to install tulipy here:
 https://tulipindicators.org/ or go directly to the pypi page:
 https://pypi.org/project/tulipy/
 """
-# Define market data sources
 
+
+# Define market data sources
 def is_below_trend(fast_series, slow_series):
     return fast_series[-1] < slow_series[-1]
 

@@ -148,3 +148,4 @@ bumpversion.egg-info/
 **/backtest_data/*
 */backtest_reports/
 **/backtest_reports/*
+.vscode/
