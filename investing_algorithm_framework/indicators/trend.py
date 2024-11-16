@@ -1,4 +1,3 @@
-import importlib.util
 import pandas as pd
 from typing import Union, List
 from datetime import timedelta
@@ -6,13 +5,6 @@ import tulipy as tp
 import numpy as np
 from investing_algorithm_framework.domain import OperationalException, \
     DateRange
-
-if importlib.util.find_spec("scipy") is None \
-        or importlib.util.find_spec("tulipy") is None \
-        or importlib.util.find_spec("numpy") is None:
-    raise ImportError(
-        "You have not installed the indicators package"
-    )
 
 """
 This module contains functions for trend analysis. Trend analysis is

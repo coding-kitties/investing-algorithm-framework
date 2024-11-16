@@ -1,10 +1,3 @@
-import importlib.util
-
-if importlib.util.find_spec("scipy") is None \
-        or importlib.util.find_spec("tulipy") is None \
-        or importlib.util.find_spec("numpy") is None:
-    raise ImportError("You have not installed the indicators package")
-
 from scipy.signal import argrelextrema
 from collections import deque
 import numpy as np
