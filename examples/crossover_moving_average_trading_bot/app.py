@@ -8,4 +8,3 @@ config = {
     RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve()
 }
 app = create_app(config=config)
-

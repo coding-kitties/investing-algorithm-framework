@@ -5,6 +5,7 @@ from .csv import get_total_amount_of_rows, append_dict_as_row_to_csv, \
 from .random import random_string
 from .stoppable_thread import StoppableThread
 from .synchronized import synchronized
+from .polars import convert_polars_to_pandas
 
 __all__ = [
     'synchronized',
@@ -19,4 +20,5 @@ __all__ = [
     'load_csv_into_dict',
     'load_backtest_report',
     'load_backtest_reports',
+    'convert_polars_to_pandas'
 ]

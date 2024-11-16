@@ -126,7 +126,7 @@ class MarketDataSourceService:
                         if market_data_source.market.lower() == market.lower()\
                                 and market_data_source.symbol.lower() \
                                 == symbol.lower() and \
-                                market_data_source.timeframe == time_frame:
+                                market_data_source.time_frame == time_frame:
                             return market_data_source
                     elif market is not None:
                         if market_data_source.market.lower() == market.lower()\
@@ -136,7 +136,7 @@ class MarketDataSourceService:
                     elif time_frame is not None:
                         if market_data_source.symbol.lower() \
                                 == symbol.lower() and \
-                                market_data_source.timeframe == time_frame:
+                                market_data_source.time_frame == time_frame:
                             return market_data_source
                     else:
                         if market_data_source.symbol.lower() \

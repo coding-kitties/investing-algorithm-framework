@@ -37,7 +37,7 @@ class CCXTOHLCVBacktestMarketDataSource(
     """
     backtest_data_directory = None
     backtest_data_end_date = None
-    total_minutes_timeframe = None
+    total_minutes_time_frame = None
     column_names = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
 
     def __init__(
@@ -45,14 +45,14 @@ class CCXTOHLCVBacktestMarketDataSource(
         identifier,
         market,
         symbol,
-        timeframe,
+        time_frame,
         window_size=None,
     ):
         super().__init__(
             identifier=identifier,
             market=market,
             symbol=symbol,
-            timeframe=timeframe,
+            time_frame=time_frame,
             window_size=window_size,
         )
         self.data = None
@@ -81,7 +81,7 @@ class CCXTOHLCVBacktestMarketDataSource(
             backtest_start_date - timedelta(
                 minutes=(
                     (self.window_size + 1) *
-                    TimeFrame.from_value(self.timeframe).amount_of_minutes
+                    TimeFrame.from_value(self.time_frame).amount_of_minutes
                 )
             )
         self.backtest_data_start_date = backtest_data_start_date\
@@ -119,7 +119,7 @@ class CCXTOHLCVBacktestMarketDataSource(
             market_service.config = config
             ohlcv = market_service.get_ohlcv(
                 symbol=self.symbol,
-                time_frame=self.timeframe,
+                time_frame=self.time_frame,
                 from_timestamp=backtest_data_start_date,
                 to_timestamp=backtest_end_date,
                 market=self.market
@@ -139,10 +139,10 @@ class CCXTOHLCVBacktestMarketDataSource(
     def _create_file_path(self):
         """
         Function to create a filename in the following format:
-        OHLCV_{symbol}_{market}_{timeframe}_{start_date}_{end_date}.csv
+        OHLCV_{symbol}_{market}_{time_frame}_{start_date}_{end_date}.csv
         """
         symbol_string = self.symbol.replace("/", "-")
-        time_frame_string = self.timeframe.replace("_", "")
+        time_frame_string = self.time_frame.replace("_", "")
         backtest_data_start_date = \
             self.backtest_data_start_date.strftime(DATETIME_FORMAT_BACKTESTING)
         backtest_data_end_date = \
@@ -180,17 +180,17 @@ class CCXTOHLCVBacktestMarketDataSource(
         if backtest_index_date is not None:
             end_date = backtest_index_date
             start_date = self.create_start_date(
-                end_date, self.timeframe, self.window_size
+                end_date, self.time_frame, self.window_size
             )
         else:
             if start_date is None:
                 start_date = self.create_start_date(
-                    end_date, self.timeframe, self.window_size
+                    end_date, self.time_frame, self.window_size
                 )
 
             if end_date is None:
                 end_date = self.create_end_date(
-                    start_date, self.timeframe, self.window_size
+                    start_date, self.time_frame, self.window_size
                 )
 
         if start_date < self._start_date_data_source:
@@ -238,7 +238,7 @@ class CCXTTickerBacktestMarketDataSource(
     backtest. The reason for this is that the data source needs
     to have data on the first run (e.g. an algorithm starting on
     01-01-2024 that requires ticker data will need to have pulled data from
-    01-01-2024 - amount of minutes of the provided timeframe)
+    01-01-2024 - amount of minutes of the provided time_frame)
 
     To achieve this, a backtest_data_start_date attribute is used. This
     attribute is indexed on this calculated date.
@@ -246,7 +246,7 @@ class CCXTTickerBacktestMarketDataSource(
     backtest_data_directory = None
     backtest_data_start_date = None
     backtest_data_end_date = None
-    timeframe = None
+    time_frame = None
     column_names = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
 
     def __init__(
@@ -254,7 +254,7 @@ class CCXTTickerBacktestMarketDataSource(
         identifier,
         market,
         symbol=None,
-        timeframe=None,
+        time_frame=None,
     ):
         super().__init__(
             identifier=identifier,
@@ -262,12 +262,12 @@ class CCXTTickerBacktestMarketDataSource(
             symbol=symbol,
         )
 
-        if timeframe is not None:
-            self.timeframe = timeframe
+        if time_frame is not None:
+            self.time_frame = time_frame
 
-        if self.timeframe is None:
+        if self.time_frame is None:
             raise OperationalException(
-                "timeframe should be set for "
+                "time_frame should be set for "
                 "CCXTTickerBacktestMarketDataSource"
             )
 
@@ -288,7 +288,8 @@ class CCXTTickerBacktestMarketDataSource(
 
         When downloading the data it will use the ccxt library.
         """
-        total_minutes = TimeFrame.from_string(self.timeframe).amount_of_minutes
+        total_minutes = TimeFrame.from_string(self.time_frame)\
+            .amount_of_minutes
         self.backtest_data_start_date = \
             backtest_start_date - timedelta(minutes=total_minutes)
         self.backtest_data_end_date = backtest_end_date
@@ -333,7 +334,7 @@ class CCXTTickerBacktestMarketDataSource(
             market_service.config = config
             ohlcv = market_service.get_ohlcv(
                 symbol=self.symbol,
-                time_frame=self.timeframe,
+                time_frame=self.time_frame,
                 from_timestamp=self.backtest_data_start_date,
                 to_timestamp=backtest_end_date,
                 market=self.market
@@ -426,9 +427,22 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
         Implementation of get_data for CCXTOHLCVMarketDataSource.
         This implementation uses the CCXTMarketService to get the OHLCV data.
 
-        In the kwargs, the start_date should be set as a datetime object.
+        Parameters:
+            window_size: int (optional) - the total amount of candle
+            sticks that need to be returned
+            start_date: datetime (optional) - the start date of the data. The
+            first candle stick should close to this date.
+            end_date: datetime (optional) - the end date of the data. The last
+            candle stick should close to this date.
+            storage_path: string (optional) - the storage path specifies the
+            directory where the data is written to or read from.
+                If set the data provider will write all its downloaded data
+                to this location. Also, it will check if the
+                data already exists at the storage location. If this is the
+                case it will return this.
 
-        returns a polars.DataFrame with the OHLCV data
+        Returns
+            polars.DataFrame with the OHLCV data
         """
         market_service = CCXTMarketService(
             market_credential_service=self.market_credential_service,
@@ -463,7 +477,7 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
                 )
 
             end_date = self.create_end_date(
-                start_date, self.timeframe, self.window_size
+                start_date, self.time_frame, self.window_size
             )
         else:
             end_date = kwargs["end_date"]
@@ -478,22 +492,158 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
                 "start_date should be a datetime object"
             )
 
-        return market_service.get_ohlcv(
-            symbol=self.symbol,
-            time_frame=self.timeframe,
-            from_timestamp=start_date,
-            to_timestamp=end_date,
-            market=self.market
-        )
+        if "storage_path" in kwargs:
+            storage_path = kwargs["storage_path"]
+        else:
+            storage_path = self.get_storage_path()
+
+        data = None
+
+        if storage_path is not None:
+            # Check if data is already in storage
+            data = self._get_data_from_storage(
+                storage_path=storage_path,
+                symbol=self.symbol,
+                time_frame=self.time_frame,
+                from_timestamp=start_date,
+                to_timestamp=end_date,
+                market=self.market
+            )
+
+        if data is None:
+            # Get the OHLCV data from the ccxt market service
+            data = market_service.get_ohlcv(
+                symbol=self.symbol,
+                time_frame=self.time_frame,
+                from_timestamp=start_date,
+                to_timestamp=end_date,
+                market=self.market
+            )
+
+        # if storage path is set, write the data to the storage path
+        if storage_path is not None:
+            self.write_data_to_storage(
+                data=data,
+                storage_path=storage_path,
+                symbol=self.symbol,
+                time_frame=self.time_frame,
+                from_timestamp=start_date,
+                to_timestamp=end_date,
+                market=self.market
+            )
+
+        return data
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
         return CCXTOHLCVBacktestMarketDataSource(
             identifier=self.identifier,
             market=self.market,
             symbol=self.symbol,
-            timeframe=self.timeframe,
+            time_frame=self.time_frame,
             window_size=self.window_size
         )
+
+    def _get_data_from_storage(
+        self,
+        storage_path,
+        symbol,
+        time_frame,
+        from_timestamp,
+        to_timestamp,
+        market
+    ):
+        """
+        Function to get data from the storage path:
+
+        Parameters:
+            storage_path: string - the storage path where the
+            data should be in.
+
+        Return:
+            Polars dataframe.
+        """
+
+        if not os.path.isdir(storage_path):
+            return None
+
+        if not os.path.isdir(storage_path):
+            return None
+
+        for filename in os.listdir(storage_path):
+            path = os.path.join(storage_path, filename)
+
+            if os.path.isfile(path) or path.split('.')[-1] != ".csv":
+                continue
+
+            file_name_symbol = self.get_file_name_symbol(path)
+            file_name_market = self.get_file_name_market(path)
+            file_name_time_frame = self.get_file_name_time_frame(path)
+            file_name_start_date = self.get_file_name_start_date(path)
+            file_name_end_date = self.get_file_name_end_date(path)
+
+            if file_name_symbol == symbol \
+                    and file_name_market == market \
+                    and file_name_time_frame == time_frame \
+                    and file_name_start_date >= from_timestamp \
+                    and file_name_end_date <= to_timestamp:
+                return polars.read_csv(path)
+
+        return None
+
+    def write_data_to_storage(
+        self,
+        data: polars.DataFrame,
+        storage_path,
+        symbol,
+        time_frame,
+        from_timestamp,
+        to_timestamp,
+        market
+    ):
+        """
+        Function to write data to the storage path:
+
+        Parameters:
+            data: polars.DataFrame - the data that should be written to the
+                storage path.
+            storage_path: string - the storage path where the data should
+                be written to.
+            symbol: string - the symbol of the data.
+            time_frame: string - the time_frame of the data.
+            from_timestamp: datetime - the start date of the data.
+            to_timestamp: datetime - the end date of the data.
+            market: string - the market of the data.
+
+        Return:
+            None
+        """
+
+        if not os.path.isdir(storage_path):
+            os.mkdir(storage_path)
+
+        file_path = self.create_storage_file_path(
+            storage_path=storage_path,
+            symbol=symbol,
+            time_frame=time_frame,
+            from_timestamp=from_timestamp,
+            to_timestamp=to_timestamp,
+            market=market
+        )
+
+        if os.path.isfile(file_path):
+            return
+
+        else:
+            try:
+                with open(file_path, 'w') as _:
+                    pass
+            except Exception as e:
+                logger.error(e)
+                raise OperationalException(
+                    f"Could not create data file {file_path}"
+                )
+
+            data.write_csv(file_path)
 
 
 class CCXTOrderBookMarketDataSource(OrderBookMarketDataSource):
@@ -518,7 +668,7 @@ class CCXTTickerMarketDataSource(TickerMarketDataSource):
         identifier,
         market,
         symbol=None,
-        backtest_timeframe=None,
+        backtest_time_frame=None,
 
     ):
         super().__init__(
@@ -526,7 +676,7 @@ class CCXTTickerMarketDataSource(TickerMarketDataSource):
             market=market,
             symbol=symbol,
         )
-        self._backtest_timeframe = backtest_timeframe
+        self._backtest_time_frame = backtest_time_frame
 
     def get_data(self, **kwargs):
         market_service = CCXTMarketService(
@@ -566,5 +716,5 @@ class CCXTTickerMarketDataSource(TickerMarketDataSource):
             identifier=self.identifier,
             market=self.market,
             symbol=self.symbol,
-            timeframe=self._backtest_timeframe,
+            time_frame=self._backtest_time_frame,
         )

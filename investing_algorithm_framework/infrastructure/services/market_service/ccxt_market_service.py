@@ -402,7 +402,7 @@ class CCXTMarketService(MarketService):
 
             if len(ohlcv) > 0:
                 from_time_stamp = \
-                    ohlcv[-1][0] + exchange.parse_timeframe(time_frame) * 1000
+                    ohlcv[-1][0] + exchange.parse_time_frame(time_frame) * 1000
             else:
                 from_time_stamp = to_timestamp
 

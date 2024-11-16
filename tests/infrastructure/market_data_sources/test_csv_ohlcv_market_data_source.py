@@ -67,7 +67,7 @@ class Test(TestCase):
                           "market_data_sources/"
                           f"{file_name}",
             window_size=10,
-            timeframe=TimeFrame.TWO_HOUR,
+            time_frame=TimeFrame.TWO_HOUR,
         )
         self.assertEqual(
             start_date,
@@ -86,7 +86,7 @@ class Test(TestCase):
                           "market_data_sources/"
                           f"{file_name}",
             window_size=12,
-            timeframe=TimeFrame.TWO_HOUR,
+            time_frame=TimeFrame.TWO_HOUR,
         )
         data = csv_ohlcv_market_data_source.get_data(start_date=start_date)
         self.assertEqual(12, len(data))
@@ -119,7 +119,7 @@ class Test(TestCase):
                           "market_data_sources/"
                           f"{file_name}",
             window_size=10,
-            timeframe="2h",
+            time_frame="2h",
         )
         start_date = datetime(2023, 8, 7, 8, 0, tzinfo=tzutc())
         end_date = datetime(2023, 12, 2, 0, 0, tzinfo=tzutc())
@@ -133,7 +133,7 @@ class Test(TestCase):
                           "market_data_sources_for_testing/"
                           f"{file_name}",
             window_size=200,
-            timeframe="2h",
+            time_frame="2h",
         )
         number_of_runs = 0
         backtest_index_date = datasource._start_date_data_source
@@ -157,7 +157,7 @@ class Test(TestCase):
                           f"{file_name}",
             identifier="test",
             window_size=10,
-            timeframe="2h",
+            time_frame="2h",
         )
         self.assertEqual("test", datasource.get_identifier())
 
@@ -169,7 +169,7 @@ class Test(TestCase):
                           "market_data_sources/"
                           f"{file_name}",
             market="test",
-            timeframe="2h",
+            time_frame="2h",
         )
         self.assertEqual("test", datasource.get_market())
 
@@ -182,7 +182,7 @@ class Test(TestCase):
                           f"{file_name}",
             symbol="BTC/EUR",
             window_size=10,
-            timeframe="2h",
+            time_frame="2h",
         )
         self.assertEqual("BTC/EUR", datasource.get_symbol())
 
@@ -193,7 +193,7 @@ class Test(TestCase):
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
                           f"{file_name}",
-            timeframe="2h",
+            time_frame="2h",
             window_size=10,
         )
-        self.assertTrue(TimeFrame.TWO_HOUR.equals(datasource.get_timeframe()))
+        self.assertTrue(TimeFrame.TWO_HOUR.equals(datasource.get_time_frame()))

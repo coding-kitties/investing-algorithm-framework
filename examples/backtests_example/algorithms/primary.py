@@ -1,5 +1,4 @@
 import tulipy as tp
-import numpy as np
 
 from investing_algorithm_framework import Algorithm, TradingStrategy, \
     TimeUnit, OrderSide, CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource
@@ -18,6 +17,7 @@ btc_eur_ticker_data = CCXTTickerMarketDataSource(
     market="BITVAVO",
     backtest_timeframe="2h"
 )
+
 
 def is_below_trend(fast_series, slow_series):
     return fast_series[-1] < slow_series[-1]
@@ -96,7 +96,7 @@ class Strategy(TradingStrategy):
         crossover with the ma_<period_two>
         """
         return data[fast_key].iloc[-2] <= data[slow_key].iloc[-2] \
-               and data[fast_key].iloc[-1] > data[slow_key].iloc[-1]
+            and data[fast_key].iloc[-1] > data[slow_key].iloc[-1]
 
     def add_ema(self, data, key, period):
         data[f"EMA_{key}_{period}"] = tp.ema(data[key].to_numpy(), period)
