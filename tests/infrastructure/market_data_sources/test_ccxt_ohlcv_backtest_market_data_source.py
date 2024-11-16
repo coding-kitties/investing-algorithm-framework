@@ -49,7 +49,7 @@ class Test(TestCase):
             identifier="OHLCV_BTC_EUR_BINANCE_15m",
             market="BINANCE",
             symbol="BTC/EUR",
-            timeframe="15m",
+            time_frame="15m",
             window_size=200,
         )
 
@@ -71,7 +71,7 @@ class Test(TestCase):
             identifier="OHLCV_BTC_EUR_BINANCE_15m",
             market="BINANCE",
             symbol="BTC/EUR",
-            timeframe="15m",
+            time_frame="15m",
             window_size=200,
         )
         data_source.prepare_data(
@@ -94,7 +94,7 @@ class Test(TestCase):
             identifier="OHLCV_BTC_EUR_BINANCE_15m",
             market="BINANCE",
             symbol="BTC/EUR",
-            timeframe="15m",
+            time_frame="15m",
             window_size=200
         )
         data_source.config = {"DATETIME_FORMAT": DATETIME_FORMAT}
