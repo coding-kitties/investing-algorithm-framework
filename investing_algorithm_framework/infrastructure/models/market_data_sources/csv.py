@@ -20,7 +20,7 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
     def empty(self, start_date, end_date=None):
         if end_date is None:
             end_date = self.create_end_date(
-                start_date, self.timeframe, self.window_size
+                start_date, self.time_frame, self.window_size
             )
         data = self.get_data(start_date=start_date, end_date=end_date)
         return len(data) == 0
@@ -31,14 +31,14 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
         identifier=None,
         market=None,
         symbol=None,
-        timeframe=None,
+        time_frame=None,
         window_size=None,
     ):
         super().__init__(
             identifier=identifier,
             market=market,
             symbol=symbol,
-            timeframe=timeframe,
+            time_frame=time_frame,
             window_size=window_size,
         )
         self._csv_file_path = csv_file_path
@@ -109,7 +109,7 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
                 )
 
             start_date = self.create_start_date(
-                end_date, self.timeframe, self.window_size
+                end_date, self.time_frame, self.window_size
             )
         else:
             if start_date is None:
@@ -122,12 +122,12 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
                     )
 
                 start_date = self.create_start_date(
-                    end_date, self.timeframe, self.window_size
+                    end_date, self.time_frame, self.window_size
                 )
 
             if end_date is None:
                 end_date = self.create_end_date(
-                    start_date, self.timeframe, self.window_size
+                    start_date, self.time_frame, self.window_size
                 )
 
         df = polars.read_csv(

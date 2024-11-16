@@ -32,6 +32,9 @@ Features:
 * Stateless running for cloud function deployments
 * Polars dataframes support out of the box for fast data processing [pola.rs](https://pola.rs/)
 
+Additional features:
+* Indicators (python >= 3.10 required): Set of indicators that can be used in your trading bot. You can donwload the package with `pip install investing-algorithm-framework[indicators]` or `poetry add investing-algorithm-framework[indicators]]`
+ 
 ## Example implementation
 The following algorithm connects to binance and buys BTC every 5 seconds. 
 It also exposes an REST API that allows you to interact with the algorithm.
@@ -58,7 +61,7 @@ bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
     identifier="BTC-ohlcv",
     market="BITVAVO",
     symbol="BTC/EUR",
-    timeframe="2h",
+    time_frame="2h",
     window_size=200
 )
 # Ticker data for orders, trades and positions
