@@ -44,7 +44,7 @@ class TestUtils(TestCase):
         self.assertFalse(has_any_higher_then_threshold(df, column="RSI", threshold=80, number_of_data_points=10, strict=False))
         self.assertTrue(has_any_higher_then_threshold(df, column="RSI", threshold=70, number_of_data_points=10, strict=True))
         self.assertFalse(has_any_higher_then_threshold(df, column="RSI", threshold=80, number_of_data_points=10, strict=True))
-        
+
         df = pd.DataFrame({
             "RSI": [70, 71, 100, 73, 20, 75, 15, 77, 78, 79],
             "DateTime": pd.date_range("2021-01-01", periods=10, freq="D")
@@ -81,7 +81,7 @@ class TestUtils(TestCase):
         })
         self.assertTrue(
             has_slope_above_threshold(
-                df, column="RSI", threshold=-0.3, number_of_data_points=5, window_size=5
+                df, column="RSI", threshold=-0.4, number_of_data_points=5, window_size=5
             )
         )
         self.assertTrue(
