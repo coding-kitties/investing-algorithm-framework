@@ -31,11 +31,11 @@ class BacktestReportWriterService:
 
         if not os.path.exists(output_directory):
             os.makedirs(output_directory)
-      
+
         json_file_path = self.create_report_file_path(
             report, output_directory, extension=".json"
         )
-       
+
         report_dict = report.to_dict()
         # Convert dictionary to JSON
         json_data = json.dumps(report_dict, indent=4)
@@ -58,9 +58,11 @@ class BacktestReportWriterService:
             f"{backtest_end_date}_created-at_{created_at}{extension}"
         )
         return file_path
-    
+
     @staticmethod
-    def create_report_file_path(report, output_directory, extension=".json") -> str:
+    def create_report_file_path(
+        report, output_directory, extension=".json"
+    ) -> str:
         """
         Function to create a file path for a backtest report.
 

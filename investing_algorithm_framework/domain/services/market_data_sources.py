@@ -169,7 +169,6 @@ class MarketDataSource(ABC):
         self._config = None
         self._storage_path = storage_path
 
-
         if self._identifier is None:
             self._identifier = f"{self.market}_{self.symbol}"
 
@@ -187,7 +186,7 @@ class MarketDataSource(ABC):
     @property
     def identifier(self):
         return self._identifier
-    
+
     @identifier.setter
     def identifier(self, value):
         self._identifier = value

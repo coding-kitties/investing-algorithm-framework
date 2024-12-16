@@ -70,7 +70,7 @@ class TradingStrategy:
 
     def run_strategy(self, algorithm, market_data):
         self.algorithm = algorithm
-        
+
         # Check pending orders before running the strategy
         algorithm.check_pending_orders()
 
@@ -215,79 +215,88 @@ class TradingStrategy:
             dict: The traces object
         """
         return self.traces
-    
-    def has_open_orders(self, target_symbol=None, identifier=None, market=None) -> bool:
+
+    def has_open_orders(
+        self, target_symbol=None, identifier=None, market=None
+    ) -> bool:
         """
         Check if there are open orders for a given symbol
 
         Parameters:
-            target_symbol (str): The symbol of the asset e.g BTC if the asset is BTC/USDT
+            target_symbol (str): The symbol of the asset e.g BTC if the
+              asset is BTC/USDT
             identifier (str): The identifier of the portfolio
             market (str): The market of the asset
 
         Returns:
             bool: True if there are open orders, False otherwise
         """
-        return self.algorithm.has_open_orders(target_symbol=target_symbol, identifier=identifier, market=market)
+        return self.algorithm.has_open_orders(
+            target_symbol=target_symbol, identifier=identifier, market=market
+        )
 
     def create_limit_order(
-            self,
-            target_symbol,
-            price,
-            order_side,
-            amount=None,
-            amount_trading_symbol=None,
-            percentage=None,
-            percentage_of_portfolio=None,
-            percentage_of_position=None,
-            precision=None,
-            market=None,
-            execute=True,
-            validate=True,
-            sync=True
-        ):
-            """
-            Function to create a limit order. This function will create a limit
-            order and execute it if the execute parameter is set to True. If the
-            validate parameter is set to True, the order will be validated
+        self,
+        target_symbol,
+        price,
+        order_side,
+        amount=None,
+        amount_trading_symbol=None,
+        percentage=None,
+        percentage_of_portfolio=None,
+        percentage_of_position=None,
+        precision=None,
+        market=None,
+        execute=True,
+        validate=True,
+        sync=True
+    ):
+        """
+        Function to create a limit order. This function will create
+        a limit order and execute it if the execute parameter is set to True.
+        If the validate parameter is set to True, the order will be validated
 
-            Parameters:
-                target_symbol: The symbol of the asset to trade
-                price: The price of the asset
-                order_side: The side of the order
-                amount (optional): The amount of the asset to trade
-                amount_trading_symbol (optional): The amount of the trading symbol to trade
-                percentage (optional): The percentage of the portfolio to allocate to the
-                    order
-                percentage_of_portfolio (optional): The percentage of the portfolio to
-                    allocate to the order
-                percentage_of_position (optional): The percentage of the position to
-                    allocate to the order. (Only supported for SELL orders)
-                precision (optional): The precision of the amount
-                market (optional): The market to trade the asset
-                execute (optional): Default True. If set to True, the order will be executed
-                validate (optional): Default True. If set to True, the order will be validated
-                sync (optional): Default True. If set to True, the created order will be synced with the
-                    portfolio of the algorithm
-                
-            Returns:
-                Order: Instance of the order created
-            """
-            self.algorithm.create_limit_order(
-                target_symbol=target_symbol,
-                price=price,
-                order_side=order_side,
-                amount=amount,
-                amount_trading_symbol=amount_trading_symbol,
-                percentage=percentage,
-                percentage_of_portfolio=percentage_of_portfolio,
-                percentage_of_position=percentage_of_position,
-                precision=precision,
-                market=market,
-                execute=execute,
-                validate=validate,
-                sync=sync
-            )
+        Parameters:
+            target_symbol: The symbol of the asset to trade
+            price: The price of the asset
+            order_side: The side of the order
+            amount (optional): The amount of the asset to trade
+            amount_trading_symbol (optional): The amount of the trading
+              symbol to trade
+            percentage (optional): The percentage of the portfolio to
+                allocate to the order
+            percentage_of_portfolio (optional): The percentage of
+              the portfolio to allocate to the order
+            percentage_of_position (optional): The percentage of
+              the position to allocate to the order.
+              (Only supported for SELL orders)
+            precision (optional): The precision of the amount
+            market (optional): The market to trade the asset
+            execute (optional): Default True. If set to True, the order
+              will be executed
+            validate (optional): Default True. If set to True, the order
+              will be validated
+            sync (optional): Default True. If set to True, the created
+              order will be synced with the portfolio of the algorithm
+
+        Returns:
+            Order: Instance of the order created
+        """
+        self.algorithm.create_limit_order(
+            target_symbol=target_symbol,
+            price=price,
+            order_side=order_side,
+            amount=amount,
+            amount_trading_symbol=amount_trading_symbol,
+            percentage=percentage,
+            percentage_of_portfolio=percentage_of_portfolio,
+            percentage_of_position=percentage_of_position,
+            precision=precision,
+            market=market,
+            execute=execute,
+            validate=validate,
+            sync=sync
+        )
 
     def create_market_order(
         self,
@@ -313,7 +322,7 @@ class TradingStrategy:
             validate: If set to True, the order will be validated
             sync: If set to True, the created order will be synced with the
                 portfolio of the algorithm
-        
+
         Returns:
             Order: Instance of the order created
         """
@@ -325,7 +334,7 @@ class TradingStrategy:
             execute=execute,
             validate=validate,
             sync=sync
-        )   
+        )
 
     def close_position(
         self, symbol, market=None, identifier=None, precision=None
@@ -385,7 +394,7 @@ class TradingStrategy:
             amount_lt: The amount of the asset must be less than this
             amount_lte: The amount of the asset must be less than or equal
                 to this
-        
+
         Returns:
             List[Position]: A list of positions that match the query parameters
         """
@@ -416,7 +425,7 @@ class TradingStrategy:
         """
         Function to get all closed trades. This function will return all
         closed trades of the algorithm.
-        
+
         Returns:
             List[Trade]: A list of closed trades
         """
@@ -439,7 +448,7 @@ class TradingStrategy:
             List[Trade]: A list of open trades that match the query parameters
         """
         return self.algorithm.get_open_trades(target_symbol, market)
-  
+
     def close_trade(self, trade, market=None, precision=None) -> None:
         """
         Function to close a trade. This function will close a trade by
@@ -455,7 +464,9 @@ class TradingStrategy:
         Returns:
             None
         """
-        self.algorithm.close_trade(trade=trade, market=market, precision=precision)
+        self.algorithm.close_trade(
+            trade=trade, market=market, precision=precision
+        )
 
     def get_number_of_positions(self):
         """
@@ -490,7 +501,7 @@ class TradingStrategy:
             market=market,
             identifier=identifier
         )
-    
+
     def has_position(
         self,
         symbol,
@@ -534,14 +545,14 @@ class TradingStrategy:
         """
         Function to check if the portfolio has enough balance to
         create an order. This function will return True if the
-        portfolio has enough balance to create an order, False  
+        portfolio has enough balance to create an order, False
         otherwise.
 
         Parameters:
             symbol: The symbol of the asset
             amount: The amount of the asset
             market: The market of the asset
-        
+
         Returns:
             Boolean: True if the portfolio has enough balance
         """

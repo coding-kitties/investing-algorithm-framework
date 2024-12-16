@@ -22,7 +22,8 @@ def convert_polars_to_pandas(
             This is only used if add_index is set to True
 
     Returns:
-        DataFrame - Pandas DataFrame that has been converted from a Polars DataFrame
+        DataFrame - Pandas DataFrame that has been converted
+          from a Polars DataFrame
     """
     data = data.to_pandas().copy()
 

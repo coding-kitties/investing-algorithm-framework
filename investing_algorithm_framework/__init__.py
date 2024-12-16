@@ -17,7 +17,6 @@ from investing_algorithm_framework.infrastructure import \
     CCXTTickerMarketDataSource, CSVOHLCVMarketDataSource, \
     CSVTickerMarketDataSource
 from .create_app import create_app
-from investing_algorithm_framework.indicators import *
 
 __all__ = [
     "Algorithm",

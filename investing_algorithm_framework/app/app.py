@@ -283,7 +283,7 @@ class App:
         should be called before running a backtest for an algorithm.
         It creates the database if it does not exist.
 
-        Args:
+        Parameters:
             None
 
         Returns
@@ -728,9 +728,10 @@ class App:
                 Algorithm)
             backtest_date_range: The date range to run the backtest for
                 (instance of BacktestDateRange)
-            pending_order_check_interval: str - pending_order_check_interval: The interval at which to check
-                pending orders (e.g. 1h, 1d, 1w)
-            output_directory: str - The directory to write the backtest report to
+            pending_order_check_interval: str - pending_order_check_interval:
+              The interval at which to check pending orders (e.g. 1h, 1d, 1w)
+            output_directory: str - The directory to
+              write the backtest report to
 
         Returns:
             Instance of BacktestReport
@@ -776,7 +777,7 @@ class App:
         date_ranges: List[BacktestDateRange] = None,
         pending_order_check_interval=None,
         output_directory=None,
-        checkpoint = False
+        checkpoint=False
     ) -> List[BacktestReport]:
         """
         Run a backtest for a set algorithm. This method should be called when
@@ -788,15 +789,17 @@ class App:
                 backtests for
             pending_order_check_interval: str - The interval at which to check
                 pending orders
-            output_directory: str - The directory to write the backtest report to.
-            checkpoint: bool - Whether to checkpoint the backtest, If True, then it
-                will be checked if for a given algorithm name and date range,
-                a backtest report already exists. If it does, then the backtest will
-                not be run again. This is useful when running backtests
-                for a large number of algorithms and date ranges where some of the
-                backtests may fail and you want to re-run only the failed backtests.
+            output_directory: str - The directory to write the backtest
+              report to.
+            checkpoint: bool - Whether to checkpoint the backtest,
+              If True, then it will be checked if for a given algorithm name
+                and date range, a backtest report already exists. If it does,
+                then the backtest will not be run again. This is useful
+                when running backtests for a large number of algorithms
+                and date ranges where some of the backtests may fail
+                and you want to re-run only the failed backtests.
 
-        Returns        
+        Returns
             List of BacktestReport intances
         """
         logger.info("Initializing backtests")
@@ -822,17 +825,18 @@ class App:
                 if checkpoint:
                     backtest_service = self.container.backtest_service()
                     report = backtest_service.get_report(
-                        algorithm_name=algorithm.name, 
-                        backtest_date_range=date_range, 
+                        algorithm_name=algorithm.name,
+                        backtest_date_range=date_range,
                         directory=output_directory
                     )
 
                     if report is not None:
-                        
+
                         print(
                             f"{COLOR_YELLOW}Backtest already exists "
                             f"for algorithm {algorithm.name} date "
-                            f"range:{COLOR_RESET} {COLOR_GREEN}{date_range.name} "
+                            f"range:{COLOR_RESET} {COLOR_GREEN} "
+                            f"{date_range.name} "
                             f"{date_range.start_date} - "
                             f"{date_range.end_date}"
                         )

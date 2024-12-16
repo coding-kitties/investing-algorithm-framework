@@ -83,7 +83,7 @@ class CCXTOHLCVBacktestMarketDataSource(
             time_frame: string - the time frame of the data
             window_size: int - the total amount of candle sticks that need to
             be returned
-        
+
         Returns:
             None
         """
@@ -215,9 +215,10 @@ class CCXTOHLCVBacktestMarketDataSource(
                 f"End date {end_date} is after the end date "
                 f"of the data source {self._end_date_data_source}"
             )
-        
+
         time_frame = TimeFrame.from_string(self.time_frame)
-        start_date = start_date - timedelta(minutes=time_frame.amount_of_minutes)
+        start_date = start_date - \
+            timedelta(minutes=time_frame.amount_of_minutes)
         selection = self.data.filter(
             (self.data['Datetime'] >= start_date.strftime(DATETIME_FORMAT))
             & (self.data['Datetime'] <= end_date.strftime(DATETIME_FORMAT))
@@ -553,12 +554,12 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
 
         if self.window_size is None:
             raise OperationalException(
-                "Window_size should be defined before the " + 
+                "Window_size should be defined before the " +
                 "CCXTOHLCVMarketDataSource can be converted to " +
                 "a backtest market data source. Make sure to set " +
                 "the window_size attribute on your CCXTOHLCVMarketDataSource"
             )
-        
+
         return CCXTOHLCVBacktestMarketDataSource(
             identifier=self.identifier,
             market=self.market,
@@ -746,7 +747,7 @@ class CCXTTickerMarketDataSource(TickerMarketDataSource):
                 "the backtest_time_frame attribute on your " +
                 "CCXTTickerMarketDataSource"
             )
-        
+
         return CCXTTickerBacktestMarketDataSource(
             identifier=self.identifier,
             market=self.market,

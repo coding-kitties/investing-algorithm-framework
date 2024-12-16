@@ -1,5 +1,5 @@
 from .advanced import get_peaks, is_divergence, is_lower_low_detected
-from .trend import is_downtrend, get_rsi, is_uptrend, \
+from .trend import is_downtrend, is_uptrend, \
     get_sma, get_up_and_downtrends, get_rsi, get_ema, get_adx
 from .utils import is_crossunder, is_crossover, is_above, \
     is_below, has_crossed_upward, has_crossed_downward, \

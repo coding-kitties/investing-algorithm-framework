@@ -16,7 +16,9 @@ indicators such as the RSI.
 
 
 def is_uptrend(
-    data: Union[pd.DataFrame, pd.Series], fast_column="SMA_50", slow_column="SMA_200"
+    data: Union[pd.DataFrame, pd.Series],
+    fast_column="SMA_50",
+    slow_column="SMA_200"
 ) -> bool:
     """
     Check if the price data is in a upturn. By default if will check if the
@@ -46,10 +48,14 @@ def is_uptrend(
 
     # Check if the data keys are present in the data
     if fast_column not in data.columns:
-        raise OperationalException(f"Data column {fast_column} not present in the data.")
+        raise OperationalException(
+            f"Data column {fast_column} not present in the data."
+        )
 
     if slow_column not in data.columns:
-        raise OperationalException(f"Data columns {slow_column} not present in the data.")
+        raise OperationalException(
+            f"Data columns {slow_column} not present in the data."
+        )
 
     # Check if the index of the data is a datetime index
     if not isinstance(data.index, pd.DatetimeIndex):
@@ -66,7 +72,9 @@ def is_uptrend(
 
 
 def is_downtrend(
-    data: Union[pd.DataFrame, pd.Series], fast_column="SMA_50", slow_column="SMA_200"
+    data: Union[pd.DataFrame, pd.Series],
+    fast_column="SMA_50",
+    slow_column="SMA_200"
 ) -> bool:
     """
     Check if the price data is in a downturn.
@@ -125,7 +133,6 @@ def is_crossover(data, key1, key2, strict=True) -> bool:
         and data[key1].iloc[-2] <= data[key2].iloc[-2]
 
 
-
 def get_up_and_downtrends(data: pd.DataFrame) -> List[DateRange]:
     """
     Function to get the up and down trends of a pandas dataframe.
@@ -166,7 +173,9 @@ def get_up_and_downtrends(data: pd.DataFrame) -> List[DateRange]:
             continue
 
         if is_uptrend(
-            selected_rows, fast_column="SMA_Close_50", slow_column="SMA_Close_200"
+            selected_rows,
+            fast_column="SMA_Close_50",
+            slow_column="SMA_Close_200"
         ):
             if current_trend != 'Up':
 
@@ -270,14 +279,15 @@ def get_sma(
 
     sma = tp.sma(data[source_column_name].to_numpy(), period=period)
 
-    # Pad NaN values for initial rows with a default value, e.g., 0 up to period - 1
+    # Pad NaN values for initial rows with a default value,
+    #  e.g., 0 up to period - 1
     sma = np.concatenate((np.full(period - 1, 0), sma))
 
     if result_column_name:
         data[result_column_name] = sma
     else:
         data[f"SMA_{source_column_name}_{period}"] = sma
-    
+
     return data
 
 
@@ -301,7 +311,7 @@ def get_rsi(
         dataframe where the result will be written to. If
             not set the result column is
         named 'RSI_{key}_{period}'.
-    
+
     Returns:
         Pandas dataframe with RSI column added,
         named 'RSI_{period}' or named according to the
@@ -317,7 +327,7 @@ def get_rsi(
         data[result_column_name] = rsi_values
     else:
         data[f"RSI_{period}"] = rsi_values
-    
+
     return data
 
 

@@ -24,7 +24,8 @@ class BacktestDateRange:
         if end_date < start_date:
             raise ValueError(
                 "End date cannot be before start date for a backtest "
-                f"date range. (start_date: {start_date}, end_date: {end_date})" 
+                "date range. " +
+                f"(start_date: {start_date}, end_date: {end_date})"
             )
 
     @property

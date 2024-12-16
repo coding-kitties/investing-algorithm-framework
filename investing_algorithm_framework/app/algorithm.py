@@ -89,11 +89,16 @@ class Algorithm:
             None
         """
         if not isinstance(name, str):
-            raise OperationalException("The name of the algorithm must be a string")
-        
+            raise OperationalException(
+                "The name of the algorithm must be a string"
+            )
+
         pattern = re.compile(r"^[a-zA-Z0-9]*$")
         if not pattern.match(name):
-            raise OperationalException("The name of the algorithm can only contain letters and numbers")
+            raise OperationalException(
+                "The name of the algorithm can only contain" +
+                " letters and numbers"
+            )
 
     def initialize_services(
         self,
@@ -256,19 +261,19 @@ class Algorithm:
         return self.order_service.create(
             order_data, execute=execute, validate=validate, sync=sync
         )
-    
+
     def has_balance(self, symbol, amount, market=None):
         """
         Function to check if the portfolio has enough balance to
         create an order. This function will return True if the
-        portfolio has enough balance to create an order, False  
+        portfolio has enough balance to create an order, False
         otherwise.
 
         Parameters:
             symbol: The symbol of the asset
             amount: The amount of the asset
             market: The market of the asset
-        
+
         Returns:
             Boolean: True if the portfolio has enough balance
         """
@@ -309,20 +314,26 @@ class Algorithm:
             price: The price of the asset
             order_side: The side of the order
             amount (optional): The amount of the asset to trade
-            amount_trading_symbol (optional): The amount of the trading symbol to trade
-            percentage (optional): The percentage of the portfolio to allocate to the
+            amount_trading_symbol (optional): The amount of the
+              trading symbol to trade
+            percentage (optional): The percentage of the portfolio
+              to allocate to the
                 order
-            percentage_of_portfolio (optional): The percentage of the portfolio to
-                allocate to the order
-            percentage_of_position (optional): The percentage of the position to
-                allocate to the order. (Only supported for SELL orders)
+            percentage_of_portfolio (optional): The percentage
+              of the portfolio to allocate to the order
+            percentage_of_position (optional): The percentage
+              of the position to allocate to
+                the order. (Only supported for SELL orders)
             precision (optional): The precision of the amount
             market (optional): The market to trade the asset
-            execute (optional): Default True. If set to True, the order will be executed
-            validate (optional): Default True. If set to True, the order will be validated
-            sync (optional): Default True. If set to True, the created order will be synced with the
+            execute (optional): Default True. If set to True,
+              the order will be executed
+            validate (optional): Default True. If set to
+              True, the order will be validated
+            sync (optional): Default True. If set to True,
+              the created order will be synced with the
                 portfolio of the algorithm
-            
+
         Returns:
             Order: Instance of the order created
         """
@@ -369,10 +380,10 @@ class Algorithm:
             raise OperationalException(
                 "The amount parameter is required to create a limit order." +
                 "Either the amount, amount_trading_symbol, percentage, " +
-                "percentage_of_portfolio or percentage_of_position parameter " +
-                "must be specified."
+                "percentage_of_portfolio or percentage_of_position "
+                "parameter must be specified."
             )
-        
+
         order_data = {
             "target_symbol": target_symbol,
             "price": price,
@@ -417,7 +428,7 @@ class Algorithm:
             validate: If set to True, the order will be validated
             sync: If set to True, the created order will be synced with the
                 portfolio of the algorithm
-        
+
         Returns:
             Order: Instance of the order created
         """
@@ -454,7 +465,7 @@ class Algorithm:
 
         Parameters:
             market: The market of the portfolio
-        
+
         Returns:
             Portfolio: The portfolio of the algorithm
         """
@@ -492,7 +503,7 @@ class Algorithm:
         """
         Returns the total size of the portfolio.
 
-        The total size of the portfolio is the unallocated balance and the 
+        The total size of the portfolio is the unallocated balance and the
         allocated balance of the portfolio.
 
         Returns:
@@ -597,7 +608,7 @@ class Algorithm:
             amount_lt: The amount of the asset must be less than this
             amount_lte: The amount of the asset must be less than or equal
                 to this
-        
+
         Returns:
             List[Position]: A list of positions that match the query parameters
         """
@@ -1167,7 +1178,7 @@ class Algorithm:
         """
         Function to get all closed trades. This function will return all
         closed trades of the algorithm.
-        
+
         Returns:
             List[Trade]: A list of closed trades
         """
@@ -1234,8 +1245,9 @@ class Algorithm:
         the position must be greater than the net_size of the
         portfolio.
 
-        :param amount_gt: The amount of the position must be greater than
-        this amount.
+        Parameters:
+            amount_gt: The amount of the position must be greater than this
+              amount.
         :param amount_gte: The amount of the position must be greater than
         or equal to this amount.
         :param percentage_of_portfolio: The amount of the position must be
