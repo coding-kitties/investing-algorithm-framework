@@ -1,5 +1,6 @@
 from datetime import datetime
 from typing import Union
+from .backtesting.backtest_date_range import BacktestDateRange
 
 
 class DateRange:
@@ -54,3 +55,10 @@ class DateRange:
         return f"DateRange(Name: {self.name} " + \
             f"Start date: {self.start_date} " + \
             f"End date: {self.end_date})"
+
+    def to_backtest_date_range(self):
+        return BacktestDateRange(
+            start_date=self.start_date,
+            end_date=self.end_date,
+            name=self.name
+        )

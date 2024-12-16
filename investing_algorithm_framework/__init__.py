@@ -17,6 +17,7 @@ from investing_algorithm_framework.infrastructure import \
     CCXTTickerMarketDataSource, CSVOHLCVMarketDataSource, \
     CSVTickerMarketDataSource
 from .create_app import create_app
+from investing_algorithm_framework.indicators import *
 
 __all__ = [
     "Algorithm",
@@ -66,5 +67,23 @@ __all__ = [
     "load_backtest_report",
     "BacktestDateRange",
     "convert_polars_to_pandas",
-    "DateRange"
+    "DateRange",
+    "get_rsi",
+    "get_peaks",
+    "is_uptrend",
+    "is_downtrend",
+    "is_crossover",
+    "is_crossunder",
+    "is_above",
+    "is_below",
+    "has_crossed_upward",
+    "get_sma",
+    "get_up_and_downtrends",
+    "get_rsi",
+    "get_ema",
+    "get_adx",
+    "has_crossed_downward",
+    "get_willr",
+    "is_bearish_divergence",
+    "is_bullish_divergence",
 ]

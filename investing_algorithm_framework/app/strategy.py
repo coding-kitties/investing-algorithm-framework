@@ -1,4 +1,5 @@
-from investing_algorithm_framework.domain import OperationalException
+from typing import List
+from investing_algorithm_framework.domain import OperationalException, Position
 from investing_algorithm_framework.domain import \
     TimeUnit, StrategyProfile, Trade
 from .algorithm import Algorithm
@@ -13,6 +14,7 @@ class TradingStrategy:
     decorated = None
     market_data_sources = None
     traces = None
+    algorithm: Algorithm = None
 
     def __init__(
         self,
@@ -67,6 +69,8 @@ class TradingStrategy:
         self._context = None
 
     def run_strategy(self, algorithm, market_data):
+        self.algorithm = algorithm
+        
         # Check pending orders before running the strategy
         algorithm.check_pending_orders()
 
@@ -211,3 +215,334 @@ class TradingStrategy:
             dict: The traces object
         """
         return self.traces
+    
+    def has_open_orders(self, target_symbol=None, identifier=None, market=None) -> bool:
+        """
+        Check if there are open orders for a given symbol
+
+        Parameters:
+            target_symbol (str): The symbol of the asset e.g BTC if the asset is BTC/USDT
+            identifier (str): The identifier of the portfolio
+            market (str): The market of the asset
+
+        Returns:
+            bool: True if there are open orders, False otherwise
+        """
+        return self.algorithm.has_open_orders(target_symbol=target_symbol, identifier=identifier, market=market)
+
+    def create_limit_order(
+            self,
+            target_symbol,
+            price,
+            order_side,
+            amount=None,
+            amount_trading_symbol=None,
+            percentage=None,
+            percentage_of_portfolio=None,
+            percentage_of_position=None,
+            precision=None,
+            market=None,
+            execute=True,
+            validate=True,
+            sync=True
+        ):
+            """
+            Function to create a limit order. This function will create a limit
+            order and execute it if the execute parameter is set to True. If the
+            validate parameter is set to True, the order will be validated
+
+            Parameters:
+                target_symbol: The symbol of the asset to trade
+                price: The price of the asset
+                order_side: The side of the order
+                amount (optional): The amount of the asset to trade
+                amount_trading_symbol (optional): The amount of the trading symbol to trade
+                percentage (optional): The percentage of the portfolio to allocate to the
+                    order
+                percentage_of_portfolio (optional): The percentage of the portfolio to
+                    allocate to the order
+                percentage_of_position (optional): The percentage of the position to
+                    allocate to the order. (Only supported for SELL orders)
+                precision (optional): The precision of the amount
+                market (optional): The market to trade the asset
+                execute (optional): Default True. If set to True, the order will be executed
+                validate (optional): Default True. If set to True, the order will be validated
+                sync (optional): Default True. If set to True, the created order will be synced with the
+                    portfolio of the algorithm
+                
+            Returns:
+                Order: Instance of the order created
+            """
+            self.algorithm.create_limit_order(
+                target_symbol=target_symbol,
+                price=price,
+                order_side=order_side,
+                amount=amount,
+                amount_trading_symbol=amount_trading_symbol,
+                percentage=percentage,
+                percentage_of_portfolio=percentage_of_portfolio,
+                percentage_of_position=percentage_of_position,
+                precision=precision,
+                market=market,
+                execute=execute,
+                validate=validate,
+                sync=sync
+            )
+
+    def create_market_order(
+        self,
+        target_symbol,
+        order_side,
+        amount,
+        market=None,
+        execute=False,
+        validate=False,
+        sync=True
+    ):
+        """
+        Function to create a market order. This function will create a market
+        order and execute it if the execute parameter is set to True. If the
+        validate parameter is set to True, the order will be validated
+
+        Parameters:
+            target_symbol: The symbol of the asset to trade
+            order_side: The side of the order
+            amount: The amount of the asset to trade
+            market: The market to trade the asset
+            execute: If set to True, the order will be executed
+            validate: If set to True, the order will be validated
+            sync: If set to True, the created order will be synced with the
+                portfolio of the algorithm
+        
+        Returns:
+            Order: Instance of the order created
+        """
+        self.algorithm.create_market_order(
+            target_symbol=target_symbol,
+            order_side=order_side,
+            amount=amount,
+            market=market,
+            execute=execute,
+            validate=validate,
+            sync=sync
+        )   
+
+    def close_position(
+        self, symbol, market=None, identifier=None, precision=None
+    ):
+        """
+        Function to close a position. This function will close a position
+        by creating a market order to sell the position. If the precision
+        parameter is specified, the amount of the order will be rounded
+        down to the specified precision.
+
+        Parameters:
+            symbol: The symbol of the asset
+            market: The market of the asset
+            identifier: The identifier of the portfolio
+            precision: The precision of the amount
+
+        Returns:
+            None
+        """
+        self.algorithm.close_position(
+            symbol=symbol,
+            market=market,
+            identifier=identifier,
+            precision=precision
+        )
+
+    def get_positions(
+        self,
+        market=None,
+        identifier=None,
+        amount_gt=None,
+        amount_gte=None,
+        amount_lt=None,
+        amount_lte=None
+    ) -> List[Position]:
+        """
+        Function to get all positions. This function will return all
+        positions that match the specified query parameters. If the
+        market parameter is specified, the positions of the specified
+        market will be returned. If the identifier parameter is
+        specified, the positions of the specified portfolio will be
+        returned. If the amount_gt parameter is specified, the positions
+        with an amount greater than the specified amount will be returned.
+        If the amount_gte parameter is specified, the positions with an
+        amount greater than or equal to the specified amount will be
+        returned. If the amount_lt parameter is specified, the positions
+        with an amount less than the specified amount will be returned.
+        If the amount_lte parameter is specified, the positions with an
+        amount less than or equal to the specified amount will be returned.
+
+        Parameters:
+            market: The market of the portfolio where the positions are
+            identifier: The identifier of the portfolio
+            amount_gt: The amount of the asset must be greater than this
+            amount_gte: The amount of the asset must be greater than or
+                equal to this
+            amount_lt: The amount of the asset must be less than this
+            amount_lte: The amount of the asset must be less than or equal
+                to this
+        
+        Returns:
+            List[Position]: A list of positions that match the query parameters
+        """
+        return self.algorithm.get_positions(
+            market=market,
+            identifier=identifier,
+            amount_gt=amount_gt,
+            amount_gte=amount_gte,
+            amount_lt=amount_lt,
+            amount_lte=amount_lte
+        )
+
+    def get_trades(self, market=None) -> List[Trade]:
+        """
+        Function to get all trades. This function will return all trades
+        that match the specified query parameters. If the market parameter
+        is specified, the trades with the specified market will be returned.
+
+        Parameters:
+            market: The market of the asset
+
+        Returns:
+            List[Trade]: A list of trades that match the query parameters
+        """
+        return self.algorithm.get_trades(market)
+
+    def get_closed_trades(self) -> List[Trade]:
+        """
+        Function to get all closed trades. This function will return all
+        closed trades of the algorithm.
+        
+        Returns:
+            List[Trade]: A list of closed trades
+        """
+        return self.algorithm.get_closed_trades()
+
+    def get_open_trades(self, target_symbol=None, market=None) -> List[Trade]:
+        """
+        Function to get all open trades. This function will return all
+        open trades that match the specified query parameters. If the
+        target_symbol parameter is specified, the open trades with the
+        specified target symbol will be returned. If the market parameter
+        is specified, the open trades with the specified market will be
+        returned.
+
+        Parameters:
+            target_symbol: The symbol of the asset
+            market: The market of the asset
+
+        Returns:
+            List[Trade]: A list of open trades that match the query parameters
+        """
+        return self.algorithm.get_open_trades(target_symbol, market)
+  
+    def close_trade(self, trade, market=None, precision=None) -> None:
+        """
+        Function to close a trade. This function will close a trade by
+        creating a market order to sell the position. If the precision
+        parameter is specified, the amount of the order will be rounded
+        down to the specified precision.
+
+        Parameters:
+            trade: Trade - The trade to close
+            market: str - The market of the trade
+            precision: float - The precision of the amount
+
+        Returns:
+            None
+        """
+        self.algorithm.close_trade(trade=trade, market=market, precision=precision)
+
+    def get_number_of_positions(self):
+        """
+        Returns the number of positions that have a positive amount.
+
+        Returns:
+            int: The number of positions
+        """
+        return self.algorithm.get_number_of_positions()
+
+    def get_position(
+        self, symbol, market=None, identifier=None
+    ) -> Position:
+        """
+        Function to get a position. This function will return the
+        position that matches the specified query parameters. If the
+        market parameter is specified, the position of the specified
+        market will be returned. If the identifier parameter is
+        specified, the position of the specified portfolio will be
+        returned.
+
+        Parameters:
+            symbol: The symbol of the asset that represents the position
+            market: The market of the portfolio where the position is located
+            identifier: The identifier of the portfolio
+
+        Returns:
+            Position: The position that matches the query parameters
+        """
+        return self.algorithm.get_position(
+            symbol=symbol,
+            market=market,
+            identifier=identifier
+        )
+    
+    def has_position(
+        self,
+        symbol,
+        market=None,
+        identifier=None,
+        amount_gt=0,
+        amount_gte=None,
+        amount_lt=None,
+        amount_lte=None
+    ):
+        """
+        Function to check if a position exists. This function will return
+        True if a position exists, False otherwise. This function will check
+        if the amount > 0 condition by default.
+
+        Parameters:
+            param symbol: The symbol of the asset
+            param market: The market of the asset
+            param identifier: The identifier of the portfolio
+            param amount_gt: The amount of the asset must be greater than this
+            param amount_gte: The amount of the asset must be greater than
+            or equal to this
+            param amount_lt: The amount of the asset must be less than this
+            param amount_lte: The amount of the asset must be less than
+            or equal to this
+
+        Returns:
+            Boolean: True if a position exists, False otherwise
+        """
+        return self.algorithm.has_position(
+            symbol=symbol,
+            market=market,
+            identifier=identifier,
+            amount_gt=amount_gt,
+            amount_gte=amount_gte,
+            amount_lt=amount_lt,
+            amount_lte=amount_lte
+        )
+
+    def has_balance(self, symbol, amount, market=None):
+        """
+        Function to check if the portfolio has enough balance to
+        create an order. This function will return True if the
+        portfolio has enough balance to create an order, False  
+        otherwise.
+
+        Parameters:
+            symbol: The symbol of the asset
+            amount: The amount of the asset
+            market: The market of the asset
+        
+        Returns:
+            Boolean: True if the portfolio has enough balance
+        """
+        return self.algorithm.has_balance(symbol, amount, market)

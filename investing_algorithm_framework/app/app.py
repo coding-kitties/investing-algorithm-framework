@@ -372,10 +372,11 @@ class App:
         all data sources to backtest data sources and overrides the services
         with the backtest services equivalents.
 
-        Args:
+        Parameters:
             algorithm: The algorithm to initialize for backtesting
 
-        Return None
+        Returns
+            None
         """
         self._create_backtest_database_if_not_exists()
         self._initialize_backtest_data_sources(algorithm)
@@ -722,14 +723,14 @@ class App:
         Run a backtest for an algorithm. This method should be called when
         running a backtest.
 
-        Args:
+        Parameters:
             algorithm: The algorithm to run a backtest for (instance of
                 Algorithm)
             backtest_date_range: The date range to run the backtest for
                 (instance of BacktestDateRange)
-            pending_order_check_interval: The interval at which to check
-                pending orders
-            output_directory: The directory to write the backtest report to
+            pending_order_check_interval: str - pending_order_check_interval: The interval at which to check
+                pending orders (e.g. 1h, 1d, 1w)
+            output_directory: str - The directory to write the backtest report to
 
         Returns:
             Instance of BacktestReport
@@ -774,20 +775,29 @@ class App:
         algorithms,
         date_ranges: List[BacktestDateRange] = None,
         pending_order_check_interval=None,
-        output_directory=None
+        output_directory=None,
+        checkpoint = False
     ) -> List[BacktestReport]:
         """
         Run a backtest for a set algorithm. This method should be called when
         running a backtest.
 
-        :param algorithms: The algorithms to run backtests for (list of
-        Algorithm instances)
-        :param pending_order_check_interval: The interval at which to check
-        :param date_ranges: The date ranges to run the backtests for (list of
-        BacktestDateRange instances representing a start and end date)
-        pending orders
-        :param output_directory: The directory to write the backtest report to
-        :return: List of BacktestReport intances
+        Parameters:
+            Algorithms: List[Algorithm] - The algorithms to run backtests for
+            date_ranges: List[BacktestDateRange] - The date ranges to run the
+                backtests for
+            pending_order_check_interval: str - The interval at which to check
+                pending orders
+            output_directory: str - The directory to write the backtest report to.
+            checkpoint: bool - Whether to checkpoint the backtest, If True, then it
+                will be checked if for a given algorithm name and date range,
+                a backtest report already exists. If it does, then the backtest will
+                not be run again. This is useful when running backtests
+                for a large number of algorithms and date ranges where some of the
+                backtests may fail and you want to re-run only the failed backtests.
+
+        Returns        
+            List of BacktestReport intances
         """
         logger.info("Initializing backtests")
         reports = []
@@ -806,7 +816,29 @@ class App:
                 f"{date_range.end_date} for a "
                 f"total of {len(algorithms)} algorithms.{COLOR_RESET}"
             )
+
             for algorithm in algorithms:
+
+                if checkpoint:
+                    backtest_service = self.container.backtest_service()
+                    report = backtest_service.get_report(
+                        algorithm_name=algorithm.name, 
+                        backtest_date_range=date_range, 
+                        directory=output_directory
+                    )
+
+                    if report is not None:
+                        
+                        print(
+                            f"{COLOR_YELLOW}Backtest already exists "
+                            f"for algorithm {algorithm.name} date "
+                            f"range:{COLOR_RESET} {COLOR_GREEN}{date_range.name} "
+                            f"{date_range.start_date} - "
+                            f"{date_range.end_date}"
+                        )
+                        reports.append(report)
+                        continue
+
                 self._initialize_algorithm_for_backtest(algorithm)
                 backtest_service = self.container.backtest_service()
                 backtest_service.resource_directory = self.config.get(

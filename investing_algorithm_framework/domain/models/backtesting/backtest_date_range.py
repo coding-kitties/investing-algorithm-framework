@@ -24,7 +24,7 @@ class BacktestDateRange:
         if end_date < start_date:
             raise ValueError(
                 "End date cannot be before start date for a backtest "
-                "date range."
+                f"date range. (start_date: {start_date}, end_date: {end_date})" 
             )
 
     @property
@@ -39,5 +39,8 @@ class BacktestDateRange:
     def name(self):
         return self._name
 
-    def __str__(self):
+    def __repr__(self):
         return f"{self.name}: {self._start_date} - {self._end_date}"
+
+    def __str__(self):
+        return self.__repr__()

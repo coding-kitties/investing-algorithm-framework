@@ -22,7 +22,7 @@ def convert_polars_to_pandas(
             This is only used if add_index is set to True
 
     Returns:
-        Pandas DataFrame that has been converted from a Polars DataFrame
+        DataFrame - Pandas DataFrame that has been converted from a Polars DataFrame
     """
     data = data.to_pandas().copy()
 
@@ -37,5 +37,9 @@ def convert_polars_to_pandas(
 
         # Remove duplicate dates
         data = data[~data.index.duplicated(keep='first')]
+
+    # Make sure that the datetime column is still in the dataframe
+    if datetime_column_name not in data.columns:
+        data[datetime_column_name] = data.index
 
     return data

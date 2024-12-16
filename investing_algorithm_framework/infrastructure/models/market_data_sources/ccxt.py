@@ -75,6 +75,17 @@ class CCXTOHLCVBacktestMarketDataSource(
         of unnecessary resources.
 
         When downloading the data it will use the ccxt library.
+
+        Parameters:
+            config: dict - the configuration of the data source
+            backtest_start_date: datetime - the start date of the backtest
+            backtest_end_date: datetime - the end date of the backtest
+            time_frame: string - the time frame of the data
+            window_size: int - the total amount of candle sticks that need to
+            be returned
+        
+        Returns:
+            None
         """
         # Calculating the backtest data start date
         backtest_data_start_date = \
@@ -84,12 +95,12 @@ class CCXTOHLCVBacktestMarketDataSource(
                     TimeFrame.from_value(self.time_frame).amount_of_minutes
                 )
             )
+
         self.backtest_data_start_date = backtest_data_start_date\
             .replace(microsecond=0)
         self.backtest_data_index_date = backtest_data_start_date\
             .replace(microsecond=0)
         self.backtest_data_end_date = backtest_end_date.replace(microsecond=0)
-
         # Creating the backtest data directory and file
         self.backtest_data_directory = os.path.join(
             config.get(RESOURCE_DIRECTORY),
@@ -204,11 +215,14 @@ class CCXTOHLCVBacktestMarketDataSource(
                 f"End date {end_date} is after the end date "
                 f"of the data source {self._end_date_data_source}"
             )
-
+        
+        time_frame = TimeFrame.from_string(self.time_frame)
+        start_date = start_date - timedelta(minutes=time_frame.amount_of_minutes)
         selection = self.data.filter(
             (self.data['Datetime'] >= start_date.strftime(DATETIME_FORMAT))
             & (self.data['Datetime'] <= end_date.strftime(DATETIME_FORMAT))
         )
+
         return selection
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
@@ -507,7 +521,7 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
                 time_frame=self.time_frame,
                 from_timestamp=start_date,
                 to_timestamp=end_date,
-                market=self.market
+                market=self.market,
             )
 
         if data is None:
@@ -529,12 +543,22 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
                 time_frame=self.time_frame,
                 from_timestamp=start_date,
                 to_timestamp=end_date,
-                market=self.market
+                market=self.market,
+                data_type="OHLCV"
             )
 
         return data
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
+
+        if self.window_size is None:
+            raise OperationalException(
+                "Window_size should be defined before the " + 
+                "CCXTOHLCVMarketDataSource can be converted to " +
+                "a backtest market data source. Make sure to set " +
+                "the window_size attribute on your CCXTOHLCVMarketDataSource"
+            )
+        
         return CCXTOHLCVBacktestMarketDataSource(
             identifier=self.identifier,
             market=self.market,
@@ -598,7 +622,8 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
         time_frame,
         from_timestamp,
         to_timestamp,
-        market
+        market,
+        data_type="OHLCV"
     ):
         """
         Function to write data to the storage path:
@@ -625,9 +650,10 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
             storage_path=storage_path,
             symbol=symbol,
             time_frame=time_frame,
-            from_timestamp=from_timestamp,
-            to_timestamp=to_timestamp,
-            market=market
+            start_datetime=from_timestamp,
+            end_datetime=to_timestamp,
+            market=market,
+            data_type=data_type
         )
 
         if os.path.isfile(file_path):
@@ -665,11 +691,10 @@ class CCXTTickerMarketDataSource(TickerMarketDataSource):
 
     def __init__(
         self,
-        identifier,
         market,
+        identifier=None,
         symbol=None,
         backtest_time_frame=None,
-
     ):
         super().__init__(
             identifier=identifier,
@@ -712,6 +737,16 @@ class CCXTTickerMarketDataSource(TickerMarketDataSource):
         return market_service.get_ticker(symbol=symbol, market=market)
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
+
+        if self._backtest_time_frame is None:
+            raise OperationalException(
+                "Backtest time frame should be defined before the " +
+                "CCXTTickerMarketDataSource can be converted to " +
+                "a backtest market data source. Make sure to set " +
+                "the backtest_time_frame attribute on your " +
+                "CCXTTickerMarketDataSource"
+            )
+        
         return CCXTTickerBacktestMarketDataSource(
             identifier=self.identifier,
             market=self.market,

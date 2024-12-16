@@ -4,7 +4,7 @@ import polars as pl
 
 from investing_algorithm_framework.domain import BACKTESTING_INDEX_DATETIME, \
     OrderStatus, BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, \
-    OperationalException, OrderSide, Order
+    OperationalException, OrderSide, Order, TimeFrame
 from investing_algorithm_framework.services.market_data_source_service \
     import BacktestMarketDataSourceService
 from .order_service import OrderService
@@ -56,6 +56,9 @@ class OrderBacktestService(OrderService):
         return order
 
     def check_pending_orders(self):
+        """
+        Function to check if any pending orders have executed.
+        """
         pending_orders = self.get_all({"status": OrderStatus.OPEN.value})
         logger.info(f"Checking {len(pending_orders)} open orders")
         config = self.configuration_service.get_config()
@@ -71,6 +74,19 @@ class OrderBacktestService(OrderService):
                     self.configuration_service.config:
                 time_frame = self.configuration_service\
                     .config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]
+
+            # Get the lowest time frame available
+            if time_frame is None:
+                # Loop through all time frames
+                for tf in TimeFrame:
+                    if self._market_data_source_service\
+                            .is_ohlcv_data_source_present(
+                                symbol=symbol,
+                                market=portfolio.market,
+                                time_frame=tf
+                            ):
+                        time_frame = tf
+                        break
 
             if not self._market_data_source_service\
                     .is_ohlcv_data_source_present(

@@ -1,5 +1,8 @@
 from datetime import datetime, timedelta
 
+import re
+import os
+import json
 import pandas as pd
 from dateutil import parser
 from tqdm import tqdm
@@ -7,7 +10,7 @@ from tqdm import tqdm
 from investing_algorithm_framework.domain import BacktestReport, \
     BACKTESTING_INDEX_DATETIME, TimeUnit, BacktestPosition, \
     TradingDataType, OrderStatus, OperationalException, MarketDataSource, \
-    OrderSide, SYMBOLS, BacktestDateRange
+    OrderSide, SYMBOLS, BacktestDateRange, DATETIME_FORMAT_BACKTESTING
 from investing_algorithm_framework.services.market_data_source_service import \
     MarketDataSourceService
 
@@ -63,12 +66,12 @@ class BacktestService:
 
         At the end of the run all traces
 
-        Args:
+        Parameters:
             algorithm: The algorithm to run the backtest for
             backtest_date_range: The backtest date range
 
-        return:
-            BacktestReport: The backtest report
+        Returns:
+            BacktestReport - The backtest report
         """
         strategy_profiles = []
         portfolios = self._portfolio_repository.get_all()
@@ -116,9 +119,12 @@ class BacktestService:
         backtests for the given algorithms and return a list of backtest
         reports.
 
-        :param algorithms: The algorithms to run the backtests for
-        :param backtest_date_range: The backtest date range of the backtests
-        :return: A list of backtest reports
+        Parameters
+            - algorithms: The algorithms to run the backtests for
+            - backtest_date_range: The backtest date range of the backtests
+        
+        Returns:
+            List - A list of backtest reports
         """
         backtest_reports = []
 
@@ -160,7 +166,7 @@ class BacktestService:
         calculate when the strategies should run based on the given start
         and end date. The schedule will be stored in a pandas DataFrame.
 
-        Args:
+        Parameters:
             strategies: The strategies to generate the schedule for
             start_date: The start date of the schedule
             end_date: The end date of the schedule
@@ -230,7 +236,7 @@ class BacktestService:
         Also, it will add all traces to the backtest report. The traces
         are collected from each strategy that was run during the backtest.
 
-        Args:
+        Parameters:
             algorithm: The algorithm to create the backtest report for
             number_of_runs: The number of runs
             backtest_date_range: The backtest date range of the backtest
@@ -442,3 +448,118 @@ class BacktestService:
                         f"mode. Otherwise, the backtest report "
                         f"cannot be generated."
                     )
+
+    def get_report(
+        self, algorithm_name: str, backtest_date_range: BacktestDateRange, directory: str
+    ) -> BacktestReport:
+        """
+        Function to get a report based on the algorithm name and backtest date range if it exists.
+
+        Parameters:
+            algorithm_name: str - The name of the algorithm
+            backtest_date_range: BacktestDateRange - The backtest date range
+            directory: str - The output directory
+        
+        Returns:
+            BacktestReport - The backtest report if it exists, otherwise None
+        """
+
+        # Loop through all files in the output directory
+        for root, _, files in os.walk(directory):
+            for file in files:
+                # Check if the file contains the algorithm name and backtest date range
+                    if self._is_backtest_report(os.path.join(root, file)):
+                        # Read the file
+                        with open(os.path.join(root, file), "r") as json_file:
+
+                            name = \
+                                self._get_backtest_report_algorithm_name_from_backtest_report_file(
+                                    os.path.join(root, file)
+                                )    
+
+                            if name == algorithm_name:
+                                backtest_start_date = \
+                                    self._get_backtest_start_date_from_backtest_report_file(
+                                        os.path.join(root, file)
+                                    )
+                                backtest_end_date = \
+                                    self._get_backtest_end_date_from_backtest_report_file(
+                                        os.path.join(root, file)
+                                    )
+
+                                if backtest_start_date == backtest_date_range.start_date \
+                                    and backtest_end_date == backtest_date_range.end_date:
+                                    # Parse the JSON file
+                                    report = json.load(json_file)
+                                    # Convert the JSON file to a BacktestReport object
+                                    return BacktestReport.from_dict(report)
+
+        return None     
+        
+    def _get_backtest_start_date_from_backtest_report_file(self, path: str) -> datetime:
+        """
+        Function to get the backtest start date from a backtest report file.
+
+        Parameters:
+            path: str - The path to the backtest report file
+
+        Returns:
+            datetime - The backtest start date
+        """
+
+        # Get the backtest start date from the file name
+        backtest_start_date = os.path.basename(path).split("_")[3]
+        # Parse the backtest start date
+        return datetime.strptime(backtest_start_date, DATETIME_FORMAT_BACKTESTING)
+    
+    def _get_backtest_end_date_from_backtest_report_file(self, path: str) -> datetime:
+        """
+        Function to get the backtest end date from a backtest report file.
+
+        Parameters:
+            path: str - The path to the backtest report file
+
+        Returns:
+            datetime - The backtest end date
+        """
+            
+        # Get the backtest end date from the file name
+        backtest_end_date = os.path.basename(path).split("_")[5]
+        # Parse the backtest end date
+        return datetime.strptime(backtest_end_date, DATETIME_FORMAT_BACKTESTING)
+    
+    def _get_backtest_report_algorithm_name_from_backtest_report_file(self, path: str) -> str:
+        """
+        Function to get the algorithm name from a backtest report file.
+
+        Parameters:
+            path: str - The path to the backtest report file
+
+        Returns:
+            str - The algorithm name
+        """
+        # Get the word between "report_" and "_backtest_start_date" it can contain _
+        # Get the algorithm name from the file name
+        algorithm_name = os.path.basename(path).split("_")[1]
+        return algorithm_name
+
+    def _is_backtest_report(self, path: str) -> bool:
+        """
+        Function to check if a file is a backtest report file.
+
+        Parameters:
+            path: str - The path to the file
+        
+        Returns:
+            bool - True if the file is a backtest report file, otherwise False
+        """
+
+        # Check if the file is a JSON file
+        if path.endswith(".json"):
+           
+            BACKTEST_REPORT_FILE_NAME_PATTERN = r"^report_\w+_backtest-start-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_backtest-end-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_created-at_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}\.json$"
+            # Check if the file name matches the backtest report file name pattern
+            if re.match(BACKTEST_REPORT_FILE_NAME_PATTERN, os.path.basename(path)):
+                return True
+            
+        return False

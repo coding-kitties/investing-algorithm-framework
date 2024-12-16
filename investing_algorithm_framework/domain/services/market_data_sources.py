@@ -157,9 +157,9 @@ class MarketDataSource(ABC):
 
     def __init__(
         self,
-        identifier,
         market,
         symbol,
+        identifier=None,
         storage_path=None
     ):
         self._identifier = identifier
@@ -168,6 +168,10 @@ class MarketDataSource(ABC):
         self._market_credential_service = None
         self._config = None
         self._storage_path = storage_path
+
+
+        if self._identifier is None:
+            self._identifier = f"{self.market}_{self.symbol}"
 
     @property
     def config(self):
@@ -183,6 +187,10 @@ class MarketDataSource(ABC):
     @property
     def identifier(self):
         return self._identifier
+    
+    @identifier.setter
+    def identifier(self, value):
+        self._identifier = value
 
     def get_identifier(self):
         return self.identifier
@@ -381,10 +389,10 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
     """
     def __init__(
         self,
-        identifier,
         market,
         symbol,
         time_frame,
+        identifier=None,
         window_size=None,
         storage_path=None,
     ):

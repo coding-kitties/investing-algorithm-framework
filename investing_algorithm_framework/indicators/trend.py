@@ -16,15 +16,16 @@ indicators such as the RSI.
 
 
 def is_uptrend(
-    data: Union[pd.DataFrame, pd.Series], fast_key="SMA_50", slow_key="SMA_200"
+    data: Union[pd.DataFrame, pd.Series], fast_column="SMA_50", slow_column="SMA_200"
 ) -> bool:
     """
-    Check if the price data is in a upturn.
+    Check if the price data is in a upturn. By default if will check if the
+    fast key *SMA_50* is above the slow key *SMA_200*.
 
     Parameters:
         data: pd.DataFrame or pd.Series - The input pandas DataFrame or Series.
-        fast_key: str - The key for the fast moving average.
-        slow_key: str - The key for the slow moving average.
+        fast_key: str - The key for the fast moving average (default: SMA_50).
+        slow_key: str - The key for the slow moving average (default: SMA_200).
 
     Returns:
         - Boolean indicating if the price data is in an upturn.
@@ -38,28 +39,34 @@ def is_uptrend(
     if isinstance(data, pd.Series):
 
         # Check if the data keys are present in the data
-        if fast_key not in data.index or slow_key not in data.index:
+        if fast_column not in data.index or slow_column not in data.index:
             raise OperationalException("Data keys not present in the data.")
 
-        return data[fast_key] > data[slow_key]
+        return data[fast_column] > data[slow_column]
 
     # Check if the data keys are present in the data
-    if fast_key not in data.columns or slow_key not in data.columns:
-        raise OperationalException("Data keys not present in the data.")
+    if fast_column not in data.columns:
+        raise OperationalException(f"Data column {fast_column} not present in the data.")
+
+    if slow_column not in data.columns:
+        raise OperationalException(f"Data columns {slow_column} not present in the data.")
 
     # Check if the index of the data is a datetime index
     if not isinstance(data.index, pd.DatetimeIndex):
-        raise OperationalException("Data index must be a datetime index.")
+        raise OperationalException(
+            "Data index must be a datetime index. " +
+            f"It is currently of type: {str(type(data.index))}"
+        )
 
     # Check if the data is not empty
     if len(data) == 0:
         return False
 
-    return data[fast_key].iloc[-1] > data[slow_key].iloc[-1]
+    return data[fast_column].iloc[-1] > data[slow_column].iloc[-1]
 
 
 def is_downtrend(
-    data: Union[pd.DataFrame, pd.Series], fast_key="SMA_50", slow_key="SMA_200"
+    data: Union[pd.DataFrame, pd.Series], fast_column="SMA_50", slow_column="SMA_200"
 ) -> bool:
     """
     Check if the price data is in a downturn.
@@ -73,13 +80,13 @@ def is_downtrend(
     if isinstance(data, pd.Series):
 
         # Check if the data keys are present in the data
-        if fast_key not in data.index or slow_key not in data.index:
+        if fast_column not in data.index or slow_column not in data.index:
             raise OperationalException("Data keys not present in the data.")
 
-        return data[fast_key] < data[slow_key]
+        return data[fast_column] < data[slow_column]
 
     # Check if the data keys are present in the data
-    if fast_key not in data.columns or slow_key not in data.columns:
+    if fast_column not in data.columns or slow_column not in data.columns:
         raise ValueError("Data keys not present in the data.")
 
     # Check if the index of the data is a datetime index
@@ -90,7 +97,7 @@ def is_downtrend(
     if len(data) == 0:
         return False
 
-    return data[fast_key].iloc[-1] < data[slow_key].iloc[-1]
+    return data[fast_column].iloc[-1] < data[slow_column].iloc[-1]
 
 
 def is_crossover(data, key1, key2, strict=True) -> bool:
@@ -117,66 +124,6 @@ def is_crossover(data, key1, key2, strict=True) -> bool:
     return data[key1].iloc[-1] >= data[key2].iloc[-1] \
         and data[key1].iloc[-2] <= data[key2].iloc[-2]
 
-
-def is_crossunder(data, key1, key2, strict=True) -> bool:
-    """
-    Check if the given keys have crossed under.
-
-    Parameters:
-        - data: pd.DataFrame - The input pandas DataFrame.
-        - key1: str - The first key to compare.
-        - key2: str - The second key to compare.
-        - strict: bool - Whether to check for a strict crossover.
-
-    Returns:
-        - Boolean indicating if the keys have crossed under.
-    """
-    if len(data) < 2:
-        return False
-
-    if strict:
-        return data[key1].iloc[-1] < data[key2].iloc[-1] \
-            and data[key1].iloc[-2] > data[key2].iloc[-2]
-
-    return data[key1].iloc[-1] <= data[key2].iloc[-1] \
-        and data[key1].iloc[-2] >= data[key2].iloc[-2]
-
-
-def has_crossed_upward(
-    data: pd.DataFrame, key, threshold, strict=True
-) -> bool:
-    """
-    Check if the given key has crossed upward.
-
-    Parameters:
-        - data: pd.DataFrame - The input pandas DataFrame.
-        - key: str - The key to compare.
-        - threshold: float - The threshold value to compare.
-        - strict: bool - Whether to check for a strict crossover.
-
-    Returns:
-        - Boolean indicating if the key has crossed upward through the
-        threshold within the given data frame.
-    """
-
-    # Ensure the key exists in the DataFrame
-    if key not in data.columns:
-        raise KeyError(f"Key '{key}' not found in DataFrame")
-
-    # Identify where the values are below and above the threshold
-    if strict:
-        below_threshold = data[key].shift(1) < threshold
-        above_threshold = data[key] > threshold
-    else:
-        below_threshold = data[key] <= threshold
-        above_threshold = data[key] >= threshold
-
-    # Check if there is any point where a value is below the threshold
-    # followed by a value above the threshold
-    crossed_upward = (
-        below_threshold.shift(1, fill_value=False) & above_threshold
-    ).any()
-    return crossed_upward
 
 
 def get_up_and_downtrends(data: pd.DataFrame) -> List[DateRange]:
@@ -219,9 +166,8 @@ def get_up_and_downtrends(data: pd.DataFrame) -> List[DateRange]:
             continue
 
         if is_uptrend(
-            selected_rows, fast_key="SMA_Close_50", slow_key="SMA_Close_200"
+            selected_rows, fast_column="SMA_Close_50", slow_column="SMA_Close_200"
         ):
-
             if current_trend != 'Up':
 
                 if current_trend is not None:
@@ -289,15 +235,15 @@ def get_up_and_downtrends(data: pd.DataFrame) -> List[DateRange]:
 
 
 def get_sma(
-        data: pd.DataFrame,
-        period=50,
-        source_column_name="Close",
-        result_column_name=None
+    data: pd.DataFrame,
+    period=50,
+    source_column_name="Close",
+    result_column_name=None
 ):
     """
     Function to add Smoothed moving average to a pandas dataframe.
 
-    Params:
+    Parameters:
         data: pd.Dataframe - instance of pandas Dateframe.
         period: int - the number of data points the SMA needs
             to take into account.
@@ -314,26 +260,128 @@ def get_sma(
         named 'sma_{key}_{period}' or name
         according to the result_column_name
     """
-    # Check if the period is larger than the data
-    if period > len(data):
+
+    if len(data) < period:
         raise OperationalException(
-            f"The period {period} is larger than the data."
+            "The data must be larger than the period " +
+            f"{period} to calculate the SMA. The data " +
+            f"only contains {len(data)} data points."
         )
 
-    sma_values = tp.sma(
-        data[source_column_name].to_numpy(),
+    sma = tp.sma(data[source_column_name].to_numpy(), period=period)
+
+    # Pad NaN values for initial rows with a default value, e.g., 0 up to period - 1
+    sma = np.concatenate((np.full(period - 1, 0), sma))
+
+    if result_column_name:
+        data[result_column_name] = sma
+    else:
+        data[f"SMA_{source_column_name}_{period}"] = sma
+    
+    return data
+
+
+def get_rsi(
+    data: pd.DataFrame,
+    period=50,
+    source_column_name="Close",
+    result_column_name=None
+):
+    """
+    Function to add Relative Strength Index (RSI) to a pandas dataframe.
+
+    Params:
+        data: pd.Dataframe - instance of pandas Dateframe.
+        period: int - the number of data points the RSI needs
+            to take into account.
+        source_column_name: str - the source_column_name that
+            will be used to calculate the RSI.
+        result_column_name: (option) str - if set, this
+            will be used as column in the
+        dataframe where the result will be written to. If
+            not set the result column is
+        named 'RSI_{key}_{period}'.
+    
+    Returns:
+        Pandas dataframe with RSI column added,
+        named 'RSI_{period}' or named according to the
+        result_column_name
+    """
+    # Calculate RSI
+    rsi_values = tp.rsi(data[source_column_name].to_numpy(), period=period)
+
+    # Pad NaN values for initial rows with a default value, e.g., 0
+    rsi_values = np.concatenate((np.full(period, 0), rsi_values))
+
+    if result_column_name:
+        data[result_column_name] = rsi_values
+    else:
+        data[f"RSI_{period}"] = rsi_values
+    
+    return data
+
+
+def get_ema(
+    data: pd.DataFrame,
+    period=50,
+    source_column_name="Close",
+    result_column_name=None
+):
+    """
+    Add an Exponential Moving Average (EMA) to the data DataFrame.
+
+    Parameters:
+        data: pd.DataFrame - The input pandas DataFrame.
+        period: int - The period for the EMA.
+        source_column_name: str - The source column name.
+        result_column_name: str - The result column name.
+
+    Returns:
+        Pandas dataframe with EMA column added,
+        named 'EMA_{period}' or named according to the
+        result_column_name
+    """
+    ema = tp.ema(data[source_column_name].to_numpy(), period=period)
+
+    if result_column_name:
+        data[result_column_name] = ema
+    else:
+        data[f"EMA_{period}"] = ema
+    return data
+
+
+def get_adx(data: pd.DataFrame, period=14) -> pd.DataFrame:
+    """
+    Add the Average Directional Index (ADX) to the data DataFrame.
+
+    Parameters:
+        data: pd.DataFrame - The input pandas DataFrame with OHLCV data.
+        period: int - The period for the ADX.
+
+    Returns:
+        The input pandas DataFrame with the ADX added. The ADX consists out of
+        three columns: +DI, -DI, and ADX.
+    """
+    plus_di, min_di = tp.di(
+        high=data["High"].to_numpy(),
+        low=data["Low"].to_numpy(),
+        close=data["Close"].to_numpy(),
+        period=period
+    )
+    adx = tp.adx(
+        high=data["High"].to_numpy(),
+        low=data["Low"].to_numpy(),
+        close=data["Close"].to_numpy(),
         period=period
     )
 
     # Pad NaN values for initial rows with a default value, e.g., 0
-    sma_values = np.concatenate(
-        (np.full(period - 1, None), sma_values)
-    )
+    plus_di = np.concatenate((np.full(period - 1, 0), plus_di))
+    min_di = np.concatenate((np.full(period - 1, 0), min_di))
+    adx = np.concatenate((np.full(period + 12, 0), adx))
 
-    if result_column_name:
-        data[result_column_name] = sma_values
-    else:
-        # Assign SMA values to the DataFrame
-        data[f"SMA_{source_column_name}_{period}"] = sma_values
-
+    # Assign adx values to the DataFrame
+    data["+DI"] = plus_di
+    data["-DI"] = min_di
+    data["ADX"] = adx
     return data

@@ -112,7 +112,19 @@ class MarketDataSourceService:
     def get_ohlcv_market_data_source(
         self, symbol, time_frame=None, market=None
     ):
+        """
+        Function to get the OHLCV market data source for a symbol, time frame
+        and market.
 
+        Parameters:
+            symbol: str - The symbol of the asset 
+            time_frame: TimeFrame - The time frame of the data
+            market: str - The market of the asset
+
+        Returns:
+            OHLCVMarketDataSource - The OHLCV market data source for the
+            symbol, time frame and market
+        """
         if time_frame is not None:
             time_frame = TimeFrame.from_value(time_frame)
 
@@ -122,11 +134,10 @@ class MarketDataSourceService:
                 if isinstance(market_data_source, OHLCVMarketDataSource):
 
                     if market is not None and time_frame is not None:
-
                         if market_data_source.market.lower() == market.lower()\
                                 and market_data_source.symbol.lower() \
                                 == symbol.lower() and \
-                                market_data_source.time_frame == time_frame:
+                                time_frame.equals(market_data_source.time_frame):
                             return market_data_source
                     elif market is not None:
                         if market_data_source.market.lower() == market.lower()\
@@ -136,7 +147,7 @@ class MarketDataSourceService:
                     elif time_frame is not None:
                         if market_data_source.symbol.lower() \
                                 == symbol.lower() and \
-                                market_data_source.time_frame == time_frame:
+                                time_frame.equals(market_data_source.time_frame):
                             return market_data_source
                     else:
                         if market_data_source.symbol.lower() \

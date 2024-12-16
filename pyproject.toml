@@ -32,6 +32,10 @@ coverage= "7.4.2"
 flake8 = "7.0.0"
 Flask-Testing = "^0.8.1"
 
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
