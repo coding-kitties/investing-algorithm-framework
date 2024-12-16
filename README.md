@@ -15,12 +15,11 @@
 
 # [Investing Algorithm Framework](https://github.com/coding-kitties/investing-algorithm-framework)
 
-The Investing Algorithm Framework is a Python tool that enables swift and 
-elegant development of trading bots. It comes with all the necessary 
-components for creating algorithms, including data provisioning, 
-portfolio management, and order execution.
+The Investing Algorithm Framework is a Python framework that enables swift and elegant development of trading bots. It comes with all the necessary components for creating trading strategies, including data management, portfolio, order, position and trades management.
 
-Features: 
+Features:
+
+* Indicators module: A collection of indicators and utility functions that can be used in your trading strategies. 
 * Order execution and tracking
 * Broker and exchange connections through [ccxt](https://github.com/ccxt/ccxt)
 * Backtesting and performance analysis reports [example](./examples/backtest_example)
@@ -32,12 +31,10 @@ Features:
 * Stateless running for cloud function deployments
 * Polars dataframes support out of the box for fast data processing [pola.rs](https://pola.rs/)
 
-Additional features:
-* Indicators (python >= 3.10 required): Set of indicators that can be used in your trading bot. You can donwload the package with `pip install investing-algorithm-framework[indicators]` or `poetry add investing-algorithm-framework[indicators]]`
- 
 ## Example implementation
-The following algorithm connects to binance and buys BTC every 5 seconds. 
-It also exposes an REST API that allows you to interact with the algorithm.
+
+The following algorithm connects to binance and buys BTC every 5 seconds. It also exposes an REST API that allows you to interact with the algorithm.
+
 ```python
 import pathlib
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
@@ -129,12 +126,13 @@ if __name__ == "__main__":
 > You can find more examples [here](./examples) folder.
 
 ## Backtesting and experiments
-The framework also supports backtesting and performing backtest experiments. After 
-a backtest, you can print a report that shows the performance of your trading bot.
+
+The framework also supports backtesting and performing backtest experiments. After a backtest, you can print a report that shows the performance of your trading bot.
 
 To run a single backtest you can use the example code that can be found [here](./examples/backtest).
 
 ### Backtesting report
+
 You can use the ```pretty_print_backtest``` function to print a backtest report.
 For example if you run the [moving average example trading bot](./examples/crossover_moving_average_trading_bot)
 you will get the following backtesting report:
@@ -221,6 +219,7 @@ Trades overview
 ```
 
 ### Backtest experiments
+
 The framework also supports backtest experiments. Backtest experiments allows you to 
 compare multiple algorithms and evaluate their performance. Ideally, 
 you would do this by parameterizing your strategy and creating a factory function that
@@ -228,6 +227,7 @@ creates the algorithm with the different parameters. You can find an example of 
 in the [backtest experiments example](./examples/backtest_experiment).
 
 ## Broker/Exchange configuration
+
 The framework has by default support for [ccxt](https://github.com/ccxt/ccxt).
 This should allow you to connect to a lot of brokers/exchanges.
 
@@ -253,10 +253,12 @@ app.add_portfolio_configuration(
 ```
 
 ## Performance
+
 We are continuously working on improving the performance of the framework. If
 you have any suggestions, please let us know.
 
 ## Download
+
 You can download the framework with pypi.
 
 ```bash
@@ -264,6 +266,7 @@ pip install investing-algorithm-framework
 ```
 
 ## Disclaimer
+
 If you use this framework for your investments, do not risk money 
 which you are afraid to lose, until you have clear understanding how 
 the framework works. We can't stress this enough:
@@ -288,8 +291,8 @@ If you'd like to chat with investing-algorithm-framework users
 and developers, [join us on Slack](https://inv-algo-framework.slack.com) or [join us on reddit](https://www.reddit.com/r/InvestingBots/)
 
 ## Acknowledgements
-We want to thank all contributors to this project. A full list of all 
-the people that contributed to the project can be
+
+We want to thank all contributors to this project. A full list of all the people that contributed to the project can be
 found [here](https://github.com/investing-algorithms/investing-algorithm-framework/blob/master/AUTHORS.md)
 
 ### [Bugs / Issues](https://github.com/investing-algorithms/investing-algorithm-framework/issues?q=is%3Aissue)
@@ -298,9 +301,9 @@ If you discover a bug in the framework, please [search our issue tracker](https:
 first. If it hasn't been reported, please [create a new issue](https://github.com/investing-algorithms/investing-algorithm-framework/issues/new).
 
 ### Contributing
+
 The investing algorithm framework is a community driven project. 
-We welcome you to participate, contribute and together help build 
-the future trading bots developed in python.
+We welcome you to participate, contribute and together help build the future trading bots developed in python.
 
 Feel like the framework is missing a feature? We welcome your pull requests!
 If you want to contribute to the project roadmap, please take a look at the [project board](https://github.com/coding-kitties/investing-algorithm-framework/projects?query=is%3Aopen).
