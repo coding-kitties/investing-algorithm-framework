@@ -91,7 +91,10 @@ class App:
 
         Also, it initializes all required services for the algorithm.
 
-        :return: None
+        Args:
+            sync (bool): Whether to sync the portfolio with the exchange
+        Returns:
+            None
         """
         if self.algorithm is None:
             raise OperationalException("No algorithm registered")
@@ -162,8 +165,8 @@ class App:
                     .create_portfolio_from_configuration(
                         portfolio_configuration
                     )
-                self.sync(portfolio)
-                synced_portfolios.append(portfolio)
+                # self.sync(portfolio)
+                # synced_portfolios.append(portfolio)
 
         if sync:
             portfolios = portfolio_service.get_all()
@@ -494,16 +497,15 @@ class App:
         separate thread.
 
         Args:
-            payload: The payload to handle if the app is running in
+            payload (dict): The payload to handle if the app is running in
             stateless mode
-            number_of_iterations: The number of iterations to run the
+            number_of_iterations (int): The number of iterations to run the
             algorithm for
-            sync: Whether to sync the portfolio with the exchange
+            sync (bool): Whether to sync the portfolio with the exchange
 
         Returns:
             None
         """
-
         # Run all on_initialize hooks
         for hook in self._on_after_initialize_hooks:
             hook.on_run(self, self.algorithm)

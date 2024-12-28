@@ -19,7 +19,9 @@ class TimeUnit(Enum):
                     return entry
 
         raise ValueError(
-            f"Could not convert value {value} to time unit"
+            f"Could not convert value {value} to time unit," +
+            " please make sure that the value is either of type string or" +
+            f"TimeUnit. Its current type is {type(value)}"
         )
 
     def equals(self, other):

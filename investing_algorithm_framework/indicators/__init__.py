@@ -5,7 +5,8 @@ from .utils import is_crossunder, is_crossover, is_above, \
     is_below, has_crossed_upward, has_crossed_downward, \
     has_any_higher_then_threshold, has_any_lower_then_threshold, \
     get_slope, has_slope_above_threshold, has_slope_below_threshold, \
-    has_values_above_threshold, has_values_below_threshold
+    has_values_above_threshold, has_values_below_threshold, \
+    get_values_above_threshold, get_values_below_threshold
 from .momentum import get_willr
 
 __all__ = [
@@ -33,5 +34,7 @@ __all__ = [
     "has_slope_above_threshold",
     "has_slope_below_threshold",
     "has_values_above_threshold",
-    "has_values_below_threshold"
+    "has_values_below_threshold",
+    "get_values_above_threshold",
+    "get_values_below_threshold"
 ]

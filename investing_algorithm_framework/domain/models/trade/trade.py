@@ -232,6 +232,8 @@ class Trade(BaseModel):
 
     def to_dict(self):
         return {
+            "buy_order_id": self.buy_order_id,
+            "sell_order_id": self.sell_order_id,
             "target_symbol": self.target_symbol,
             "trading_symbol": self.trading_symbol,
             "status": self.status,
@@ -246,6 +248,25 @@ class Trade(BaseModel):
             "change": self.percentage_change,
             "absolute_change": self.absolute_change,
         }
+
+    @staticmethod
+    def from_dict(data):
+        return Trade(
+            buy_order_id=data["buy_order_id"] if "buy_order_id" in data else None,
+            sell_order_id=data["sell_order_id"] if "sell_order_id" in data else None,
+            target_symbol=data["target_symbol"],
+            trading_symbol=data["trading_symbol"],
+            amount=data["amount"],
+            open_price=data["open_price"],
+            opened_at=datetime.strptime(
+                data["opened_at"], DATETIME_FORMAT
+            ),
+            closed_price=data["closed_price"],
+            closed_at=datetime.strptime(
+                data["closed_at"], DATETIME_FORMAT
+            ) if data["closed_at"] else None,
+            current_price=data["current_price"],
+        )
 
     def __repr__(self):
         return self.repr(

@@ -19,7 +19,7 @@ The Investing Algorithm Framework is a Python framework that enables swift and e
 
 Features:
 
-* Indicators module: A collection of indicators and utility functions that can be used in your trading strategies. 
+* Indicators module: A collection of indicators and utility functions that can be used in your trading strategies.
 * Order execution and tracking
 * Broker and exchange connections through [ccxt](https://github.com/ccxt/ccxt)
 * Backtesting and performance analysis reports [example](./examples/backtest_example)
@@ -41,8 +41,8 @@ from investing_algorithm_framework import create_app, PortfolioConfiguration, \
     RESOURCE_DIRECTORY, TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, \
     CCXTTickerMarketDataSource, MarketCredential, SYMBOLS
 
-# Define the symbols you want to trade for optimization, otherwise the 
-# algorithm will check if you have orders and balances on all available 
+# Define the symbols you want to trade for optimization, otherwise the
+# algorithm will check if you have orders and balances on all available
 # symbols on the market
 symbols = ["BTC/EUR"]
 
@@ -51,6 +51,13 @@ config = {
     RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve(),
     SYMBOLS: symbols
 }
+
+state_manager = AzureBlobStorageStateManager(
+    account_name="<your account name>",
+    account_key="<your account key>",
+    container_name="<your container name>",
+    blob_name="<your blob name>",
+)
 
 # Define market data sources
 # OHLCV data for candles
@@ -67,7 +74,11 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     market="BITVAVO",
     symbol="BTC/EUR",
 )
-app = create_app(config=config)
+app = create_app(
+    config=config,
+    sync_portfolio=True,
+    state_manager=state_manager
+)
 algorithm = Algorithm()
 app.add_market_credential(MarketCredential(
     market="bitvavo",
@@ -85,16 +96,16 @@ app.add_algorithm(algorithm)
 
 @algorithm.strategy(
     # Run every two hours
-    time_unit=TimeUnit.HOUR, 
-    interval=2, 
+    time_unit=TimeUnit.HOUR,
+    interval=2,
     # Specify market data sources that need to be passed to the strategy
     market_data_sources=[bitvavo_btc_eur_ticker, bitvavo_btc_eur_ohlcv_2h]
 )
 def perform_strategy(algorithm: Algorithm, market_data: dict):
     # By default, ohlcv data is passed as polars df in the form of
-    # {"<identifier>": <dataframe>}  https://pola.rs/, 
+    # {"<identifier>": <dataframe>}  https://pola.rs/,
     # call to_pandas() to convert to pandas
-    polars_df = market_data["BTC-ohlcv"]  
+    polars_df = market_data["BTC-ohlcv"]
     print(f"I have access to {len(polars_df)} candles of ohlcv data")
 
     # Ticker data is passed as {"<identifier>": <ticker dict>}
@@ -104,21 +115,21 @@ def perform_strategy(algorithm: Algorithm, market_data: dict):
     trades = algorithm.get_trades()
     open_trades = algorithm.get_open_trades()
     closed_trades = algorithm.get_closed_trades()
-    
-    # Create a buy oder 
+
+    # Create a buy oder
     algorithm.create_limit_order(
         target_symbol="BTC/EUR",
         order_side="buy",
         amount=0.01,
         price=ticker_data["ask"],
     )
-    
+
     # Close a trade
     algorithm.close_trade(trades[0].id)
-    
+
     # Close a position
     algorithm.close_position(positions[0].get_symbol())
-    
+
 if __name__ == "__main__":
     app.run()
 ```
@@ -136,14 +147,14 @@ To run a single backtest you can use the example code that can be found [here](.
 You can use the ```pretty_print_backtest``` function to print a backtest report.
 For example if you run the [moving average example trading bot](./examples/crossover_moving_average_trading_bot)
 you will get the following backtesting report:
- 
+
 ```bash
 
                   :%%%#+-          .=*#%%%        Backtest report
                   *%%%%%%%+------=*%%%%%%%-       ---------------------------
                   *%%%%%%%%%%%%%%%%%%%%%%%-       Start date: 2023-08-24 00:00:00
                   .%%%%%%%%%%%%%%%%%%%%%%#        End date: 2023-12-02 00:00:00
-                   #%%%####%%%%%%%%**#%%%+        Number of days: 100 
+                   #%%%####%%%%%%%%**#%%%+        Number of days: 100
              .:-+*%%%%- -+..#%%%+.+-  +%%%#*=-:   Number of runs: 1201
               .:-=*%%%%. += .%%#  -+.-%%%%=-:..   Number of orders: 40
               .:=+#%%%%%*###%%%%#*+#%%%%%%*+-:    Initial balance: 400.0
@@ -156,10 +167,10 @@ you will get the following backtesting report:
            .++-        -%%%%%%%%%%%+=             Percentage negative trades: 70.0%
           .++-        .%%%%%%%%%%%%%+=            Average trade size: 100.9692 EUR
          .++-         *%%%%%%%%%%%%%*+:           Average trade duration: 83.6 hours
-        .++-          %%%%%%%%%%%%%%#+=         
-        =++........:::%%%%%%%%%%%%%%*+-         
-        .=++++++++++**#%%%%%%%%%%%%%++.         
-        
+        .++-          %%%%%%%%%%%%%%#+=
+        =++........:::%%%%%%%%%%%%%%*+-
+        .=++++++++++**#%%%%%%%%%%%%%++.
+
 Price noise
 
 Positions overview
@@ -220,8 +231,8 @@ Trades overview
 
 ### Backtest experiments
 
-The framework also supports backtest experiments. Backtest experiments allows you to 
-compare multiple algorithms and evaluate their performance. Ideally, 
+The framework also supports backtest experiments. Backtest experiments allows you to
+compare multiple algorithms and evaluate their performance. Ideally,
 you would do this by parameterizing your strategy and creating a factory function that
 creates the algorithm with the different parameters. You can find an example of this
 in the [backtest experiments example](./examples/backtest_experiment).
@@ -237,14 +248,14 @@ from investing_algorithm_framework import PortfolioConfiguration, \
 app = create_app()
 app.add_market_credential(
     MarketCredential(
-        market="<your market>", 
+        market="<your market>",
         api_key="<your api key>",
         secret_key="<your secret key>",
     )
 )
 app.add_portfolio_configuration(
     PortfolioConfiguration(
-        market="<your market>", 
+        market="<your market>",
         initial_balance=400,
         track_from="01/01/2022",
         trading_symbol="EUR"
@@ -267,27 +278,27 @@ pip install investing-algorithm-framework
 
 ## Disclaimer
 
-If you use this framework for your investments, do not risk money 
-which you are afraid to lose, until you have clear understanding how 
+If you use this framework for your investments, do not risk money
+which you are afraid to lose, until you have clear understanding how
 the framework works. We can't stress this enough:
 
-BEFORE YOU START USING MONEY WITH THE FRAMEWORK, MAKE SURE THAT YOU TESTED 
-YOUR COMPONENTS THOROUGHLY. USE THE SOFTWARE AT YOUR OWN RISK. 
+BEFORE YOU START USING MONEY WITH THE FRAMEWORK, MAKE SURE THAT YOU TESTED
+YOUR COMPONENTS THOROUGHLY. USE THE SOFTWARE AT YOUR OWN RISK.
 THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR INVESTMENT RESULTS.
 
-Also, make sure that you read the source code of any plugin you use or 
+Also, make sure that you read the source code of any plugin you use or
 implementation of an algorithm made with this framework.
 
 ## Documentation
 
-All the documentation can be found online 
+All the documentation can be found online
 at the [documentation webstie](https://investing-algorithm-framework.com)
 
-In most cases, you'll probably never have to change code on this repo directly 
-if you are building your algorithm/bot. But if you do, check out the 
+In most cases, you'll probably never have to change code on this repo directly
+if you are building your algorithm/bot. But if you do, check out the
 contributing page at the website.
 
-If you'd like to chat with investing-algorithm-framework users 
+If you'd like to chat with investing-algorithm-framework users
 and developers, [join us on Slack](https://inv-algo-framework.slack.com) or [join us on reddit](https://www.reddit.com/r/InvestingBots/)
 
 ## Acknowledgements
@@ -302,12 +313,12 @@ first. If it hasn't been reported, please [create a new issue](https://github.co
 
 ### Contributing
 
-The investing algorithm framework is a community driven project. 
+The investing algorithm framework is a community driven project.
 We welcome you to participate, contribute and together help build the future trading bots developed in python.
 
 Feel like the framework is missing a feature? We welcome your pull requests!
 If you want to contribute to the project roadmap, please take a look at the [project board](https://github.com/coding-kitties/investing-algorithm-framework/projects?query=is%3Aopen).
-You can pick up a task by assigning yourself to it. 
+You can pick up a task by assigning yourself to it.
 
 **Note** before starting any major new feature work, *please open an issue describing what you are planning to do*.
 This will ensure that interested parties can give valuable feedback on the feature, and let others know that you are working on it.

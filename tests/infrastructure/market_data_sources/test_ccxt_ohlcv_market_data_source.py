@@ -1,5 +1,6 @@
 import os
-from unittest import TestCase
+from datetime import datetime
+from unittest import TestCase, mock
 
 from investing_algorithm_framework.infrastructure import \
     CCXTOHLCVMarketDataSource
@@ -63,3 +64,62 @@ class Test(TestCase):
             symbol="BTC/EUR",
         )
         self.assertEqual("15m", ccxt_ohlcv_market_data_source.get_time_frame())
+
+    @mock.patch('investing_algorithm_framework.infrastructure.services.market_service.ccxt_market_service.CCXTMarketService.get_ohlcv')
+    def test_get_data_with_only_window_size(self, mock):
+        data_source = CCXTOHLCVMarketDataSource(
+            identifier="BTC/EUR",
+            window_size=200,
+            time_frame="15m",
+            market="BITVAVO",
+            symbol="BTC/EUR",
+        )
+        mock.return_value = {'key': 'value'}
+        data = data_source.get_data()
+        self.assertIsNotNone(data)
+        self.assertEqual(data_source.window_size, 200)
+
+    @mock.patch('investing_algorithm_framework.infrastructure.services.market_service.ccxt_market_service.CCXTMarketService.get_ohlcv')
+    def test_get_data_with_only_start_date_and_end_date(self, mock):
+        data_source = CCXTOHLCVMarketDataSource(
+            identifier="BTC/EUR",
+            time_frame="15m",
+            market="BITVAVO",
+            symbol="BTC/EUR",
+        )
+        mock.return_value = {'key': 'value'}
+        data = data_source.get_data(
+            start_date=datetime(2021, 1, 1),
+            end_date=datetime(2021, 1, 2)
+        )
+        self.assertIsNotNone(data)
+
+    @mock.patch('investing_algorithm_framework.infrastructure.services.market_service.ccxt_market_service.CCXTMarketService.get_ohlcv')
+    def test_get_data_with_only_start_date_and_window_size(self, mock):
+        data_source = CCXTOHLCVMarketDataSource(
+            identifier="BTC/EUR",
+            time_frame="15m",
+            market="BITVAVO",
+            symbol="BTC/EUR",
+        )
+        mock.return_value = {'key': 'value'}
+        data = data_source.get_data(
+            start_date=datetime(2021, 1, 1),
+            window_size=200
+        )
+        self.assertIsNotNone(data)
+
+    @mock.patch('investing_algorithm_framework.infrastructure.services.market_service.ccxt_market_service.CCXTMarketService.get_ohlcv')
+    def test_get_data_with_only_end_date_and_window_size(self, mock):
+        data_source = CCXTOHLCVMarketDataSource(
+            identifier="BTC/EUR",
+            time_frame="15m",
+            market="BITVAVO",
+            symbol="BTC/EUR",
+        )
+        mock.return_value = {'key': 'value'}
+        data = data_source.get_data(
+            start_date=datetime(2021, 1, 1),
+            window_size=200
+        )
+        self.assertIsNotNone(data)

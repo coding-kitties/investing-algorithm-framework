@@ -10,6 +10,9 @@ from investing_algorithm_framework.domain.models \
     .backtesting.backtest_date_range import BacktestDateRange
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.time_unit import TimeUnit
+from investing_algorithm_framework.domain.models.position import Position
+from investing_algorithm_framework.domain.models.trade import Trade
+from investing_algorithm_framework.domain.models.order import Order
 
 logger = getLogger(__name__)
 
@@ -451,7 +454,7 @@ class BacktestReport(BaseModel):
                 data["backtest_end_date"], DATETIME_FORMAT)
         )
 
-        return BacktestReport(
+        report = BacktestReport(
             name=data["name"],
             strategy_identifiers=data["strategy_identifiers"],
             number_of_runs=data["number_of_runs"],
@@ -476,6 +479,23 @@ class BacktestReport(BaseModel):
             average_trade_duration=data["average_trade_duration"],
             average_trade_size=float(data["average_trade_size"]),
         )
+
+        positions = data["positions"]
+
+        if positions is not None:
+            report.positions = [Position.from_dict(position) for position in positions]
+
+        trades = data["trades"]
+
+        if trades is not None:
+            report.trades = [Trade.from_dict(trade) for trade in trades]
+
+        orders = data["orders"]
+
+        if orders is not None:
+            report.orders = [Order.from_dict(order) for order in orders]
+
+        return report
 
     def get_trades(self, symbol=None):
         """

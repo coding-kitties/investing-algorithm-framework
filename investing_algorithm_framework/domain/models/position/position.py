@@ -2,6 +2,9 @@ from investing_algorithm_framework.domain.models.base_model import BaseModel
 
 
 class Position(BaseModel):
+    """
+    This class represents a position in a portfolio.
+    """
 
     def __init__(
         self,

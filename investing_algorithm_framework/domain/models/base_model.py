@@ -23,3 +23,9 @@ class BaseModel:
 
             if value is not None:
                 setattr(self, attr, value)
+
+    @staticmethod
+    def from_dict(data):
+        instance = BaseModel()
+        instance.update(data)
+        return instance
