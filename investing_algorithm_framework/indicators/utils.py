@@ -554,6 +554,7 @@ def get_values_above_threshold(
     # Return the filtered values as a list
     return above_threshold.tolist()
 
+
 def get_values_below_threshold(
     df, column, threshold, number_of_data_points
 ) -> int:

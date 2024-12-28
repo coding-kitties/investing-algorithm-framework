@@ -20,8 +20,7 @@ from .create_app import create_app
 from investing_algorithm_framework.indicators import get_rsi, get_peaks, \
     is_uptrend, is_downtrend, is_crossover, is_crossunder, is_above, \
     is_below, has_crossed_upward, get_sma, get_up_and_downtrends, \
-    get_rsi, get_ema, get_adx, has_crossed_downward, get_willr, \
-    is_divergence
+    get_ema, get_adx, has_crossed_downward, get_willr, is_divergence
 
 __all__ = [
     "Algorithm",

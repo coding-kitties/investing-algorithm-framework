@@ -80,9 +80,12 @@ def is_downtrend(
     Function to check if the price data is in a downturn.
 
     Args:
-        data (Union[pd.DataFrame, pd.Series]): The input pandas DataFrame or Series.
-        fast_column (str): The key for the fast moving average (default: SMA_50).
-        slow_column (str): The key for the slow moving average (default: SMA_200).
+        data (Union[pd.DataFrame, pd.Series]): The input pandas
+            DataFrame or Series.
+        fast_column (str): The key for the fast moving
+            average (default: SMA_50).
+        slow_column (str): The key for the slow moving
+            average (default: SMA_200).
 
     Returns:
         bool: Boolean indicating if the price data is in a downturn.

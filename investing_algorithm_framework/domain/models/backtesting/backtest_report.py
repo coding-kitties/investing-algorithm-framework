@@ -483,7 +483,9 @@ class BacktestReport(BaseModel):
         positions = data["positions"]
 
         if positions is not None:
-            report.positions = [Position.from_dict(position) for position in positions]
+            report.positions = [
+                Position.from_dict(position) for position in positions
+            ]
 
         trades = data["trades"]
 

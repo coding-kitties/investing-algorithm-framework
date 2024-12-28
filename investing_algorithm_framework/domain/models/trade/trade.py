@@ -252,8 +252,10 @@ class Trade(BaseModel):
     @staticmethod
     def from_dict(data):
         return Trade(
-            buy_order_id=data["buy_order_id"] if "buy_order_id" in data else None,
-            sell_order_id=data["sell_order_id"] if "sell_order_id" in data else None,
+            buy_order_id=data["buy_order_id"] if "buy_order_id"
+            in data else None,
+            sell_order_id=data["sell_order_id"] if "sell_order_id"
+            in data else None,
             target_symbol=data["target_symbol"],
             trading_symbol=data["trading_symbol"],
             amount=data["amount"],
