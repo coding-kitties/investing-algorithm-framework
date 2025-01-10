@@ -2,7 +2,8 @@ import logging
 from datetime import datetime
 
 from investing_algorithm_framework.domain import OrderSide, OrderStatus, \
-    OperationalException, MarketService, MarketCredentialService, Portfolio
+    OperationalException, MarketService, MarketCredentialService, Portfolio, \
+    Environment, ENVIRONMENT
 from investing_algorithm_framework.services.configuration_service import \
     ConfigurationService
 from investing_algorithm_framework.services.repository_service \
@@ -45,8 +46,48 @@ class PortfolioService(RepositoryService):
         portfolio.configuration = portfolio_configuration
         return portfolio
 
+    def get_all(self, query_params=None):
+        selection = super().get_all(query_params)
+
+        for portfolio in selection:
+            portfolio_configuration = self.portfolio_configuration_service\
+                .get(portfolio.identifier)
+            portfolio.configuration = portfolio_configuration
+
+        return selection
+
     def create(self, data):
         unallocated = data.get("unallocated", 0)
+        market = data.get("market")
+
+        # Check if the app is in backtest mode
+        config = self.configuration_service.get_config()
+        environment = config[ENVIRONMENT]
+
+        if not Environment.BACKTEST.equals(environment):
+            # Check if there is a market credential
+            # for the portfolio configuration
+            market_credential = self.market_credential_service.get(market)
+
+            if market_credential is None:
+                raise OperationalException(
+                    f"No market credential found for market "
+                    f"{market}. Cannot "
+                    f"initialize portfolio configuration."
+                )
+
+        identifier = data.get("identifier")
+        # Check if the portfolio already exists
+        # If the portfolio already exists, return the portfolio after checking
+        # the unallocated balance of the portfolio on the exchange
+        if identifier is not None and self.repository.exists(
+            {"identifier": identifier}
+        ):
+            portfolio = self.repository.find(
+                {"identifier": identifier}
+            )
+            return portfolio
+
         portfolio = super(PortfolioService, self).create(data)
         self.position_service.create(
             {
@@ -87,6 +128,12 @@ class PortfolioService(RepositoryService):
         provided. If the portfolio already exists, it will be returned.
 
         If the portfolio does not exist, it will be created.
+
+        Args:
+            portfolio_configuration (PortfolioConfiguration) Portfolio configuration to create the portfolio from
+
+        Returns:
+            Portfolio: Portfolio created from the configuration
         """
         logger.info("Creating portfolios")
 
@@ -117,4 +164,7 @@ class PortfolioService(RepositoryService):
             portfolio = Portfolio.from_portfolio_configuration(
                 portfolio_configuration
             )
+            data = portfolio.to_dict()
+            self.create(data)
+
         return portfolio

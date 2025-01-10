@@ -1,8 +1,8 @@
 import logging
 
 from investing_algorithm_framework.domain import OperationalException, \
-    AbstractPortfolioSyncService, RESERVED_BALANCES, APP_MODE, SYMBOLS, \
-    OrderSide, AppMode
+    AbstractPortfolioSyncService, RESERVED_BALANCES, SYMBOLS, \
+    OrderSide, OrderStatus
 from investing_algorithm_framework.services.trade_service import TradeService
 
 logger = logging.getLogger(__name__)
@@ -14,15 +14,15 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
     """
 
     def __init__(
-            self,
-            trade_service: TradeService,
-            configuration_service,
-            order_repository,
-            position_repository,
-            portfolio_repository,
-            portfolio_configuration_service,
-            market_credential_service,
-            market_service
+        self,
+        trade_service: TradeService,
+        configuration_service,
+        order_repository,
+        position_repository,
+        portfolio_repository,
+        portfolio_configuration_service,
+        market_credential_service,
+        market_service
     ):
         self.trade_service = trade_service
         self.configuration_service = configuration_service
@@ -40,23 +40,18 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
         available balance of the portfolio from the exchange and update the
         unallocated balance of the portfolio accordingly.
 
-        If the algorithm is running stateless it will update the unallocated
-        balance of the portfolio to the available balance on the exchange.
+        If the portfolio already exists (exists in the database), then a check is done if the exchange has the available balance of
+        the portfolio unallocated balance. If the exchange does not have
+        the available balance of the portfolio, an OperationalException will be raised.
 
-        If the algorithm is running stateful, the unallocated balance of the
-        portfolio will only check if the amount on the exchange is less
-        than the unallocated balance of the portfolio. If the amount on the
-        exchange is less than the unallocated balance of the portfolio, the
-        unallocated balance of the portfolio will be updated to the amount on
-        the exchange or an OperationalException will be raised if the
-        throw_exception_on_insufficient_balance is set to True.
+        If the portfolio does not exist, the portfolio will be created with
+        the unallocated balance of the portfolio set to the available balance on the exchange. If also a initial balance is set in the portfolio configuration, the unallocated balance will be set to the initial balance (given the balance is available on the exchange). If the initial balance is not set, the unallocated balance will be set to the available balance on the exchange.
 
-        If in the config the RESERVED_BALANCES key is set, the reserved amount
-        will be subtracted from the unallocated amount. This is to prevent
-        the algorithm from using reserved balances for trading. The reserved
-        config is not used for the stateless mode, because this would mean
-        that the algorithm should be aware of how much it already used for
-        trading. This is not possible in stateless mode.
+        Args:
+            portfolio: Portfolio object
+
+        Returns:
+            Portfolio object
         """
         market_credential = self.market_credential_service.get(
             portfolio.market
@@ -71,69 +66,70 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
         # Get the unallocated balance of the portfolio from the exchange
         balances = self.market_service.get_balance(market=portfolio.market)
 
-        if portfolio.trading_symbol.upper() not in balances:
-            unallocated = 0
-        else:
-            unallocated = float(balances[portfolio.trading_symbol.upper()])
+        if not portfolio.initialized:
+            # Check if the portfolio has an initial balance set
+            if portfolio.initial_balance is not None:
+                available = float(balances[portfolio.trading_symbol.upper()])
 
-        reserved_unallocated = 0
-        config = self.configuration_service.config
-        mode = config.get(APP_MODE)
-
-        if not AppMode.STATELESS.equals(mode):
-            if RESERVED_BALANCES in config:
-                reserved = config[RESERVED_BALANCES]
-
-                if portfolio.trading_symbol.upper() in reserved:
-                    reserved_unallocated \
-                        = reserved[portfolio.trading_symbol.upper()]
-
-            unallocated = unallocated - reserved_unallocated
-
-            if portfolio.unallocated is not None and \
-                    unallocated != portfolio.unallocated:
-
-                if unallocated < portfolio.unallocated:
+                if portfolio.initial_balance > available:
                     raise OperationalException(
-                        "There seems to be a mismatch between "
-                        "the portfolio configuration and the balances on"
-                        " the exchange. "
-                        f"Please make sure that the available "
-                        f"{portfolio.trading_symbol} "
-                        f"on your exchange {portfolio.market} "
-                        "matches the portfolio configuration amount of: "
-                        f"{portfolio.unallocated} "
-                        f"{portfolio.trading_symbol}. "
-                        f"You have currently {unallocated} "
-                        f"{portfolio.trading_symbol} available on the "
-                        f"exchange."
+                        "The initial balance of the " +
+                        "portfolio configuration " +
+                        f"({portfolio.initial_balance} "
+                        f"{portfolio.trading_symbol}) is more " +
+                        "than the available balance on the exchange. " +
+                        "Please make sure that the initial balance of " +
+                        "the portfolio configuration is less " +
+                        "than the available balance on the " +
+                        f"exchange {available} {portfolio.trading_symbol}."
                     )
+                else:
+                    unallocated = portfolio.initial_balance
+            else:
+                # If the portfolio does not have an initial balance set, get the available balance on the exchange
+                if portfolio.trading_symbol.upper() not in balances:
+                    raise OperationalException(
+                        f"There is no available balance on the exchange for "
+                        f"{portfolio.trading_symbol.upper()} on market "
+                        f"{portfolio.market}. Please make sure that you have "
+                        f"an available balance on the exchange for "
+                        f"{portfolio.trading_symbol.upper()} on market "
+                        f"{portfolio.market}."
+                    )
+                else:
+                    unallocated = float(balances[portfolio.trading_symbol.upper()])
 
-                # If portfolio does not exist and initial balance is set,
-                # create the portfolio with the initial balance
-                if unallocated > portfolio.unallocated and \
-                        not self.portfolio_repository.exists(
-                            {"identifier": portfolio.identifier}
-                        ):
-                    unallocated = portfolio.unallocated
-
-        if not self.portfolio_repository.exists(
-                {"identifier": portfolio.identifier}
-        ):
-            create_data = {
-                "identifier": portfolio.get_identifier(),
-                "market": portfolio.get_market().upper(),
-                "trading_symbol": portfolio.get_trading_symbol(),
-                "unallocated": unallocated,
-            }
-            portfolio = self.portfolio_repository.create(create_data)
-        else:
             update_data = {
                 "unallocated": unallocated,
+                "net_size": unallocated,
+                "initialized": True
             }
             portfolio = self.portfolio_repository.update(
                 portfolio.id, update_data
             )
+
+            # Update also a trading symbol position
+            trading_symbol_position = self.position_repository.find(
+                {
+                    "symbol": portfolio.trading_symbol,
+                    "portfolio_id": portfolio.id
+                }
+            )
+            self.position_repository.update(
+                trading_symbol_position.id, {"amount": unallocated}
+            )
+
+        else:
+            # Check if the portfolio unallocated balance is available on the exchange
+            if portfolio.unallocated > 0:
+                if portfolio.trading_symbol.upper() not in balances or portfolio.unallocated > float(balances[portfolio.trading_symbol.upper()]):
+                    raise OperationalException(
+                        f"Out of sync: the unallocated balance"
+                        " of the portfolio is more than the available"
+                        " balance on the exchange. Please make sure that you" f" have at least {portfolio.unallocated}"
+                        f" {portfolio.trading_symbol.upper()} available"
+                        " on the exchange."
+                    )
 
         return portfolio
 
@@ -198,121 +194,39 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
     def sync_orders(self, portfolio):
         """
         Function to sync all local orders with the orders on the exchange.
-        This function will retrieve all orders from the exchange and
-        update the portfolio balances and positions accordingly.
+        This method will go over all local open orders and check if they are
+        changed on the exchange. If they are, the local order will be updated to match the status on the exchange.
 
-        First all orders are retrieved from the exchange and updated in the
-        database. If the order does not exist in the database, it will be
-        created and treated as a new order.
+        Args:
+            portfolio: Portfolio object
 
-        When an order is closed on the exchange, the order will be updated
-        in the database to closed. We will also then update the portfolio
-        and position balances accordingly.
-
-        If the order exists, we will check if the filled amount of the order
-        has changed. If the filled amount has changed, we will update the
-        order in the database and update the portfolio and position balances
-
-        if the status of an existing order has changed, we will update the
-        order in the database and update the portfolio and position balances
-
-        During the syncing of the orders, new orders are not executed. They
-        are only created in the database. This is to prevent the algorithm
-        from executing orders that are already executed on the exchange.
+        Returns:
+            None
         """
 
         portfolio_configuration = self.portfolio_configuration_service \
             .get(portfolio.identifier)
-        symbols = self._get_symbols(portfolio)
-        positions = self.position_repository.get_all(
-            {"portfolio_id": portfolio_configuration.identifier}
+
+        open_orders = self.order_repository.get_all(
+            {
+                "portfolio": portfolio.identifier,
+                "status": OrderStatus.OPEN.value
+            }
         )
 
-        # Remove the portfolio trading symbol from the symbols
-        symbols = [
-            symbol for symbol in symbols if symbol != portfolio.trading_symbol
-        ]
-
-        # Check if there are orders for the available symbols
-        for symbol in symbols:
-            symbol = f"{symbol.upper()}"
-            orders = self.market_service.get_orders(
-                symbol=symbol,
-                since=portfolio_configuration.track_from,
+        for order in open_orders:
+            external_orders = self.market_service.get_orders(
+                symbol=order.get_symbol(),
+                since=order.created_at,
                 market=portfolio.market
             )
 
-            if orders is not None and len(orders) > 0:
-                # Order the list of orders by created_at
-                ordered_external_order_list = sorted(
-                    orders, key=lambda x: x.created_at
-                )
+            for external_order in external_orders:
 
-                if portfolio_configuration.track_from is not None:
-                    ordered_external_order_list = [
-                        order for order in ordered_external_order_list
-                        if order.created_at >= portfolio_configuration
-                        .track_from
-                    ]
-
-                for external_order in ordered_external_order_list:
-
-                    if self.order_repository.exists(
-                            {"external_id": external_order.external_id}
-                    ):
-                        logger.info("Updating existing order")
-                        order = self.order_repository.find(
-                            {"external_id": external_order.external_id}
-                        )
-                        self.order_repository.update(
-                            order.id, external_order.to_dict()
-                        )
-                    else:
-                        logger.info(
-                            "Creating new order, based on external order"
-                        )
-                        data = external_order.to_dict()
-                        data.pop("trade_closed_at", None)
-                        data.pop("trade_closed_price", None)
-                        data.pop("trade_closed_amount", None)
-                        position_id = None
-
-                        # Get position id
-                        for position in positions:
-                            if position.symbol == external_order.target_symbol:
-                                position_id = position.id
-                                break
-
-                        # Create the new order
-                        new_order_data = {
-                            "target_symbol": external_order.target_symbol,
-                            "trading_symbol": portfolio.trading_symbol,
-                            "amount": external_order.amount,
-                            "price": external_order.price,
-                            "order_side": external_order.order_side,
-                            "order_type": external_order.order_type,
-                            "external_id": external_order.external_id,
-                            "status": "open",
-                            "position_id": position_id,
-                            "created_at": external_order.created_at,
-                        }
-                        new_order = self.order_repository.create(
-                            new_order_data,
-                        )
-
-                        # Update the order to its current status
-                        # By default it should not sync the unallocated
-                        # balance as this has already by done.
-                        # Position amounts should be updated
-                        update_data = {
-                            "status": external_order.status,
-                            "filled": external_order.filled,
-                            "remaining": external_order.remaining,
-                            "updated_at": external_order.created_at,
-                        }
-                        self.order_repository.update(
-                            new_order.id, update_data
-                        )
+                if order.external_id == external_order.external_id:
+                    self.order_repository.update(
+                        order.id, external_order.to_dict()
+                    )
 
     def sync_trades(self, portfolio):
         orders = self.order_repository.get_all(

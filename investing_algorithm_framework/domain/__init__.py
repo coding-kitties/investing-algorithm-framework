@@ -1,4 +1,4 @@
-from .config import Config, Environment
+from .config import Environment, DEFAULT_LOGGING_CONFIG
 from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
     DATABASE_DIRECTORY_PATH, DATABASE_NAME, DEFAULT_PER_PAGE_VALUE, \
     DEFAULT_PAGE_VALUE, SQLALCHEMY_DATABASE_URI, RESOURCE_DIRECTORY, \
@@ -34,7 +34,6 @@ from .utils import random_string, append_dict_as_row_to_csv, \
 from .metrics import get_price_efficiency_ratio
 
 __all__ = [
-    'Config',
     "OrderStatus",
     "OrderSide",
     "OrderType",
@@ -119,5 +118,6 @@ __all__ = [
     "get_price_efficiency_ratio",
     "convert_polars_to_pandas",
     "DateRange",
-    "get_backtest_report"
+    "get_backtest_report",
+    "DEFAULT_LOGGING_CONFIG"
 ]

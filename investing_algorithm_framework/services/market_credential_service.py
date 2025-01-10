@@ -23,3 +23,11 @@ class MarketCredentialService:
 
     def get_all(self) -> List[MarketCredential]:
         return list(self._market_credentials.values())
+
+    def initialize(self):
+        """
+        Initialize all market credentials.
+        """
+
+        for market_credential in self.get_all():
+            market_credential.initialize()

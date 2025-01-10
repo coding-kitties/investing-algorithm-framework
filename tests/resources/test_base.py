@@ -1,12 +1,14 @@
 import logging
 import os
+from decimal import Decimal
 from unittest import TestCase
 
 from flask_testing import TestCase as FlaskTestCase
 
 from investing_algorithm_framework import create_app, Algorithm, App, \
-    TradingStrategy, TimeUnit
-from investing_algorithm_framework.domain import RESOURCE_DIRECTORY
+    TradingStrategy, TimeUnit, OrderStatus
+from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
+    ENVIRONMENT, Environment
 from investing_algorithm_framework.infrastructure.database import Session
 from tests.resources.stubs import MarketServiceStub
 
@@ -33,7 +35,7 @@ class TestBase(TestCase):
     algorithm = Algorithm()
     external_balances = {}
     external_orders = []
-    external_available_symbols = []
+    initial_orders = []
     market_credentials = []
     market_service = MarketServiceStub(None)
     market_data_source_service = None
@@ -45,8 +47,8 @@ class TestBase(TestCase):
         self.resource_directory = os.path.dirname(__file__)
         config = self.config
         config[RESOURCE_DIRECTORY] = self.resource_directory
+        config[ENVIRONMENT] = Environment.TEST.value
         self.app: App = create_app(config=config)
-        self.market_service.symbols = self.external_available_symbols
         self.market_service.balances = self.external_balances
         self.market_service.orders = self.external_orders
         self.app.container.market_service.override(self.market_service)
@@ -71,32 +73,66 @@ class TestBase(TestCase):
         if self.initialize:
             self.app.initialize()
 
+        if self.initial_orders is not None:
+            for order in self.initial_orders:
+                created_order = self.app.algorithm.create_order(
+                    target_symbol=order.get_target_symbol(),
+                    amount=order.get_amount(),
+                    price=order.get_price(),
+                    order_side=order.get_order_side(),
+                    order_type=order.get_order_type()
+                )
+
+                # Update the order to the correct status
+                order_service = self.app.container.order_service()
+
+                if OrderStatus.CLOSED.value == order.get_status():
+                    order_service.update(
+                        created_order.get_id(),
+                        {
+                            "status": "CLOSED",
+                            "filled": order.get_filled(),
+                            "remaining": Decimal('0'),
+                        }
+                    )
+
     def tearDown(self) -> None:
-        database_path = os.path.join(
-            self.resource_directory, "databases/prod-database.sqlite3"
+        database_dir = os.path.join(
+            self.resource_directory, "databases"
         )
 
-        if os.path.exists(database_path):
-            session = Session()
-            session.commit()
-            session.close()
-
-            try:
-                os.remove(database_path)
-            except Exception as e:
-                logger.error(e)
+        if os.path.exists(database_dir):
+            for root, dirs, files in os.walk(database_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
 
     def remove_database(self):
 
-        try:
-            database_path = os.path.join(
-                self.resource_directory, "databases/prod-database.sqlite3"
-            )
+        database_dir = os.path.join(
+            self.resource_directory, "databases"
+        )
 
-            if os.path.exists(database_path):
-                os.remove(database_path)
-        except Exception as e:
-            logger.error(e)
+        if os.path.exists(database_dir):
+            for root, dirs, files in os.walk(database_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        database_dir = os.path.join(
+            cls.resource_directory, "databases"
+        )
+
+        if os.path.exists(database_dir):
+            for root, dirs, files in os.walk(database_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
 
 
 class FlaskTestBase(FlaskTestCase):
@@ -106,17 +142,17 @@ class FlaskTestBase(FlaskTestCase):
     config = {}
     algorithm = Algorithm()
     external_balances = {}
+    initial_orders = []
     external_orders = []
-    external_available_symbols = []
     market_service = MarketServiceStub(None)
     initialize = True
+    resource_directory = os.path.dirname(__file__)
 
     def create_app(self):
         self.resource_directory = os.path.dirname(__file__)
         self.iaf_app: App = create_app(
             {RESOURCE_DIRECTORY: self.resource_directory}, web=True
         )
-        self.market_service.symbols = self.external_available_symbols
         self.market_service.balances = self.external_balances
         self.market_service.orders = self.external_orders
         self.iaf_app.container.market_service.override(self.market_service)
@@ -138,19 +174,52 @@ class FlaskTestBase(FlaskTestCase):
 
                 self.iaf_app.initialize()
 
+        if self.initial_orders is not None:
+            for order in self.initial_orders:
+                created_order = self.app.algorithm.create_order(
+                    target_symbol=order.get_target_symbol(),
+                    amount=order.get_amount(),
+                    price=order.get_price(),
+                    order_side=order.get_order_side(),
+                    order_type=order.get_order_type()
+                )
+
+                # Update the order to the correct status
+                order_service = self.app.container.order_service()
+
+                if OrderStatus.CLOSED.value == order.get_status():
+                    order_service.update(
+                        created_order.get_id(),
+                        {
+                            "status": "CLOSED",
+                            "filled": order.get_filled(),
+                            "remaining": Decimal('0'),
+                        }
+                    )
+
         return self.iaf_app._flask_app
 
     def tearDown(self) -> None:
-        database_path = os.path.join(
-            os.path.dirname(__file__), "databases/prod-database.sqlite3"
+        database_dir = os.path.join(
+            self.resource_directory, "databases"
         )
 
-        if os.path.exists(database_path):
-            session = Session()
-            session.commit()
-            session.close()
+        if os.path.exists(database_dir):
+            for root, dirs, files in os.walk(database_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
 
-            try:
-                os.remove(database_path)
-            except Exception as e:
-                logger.error(e)
+    @classmethod
+    def tearDownClass(cls) -> None:
+        database_dir = os.path.join(
+            cls.resource_directory, "databases"
+        )
+
+        if os.path.exists(database_dir):
+            for root, dirs, files in os.walk(database_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))

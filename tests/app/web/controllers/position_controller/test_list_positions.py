@@ -23,9 +23,6 @@ class Test(FlaskTestBase):
         "EUR": 1000
     }
 
-    def setUp(self) -> None:
-        super(Test, self).setUp()
-
     def test_list_portfolios(self):
         self.iaf_app.algorithm.create_limit_order(
             amount=10,

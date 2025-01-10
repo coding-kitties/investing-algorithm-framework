@@ -38,7 +38,6 @@ class Test(TestCase):
             secret_key="secret_key",
         )
     ]
-    external_available_symbols = ["BTC/EUR", "DOT/EUR", "ADA/EUR", "ETH/EUR"]
     external_balances = {
         "EUR": 1000,
     }
@@ -60,6 +59,20 @@ class Test(TestCase):
                 "resources"
             )
         )
+
+    def tearDown(self) -> None:
+        super().tearDown()
+        # Delete the resources database directory
+
+        database_dir = os.path.join(self.resource_dir, "databases")
+
+        if os.path.exists(database_dir):
+            for root, dirs, files in os.walk(database_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+
 
     def test_with_strategy_object(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
@@ -119,7 +132,7 @@ class Test(TestCase):
         self.assertTrue(strategy_orchestration_service.has_run("run_strategy"))
 
     def test_stateless(self):
-        app = create_app(stateless=True)
+        app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         app.container.market_service.override(MarketServiceStub(None))
         app.container.portfolio_configuration_service().clear()
         app.add_portfolio_configuration(

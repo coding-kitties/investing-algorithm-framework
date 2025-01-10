@@ -32,3 +32,6 @@ class RepositoryService:
 
     def exists(self, query_params):
         return self.repository.exists(query_params)
+
+    def save(self, object):
+        return self.repository.save(object)

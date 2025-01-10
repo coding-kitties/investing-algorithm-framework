@@ -22,11 +22,7 @@ class Test(TestBase):
             secret_key="secret_key",
         )
     ]
-    config = {
-        SYMBOLS: ["BTC/EUR", "DOT/EUR", "ADA/EUR", "ETH/EUR"]
-    }
-    external_available_symbols = ["BTC/EUR", "DOT/EUR", "ADA/EUR", "ETH/EUR"]
-    external_orders = [
+    initial_orders = [
         Order.from_dict(
             {
                 "id": "1323",
@@ -116,10 +112,7 @@ class Test(TestBase):
         ),
     ]
     external_balances = {
-        "EUR": 1000,
-        "BTC": 0,
-        "DOT": 0,
-        "ETH": 0,
+        "EUR": 1000
     }
 
     def test_get_unfilled_sell_value(self):
@@ -128,6 +121,16 @@ class Test(TestBase):
 
         The test should make sure that the portfolio service can sync
         existing orders from the market service to the order service.
+
+        Order overview:
+            - BTC/EUR BUY 10 10.0
+            - BTC/EUR SELL 10 20.0 (filled, profit 10*10=100)
+            - DOT/EUR BUY 10 10.0
+            - ETH/EUR BUY 10 10.0
+            - ETH/EUR SELL 10 10.0 (unfilled)
+            - DOT/EUR SELL 10 10.0 (unfilled)
+
+        At the end of the order history unallocated amount should be 900
         """
         portfolio_service: PortfolioService \
             = self.app.container.portfolio_service()
@@ -163,7 +166,7 @@ class Test(TestBase):
 
         # Check if all positions are made
         position_service = self.app.container.position_service()
-        self.assertEqual(5, position_service.count())
+        self.assertEqual(4, position_service.count())
 
         # Check if btc position exists
         btc_position = position_service.find(
@@ -187,12 +190,12 @@ class Test(TestBase):
         eur_position = position_service.find(
             {"portfolio_id": portfolio.id, "symbol": "EUR"}
         )
-        self.assertEqual(1000, eur_position.amount)
+        self.assertEqual(900, eur_position.amount)
 
         pending_orders = self.app.algorithm.get_pending_orders()
         self.assertEqual(2, len(pending_orders))
 
-        # Check the unfilled buy value
+        # Check the unfilled sell value
         unfilled_sell_value = self.app.algorithm.get_unfilled_sell_value()
         self.assertEqual(200, unfilled_sell_value)
 
@@ -215,3 +218,9 @@ class Test(TestBase):
         # Check the unfilled buy value
         unfilled_sell_value = self.app.algorithm.get_unfilled_sell_value()
         self.assertEqual(100, unfilled_sell_value)
+
+         # Check if eur position exists
+        eur_position = position_service.find(
+            {"portfolio_id": portfolio.id, "symbol": "EUR"}
+        )
+        self.assertEqual(1000, eur_position.amount)

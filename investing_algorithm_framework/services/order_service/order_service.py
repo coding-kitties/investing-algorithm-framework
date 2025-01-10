@@ -254,9 +254,16 @@ class OrderService(RepositoryService):
                         "symbol": portfolio.trading_symbol
                     }
                 )
-            amount = unallocated_position.get_amount()
+            unallocated_amount = unallocated_position.get_amount()
 
-            if amount < total_price:
+            if unallocated_amount is None:
+                raise OperationalException(
+                    "Unallocated amount of the portfolio is None" +
+                    "can't validate limit order. Please check if " +
+                    "the portfolio configuration is correct"
+                )
+
+            if unallocated_amount < total_price:
                 raise OperationalException(
                     f"Order total: {total_price} "
                     f"{portfolio.trading_symbol}, is "
@@ -336,11 +343,10 @@ class OrderService(RepositoryService):
                 "symbol": portfolio.trading_symbol
             }
         )
-
-        self.portfolio_repository.update(
+        portfolio = self.portfolio_repository.update(
             portfolio.id, {"unallocated": portfolio.get_unallocated() - size}
         )
-        self.position_repository.update(
+        position = self.position_repository.update(
             trading_symbol_position.id,
             {
                 "amount": trading_symbol_position.get_amount() - size

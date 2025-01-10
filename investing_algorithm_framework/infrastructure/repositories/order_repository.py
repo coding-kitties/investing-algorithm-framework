@@ -7,6 +7,7 @@ from .repository import Repository
 
 class SQLOrderRepository(Repository):
     base_class = SQLOrder
+    DEFAULT_NOT_FOUND_MESSAGE = "The requested order was not found"
 
     def _apply_query_params(self, db, query, query_params):
         external_id_query_param = self.get_query_param(

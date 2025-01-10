@@ -1,10 +1,8 @@
 import inspect
 import logging
 import os
-import shutil
 import threading
 from abc import abstractmethod
-from distutils.sysconfig import get_python_lib
 from time import sleep
 from typing import List, Optional
 
@@ -16,7 +14,7 @@ from investing_algorithm_framework.app.task import Task
 from investing_algorithm_framework.app.web import create_flask_app
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
-    SQLALCHEMY_DATABASE_URI, OperationalException, BACKTESTING_FLAG, \
+    SQLALCHEMY_DATABASE_URI, OperationalException, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, BacktestReport, \
     BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, APP_MODE, MarketCredential, \
     AppMode, BacktestDateRange
@@ -41,10 +39,9 @@ class AppHook:
 
 class App:
 
-    def __init__(self, stateless=False, web=False):
+    def __init__(self, state_handler=None, web=False):
         self._flask_app: Optional[Flask] = None
         self.container = None
-        self._stateless = stateless
         self._web = web
         self._algorithm: Optional[Algorithm] = None
         self._started = False
@@ -56,6 +53,7 @@ class App:
             Optional[MarketCredentialService] = None
         self._on_initialize_hooks = []
         self._on_after_initialize_hooks = []
+        self._state_handler = state_handler
 
     def add_algorithm(self, algorithm: Algorithm) -> None:
         """
@@ -64,9 +62,13 @@ class App:
         """
         self._algorithm = algorithm
 
-    def set_config(self, config: dict) -> None:
+    def set_config(self, key, value) -> None:
         configuration_service = self.container.configuration_service()
-        configuration_service.initialize_from_dict(config)
+        configuration_service.add_value(key, value)
+
+    def set_config_with_dict(self, dictionary) -> None:
+        configuration_service = self.container.configuration_service()
+        configuration_service.add_dict(dictionary)
 
     def initialize_services(self) -> None:
         self._configuration_service = self.container.configuration_service()
@@ -83,7 +85,64 @@ class App:
     def algorithm(self, algorithm: Algorithm) -> None:
         self._algorithm = algorithm
 
-    def initialize(self, sync=False):
+    def initialize_config(self):
+        """
+        Function to initialize the configuration for the app. This method
+        should be called before running the algorithm.
+        """
+        logger.info("Initializing configuration")
+        configuration_service = self.container.configuration_service()
+        config = configuration_service.get_config()
+
+        # Check if the resource directory is set
+        if RESOURCE_DIRECTORY not in config \
+            or config[RESOURCE_DIRECTORY] is None:
+            logger.info(
+                "Resource directory not set, setting" +
+                " to current working directory"
+            )
+            path = os.path.join(os.getcwd(), "resources")
+            configuration_service.add_value(RESOURCE_DIRECTORY, path)
+
+        config = configuration_service.get_config()
+        logger.info(f"Resource directory set to {config[RESOURCE_DIRECTORY]}")
+
+        if DATABASE_NAME not in config or config[DATABASE_NAME] is None:
+            configuration_service.add_value(
+                DATABASE_NAME, "prod-database.sqlite3"
+            )
+
+        config = configuration_service.get_config()
+
+        if DATABASE_DIRECTORY_PATH not in config \
+            or config[DATABASE_DIRECTORY_PATH] is None:
+            resource_dir = config[RESOURCE_DIRECTORY]
+            configuration_service.add_value(
+                DATABASE_DIRECTORY_PATH,
+                os.path.join(resource_dir, "databases")
+            )
+
+        config = configuration_service.get_config()
+
+        if SQLALCHEMY_DATABASE_URI not in config \
+            or config[SQLALCHEMY_DATABASE_URI] is None:
+            path = "sqlite:///" + os.path.join(
+                configuration_service.config[DATABASE_DIRECTORY_PATH],
+                configuration_service.config[DATABASE_NAME]
+            )
+            configuration_service.add_value(SQLALCHEMY_DATABASE_URI, path)
+
+        config = configuration_service.get_config()
+
+        if APP_MODE not in config or config[APP_MODE] is None:
+            if self._web:
+                configuration_service.add_value(APP_MODE, AppMode.WEB.value)
+            else:
+                configuration_service.add_value(
+                    APP_MODE, AppMode.DEFAULT.value
+                )
+
+    def initialize(self):
         """
         Method to initialize the app. This method should be called before
         running the algorithm. It initializes the services and the algorithm
@@ -91,11 +150,11 @@ class App:
 
         Also, it initializes all required services for the algorithm.
 
-        Args:
-            sync (bool): Whether to sync the portfolio with the exchange
         Returns:
             None
         """
+        logger.info("Initializing app")
+
         if self.algorithm is None:
             raise OperationalException("No algorithm registered")
 
@@ -122,26 +181,31 @@ class App:
             trade_service=self.container.trade_service(),
         )
 
-        if APP_MODE not in self.config:
-            if self._stateless:
-                self.config[APP_MODE] = AppMode.STATELESS.value
-            elif self._web:
-                self.config[APP_MODE] = AppMode.WEB.value
-            else:
-                self.config[APP_MODE] = AppMode.DEFAULT.value
+        # Ensure that all resource directories exist
+        self._create_resources_if_not_exists()
 
-        if AppMode.WEB.from_value(self.config[APP_MODE]):
+        # Setup the database
+        setup_sqlalchemy(self)
+        create_all_tables()
+
+        # Initialize all market credentials
+        market_credential_service = self.container.market_credential_service()
+        market_credential_service.initialize()
+
+        # Initialize all market data sources from registered the strategies
+        market_data_source_service = \
+            self.container.market_data_source_service()
+
+        for strategy in self.algorithm.strategies:
+
+            for market_data_source in strategy.market_data_sources:
+                market_data_source_service.add(market_data_source)
+
+        if self._web:
+            self._configuration_service.add_value(
+                APP_MODE, AppMode.WEB.value
+            )
             self._initialize_web()
-            setup_sqlalchemy(self)
-            create_all_tables()
-        elif AppMode.STATELESS.from_value(self.config[APP_MODE]):
-            self._initialize_stateless()
-            setup_sqlalchemy(self)
-            create_all_tables()
-        else:
-            self._initialize_standard()
-            setup_sqlalchemy(self)
-            create_all_tables()
 
         # Initialize all portfolios that are registered
         portfolio_configuration_service = self.container \
@@ -165,16 +229,13 @@ class App:
                     .create_portfolio_from_configuration(
                         portfolio_configuration
                     )
-                # self.sync(portfolio)
-                # synced_portfolios.append(portfolio)
 
-        if sync:
-            portfolios = portfolio_service.get_all()
+        portfolios = portfolio_service.get_all()
 
-            for portfolio in portfolios:
+        for portfolio in portfolios:
 
-                if portfolio not in synced_portfolios:
-                    self.sync(portfolio)
+            if portfolio not in synced_portfolios:
+                self.sync(portfolio)
 
     def sync(self, portfolio):
         """
@@ -182,15 +243,18 @@ class App:
         before running the algorithm. It syncs the portfolio with the
         exchange by syncing the unallocated balance, positions, orders, and
         trades.
+
+        Args:
+            portfolio (Portfolio): The portfolio to sync
+
+        Returns:
+            None
         """
+        logger.info(f"Syncing portfolio {portfolio.identifier}")
         portfolio_sync_service = self.container.portfolio_sync_service()
 
         # Sync unallocated balance
         portfolio_sync_service.sync_unallocated(portfolio)
-
-        # Sync all positions from exchange with current
-        # position history
-        portfolio_sync_service.sync_positions(portfolio)
 
         # Sync all orders from exchange with current order history
         portfolio_sync_service.sync_orders(portfolio)
@@ -198,22 +262,6 @@ class App:
         # Sync all trades from exchange with current trade history
         portfolio_sync_service.sync_trades(portfolio)
 
-    def _initialize_stateless(self):
-        """
-        Initialize the app for stateless mode by setting the configuration
-        parameters for stateless mode and overriding the services with the
-        stateless services equivalents.
-
-        In stateless mode, sqlalchemy is-setup with an in-memory database.
-
-        Stateless has the following implications:
-        db: in-memory
-        web: False
-        app: Run with stateless action objects
-        algorithm: Run with stateless action objects
-        """
-        configuration_service = self.container.configuration_service()
-        configuration_service.config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
 
     def _initialize_standard(self):
         """
@@ -266,16 +314,21 @@ class App:
         """
         # Set all config vars for backtesting
         configuration_service = self.container.configuration_service()
-        configuration_service.config[BACKTESTING_FLAG] = True
-        configuration_service.config[BACKTESTING_START_DATE] = \
-            backtest_date_range.start_date
-        configuration_service.config[BACKTESTING_END_DATE] = \
-            backtest_date_range.end_date
+        configuration_service.add_value(
+            ENVIRONMENT, Environment.BACKTEST.value
+        )
+        configuration_service.add_value(
+            BACKTESTING_START_DATE, backtest_date_range.start_date
+        )
+        configuration_service.add_value(
+            BACKTESTING_END_DATE, backtest_date_range.end_date
+        )
 
         if pending_order_check_interval is not None:
-            configuration_service.config[
-                BACKTESTING_PENDING_ORDER_CHECK_INTERVAL
-            ] = pending_order_check_interval
+            configuration_service.add_value(
+                BACKTESTING_PENDING_ORDER_CHECK_INTERVAL,
+                pending_order_check_interval
+            )
 
         # Create resource dir if not exits
         self._create_resource_directory_if_not_exists()
@@ -296,10 +349,14 @@ class App:
         resource_dir = configuration_service.config[RESOURCE_DIRECTORY]
 
         # Create the database if not exists
-        configuration_service.config[DATABASE_DIRECTORY_PATH] = \
+        configuration_service.add_value(
+            DATABASE_NAME, "backtest-database.sqlite3"
+        )
+        configuration_service.add_value(
+            DATABASE_DIRECTORY_PATH,
             os.path.join(resource_dir, "databases")
-        configuration_service.config[DATABASE_NAME] = \
-            "backtest-database.sqlite3"
+        )
+
         database_path = os.path.join(
             configuration_service.config[DATABASE_DIRECTORY_PATH],
             configuration_service.config[DATABASE_NAME]
@@ -308,11 +365,15 @@ class App:
         if os.path.exists(database_path):
             os.remove(database_path)
 
-        configuration_service.config[SQLALCHEMY_DATABASE_URI] = \
+        sql_alchemy_uri = \
             "sqlite:///" + os.path.join(
                 configuration_service.config[DATABASE_DIRECTORY_PATH],
                 configuration_service.config[DATABASE_NAME]
             )
+
+        configuration_service.add_value(
+            SQLALCHEMY_DATABASE_URI, sql_alchemy_uri
+        )
         self._create_database_if_not_exists()
         setup_sqlalchemy(self)
         create_all_tables()
@@ -460,97 +521,100 @@ class App:
                 portfolio_configuration
             )
 
-    def _initialize_management_commands(self):
-
-        if not Environment.TEST.equals(self.config.get(ENVIRONMENT)):
-            # Copy the template manage.py file to the resource directory of the
-            # algorithm
-            management_commands_template = os.path.join(
-                get_python_lib(),
-                "investing_algorithm_framework/templates/manage.py"
-            )
-            destination = os.path.join(
-                self.config.get(RESOURCE_DIRECTORY), "manage.py"
-            )
-
-            if not os.path.exists(destination):
-                shutil.copy(management_commands_template, destination)
-
     def run(
         self,
         payload: dict = None,
         number_of_iterations: int = None,
-        sync=False
     ):
         """
         Entry point to run the application. This method should be called to
-        start the algorithm. The method runs the algorithm for the specified
-        number of iterations and handles the payload if the app is running in
-        stateless mode.
+        start the algorithm. This method can be called in three modes:
 
-        First the app checks if there is an algorithm registered. If not, it
-        raises an OperationalException. Then it initializes the algorithm
-        with the services and the configuration.
+        - Without any params: In this mode, the app runs until a keyboard
+        interrupt is received. This mode is useful when running the app in
+        a loop.
+        - With a payload: In this mode, the app runs only once with the
+        payload provided. This mode is useful when running the app in a
+        one-off mode, such as running the app from the command line or
+        on a schedule. Payload is a dictionary that contains the data to
+        handle for the algorithm. This data should look like this:
+        {
+            "action": "RUN_STRATEGY",
+        }
+        - With a number of iterations: In this mode, the app runs for the
+        number of iterations provided. This mode is useful when running the
+        app in a loop for a fixed number of iterations.
 
-        If the app is running in stateless mode, it handles the
-        payload. If the app is running in web mode, it starts the web app in a
-        separate thread.
+        This function first checks if there is an algorithm registered. If not, it raises an OperationalException. Then it initializes the algorithm with the services and the configuration.
+
 
         Args:
-            payload (dict): The payload to handle if the app is running in
-            stateless mode
+            payload (dict): The payload to handle for the algorithm
             number_of_iterations (int): The number of iterations to run the
             algorithm for
-            sync (bool): Whether to sync the portfolio with the exchange
 
         Returns:
             None
         """
-        # Run all on_initialize hooks
-        for hook in self._on_after_initialize_hooks:
-            hook.on_run(self, self.algorithm)
-
-        self.initialize(sync=sync)
-
-        # Run all on_initialize hooks
-        for hook in self._on_initialize_hooks:
-            hook.on_run(self, self.algorithm)
-
-        self.algorithm.start(
-            number_of_iterations=number_of_iterations,
-            stateless=self.stateless
-        )
-
-        if AppMode.STATELESS.equals(self.config[APP_MODE]):
-            logger.info("Running stateless")
-            action_handler = ActionHandler.of(payload)
-            return action_handler.handle(
-                payload=payload, algorithm=self.algorithm
-            )
-        elif AppMode.WEB.equals(self.config[APP_MODE]):
-            logger.info("Running web")
-            flask_thread = threading.Thread(
-                name='Web App',
-                target=self._flask_app.run,
-                kwargs={"port": 8080}
-            )
-            flask_thread.setDaemon(True)
-            flask_thread.start()
-
-        number_of_iterations_since_last_orders_check = 1
-        self.algorithm.check_pending_orders()
-
         try:
-            while self.algorithm.running:
-                if number_of_iterations_since_last_orders_check == 30:
-                    logger.info("Checking pending orders")
-                    number_of_iterations_since_last_orders_check = 1
+            self.initialize_config()
 
-                self.algorithm.run_jobs()
-                number_of_iterations_since_last_orders_check += 1
-                sleep(1)
-        except KeyboardInterrupt:
-            exit(0)
+            # Load the state if a state handler is provided
+            if self._state_handler is not None:
+                logger.info("Detected state handler, loading state")
+                config = self.container.configuration_service().get_config()
+                self._state_handler.load(config[RESOURCE_DIRECTORY])
+
+            self.initialize()
+            logger.info("Initialization complete")
+
+            # Run all on_initialize hooks
+            for hook in self._on_initialize_hooks:
+                hook.on_run(self, self.algorithm)
+
+            configuration_service = self.container.configuration_service()
+            config = configuration_service.get_config()
+
+            # Run in payload mode if payload is provided
+            if payload is not None:
+                logger.info("Running with payload")
+                action_handler = ActionHandler.of(payload)
+                response = action_handler.handle(
+                    payload=payload, algorithm=self.algorithm
+                )
+                return response
+
+            if AppMode.WEB.equals(config[APP_MODE]):
+                logger.info("Running web")
+                flask_thread = threading.Thread(
+                    name='Web App',
+                    target=self._flask_app.run,
+                    kwargs={"port": 8080}
+                )
+                flask_thread.setDaemon(True)
+                flask_thread.start()
+
+            self.algorithm.start(number_of_iterations=number_of_iterations)
+            number_of_iterations_since_last_orders_check = 1
+            self.algorithm.check_pending_orders()
+
+            try:
+                while self.algorithm.running:
+                    if number_of_iterations_since_last_orders_check == 30:
+                        logger.info("Checking pending orders")
+                        number_of_iterations_since_last_orders_check = 1
+
+                    self.algorithm.run_jobs()
+                    number_of_iterations_since_last_orders_check += 1
+                    sleep(1)
+            except KeyboardInterrupt:
+                exit(0)
+        finally:
+            # Upload state if state handler is provided
+            if self._state_handler is not None:
+                logger.info("Detected state handler, saving state")
+                config = self.container.configuration_service().get_config()
+                self._state_handler.save(config[RESOURCE_DIRECTORY])
 
     @property
     def started(self):
@@ -579,10 +643,6 @@ class App:
         portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
         portfolio_configuration_service.add(portfolio_configuration)
-
-    @property
-    def stateless(self):
-        return self._stateless
 
     @property
     def web(self):
@@ -633,39 +693,26 @@ class App:
             - Algorithm
         """
         configuration_service = self.container.configuration_service()
-        resource_dir = configuration_service.config[RESOURCE_DIRECTORY]
+        self._flask_app = create_flask_app(configuration_service)
 
-        if resource_dir is None:
-            configuration_service.config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
-        else:
-            resource_dir = self._create_resource_directory_if_not_exists()
-            configuration_service.config[DATABASE_DIRECTORY_PATH] = \
-                os.path.join(resource_dir, "databases")
-            configuration_service.config[DATABASE_NAME] \
-                = "prod-database.sqlite3"
-            configuration_service.config[SQLALCHEMY_DATABASE_URI] = \
-                "sqlite:///" + os.path.join(
-                    configuration_service.config[DATABASE_DIRECTORY_PATH],
-                    configuration_service.config[DATABASE_NAME]
-                )
-            self._create_database_if_not_exists()
+    def _create_resources_if_not_exists(self):
+        """
+        Function to create the resources required by the app if they do not exist. This function will check if the resource directory exists and
+        check if the database directory exists. If they do not exist, it will create them.
 
-        self._flask_app = create_flask_app(configuration_service.config)
-
-    def _create_resource_directory_if_not_exists(self):
-
-        if self._stateless:
-            return
-
+        Returns:
+            None
+        """
         configuration_service = self.container.configuration_service()
-        resource_dir = configuration_service.config.get(
-            RESOURCE_DIRECTORY, None
-        )
+        config = configuration_service.get_config()
+        resource_dir = config[RESOURCE_DIRECTORY]
+        database_dir = config[DATABASE_DIRECTORY_PATH]
 
         if resource_dir is None:
             raise OperationalException(
-                "Resource directory is not specified. "
-                "A resource directory is required for running a backtest."
+                "Resource directory is not specified in the config, please "
+                "specify the resource directory in the config with the key "
+                "RESOURCE_DIRECTORY"
             )
 
         if not os.path.isdir(resource_dir):
@@ -677,13 +724,16 @@ class App:
                     "Could not create resource directory"
                 )
 
-        return resource_dir
+        if not os.path.isdir(database_dir):
+            try:
+                os.makedirs(database_dir)
+            except OSError as e:
+                logger.error(e)
+                raise OperationalException(
+                    "Could not create database directory"
+                )
 
     def _create_database_if_not_exists(self):
-
-        if self._stateless:
-            return
-
         configuration_service = self.container.configuration_service()
         database_dir = configuration_service.config \
             .get(DATABASE_DIRECTORY_PATH, None)
@@ -691,7 +741,8 @@ class App:
         if database_dir is None:
             return
 
-        database_name = configuration_service.config.get(DATABASE_NAME, None)
+        config = configuration_service.get_config()
+        database_name = config[DATABASE_NAME]
 
         if database_name is None:
             return
@@ -750,9 +801,9 @@ class App:
             algorithm=self.algorithm
         )
         backtest_service = self.container.backtest_service()
-        backtest_service.resource_directory = self.config.get(
-            RESOURCE_DIRECTORY
-        )
+        configuration_service = self.container.configuration_service()
+        config = configuration_service.get_config()
+        backtest_service.resource_directory = config[RESOURCE_DIRECTORY]
 
         # Run the backtest with the backtest_service and collect the report
         report = backtest_service.run_backtest(
@@ -763,8 +814,7 @@ class App:
 
         if output_directory is None:
             output_directory = os.path.join(
-                self.config.get(RESOURCE_DIRECTORY),
-                "backtest_reports"
+                config[RESOURCE_DIRECTORY], "backtest_reports"
             )
 
         backtest_report_writer_service.write_report_to_json(
@@ -847,9 +897,9 @@ class App:
 
                 self._initialize_algorithm_for_backtest(algorithm)
                 backtest_service = self.container.backtest_service()
-                backtest_service.resource_directory = self.config.get(
+                backtest_service.resource_directory = self.config[
                     RESOURCE_DIRECTORY
-                )
+                ]
 
                 # Run the backtest with the backtest_service
                 # and collect the report
@@ -866,8 +916,7 @@ class App:
 
                 if output_directory is None:
                     output_directory = os.path.join(
-                        self.config.get(RESOURCE_DIRECTORY),
-                        "backtest_reports"
+                        self.config[RESOURCE_DIRECTORY], "backtest_reports"
                     )
 
                 backtest_report_writer_service.write_report_to_json(

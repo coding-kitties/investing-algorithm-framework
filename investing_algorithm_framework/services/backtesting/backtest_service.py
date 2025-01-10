@@ -440,6 +440,7 @@ class BacktestService:
         if a ticker market data source is registered for the symbol and market.
         """
         symbols = self._configuration_service.config[SYMBOLS]
+        print(symbols)
 
         if symbols is not None:
 

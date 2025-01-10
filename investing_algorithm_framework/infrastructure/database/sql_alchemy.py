@@ -19,18 +19,11 @@ class SQLAlchemyAdapter:
             raise OperationalException("SQLALCHEMY_DATABASE_URI not set")
 
         global Session
-
-        if app.config[SQLALCHEMY_DATABASE_URI] != "sqlite:///:memory:":
-            engine = create_engine(
-                app.config[SQLALCHEMY_DATABASE_URI],
-                connect_args={'check_same_thread': False},
-                poolclass=StaticPool
-            )
-        else:
-            engine = create_engine(
-                app.config[SQLALCHEMY_DATABASE_URI],
-            )
-
+        engine = create_engine(
+            app.config[SQLALCHEMY_DATABASE_URI],
+            connect_args={'check_same_thread': False},
+            poolclass=StaticPool
+        )
         Session.configure(bind=engine)
 
 

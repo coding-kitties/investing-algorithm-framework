@@ -23,4 +23,3 @@ class Test(TestCase):
     def test_backtest_reports_evaluation(self):
         path = os.path.join(self.resource_dir, "backtest_reports_for_testing")
         reports = load_backtest_reports(path)
-        print(len(reports))

@@ -7,6 +7,7 @@
 [![GitHub stars](https://img.shields.io/github/stars/coding-kitties/investing-algorithm-framework.svg?style=social&label=Star&maxAge=1)](https://github.com/SeaQL/sea-orm/stargazers/) If you like what we do, consider starring, sharing and contributing!
 
 ###### Sponsors
+
 <p align="left">
 <a href="https://finterion.com">
   <img alt="Finterion" src="static/sponsors/finterion.png" width="200px" />
@@ -36,30 +37,13 @@ Features:
 The following algorithm connects to binance and buys BTC every 5 seconds. It also exposes an REST API that allows you to interact with the algorithm.
 
 ```python
-import pathlib
+import logging
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    RESOURCE_DIRECTORY, TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, \
-    CCXTTickerMarketDataSource, MarketCredential, SYMBOLS
+    TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, \
+    CCXTTickerMarketDataSource, MarketCredential, DEFAULT_LOGGING_CONFIG
 
-# Define the symbols you want to trade for optimization, otherwise the
-# algorithm will check if you have orders and balances on all available
-# symbols on the market
-symbols = ["BTC/EUR"]
+logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
 
-# Define resource directory and the symbols you want to trade
-config = {
-    RESOURCE_DIRECTORY: pathlib.Path(__file__).parent.resolve(),
-    SYMBOLS: symbols
-}
-
-state_manager = AzureBlobStorageStateManager(
-    account_name="<your account name>",
-    account_key="<your account key>",
-    container_name="<your container name>",
-    blob_name="<your blob name>",
-)
-
-# Define market data sources
 # OHLCV data for candles
 bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
     identifier="BTC-ohlcv",
@@ -74,17 +58,10 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     market="BITVAVO",
     symbol="BTC/EUR",
 )
-app = create_app(
-    config=config,
-    sync_portfolio=True,
-    state_manager=state_manager
-)
+app = create_app()
 algorithm = Algorithm()
-app.add_market_credential(MarketCredential(
-    market="bitvavo",
-    api_key="<your api key>",
-    secret_key="<your secret key>",
-))
+# Bitvavo market credentials are read from .env file
+app.add_market_credential(MarketCredential(market="bitvavo"))
 app.add_portfolio_configuration(
     PortfolioConfiguration(
         market="bitvavo",
@@ -94,21 +71,18 @@ app.add_portfolio_configuration(
 )
 app.add_algorithm(algorithm)
 
+# Run every two hours and register the data sources
 @algorithm.strategy(
-    # Run every two hours
     time_unit=TimeUnit.HOUR,
     interval=2,
-    # Specify market data sources that need to be passed to the strategy
     market_data_sources=[bitvavo_btc_eur_ticker, bitvavo_btc_eur_ohlcv_2h]
 )
 def perform_strategy(algorithm: Algorithm, market_data: dict):
-    # By default, ohlcv data is passed as polars df in the form of
-    # {"<identifier>": <dataframe>}  https://pola.rs/,
-    # call to_pandas() to convert to pandas
+    # Access the data sources with the indentifier
     polars_df = market_data["BTC-ohlcv"]
-    print(f"I have access to {len(polars_df)} candles of ohlcv data")
 
-    # Ticker data is passed as {"<identifier>": <ticker dict>}
+    # Convert the polars dataframe to a pandas dataframe
+    pandas_df = polars_df.to_pandas()
     ticker_data = market_data["BTC-ticker"]
     unallocated_balance = algorithm.get_unallocated()
     positions = algorithm.get_positions()
@@ -257,7 +231,6 @@ app.add_portfolio_configuration(
     PortfolioConfiguration(
         market="<your market>",
         initial_balance=400,
-        track_from="01/01/2022",
         trading_symbol="EUR"
     )
 )

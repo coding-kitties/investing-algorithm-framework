@@ -35,9 +35,10 @@ class OrderBacktestService(OrderService):
             market_data_source_service
 
     def create(self, data, execute=True, validate=True, sync=True) -> Order:
+        config = self.configuration_service.get_config()
+
         # Make sure the created_at is set to the current backtest time
-        data["created_at"] = self.configuration_service\
-            .config[BACKTESTING_INDEX_DATETIME]
+        data["created_at"] = config[BACKTESTING_INDEX_DATETIME]
         # Call super to have standard behavior
         return super(OrderBacktestService, self)\
             .create(data, execute, validate, sync)
@@ -106,13 +107,12 @@ class OrderBacktestService(OrderService):
                     f"{config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]} "
                 )
 
+            config = self.configuration_service.get_config()
             df = self._market_data_source_service.get_ohlcv(
                 symbol=symbol,
                 market=portfolio.market,
                 time_frame=time_frame,
-                to_timestamp=self.configuration_service.config.get(
-                    BACKTESTING_INDEX_DATETIME
-                ),
+                to_timestamp=config[BACKTESTING_INDEX_DATETIME],
                 from_timestamp=order.get_created_at(),
             )
 

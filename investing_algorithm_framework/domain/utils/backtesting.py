@@ -524,7 +524,6 @@ def get_backtest_report(
                             get_start_date_from_backtest_report_file(
                                 os.path.join(root, file)
                             )
-                        print(backtest_start_date)
                         backtest_end_date = \
                             get_end_date_from_backtest_report_file(
                                 os.path.join(root, file)

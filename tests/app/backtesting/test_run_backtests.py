@@ -38,12 +38,22 @@ class Test(TestCase):
             )
         )
 
+    def tearDown(self) -> None:
+        database_dir = os.path.join(self.resource_dir, "databases")
+
+        if os.path.exists(database_dir):
+            for root, dirs, files in os.walk(database_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+
     def test_run_backtests(self):
         """
         Test if all backtests are run when multiple algorithms are provided
         """
         app = create_app(
-            config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
+            config={RESOURCE_DIRECTORY: self.resource_dir}
         )
 
         # Add all algorithms

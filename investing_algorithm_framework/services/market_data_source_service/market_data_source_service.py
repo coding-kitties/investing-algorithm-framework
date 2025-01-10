@@ -2,7 +2,7 @@ from typing import List
 
 from investing_algorithm_framework.domain import MarketService, \
     MarketDataSource, OHLCVMarketDataSource, TickerMarketDataSource, \
-    OrderBookMarketDataSource, TimeFrame
+    OrderBookMarketDataSource, TimeFrame, OperationalException
 from investing_algorithm_framework.services.market_credential_service \
     import MarketCredentialService
 
@@ -85,11 +85,18 @@ class MarketDataSourceService:
         )
 
     def get_data(self, identifier):
+
         for market_data_source in self._market_data_sources:
             if market_data_source.get_identifier() == identifier:
                 return market_data_source.get_data(
                     market_credential_service=self._market_credential_service
                 )
+
+        if isinstance(identifier, str):
+            raise OperationalException(
+                f"Market data source with identifier {identifier} not found. "
+                "Please make sure that the market data source is registered to the app if you refer to it by identifier in your strategy."
+            )
 
     def get_ticker_market_data_source(self, symbol, market=None):
 
@@ -187,6 +194,10 @@ class MarketDataSourceService:
         self._market_data_sources = market_data_sources
 
     def add(self, market_data_source):
+
+        # Check if the market data source is an instance of MarketDataSource
+        if not isinstance(market_data_source, MarketDataSource):
+            return
 
         # Check if there is already a market data source with the same
         # identifier

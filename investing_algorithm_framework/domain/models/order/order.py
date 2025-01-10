@@ -42,7 +42,8 @@ class Order(BaseModel):
         position_id=None,
         order_fee=None,
         order_fee_currency=None,
-        order_fee_rate=None
+        order_fee_rate=None,
+        id=None
     ):
         if target_symbol is None:
             raise OperationalException("Target symbol is not specified")
@@ -83,6 +84,7 @@ class Order(BaseModel):
         self.order_fee = order_fee
         self.order_fee_currency = order_fee_currency
         self.order_fee_rate = order_fee_rate
+        self.id = id
 
     def get_id(self):
         return self.id
@@ -321,6 +323,7 @@ class Order(BaseModel):
             order_fee=data.get("order_fee", None),
             order_fee_currency=data.get("order_fee_currency", None),
             order_fee_rate=data.get("order_fee_rate", None),
+            id=data.get("id", None)
         )
 
     @staticmethod

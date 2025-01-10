@@ -69,11 +69,9 @@ class StrategyOrchestratorService:
                 and len(strategy.market_data_sources) > 0:
 
             for data_id in strategy.market_data_sources:
-
                 if isinstance(data_id, MarketDataSource):
                     market_data[data_id.get_identifier()] = \
-                        self.market_data_source_service\
-                            .get_data(identifier=data_id.get_identifier())
+                        data_id.get_data()
                 else:
                     market_data[data_id] = \
                         self.market_data_source_service \

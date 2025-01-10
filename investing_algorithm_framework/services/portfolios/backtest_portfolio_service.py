@@ -16,5 +16,6 @@ class BacktestPortfolioService(PortfolioService):
             "market": portfolio_configuration.market,
             "trading_symbol": portfolio_configuration.trading_symbol,
             "unallocated": portfolio_configuration.initial_balance,
+            "initialized": False
         }
         return self.create(data)

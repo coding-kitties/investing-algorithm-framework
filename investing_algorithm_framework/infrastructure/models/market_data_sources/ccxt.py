@@ -13,7 +13,7 @@ from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
 from investing_algorithm_framework.infrastructure.services import \
     CCXTMarketService
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class CCXTOHLCVBacktestMarketDataSource(
@@ -63,7 +63,6 @@ class CCXTOHLCVBacktestMarketDataSource(
         config,
         backtest_start_date,
         backtest_end_date,
-        **kwargs
     ):
         """
         Prepare data implementation of ccxt based ohlcv backtest market
@@ -86,6 +85,10 @@ class CCXTOHLCVBacktestMarketDataSource(
         Returns:
             None
         """
+
+        if config is None:
+            config = self.config
+
         # Calculating the backtest data start date
         backtest_data_start_date = \
             backtest_start_date - timedelta(
@@ -103,8 +106,7 @@ class CCXTOHLCVBacktestMarketDataSource(
 
         # Creating the backtest data directory and file
         self.backtest_data_directory = os.path.join(
-            config.get(RESOURCE_DIRECTORY),
-            config.get(BACKTEST_DATA_DIRECTORY_NAME)
+            config[RESOURCE_DIRECTORY], config[BACKTEST_DATA_DIRECTORY_NAME]
         )
 
         if not os.path.isdir(self.backtest_data_directory):
@@ -303,6 +305,7 @@ class CCXTTickerBacktestMarketDataSource(
 
         When downloading the data it will use the ccxt library.
         """
+        config = self.config
         total_minutes = TimeFrame.from_string(self.time_frame)\
             .amount_of_minutes
         self.backtest_data_start_date = \
@@ -311,8 +314,7 @@ class CCXTTickerBacktestMarketDataSource(
 
         # Creating the backtest data directory and file
         self.backtest_data_directory = os.path.join(
-            config.get(RESOURCE_DIRECTORY),
-            config.get(BACKTEST_DATA_DIRECTORY_NAME)
+            config[RESOURCE_DIRECTORY], config[BACKTEST_DATA_DIRECTORY_NAME]
         )
 
         if not os.path.isdir(self.backtest_data_directory):
@@ -521,6 +523,9 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
         else:
             storage_path = self.get_storage_path()
 
+        logger.info(
+            f"Getting OHLCV data for {self.symbol} from {start_date} to {end_date}"
+        )
         data = None
 
         if storage_path is not None:

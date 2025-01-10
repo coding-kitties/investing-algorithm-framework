@@ -24,6 +24,6 @@ class Test(TestBase):
         )
     ]
 
-    def test_create_limit_buy_order_with_percentage_of_portfolio(self):
+    def test_get_portfolio(self):
         portfolio = self.app.algorithm.get_portfolio()
         self.assertEqual(Decimal(1000), portfolio.get_unallocated())
