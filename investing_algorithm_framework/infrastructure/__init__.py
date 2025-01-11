@@ -8,7 +8,8 @@ from .models import SQLPortfolio, SQLOrder, SQLPosition, \
 from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLPortfolioRepository, \
     SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository
-from .services import PerformanceService, CCXTMarketService
+from .services import PerformanceService, CCXTMarketService, \
+    AzureBlobStorageStateHandler
 
 __all__ = [
     "create_all_tables",
@@ -34,4 +35,5 @@ __all__ = [
     "CSVTickerMarketDataSource",
     "CCXTOHLCVBacktestMarketDataSource",
     "CCXTOrderBookMarketDataSource",
+    "AzureBlobStorageStateHandler"
 ]

@@ -408,7 +408,13 @@ def has_slope_below_threshold(
 
 
 def has_values_below_threshold(
-    df, column, threshold, number_of_data_points, proportion=100
+    df,
+    column,
+    threshold,
+    number_of_data_points,
+    proportion=100,
+    window_size=None,
+    strict=True
 ) -> bool:
     """
     Detect if the last N data points in a column are below a certain threshold.
@@ -419,26 +425,57 @@ def has_values_below_threshold(
     - threshold: float, the threshold for "low" values
     - number_of_data_points: int, the number of recent data points to analyze
     - proportion: float, the required proportion of values below the threshold
+    - window_size: int, the number of data points to consider for the threshold
+    - strict: bool, whether to check for a strict comparison
 
     Returns:
     - bool: True if the last N data points are below the threshold,
       False otherwise
     """
-    # Get the last `window_size` data points
-    recent_data = df[column].iloc[-number_of_data_points:]
+    if window_size is not None and window_size < number_of_data_points:
+        difference = number_of_data_points - window_size
+        count = 0
+    else:
+        difference = 1
+        window_size = number_of_data_points
 
+    count = 0
+    index = -(window_size)
     proportion = proportion / 100
 
-    # Calculate the proportion of values below the threshold
-    below_threshold = recent_data < threshold
-    proportion_below = below_threshold.mean()
+    # Loop over sliding windows that shrink from the beginning
+    while count <= difference:
 
-    # Determine if this window qualifies as a low period
-    return proportion_below >= proportion
+        if count == 0:
+            selected_window = df[column].iloc[index:]
+        else:
+            selected_window = df[column].iloc[index:-count]
+
+        count += 1
+        index -= 1
+
+        # Calculate the proportion of values below the threshold
+        if strict:
+            below_threshold = selected_window < threshold
+        else:
+            below_threshold = selected_window <= threshold
+
+        proportion_below = below_threshold.mean()
+
+        if proportion_below >= proportion:
+            return True
+
+    return False
 
 
 def has_values_above_threshold(
-    df, column, threshold, number_of_data_points, proportion=100
+    df,
+    column,
+    threshold,
+    number_of_data_points,
+    proportion=100,
+    window_size=None,
+    strict=True
 ) -> bool:
     """
     Detect if the last N data points in a column are above a certain threshold.
@@ -449,19 +486,95 @@ def has_values_above_threshold(
     - threshold: float, the threshold for values
     - number_of_data_points: int, the number of recent data points to analyze
     - proportion: float, the required proportion of values below the threshold
+    - window_size: int, the number of data points to consider for the threshold
+    - strict: bool, whether to check for a strict comparison
 
     Returns:
     - bool: True if the last N data points are above the threshold,
       False otherwise
     """
-    # Get the last `window_size` data points
-    recent_data = df[column].iloc[-number_of_data_points:]
+    if window_size is not None and window_size < number_of_data_points:
+        difference = number_of_data_points - window_size
+        count = 0
+    else:
+        difference = 1
+        window_size = number_of_data_points
+        count = 1
 
+    index = -(window_size)
     proportion = proportion / 100
 
-    # Calculate the proportion of values below the threshold
-    above_threshold = recent_data < threshold
-    proportion_below = above_threshold.mean()
+    # Loop over sliding windows that shrink from the beginning
+    while count <= difference:
 
-    # Determine if this window qualifies as a low period
-    return proportion_below >= proportion
+        if count == 0:
+            selected_window = df[column].iloc[index:]
+        else:
+            selected_window = df[column].iloc[index:-count]
+
+        count += 1
+        index -= 1
+
+        # Calculate the proportion of values below the threshold
+        if strict:
+            above_threshold = selected_window > threshold
+        else:
+            above_threshold = selected_window >= threshold
+
+        proportion_above = above_threshold.mean()
+
+        if proportion_above >= proportion:
+            return True
+
+    return False
+
+
+def get_values_above_threshold(
+    df, column, threshold, number_of_data_points
+) -> int:
+    """
+    Return a list of values above the threshold.
+
+    Parameters:
+    - df: pandas DataFrame
+    - column: str, the column containing the values to analyze
+    - threshold: float, the threshold for values
+    - number_of_data_points: int, the number of recent data points to analyze
+    - window_size: int, the number of
+
+    Returns:
+    - list: a list of values above the threshold
+    """
+    # Get the last `number_of_data_points` data points
+    recent_data = df[column].iloc[-number_of_data_points:]
+
+    # Filter for values above the threshold
+    above_threshold = recent_data[recent_data > threshold]
+
+    # Return the filtered values as a list
+    return above_threshold.tolist()
+
+
+def get_values_below_threshold(
+    df, column, threshold, number_of_data_points
+) -> int:
+    """
+    Return a list of values below the threshold.
+
+    Parameters:
+    - df: pandas DataFrame
+    - column: str, the column containing the values to analyze
+    - threshold: float, the threshold for values
+    - number_of_data_points: int, the number of recent data points to analyze
+
+    Returns:
+    - list: a list of values below the threshold
+    """
+    # Get the last `number_of_data_points` data points
+    recent_data = df[column].iloc[-number_of_data_points:]
+
+    # Filter for values below the threshold
+    below_threshold = recent_data[recent_data < threshold]
+
+    # Return the filtered values as a list
+    return below_threshold.tolist()

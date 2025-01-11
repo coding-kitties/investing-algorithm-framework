@@ -1,7 +1,7 @@
 from unittest import TestCase
 from investing_algorithm_framework.indicators import is_crossover, \
-    has_any_higher_then_threshold, \
-    get_slope, has_slope_above_threshold
+    has_any_higher_then_threshold, has_values_above_threshold, \
+    get_slope, has_slope_above_threshold, has_values_below_threshold
 import pandas as pd
 
 class TestUtils(TestCase):
@@ -96,5 +96,121 @@ class TestUtils(TestCase):
         self.assertTrue(
             has_slope_above_threshold(
                 df, column="RSI", threshold=2, number_of_data_points=2, window_size=2
+            )
+        )
+
+    def test_has_values_above_threshold(self):
+        df = pd.DataFrame({
+            "RSI": [2, 5, 6, 5, 10, 9, 7, 7, 9, 7, 5],
+            "DateTime": pd.date_range("2021-01-01", periods=11, freq="D")
+        })
+        self.assertTrue(
+            has_values_above_threshold(
+                df,
+                column="RSI",
+                threshold=1,
+                number_of_data_points=5,
+                proportion=100
+            )
+        )
+        self.assertFalse(
+            has_values_above_threshold(
+                df,
+                column="RSI",
+                threshold=7,
+                number_of_data_points=5,
+                proportion=100
+            )
+        )
+        self.assertTrue(
+            has_values_above_threshold(
+                df,
+                column="RSI",
+                threshold=6,
+                number_of_data_points=6,
+                proportion=100,
+                window_size=5
+            )
+        )
+        self.assertTrue(
+            has_values_above_threshold(
+                df,
+                column="RSI",
+                threshold=9,
+                number_of_data_points=10,
+                proportion=20,
+                window_size=5
+            )
+        )
+        self.assertFalse(
+            has_values_above_threshold(
+                df,
+                column="RSI",
+                threshold=9,
+                number_of_data_points=10,
+                proportion=40,
+                window_size=5
+            )
+        )
+
+    def test_has_values_below_threshold(self):
+        df = pd.DataFrame({
+            "RSI": [2, 5, 6, 5, 10, 8, 7, 7, 5, 7, 9],
+            "DateTime": pd.date_range("2021-01-01", periods=11, freq="D")
+        })
+        self.assertTrue(
+            has_values_below_threshold(
+                df,
+                column="RSI",
+                threshold=8,
+                number_of_data_points=5,
+                proportion=80
+            )
+        )
+        self.assertFalse(
+            has_values_below_threshold(
+                df,
+                column="RSI",
+                threshold=8,
+                number_of_data_points=5,
+                proportion=90
+            )
+        )
+        self.assertTrue(
+            has_values_below_threshold(
+                df,
+                column="RSI",
+                threshold=10,
+                number_of_data_points=5,
+                proportion=100
+            )
+        )
+        self.assertFalse(
+            has_values_below_threshold(
+                df,
+                column="RSI",
+                threshold=4,
+                number_of_data_points=5,
+                proportion=100
+            )
+        )
+        self.assertFalse(
+            has_values_below_threshold(
+                df,
+                column="RSI",
+                threshold=8,
+                number_of_data_points=6,
+                proportion=100,
+                window_size=5
+            )
+        )
+        self.assertTrue(
+            has_values_below_threshold(
+                df,
+                column="RSI",
+                threshold=9,
+                number_of_data_points=6,
+                proportion=100,
+                window_size=5
             )
         )

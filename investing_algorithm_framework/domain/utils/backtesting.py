@@ -1,4 +1,5 @@
 import os
+import re
 import json
 from datetime import datetime
 from typing import List, Tuple
@@ -11,13 +12,19 @@ from investing_algorithm_framework.domain.exceptions import \
     OperationalException
 from investing_algorithm_framework.domain.models.backtesting import \
     BacktestReportsEvaluation, BacktestReport
+from investing_algorithm_framework.domain.constants import \
+    DATETIME_FORMAT_BACKTESTING
 
 COLOR_RED = '\033[91m'
 COLOR_PURPLE = '\033[95m'
 COLOR_RESET = '\033[0m'
 COLOR_GREEN = '\033[92m'
 COLOR_YELLOW = '\033[93m'
-
+BACKTEST_REPORT_FILE_NAME_PATTERN = (
+    r"^report_\w+_backtest-start-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
+    r"backtest-end-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
+    r"created-at_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}\.json$"
+)
 
 def is_positive(number) -> bool:
     """
@@ -261,23 +268,23 @@ def pretty_print_backtest_reports_evaluation(
               :%%%#+-          .=*#%%%      {COLOR_GREEN}Backtest reports evaluation{COLOR_RESET}
               *%%%%%%%+------=*%%%%%%%-     {COLOR_GREEN}---------------------------{COLOR_RESET}
               *%%%%%%%%%%%%%%%%%%%%%%%-     {COLOR_YELLOW}Number of reports:{COLOR_RESET} {COLOR_GREEN}{number_of_backtest_reports} backtest reports{COLOR_RESET}
-              .%%%%%%%%%%%%%%%%%%%%%%#      {COLOR_YELLOW}Largest overall profit:{COLOR_RESET}{COLOR_GREEN}{COLOR_RESET}{COLOR_GREEN} (Algorithm {most_profitable.name}) {most_profitable.total_net_gain:.{precision}f} {most_profitable.trading_symbol} {most_profitable.total_net_gain_percentage:.{precision}f}% ({most_profitable.backtest_date_range.name} {most_profitable.backtest_date_range.start_date} - {most_profitable.backtest_date_range.end_date}){COLOR_RESET} 
+              .%%%%%%%%%%%%%%%%%%%%%%#      {COLOR_YELLOW}Largest overall profit:{COLOR_RESET}{COLOR_GREEN}{COLOR_RESET}{COLOR_GREEN} (Algorithm {most_profitable.name}) {most_profitable.total_net_gain:.{precision}f} {most_profitable.trading_symbol} {most_profitable.total_net_gain_percentage:.{precision}f}% ({most_profitable.backtest_date_range.name} {most_profitable.backtest_date_range.start_date} - {most_profitable.backtest_date_range.end_date}){COLOR_RESET}
                #%%%####%%%%%%%%**#%%%+      {COLOR_YELLOW}Largest overall growth:{COLOR_RESET}{COLOR_GREEN} (Algorithm {most_profitable.name}) {most_growth.growth:.{precision}f} {most_growth.trading_symbol} {most_growth.growth_rate:.{precision}f}% ({most_growth.backtest_date_range.name} {most_growth.backtest_date_range.start_date} - {most_growth.backtest_date_range.end_date}){COLOR_RESET}
-         .:-+*%%%%- {COLOR_PURPLE}-+..#{COLOR_RESET}%%%+.{COLOR_PURPLE}+-  +{COLOR_RESET}%%%#*=-: 
-          .:-=*%%%%. {COLOR_PURPLE}+={COLOR_RESET} .%%#  {COLOR_PURPLE}-+.-{COLOR_RESET}%%%%=-:.. 
-          .:=+#%%%%%*###%%%%#*+#%%%%%%*+-:  
-                +%%%%%%%%%%%%%%%%%%%=       
-            :++  .=#%%%%%%%%%%%%%*-         
-           :++:      :+%%%%%%#-.            
-          :++:        .%%%%%#=              
-         :++:        .#%%%%%#*=             
-        :++-        :%%%%%%%%%+=            
-       .++-        -%%%%%%%%%%%+=           
-      .++-        .%%%%%%%%%%%%%+=          
-     .++-         *%%%%%%%%%%%%%*+:         
-    .++-          %%%%%%%%%%%%%%#+=         
-    =++........:::%%%%%%%%%%%%%%*+-         
-    .=++++++++++**#%%%%%%%%%%%%%++.         
+         .:-+*%%%%- {COLOR_PURPLE}-+..#{COLOR_RESET}%%%+.{COLOR_PURPLE}+-  +{COLOR_RESET}%%%#*=-:
+          .:-=*%%%%. {COLOR_PURPLE}+={COLOR_RESET} .%%#  {COLOR_PURPLE}-+.-{COLOR_RESET}%%%%=-:..
+          .:=+#%%%%%*###%%%%#*+#%%%%%%*+-:
+                +%%%%%%%%%%%%%%%%%%%=
+            :++  .=#%%%%%%%%%%%%%*-
+           :++:      :+%%%%%%#-.
+          :++:        .%%%%%#=
+         :++:        .#%%%%%#*=
+        :++-        :%%%%%%%%%+=
+       .++-        -%%%%%%%%%%%+=
+      .++-        .%%%%%%%%%%%%%+=
+     .++-         *%%%%%%%%%%%%%*+:
+    .++-          %%%%%%%%%%%%%%#+=
+    =++........:::%%%%%%%%%%%%%%*+-
+    .=++++++++++**#%%%%%%%%%%%%%++.
     """
 
     if len(backtest_reports_evaluation.backtest_reports) == 0:
@@ -326,7 +333,7 @@ def pretty_print_backtest(
                   *%%%%%%%+------=*%%%%%%%-       {COLOR_GREEN}---------------------------{COLOR_RESET}
                   *%%%%%%%%%%%%%%%%%%%%%%%-       {COLOR_YELLOW}Start date:{COLOR_RESET}{COLOR_GREEN} {backtest_report.backtest_start_date}{COLOR_RESET}
                   .%%%%%%%%%%%%%%%%%%%%%%#        {COLOR_YELLOW}End date:{COLOR_RESET}{COLOR_GREEN} {backtest_report.backtest_end_date}{COLOR_RESET}
-                   #%%%####%%%%%%%%**#%%%+        {COLOR_YELLOW}Number of days:{COLOR_RESET}{COLOR_GREEN}{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_days}{COLOR_RESET} 
+                   #%%%####%%%%%%%%**#%%%+        {COLOR_YELLOW}Number of days:{COLOR_RESET}{COLOR_GREEN}{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_days}{COLOR_RESET}
              .:-+*%%%%- {COLOR_PURPLE}-+..#{COLOR_RESET}%%%+.{COLOR_PURPLE}+-  +{COLOR_RESET}%%%#*=-:   {COLOR_YELLOW}Number of runs:{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_runs}{COLOR_RESET}
               .:-=*%%%%. {COLOR_PURPLE}+={COLOR_RESET} .%%#  {COLOR_PURPLE}-+.-{COLOR_RESET}%%%%=-:..   {COLOR_YELLOW}Number of orders:{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_orders}{COLOR_RESET}
               .:=+#%%%%%*###%%%%#*+#%%%%%%*+-:    {COLOR_YELLOW}Initial balance:{COLOR_RESET}{COLOR_GREEN} {backtest_report.initial_unallocated}{COLOR_RESET}
@@ -339,9 +346,9 @@ def pretty_print_backtest(
            .++-        -%%%%%%%%%%%+=             {COLOR_YELLOW}Percentage negative trades:{COLOR_RESET}{COLOR_GREEN} {backtest_report.percentage_negative_trades}%{COLOR_RESET}
           .++-        .%%%%%%%%%%%%%+=            {COLOR_YELLOW}Average trade size:{COLOR_RESET}{COLOR_GREEN} {backtest_report.average_trade_size:.{precision}f} {backtest_report.trading_symbol}{COLOR_RESET}
          .++-         *%%%%%%%%%%%%%*+:           {COLOR_YELLOW}Average trade duration:{COLOR_RESET}{COLOR_GREEN} {backtest_report.average_trade_duration} hours{COLOR_RESET}
-        .++-          %%%%%%%%%%%%%%#+=         
-        =++........:::%%%%%%%%%%%%%%*+-         
-        .=++++++++++**#%%%%%%%%%%%%%++.         
+        .++-          %%%%%%%%%%%%%%#+=
+        =++........:::%%%%%%%%%%%%%%*+-
+        .=++++++++++**#%%%%%%%%%%%%%++.
         """
 
     print(ascii_art)
@@ -470,3 +477,145 @@ def load_backtest_reports(folder_path: str) -> List[BacktestReport]:
         backtest_reports.append(report)
 
     return backtest_reports
+
+
+def get_backtest_report(
+    directory: str,
+    algorithm_name: str,
+    backtest_date_range: BacktestDateRange=None
+) -> BacktestReport:
+    """
+    Function to get a report based on the algorithm name and
+    backtest date range if it exists.
+
+    Args:
+        algorithm_name (str): The name of the algorithm
+        backtest_date_range (BacktestDateRange): The backtest date range
+        directory (str): The output directory
+
+    Returns:
+        BacktestReport: The backtest report if it exists, otherwise None
+    """
+
+    # Loop through all files in the output directory
+    for root, _, files in os.walk(directory):
+        for file in files:
+            # Check if the file contains the algorithm name
+            # and backtest date range
+            if is_backtest_report(os.path.join(root, file)):
+                # Read the file
+                with open(os.path.join(root, file), "r") as json_file:
+
+                    name = \
+                        get_algorithm_name_from_backtest_report_file(
+                            os.path.join(root, file)
+                        )
+
+                    if name == algorithm_name:
+
+                        if backtest_date_range is None:
+                            # Parse the JSON file
+                            report = json.load(json_file)
+                            # Convert the JSON file to a
+                            # BacktestReport object
+                            return BacktestReport.from_dict(report)
+
+                        backtest_start_date = \
+                            get_start_date_from_backtest_report_file(
+                                os.path.join(root, file)
+                            )
+                        backtest_end_date = \
+                            get_end_date_from_backtest_report_file(
+                                os.path.join(root, file)
+                            )
+
+                        if backtest_start_date == \
+                                backtest_date_range.start_date \
+                                and backtest_end_date == \
+                                backtest_date_range.end_date:
+                            # Parse the JSON file
+                            report = json.load(json_file)
+                            # Convert the JSON file to a
+                            # BacktestReport object
+                            return BacktestReport.from_dict(report)
+
+    return None
+
+
+def get_start_date_from_backtest_report_file(path: str) -> datetime:
+    """
+    Function to get the backtest start date from a backtest report file.
+
+    Parameters:
+        path (str): The path to the backtest report file
+
+    Returns:
+        datetime: The backtest start date
+    """
+
+    # Get the backtest start date from the file name
+    backtest_start_date = os.path.basename(path).split("_")[3]
+    # Parse the backtest start date
+    return datetime.strptime(
+        backtest_start_date, DATETIME_FORMAT_BACKTESTING
+    )
+
+
+def get_end_date_from_backtest_report_file(path: str) -> datetime:
+    """
+    Function to get the backtest end date from a backtest report file.
+
+    Parameters:
+        path (str): The path to the backtest report file
+
+    Returns:
+        datetime: The backtest end date
+    """
+
+    # Get the backtest end date from the file name
+    backtest_end_date = os.path.basename(path).split("_")[5]
+    # Parse the backtest end date
+    return datetime.strptime(
+        backtest_end_date, DATETIME_FORMAT_BACKTESTING
+    )
+
+
+def get_algorithm_name_from_backtest_report_file(path: str) -> str:
+    """
+    Function to get the algorithm name from a backtest report file.
+
+    Parameters:
+        path (str): The path to the backtest report file
+
+    Returns:
+        str: The algorithm name
+    """
+    # Get the word between "report_" and "_backtest_start_date"
+    # it can contain _
+    # Get the algorithm name from the file name
+    algorithm_name = os.path.basename(path).split("_")[1]
+    return algorithm_name
+
+
+def is_backtest_report(path: str) -> bool:
+    """
+    Function to check if a file is a backtest report file.
+
+    Args:
+        path (str): The path to the file
+
+    Returns:
+        bool: True if the file is a backtest report file, otherwise False
+    """
+
+    # Check if the file is a JSON file
+    if path.endswith(".json"):
+
+        # Check if the file name matches the backtest
+        # report file name pattern
+        if re.match(
+            BACKTEST_REPORT_FILE_NAME_PATTERN, os.path.basename(path)
+        ):
+            return True
+
+    return False

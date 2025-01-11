@@ -18,7 +18,7 @@ class TestPortfolioService(TestBase):
             secret_key="secret_key",
         )
     ]
-    external_orders = [
+    initial_orders = [
         Order.from_dict(
             {
                 "id": "1323",
@@ -65,14 +65,9 @@ class TestPortfolioService(TestBase):
             },
         ),
     ]
-    external_available_symbols = [
-        "BTC/EUR", "DOT/EUR", "ADA/EUR", "ETH/EUR"
-    ]
     external_balances = {
         "EUR": 700,
-        "BTC": 10,
     }
-    config = {SYMBOLS: ["BTC/EUR", "DOT/EUR", "ETH/EUR", "ADA/EUR"]}
 
     def test_get_pending_orders(self):
         """
@@ -115,7 +110,7 @@ class TestPortfolioService(TestBase):
 
         # Check if all positions are made
         position_service = self.app.container.position_service()
-        self.assertEqual(5, position_service.count())
+        self.assertEqual(4, position_service.count())
 
         # Check if btc position exists
         btc_position = position_service.find(
@@ -139,7 +134,7 @@ class TestPortfolioService(TestBase):
         eur_position = position_service.find(
             {"portfolio_id": portfolio.id, "symbol": "EUR"}
         )
-        self.assertEqual(700, eur_position.amount)
+        self.assertEqual(400, eur_position.amount)
 
         pending_orders = self.app.algorithm.get_pending_orders()
         self.assertEqual(2, len(pending_orders))

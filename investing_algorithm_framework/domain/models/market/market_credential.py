@@ -1,8 +1,61 @@
+import os
+import logging
+
+from investing_algorithm_framework.domain import OperationalException
+
+logger = logging.getLogger("investing_algorithm_framework")
+
+
 class MarketCredential:
-    def __init__(self, api_key: str, secret_key: str, market: str):
+    """
+    Market credential model to store the api key and secret key for a market.
+    """
+    def __init__(
+        self, market: str, api_key: str = None, secret_key: str = None
+    ):
         self._api_key = api_key
         self._secret_key = secret_key
         self._market = market
+
+    def initialize(self):
+        """
+        Internal helper to initialize the market credential.
+        """
+        logger.info(f"Initializing market credential for {self.market}")
+
+        if self.api_key is None:
+            logger.info(
+                "Reading api key from environment variable"
+                f" {self.market.upper()}_API_KEY"
+            )
+
+            # Check if environment variable is set
+            environment_variable = f"{self.market.upper()}_API_KEY"
+            self._api_key = os.getenv(environment_variable)
+
+            if self.api_key is None:
+                raise OperationalException(
+                    "Market credential requires an api key, either"
+                    " as an argument or as an environment variable"
+                    f" named as {self._market.upper()}_API_KEY"
+                )
+
+        if self.secret_key is None:
+            logger.info(
+                "Reading secret key from environment variable"
+                f" {self.market.upper()}_SECRET_KEY"
+            )
+
+            # Check if environment variable is set
+            environment_variable = f"{self.market.upper()}_SECRET_KEY"
+            self._secret_key = os.getenv(environment_variable)
+
+            if self.secret_key is None:
+                raise OperationalException(
+                    "Market credential requires a secret key, either"
+                    " as an argument or as an environment variable"
+                    f" named as {self._market.upper()}_SECRET_KEY"
+                )
 
     def get_api_key(self):
         return self.api_key

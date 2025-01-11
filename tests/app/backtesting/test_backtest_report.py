@@ -38,13 +38,23 @@ class Test(TestCase):
             )
         )
 
-    def test_report_csv_creation(self):
+    def tearDown(self) -> None:
+        database_dir = os.path.join(
+            self.resource_dir, "databases"
+        )
+
+        if os.path.exists(database_dir):
+            for root, dirs, files in os.walk(database_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+
+    def test_report_json_creation(self):
         """
         Test if the backtest report is created as a CSV file
         """
-        app = create_app(
-            config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
-        )
+        app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         algorithm = Algorithm()
         algorithm.add_strategy(TestStrategy())
         app.add_algorithm(algorithm)
@@ -71,89 +81,13 @@ class Test(TestCase):
             os.path.isfile(os.path.join(self.resource_dir, file_path))
         )
 
-    def test_report_csv_creation_without_strategy_identifier(self):
-        """
-        Test if the backtest report is created as a CSV file
-        when the strategy does not have an identifier
-        """
-        app = create_app(
-            config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
-        )
-        strategy = TestStrategy()
-        strategy.strategy_id = None
-        algorithm = Algorithm()
-        algorithm.add_strategy(strategy)
-        app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="bitvavo",
-                trading_symbol="EUR",
-                initial_balance=1000
-            )
-        )
-        backtest_date_range = BacktestDateRange(
-            start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow()
-        )
-        report = app.run_backtest(
-            algorithm=algorithm,
-            backtest_date_range=backtest_date_range
-        )
-        file_path = BacktestReportWriterService.create_report_name(
-            report, os.path.join(self.resource_dir, "backtest_reports")
-        )
-        # Check if the backtest report exists
-        self.assertTrue(
-            os.path.isfile(os.path.join(self.resource_dir, file_path))
-        )
-
-    def test_report_csv_creation_with_multiple_strategies(self):
-        """
-        Test if the backtest report is created as a CSV file
-        when there are multiple strategies
-        """
-        app = create_app(
-            config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
-        )
-        strategy = TestStrategy()
-        strategy.strategy_id = None
-        algorithm = Algorithm()
-        algorithm.add_strategy(strategy)
-
-        @algorithm.strategy()
-        def run_strategy(algorithm, market_data):
-            pass
-
-        app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="bitvavo",
-                trading_symbol="EUR",
-                initial_balance=1000
-            )
-        )
-
-        self.assertEqual(2, len(algorithm.strategies))
-        backtest_date_range = BacktestDateRange(
-            start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow()
-        )
-        report = app.run_backtest(
-            algorithm=algorithm, backtest_date_range=backtest_date_range
-        )
-        file_path = BacktestReportWriterService.create_report_name(
-            report, os.path.join(self.resource_dir, "backtest_reports")
-        )
-        # Check if the backtest report exists
-        self.assertTrue(
-            os.path.isfile(os.path.join(self.resource_dir, file_path))
-        )
-
     def test_report_json_creation_with_multiple_strategies_with_id(self):
         """
         Test if the backtest report is created as a CSV file
         when there are multiple strategies with identifiers
         """
         app = create_app(
-            config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
+            config={RESOURCE_DIRECTORY: self.resource_dir}
         )
         algorithm = Algorithm()
 

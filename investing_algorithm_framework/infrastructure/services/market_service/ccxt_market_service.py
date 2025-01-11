@@ -161,7 +161,11 @@ class CCXTMarketService(MarketService):
     def get_orders(self, symbol, market, since: datetime = None):
         market_credential = self.get_market_credential(market)
         exchange = self.initialize_exchange(market, market_credential)
-        datetime_format = self.config["DATETIME_FORMAT"]
+
+        if self.config is not None and "DATETIME_FORMAT" in self.config:
+            datetime_format = self.config["DATETIME_FORMAT"]
+        else:
+            datetime_format = DATETIME_FORMAT
 
         if not exchange.has['fetchOrders']:
             raise OperationalException(

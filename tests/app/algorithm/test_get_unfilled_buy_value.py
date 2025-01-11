@@ -8,7 +8,7 @@ class Test(TestBase):
     """
     Test for functionality of algorithm get_unfilled_buy_value
     """
-    external_orders = [
+    initial_orders = [
         Order.from_dict(
             {
                 "id": "1323",
@@ -56,15 +56,8 @@ class Test(TestBase):
         )
     ]
     external_balances = {
-        "EUR": 1000,
-        "BTC": 10,
-        "DOT": 0,
-        "ETH": 0
+        "EUR": 1000
     }
-    config = {
-        SYMBOLS: ["BTC/EUR", "DOT/EUR", "ETH/EUR"],
-    }
-    external_available_symbols = ["BTC/EUR", "DOT/EUR", "ETH/EUR"]
     portfolio_configurations = [
         PortfolioConfiguration(
             market="BITVAVO",
@@ -85,6 +78,14 @@ class Test(TestBase):
 
         The test should make sure that the portfolio service can sync
         existing orders from the market service to the order service.
+
+        Orders overview:
+            - BTC/EUR: 10  10.0 (filled)
+            - DOT/EUR: 10  10.0 (unfilled)
+            - ETH/EUR: 10  10.0 (unfilled)
+
+        The unfilled buy value should be 200
+        The unallocated amount should be 700
         """
         portfolio_service: PortfolioService \
             = self.app.container.portfolio_service()
@@ -144,7 +145,7 @@ class Test(TestBase):
         eur_position = position_service.find(
             {"portfolio_id": portfolio.id, "symbol": "EUR"}
         )
-        self.assertEqual(1000, eur_position.amount)
+        self.assertEqual(700, eur_position.amount)
 
         pending_orders = self.app.algorithm.get_pending_orders()
         self.assertEqual(2, len(pending_orders))

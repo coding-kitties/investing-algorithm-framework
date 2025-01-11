@@ -3,7 +3,7 @@ from investing_algorithm_framework.app import TradingStrategy, \
     StatelessAction, Task
 from investing_algorithm_framework.domain import ApiException, \
     TradingDataType, TradingTimeFrame, OrderType, OperationalException, \
-    OrderStatus, OrderSide, Config, TimeUnit, TimeInterval, Order, Portfolio, \
+    OrderStatus, OrderSide, TimeUnit, TimeInterval, Order, Portfolio, \
     Position, TimeFrame, BACKTESTING_INDEX_DATETIME, MarketCredential, \
     PortfolioConfiguration, RESOURCE_DIRECTORY, pretty_print_backtest, \
     Trade, OHLCVMarketDataSource, OrderBookMarketDataSource, SYMBOLS, \
@@ -11,12 +11,16 @@ from investing_algorithm_framework.domain import ApiException, \
     pretty_print_backtest_reports_evaluation, load_backtest_reports, \
     RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT, \
     load_backtest_report, BacktestDateRange, convert_polars_to_pandas, \
-    DateRange
+    DateRange, get_backtest_report, DEFAULT_LOGGING_CONFIG
 from investing_algorithm_framework.infrastructure import \
     CCXTOrderBookMarketDataSource, CCXTOHLCVMarketDataSource, \
     CCXTTickerMarketDataSource, CSVOHLCVMarketDataSource, \
-    CSVTickerMarketDataSource
+    CSVTickerMarketDataSource, AzureBlobStorageStateHandler
 from .create_app import create_app
+from investing_algorithm_framework.indicators import get_rsi, get_peaks, \
+    is_uptrend, is_downtrend, is_crossover, is_crossunder, is_above, \
+    is_below, has_crossed_upward, get_sma, get_up_and_downtrends, \
+    get_ema, get_adx, has_crossed_downward, get_willr, is_divergence
 
 __all__ = [
     "Algorithm",
@@ -30,7 +34,6 @@ __all__ = [
     "OrderType",
     "OrderStatus",
     "OrderSide",
-    "Config",
     "PortfolioConfiguration",
     "TimeUnit",
     "TimeInterval",
@@ -83,6 +86,8 @@ __all__ = [
     "get_adx",
     "has_crossed_downward",
     "get_willr",
-    "is_bearish_divergence",
-    "is_bullish_divergence",
+    "is_divergence",
+    "get_backtest_report",
+    "AzureBlobStorageStateHandler",
+    "DEFAULT_LOGGING_CONFIG"
 ]

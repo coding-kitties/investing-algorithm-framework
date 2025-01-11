@@ -6,6 +6,11 @@ logger = logging.getLogger(__name__)
 
 
 class PortfolioConfigurationService:
+    """
+    Service to manage portfolio configurations. This service will
+    manage the portfolio configurations that the user has
+    registered in the app.
+    """
 
     def __init__(self, portfolio_repository, position_repository):
         self.portfolio_repository = portfolio_repository

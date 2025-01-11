@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Integer, String, DateTime, Float
+from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm import validates
@@ -23,6 +23,7 @@ class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
     total_trade_volume = Column(Float, nullable=False, default=0)
     net_size = Column(Float, nullable=False, default=0)
     unallocated = Column(Float, nullable=False, default=0)
+    initial_balance = Column(Float, nullable=True)
     market = Column(String, nullable=False)
     positions = relationship(
         "SQLPosition",
@@ -32,6 +33,8 @@ class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
     )
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    initialized = Column(Boolean, nullable=False, default=False)
+
     __table_args__ = (
         UniqueConstraint(
             'trading_symbol',
@@ -53,8 +56,11 @@ class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
         trading_symbol,
         market,
         unallocated,
+        initialized,
+        initial_balance=None,
         identifier=None,
         created_at=None,
+        updated_at=None,
     ):
 
         if identifier is None:
@@ -73,6 +79,9 @@ class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
             total_revenue=0,
             total_cost=0,
             created_at=created_at,
+            updated_at=updated_at,
+            initialized=initialized,
+            initial_balance=initial_balance,
         )
 
     def update(self, data):

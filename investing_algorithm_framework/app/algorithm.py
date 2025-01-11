@@ -23,13 +23,13 @@ class Algorithm:
     class is responsible for managing the strategies and executing
     them in the correct order.
 
-    :param (optional) name: The name of the algorithm
-    :param (optional) description: The description of the algorithm
-    :param (optional) context: The context of the algorithm,
-    for backtest references
-    :param (optional) strategy: A single strategy to add to the algorithm
-    :param (optional) data_sources: The list of data sources to
-    add to the algorithm
+    Args:
+        name (str): The name of the algorithm
+        description (str): The description of the algorithm
+        context (dict): The context of the algorithm, for backtest
+          references
+        strategy: A single strategy to add to the algorithm
+        data_sources: The list of data sources to add to the algorithm
     """
     def __init__(
         self,
@@ -135,13 +135,25 @@ class Algorithm:
             self._strategies
         )
 
-    def start(self, number_of_iterations=None, stateless=False):
+    def start(self, number_of_iterations: int = None):
+        """
+        Function to start the algorithm.
+        This function will start the algorithm by scheduling all
+        jobs in the strategy orchestrator service. The jobs are not
+        run immediately, but are scheduled to run in the future by the
+        app.
 
-        if not stateless:
-            self.strategy_orchestrator_service.start(
-                algorithm=self,
-                number_of_iterations=number_of_iterations
-            )
+        Args:
+            number_of_iterations (int): (Optional) The number of
+              iterations to run the algorithm
+
+        Returns:
+            None
+        """
+        self.strategy_orchestrator_service.start(
+            algorithm=self,
+            number_of_iterations=number_of_iterations
+        )
 
     @property
     def name(self):
@@ -229,17 +241,20 @@ class Algorithm:
         and execute it if the execute parameter is set to True. If the
         validate parameter is set to True, the order will be validated
 
-        :param target_symbol: The symbol of the asset to trade
-        :param price: The price of the asset
-        :param order_type: The type of the order
-        :param order_side: The side of the order
-        :param amount: The amount of the asset to trade
-        :param market: The market to trade the asset
-        :param execute: If set to True, the order will be executed
-        :param validate: If set to True, the order will be validated
-        :param sync: If set to True, the created order will be synced
-        with the portfolio of the algorithm.
-        :return: The order created
+        Args:
+            target_symbol: The symbol of the asset to trade
+            price: The price of the asset
+            order_type: The type of the order
+            order_side: The side of the order
+            amount: The amount of the asset to trade
+            market: The market to trade the asset
+            execute: If set to True, the order will be executed
+            validate: If set to True, the order will be validated
+            sync: If set to True, the created order will be synced
+            with the portfolio of the algorithm.
+
+        Returns:
+            The order created
         """
         portfolio = self.portfolio_service.find({"market": market})
         order_data = {
@@ -345,9 +360,8 @@ class Algorithm:
                     "Percentage of portfolio is only supported for BUY orders."
                 )
 
-            percentage_of_portfolio = percentage_of_portfolio
             net_size = portfolio.get_net_size()
-            size = net_size * percentage_of_portfolio / 100
+            size = net_size * (percentage_of_portfolio / 100)
             amount = size / price
 
         elif percentage_of_position is not None:

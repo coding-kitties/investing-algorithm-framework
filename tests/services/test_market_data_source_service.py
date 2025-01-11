@@ -1,56 +1,42 @@
 import os
 
-from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    PortfolioConfiguration, CSVTickerMarketDataSource, MarketCredential, \
-    Algorithm
-from tests.resources import TestBase, MarketServiceStub
+from investing_algorithm_framework import RESOURCE_DIRECTORY, \
+    PortfolioConfiguration, CSVTickerMarketDataSource, MarketCredential
+from tests.resources import TestBase
 
 
 class TestMarketDataSourceService(TestBase):
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="binance",
+            trading_symbol="USDT"
+        )
+    ]
+    market_credentials = [
+        MarketCredential(
+            market="binance",
+            api_key="api_key",
+            secret_key="secret_key"
+        )
+    ]
+    external_balances = {
+         "USDT": 1000
+    }
 
     def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.realpath(__file__),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
-        )
-        self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        self.app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="binance",
-                trading_symbol="USDT"
-            )
-        )
-        self.app.container.market_service.override(
-            MarketServiceStub(self.app.container.market_credential_service())
-        )
+        super(TestMarketDataSourceService, self).setUp()
+        configuration_service = self.app.container.configuration_service()
+        config = configuration_service.get_config()
         self.app.add_market_data_source(CSVTickerMarketDataSource(
             identifier="BTC/EUR-ticker",
             market="BITVAVO",
             symbol="BTC/EUR",
             csv_file_path=os.path.join(
-                self.resource_dir,
+                config[RESOURCE_DIRECTORY],
                 "market_data_sources",
                 "TICKER_BTC-EUR_BINANCE_2023-08-23:22:00_2023-12-02:00:00.csv"
             )
         ))
-        algorithm = Algorithm()
-        self.app.add_algorithm(algorithm)
-        self.app.add_market_credential(
-            MarketCredential(
-                market="binance",
-                api_key="api_key",
-                secret_key="secret_key",
-            )
-        )
-        self.app.initialize()
 
     def test_get_ticker_market_data_source(self):
         market_data_source_service = self.app.container\

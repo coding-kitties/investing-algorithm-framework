@@ -6,43 +6,62 @@ from tests.resources import TestBase, MarketServiceStub
 
 
 class Test(TestBase):
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="BITVAVO",
+            trading_symbol="USDT"
+        )
+    ]
+    external_balances = {
+        "USDT": 1000
+    }
+    market_credentials = [
+        MarketCredential(
+            market="BITVAVO",
+            api_key="",
+            secret_key=""
+        )
+    ]
 
-    def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.join(
-                            os.path.realpath(__file__),
-                            os.pardir
-                        ),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
-        )
-        self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        self.app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="BITVAVO",
-                trading_symbol="USDT"
-            )
-        )
-        self.app.container.market_service.override(
-            MarketServiceStub(self.app.container.market_credential_service())
-        )
-        algorithm = Algorithm()
-        self.app.add_algorithm(algorithm)
-        self.app.add_market_credential(
-            MarketCredential(
-                market="BITVAVO",
-                api_key="api_key",
-                secret_key="secret_key"
-            )
-        )
-        self.app.initialize()
+    # def setUp(self) -> None:
+    #     self.resource_dir = os.path.abspath(
+    #         os.path.join(
+    #             os.path.join(
+    #                 os.path.join(
+    #                     os.path.join(
+    #                         os.path.realpath(__file__),
+    #                         os.pardir
+    #                     ),
+    #                     os.pardir
+    #                 ),
+    #                 os.pardir
+    #             ),
+    #             "resources"
+    #         )
+    #     )
+    #     self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+    #     self.app.add_portfolio_configuration(
+    #         PortfolioConfiguration(
+    #             market="BITVAVO",
+    #             trading_symbol="USDT"
+    #         )
+    #     )
+    #     self.app.container.market_service.override(
+    #         MarketServiceStub(self.app.container.market_credential_service())
+    #     )
+    #     algorithm = Algorithm()
+    #     self.app.add_algorithm(algorithm)
+    #     self.app.add_market_credential(
+    #         MarketCredential(
+    #             market="BITVAVO",
+    #             api_key="api_key",
+    #             secret_key="secret_key"
+    #         )
+    #     )
+    #     self.app.initialize()
+
+    # def tearDown(self):
+    #     return super().tearDown()
 
     def test_store_position_amount(self):
         self.portfolio_service = self.app.container.portfolio_service()

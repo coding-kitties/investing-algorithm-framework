@@ -1,7 +1,7 @@
 import os
 from unittest import TestCase
 
-from investing_algorithm_framework import create_app, Config, \
+from investing_algorithm_framework import create_app, \
     PortfolioConfiguration, Algorithm, MarketCredential
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY
 from tests.resources import MarketServiceStub
@@ -25,29 +25,15 @@ class TestCreateApp(TestCase):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         self.assertIsNotNone(app)
         self.assertIsNone(app._flask_app)
-        self.assertFalse(app._stateless)
         self.assertIsNotNone(app.container)
         self.assertIsNone(app.algorithm)
 
     def test_create_app_with_config(self):
-        config = Config(
-            resource_directory=self.resource_dir
-        )
-        app = create_app(config=config)
+        app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         self.assertIsNotNone(app)
         self.assertIsNotNone(app.config)
         self.assertIsNone(app._flask_app)
-        self.assertFalse(app._stateless)
         self.assertIsNotNone(app.container)
-        self.assertIsNone(app.algorithm)
-
-    def test_create_app_stateless(self):
-        app = create_app(stateless=True, config={})
-        self.assertIsNotNone(app)
-        self.assertIsNotNone(app.config)
-        self.assertTrue(app._stateless)
-        self.assertIsNotNone(app.container)
-        self.assertIsNotNone(app.config)
         self.assertIsNone(app.algorithm)
 
     def test_create_app_web(self):
@@ -76,8 +62,12 @@ class TestCreateApp(TestCase):
                 secret_key="secret_key"
             )
         )
+        market_service = MarketServiceStub(app.container.market_credential_service())
+        market_service.balances = {
+            "USDT": 1000
+        }
         app.container.market_service.override(
-            MarketServiceStub(app.container.market_credential_service())
+            market_service
         )
         app.initialize()
         self.assertIsNotNone(app)

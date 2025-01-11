@@ -243,3 +243,15 @@ class Repository(ABC):
             return new_selection[0]
 
         return new_selection
+
+    def save(self, object):
+
+        with Session() as db:
+            try:
+                db.add(object)
+                db.commit()
+                return self.get(object)
+            except SQLAlchemyError as e:
+                logger.error(e)
+                db.rollback()
+                raise ApiException("Error saving object")

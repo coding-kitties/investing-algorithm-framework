@@ -1,0 +1,32 @@
+import azure.functions as func
+import logging
+from investing_algorithm_framework import DEFAULT_LOGGING_CONFIG,\
+    StatelessAction
+from app_entry import app as trading_bot_app
+
+logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
+
+app = func.FunctionApp()
+
+@app.route(route="trading_bot", auth_level=func.AuthLevel.ANONYMOUS)
+def trading_bot(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info('Python HTTP trigger function processed a request.')
+
+    name = req.params.get('name')
+
+    trading_bot_app.run(payload={"action": StatelessAction.RUN_STRATEGY.value})
+    if not name:
+        try:
+            req_body = req.get_json()
+        except ValueError:
+            pass
+        else:
+            name = req_body.get('name')
+
+    if name:
+        return func.HttpResponse(f"Hello, {name}. This HTTP triggered function executed successfully.")
+    else:
+        return func.HttpResponse(
+             "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.",
+             status_code=200
+        )

@@ -1,7 +1,6 @@
-import datetime
 import logging
 import os
-from datetime import timedelta
+from datetime import timedelta, datetime, timezone
 from dateutil.parser import parse
 import polars
 from dateutil import parser
@@ -14,7 +13,7 @@ from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
 from investing_algorithm_framework.infrastructure.services import \
     CCXTMarketService
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 class CCXTOHLCVBacktestMarketDataSource(
@@ -64,7 +63,6 @@ class CCXTOHLCVBacktestMarketDataSource(
         config,
         backtest_start_date,
         backtest_end_date,
-        **kwargs
     ):
         """
         Prepare data implementation of ccxt based ohlcv backtest market
@@ -87,6 +85,10 @@ class CCXTOHLCVBacktestMarketDataSource(
         Returns:
             None
         """
+
+        if config is None:
+            config = self.config
+
         # Calculating the backtest data start date
         backtest_data_start_date = \
             backtest_start_date - timedelta(
@@ -101,10 +103,10 @@ class CCXTOHLCVBacktestMarketDataSource(
         self.backtest_data_index_date = backtest_data_start_date\
             .replace(microsecond=0)
         self.backtest_data_end_date = backtest_end_date.replace(microsecond=0)
+
         # Creating the backtest data directory and file
         self.backtest_data_directory = os.path.join(
-            config.get(RESOURCE_DIRECTORY),
-            config.get(BACKTEST_DATA_DIRECTORY_NAME)
+            config[RESOURCE_DIRECTORY], config[BACKTEST_DATA_DIRECTORY_NAME]
         )
 
         if not os.path.isdir(self.backtest_data_directory):
@@ -303,6 +305,7 @@ class CCXTTickerBacktestMarketDataSource(
 
         When downloading the data it will use the ccxt library.
         """
+        config = self.config
         total_minutes = TimeFrame.from_string(self.time_frame)\
             .amount_of_minutes
         self.backtest_data_start_date = \
@@ -311,8 +314,7 @@ class CCXTTickerBacktestMarketDataSource(
 
         # Creating the backtest data directory and file
         self.backtest_data_directory = os.path.join(
-            config.get(RESOURCE_DIRECTORY),
-            config.get(BACKTEST_DATA_DIRECTORY_NAME)
+            config[RESOURCE_DIRECTORY], config[BACKTEST_DATA_DIRECTORY_NAME]
         )
 
         if not os.path.isdir(self.backtest_data_directory):
@@ -442,7 +444,7 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
         Implementation of get_data for CCXTOHLCVMarketDataSource.
         This implementation uses the CCXTMarketService to get the OHLCV data.
 
-        Parameters:
+        Args:
             window_size: int (optional) - the total amount of candle
             sticks that need to be returned
             start_date: datetime (optional) - the start date of the data. The
@@ -470,19 +472,27 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
         if "window_size" in kwargs:
             self.window_size = kwargs["window_size"]
 
+        start_date = None
+        end_date = None
+
         if "start_date" in kwargs:
             start_date = kwargs["start_date"]
 
-            if not isinstance(start_date, datetime.datetime):
+            if not isinstance(start_date, datetime):
                 raise OperationalException(
                     "start_date should be a datetime object"
                 )
-        else:
-            raise OperationalException(
-                "start_date should be set for CCXTOHLCVMarketDataSource"
-            )
 
-        if "end_date" not in kwargs:
+        if "end_date" in kwargs:
+            end_date = kwargs["end_date"]
+
+            if not isinstance(end_date, datetime):
+                raise OperationalException(
+                    "end_date should be a datetime object"
+                )
+
+        # Calculate the start and end dates
+        if start_date is None or end_date is None:
 
             if self.window_size is None:
                 raise OperationalException(
@@ -491,27 +501,32 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
                     "parameter for CCXTOHLCVMarketDataSource"
                 )
 
-            end_date = self.create_end_date(
-                start_date, self.time_frame, self.window_size
-            )
-        else:
-            end_date = kwargs["end_date"]
+            if start_date is None:
 
-            if not isinstance(end_date, datetime.datetime):
-                raise OperationalException(
-                    "end_date should be a datetime object"
+                if end_date is None:
+                    end_date = datetime.now(tz=timezone.utc)
+
+                start_date = self.create_start_date(
+                    end_date=end_date,
+                    time_frame=self.time_frame,
+                    window_size=self.window_size
                 )
-
-        if not isinstance(start_date, datetime.datetime):
-            raise OperationalException(
-                "start_date should be a datetime object"
-            )
+            else:
+                end_date = self.create_end_date(
+                    start_date=start_date,
+                    time_frame=self.time_frame,
+                    window_size=self.window_size
+                )
 
         if "storage_path" in kwargs:
             storage_path = kwargs["storage_path"]
         else:
             storage_path = self.get_storage_path()
 
+        logger.info(
+            f"Getting OHLCV data for {self.symbol} " +
+            f"from {start_date} to {end_date}"
+        )
         data = None
 
         if storage_path is not None:

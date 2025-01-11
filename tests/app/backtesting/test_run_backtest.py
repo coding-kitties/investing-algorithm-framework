@@ -38,6 +38,18 @@ class Test(TestCase):
             )
         )
 
+    def tearDown(self) -> None:
+        database_dir = os.path.join(
+            self.resource_dir, "databases"
+        )
+
+        if os.path.exists(database_dir):
+            for root, dirs, files in os.walk(database_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+
     def test_report_csv_creation(self):
         """
         Test if the backtest report is created as a CSV file
@@ -74,7 +86,7 @@ class Test(TestCase):
         when the strategy does not have an identifier
         """
         app = create_app(
-            config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
+            config={RESOURCE_DIRECTORY: self.resource_dir}
         )
         strategy = TestStrategy()
         strategy.strategy_id = None
@@ -106,7 +118,7 @@ class Test(TestCase):
         when there are multiple strategies
         """
         app = create_app(
-            config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
+            config={RESOURCE_DIRECTORY: self.resource_dir}
         )
         strategy = TestStrategy()
         strategy.strategy_id = None
@@ -145,7 +157,7 @@ class Test(TestCase):
         when there are multiple strategies with identifiers
         """
         app = create_app(
-            config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
+            config={RESOURCE_DIRECTORY: self.resource_dir}
         )
         algorithm = Algorithm()
 

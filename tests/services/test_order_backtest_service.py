@@ -77,8 +77,12 @@ class TestOrderBacktestService(TestBase):
 
     def test_create_limit_order(self):
         order_service = self.app.container.order_service()
-        config = self.app.config
-        config[BACKTESTING_INDEX_DATETIME] = datetime.utcnow()
+        configuration_service = self.app.container.configuration_service()
+        configuration_service.add_value(
+            BACKTESTING_INDEX_DATETIME,
+            datetime.utcnow()
+        )
+
         order = order_service.create(
             {
                 "target_symbol": "ADA",
@@ -104,8 +108,12 @@ class TestOrderBacktestService(TestBase):
 
     def test_update_order(self):
         order_service = self.app.container.order_service()
-        config = self.app.config
-        config[BACKTESTING_INDEX_DATETIME] = datetime.utcnow()
+        configuration_service = self.app.container.configuration_service()
+        configuration_service.add_value(
+            BACKTESTING_INDEX_DATETIME,
+            datetime.utcnow()
+        )
+
         order = order_service.create(
             {
                 "target_symbol": "ADA",
@@ -136,8 +144,11 @@ class TestOrderBacktestService(TestBase):
 
     def test_create_limit_buy_order(self):
         order_service = self.app.container.order_service()
-        config = self.app.config
-        config[BACKTESTING_INDEX_DATETIME] = datetime.utcnow()
+        configuration_service = self.app.container.configuration_service()
+        configuration_service.add_value(
+            BACKTESTING_INDEX_DATETIME,
+            datetime.utcnow()
+        )
         order = order_service.create(
             {
                 "target_symbol": "ADA",
@@ -163,9 +174,11 @@ class TestOrderBacktestService(TestBase):
 
     def test_create_limit_sell_order(self):
         order_service = self.app.container.order_service()
-        config = self.app.config
-        config[BACKTESTING_INDEX_DATETIME] = datetime.utcnow()
-
+        configuration_service = self.app.container.configuration_service()
+        configuration_service.add_value(
+            BACKTESTING_INDEX_DATETIME,
+            datetime.utcnow()
+        )
         order = order_service.create(
             {
                 "target_symbol": "ADA",
@@ -232,8 +245,11 @@ class TestOrderBacktestService(TestBase):
 
     def test_update_closing_partial_buy_orders(self):
         order_service = self.app.container.order_service()
-        config = self.app.config
-        config[BACKTESTING_INDEX_DATETIME] = datetime.utcnow()
+        configuration_service = self.app.container.configuration_service()
+        configuration_service.add_value(
+            BACKTESTING_INDEX_DATETIME,
+            datetime.utcnow()
+        )
         buy_order_one = order_service.create(
             {
                 "target_symbol": "ADA",
@@ -356,8 +372,11 @@ class TestOrderBacktestService(TestBase):
 
     def test_trade_closing_winning_trade(self):
         order_service = self.app.container.order_service()
-        config = self.app.config
-        config[BACKTESTING_INDEX_DATETIME] = datetime.utcnow()
+        configuration_service = self.app.container.configuration_service()
+        configuration_service.add_value(
+            BACKTESTING_INDEX_DATETIME,
+            datetime.utcnow()
+        )
         buy_order = order_service.create(
             {
                 "target_symbol": "ADA",
@@ -416,8 +435,11 @@ class TestOrderBacktestService(TestBase):
 
     def test_trade_closing_losing_trade(self):
         order_service = self.app.container.order_service()
-        config = self.app.config
-        config[BACKTESTING_INDEX_DATETIME] = datetime.utcnow()
+        configuration_service = self.app.container.configuration_service()
+        configuration_service.add_value(
+            BACKTESTING_INDEX_DATETIME,
+            datetime.utcnow()
+        )
         buy_order = order_service.create(
             {
                 "target_symbol": "ADA",
@@ -476,8 +498,11 @@ class TestOrderBacktestService(TestBase):
 
     def test_has_executed_buy_order(self):
         order_service = self.app.container.order_service()
-        config = self.app.config
-        config[BACKTESTING_INDEX_DATETIME] = datetime.utcnow()
+        configuration_service = self.app.container.configuration_service()
+        configuration_service.add_value(
+            BACKTESTING_INDEX_DATETIME,
+            datetime.utcnow()
+        )
 
         # Create the buy order
         order = order_service.create(
@@ -604,8 +629,11 @@ class TestOrderBacktestService(TestBase):
 
     def test_has_executed_sell_order(self):
         order_service = self.app.container.order_service()
-        config = self.app.config
-        config[BACKTESTING_INDEX_DATETIME] = datetime.utcnow()
+        configuration_service = self.app.container.configuration_service()
+        configuration_service.add_value(
+            BACKTESTING_INDEX_DATETIME,
+            datetime.utcnow()
+        )
 
         # Create the buy order
         order = order_service.create(

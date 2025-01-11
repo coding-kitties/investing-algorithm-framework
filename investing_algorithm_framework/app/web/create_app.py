@@ -5,10 +5,12 @@ from investing_algorithm_framework.app.web.setup_cors import setup_cors
 from .error_handler import setup_error_handler
 
 
-def create_flask_app(config):
+def create_flask_app(configuration_service):
     app = Flask(__name__.split('.')[0])
 
-    for key, value in config.items():
+    flask_config = configuration_service.get_flask_config()
+
+    for key, value in flask_config.items():
         app.config[key] = value
 
     app = setup_cors(app)
