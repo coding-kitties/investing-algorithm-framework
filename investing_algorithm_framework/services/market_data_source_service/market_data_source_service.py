@@ -95,7 +95,9 @@ class MarketDataSourceService:
         if isinstance(identifier, str):
             raise OperationalException(
                 f"Market data source with identifier {identifier} not found. "
-                "Please make sure that the market data source is registered to the app if you refer to it by identifier in your strategy."
+                "Please make sure that the market data source is "
+                "registered to the app if you refer to it by "
+                "identifier in your strategy."
             )
 
     def get_ticker_market_data_source(self, symbol, market=None):

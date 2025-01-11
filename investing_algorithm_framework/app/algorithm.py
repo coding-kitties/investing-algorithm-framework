@@ -144,7 +144,8 @@ class Algorithm:
         app.
 
         Args:
-            number_of_iterations (int): (Optional) The number of iterations to run the algorithm
+            number_of_iterations (int): (Optional) The number of
+              iterations to run the algorithm
 
         Returns:
             None

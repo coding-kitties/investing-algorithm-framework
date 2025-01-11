@@ -130,7 +130,8 @@ class PortfolioService(RepositoryService):
         If the portfolio does not exist, it will be created.
 
         Args:
-            portfolio_configuration (PortfolioConfiguration) Portfolio configuration to create the portfolio from
+            portfolio_configuration (PortfolioConfiguration)
+                Portfolio configuration to create the portfolio from
 
         Returns:
             Portfolio: Portfolio created from the configuration

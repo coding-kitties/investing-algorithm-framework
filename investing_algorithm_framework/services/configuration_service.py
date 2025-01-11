@@ -6,7 +6,9 @@ DEFAULT_CONFIGURATION = {
     "ENVIRONMENT": Environment.PROD.value,
     "LOG_LEVEL": 'DEBUG',
     "APP_DIR": os.path.abspath(os.path.dirname(__file__)),
-    "PROJECT_ROOT": os.path.abspath(os.path.join(os.path.abspath(os.path.dirname(__file__)), os.pardir)),
+    "PROJECT_ROOT": os.path.abspath(
+        os.path.join(os.path.abspath(os.path.dirname(__file__)), os.pardir)
+    ),
     "RESOURCE_DIRECTORY": os.getenv(RESOURCE_DIRECTORY),
     "CHECK_PENDING_ORDERS": True,
     "SQLITE_INITIALIZED": False,
@@ -32,6 +34,7 @@ DEFAULT_FLASK_CONFIGURATION = {
     ],
     "SCHEDULER_API_ENABLED": True,
 }
+
 
 class ConfigurationService:
 

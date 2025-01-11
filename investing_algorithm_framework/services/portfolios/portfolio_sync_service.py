@@ -40,12 +40,20 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
         available balance of the portfolio from the exchange and update the
         unallocated balance of the portfolio accordingly.
 
-        If the portfolio already exists (exists in the database), then a check is done if the exchange has the available balance of
-        the portfolio unallocated balance. If the exchange does not have
-        the available balance of the portfolio, an OperationalException will be raised.
+        If the portfolio already exists (exists in the database),
+        then a check is done if the exchange has the available
+        balance of the portfolio unallocated balance. If the exchange
+        does not have the available balance of the portfolio,
+        an OperationalException will be raised.
 
         If the portfolio does not exist, the portfolio will be created with
-        the unallocated balance of the portfolio set to the available balance on the exchange. If also a initial balance is set in the portfolio configuration, the unallocated balance will be set to the initial balance (given the balance is available on the exchange). If the initial balance is not set, the unallocated balance will be set to the available balance on the exchange.
+        the unallocated balance of the portfolio set to the available
+        balance on the exchange. If also a initial balance is set in
+        the portfolio configuration, the unallocated balance will be set
+        to the initial balance (given the balance is available on
+        the exchange). If the initial balance is not set, the
+        unallocated balance will be set to the available balance
+        on the exchange.
 
         Args:
             portfolio: Portfolio object
@@ -86,7 +94,8 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
                 else:
                     unallocated = portfolio.initial_balance
             else:
-                # If the portfolio does not have an initial balance set, get the available balance on the exchange
+                # If the portfolio does not have an initial balance
+                # set, get the available balance on the exchange
                 if portfolio.trading_symbol.upper() not in balances:
                     raise OperationalException(
                         f"There is no available balance on the exchange for "
@@ -97,7 +106,9 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
                         f"{portfolio.market}."
                     )
                 else:
-                    unallocated = float(balances[portfolio.trading_symbol.upper()])
+                    unallocated = float(
+                        balances[portfolio.trading_symbol.upper()]
+                    )
 
             update_data = {
                 "unallocated": unallocated,
@@ -120,13 +131,18 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
             )
 
         else:
-            # Check if the portfolio unallocated balance is available on the exchange
+            # Check if the portfolio unallocated balance is
+            # available on the exchange
             if portfolio.unallocated > 0:
-                if portfolio.trading_symbol.upper() not in balances or portfolio.unallocated > float(balances[portfolio.trading_symbol.upper()]):
+                if portfolio.trading_symbol.upper() not in balances \
+                    or portfolio.unallocated > \
+                        float(balances[portfolio.trading_symbol.upper()]):
                     raise OperationalException(
                         f"Out of sync: the unallocated balance"
                         " of the portfolio is more than the available"
-                        " balance on the exchange. Please make sure that you" f" have at least {portfolio.unallocated}"
+                        " balance on the exchange. Please make sure"
+                        " that you have at least "
+                        f"{portfolio.unallocated}"
                         f" {portfolio.trading_symbol.upper()} available"
                         " on the exchange."
                     )
@@ -195,7 +211,8 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
         """
         Function to sync all local orders with the orders on the exchange.
         This method will go over all local open orders and check if they are
-        changed on the exchange. If they are, the local order will be updated to match the status on the exchange.
+        changed on the exchange. If they are, the local order will be
+        updated to match the status on the exchange.
 
         Args:
             portfolio: Portfolio object
@@ -203,9 +220,6 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
         Returns:
             None
         """
-
-        portfolio_configuration = self.portfolio_configuration_service \
-            .get(portfolio.identifier)
 
         open_orders = self.order_repository.get_all(
             {

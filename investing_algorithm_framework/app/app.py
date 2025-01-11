@@ -96,7 +96,7 @@ class App:
 
         # Check if the resource directory is set
         if RESOURCE_DIRECTORY not in config \
-            or config[RESOURCE_DIRECTORY] is None:
+                or config[RESOURCE_DIRECTORY] is None:
             logger.info(
                 "Resource directory not set, setting" +
                 " to current working directory"
@@ -115,7 +115,7 @@ class App:
         config = configuration_service.get_config()
 
         if DATABASE_DIRECTORY_PATH not in config \
-            or config[DATABASE_DIRECTORY_PATH] is None:
+                or config[DATABASE_DIRECTORY_PATH] is None:
             resource_dir = config[RESOURCE_DIRECTORY]
             configuration_service.add_value(
                 DATABASE_DIRECTORY_PATH,
@@ -125,7 +125,7 @@ class App:
         config = configuration_service.get_config()
 
         if SQLALCHEMY_DATABASE_URI not in config \
-            or config[SQLALCHEMY_DATABASE_URI] is None:
+                or config[SQLALCHEMY_DATABASE_URI] is None:
             path = "sqlite:///" + os.path.join(
                 configuration_service.config[DATABASE_DIRECTORY_PATH],
                 configuration_service.config[DATABASE_NAME]
@@ -261,7 +261,6 @@ class App:
 
         # Sync all trades from exchange with current trade history
         portfolio_sync_service.sync_trades(portfolio)
-
 
     def _initialize_standard(self):
         """
@@ -545,8 +544,9 @@ class App:
         number of iterations provided. This mode is useful when running the
         app in a loop for a fixed number of iterations.
 
-        This function first checks if there is an algorithm registered. If not, it raises an OperationalException. Then it initializes the algorithm with the services and the configuration.
-
+        This function first checks if there is an algorithm registered.
+         If not, it raises an OperationalException. Then it
+         initializes the algorithm with the services and the configuration.
 
         Args:
             payload (dict): The payload to handle for the algorithm
@@ -697,8 +697,10 @@ class App:
 
     def _create_resources_if_not_exists(self):
         """
-        Function to create the resources required by the app if they do not exist. This function will check if the resource directory exists and
-        check if the database directory exists. If they do not exist, it will create them.
+        Function to create the resources required by the app if they
+          do not exist. This function will check if the resource directory
+          exists and check if the database directory exists. If they do
+          not exist, it will create them.
 
         Returns:
             None
@@ -947,8 +949,8 @@ class App:
 
     def after_initialize(self, app_hook: AppHook):
         """
-        Function to add a hook that runs after the app is initialized. The hook
-        should be an instance of AppHook.
+        Function to add a hook that runs after the app is initialized.
+        The hook should be an instance of AppHook.
         """
 
         if inspect.isclass(app_hook):

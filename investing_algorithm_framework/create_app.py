@@ -1,5 +1,4 @@
 import logging
-import os
 from dotenv import load_dotenv
 
 from .app import App
@@ -9,7 +8,7 @@ logger = logging.getLogger("investing_algorithm_framework")
 
 
 def create_app(
-    config: dict =None,
+    config: dict = None,
     web=False,
     state_handler=None
 ) -> App:

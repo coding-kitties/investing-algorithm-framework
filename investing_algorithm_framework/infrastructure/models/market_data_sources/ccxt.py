@@ -524,7 +524,8 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
             storage_path = self.get_storage_path()
 
         logger.info(
-            f"Getting OHLCV data for {self.symbol} from {start_date} to {end_date}"
+            f"Getting OHLCV data for {self.symbol} " +
+            f"from {start_date} to {end_date}"
         )
         data = None
 

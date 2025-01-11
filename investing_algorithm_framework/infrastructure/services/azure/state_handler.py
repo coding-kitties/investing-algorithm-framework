@@ -29,7 +29,9 @@ class AzureBlobStorageStateHandler:
 
             if self.connection_string is None:
                 raise OperationalException(
-                    "Azure Blob Storage state handler requires a connection string or an environment variable AZURE_STORAGE_CONNECTION_STRING to be set"
+                    "Azure Blob Storage state handler requires" +
+                    " a connection string or an environment" +
+                    " variable AZURE_STORAGE_CONNECTION_STRING to be set"
                 )
 
         if self.container_name is None:
@@ -39,7 +41,9 @@ class AzureBlobStorageStateHandler:
 
             if self.container_name is None:
                 raise OperationalException(
-                    "Azure Blob Storage state handler requires a container name or an environment variable AZURE_STORAGE_CONTAINER_NAME to be set"
+                    "Azure Blob Storage state handler requires a" +
+                    " container name or an environment" +
+                    " variable AZURE_STORAGE_CONTAINER_NAME to be set"
                 )
 
     def save(self, source_directory: str):
@@ -73,7 +77,9 @@ class AzureBlobStorageStateHandler:
 
                     # Upload the file
                     with open(file_path, "rb") as data:
-                        container_client.upload_blob(name=blob_name, data=data, overwrite=True)
+                        container_client.upload_blob(
+                            name=blob_name, data=data, overwrite=True
+                        )
 
         except Exception as ex:
             logger.error(f"Error saving state to Azure Blob Storage: {ex}")

@@ -22,7 +22,6 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     symbol="BTC/EUR",
 )
 app = create_app(state_handler=AzureBlobStorageStateHandler())
-app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
 algorithm = Algorithm()
 app.add_market_credential(MarketCredential(market="bitvavo"))
 app.add_portfolio_configuration(
@@ -39,7 +38,7 @@ app.add_algorithm(algorithm)
     time_unit=TimeUnit.HOUR,
     interval=2,
     # Specify market data sources that need to be passed to the strategy
-    market_data_sources=[bitvavo_btc_eur_ticker, "BTC-ohlcv"]
+    market_data_sources=[bitvavo_btc_eur_ticker, bitvavo_btc_eur_ohlcv_2h]
 )
 def perform_strategy(algorithm: Algorithm, market_data: dict):
     # By default, ohlcv data is passed as polars df in the form of

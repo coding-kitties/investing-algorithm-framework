@@ -2,6 +2,22 @@ import os
 import click
 
 
+def create_file(file_path):
+    """
+    Creates a new file.
+
+    Args:
+        file_path (str): The path to the file to create.
+
+    Returns:
+        None
+    """
+
+    if not os.path.exists(file_path):
+        with open(file_path, "w") as file:
+            file.write("")
+
+
 def create_file_from_template(template_path, output_path):
     """
     Creates a new file by replacing placeholders in a template file.
@@ -9,16 +25,21 @@ def create_file_from_template(template_path, output_path):
     Args:
         template_path (str): The path to the template file.
         output_path (str): The path to the output file.
-        replacements (dict): A dictionary of placeholder keys and their replacements.
+        replacements (dict): A dictionary of placeholder keys and
+        their replacements.
 
     Returns:
         None
     """
-    with open(template_path, "r") as file:
-        template = file.read()
 
-    with open(output_path, "w") as file:
-        file.write(template)
+    # Check if output path already exists
+    if not os.path.exists(output_path):
+        with open(template_path, "r") as file:
+            template = file.read()
+
+        with open(output_path, "w") as file:
+            file.write(template)
+
 
 def create_azure_function_skeleton(
     add_app_template, add_requirements_template
@@ -62,6 +83,10 @@ def create_azure_function_skeleton(
             "templates",
             "azure_function_framework_app.py.template"
         )
+        create_file_from_template(
+            function_app_path,
+            os.path.join(cwd, "app_entry.py")
+        )
 
     if add_requirements_template:
         requirements_path = os.path.join(
@@ -69,7 +94,12 @@ def create_azure_function_skeleton(
             "templates",
             "azure_function_requirements.txt.template"
         )
+        create_file_from_template(
+            function_app_path,
+            os.path.join(cwd, "requirements.txt")
+        )
 
+    create_file(os.path.join(cwd, "__init__.py"))
     create_file_from_template(
         template_host_file_path,
         os.path.join(cwd, "host.json")
@@ -87,7 +117,7 @@ def create_azure_function_skeleton(
         os.path.join(cwd, "requirements.txt")
     )
     print(
-        f"Function App trading bot skeleton creation completed"
+        "Function App trading bot skeleton creation completed"
     )
 
 
@@ -110,7 +140,8 @@ def cli(add_app_template, add_requirements_template):
 
     Args:
         add_app_template (bool): Flag to create an app skeleton.
-        add_requirements_template (bool): Flag to create a requirements template.
+        add_requirements_template (bool): Flag to create a
+        requirements template.
 
     Returns:
         None

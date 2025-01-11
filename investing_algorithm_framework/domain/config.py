@@ -74,7 +74,7 @@ DEFAULT_LOGGING_CONFIG = {
         'investing_algorithm_framework': {  # Define your logger here
             'level': 'INFO',  # Set the desired level
             'handlers': ['console', 'file'],  # Use these handlers
-            'propagate': False,  # Prevent logs from propagating to the root logger (optional)
+            'propagate': False,
         },
     },
     'root': {  # Optional: Root logger configuration

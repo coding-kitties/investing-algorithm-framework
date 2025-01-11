@@ -100,7 +100,7 @@ async def publish_function_app(
             "--settings",
             f"AZURE_STORAGE_CONNECTION_STRING={storage_connection_string}",
             f"AZURE_STORAGE_CONTAINER_NAME={storage_container_name}",
-            f"--resource-group", resource_group_name
+            "--resource-group", resource_group_name
         )
         _, stderr1 = await add_settings_process.communicate()
 
@@ -114,7 +114,7 @@ async def publish_function_app(
                 raise Exception("Error adding App settings")
 
         print(
-            f"Added app settings to the Function App successfully"
+            "Added app settings to the Function App successfully"
         )
 
         # Step 3: Update the cors settings
@@ -137,7 +137,7 @@ async def publish_function_app(
                 raise Exception("Error adding cors settings")
 
         print("All app settings have been added successfully.")
-        print(f"Function App creation completed successfully.")
+        print("Function App creation completed successfully.")
     except Exception as e:
         print(f"Error publishing Function App: {e}")
 
@@ -149,7 +149,8 @@ async def create_function_app(
     region
 ):
     """
-    Creates an Azure Function App in a Consumption Plan and deploys a Python Function.
+    Creates an Azure Function App in a Consumption Plan and deploys
+      a Python Function.
 
     Args:
         resource_group_name (str): Resource group name.
@@ -183,9 +184,13 @@ async def create_function_app(
             print(f"Function App '{deployment_name}' already exists.")
             return stdout.decode()
 
-        # If the return code is non-zero, and the error indicates the Function App doesn't exist, proceed to create it
+        # If the return code is non-zero, and the error indicates
+        # the Function App doesn't exist, proceed to create it
         if "ResourceNotFound" in stderr.decode():
-            print(f"Function App '{deployment_name}' does not exist. Proceeding to create it...")
+            print(
+                f"Function App '{deployment_name}' does not exist." +
+                " Proceeding to create it..."
+            )
         else:
             # If the error is something else, raise it
             print(f"Error checking for Function App: {stderr.decode()}")
@@ -220,8 +225,14 @@ async def create_function_app(
 
         # Check the return code for the create command
         if create_process.returncode != 0:
-            print(f"Error creating Function App: {create_stderr.decode().strip()}")
-            raise Exception(f"Error creating Function App: {create_stderr.decode().strip()}")
+            print(
+                "Error creating Function App: " +
+                f"{create_stderr.decode().strip()}"
+            )
+            raise Exception(
+                "Error creating Function App: " +
+                f"{create_stderr.decode().strip()}"
+            )
 
         print(f"Function App '{deployment_name}' created successfully.")
         return {"status": "created"}
@@ -238,7 +249,8 @@ def create_file_from_template(template_path, output_path):
     Args:
         template_path (str): The path to the template file.
         output_path (str): The path to the output file.
-        replacements (dict): A dictionary of placeholder keys and their replacements.
+        replacements (dict): A dictionary of placeholder
+            keys and their replacements.
 
     Returns:
         None
@@ -258,7 +270,8 @@ def ensure_consumption_plan(
     credential
 ):
     """
-    Ensures that an App Service Plan with the Consumption Plan exists. If not, creates it.
+    Ensures that an App Service Plan with the Consumption Plan exists.
+    If not, creates it.
 
     Args:
         resource_group_name (str): The name of the resource group.
@@ -273,13 +286,15 @@ def ensure_consumption_plan(
 
     try:
         print(
-            f"Checking if App Service Plan '{plan_name}' exists in resource group '{resource_group_name}'..."
+            f"Checking if App Service Plan '{plan_name}' exists" +
+            f" in resource group '{resource_group_name}'..."
         )
         plan = web_client.app_service_plans.get(resource_group_name, plan_name)
         print(f"App Service Plan '{plan_name}' already exists.")
     except Exception:  # Plan does not exist
         print(
-            f"App Service Plan '{plan_name}' not found. Creating it as a Consumption Plan..."
+            f"App Service Plan '{plan_name}' not found. " +
+            "Creating it as a Consumption Plan..."
         )
         plan = web_client.app_service_plans.begin_create_or_update(
             resource_group_name,
@@ -294,6 +309,7 @@ def ensure_consumption_plan(
         print(f"App Service Plan '{plan_name}' created successfully.")
     return plan
 
+
 def ensure_storage_account(
     storage_account_name,
     resource_group_name,
@@ -304,8 +320,11 @@ def ensure_storage_account(
     """
     Checks if a storage account exists. If it doesn't, creates it.
 
-    If no storage account name is provided, a unique name will be generated.
-    However, before we create a new storage account, we check if there a storage account exists with the prefix 'iafstorageaccount'. If it exists, we use that storage account.
+    If no storage account name is provided, a unique name will
+    be generated. However, before we create a new
+    storage account, we check if there a storage account exists
+    with the prefix 'iafstorageaccount'. If it exists, we use
+    that storage account.
 
     Args:
         storage_account_name (str): The name of the storage account.
@@ -345,9 +364,11 @@ def ensure_storage_account(
             resource_group_name,
             storage_account_name,
         ).keys[1].value
-        connection_string = f"DefaultEndpointsProtocol=https;AccountName={storage_account_name};AccountKey={account_key};EndpointSuffix=core.windows.net"
+        connection_string = "DefaultEndpointsProtocol=https;" + \
+            f"AccountName={storage_account_name};" + \
+            f"AccountKey={account_key};EndpointSuffix=core.windows.net"
         return connection_string, storage_account_name
-    except Exception as e:  # If the storage account does not exist
+    except Exception:  # If the storage account does not exist
         print("Creating storage account ...")
 
         # Create storage account
@@ -363,13 +384,20 @@ def ensure_storage_account(
         storage_async_operation.result()
 
         if storage_async_operation.status() == "Succeeded":
-            print(f"Storage account '{storage_account_name}' created successfully.")
+            print(
+                f"Storage account '{storage_account_name}'" +
+                "created successfully."
+            )
 
-        account_key = storage_client.storage_accounts.list_keys(
-            resource_group_name,
-            storage_account_name,
-        ).keys[1].value
-        connection_string = f"DefaultEndpointsProtocol=https;AccountName={storage_account_name};AccountKey={account_key};EndpointSuffix=core.windows.net"
+        account_key = storage_client.storage_accounts\
+            .list_keys(
+                resource_group_name,
+                storage_account_name,
+            ).keys[1].value
+        connection_string = f"DefaultEndpointsProtocol=https;"\
+            f"AccountName={storage_account_name};" + \
+            f"AccountKey={account_key};" + \
+            "EndpointSuffix=core.windows.net"
         return connection_string, storage_account_name
 
 
@@ -420,9 +448,13 @@ def get_default_subscription_id():
         subscription_id = result.stdout.strip()
         print(f"Default subscription ID: {subscription_id}")
         return subscription_id
-    except subprocess.CalledProcessError as e:
-        print("Error fetching default subscription ID. Please log in with 'az login'.")
+    except subprocess.CalledProcessError:
+        print(
+            "Error fetching default subscription ID." +
+            " Please log in with 'az login'."
+        )
         raise
+
 
 def ensure_resource_group(
     resource_group_name,
@@ -431,13 +463,15 @@ def ensure_resource_group(
     create_if_not_exists
 ):
     """
-    Checks if a resource group exists. If it doesn't, creates it if `create_if_not_exists` is True.
+    Checks if a resource group exists. If it doesn't,
+     creates it if `create_if_not_exists` is True.
 
     Args:
         resource_group_name (str): The name of the resource group.
         region (str): The Azure region for the resources.
         subscription_id (str): The Azure subscription ID.
-        create_if_not_exists (bool): Flag to create the resource group if it does not exist.
+        create_if_not_exists (bool): Flag to create the
+            resource group if it does not exist.
 
     Returns:
         None
@@ -447,21 +481,32 @@ def ensure_resource_group(
 
     print(f"Checking if resource group '{resource_group_name}' exists...")
     try:
-        resource_group = resource_client.resource_groups.get(resource_group_name)
+        resource_client.resource_groups.get(resource_group_name)
         print(f"Resource group '{resource_group_name}' already exists.")
     except Exception:  # If the resource group does not exist
 
         try:
             if create_if_not_exists:
-                print(f"Resource group '{resource_group_name}' not found. Creating it...")
+                print(
+                    f"Resource group '{resource_group_name}' not" +
+                    " found. Creating it..."
+                )
                 resource_client.resource_groups.create_or_update(
                     resource_group_name,
                     {"location": region},
                 )
-                print(f"Resource group '{resource_group_name}' created successfully.")
+                print(
+                    f"Resource group '{resource_group_name}'" +
+                    " created successfully."
+                )
             else:
-                print(f"Resource group '{resource_group_name}' does not exist, and 'create_if_not_exists' is False.")
-                raise ValueError(f"Resource group '{resource_group_name}' does not exist.")
+                print(
+                    f"Resource group '{resource_group_name}' does" +
+                    " not exist, and 'create_if_not_exists' is False."
+                )
+                raise ValueError(
+                    f"Resource group '{resource_group_name}' does not exist."
+                )
         except Exception as e:
             raise Exception(f"Error creating resource group: {e}")
 
@@ -521,7 +566,8 @@ def create_storage_and_function(
     if not subscription_id:
         subscription_id = get_default_subscription_id()
 
-    # Authenticate using DefaultAzureCredential (requires environment variables or Azure CLI login)
+    # Authenticate using DefaultAzureCredential
+    # (requires environment variables or Azure CLI login)
     credential = DefaultAzureCredential()
 
     # Check if the resource group exists
@@ -537,13 +583,14 @@ def create_storage_and_function(
             generate_unique_resource_name(STORAGE_ACCOUNT_NAME_PREFIX)
 
     # Ensure storage account exists
-    storage_account_connection_string, storage_account_name = ensure_storage_account(
-        storage_account_name,
-        resource_group_name,
-        region,
-        subscription_id,
-        credential
-    )
+    storage_account_connection_string, storage_account_name = \
+        ensure_storage_account(
+            storage_account_name,
+            resource_group_name,
+            region,
+            subscription_id,
+            credential
+        )
 
     # Create Function App
     asyncio.run(
@@ -596,7 +643,8 @@ def create_storage_and_function(
 @click.option(
     '--deployment_name',
     required=True,
-    help='The name of the deployment. This will be used as the name of the Function App.'
+    help='The name of the deployment. This will be" + \
+        "used as the name of the Function App.'
 )
 @click.option(
     '--region',
@@ -625,7 +673,8 @@ def cli(
     skip_login
 ):
     """
-    Command-line tool for creating an Azure storage account, blob container, and Function App.
+    Command-line tool for creating an Azure storage account,
+        blob container, and Function App.
 
     Args:
         resource_group (str): The name of the resource group.
@@ -634,7 +683,8 @@ def cli(
         container_name (str): The name of the blob container.
         function_app (str): The name of the Azure Function App.
         region (str): The Azure region for the resources.
-        create_resource_group_if_not_exists (bool): Flag to create the resource group if it does not exist.
+        create_resource_group_if_not_exists (bool): Flag to create
+            the resource group if it does not exist.
 
     Returns:
         None
