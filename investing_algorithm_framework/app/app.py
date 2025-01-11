@@ -39,10 +39,9 @@ class AppHook:
 
 class App:
 
-    def __init__(self, state_handler=None, web=False):
+    def __init__(self, state_handler=None):
         self._flask_app: Optional[Flask] = None
         self.container = None
-        self._web = web
         self._algorithm: Optional[Algorithm] = None
         self._started = False
         self._tasks = []
@@ -134,13 +133,8 @@ class App:
 
         config = configuration_service.get_config()
 
-        if APP_MODE not in config or config[APP_MODE] is None:
-            if self._web:
-                configuration_service.add_value(APP_MODE, AppMode.WEB.value)
-            else:
-                configuration_service.add_value(
-                    APP_MODE, AppMode.DEFAULT.value
-                )
+        if APP_MODE not in config:
+            configuration_service.add_value(APP_MODE, AppMode.DEFAULT.value)
 
     def initialize(self):
         """
@@ -198,10 +192,13 @@ class App:
 
         for strategy in self.algorithm.strategies:
 
-            for market_data_source in strategy.market_data_sources:
-                market_data_source_service.add(market_data_source)
+            if strategy.market_data_sources is not None:
+                for market_data_source in strategy.market_data_sources:
+                    market_data_source_service.add(market_data_source)
 
-        if self._web:
+        config = self.container.configuration_service().get_config()
+
+        if config[APP_MODE] == AppMode.WEB.value:
             self._configuration_service.add_value(
                 APP_MODE, AppMode.WEB.value
             )
@@ -322,6 +319,15 @@ class App:
         configuration_service.add_value(
             BACKTESTING_END_DATE, backtest_date_range.end_date
         )
+        configuration_service.add_value(
+            DATABASE_NAME, "backtest-database.sqlite3"
+        )
+        configuration_service.add_value(
+            DATABASE_DIRECTORY_PATH,
+            os.path.join(
+                configuration_service.config[RESOURCE_DIRECTORY], "backtest_databases"
+            )
+        )
 
         if pending_order_check_interval is not None:
             configuration_service.add_value(
@@ -330,7 +336,7 @@ class App:
             )
 
         # Create resource dir if not exits
-        self._create_resource_directory_if_not_exists()
+        self._create_resources_if_not_exists()
 
     def _create_backtest_database_if_not_exists(self):
         """
@@ -643,10 +649,6 @@ class App:
         portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
         portfolio_configuration_service.add(portfolio_configuration)
-
-    @property
-    def web(self):
-        return self._web
 
     @property
     def running(self):

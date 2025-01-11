@@ -70,6 +70,8 @@ class TestBase(TestCase):
             for market_credential in self.market_credentials:
                 self.app.add_market_credential(market_credential)
 
+        self.app.initialize_config()
+
         if self.initialize:
             self.app.initialize()
 

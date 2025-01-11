@@ -1,8 +1,5 @@
-from datetime import datetime
-
 from investing_algorithm_framework import PortfolioConfiguration, Algorithm, \
-    MarketCredential, OperationalException, RESERVED_BALANCES, APP_MODE, \
-    Order, SYMBOLS, AppMode
+    MarketCredential, OperationalException, RESERVED_BALANCES
 from tests.resources import TestBase
 
 
@@ -36,6 +33,7 @@ class Test(TestBase):
         )
         self.market_service.balances = {"EUR": 1000}
         self.app.add_algorithm(Algorithm())
+        self.app.initialize_config()
         self.app.initialize()
 
         portfolio = self.app.container.portfolio_service()\
@@ -76,12 +74,11 @@ class Test(TestBase):
         self.app.add_algorithm(Algorithm())
 
         with self.assertRaises(OperationalException) as context:
+            self.app.initialize_config()
             self.app.initialize()
 
         self.assertEqual(
-            "The initial balance of the portfolio configuration is more than" " the available balance on the exchange. Please make sure"
-            " that the initial balance of the portfolio configuration"
-            " is less than the available balance on the exchange.",
+            "The initial balance of the portfolio configuration (1000.0 EUR) is more than the available balance on the exchange. Please make sure that the initial balance of the portfolio configuration is less than the available balance on the exchange 0.0 EUR.",
             str(context.exception)
         )
 
@@ -105,6 +102,7 @@ class Test(TestBase):
         )
         self.market_service.balances = {"EUR": 1200}
         self.app.add_algorithm(Algorithm())
+        self.app.initialize_config()
         self.app.initialize()
 
         portfolio = self.app.container.portfolio_service() \
@@ -129,6 +127,7 @@ class Test(TestBase):
         )
         self.market_service.balances = {"EUR": 1200}
         self.app.add_algorithm(Algorithm())
+        self.app.initialize_config()
         self.app.initialize()
 
         portfolio = self.app.container.portfolio_service() \

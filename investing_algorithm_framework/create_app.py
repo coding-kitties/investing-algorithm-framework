@@ -3,14 +3,15 @@ from dotenv import load_dotenv
 
 from .app import App
 from .dependency_container import setup_dependency_container
+from .domain import APP_MODE, AppMode
 
 logger = logging.getLogger("investing_algorithm_framework")
 
 
 def create_app(
     config: dict = None,
-    web=False,
-    state_handler=None
+    state_handler=None,
+    web: bool = False
 ) -> App:
     """
     Factory method to create an app instance.
@@ -26,7 +27,7 @@ def create_app(
     # Load the environment variables
     load_dotenv()
 
-    app = App(web=web, state_handler=state_handler)
+    app = App(state_handler=state_handler)
     app = setup_dependency_container(
         app,
         ["investing_algorithm_framework"],
@@ -37,6 +38,9 @@ def create_app(
 
     if config is not None:
         app.set_config_with_dict(config)
+
+    if web:
+        app.set_config("APP_MODE", AppMode.WEB.value)
 
     logger.info("Investing algoritm framework app created")
     return app
