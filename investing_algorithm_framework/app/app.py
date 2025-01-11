@@ -325,7 +325,10 @@ class App:
         configuration_service.add_value(
             DATABASE_DIRECTORY_PATH,
             os.path.join(
-                configuration_service.config[RESOURCE_DIRECTORY], "backtest_databases"
+                configuration_service.config[
+                    RESOURCE_DIRECTORY
+                ],
+                "backtest_databases"
             )
         )
 

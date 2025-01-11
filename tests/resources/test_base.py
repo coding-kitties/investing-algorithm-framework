@@ -153,7 +153,9 @@ class FlaskTestBase(FlaskTestCase):
     def create_app(self):
         self.resource_directory = os.path.dirname(__file__)
         self.iaf_app: App = create_app(
-            {RESOURCE_DIRECTORY: self.resource_directory}, web=True
+            {
+                RESOURCE_DIRECTORY: self.resource_directory
+            }
         )
         self.market_service.balances = self.external_balances
         self.market_service.orders = self.external_orders

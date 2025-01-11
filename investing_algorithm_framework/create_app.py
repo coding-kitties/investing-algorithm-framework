@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 from .app import App
 from .dependency_container import setup_dependency_container
-from .domain import APP_MODE, AppMode
+from .domain import AppMode
 
 logger = logging.getLogger("investing_algorithm_framework")
 
