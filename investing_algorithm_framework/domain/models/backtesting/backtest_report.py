@@ -9,7 +9,6 @@ from investing_algorithm_framework.domain.metrics import \
 from investing_algorithm_framework.domain.models \
     .backtesting.backtest_date_range import BacktestDateRange
 from investing_algorithm_framework.domain.models.base_model import BaseModel
-from investing_algorithm_framework.domain.models.time_unit import TimeUnit
 from investing_algorithm_framework.domain.models.position import Position
 from investing_algorithm_framework.domain.models.trade import Trade
 from investing_algorithm_framework.domain.models.order import Order

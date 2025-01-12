@@ -22,10 +22,11 @@ class PortfolioConfigurationService:
 
     def get(self, identifier):
         portfolio_configuration = next(
-            (portfolio_configuration for portfolio_configuration in
-                self.portfolio_configurations if
-                portfolio_configuration.identifier.upper() \
-                == identifier.upper()),
+            (
+                portfolio_configuration for portfolio_configuration in
+                self.portfolio_configurations
+                if portfolio_configuration.identifier.upper() ==
+                identifier.upper()),
             None
         )
 
@@ -48,8 +49,8 @@ class PortfolioConfigurationService:
         elif identifier is not None:
             return next(
                 (portfolio_configuration for portfolio_configuration in
-                 self.portfolio_configurations if
-                 portfolio_configuration.identifier.upper() \
+                    self.portfolio_configurations if
+                    portfolio_configuration.identifier.upper()
                     == identifier.upper()),
                 None
             )

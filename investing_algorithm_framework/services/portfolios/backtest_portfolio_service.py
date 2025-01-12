@@ -11,7 +11,7 @@ class BacktestPortfolioService(PortfolioService):
     """
     def create_portfolio_from_configuration(
         self, portfolio_configuration: PortfolioConfiguration,
-        initial_amount = None
+        initial_amount=None
     ):
         """
         Wil create a portfolio from a portfolio configuration for backtesting.

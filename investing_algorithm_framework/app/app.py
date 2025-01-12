@@ -498,9 +498,6 @@ class App:
         if portfolio_configuration_service.count() == 0:
             raise OperationalException("No portfolios configured")
 
-        # Initialize all portfolios that are registered
-
-
         strategy_orchestrator_service = \
             self.container.strategy_orchestrator_service()
         market_credential_service = self.container.market_credential_service()

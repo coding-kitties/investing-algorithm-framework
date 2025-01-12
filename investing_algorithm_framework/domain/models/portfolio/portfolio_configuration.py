@@ -20,7 +20,8 @@ class PortfolioConfiguration(BaseModel):
     For backtesting, a portfolio configuration is used to create a
     portfolio that will be used to simulate the trading of the algorithm. if
     the user does not provide an initial balance, the portfolio will be created
-    with a balance of according to the initial balanace of the PortfolioConfiguration class.
+    with a balance of according to the initial balanace of
+        the PortfolioConfiguration class.
     """
 
     def __init__(
