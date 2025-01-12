@@ -193,6 +193,10 @@ class PerformanceService:
         return: The total net gain percentage of the backtest
         """
         portfolio = self.portfolio_repository.find({"id": portfolio_id})
+
+        if portfolio.total_net_gain == 0:
+            return 0
+
         return portfolio.total_net_gain \
             / backtest_profile.initial_unallocated * 100
 

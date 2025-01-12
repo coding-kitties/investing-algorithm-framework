@@ -498,6 +498,9 @@ class App:
         if portfolio_configuration_service.count() == 0:
             raise OperationalException("No portfolios configured")
 
+        # Initialize all portfolios that are registered
+
+
         strategy_orchestrator_service = \
             self.container.strategy_orchestrator_service()
         market_credential_service = self.container.market_credential_service()
@@ -517,17 +520,6 @@ class App:
             market_data_source_service=market_data_source_service,
             trade_service=self.container.trade_service(),
         )
-
-        # Create all portfolios
-        portfolio_configuration_service = self.container \
-            .portfolio_configuration_service()
-        portfolio_configurations = portfolio_configuration_service.get_all()
-        portfolio_service = self.container.portfolio_service()
-
-        for portfolio_configuration in portfolio_configurations:
-            portfolio_service.create_portfolio_from_configuration(
-                portfolio_configuration
-            )
 
     def run(
         self,
@@ -774,20 +766,24 @@ class App:
 
     def run_backtest(
         self,
-        algorithm,
         backtest_date_range: BacktestDateRange,
+        initial_amount=None,
         pending_order_check_interval=None,
-        output_directory=None
+        output_directory=None,
+        algorithm: Algorithm = None
     ) -> BacktestReport:
         """
         Run a backtest for an algorithm. This method should be called when
         running a backtest.
 
         Parameters:
-            algorithm: The algorithm to run a backtest for (instance of
-                Algorithm)
             backtest_date_range: The date range to run the backtest for
                 (instance of BacktestDateRange)
+            initial_amount: The initial amount to start the backtest with.
+                This will be the amount of trading currency that the backtest
+                portfolio will start with.
+            algorithm: The algorithm to run a backtest for (instance of
+                Algorithm)
             pending_order_check_interval: str - pending_order_check_interval:
               The interval at which to check pending orders (e.g. 1h, 1d, 1w)
             output_directory: str - The directory to
@@ -796,8 +792,11 @@ class App:
         Returns:
             Instance of BacktestReport
         """
-        logger.info("Initializing backtest")
-        self.algorithm = algorithm
+        if algorithm is not None:
+            self.algorithm = algorithm
+
+        if self.algorithm is None:
+            raise OperationalException("No algorithm registered")
 
         self._initialize_app_for_backtest(
             backtest_date_range=backtest_date_range,
@@ -807,17 +806,19 @@ class App:
         self._initialize_algorithm_for_backtest(
             algorithm=self.algorithm
         )
+
         backtest_service = self.container.backtest_service()
-        configuration_service = self.container.configuration_service()
-        config = configuration_service.get_config()
-        backtest_service.resource_directory = config[RESOURCE_DIRECTORY]
 
         # Run the backtest with the backtest_service and collect the report
         report = backtest_service.run_backtest(
-            algorithm=self.algorithm, backtest_date_range=backtest_date_range
+            algorithm=self.algorithm,
+            initial_amount=initial_amount,
+            backtest_date_range=backtest_date_range
         )
         backtest_report_writer_service = self.container \
             .backtest_report_writer_service()
+
+        config = self.container.configuration_service().get_config()
 
         if output_directory is None:
             output_directory = os.path.join(

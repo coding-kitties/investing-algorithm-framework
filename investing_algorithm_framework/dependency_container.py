@@ -126,10 +126,11 @@ class DependencyContainer(containers.DeclarativeContainer):
         BacktestService,
         configuration_service=configuration_service,
         order_service=order_service,
-        portfolio_repository=portfolio_repository,
+        portfolio_service=portfolio_service,
         performance_service=performance_service,
         position_repository=position_repository,
         market_data_source_service=market_data_source_service,
+        portfolio_configuration_service=portfolio_configuration_service,
     )
     backtest_report_writer_service = providers.Factory(
         BacktestReportWriterService,

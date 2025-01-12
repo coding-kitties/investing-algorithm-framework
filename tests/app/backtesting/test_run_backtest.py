@@ -71,7 +71,9 @@ class Test(TestCase):
             start_date=datetime.utcnow() - timedelta(days=1),
             end_date=datetime.utcnow()
         )
-        report = app.run_backtest(algorithm, backtest_date_range)
+        report = app.run_backtest(
+            algorithm=algorithm, backtest_date_range=backtest_date_range
+        )
         file_path = BacktestReportWriterService.create_report_name(
             report, os.path.join(self.resource_dir, "backtest_reports")
         )

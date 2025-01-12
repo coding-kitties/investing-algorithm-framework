@@ -24,7 +24,8 @@ class PortfolioConfigurationService:
         portfolio_configuration = next(
             (portfolio_configuration for portfolio_configuration in
                 self.portfolio_configurations if
-                portfolio_configuration.identifier == identifier.lower()),
+                portfolio_configuration.identifier.upper() \
+                == identifier.upper()),
             None
         )
 
@@ -41,14 +42,15 @@ class PortfolioConfigurationService:
             return next(
                 (portfolio_configuration for portfolio_configuration in
                  self.portfolio_configurations if
-                 portfolio_configuration.market == market.lower()),
+                 portfolio_configuration.market.upper() == market.upper()),
                 None
             )
         elif identifier is not None:
             return next(
                 (portfolio_configuration for portfolio_configuration in
                  self.portfolio_configurations if
-                 portfolio_configuration.identifier == identifier.lower()),
+                 portfolio_configuration.identifier.upper() \
+                    == identifier.upper()),
                 None
             )
         elif market is None and identifier is None:

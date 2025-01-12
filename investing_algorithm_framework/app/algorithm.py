@@ -164,22 +164,13 @@ class Algorithm:
         return self._data_sources
 
     @property
-    def identifier(self):
-        """
-        Function to get a config instance. This allows users when
-        having access to the algorithm instance also to read the
-        configs of the app.
-        """
-        return self.configuration_service.config
-
-    @property
     def config(self):
         """
         Function to get a config instance. This allows users when
         having access to the algorithm instance also to read the
         configs of the app.
         """
-        return self.configuration_service.config
+        return self.configuration_service.get_config()
 
     @property
     def description(self):
@@ -488,6 +479,16 @@ class Algorithm:
             return self.portfolio_service.find({})
 
         return self.portfolio_service.find({{"market": market}})
+
+    def get_portfolios(self):
+        """
+        Function to get all portfolios of the algorithm. This function
+        will return all portfolios of the algorithm.
+
+        Returns:
+            List[Portfolio]: A list of all portfolios of the algorithm
+        """
+        return self.portfolio_service.get_all()
 
     def get_unallocated(self, market=None) -> float:
         """
@@ -834,7 +835,7 @@ class Algorithm:
         return (position.amount * ticker["bid"] / total) * 100
 
     def get_position_percentage_of_portfolio_by_net_size(
-            self, symbol, market=None, identifier=None
+        self, symbol, market=None, identifier=None
     ) -> float:
         """
         Returns the percentage of the portfolio that is allocated to a

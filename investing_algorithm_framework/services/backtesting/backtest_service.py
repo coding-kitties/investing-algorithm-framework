@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
-
 import re
 import os
 import json
 import pandas as pd
 from dateutil import parser
 from tqdm import tqdm
+import logging
 
 from investing_algorithm_framework.domain import BacktestReport, \
     BACKTESTING_INDEX_DATETIME, TimeUnit, BacktestPosition, \
@@ -15,6 +15,7 @@ from investing_algorithm_framework.services.market_data_source_service import \
     MarketDataSourceService
 
 
+logger = logging.getLogger(__name__)
 BACKTEST_REPORT_FILE_NAME_PATTERN = (
     r"^report_\w+_backtest-start-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
     r"backtest-end-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
@@ -28,17 +29,18 @@ class BacktestService:
     """
 
     def __init__(
-            self,
-            market_data_source_service: MarketDataSourceService,
-            order_service,
-            portfolio_repository,
-            position_repository,
-            performance_service,
-            configuration_service
+        self,
+        market_data_source_service: MarketDataSourceService,
+        order_service,
+        portfolio_service,
+        position_repository,
+        performance_service,
+        configuration_service,
+        portfolio_configuration_service
     ):
         self._resource_directory = None
         self._order_service = order_service
-        self._portfolio_repository = portfolio_repository
+        self._portfolio_service = portfolio_service
         self._data_index = {
             TradingDataType.OHLCV: {},
             TradingDataType.TICKER: {}
@@ -49,6 +51,7 @@ class BacktestService:
             = market_data_source_service
         self._backtest_market_data_sources = []
         self._configuration_service = configuration_service
+        self._portfolio_configuration_service = portfolio_configuration_service
 
     @property
     def resource_directory(self):
@@ -59,7 +62,10 @@ class BacktestService:
         self._resource_directory = resource_directory
 
     def run_backtest(
-        self, algorithm, backtest_date_range: BacktestDateRange
+        self,
+        algorithm,
+        backtest_date_range: BacktestDateRange,
+        initial_amount=None
     ) -> BacktestReport:
         """
         Run a backtest for the given algorithm. This function will run
@@ -73,15 +79,40 @@ class BacktestService:
 
         At the end of the run all traces
 
-        Parameters:
+        Args:
             algorithm: The algorithm to run the backtest for
             backtest_date_range: The backtest date range
+            initial_amount: The initial amount of the backtest portfolio
 
         Returns:
             BacktestReport - The backtest report
         """
+        logging.info(
+            f"Running backtest for algorithm with name {algorithm.name}"
+        )
+
+        # Create backtest portfolio
+        portfolio_configurations = \
+            self._portfolio_configuration_service.get_all()
+
+        for portfolio_configuration in portfolio_configurations:
+
+            if self._portfolio_service.exists(
+                {"identifier": portfolio_configuration.identifier}
+            ):
+                # Delete existing portfolio
+                portfolio = self._portfolio_service.find(
+                    {"identifier": portfolio_configuration.identifier}
+                )
+                self._portfolio_service.delete(portfolio.id)
+
+            # Check if the portfolio configuration has a initial balance
+            self._portfolio_service.create_portfolio_from_configuration(
+                portfolio_configuration, initial_amount=initial_amount
+            )
+
         strategy_profiles = []
-        portfolios = self._portfolio_repository.get_all()
+        portfolios = self._portfolio_service.get_all()
         initial_unallocated = 0
 
         for portfolio in portfolios:
@@ -114,9 +145,22 @@ class BacktestService:
                 strategy=algorithm.get_strategy(strategy_profile.strategy_id),
                 index_date=index_date,
             )
-        return self.create_backtest_report(
+
+        report = self.create_backtest_report(
             algorithm, len(schedule), backtest_date_range, initial_unallocated
         )
+
+        # Cleanup backtest portfolio
+        portfolio_configurations = \
+            self._portfolio_configuration_service.get_all()
+
+        for portfolio_configuration in portfolio_configurations:
+            portfolio = self._portfolio_service.find(
+                {"identifier": portfolio_configuration.identifier}
+            )
+            self._portfolio_service.delete(portfolio.id)
+
+        return report
 
     def run_backtests(
         self, algorithms, backtest_date_range: BacktestDateRange
@@ -126,9 +170,9 @@ class BacktestService:
         backtests for the given algorithms and return a list of backtest
         reports.
 
-        Parameters
-            - algorithms: The algorithms to run the backtests for
-            - backtest_date_range: The backtest date range of the backtests
+        Args:
+            algorithms: The algorithms to run the backtests for
+            backtest_date_range: The backtest date range of the backtests
 
         Returns:
             List - A list of backtest reports
@@ -146,6 +190,9 @@ class BacktestService:
         return backtest_reports
 
     def run_backtest_for_profile(self, algorithm, strategy, index_date):
+        self._configuration_service.add_value(
+            BACKTESTING_INDEX_DATETIME, index_date
+        )
         algorithm.config[BACKTESTING_INDEX_DATETIME] = index_date
         market_data = {}
 
@@ -173,7 +220,7 @@ class BacktestService:
         calculate when the strategies should run based on the given start
         and end date. The schedule will be stored in a pandas DataFrame.
 
-        Parameters:
+        Args:
             strategies: The strategies to generate the schedule for
             start_date: The start date of the schedule
             end_date: The end date of the schedule
@@ -207,6 +254,7 @@ class BacktestService:
                     raise ValueError(f"Unsupported time unit: {time_unit}")
 
         schedule_df = pd.DataFrame(data)
+
         if schedule_df.empty:
             raise OperationalException(
                 "Could not generate schedule "
@@ -253,7 +301,7 @@ class BacktestService:
             BacktestReport: The backtest report instance of BacktestReport
         """
 
-        for portfolio in self._portfolio_repository.get_all():
+        for portfolio in self._portfolio_service.get_all():
             ids = [strategy.strategy_id for strategy in algorithm.strategies]
 
             # Check if strategy_id is None
@@ -440,7 +488,6 @@ class BacktestService:
         if a ticker market data source is registered for the symbol and market.
         """
         symbols = self._configuration_service.config[SYMBOLS]
-        print(symbols)
 
         if symbols is not None:
 

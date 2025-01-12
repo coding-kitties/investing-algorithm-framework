@@ -11,7 +11,8 @@ from investing_algorithm_framework.domain import ApiException, \
     pretty_print_backtest_reports_evaluation, load_backtest_reports, \
     RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT, \
     load_backtest_report, BacktestDateRange, convert_polars_to_pandas, \
-    DateRange, get_backtest_report, DEFAULT_LOGGING_CONFIG
+    DateRange, get_backtest_report, DEFAULT_LOGGING_CONFIG, \
+    BacktestReport
 from investing_algorithm_framework.infrastructure import \
     CCXTOrderBookMarketDataSource, CCXTOHLCVMarketDataSource, \
     CCXTTickerMarketDataSource, CSVOHLCVMarketDataSource, \
@@ -88,5 +89,6 @@ __all__ = [
     "is_divergence",
     "get_backtest_report",
     "AzureBlobStorageStateHandler",
-    "DEFAULT_LOGGING_CONFIG"
+    "DEFAULT_LOGGING_CONFIG",
+    "BacktestReport"
 ]

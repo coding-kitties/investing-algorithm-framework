@@ -2,6 +2,35 @@ from investing_algorithm_framework.domain.models.base_model import BaseModel
 
 
 class Portfolio(BaseModel):
+    """
+    Portfolio base class.
+
+    A portfolio is a collection of positions that are managed by an algorithm.
+
+    Attributes:
+    * identifier: str, unique identifier of the portfolio
+    * trading_symbol: str, trading symbol of the portfolio
+    * unallocated: float, the size of the trading symbol that is not
+      allocated. For example, if the trading symbol is USDT and the unallocated
+      is 1000, it means that the portfolio has 1000 USDT that is not allocated to any position.
+    * net_size: float, net size of the portfolio is the initial balance of the
+        portfolio plus the all the net gains of the trades. The
+    * realized: float, the realized gain of the portfolio is the sum of all the
+        realized gains of the trades.
+    * total_revenue: float, the total revenue of the portfolio is the sum
+        of all the orders (price * size)
+    * total_cost: float, the total cost of the portfolio is the sum of all the
+        costs of the trades (price * size (for buy orders) or -price * size (for sell orders))
+    * total_net_gain: float, the total net gain of the portfolio is the sum of
+        all the net gains of the trades
+    * total_trade_volume: float, the total trade volume of the
+        portfolio is the sum of all the sizes of the trades
+    * market: str, the market of the portfolio (e.g. BITVAVO, BINANCE)
+    * created_at: datetime, the datetime when the portfolio was created
+    * updated_at: datetime, the datetime when the portfolio was last updated
+    * initialized: bool, whether the portfolio is initialized or not
+    * initial_balance: float, the initial balance of the portfolio
+    """
 
     def __init__(
         self,

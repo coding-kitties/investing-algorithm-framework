@@ -70,7 +70,7 @@ class Test(TestCase):
             end_date=datetime.utcnow()
         )
         report = app.run_backtest(
-            algorithm,
+            algorithm=algorithm,
             backtest_date_range=backtest_date_range
         )
         file_path = BacktestReportWriterService.create_report_name(

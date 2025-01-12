@@ -71,6 +71,7 @@ class Repository(ABC):
             try:
                 delete_object = self.get(object_id)
                 db.delete(delete_object)
+                db.commit()
                 return delete_object
             except SQLAlchemyError as e:
                 logger.error(e)

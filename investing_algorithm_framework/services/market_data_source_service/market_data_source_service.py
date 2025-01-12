@@ -107,13 +107,13 @@ class MarketDataSourceService:
                 if isinstance(market_data_source, TickerMarketDataSource):
 
                     if market is not None:
-                        if market_data_source.market.lower() == market.lower()\
-                                and market_data_source.symbol.lower() \
-                                == symbol.lower():
+                        if market_data_source.market.upper() == market.upper()\
+                                and market_data_source.symbol.upper() \
+                                == symbol.upper():
                             return market_data_source
                     else:
-                        if market_data_source.symbol.lower() \
-                                == symbol.lower():
+                        if market_data_source.symbol.upper() \
+                                == symbol.upper():
                             return market_data_source
 
         return None
@@ -143,28 +143,28 @@ class MarketDataSourceService:
                 if isinstance(market_data_source, OHLCVMarketDataSource):
 
                     if market is not None and time_frame is not None:
-                        if market_data_source.market.lower() == market.lower()\
-                                and market_data_source.symbol.lower() \
-                                == symbol.lower() and \
+                        if market_data_source.market.upper() == market.upper()\
+                                and market_data_source.symbol.upper() \
+                                == symbol.upper() and \
                                 time_frame.equals(
                                     market_data_source.time_frame
                                 ):
                             return market_data_source
                     elif market is not None:
-                        if market_data_source.market.lower() == market.lower()\
-                                and market_data_source.symbol.lower() \
-                                == symbol.lower():
+                        if market_data_source.market.upper() == market.upper()\
+                                and market_data_source.symbol.upper() \
+                                == symbol.upper():
                             return market_data_source
                     elif time_frame is not None:
-                        if market_data_source.symbol.lower() \
-                                == symbol.lower() and \
+                        if market_data_source.symbol.upper() \
+                                == symbol.upper() and \
                                 time_frame.equals(
                                     market_data_source.time_frame
                                 ):
                             return market_data_source
                     else:
-                        if market_data_source.symbol.lower() \
-                                == symbol.lower():
+                        if market_data_source.symbol.upper() \
+                                == symbol.upper():
                             return market_data_source
 
         return None
@@ -176,13 +176,13 @@ class MarketDataSourceService:
                 if isinstance(market_data_source, OrderBookMarketDataSource):
 
                     if market is not None:
-                        if market_data_source.market.lower() == market.lower()\
-                                and market_data_source.symbol.lower() \
-                                == symbol.lower():
+                        if market_data_source.market.upper() == market.upper()\
+                                and market_data_source.symbol.upper() \
+                                == symbol.upper():
                             return market_data_source
                     else:
-                        if market_data_source.symbol.lower() \
-                                == symbol.lower():
+                        if market_data_source.symbol.upper() \
+                                == symbol.upper():
                             return market_data_source
 
         return None
