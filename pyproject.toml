@@ -4,7 +4,7 @@ version = "v4.0.0"
 description = "A framework for creating trading bots"
 authors = ["MDUYN"]
 readme = "README.md"
-exclude = ["tests", "static", "examples", "CONTRIBUTING"]
+exclude = ["tests", "static", "examples", "docs"]
 
 
 [tool.poetry.dependencies]
