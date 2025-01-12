@@ -70,7 +70,6 @@ __all__ = [
     "BacktestDateRange",
     "convert_polars_to_pandas",
     "DateRange",
-    "get_rsi",
     "get_peaks",
     "is_uptrend",
     "is_downtrend",
