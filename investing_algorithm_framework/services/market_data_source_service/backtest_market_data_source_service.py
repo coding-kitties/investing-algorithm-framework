@@ -61,7 +61,6 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
                     .get_config()[BACKTESTING_START_DATE],
                     backtest_end_date=configuration_service
                     .get_config()[BACKTESTING_END_DATE],
-                    market_credential_service=self._market_credential_service
                 )
 
     def get_data(self, identifier):

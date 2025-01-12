@@ -241,12 +241,33 @@ app.add_portfolio_configuration(
 We are continuously working on improving the performance of the framework. If
 you have any suggestions, please let us know.
 
-## Download
+## How to install
 
 You can download the framework with pypi.
 
 ```bash
 pip install investing-algorithm-framework
+```
+
+## Installation for local development
+
+The framework is built with poetry. To install the framework for local development, you can run the following commands:
+
+> Make sure you have poetry installed. If you don't have poetry installed, you can find installation instructions [here](https://python-poetry.org/docs/#installation)
+
+```bash
+git clone http
+cd investing-algorithm-framework
+poetry install
+```
+
+### Running tests
+
+To run the tests, you can run the following command:
+
+```bash
+# In the root of the project
+python -m unittest discover -s tests
 ```
 
 ## Disclaimer
