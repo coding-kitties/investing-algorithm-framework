@@ -4,6 +4,8 @@ version = "v3.8.1"
 description = "A framework for creating trading bots"
 authors = ["MDUYN"]
 readme = "README.md"
+exclude = ["tests", "static", "examples", "CONTRIBUTING]
+
 
 [tool.poetry.dependencies]
 python = ">=3.10"
@@ -37,7 +39,6 @@ python-dotenv = "^1.0.1"
 coverage= "7.4.2"
 flake8 = "7.0.0"
 Flask-Testing = "^0.8.1"
-
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"
