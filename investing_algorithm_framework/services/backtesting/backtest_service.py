@@ -23,6 +23,27 @@ BACKTEST_REPORT_FILE_NAME_PATTERN = (
 )
 
 
+def validate_algorithm_name(name, illegal_chars=r"[\/:*?\"<>|]"):
+    """
+    Validate a algorithm name for illegal characters and throw an
+        exception if any are found.
+
+    Args:
+        name (str): The name to validate.
+        illegal_chars (str): A regex pattern for characters considered
+            illegal (default: r"[/:*?\"<>|]").
+
+    Raises:
+        ValueError: If illegal characters are found in the filename.
+    """
+    # Check for illegal characters
+    if re.search(illegal_chars, name):
+        raise OperationalException(
+            f"Illegal characters detected in filename: {name}. "
+            f"Illegal characters: / \\ : * ? \" < > |"
+        )
+
+
 class BacktestService:
     """
     Service that facilitates backtests for algorithm objects.
@@ -87,6 +108,8 @@ class BacktestService:
         Returns:
             BacktestReport - The backtest report
         """
+        validate_algorithm_name(algorithm.name)
+
         logging.info(
             f"Running backtest for algorithm with name {algorithm.name}"
         )
@@ -178,6 +201,10 @@ class BacktestService:
             List - A list of backtest reports
         """
         backtest_reports = []
+
+        # Check algorithm names for illegal characters
+        for algorithm in algorithms:
+            validate_algorithm_name(algorithm.name)
 
         for algorithm in algorithms:
             backtest_reports.append(
@@ -291,7 +318,7 @@ class BacktestService:
         Also, it will add all traces to the backtest report. The traces
         are collected from each strategy that was run during the backtest.
 
-        Parameters:
+        Args:
             algorithm: The algorithm to create the backtest report for
             number_of_runs: The number of runs
             backtest_date_range: The backtest date range of the backtest
@@ -514,7 +541,7 @@ class BacktestService:
         Function to get a report based on the algorithm name and
         backtest date range if it exists.
 
-        Parameters:
+        Args:
             algorithm_name: str - The name of the algorithm
             backtest_date_range: BacktestDateRange - The backtest date range
             directory: str - The output directory
@@ -563,7 +590,7 @@ class BacktestService:
         """
         Function to get the backtest start date from a backtest report file.
 
-        Parameters:
+        Args:
             path: str - The path to the backtest report file
 
         Returns:
@@ -581,7 +608,7 @@ class BacktestService:
         """
         Function to get the backtest end date from a backtest report file.
 
-        Parameters:
+        Args:
             path: str - The path to the backtest report file
 
         Returns:
@@ -599,7 +626,7 @@ class BacktestService:
         """
         Function to get the algorithm name from a backtest report file.
 
-        Parameters:
+        Args:
             path: str - The path to the backtest report file
 
         Returns:
@@ -615,7 +642,7 @@ class BacktestService:
         """
         Function to check if a file is a backtest report file.
 
-        Parameters:
+        Args:
             path: str - The path to the file
 
         Returns:
@@ -633,3 +660,80 @@ class BacktestService:
                 return True
 
         return False
+
+    def write_report_to_json(
+        self, report: BacktestReport, output_directory: str
+    ) -> None:
+        """
+        Function to write a backtest report to a JSON file.
+
+        Args:
+            - report: BacktestReport
+                The backtest report to write to a file.
+            - output_directory: str
+                The directory to store the backtest report file.
+
+        Returns:
+            - None
+        """
+
+        if not os.path.exists(output_directory):
+            os.makedirs(output_directory)
+
+        json_file_path = self.create_report_file_path(
+            report, output_directory, extension=".json"
+        )
+
+        report_dict = report.to_dict()
+        # Convert dictionary to JSON
+        json_data = json.dumps(report_dict, indent=4)
+
+        # Write JSON data to a .json file
+        with open(json_file_path, "w") as json_file:
+            json_file.write(json_data)
+
+    @staticmethod
+    def create_report_name(report, output_directory, extension=".json"):
+        backtest_start_date = report.backtest_start_date \
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        backtest_end_date = report.backtest_end_date \
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        created_at = report.created_at.strftime(DATETIME_FORMAT_BACKTESTING)
+        file_path = os.path.join(
+            output_directory,
+            f"report_{report.name}_backtest-start-date_"
+            f"{backtest_start_date}_backtest-end-date_"
+            f"{backtest_end_date}_created-at_{created_at}{extension}"
+        )
+        return file_path
+
+    @staticmethod
+    def create_report_file_path(
+        report, output_directory, extension=".json"
+    ) -> str:
+        """
+        Function to create a file path for a backtest report.
+
+        Args:
+            - report: BacktestReport
+                The backtest report to create a file path for.
+            - output_directory: str
+                The directory to store the backtest report file.
+            - extension: str (default=".json") - optional
+                The file extension to use for the backtest report file.
+        Returns:
+            - file_path: str
+                The file path for the backtest report file.
+        """
+        backtest_start_date = report.backtest_start_date \
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        backtest_end_date = report.backtest_end_date \
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        created_at = report.created_at.strftime(DATETIME_FORMAT_BACKTESTING)
+        file_path = os.path.join(
+            output_directory,
+            f"report_{report.name}_backtest-start-date_"
+            f"{backtest_start_date}_backtest-end-date_"
+            f"{backtest_end_date}_created-at_{created_at}{extension}"
+        )
+        return file_path

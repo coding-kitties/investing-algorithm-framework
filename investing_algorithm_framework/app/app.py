@@ -773,7 +773,7 @@ class App:
         Run a backtest for an algorithm. This method should be called when
         running a backtest.
 
-        Parameters:
+        Args:
             backtest_date_range: The date range to run the backtest for
                 (instance of BacktestDateRange)
             initial_amount: The initial amount to start the backtest with.
@@ -812,8 +812,6 @@ class App:
             initial_amount=initial_amount,
             backtest_date_range=backtest_date_range
         )
-        backtest_report_writer_service = self.container \
-            .backtest_report_writer_service()
 
         config = self.container.configuration_service().get_config()
 
@@ -822,7 +820,7 @@ class App:
                 config[RESOURCE_DIRECTORY], "backtest_reports"
             )
 
-        backtest_report_writer_service.write_report_to_json(
+        backtest_service.write_report_to_json(
             report=report, output_directory=output_directory
         )
 
@@ -840,7 +838,7 @@ class App:
         Run a backtest for a set algorithm. This method should be called when
         running a backtest.
 
-        Parameters:
+        Args:
             Algorithms: List[Algorithm] - The algorithms to run backtests for
             date_ranges: List[BacktestDateRange] - The date ranges to run the
                 backtests for
@@ -916,15 +914,12 @@ class App:
                 if date_range.name is not None:
                     report.date_range_name = date_range.name
 
-                backtest_report_writer_service = self.container \
-                    .backtest_report_writer_service()
-
                 if output_directory is None:
                     output_directory = os.path.join(
                         self.config[RESOURCE_DIRECTORY], "backtest_reports"
                     )
 
-                backtest_report_writer_service.write_report_to_json(
+                backtest_service.write_report_to_json(
                     report=report, output_directory=output_directory
                 )
                 reports.append(report)

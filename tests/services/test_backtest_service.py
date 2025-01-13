@@ -1,40 +1,39 @@
 import os
 
-from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    RESOURCE_DIRECTORY, BacktestDateRange
-from investing_algorithm_framework.services import BacktestService
-from tests.resources import TestBase, MarketServiceStub
+from investing_algorithm_framework import PortfolioConfiguration, \
+    MarketCredential, BacktestDateRange
+from tests.resources import TestBase
 
 
-class TestMarketDataSourceService(TestBase):
-
-    def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
+class TestBacktestService(TestBase):
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="binance",
+            trading_symbol="USDT"
+        )
+    ]
+    backtest_report_dir = os.path.join(
+        TestBase.resource_directory,
+        "backtest_reports_for_testing"
+    )
+    resource_directory = os.path.join(
+        os.path.join(
             os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.realpath(__file__),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
+                os.path.realpath(__file__),
+                os.pardir
+            ),
+            os.pardir
+        ),
+        "resources"
+    )
+    market_credentials = [
+        MarketCredential(
+            market="binance",
+            api_key="test",
+            secret_key="test"
         )
-        self.backtest_report_dir = os.path.join(
-            self.resource_dir,
-            "backtest_reports_for_testing"
-        )
-        self.app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        self.app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="binance",
-                trading_symbol="USDT"
-            )
-        )
-        self.app.container.market_service.override(
-            MarketServiceStub(self.app.container.market_credential_service())
-        )
+    ]
+    initialize = False
 
     def test_is_backtest_report(self):
         backtest_service = self.app.container.backtest_service()
@@ -46,7 +45,7 @@ class TestMarketDataSourceService(TestBase):
         )
         self.assertTrue(backtest_service._is_backtest_report(path))
         self.assertFalse(backtest_service._is_backtest_report(
-            os.path.join(self.resource_dir, "config.json")
+            os.path.join(self.resource_directory, "config.json")
         ))
         path = os.path.join(
             self.backtest_report_dir,
@@ -68,7 +67,20 @@ class TestMarketDataSourceService(TestBase):
             end_date="2022-06-20 00:00"
         )
         report = backtest_service.get_report(
-            algorithm_name="test", 
+            algorithm_name="test",
             backtest_date_range=date_range, directory=self.backtest_report_dir
+        )
+        self.assertIsNotNone(report)
+
+    def test_get_report(self):
+        backtest_service = self.app.container.backtest_service()
+        date_range = BacktestDateRange(
+            start_date="2021-12-21 00:00",
+            end_date="2022-06-20 00:00"
+        )
+        report = backtest_service.get_report(
+            algorithm_name="950100",
+            backtest_date_range=date_range,
+            directory=self.backtest_report_dir
         )
         self.assertIsNotNone(report)

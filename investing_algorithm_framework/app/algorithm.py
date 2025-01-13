@@ -94,10 +94,19 @@ class Algorithm:
             )
 
         pattern = re.compile(r"^[a-zA-Z0-9]*$")
+
         if not pattern.match(name):
             raise OperationalException(
                 "The name of the algorithm can only contain" +
                 " letters and numbers"
+            )
+
+        illegal_chars = r"[\/:*?\"<>|]"
+
+        if re.search(illegal_chars, name):
+            raise OperationalException(
+                f"Illegal characters detected in algorithm: {name}. "
+                f"Illegal characters: / \\ : * ? \" < > |"
             )
 
     def initialize_services(
@@ -158,6 +167,11 @@ class Algorithm:
     @property
     def name(self):
         return self._name
+
+    @name.setter
+    def name(self, name):
+        self._validate_name(name)
+        self._name = name
 
     @property
     def data_sources(self):

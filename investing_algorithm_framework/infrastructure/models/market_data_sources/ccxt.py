@@ -74,12 +74,12 @@ class CCXTOHLCVBacktestMarketDataSource(
 
         When downloading the data it will use the ccxt library.
 
-        Parameters:
-            config: dict - the configuration of the data source
-            backtest_start_date: datetime - the start date of the backtest
-            backtest_end_date: datetime - the end date of the backtest
-            time_frame: string - the time frame of the data
-            window_size: int - the total amount of candle sticks that need to
+        Args:
+            config (dict): the configuration of the data source
+            backtest_start_date (datetime): the start date of the backtest
+            backtest_end_date (datetime): the end date of the backtest
+            time_frame (string): the time frame of the data
+            window_size (int): the total amount of candle sticks that need to
             be returned
 
         Returns:
@@ -137,6 +137,14 @@ class CCXTOHLCVBacktestMarketDataSource(
                 to_timestamp=backtest_end_date,
                 market=self.market
             )
+
+            if len(ohlcv) == 0:
+                raise OperationalException(
+                    f"No data found for {self.symbol} " +
+                    f"for date range: {backtest_data_start_date} " +
+                    f"to {backtest_end_date}. Please make sure that " +
+                    "the market has data for this date range."
+                )
             self.write_data_to_file_path(file_path, ohlcv)
 
         self.load_data()

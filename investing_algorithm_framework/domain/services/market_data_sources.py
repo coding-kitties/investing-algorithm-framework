@@ -49,6 +49,12 @@ class BacktestMarketDataSource(ABC):
 
         This function prevents the backtest datasource to download the data
         every time the backtest is run.
+
+        Args:
+            file_path: str - the file path of the data storage file
+
+        Returns:
+            bool - True if the file exists and the column names are correct,
         """
         try:
             if os.path.isfile(file_path):
@@ -444,6 +450,15 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
         Function to get the date ranges of the market data source based
         on the window size and the time_frame. The date ranges
         will be calculated based on the start date and the end date.
+
+        Args:
+            start_date: datetime - The start date
+            end_date: datetime - The end date
+            window_size: int - The window size
+            time_frame: str - The time frame
+
+        Returns:
+            list - A list of tuples with the date ranges
         """
 
         if start_date > end_date:

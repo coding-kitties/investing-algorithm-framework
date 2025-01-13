@@ -9,8 +9,7 @@ from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, StrategyOrchestratorService, \
     PortfolioConfigurationService, MarketDataSourceService, BacktestService, \
     ConfigurationService, PortfolioSnapshotService, PositionSnapshotService, \
-    MarketCredentialService, TradeService, BacktestReportWriterService, \
-    PortfolioSyncService
+    MarketCredentialService, TradeService, PortfolioSyncService
 
 
 def setup_dependency_container(app, modules=None, packages=None):
@@ -131,9 +130,6 @@ class DependencyContainer(containers.DeclarativeContainer):
         position_repository=position_repository,
         market_data_source_service=market_data_source_service,
         portfolio_configuration_service=portfolio_configuration_service,
-    )
-    backtest_report_writer_service = providers.Factory(
-        BacktestReportWriterService,
     )
     algorithm = providers.Factory(
         Algorithm,
