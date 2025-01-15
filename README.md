@@ -38,6 +38,8 @@ The following algorithm connects to binance and buys BTC every 5 seconds. It als
 
 ```python
 import logging
+import logging.config
+
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
     TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, \
     CCXTTickerMarketDataSource, MarketCredential, DEFAULT_LOGGING_CONFIG
