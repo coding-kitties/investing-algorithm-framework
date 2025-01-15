@@ -23,7 +23,8 @@ class OrderService(RepositoryService):
         portfolio_repository,
         portfolio_configuration_service,
         portfolio_snapshot_service,
-        market_credential_service
+        market_credential_service,
+        trade_service
     ):
         super(OrderService, self).__init__(order_repository)
         self.configuration_service = configuration_service
@@ -34,6 +35,7 @@ class OrderService(RepositoryService):
         self.portfolio_configuration_service = portfolio_configuration_service
         self.portfolio_snapshot_service = portfolio_snapshot_service
         self.market_credential_service = market_credential_service
+        self.trade_service = trade_service
 
     def create(self, data, execute=True, validate=True, sync=True) -> Order:
         portfolio_id = data["portfolio_id"]
@@ -67,6 +69,10 @@ class OrderService(RepositoryService):
             portfolio.configuration = self.portfolio_configuration_service\
                 .get(portfolio.identifier)
             self.execute_order(order_id, portfolio)
+
+
+        # Create trade from buy order
+        self.trade_service.create_trade_from_buy_order(order)
 
         return order
 

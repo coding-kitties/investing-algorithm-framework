@@ -5,6 +5,7 @@ from .market_data_sources import CCXTOrderBookMarketDataSource, \
 from .order import SQLOrder
 from .portfolio import SQLPortfolio, SQLPortfolioSnapshot
 from .position import SQLPosition, SQLPositionSnapshot
+from .trade import SQLTrade
 
 __all__ = [
     "SQLOrder",
@@ -18,4 +19,5 @@ __all__ = [
     "CCXTOHLCVMarketDataSource",
     "CSVTickerMarketDataSource",
     "CSVOHLCVMarketDataSource",
+    "SQLTrade"
 ]

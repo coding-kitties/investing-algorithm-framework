@@ -3,7 +3,7 @@ from dependency_injector import containers, providers
 from investing_algorithm_framework.app.algorithm import Algorithm
 from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPositionRepository, SQLPortfolioRepository, \
-    SQLPortfolioSnapshotRepository, \
+    SQLPortfolioSnapshotRepository, SQLTradeRepository, \
     SQLPositionSnapshotRepository, PerformanceService, CCXTMarketService
 from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, StrategyOrchestratorService, \
@@ -40,6 +40,7 @@ class DependencyContainer(containers.DeclarativeContainer):
     portfolio_snapshot_repository = providers.Factory(
         SQLPortfolioSnapshotRepository
     )
+    trade_repository = providers.Factory(SQLTradeRepository)
     market_service = providers.Factory(
         CCXTMarketService,
         market_credential_service=market_credential_service,
@@ -65,6 +66,17 @@ class DependencyContainer(containers.DeclarativeContainer):
         portfolio_repository=portfolio_repository,
         position_repository=position_repository,
     )
+    position_service = providers.Factory(
+        PositionService,
+        repository=position_repository,
+        market_service=market_service,
+        market_credential_service=market_credential_service,
+        order_repository=order_repository,
+    )
+    trade_service = providers.Factory(
+        TradeService,
+        trade_repository=trade_repository,
+    )
     order_service = providers.Factory(
         OrderService,
         configuration_service=configuration_service,
@@ -74,14 +86,8 @@ class DependencyContainer(containers.DeclarativeContainer):
         market_service=market_service,
         market_credential_service=market_credential_service,
         portfolio_configuration_service=portfolio_configuration_service,
-        portfolio_snapshot_service=portfolio_snapshot_service
-    )
-    position_service = providers.Factory(
-        PositionService,
-        repository=position_repository,
-        market_service=market_service,
-        market_credential_service=market_credential_service,
-        order_repository=order_repository,
+        portfolio_snapshot_service=portfolio_snapshot_service,
+        trade_service=trade_service,
     )
     portfolio_service = providers.Factory(
         PortfolioService,
@@ -93,13 +99,6 @@ class DependencyContainer(containers.DeclarativeContainer):
         portfolio_repository=portfolio_repository,
         portfolio_configuration_service=portfolio_configuration_service,
         portfolio_snapshot_service=portfolio_snapshot_service,
-    )
-    trade_service = providers.Factory(
-        TradeService,
-        portfolio_repository=portfolio_repository,
-        order_service=order_service,
-        market_data_source_service=market_data_source_service,
-        position_service=position_service,
     )
     portfolio_sync_service = providers.Factory(
         PortfolioSyncService,
