@@ -2,7 +2,7 @@ import os
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     CSVTickerMarketDataSource, MarketCredential
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -23,19 +23,22 @@ class Test(TestBase):
             secret_key="secret_key"
         )
     ]
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def setUp(self) -> None:
         super(Test, self).setUp()
-        self.app.add_market_data_source(CSVTickerMarketDataSource(
-            identifier="BTC/EUR-ticker",
-            market="BITVAVO",
-            symbol="BTC/EUR",
-            csv_file_path=os.path.join(
-                self.resource_directory,
-                "market_data_sources_for_testing",
-                "TICKER_BTC-EUR_BINANCE_2023-08-23:22:00_2023-12-02:00:00.csv"
+        self.app.add_market_data_source(
+            CSVTickerMarketDataSource(
+                identifier="BTC/EUR-ticker",
+                market="BITVAVO",
+                symbol="BTC/EUR",
+                csv_file_path=os.path.join(
+                    self.resource_directory,
+                    "market_data_sources_for_testing",
+                    "TICKER_BTC-EUR_BINANCE_2023-08-23:22:00_2023-12-02:00:00.csv"
+                )
             )
-        ))
+        )
 
     def test_get_open_trades(self):
         self.app.algorithm.create_limit_order(

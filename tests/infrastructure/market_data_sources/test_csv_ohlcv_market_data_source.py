@@ -40,8 +40,10 @@ class Test(TestCase):
         data_source = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/market_data_sources/"
                           f"{file_name}",
+            window_size=10,
         )
-        df = data_source.get_data()
+        date = datetime(2023, 8, 7, 8, 0, tzinfo=tzutc())
+        df = data_source.get_data(start_date=date)
         self.assertEqual(
             ["Datetime", "Open", "High", "Low", "Close", "Volume"], df.columns
         )
@@ -55,7 +57,7 @@ class Test(TestCase):
                 csv_file_path=f"{self.resource_dir}/"
                               "market_data_sources_for_testing/"
                               f"{file_name}",
-                window_size=10
+                window_size=10,
             )
 
     def test_start_date(self):
@@ -67,7 +69,6 @@ class Test(TestCase):
                           "market_data_sources/"
                           f"{file_name}",
             window_size=10,
-            time_frame=TimeFrame.TWO_HOUR,
         )
         self.assertEqual(
             start_date,
@@ -86,9 +87,10 @@ class Test(TestCase):
                           "market_data_sources/"
                           f"{file_name}",
             window_size=12,
-            time_frame=TimeFrame.TWO_HOUR,
         )
-        data = csv_ohlcv_market_data_source.get_data(start_date=start_date)
+        data = csv_ohlcv_market_data_source.get_data(
+            start_date=start_date
+        )
         self.assertEqual(12, len(data))
         first_date = parser.parse(data["Datetime"][0])
         self.assertEqual(
@@ -119,11 +121,9 @@ class Test(TestCase):
                           "market_data_sources/"
                           f"{file_name}",
             window_size=10,
-            time_frame="2h",
         )
-        start_date = datetime(2023, 8, 7, 8, 0, tzinfo=tzutc())
-        end_date = datetime(2023, 12, 2, 0, 0, tzinfo=tzutc())
-        self.assertFalse(data_source.empty(start_date, end_date))
+        start_date = datetime(2023, 12, 2, 0, 0, tzinfo=tzutc())
+        self.assertFalse(data_source.empty(start_date))
 
     def test_get_data(self):
         file_name = \
@@ -133,13 +133,12 @@ class Test(TestCase):
                           "market_data_sources_for_testing/"
                           f"{file_name}",
             window_size=200,
-            time_frame="2h",
         )
         number_of_runs = 0
         backtest_index_date = datasource._start_date_data_source
 
-        while not datasource.empty(start_date=backtest_index_date):
-            data = datasource.get_data(start_date=backtest_index_date)
+        while not datasource.empty(end_date=backtest_index_date):
+            data = datasource.get_data(end_date=backtest_index_date)
             backtest_index_date = \
                 backtest_index_date + timedelta(hours=2 * 200)
             self.assertTrue(len(data) > 0)
@@ -157,7 +156,6 @@ class Test(TestCase):
                           f"{file_name}",
             identifier="test",
             window_size=10,
-            time_frame="2h",
         )
         self.assertEqual("test", datasource.get_identifier())
 
@@ -169,7 +167,6 @@ class Test(TestCase):
                           "market_data_sources/"
                           f"{file_name}",
             market="test",
-            time_frame="2h",
         )
         self.assertEqual("test", datasource.get_market())
 
@@ -182,18 +179,5 @@ class Test(TestCase):
                           f"{file_name}",
             symbol="BTC/EUR",
             window_size=10,
-            time_frame="2h",
         )
         self.assertEqual("BTC/EUR", datasource.get_symbol())
-
-    def test_get_timeframe(self):
-        file_name = "OHLCV_BTC-EUR_BINANCE" \
-                    "_2h_2023-08-07:07:59_2023-12-02:00:00.csv"
-        datasource = CSVOHLCVMarketDataSource(
-            csv_file_path=f"{self.resource_dir}/"
-                          "market_data_sources/"
-                          f"{file_name}",
-            time_frame="2h",
-            window_size=10,
-        )
-        self.assertTrue(TimeFrame.TWO_HOUR.equals(datasource.get_time_frame()))

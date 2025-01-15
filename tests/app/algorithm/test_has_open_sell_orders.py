@@ -1,6 +1,6 @@
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -22,6 +22,7 @@ class Test(TestBase):
     external_balances = {
         "EUR": 1000,
     }
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_has_open_sell_orders(self):
         trading_symbol_position = self.app.algorithm.get_position("EUR")

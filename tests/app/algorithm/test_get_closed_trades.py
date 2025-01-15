@@ -2,7 +2,7 @@ import os
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     CSVTickerMarketDataSource, MarketCredential
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -23,6 +23,7 @@ class Test(TestBase):
             secret_key="secret_key"
         )
     ]
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def setUp(self) -> None:
         super(Test, self).setUp()

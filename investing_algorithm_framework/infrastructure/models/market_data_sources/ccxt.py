@@ -180,39 +180,25 @@ class CCXTOHLCVBacktestMarketDataSource(
             )
         )
 
-    def get_data(self, **kwargs):
+    def get_data(
+        self,
+        end_date,
+        config=None
+    ):
         """
         Get data implementation of ccxt based ohlcv backtest market data
         source. This implementation will use polars to load and filter the
         data.
         """
-        start_date = kwargs.get("start_date")
-        end_date = kwargs.get("end_date")
-        backtest_index_date = kwargs.get("backtest_index_date")
-
         if self.data is None:
             self.load_data()
 
-        if start_date is None \
-                and end_date is None \
-                and backtest_index_date is None:
+        if end_date is None:
             return self.data
 
-        if backtest_index_date is not None:
-            end_date = backtest_index_date
-            start_date = self.create_start_date(
-                end_date, self.time_frame, self.window_size
-            )
-        else:
-            if start_date is None:
-                start_date = self.create_start_date(
-                    end_date, self.time_frame, self.window_size
-                )
-
-            if end_date is None:
-                end_date = self.create_end_date(
-                    start_date, self.time_frame, self.window_size
-                )
+        start_date = self.create_start_date(
+            end_date, self.time_frame, self.window_size
+        )
 
         if start_date < self._start_date_data_source:
             raise OperationalException(
@@ -233,7 +219,6 @@ class CCXTOHLCVBacktestMarketDataSource(
             (self.data['Datetime'] >= start_date.strftime(DATETIME_FORMAT))
             & (self.data['Datetime'] <= end_date.strftime(DATETIME_FORMAT))
         )
-
         return selection
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
@@ -301,7 +286,6 @@ class CCXTTickerBacktestMarketDataSource(
         config,
         backtest_start_date,
         backtest_end_date,
-        **kwargs
     ):
         """
         Prepare data implementation of ccxt based ticker backtest market
@@ -395,30 +379,27 @@ class CCXTTickerBacktestMarketDataSource(
     def empty(self):
         return False
 
-    def get_data(self, **kwargs):
+    def get_data(
+        self,
+        config,
+        date,
+    ):
         """
         Get data implementation of ccxt based ticker backtest market data
         source
         """
-        if "backtest_index_date" not in kwargs:
-            raise OperationalException(
-                "backtest_index_date should be passed as a parameter "
-                "for CCXTTickerBacktestMarketDataSource"
-            )
-
         file_path = self._create_file_path()
-        backtest_index_date = kwargs["backtest_index_date"]
 
         # Filter the data based on the backtest index date and the end date
         df = polars.read_csv(file_path)
         filtered_df = df.filter(
-            (df['Datetime'] >= backtest_index_date.strftime(DATETIME_FORMAT))
+            (df['Datetime'] >= date.strftime(DATETIME_FORMAT))
         )
 
         # If nothing is found, get all dates before the index date
         if len(filtered_df) == 0:
             filtered_df = df.filter(
-                (df['Datetime'] <= backtest_index_date.strftime(
+                (df['Datetime'] <= date.strftime(
                     DATETIME_FORMAT))
             )
             first_row = filtered_df.tail(1)[0]
@@ -447,20 +428,23 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
     ccxt to download all ohlcv data sources.
     """
 
-    def get_data(self, **kwargs):
+    def get_data(
+        self,
+        config=None,
+        start_date: datetime = None,
+        end_date: datetime = None,
+    ):
         """
         Implementation of get_data for CCXTOHLCVMarketDataSource.
         This implementation uses the CCXTMarketService to get the OHLCV data.
 
         Args:
-            window_size: int (optional) - the total amount of candle
-            sticks that need to be returned
             start_date: datetime (optional) - the start date of the data. The
             first candle stick should close to this date.
             end_date: datetime (optional) - the end date of the data. The last
             candle stick should close to this date.
             storage_path: string (optional) - the storage path specifies the
-            directory where the data is written to or read from.
+                directory where the data is written to or read from.
                 If set the data provider will write all its downloaded data
                 to this location. Also, it will check if the
                 data already exists at the storage location. If this is the
@@ -477,37 +461,11 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
         if self.config is not None:
             market_service.config = self.config
 
-        if "window_size" in kwargs:
-            self.window_size = kwargs["window_size"]
-
         start_date = None
         end_date = None
 
-        if "start_date" in kwargs:
-            start_date = kwargs["start_date"]
-
-            if not isinstance(start_date, datetime):
-                raise OperationalException(
-                    "start_date should be a datetime object"
-                )
-
-        if "end_date" in kwargs:
-            end_date = kwargs["end_date"]
-
-            if not isinstance(end_date, datetime):
-                raise OperationalException(
-                    "end_date should be a datetime object"
-                )
-
         # Calculate the start and end dates
         if start_date is None or end_date is None:
-
-            if self.window_size is None:
-                raise OperationalException(
-                    "Either end_date or window_size "
-                    "should be passed as a "
-                    "parameter for CCXTOHLCVMarketDataSource"
-                )
 
             if start_date is None:
 
@@ -526,10 +484,7 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
                     window_size=self.window_size
                 )
 
-        if "storage_path" in kwargs:
-            storage_path = kwargs["storage_path"]
-        else:
-            storage_path = self.get_storage_path()
+        storage_path = self.get_storage_path()
 
         logger.info(
             f"Getting OHLCV data for {self.symbol} " +
@@ -698,7 +653,12 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
 
 class CCXTOrderBookMarketDataSource(OrderBookMarketDataSource):
 
-    def get_data(self, **kwargs):
+    def get_data(
+        self,
+        config=None,
+        start_date: datetime = None,
+        end_date: datetime = None,
+    ):
         market_service = CCXTMarketService(
             market_credential_service=self.market_credential_service
         )
@@ -727,37 +687,20 @@ class CCXTTickerMarketDataSource(TickerMarketDataSource):
         )
         self._backtest_time_frame = backtest_time_frame
 
-    def get_data(self, **kwargs):
+    def get_data(
+        self,
+        config=None,
+        start_date: datetime = None,
+        end_date: datetime = None,
+    ):
         market_service = CCXTMarketService(
             market_credential_service=self.market_credential_service
         )
         market_service.config = self.config
-
-        if self.market is None:
-
-            if "market" not in kwargs:
-                raise OperationalException(
-                    "Either market or market should be "
-                    "passed as a parameter"
-                )
-            else:
-                market = kwargs["market"]
-        else:
-            market = self.market
+        market = self.market
 
         market_service.market = market
-
-        if self.symbol is None:
-
-            if "symbol" not in kwargs:
-                raise OperationalException(
-                    "Either symbol or symbol should be passed as a parameter"
-                )
-            else:
-                symbol = kwargs["symbol"]
-        else:
-            symbol = self.symbol
-
+        symbol = self.symbol
         return market_service.get_ticker(symbol=symbol, market=market)
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:

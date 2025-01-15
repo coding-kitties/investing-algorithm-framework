@@ -48,6 +48,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         MarketDataSourceService,
         market_service=market_service,
         market_credential_service=market_credential_service,
+        configuration_service=configuration_service
     )
     position_snapshot_service = providers.Factory(
         PositionSnapshotService,
@@ -113,7 +114,8 @@ class DependencyContainer(containers.DeclarativeContainer):
     )
     strategy_orchestrator_service = providers.Factory(
         StrategyOrchestratorService,
-        market_data_source_service=market_data_source_service
+        market_data_source_service=market_data_source_service,
+        configuration_service=configuration_service,
     )
     performance_service = providers.Factory(
         PerformanceService,
@@ -130,6 +132,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         position_repository=position_repository,
         market_data_source_service=market_data_source_service,
         portfolio_configuration_service=portfolio_configuration_service,
+        strategy_orchestrator_service=strategy_orchestrator_service,
     )
     algorithm = providers.Factory(
         Algorithm,

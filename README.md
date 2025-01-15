@@ -38,6 +38,8 @@ The following algorithm connects to binance and buys BTC every 5 seconds. It als
 
 ```python
 import logging
+import logging.config
+
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
     TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, \
     CCXTTickerMarketDataSource, MarketCredential, DEFAULT_LOGGING_CONFIG
@@ -59,7 +61,6 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     symbol="BTC/EUR",
 )
 app = create_app()
-algorithm = Algorithm()
 # Bitvavo market credentials are read from .env file
 app.add_market_credential(MarketCredential(market="bitvavo"))
 app.add_portfolio_configuration(
@@ -69,10 +70,9 @@ app.add_portfolio_configuration(
         initial_balance=400
     )
 )
-app.add_algorithm(algorithm)
 
 # Run every two hours and register the data sources
-@algorithm.strategy(
+@app.strategy(
     time_unit=TimeUnit.HOUR,
     interval=2,
     market_data_sources=[bitvavo_btc_eur_ticker, bitvavo_btc_eur_ohlcv_2h]
@@ -80,7 +80,6 @@ app.add_algorithm(algorithm)
 def perform_strategy(algorithm: Algorithm, market_data: dict):
     # Access the data sources with the indentifier
     polars_df = market_data["BTC-ohlcv"]
-
     # Convert the polars dataframe to a pandas dataframe
     pandas_df = polars_df.to_pandas()
     ticker_data = market_data["BTC-ticker"]
@@ -91,12 +90,18 @@ def perform_strategy(algorithm: Algorithm, market_data: dict):
     closed_trades = algorithm.get_closed_trades()
 
     # Create a buy oder
-    algorithm.create_limit_order(
+    trade = algorithm.create_limit_order(
         target_symbol="BTC/EUR",
         order_side="buy",
         amount=0.01,
         price=ticker_data["ask"],
     )
+
+    # Add a stop loss percentage of 5%
+    algorithm.add_stop_loss(trade.id, percentage=5)
+
+    # Add a take profit percentage of 10%
+    algorithm.add_take_profit(trade.id, percentage=5)
 
     # Close a trade
     algorithm.close_trade(trades[0].id)

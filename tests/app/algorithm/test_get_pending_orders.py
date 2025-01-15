@@ -1,7 +1,7 @@
 from investing_algorithm_framework import PortfolioConfiguration, Order, \
-    MarketCredential, SYMBOLS
+    MarketCredential
 from investing_algorithm_framework.services import PortfolioService
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class TestPortfolioService(TestBase):
@@ -68,6 +68,7 @@ class TestPortfolioService(TestBase):
     external_balances = {
         "EUR": 700,
     }
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_get_pending_orders(self):
         """

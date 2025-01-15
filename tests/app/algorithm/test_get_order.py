@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     OrderStatus, MarketCredential
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -23,6 +23,7 @@ class Test(TestBase):
             secret_key="secret_key"
         )
     ]
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_create_limit_buy_order_with_percentage_of_portfolio(self):
         self.app.algorithm.create_limit_order(

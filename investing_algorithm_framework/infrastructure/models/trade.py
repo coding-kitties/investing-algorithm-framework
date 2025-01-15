@@ -4,13 +4,19 @@ from typing import List
 import polars as pl
 from polars import DataFrame
 
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float
+from sqlalchemy.orm import relationship
+
 from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
-from investing_algorithm_framework.domain.models.base_model import BaseModel
+from investing_algorithm_framework.domain import Trade
+from investing_algorithm_framework.infrastructure.database import SQLBaseModel
+from investing_algorithm_framework.infrastructure.models.model_extension \
+    import SQLAlchemyModelExtension
 
 
-class Trade(BaseModel):
+class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
     """
     Trade model
 
@@ -26,8 +32,8 @@ class Trade(BaseModel):
     buy order can be closed by multiple sell orders.
 
     Attributes:
-    * buy_order_id: str, the id of the buy order
-    * sell_order_id: str, the id of the sell order
+    * buy_order: str, the id of the buy order
+    * sell_orders: str, the id of the sell order
     * target_symbol: str, the target symbol of the trade
     * trading_symbol: str, the trading symbol of the trade
     * amount: float, the amount of the trade
@@ -38,9 +44,35 @@ class Trade(BaseModel):
     * updated_at: datetime, the datetime when the trade was last updated
     * last_price: float, the current price of the trade
     """
+
+    __tablename__ = "trades"
+    id = Column(Integer, primary_key=True, unique=True)
+    # A one-to-one relationship for the buy order
+    buy_order = relationship(
+        'Order',
+        primaryjoin="and_(Order.trade_id==Trade.id, Order.side=='buy')",
+        uselist=False
+    )
+    # A one-to-many relationship for the sell orders
+    sell_orders = relationship(
+        'Order',
+        primaryjoin="and_(Order.trade_id==Trade.id, Order.side=='sell')",
+        uselist=True
+    )
+    target_symbol = Column(String)
+    trading_symbol = Column(String)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+    closed_at = Column(DateTime, default=None)
+    closed_price = Column(Float, default=None)
+    closed_amount = Column(Float, default=None)
+    net_gain = Column(Float, default=0)
+    last_reported_price = Column(Float, default=None)
+
     def __init__(
         self,
         buy_order_id,
+        sell_order_ids,
         target_symbol,
         trading_symbol,
         amount,
@@ -48,20 +80,9 @@ class Trade(BaseModel):
         opened_at,
         closed_price=None,
         closed_at=None,
-        current_price=None,
-        sell_order_id=None,
+        last_reported_price=None,
     ):
-        self._target_symbol = target_symbol
-        self._trading_symbol = trading_symbol
-        self._amount = amount
-        self._open_price = open_price
-        self._closed_price = closed_price
-        self._closed_at = closed_at
-        self._opened_at = opened_at
-        self._trading_symbol = trading_symbol
-        self._current_price = current_price
         self._buy_order_id = buy_order_id
-        self._sell_order_id = sell_order_id,
 
     @property
     def buy_order_id(self):

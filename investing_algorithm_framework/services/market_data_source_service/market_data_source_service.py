@@ -1,8 +1,11 @@
 from typing import List
+from datetime import datetime, timezone
 
 from investing_algorithm_framework.domain import MarketService, \
     MarketDataSource, OHLCVMarketDataSource, TickerMarketDataSource, \
     OrderBookMarketDataSource, TimeFrame, OperationalException
+from investing_algorithm_framework.services.configuration_service import \
+    ConfigurationService
 from investing_algorithm_framework.services.market_credential_service \
     import MarketCredentialService
 
@@ -23,7 +26,8 @@ class MarketDataSourceService:
         self,
         market_service: MarketService,
         market_credential_service: MarketCredentialService,
-        market_data_sources: List[MarketDataSource] = None,
+        configuration_service: ConfigurationService,
+        market_data_sources: List[MarketDataSource] = None
     ):
 
         if market_data_sources is not None:
@@ -33,15 +37,23 @@ class MarketDataSourceService:
         self._market_service: MarketService = market_service
         self._market_credential_service: MarketCredentialService = \
             market_credential_service
+        self._configuration_service = configuration_service
+
+    def initialize_market_data_sources(self):
+
+        for market_data_source in self._market_data_sources:
+            market_data_source.market_credential_service = \
+                self._market_credential_service
 
     def get_ticker(self, symbol, market=None):
         ticker_market_data_source = self.get_ticker_market_data_source(
             symbol=symbol, market=market
         )
+        config = self._configuration_service.get_config()
 
         if ticker_market_data_source is not None:
             return ticker_market_data_source.get_data(
-                market_credential_service=self._market_credential_service
+                date=datetime.now(tz=timezone.utc), config=config
             )
         return self._market_service.get_ticker(symbol, market)
 
@@ -49,10 +61,11 @@ class MarketDataSourceService:
         order_book_market_data_source = self.get_order_book_market_data_source(
             symbol=symbol, market=market
         )
+        config = self._configuration_service.get_config()
 
         if order_book_market_data_source is not None:
             return order_book_market_data_source.get_data(
-                market_credential_service=self._market_credential_service
+                date=datetime.now(tz=timezone.utc), config=config
             )
 
         return self._market_service.get_order_book(symbol, market)
@@ -68,12 +81,11 @@ class MarketDataSourceService:
         ohlcv_market_data_source = self.get_ohlcv_market_data_source(
             symbol=symbol, market=market, time_frame=time_frame
         )
+        config = self._configuration_service.get_config()
 
         if ohlcv_market_data_source is not None:
             return ohlcv_market_data_source.get_data(
-                from_timestamp=from_timestamp,
-                to_timestamp=to_timestamp,
-                market_credential_service=self._market_credential_service
+                date=datetime.now(tz=timezone.utc), config=config
             )
 
         return self._market_service.get_ohlcv(
@@ -84,13 +96,40 @@ class MarketDataSourceService:
             to_timestamp=to_timestamp
         )
 
-    def get_data(self, identifier):
+    def get_data_for_strategy(self, strategy):
+        """
+        Function to get the data for the strategy. It loops over all
+          the market data sources in the strategy and returns the
+          data for each
 
-        for market_data_source in self._market_data_sources:
-            if market_data_source.get_identifier() == identifier:
-                return market_data_source.get_data(
-                    market_credential_service=self._market_credential_service
+        Args:
+            strategy: The strategy for which the data is required
+
+        Returns:
+            The data for the strategy in dictionary format with
+              the keys being the identifier of the market data sources
+        """
+        identifiers = []
+
+        for market_data_source in strategy.market_data_sources:
+
+            if isinstance(market_data_source, MarketDataSource):
+                identifiers.append(market_data_source.get_identifier())
+            elif isinstance(market_data_source, str):
+                identifiers.append(market_data_source)
+            else:
+                raise OperationalException(
+                    "Market data source must be a string or MarketDataSource"
                 )
+
+        data = {}
+
+        for identifier in identifiers:
+            data[identifier] = self.get_data(identifier)
+
+        return data
+
+    def get_data(self, identifier):
 
         if isinstance(identifier, str):
             raise OperationalException(
@@ -99,6 +138,14 @@ class MarketDataSourceService:
                 "registered to the app if you refer to it by "
                 "identifier in your strategy."
             )
+
+        for market_data_source in self._market_data_sources:
+            if market_data_source.get_identifier() == identifier:
+                config = self._configuration_service.get_config()
+
+                return market_data_source.get_data(
+                    date=datetime.now(tz=timezone.utc), config=config,
+                )
 
     def get_ticker_market_data_source(self, symbol, market=None):
 
@@ -208,6 +255,8 @@ class MarketDataSourceService:
                     market_data_source.get_identifier():
                 return
 
+        market_data_source.market_credential_service = \
+            self._market_credential_service
         self._market_data_sources.append(market_data_source)
 
     def get_market_data_sources(self):

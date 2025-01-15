@@ -1,6 +1,6 @@
 import os
 from investing_algorithm_framework.domain import Environment, \
-    RESOURCE_DIRECTORY
+    RESOURCE_DIRECTORY, DATABASE_DIRECTORY_NAME
 
 DEFAULT_CONFIGURATION = {
     "ENVIRONMENT": Environment.PROD.value,
@@ -15,7 +15,8 @@ DEFAULT_CONFIGURATION = {
     "BACKTEST_DATA_DIRECTORY_NAME": "backtest_data",
     "SYMBOLS": None,
     "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
-    "DATABASE_DIRECTORY_PATH": None
+    "DATABASE_DIRECTORY_PATH": None,
+    "DATABASE_DIRECTORY_NAME": "databases"
 }
 
 DEFAULT_FLASK_CONFIGURATION = {
@@ -39,8 +40,12 @@ DEFAULT_FLASK_CONFIGURATION = {
 class ConfigurationService:
 
     def __init__(self):
-        self._config = DEFAULT_CONFIGURATION
-        self._flask_config = DEFAULT_FLASK_CONFIGURATION
+        self._config = DEFAULT_CONFIGURATION.copy()
+        self._flask_config = DEFAULT_FLASK_CONFIGURATION.copy()
+
+    def initialize(self):
+        self._config = DEFAULT_CONFIGURATION.copy()
+        self._flask_config = DEFAULT_FLASK_CONFIGURATION.copy()
 
     @property
     def config(self):

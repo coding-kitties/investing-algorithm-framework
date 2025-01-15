@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     OrderStatus, MarketCredential
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -22,6 +22,7 @@ class Test(TestBase):
     external_balances = {
         "EUR": 1000,
     }
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_check_order_status(self):
         order_repository = self.app.container.order_repository()

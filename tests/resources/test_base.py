@@ -162,9 +162,7 @@ class FlaskTestBase(FlaskTestCase):
         self.market_service.orders = self.external_orders
         self.iaf_app.container.market_service.override(self.market_service)
 
-        if self.initialize:
-
-            if len(self.portfolio_configurations) > 0:
+        if len(self.portfolio_configurations) > 0:
                 for portfolio_configuration in self.portfolio_configurations:
                     self.iaf_app.add_portfolio_configuration(
                         portfolio_configuration
@@ -177,7 +175,9 @@ class FlaskTestBase(FlaskTestCase):
                     for market_credential in self.market_credentials:
                         self.iaf_app.add_market_credential(market_credential)
 
-                self.iaf_app.initialize()
+        if self.initialize:
+            self.iaf_app.initialize_config()
+            self.iaf_app.initialize()
 
         if self.initial_orders is not None:
             for order in self.initial_orders:

@@ -164,6 +164,17 @@ class Algorithm:
             number_of_iterations=number_of_iterations
         )
 
+    def stop(self) -> None:
+        """
+        Function to stop the algorithm. This function will stop the
+        algorithm by stopping all jobs in the strategy orchestrator
+        service.
+
+        Returns:
+            None
+        """
+        self.strategy_orchestrator_service.stop()
+
     @property
     def name(self):
         return self._name
@@ -179,6 +190,14 @@ class Algorithm:
 
     @property
     def config(self):
+        """
+        Function to get a config instance. This allows users when
+        having access to the algorithm instance also to read the
+        configs of the app.
+        """
+        return self.configuration_service.get_config()
+
+    def get_config(self):
         """
         Function to get a config instance. This allows users when
         having access to the algorithm instance also to read the
@@ -1222,7 +1241,7 @@ class Algorithm:
         is specified, the open trades with the specified market will be
         returned.
 
-        Parameters:
+        Args:
             target_symbol: The symbol of the asset
             market: The market of the asset
 
@@ -1238,7 +1257,7 @@ class Algorithm:
         parameter is specified, the amount of the order will be rounded
         down to the specified precision.
 
-        Parameters:
+        Args:
             trade: Trade - The trade to close
             market: str - The market of the trade
             precision: float - The precision of the amount
@@ -1400,3 +1419,9 @@ class Algorithm:
             [order.get_amount() * order.get_price()
              for order in pending_orders]
         )
+
+    def get_trade_service(self):
+        return self.trade_service
+
+    def get_market_data_source_service(self):
+        return self._market_data_source_service

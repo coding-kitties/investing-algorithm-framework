@@ -35,9 +35,12 @@ class TradeService:
         """
         Get open trades method
 
-        :param target_symbol: str representing the target symbol
-        :param market: str representing the market
-        :return: list of Trade objects
+        Args:
+            target_symbol: str representing the target symbol
+            market: str representing the market
+
+        Returns:
+            list of Trade objects
         """
 
         portfolios = self.portfolio_repository.get_all()
@@ -99,6 +102,7 @@ class TradeService:
             for buy_order in buy_orders_queue:
                 symbol = buy_order.get_symbol()
                 current_price = buy_order.get_price()
+
                 try:
                     ticker = self.market_data_source_service.get_ticker(
                         symbol=symbol, market=market
@@ -131,9 +135,12 @@ class TradeService:
         """
         Get trades method
 
-        :param market: str representing the market
-        :param portfolio_id: str representing the portfolio id
-        :return: list of Trade objects
+        Args:
+            market: str representing the market
+            portfolio_id: str representing the portfolio id
+
+        Returns:
+            list of Trade objects
         """
 
         portfolios = self.portfolio_repository.get_all()

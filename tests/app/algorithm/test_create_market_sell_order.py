@@ -1,6 +1,6 @@
 from investing_algorithm_framework import PortfolioConfiguration, \
     OrderType, OrderSide, OrderStatus, MarketCredential
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -21,6 +21,7 @@ class Test(TestBase):
             secret_key="secret_key"
         )
     ]
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_create_market_sell_order(self):
         portfolio = self.app.algorithm.get_portfolio()

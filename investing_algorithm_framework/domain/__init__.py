@@ -7,7 +7,8 @@ from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
     BACKTEST_DATA_DIRECTORY_NAME, TICKER_DATA_TYPE, OHLCV_DATA_TYPE, \
     CURRENT_UTC_DATETIME, BACKTESTING_END_DATE, SYMBOLS, \
     CCXT_DATETIME_FORMAT_WITH_TIMEZONE, RESERVED_BALANCES, \
-    BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, APP_MODE
+    BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, APP_MODE, \
+    DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT
 from .data_structures import PeekableQueue
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
 from .exceptions import OperationalException, ApiException, \
@@ -119,5 +120,7 @@ __all__ = [
     "convert_polars_to_pandas",
     "DateRange",
     "get_backtest_report",
-    "DEFAULT_LOGGING_CONFIG"
+    "DEFAULT_LOGGING_CONFIG",
+    "DATABASE_DIRECTORY_NAME",
+    "BACKTESTING_INITIAL_AMOUNT"
 ]

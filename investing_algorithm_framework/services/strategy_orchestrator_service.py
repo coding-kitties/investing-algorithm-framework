@@ -33,7 +33,11 @@ class StrategyOrchestratorService:
         The service that provides market data
     """
 
-    def __init__(self, market_data_source_service: MarketDataSourceService):
+    def __init__(
+        self,
+        market_data_source_service: MarketDataSourceService,
+        configuration_service
+    ):
         self.history = {}
         self._strategies = []
         self._tasks = []
@@ -43,6 +47,7 @@ class StrategyOrchestratorService:
         self.clear()
         self.market_data_source_service: MarketDataSourceService \
             = market_data_source_service
+        self.configuration_service = configuration_service
 
     def cleanup_threads(self):
 
@@ -64,24 +69,19 @@ class StrategyOrchestratorService:
             return
 
         market_data = {}
-
+        config = self.configuration_service.get_config()
         if strategy.market_data_sources is not None \
                 and len(strategy.market_data_sources) > 0:
 
-            for data_id in strategy.market_data_sources:
-                if isinstance(data_id, MarketDataSource):
-                    market_data[data_id.get_identifier()] = \
-                        data_id.get_data()
-                else:
-                    market_data[data_id] = \
-                        self.market_data_source_service \
-                            .get_data(identifier=data_id)
+            market_data = \
+                self.market_data_source_service.get_data_for_strategy(strategy)
 
         logger.info(f"Running strategy {strategy.worker_id}")
 
         if sync:
             strategy.run_strategy(
-                market_data=market_data, algorithm=algorithm
+                market_data=market_data,
+                algorithm=algorithm,
             )
         else:
             self.iterations += 1
@@ -89,7 +89,7 @@ class StrategyOrchestratorService:
                 target=strategy.run_strategy,
                 kwargs={
                     "market_data": market_data,
-                    "algorithm": algorithm
+                    "algorithm": algorithm,
                 }
             )
             thread.name = strategy.worker_id
@@ -97,6 +97,19 @@ class StrategyOrchestratorService:
             self.threads.append(thread)
 
         self.history[strategy.worker_id] = {"last_run": datetime.utcnow()}
+
+    def run_backtest_strategy(self, strategy, algorithm, config):
+        data = {}
+
+        if strategy.market_data_sources is not None \
+            and len(strategy.market_data_sources) > 0:
+            data = \
+                self.market_data_source_service.get_data_for_strategy(strategy)
+
+        strategy.run_strategy(
+            market_data=data,
+            algorithm=algorithm,
+        )
 
     def run_task(self, task, algorithm, sync=False):
         self.cleanup_threads()
@@ -128,8 +141,16 @@ class StrategyOrchestratorService:
 
     def start(self, algorithm, number_of_iterations=None):
         """
-        F
+        Function to start and schedule the strategies and tasks
 
+        Args:
+            algorithm (Algorithm): The algorithm that will be used to run the
+                strategies and tasks
+            number_of_iterations (int): The number of iterations that the
+                strategies and tasks will run. If None, the strategies and tasks
+
+        Returns:
+            None
         """
         self.max_iterations = number_of_iterations
 

@@ -21,6 +21,7 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     trading_symbol = Column(String)
     order_side = Column(String, nullable=False, default=OrderSide.BUY.value)
     order_type = Column(String, nullable=False, default=OrderType.LIMIT.value)
+    trade_id = Column(Integer, ForeignKey('trades.id'))
     price = Column(Float)
     amount = Column(Float)
     filled = Column(Float)

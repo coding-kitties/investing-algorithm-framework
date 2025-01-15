@@ -80,46 +80,34 @@ class Test(TestCase):
         self.assertEqual(data_source.window_size, 200)
 
     @mock.patch('investing_algorithm_framework.infrastructure.services.market_service.ccxt_market_service.CCXTMarketService.get_ohlcv')
-    def test_get_data_with_only_start_date_and_end_date(self, mock):
+    def test_get_data_with_only_start_date(self, mock):
         data_source = CCXTOHLCVMarketDataSource(
             identifier="BTC/EUR",
             time_frame="15m",
             market="BITVAVO",
             symbol="BTC/EUR",
+            window_size=200
         )
         mock.return_value = {'key': 'value'}
         data = data_source.get_data(
-            start_date=datetime(2021, 1, 1),
-            end_date=datetime(2021, 1, 2)
+            start_date=datetime(2021, 1, 1)
         )
         self.assertIsNotNone(data)
 
     @mock.patch('investing_algorithm_framework.infrastructure.services.market_service.ccxt_market_service.CCXTMarketService.get_ohlcv')
-    def test_get_data_with_only_start_date_and_window_size(self, mock):
+    def test_get_data_with_only_date_and_end_date(self, mock):
         data_source = CCXTOHLCVMarketDataSource(
             identifier="BTC/EUR",
             time_frame="15m",
             market="BITVAVO",
             symbol="BTC/EUR",
-        )
-        mock.return_value = {'key': 'value'}
-        data = data_source.get_data(
-            start_date=datetime(2021, 1, 1),
             window_size=200
         )
-        self.assertIsNotNone(data)
-
-    @mock.patch('investing_algorithm_framework.infrastructure.services.market_service.ccxt_market_service.CCXTMarketService.get_ohlcv')
-    def test_get_data_with_only_end_date_and_window_size(self, mock):
-        data_source = CCXTOHLCVMarketDataSource(
-            identifier="BTC/EUR",
-            time_frame="15m",
-            market="BITVAVO",
-            symbol="BTC/EUR",
-        )
         mock.return_value = {'key': 'value'}
+        start_date = datetime(2021, 1, 1)
+        end_date = datetime(2021, 1, 2)
         data = data_source.get_data(
-            start_date=datetime(2021, 1, 1),
-            window_size=200
+            start_date=start_date,
+            end_date=end_date
         )
         self.assertIsNotNone(data)

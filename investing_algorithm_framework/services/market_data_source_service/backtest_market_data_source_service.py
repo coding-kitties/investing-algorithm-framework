@@ -22,18 +22,21 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
 
     The prepare_data method of BacktestMarketDataSource is called in the
     constructor.
+
+    The main difference between MarketDataSourceService and the BacktestMarketDataSourceService is that it will prepare the data for backtesting in the constructor.
     """
     def __init__(
         self,
-        market_data_sources: List[BacktestMarketDataSource],
         market_service: MarketService,
         market_credential_service: MarketCredentialService,
         configuration_service: ConfigurationService,
+        market_data_sources: List[BacktestMarketDataSource] = None
     ):
         super().__init__(
             market_service=market_service,
             market_data_sources=None,
             market_credential_service=market_credential_service,
+            configuration_service=configuration_service
         )
         self.market_data_sources = []
 
@@ -42,40 +45,56 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
             for market_data_source in market_data_sources:
                 self.add(market_data_source)
 
-        self._configuration_service: ConfigurationService = \
-            configuration_service
+    def initialize_market_data_sources(self):
+        config = self._configuration_service.get_config()
+        backtest_start_date = config[BACKTESTING_START_DATE]
+        backtest_end_date = config[BACKTESTING_END_DATE]
+        backtest_market_data_sources = [
+            market_data_source.to_backtest_market_data_source() for
+            market_data_source in self._market_data_sources
+        ]
+
+        # Filter out the None values
+        backtest_market_data_sources = [
+            market_data_source for market_data_source in
+            backtest_market_data_sources if market_data_source is not None
+        ]
 
         for backtest_market_data_source in tqdm(
-            market_data_sources,
+            backtest_market_data_sources,
             total=len(self._market_data_sources),
             desc="Preparing backtest market data",
             colour="GREEN"
         ):
-
-            if backtest_market_data_source is not None:
-                backtest_market_data_source.market_credentials_service = \
-                    self._market_credential_service
-                backtest_market_data_source.prepare_data(
-                    config=configuration_service.get_config(),
-                    backtest_start_date=configuration_service
-                    .get_config()[BACKTESTING_START_DATE],
-                    backtest_end_date=configuration_service
-                    .get_config()[BACKTESTING_END_DATE],
-                )
+            backtest_market_data_source.market_credential_service = \
+                self._market_credential_service
+            backtest_market_data_source.prepare_data(
+                config=config,
+                backtest_start_date=backtest_start_date,
+                backtest_end_date=backtest_end_date
+            )
 
     def get_data(self, identifier):
         """
         This method is used to get the data for backtesting. It loops
         over all the backtest market data sources and returns the data
         for the given identifier (If there is a match).
+
+        If there is no match, it raises an OperationalException.
+
+        Args:
+            identifier: The identifier of the market data source
+
+        Returns:
+            The data for the given identifier
         """
-        for backtest_market_data_source in self._market_data_sources:
-            if backtest_market_data_source.identifier == identifier:
-                backtest_market_data_source.market_credentials_service = \
-                    self._market_credential_service
-                return backtest_market_data_source.get_data(
-                    backtest_index_date=self._configuration_service
-                    .config[BACKTESTING_INDEX_DATETIME],
+        for market_data_source in self._market_data_sources:
+
+            if market_data_source.get_identifier() == identifier:
+                config = self._configuration_service.get_config()
+                backtest_index_date = config[BACKTESTING_INDEX_DATETIME]
+                return market_data_source.get_data(
+                    self, date=backtest_index_date, config=config
                 )
 
         raise OperationalException(
@@ -95,9 +114,10 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
 
         market_data_source.market_credentials_service = \
             self._market_credential_service
+        config = self._configuration_service.get_config()
+        backtest_index_date = config[BACKTESTING_INDEX_DATETIME]
         return market_data_source.get_data(
-            backtest_index_date=self._configuration_service
-            .config[BACKTESTING_INDEX_DATETIME],
+            self, date=backtest_index_date, config=config
         )
 
     def get_order_book(self, symbol, market):
@@ -106,9 +126,10 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
         )
         market_data_source.market_credential_service = \
             self._market_credential_service
+        config = self._configuration_service.get_config()
+        backtest_index_date = config[BACKTESTING_INDEX_DATETIME]
         return market_data_source.get_data(
-            backtest_index_date=self._configuration_service
-            .config[BACKTESTING_INDEX_DATETIME],
+            self, date=backtest_index_date, config=config
         )
 
     def get_ohlcv(
@@ -124,11 +145,10 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
         )
         market_data_source.market_credential_service = \
             self._market_credential_service
+        config = self._configuration_service.get_config()
+        backtest_index_date = config[BACKTESTING_INDEX_DATETIME]
         return market_data_source.get_data(
-            from_timestamp=from_timestamp,
-            to_timestamp=to_timestamp,
-            backtest_index_date=self._configuration_service
-            .config[BACKTESTING_INDEX_DATETIME],
+            self, date=backtest_index_date, config=config
         )
 
     def is_ohlcv_data_source_present(self, symbol, time_frame, market):

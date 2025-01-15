@@ -76,10 +76,6 @@ class Test(TestCase):
             start_date=start_date,
             end_date=end_date
         )
-        app._initialize_app_for_backtest(
-            backtest_date_range=backtest_date_range,
-            pending_order_check_interval='2h',
-        )
         reports = app.run_backtests(
             algorithms=[algorithm_one, algorithm_two, algorithm_three],
             date_ranges=[backtest_date_range]

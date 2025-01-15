@@ -49,6 +49,10 @@ def pretty_print_profit_evaluation(reports, precision=4):
     profit_table["Profit percentage"] = [
         f"{report.total_net_gain_percentage:.{precision}f}%" for report in reports
     ]
+    profit_table["Percentage positive trades"] = [
+        f"{report.percentage_positive_trades:.{0}f}%"
+        for report in reports
+    ]
     profit_table["Date range"] = [
         f"{report.backtest_date_range.name} {report.backtest_date_range.start_date} - {report.backtest_date_range.end_date}"
         for report in reports
@@ -69,6 +73,10 @@ def pretty_print_growth_evaluation(reports, precision=4):
     ]
     growth_table["Growth percentage"] = [
         f"{report.growth_rate:.{precision}f}%" for report in reports
+    ]
+    growth_table["Percentage positive trades"] = [
+        f"{report.percentage_positive_trades:.{0}f}%"
+        for report in reports
     ]
     growth_table["Date range"] = [
         f"{report.backtest_date_range.name} {report.backtest_date_range.start_date} - {report.backtest_date_range.end_date}"
@@ -241,6 +249,42 @@ def pretty_print_percentage_positive_trades(
     percentages = evaluation.get_percentage_positive_trades_order(backtest_date_range=backtest_date_range)
     percentages = percentages[0]
     print(f"{COLOR_YELLOW}Most positive trades:{COLOR_RESET} {COLOR_GREEN}Algorithm {percentages.name} {percentages.percentage_positive_trades:.{precision}f}%{COLOR_RESET}")
+
+
+def pretty_print_trades(backtest_report, precision=4):
+    print(f"{COLOR_YELLOW}Trades overview{COLOR_RESET}")
+    trades_table = {}
+    trades_table["Pair"] = [
+        f"{trade.target_symbol}-{trade.trading_symbol}"
+        for trade in backtest_report.trades
+    ]
+    trades_table["Open date"] = [
+        trade.opened_at for trade in backtest_report.trades
+    ]
+    trades_table["Close date"] = [
+        trade.closed_at for trade in backtest_report.trades
+    ]
+    trades_table["Duration (hours)"] = [
+        trade.duration for trade in backtest_report.trades
+    ]
+    trades_table[f"Size ({backtest_report.trading_symbol})"] = [
+        f"{trade.size:.{precision}f}" for trade in backtest_report.trades
+    ]
+    trades_table[f"Net gain ({backtest_report.trading_symbol})"] = [
+        f"{trade.net_gain:.{precision}f}" + (" (unrealized)" if trade.closed_price is None else "")
+        for trade in backtest_report.trades
+    ]
+    trades_table["Net gain percentage"] = [
+        f"{trade.net_gain_percentage:.{precision}f}%" + (" (unrealized)" if trade.closed_price is None else "")
+        for trade in backtest_report.trades
+    ]
+    trades_table[f"Open price ({backtest_report.trading_symbol})"] = [
+        trade.open_price for trade in backtest_report.trades
+    ]
+    trades_table[f"Close price ({backtest_report.trading_symbol})"] = [
+        trade.closed_price for trade in backtest_report.trades
+    ]
+    print(tabulate(trades_table, headers="keys", tablefmt="rounded_grid"))
 
 
 def pretty_print_backtest_reports_evaluation(

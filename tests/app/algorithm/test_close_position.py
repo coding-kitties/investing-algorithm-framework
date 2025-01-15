@@ -3,7 +3,8 @@ from decimal import Decimal
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     CSVTickerMarketDataSource, MarketCredential
-from tests.resources import TestBase, RandomPriceMarketDataSourceServiceStub
+from tests.resources import TestBase, RandomPriceMarketDataSourceServiceStub, \
+    MarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -28,6 +29,7 @@ class Test(TestBase):
         None,
         None
     )
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def setUp(self) -> None:
         super(Test, self).setUp()

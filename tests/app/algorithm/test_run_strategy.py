@@ -4,7 +4,8 @@ from unittest import TestCase
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
     Algorithm, MarketCredential
-from tests.resources import random_string, MarketServiceStub
+from tests.resources import random_string, MarketServiceStub, \
+    MarketDataSourceServiceStub
 
 
 class StrategyOne(TradingStrategy):
@@ -41,6 +42,7 @@ class Test(TestCase):
     external_balances = {
         "EUR": 1000,
     }
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def setUp(self) -> None:
         super(Test, self).setUp()

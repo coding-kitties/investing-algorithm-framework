@@ -110,9 +110,10 @@ class Test(TestCase):
         self.assertEqual(csv_file_path, data_source._create_file_path())
         df = data_source\
             .get_data(
-                start_date=datetime(
+                end_date=datetime(
                     year=2023, month=12, day=17, hour=0, minute=0
-                )
+                ),
+                config={}
             )
         self.assertEqual(
             ["Datetime", "Open", "High", "Low", "Close", "Volume"], df.columns

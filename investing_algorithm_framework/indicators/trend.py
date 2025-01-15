@@ -41,8 +41,14 @@ def is_uptrend(
     if isinstance(data, pd.Series):
 
         # Check if the data keys are present in the data
-        if fast_column not in data.index or slow_column not in data.index:
-            raise OperationalException("Data keys not present in the data.")
+        if fast_column not in data.index:
+            raise OperationalException(
+                f"Data column {fast_column} not present in the data."
+            )
+        if slow_column not in data.index:
+            raise OperationalException(
+                f"Data columns {slow_column} not present in the data."
+            )
 
         return data[fast_column] > data[slow_column]
 
