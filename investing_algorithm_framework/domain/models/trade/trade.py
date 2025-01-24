@@ -1,6 +1,5 @@
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.order import OrderSide
-from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
 from investing_algorithm_framework.domain.models.trade.trade_status import \
     TradeStatus
 
@@ -35,8 +34,10 @@ class Trade(BaseModel):
         created_at (datetime): the datetime when the trade was created
         updated_at (datetime): the datetime when the trade was last updated
         status (str): the status of the trade
-        stop_loss_percentage (float): the stop loss percentage of the trade
-        trailing_stop_loss_percentage (float): the trailing stop loss percentage
+        stop_loss_percentage (float): the stop loss percentage of
+            the trade
+        trailing_stop_loss_percentage (float): the trailing stop
+            loss percentage
     """
 
     def __init__(
@@ -52,13 +53,13 @@ class Trade(BaseModel):
         cost,
         remaining,
         status,
-        net_gain = 0,
-        last_reported_price = None,
-        high_water_mark = None,
-        updated_at = None,
-        stop_loss_percentage = None,
-        trailing_stop_loss_percentage = None,
-        stop_loss_triggered = False,
+        net_gain=0,
+        last_reported_price=None,
+        high_water_mark=None,
+        updated_at=None,
+        stop_loss_percentage=None,
+        trailing_stop_loss_percentage=None,
+        stop_loss_triggered=False,
     ):
         self.id = id
         self.orders = orders

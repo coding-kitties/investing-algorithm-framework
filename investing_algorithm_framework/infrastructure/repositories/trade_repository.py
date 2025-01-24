@@ -24,7 +24,6 @@ class SQLTradeRepository(Repository):
             "target_symbol", query_params
         )
         trading_symbol = self.get_query_param("trading_symbol", query_params)
-        market = self.get_query_param("market", query_params)
         order_id_query_param = self.get_query_param("order_id", query_params)
 
         if order_id_query_param:

@@ -11,7 +11,6 @@ from investing_algorithm_framework.domain.models.order.order_status import \
     OrderStatus
 from investing_algorithm_framework.domain.models.order.order_type import \
     OrderType
-from investing_algorithm_framework.domain import DATETIME_FORMAT
 
 logger = logging.getLogger("investing_algorithm_framework")
 

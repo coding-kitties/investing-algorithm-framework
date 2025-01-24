@@ -1413,7 +1413,7 @@ class Algorithm:
         """
         self.trade_service.add_trailing_stop_loss(trade, percentage=percentage)
 
-    def close_trade(self, trade, precision = None) -> None:
+    def close_trade(self, trade, precision=None) -> None:
         """
         Function to close a trade. This function will close a trade by
         creating a market order to sell the position. If the precision

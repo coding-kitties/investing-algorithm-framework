@@ -4,7 +4,7 @@ from datetime import datetime
 import schedule
 
 from investing_algorithm_framework.domain import StoppableThread, TimeUnit, \
-    OperationalException, MarketDataSource
+    OperationalException
 from investing_algorithm_framework.services.market_data_source_service \
     import MarketDataSourceService
 
@@ -138,7 +138,8 @@ class StrategyOrchestratorService:
             algorithm (Algorithm): The algorithm that will be used to run the
                 strategies and tasks
             number_of_iterations (int): The number of iterations that the
-                strategies and tasks will run. If None, the strategies and tasks
+                strategies and tasks will run. If None, the
+                strategies and tasks
 
         Returns:
             None

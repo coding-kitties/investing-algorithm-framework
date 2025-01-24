@@ -224,7 +224,7 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
         config = self.configuration_service.get_config()
 
         if ENVIRONMENT in config \
-            and Environment.BACKTEST.equals(config[ENVIRONMENT]):
+                and Environment.BACKTEST.equals(config[ENVIRONMENT]):
             return
 
         self.order_service.check_pending_orders(portfolio=portfolio)

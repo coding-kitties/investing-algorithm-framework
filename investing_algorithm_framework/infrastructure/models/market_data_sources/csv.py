@@ -119,7 +119,6 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
             if start_date > self._end_date_data_source:
                 return polars.DataFrame()
 
-
             df = polars.read_csv(
                 self.csv_file_path, columns=self._columns, separator=","
             )

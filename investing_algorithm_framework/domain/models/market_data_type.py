@@ -17,7 +17,6 @@ class MarketDataType(Enum):
                 if value.upper() == entry.value:
                     return entry
 
-
             raise ValueError(
                 f"Could not convert {value} to MarketDataType"
             )

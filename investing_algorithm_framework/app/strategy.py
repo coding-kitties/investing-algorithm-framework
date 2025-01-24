@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from investing_algorithm_framework.domain import OperationalException, Position
 from investing_algorithm_framework.domain import \
     TimeUnit, StrategyProfile, Trade, ENVIRONMENT, Environment, \
-    BACKTESTING_INDEX_DATETIME, TradeStatus
+    BACKTESTING_INDEX_DATETIME
 from .algorithm import Algorithm
 
 

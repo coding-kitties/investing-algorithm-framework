@@ -25,7 +25,9 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
     The prepare_data method of BacktestMarketDataSource is called in the
     constructor.
 
-    The main difference between MarketDataSourceService and the BacktestMarketDataSourceService is that it will prepare the data for backtesting in the constructor.
+    The main difference between MarketDataSourceService and
+    the BacktestMarketDataSourceService is that it will
+    prepare the data for backtesting in the constructor.
     """
     def __init__(
         self,

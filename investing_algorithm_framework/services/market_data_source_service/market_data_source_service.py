@@ -9,8 +9,6 @@ from investing_algorithm_framework.services.configuration_service import \
     ConfigurationService
 from investing_algorithm_framework.services.market_credential_service \
     import MarketCredentialService
-from investing_algorithm_framework.domain import OHLCVMarketDataSource, \
-    TickerMarketDataSource, OrderBookMarketDataSource
 
 
 class MarketDataSourceService:
@@ -131,7 +129,8 @@ class MarketDataSourceService:
                     identifiers.append(market_data_source)
                 else:
                     raise OperationalException(
-                        "Market data source must be a string or MarketDataSource"
+                        "Market data source must be a string " +
+                        "or MarketDataSource"
                     )
 
         market_data = {"metadata": {
@@ -145,7 +144,8 @@ class MarketDataSourceService:
             result_data = self.get_data(identifier)
 
             if "symbol" in result_data and result_data["symbol"] is not None \
-                    and "type" in result_data and result_data["type"] is not None:
+                    and "type" in result_data \
+                        and result_data["type"] is not None:
                 type = result_data["type"]
                 symbol = result_data["symbol"]
                 time_frame = result_data["time_frame"]
@@ -157,7 +157,8 @@ class MarketDataSourceService:
                     market_data["metadata"][type][symbol] = identifier
 
             if time_frame is not None and \
-                time_frame not in market_data["metadata"][type][symbol]:
+                time_frame not in \
+                    market_data["metadata"][type][symbol]:
                 market_data["metadata"][type][symbol][time_frame] = identifier
 
             market_data[identifier] = result_data["data"]
@@ -228,7 +229,6 @@ class MarketDataSourceService:
         raise OperationalException(
             f"Backtest market data source not found for {identifier}"
         )
-
 
     def get_ticker_market_data_source(self, symbol, market=None):
 

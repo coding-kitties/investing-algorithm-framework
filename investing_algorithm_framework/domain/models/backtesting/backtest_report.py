@@ -424,7 +424,10 @@ class BacktestReport(BaseModel):
             "average_trade_duration": self.average_trade_duration,
             "average_trade_size": self.average_trade_size,
             "positions": [position.to_dict() for position in self.positions],
-            "trades": [trade.to_dict(datetime_format=DATETIME_FORMAT) for trade in self.trades],
+            "trades": [
+                trade.to_dict(datetime_format=DATETIME_FORMAT)
+                for trade in self.trades
+            ],
             "orders": [
                 order.to_dict(datetime_format=DATETIME_FORMAT)
                 for order in self.orders

@@ -5,8 +5,8 @@ from investing_algorithm_framework.domain import Trade, TradeStatus
 from investing_algorithm_framework.infrastructure.database import SQLBaseModel
 from investing_algorithm_framework.infrastructure.models.model_extension \
     import SQLAlchemyModelExtension
-from investing_algorithm_framework\
-    .infrastructure.models.order_trade_association import order_trade_association
+from investing_algorithm_framework.infrastructure.models\
+    .order_trade_association import order_trade_association
 
 
 class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
@@ -72,17 +72,17 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         opened_at,
         amount,
         remaining,
-        status = TradeStatus.CREATED.value,
-        closed_at = None,
-        updated_at = None,
-        net_gain = 0,
-        cost = 0,
-        last_reported_price = None,
-        high_water_mark = None,
-        sell_orders = [],
-        stop_loss_percentage = None,
-        trailing_stop_loss_percentage = None,
-        stop_loss_triggered = False
+        status=TradeStatus.CREATED.value,
+        closed_at=None,
+        updated_at=None,
+        net_gain=0,
+        cost=0,
+        last_reported_price=None,
+        high_water_mark=None,
+        sell_orders=[],
+        stop_loss_percentage=None,
+        trailing_stop_loss_percentage=None,
+        stop_loss_triggered=False
     ):
         self.orders = [buy_order]
         self.open_price = buy_order.price

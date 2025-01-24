@@ -1,4 +1,3 @@
-from datetime import datetime
 from pandas import DataFrame
 
 from investing_algorithm_framework.domain import OHLCVMarketDataSource, \
@@ -41,10 +40,7 @@ class PandasOHLCVBacktestMarketDataSource(
     def empty(self):
         pass
 
-    def get_data(self,
-        config,
-        date
-    ):
+    def get_data(self, config, date):
         pass
 
     def _validate_dataframe_with_ohlcv_structure(self):

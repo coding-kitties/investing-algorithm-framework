@@ -9,8 +9,8 @@ from investing_algorithm_framework.domain import OrderType, \
 from investing_algorithm_framework.infrastructure.database import SQLBaseModel
 from investing_algorithm_framework.infrastructure.models.model_extension \
     import SQLAlchemyModelExtension
-from investing_algorithm_framework\
-    .infrastructure.models.order_trade_association import order_trade_association
+from investing_algorithm_framework.infrastructure.models.\
+    order_trade_association import order_trade_association
 
 logger = logging.getLogger("investing_algorithm_framework")
 

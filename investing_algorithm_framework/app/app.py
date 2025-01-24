@@ -197,21 +197,24 @@ class App:
         # Initialize services in backtest
         if Environment.BACKTEST.equals(config[ENVIRONMENT]):
 
+            configuration_service = self.container.configuration_service()
+            portfolio_conf_service = self.container \
+                .portfolio_configuration_service()
+            portfolio_snap_service = self.container \
+                .portfolio_snapshot_service()
+            market_cred_service = self.container.market_credential_service()
             # Override the portfolio service with the backtest
             # portfolio service
             self.container.portfolio_service.override(
                 BacktestPortfolioService(
-                    configuration_service=self.container.configuration_service(),
-                    market_credential_service=self.container
-                    .market_credential_service(),
+                    configuration_service=configuration_service,
+                    market_credential_service=market_cred_service,
                     market_service=self.container.market_service(),
                     position_service=self.container.position_service(),
                     order_service=self.container.order_service(),
                     portfolio_repository=self.container.portfolio_repository(),
-                    portfolio_configuration_service=self.container
-                    .portfolio_configuration_service(),
-                    portfolio_snapshot_service=self.container
-                    .portfolio_snapshot_service(),
+                    portfolio_configuration_service=portfolio_conf_service,
+                    portfolio_snapshot_service=portfolio_snap_service
                 )
             )
 
@@ -232,6 +235,13 @@ class App:
                 )
             )
 
+            portfolio_conf_service = self.container.\
+                portfolio_configuration_service()
+            portfolio_snap_service = self.container.\
+                portfolio_snapshot_service()
+            configuration_service = self.container.configuration_service()
+            market_data_source_service = self.container.\
+                market_data_source_service()
             # Override the order service with the backtest order service
             self.container.order_service.override(
                 OrderBacktestService(
@@ -239,12 +249,10 @@ class App:
                     order_repository=self.container.order_repository(),
                     position_repository=self.container.position_repository(),
                     portfolio_repository=self.container.portfolio_repository(),
-                    portfolio_configuration_service=self.container
-                    .portfolio_configuration_service(),
-                    portfolio_snapshot_service=self.container
-                    .portfolio_snapshot_service(),
-                    configuration_service=self.container.configuration_service(),
-                    market_data_source_service=self.container.market_data_source_service(),
+                    portfolio_configuration_service=portfolio_conf_service,
+                    portfolio_snapshot_service=portfolio_snap_service,
+                    configuration_service=configuration_service,
+                    market_data_source_service=market_data_source_service
                 )
             )
 
@@ -319,15 +327,17 @@ class App:
             )
 
             for portfolio_configuration \
-                in portfolio_configuration_service.get_all():
+                    in portfolio_configuration_service.get_all():
 
                 if not portfolio_service.exists(
                     {"identifier": portfolio_configuration.identifier}
                 ):
-                    portfolio = portfolio_service\
-                        .create_portfolio_from_configuration(
-                            portfolio_configuration, initial_amount=initial_backtest_amount,
+                    portfolio = (
+                        portfolio_service.create_portfolio_from_configuration(
+                            portfolio_configuration,
+                            initial_amount=initial_backtest_amount,
                         )
+                    )
         else:
             synced_portfolios = []
 
@@ -637,7 +647,9 @@ class App:
             BACKTESTING_END_DATE: backtest_date_range.end_date,
             DATABASE_NAME: "backtest-database.sqlite3",
             DATABASE_DIRECTORY_NAME: "backtest_databases",
-            BACKTESTING_PENDING_ORDER_CHECK_INTERVAL: pending_order_check_interval,
+            BACKTESTING_PENDING_ORDER_CHECK_INTERVAL: (
+                pending_order_check_interval
+            ),
             BACKTESTING_INITIAL_AMOUNT: initial_amount
         })
 
@@ -748,7 +760,9 @@ class App:
                     BACKTESTING_END_DATE: date_range.end_date,
                     DATABASE_NAME: "backtest-database.sqlite3",
                     DATABASE_DIRECTORY_NAME: "backtest_databases",
-                    BACKTESTING_PENDING_ORDER_CHECK_INTERVAL: pending_order_check_interval
+                    BACKTESTING_PENDING_ORDER_CHECK_INTERVAL: (
+                        pending_order_check_interval
+                    )
                 })
                 self.initialize_config()
 

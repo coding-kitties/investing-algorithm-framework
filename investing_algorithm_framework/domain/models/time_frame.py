@@ -20,7 +20,6 @@ class TimeFrame(Enum):
     ONE_MONTH = "1M"
     ONE_YEAR = "1Y"
 
-
     @staticmethod
     def from_string(value: str):
 

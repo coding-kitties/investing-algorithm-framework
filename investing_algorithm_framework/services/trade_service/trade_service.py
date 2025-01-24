@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 from queue import PriorityQueue
 from dateutil import parser
 
@@ -44,11 +43,11 @@ class TradeService(RepositoryService):
         status = buy_order.get_status()
 
         if status in \
-            [
-                OrderStatus.CANCELED.value,
-                OrderStatus.EXPIRED.value,
-                OrderStatus.REJECTED.value
-            ]:
+                [
+                    OrderStatus.CANCELED.value,
+                    OrderStatus.EXPIRED.value,
+                    OrderStatus.REJECTED.value
+                ]:
             return None
 
         data = {
@@ -74,12 +73,14 @@ class TradeService(RepositoryService):
         Function to update a trade from a buy order. This function
         checks if a trade exists for the buy order. If the given buy
         order has its status set to CANCLED, EXPIRED, or REJECTED, the
-        trade will object will be removed. If the given buy order has its status set to CLOSED or OPEN, the amount and remaining of
-        the trade object will be updated.
+        trade will object will be removed. If the given buy order has
+        its status set to CLOSED or OPEN, the amount and
+        remaining of the trade object will be updated.
 
         Args:
             filled_difference: float representing the difference between the
-                filled amount of the buy order and the filled amount of the trade
+                filled amount of the buy order and the filled amount
+                of the trade
             buy_order: Order object representing the buy order
 
         Returns:
@@ -96,11 +97,11 @@ class TradeService(RepositoryService):
         status = buy_order.get_status()
 
         if status in \
-            [
-                OrderStatus.CANCELED.value,
-                OrderStatus.EXPIRED.value,
-                OrderStatus.REJECTED.value
-            ]:
+                [
+                    OrderStatus.CANCELED.value,
+                    OrderStatus.EXPIRED.value,
+                    OrderStatus.REJECTED.value
+                ]:
             return self.delete(trade.id)
 
         trade = self.find({"order_id": buy_order.id})
@@ -124,8 +125,9 @@ class TradeService(RepositoryService):
         This function checks if a trade exists for the buy order.
         If the given buy order has its status set to
         CANCLED, EXPIRED, or REJECTED, the
-        trade will object will be removed. If the given buy order has its status set to CLOSED or OPEN, the amount and remaining of
-        the trade object will be updated.
+        trade will object will be removed. If the given buy order
+        has its status set to CLOSED or OPEN, the amount and
+        remaining of the trade object will be updated.
 
         Args:
             sell_order: Order object representing the sell order that has
@@ -225,7 +227,6 @@ class TradeService(RepositoryService):
         )
 
     def update_trades_with_market_data(self, market_data):
-        config = self.configuration_service.get_config()
         open_trades = self.get_all({"status": TradeStatus.OPEN.value})
         meta_data = market_data["metadata"]
 
@@ -238,7 +239,9 @@ class TradeService(RepositoryService):
             timeframes = ohlcv_meta_data[open_trade.symbol].keys()
             sorted_timeframes = sorted(timeframes)
             most_granular_interval = sorted_timeframes[0]
-            identifier = ohlcv_meta_data[open_trade.symbol][most_granular_interval]
+            identifier = (
+                ohlcv_meta_data[open_trade.symbol][most_granular_interval]
+            )
             data = market_data[identifier]
 
             # Get last row of data
@@ -254,7 +257,7 @@ class TradeService(RepositoryService):
             if open_trade.trailing_stop_loss_percentage is not None:
 
                 if open_trade.high_water_mark is None or \
-                    open_trade.high_water_mark < price:
+                        open_trade.high_water_mark < price:
                     update_data["high_water_mark"] = price
 
             self.update(open_trade.id, update_data)
@@ -300,17 +303,18 @@ class TradeService(RepositoryService):
     def get_triggered_stop_losses(self):
         """
         Function to check if any trades have hit their stop loss. If a trade
-        has hit its stop loss, the trade is added to a list of triggered trades. This list is then returned.
+        has hit its stop loss, the trade is added to a list of
+        triggered trades. This list is then returned.
 
         Returns:
             List of Trade objects
         """
         triggered_trades = []
-        open_trades = self.get_all(
-            {
-                "status": TradeStatus.OPEN.value, "stop_loss_percentage_not_none": True
-            }
-        )
+        query = {
+            "status": TradeStatus.OPEN.value,
+            "stop_loss_percentage_not_none": True
+        }
+        open_trades = self.get_all(query)
 
         for open_trade in open_trades:
 
@@ -322,17 +326,18 @@ class TradeService(RepositoryService):
     def get_triggered_trailing_stop_losses(self):
         """
         Function to check if any trades have hit their stop loss. If a trade
-        has hit its stop loss, the trade is added to a list of triggered trades. This list is then returned.
+        has hit its stop loss, the trade is added to a list of
+        triggered trades. This list is then returned.
 
         Returns:
             List of Trade objects
         """
         triggered_trades = []
-        open_trades = self.get_all(
-            {
-                "status": TradeStatus.OPEN.value, "trailing_stop_loss_percentage_not_none": True
-            }
-        )
+        query = {
+            "status": TradeStatus.OPEN.value,
+            "trailing_stop_loss_percentage_not_none": True
+        }
+        open_trades = self.get_all(query)
 
         for open_trade in open_trades:
 
