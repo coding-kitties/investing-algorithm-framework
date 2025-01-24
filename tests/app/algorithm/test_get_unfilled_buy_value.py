@@ -113,7 +113,7 @@ class Test(TestBase):
 
         # Check that the portfolio has the correct amount of trades
         trade_service = self.app.container.trade_service()
-        self.assertEqual(1, trade_service.count())
+        self.assertEqual(3, trade_service.count())
         self.assertEqual(
             1, trade_service.count(
                 {"portfolio_id": portfolio.id, "status": "OPEN"}

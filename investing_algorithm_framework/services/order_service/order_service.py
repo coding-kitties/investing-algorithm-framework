@@ -1,6 +1,5 @@
 import logging
 from datetime import datetime
-from queue import PriorityQueue
 
 from dateutil.tz import tzutc
 
@@ -70,9 +69,9 @@ class OrderService(RepositoryService):
                 .get(portfolio.identifier)
             self.execute_order(order_id, portfolio)
 
-
-        # Create trade from buy order
-        self.trade_service.create_trade_from_buy_order(order)
+        # Create trade from buy order if buy order
+        if OrderSide.BUY.equals(order.get_order_side()):
+            self.trade_service.create_trade_from_buy_order(order)
 
         return order
 
@@ -214,7 +213,8 @@ class OrderService(RepositoryService):
 
         if position.get_amount() < order_data["amount"]:
             raise OperationalException(
-                "Order amount is larger then amount of open position"
+                f"Order amount {order_data['amount']} is larger " +
+                f"then amount of open position {position.get_amount()}"
             )
 
         if not order_data["trading_symbol"] == portfolio.trading_symbol:
@@ -314,9 +314,20 @@ class OrderService(RepositoryService):
                     "Sell order amount larger then position size"
                 )
 
-    def check_pending_orders(self):
-        pending_orders = self.get_all({"status": OrderStatus.OPEN.value})
-        logger.info(f"Checking {len(pending_orders)} open orders")
+    def check_pending_orders(self, portfolio=None):
+        """
+        Function to check if
+        """
+
+        if portfolio is not None:
+            pending_orders = self.get_all(
+                {
+                    "status": OrderStatus.OPEN.value,
+                    "portfolio_id": portfolio.id
+                }
+            )
+        else:
+            pending_orders = self.get_all({"status": OrderStatus.OPEN.value})
 
         for order in pending_orders:
             position = self.position_repository.get(order.position_id)
@@ -360,6 +371,18 @@ class OrderService(RepositoryService):
         )
 
     def _sync_portfolio_with_created_sell_order(self, order):
+        """
+        Function to sync the portfolio with a created sell order. The
+        function will subtract the amount of the order from the position.
+        The portfolio will not be updated because the sell order has not been
+        filled.
+
+        Args:
+            order: Order object representing the sell order
+
+        Returns:
+            None
+        """
         position = self.position_repository.get(order.position_id)
         self.position_repository.update(
             position.id,
@@ -411,6 +434,10 @@ class OrderService(RepositoryService):
             }
         )
 
+        self.trade_service.update_trade_with_buy_order(
+            filled_difference, current_order
+        )
+
     def _sync_with_sell_order_filled(self, previous_order, current_order):
         filled_difference = current_order.get_filled() - \
                             previous_order.get_filled()
@@ -447,8 +474,9 @@ class OrderService(RepositoryService):
                 + filled_size
             }
         )
-
-        self._close_trades(filled_difference, current_order)
+        self.trade_service.update_trade_with_sell_order_filled(
+            filled_difference, current_order
+        )
 
     def _sync_with_buy_order_cancelled(self, order):
         remaining = order.get_amount() - order.get_filled()
@@ -619,113 +647,6 @@ class OrderService(RepositoryService):
             position.id,
             {
                 "amount": position.get_amount() + remaining
-            }
-        )
-
-    def _close_trades(self, amount_to_close, sell_order):
-        """
-        Close trades for an executed sell order.
-
-        This method will c
-        """
-        matching_buy_orders = self.order_repository.get_all(
-            {
-                "position": sell_order.position_id,
-                "order_side": OrderSide.BUY.value,
-                "status": OrderStatus.CLOSED.value
-            }
-        )
-        matching_buy_orders = [
-            buy_order for buy_order in matching_buy_orders
-            if buy_order.get_trade_closed_at() is None
-        ]
-        order_queue = PriorityQueue()
-
-        for order in matching_buy_orders:
-            order_queue.put(order)
-
-        total_net_gain = 0
-        total_cost = 0
-
-        while amount_to_close > 0 and not order_queue.empty():
-            buy_order = order_queue.get()
-            closed_amount = buy_order.get_trade_closed_amount()
-
-            # Check if the order has been closed
-            if closed_amount is None:
-                closed_amount = 0
-
-            available_to_close = buy_order.get_filled() - closed_amount
-
-            if amount_to_close >= available_to_close:
-                to_be_closed = available_to_close
-                remaining = amount_to_close - to_be_closed
-                cost = buy_order.get_price() * to_be_closed
-                net_gain = (sell_order.get_price() - buy_order.get_price()) \
-                    * to_be_closed
-                amount_to_close = remaining
-                self.order_repository.update(
-                    buy_order.id,
-                    {
-                        "trade_closed_amount": buy_order.get_filled(),
-                        "trade_closed_at": sell_order.get_updated_at(),
-                        "trade_closed_price": sell_order.get_price(),
-                        "net_gain": buy_order.get_net_gain() + net_gain
-                    }
-                )
-            else:
-                to_be_closed = amount_to_close
-                net_gain = (sell_order.get_price() - buy_order.get_price()) \
-                    * to_be_closed
-                cost = buy_order.get_price() * amount_to_close
-                closed_amount = buy_order.get_trade_closed_amount()
-
-                if closed_amount is None:
-                    closed_amount = 0
-
-                self.order_repository.update(
-                    buy_order.id,
-                    {
-                        "trade_closed_amount": closed_amount + to_be_closed,
-                        "trade_closed_price": sell_order.get_price(),
-                        "net_gain": buy_order.get_net_gain() + net_gain
-                    }
-                )
-                amount_to_close = 0
-
-            total_net_gain += net_gain
-            total_cost += cost
-
-        position = self.position_repository.get(sell_order.position_id)
-
-        # Update portfolio
-        portfolio = self.portfolio_repository.get(position.portfolio_id)
-        self.portfolio_repository.update(
-            portfolio.id,
-            {
-                "total_net_gain": portfolio.get_total_net_gain()
-                + total_net_gain,
-                "total_cost": portfolio.get_total_cost() - total_cost,
-                "net_size": portfolio.get_net_size() + total_net_gain
-            }
-        )
-        # Update the position
-        position = self.position_repository.get(sell_order.position_id)
-        self.position_repository.update(
-            position.id,
-            {
-                "cost": position.get_cost() - total_cost
-            }
-        )
-
-        # Update the sell order
-        self.order_repository.update(
-            sell_order.id,
-            {
-                "trade_closed_amount": sell_order.get_filled(),
-                "trade_closed_at": sell_order.get_updated_at(),
-                "trade_closed_price": sell_order.get_price(),
-                "net_gain": sell_order.get_net_gain() + total_net_gain
             }
         )
 

@@ -1,6 +1,6 @@
 import os
 from investing_algorithm_framework.domain import Environment, \
-    RESOURCE_DIRECTORY, DATABASE_DIRECTORY_NAME
+    RESOURCE_DIRECTORY
 
 DEFAULT_CONFIGURATION = {
     "ENVIRONMENT": Environment.PROD.value,

@@ -18,7 +18,8 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     PortfolioConfiguration, Portfolio, Position, Order, TradeStatus, \
     BacktestReport, PortfolioSnapshot, StrategyProfile, \
     BacktestPosition, Trade, MarketCredential, PositionSnapshot, \
-    BacktestReportsEvaluation, AppMode, BacktestDateRange, DateRange
+    BacktestReportsEvaluation, AppMode, BacktestDateRange, DateRange, \
+    MarketDataType
 from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
     OHLCVMarketDataSource, BacktestMarketDataSource, MarketDataSource, \
     MarketService, MarketCredentialService, AbstractPortfolioSyncService, \
@@ -122,5 +123,6 @@ __all__ = [
     "get_backtest_report",
     "DEFAULT_LOGGING_CONFIG",
     "DATABASE_DIRECTORY_NAME",
-    "BACKTESTING_INITIAL_AMOUNT"
+    "BACKTESTING_INITIAL_AMOUNT",
+    "MarketDataType"
 ]

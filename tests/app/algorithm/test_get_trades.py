@@ -39,15 +39,14 @@ class Test(TestBase):
         ))
 
     def test_get_trades(self):
-        self.app.algorithm.create_limit_order(
+        order = self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="BUY",
             amount=20
         )
-        order = self.app.algorithm.get_order()
         self.assertIsNotNone(order)
-        self.assertEqual(0, len(self.app.algorithm.get_trades()))
+        self.assertEqual(1, len(self.app.algorithm.get_trades()))
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
         self.assertEqual(1, len(self.app.algorithm.get_trades()))
@@ -56,7 +55,6 @@ class Test(TestBase):
         self.assertEqual(20, trade.amount)
         self.assertEqual("BTC", trade.target_symbol)
         self.assertEqual("EUR", trade.trading_symbol)
-        self.assertIsNone(trade.closed_price)
         self.assertIsNone(trade.closed_at)
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
@@ -71,5 +69,4 @@ class Test(TestBase):
         self.assertEqual(20, trade.amount)
         self.assertEqual("BTC", trade.target_symbol)
         self.assertEqual("EUR", trade.trading_symbol)
-        self.assertIsNotNone(trade.closed_price)
         self.assertIsNotNone(trade.closed_at)

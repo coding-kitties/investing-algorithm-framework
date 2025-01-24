@@ -182,8 +182,8 @@ class CCXTOHLCVBacktestMarketDataSource(
 
     def get_data(
         self,
-        end_date,
-        config=None
+        date,
+        config=None,
     ):
         """
         Get data implementation of ccxt based ohlcv backtest market data
@@ -192,6 +192,8 @@ class CCXTOHLCVBacktestMarketDataSource(
         """
         if self.data is None:
             self.load_data()
+
+        end_date = date
 
         if end_date is None:
             return self.data
@@ -297,7 +299,6 @@ class CCXTTickerBacktestMarketDataSource(
 
         When downloading the data it will use the ccxt library.
         """
-        config = self.config
         total_minutes = TimeFrame.from_string(self.time_frame)\
             .amount_of_minutes
         self.backtest_data_start_date = \
@@ -381,8 +382,8 @@ class CCXTTickerBacktestMarketDataSource(
 
     def get_data(
         self,
-        config,
         date,
+        config,
     ):
         """
         Get data implementation of ccxt based ticker backtest market data
@@ -430,9 +431,9 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
 
     def get_data(
         self,
-        config=None,
         start_date: datetime = None,
         end_date: datetime = None,
+        config=None,
     ):
         """
         Implementation of get_data for CCXTOHLCVMarketDataSource.
@@ -460,9 +461,6 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
         # Add config if present
         if self.config is not None:
             market_service.config = self.config
-
-        start_date = None
-        end_date = None
 
         # Calculate the start and end dates
         if start_date is None or end_date is None:
@@ -655,9 +653,9 @@ class CCXTOrderBookMarketDataSource(OrderBookMarketDataSource):
 
     def get_data(
         self,
-        config=None,
         start_date: datetime = None,
         end_date: datetime = None,
+        config=None,
     ):
         market_service = CCXTMarketService(
             market_credential_service=self.market_credential_service
@@ -689,9 +687,9 @@ class CCXTTickerMarketDataSource(TickerMarketDataSource):
 
     def get_data(
         self,
-        config=None,
         start_date: datetime = None,
         end_date: datetime = None,
+        config=None,
     ):
         market_service = CCXTMarketService(
             market_credential_service=self.market_credential_service

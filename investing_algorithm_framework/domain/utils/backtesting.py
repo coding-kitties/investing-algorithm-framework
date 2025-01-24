@@ -7,7 +7,7 @@ from typing import List, Tuple
 from tabulate import tabulate
 
 from investing_algorithm_framework.domain import DATETIME_FORMAT, \
-    BacktestDateRange
+    BacktestDateRange, TradeStatus
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
 from investing_algorithm_framework.domain.models.backtesting import \
@@ -456,22 +456,33 @@ def pretty_print_backtest(
         trades_table["Duration (hours)"] = [
             trade.duration for trade in backtest_report.trades
         ]
-        trades_table[f"Size ({backtest_report.trading_symbol})"] = [
-            f"{trade.size:.{precision}f}" for trade in backtest_report.trades
+        trades_table[f"Cost ({backtest_report.trading_symbol})"] = [
+            f"{trade.cost:.{precision}f}" for trade in backtest_report.trades
         ]
         trades_table[f"Net gain ({backtest_report.trading_symbol})"] = [
             f"{trade.net_gain:.{precision}f}"
             for trade in backtest_report.trades
         ]
+
+        # Add (unrealized) to the net gain if the trade is still open
+        trades_table[f"Net gain ({backtest_report.trading_symbol})"] = [
+            f"{trade.net_gain_absolute:.{precision}f}" + (" (unrealized)" if not TradeStatus.CLOSED.equals(trade.status) else "")
+            for trade in backtest_report.trades
+        ]
         trades_table["Net gain percentage"] = [
-            f"{trade.net_gain_percentage:.{precision}f}%"
+            f"{trade.net_gain_percentage:.{precision}f}%" + (" (unrealized)" if not TradeStatus.CLOSED.equals(trade.status) else "")
             for trade in backtest_report.trades
         ]
         trades_table[f"Open price ({backtest_report.trading_symbol})"] = [
             trade.open_price for trade in backtest_report.trades
         ]
-        trades_table[f"Close price ({backtest_report.trading_symbol})"] = [
-            trade.closed_price for trade in backtest_report.trades
+        trades_table[
+            f"Last reported price ({backtest_report.trading_symbol})"
+        ] = [
+            trade.last_reported_price for trade in backtest_report.trades
+        ]
+        trades_table["Stop loss triggered"] = [
+            trade.stop_loss_triggered for trade in backtest_report.trades
         ]
         print(tabulate(trades_table, headers="keys", tablefmt="rounded_grid"))
 

@@ -18,7 +18,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, BacktestReport, \
     BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, APP_MODE, MarketCredential, \
     AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, \
-    BACKTESTING_INITIAL_AMOUNT
+    BACKTESTING_INITIAL_AMOUNT, MarketDataSource
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables
 from investing_algorithm_framework.services import OrderBacktestService, \
@@ -49,6 +49,7 @@ class App:
         self._configuration_service = None
         self._market_data_source_service: \
             Optional[MarketDataSourceService] = None
+        self._market_data_sources = []
         self._market_credential_service: \
             Optional[MarketCredentialService] = None
         self._on_initialize_hooks = []
@@ -234,6 +235,7 @@ class App:
             # Override the order service with the backtest order service
             self.container.order_service.override(
                 OrderBacktestService(
+                    trade_service=self.container.trade_service(),
                     order_repository=self.container.order_repository(),
                     position_repository=self.container.position_repository(),
                     portfolio_repository=self.container.portfolio_repository(),
@@ -247,19 +249,25 @@ class App:
             )
 
         # Initialize all market credentials
-        market_credential_service = self.container.market_credential_service()
-        market_credential_service.initialize()
+        self._market_credential_service = self.container.\
+            market_credential_service()
+        self._market_credential_service.initialize()
 
         # Add all market data sources of the strategies to the market data
         # source service
-        market_data_source_service = \
-            self.container.market_data_source_service()
+        self._market_data_source_service = self.container.\
+            market_data_source_service()
+        self._market_data_source_service.market_data_sources = \
+            self._market_data_sources
 
         for strategy in self.algorithm.strategies:
 
             if strategy.market_data_sources is not None:
                 for market_data_source in strategy.market_data_sources:
-                    market_data_source_service.add(market_data_source)
+                    self._market_data_source_service.add(market_data_source)
+
+        # Initialize the market data source service
+        self._market_data_source_service.initialize_market_data_sources()
 
         portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
@@ -272,17 +280,9 @@ class App:
         if portfolio_configuration_service.count() == 0:
             raise OperationalException("No portfolios configured")
 
-        market_credential_service = self.container.market_credential_service()
-        market_data_source_service = \
-            self.container.market_data_source_service()
-
-        # Initialize market data source service
-        market_data_source_service.initialize_market_data_sources()
-
         self.algorithm.initialize_services(
             configuration_service=self.container.configuration_service(),
-            market_data_source_service=self.container
-            .market_data_source_service(),
+            market_data_source_service=self._market_data_source_service,
             market_credential_service=self.container
             .market_credential_service(),
             portfolio_service=self.container.portfolio_service(),
@@ -371,9 +371,6 @@ class App:
         # Sync all orders from exchange with current order history
         portfolio_sync_service.sync_orders(portfolio)
 
-        # Sync all trades from exchange with current trade history
-        portfolio_sync_service.sync_trades(portfolio)
-
     def run(
         self,
         payload: dict = None,
@@ -460,7 +457,6 @@ class App:
 
             self.algorithm.start(number_of_iterations=number_of_iterations)
             number_of_iterations_since_last_orders_check = 1
-            self.algorithm.check_pending_orders()
 
             try:
                 while self.algorithm.running:
@@ -646,6 +642,15 @@ class App:
         })
 
         self.initialize_config()
+        config = self._configuration_service.get_config()
+        path = os.path.join(
+            config[DATABASE_DIRECTORY_PATH],
+            config[DATABASE_NAME]
+        )
+        # Remove the previous backtest db
+        if os.path.exists(path):
+            os.remove(path)
+
         self.initialize()
 
         backtest_service = self.container.backtest_service()
@@ -746,6 +751,17 @@ class App:
                     BACKTESTING_PENDING_ORDER_CHECK_INTERVAL: pending_order_check_interval
                 })
                 self.initialize_config()
+
+                config = self._configuration_service.get_config()
+
+                path = os.path.join(
+                    config[DATABASE_DIRECTORY_PATH],
+                    config[DATABASE_NAME]
+                )
+                # Remove the previous backtest db
+                if os.path.exists(path):
+                    os.remove(path)
+
                 self.initialize()
                 backtest_service = self.container.backtest_service()
                 backtest_service.resource_directory = self.config[
@@ -777,8 +793,35 @@ class App:
         return reports
 
     def add_market_data_source(self, market_data_source):
-        market_data_source.config = self.config
-        self._market_data_source_service.add(market_data_source)
+        """
+        Function to add a market data source to the app. The market data
+        source should be an instance of MarketDataSource.
+
+        This is a seperate function from the market data source service. This
+        is because the market data source service can be re-initialized.
+        Therefore we need a persistent list of market data sources in the app.
+
+        Args:
+            market_data_source: Instance of MarketDataSource
+
+        Returns:
+            None
+        """
+
+        # Check if the market data source is an instance of MarketDataSource
+        if not isinstance(market_data_source, MarketDataSource):
+            return
+
+        # Check if there is already a market data source with the same
+        # identifier
+        for existing_market_data_source in self._market_data_sources:
+            if existing_market_data_source.get_identifier() == \
+                    market_data_source.get_identifier():
+                return
+
+        market_data_source.market_credential_service = \
+            self._market_credential_service
+        self._market_data_sources.append(market_data_source)
 
     def add_market_credential(self, market_credential: MarketCredential):
         market_credential.market = market_credential.market.upper()

@@ -3,11 +3,14 @@ from datetime import datetime, timezone
 
 from investing_algorithm_framework.domain import MarketService, \
     MarketDataSource, OHLCVMarketDataSource, TickerMarketDataSource, \
-    OrderBookMarketDataSource, TimeFrame, OperationalException
+    OrderBookMarketDataSource, TimeFrame, OperationalException, \
+    MarketDataType
 from investing_algorithm_framework.services.configuration_service import \
     ConfigurationService
 from investing_algorithm_framework.services.market_credential_service \
     import MarketCredentialService
+from investing_algorithm_framework.domain import OHLCVMarketDataSource, \
+    TickerMarketDataSource, OrderBookMarketDataSource
 
 
 class MarketDataSourceService:
@@ -50,11 +53,19 @@ class MarketDataSourceService:
             symbol=symbol, market=market
         )
         config = self._configuration_service.get_config()
+        date = config.get("DATE_TIME", None)
 
         if ticker_market_data_source is not None:
+
+            if date is not None:
+                return ticker_market_data_source.get_data(
+                   end_date=date, config=config
+                )
+
             return ticker_market_data_source.get_data(
-                date=datetime.now(tz=timezone.utc), config=config
+                end_date=datetime.now(tz=timezone.utc), config=config
             )
+
         return self._market_service.get_ticker(symbol, market)
 
     def get_order_book(self, symbol, market=None):
@@ -65,7 +76,7 @@ class MarketDataSourceService:
 
         if order_book_market_data_source is not None:
             return order_book_market_data_source.get_data(
-                date=datetime.now(tz=timezone.utc), config=config
+                end_date=datetime.now(tz=timezone.utc), config=config
             )
 
         return self._market_service.get_order_book(symbol, market)
@@ -85,7 +96,7 @@ class MarketDataSourceService:
 
         if ohlcv_market_data_source is not None:
             return ohlcv_market_data_source.get_data(
-                date=datetime.now(tz=timezone.utc), config=config
+                end_date=datetime.now(tz=timezone.utc), config=config
             )
 
         return self._market_service.get_ohlcv(
@@ -111,41 +122,113 @@ class MarketDataSourceService:
         """
         identifiers = []
 
-        for market_data_source in strategy.market_data_sources:
+        if strategy.market_data_sources is not None:
+            for market_data_source in strategy.market_data_sources:
 
-            if isinstance(market_data_source, MarketDataSource):
-                identifiers.append(market_data_source.get_identifier())
-            elif isinstance(market_data_source, str):
-                identifiers.append(market_data_source)
-            else:
-                raise OperationalException(
-                    "Market data source must be a string or MarketDataSource"
-                )
+                if isinstance(market_data_source, MarketDataSource):
+                    identifiers.append(market_data_source.get_identifier())
+                elif isinstance(market_data_source, str):
+                    identifiers.append(market_data_source)
+                else:
+                    raise OperationalException(
+                        "Market data source must be a string or MarketDataSource"
+                    )
 
-        data = {}
+        market_data = {"metadata": {
+            MarketDataType.OHLCV: {},
+            MarketDataType.TICKER: {},
+            MarketDataType.ORDER_BOOK: {},
+            MarketDataType.CUSTOM: {}
+        }}
 
         for identifier in identifiers:
-            data[identifier] = self.get_data(identifier)
+            result_data = self.get_data(identifier)
 
-        return data
+            if "symbol" in result_data and result_data["symbol"] is not None \
+                    and "type" in result_data and result_data["type"] is not None:
+                type = result_data["type"]
+                symbol = result_data["symbol"]
+                time_frame = result_data["time_frame"]
+
+                if symbol not in market_data["metadata"][type]:
+                    market_data["metadata"][type][symbol] = {}
+
+                if time_frame is None:
+                    market_data["metadata"][type][symbol] = identifier
+
+            if time_frame is not None and \
+                time_frame not in market_data["metadata"][type][symbol]:
+                market_data["metadata"][type][symbol][time_frame] = identifier
+
+            market_data[identifier] = result_data["data"]
+        return market_data
 
     def get_data(self, identifier):
 
-        if isinstance(identifier, str):
-            raise OperationalException(
-                f"Market data source with identifier {identifier} not found. "
-                "Please make sure that the market data source is "
-                "registered to the app if you refer to it by "
-                "identifier in your strategy."
-            )
-
         for market_data_source in self._market_data_sources:
+
             if market_data_source.get_identifier() == identifier:
                 config = self._configuration_service.get_config()
 
-                return market_data_source.get_data(
-                    date=datetime.now(tz=timezone.utc), config=config,
-                )
+                config = self._configuration_service.get_config()
+                date = config.get("DATE_TIME", None)
+
+                if date is not None:
+                    data = market_data_source.get_data(
+                        end_date=date, config=config
+                    )
+
+                if "DATE_TIME" in config:
+                    data = market_data_source.get_data(
+                        end_date=config["DATE_TIME"], config=config,
+                    )
+                else:
+                    data = market_data_source.get_data(
+                        end_date=datetime.now(tz=timezone.utc), config=config,
+                    )
+
+                result = {
+                    "data": data,
+                    "type": None,
+                    "symbol": None,
+                    "time_frame": None
+                }
+
+                # Add metadata to the data
+                if isinstance(market_data_source, OHLCVMarketDataSource):
+                    result["type"] = MarketDataType.OHLCV
+
+                    time_frame = market_data_source.time_frame
+
+                    if time_frame is not None:
+                        result["time_frame"] = time_frame.value
+                    else:
+                        result["time_frame"] = TimeFrame.CURRENT
+
+                    result["symbol"] = market_data_source.symbol
+                    return result
+
+                if isinstance(market_data_source, TickerMarketDataSource):
+                    result["type"] = MarketDataType.TICKER
+                    result["time_frame"] = TimeFrame.CURRENT
+                    result["symbol"] = market_data_source.symbol
+                    return result
+
+                if isinstance(market_data_source, OrderBookMarketDataSource):
+                    result["type"] = MarketDataType.ORDER_BOOK
+                    result["time_frame"] = TimeFrame.CURRENT
+                    result["symbol"] = market_data_source.symbol
+                    return result
+
+                result["type"] = MarketDataType.CUSTOM
+                result["time_frame"] = TimeFrame.CURRENT
+                result["symbol"] = market_data_source.symbol
+                return result
+
+        raise OperationalException(
+            f"Backtest market data source not found for {identifier}"
+        )
+
 
     def get_ticker_market_data_source(self, symbol, market=None):
 

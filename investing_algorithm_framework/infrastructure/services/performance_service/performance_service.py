@@ -1,6 +1,7 @@
 import logging
 
-from investing_algorithm_framework.domain import OrderStatus, OrderSide
+from investing_algorithm_framework.domain import OrderStatus, OrderSide, \
+    TradeStatus
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +16,12 @@ class PerformanceService:
         order_repository,
         position_repository,
         portfolio_repository,
+        trade_repository,
     ):
         self.order_repository = order_repository
         self.position_repository = position_repository
         self.portfolio_repository = portfolio_repository
+        self.trade_repository = trade_repository
 
     def get_total_net_gain(self, portfolio_id):
         pass
@@ -43,19 +46,9 @@ class PerformanceService:
         return: The number of trades closed
         """
         portfolio = self.portfolio_repository.find({"id": portfolio_id})
-        number_of_trades_closed = 0
-        orders = self.order_repository.get_all(
-            {
-                "portfolio_id": portfolio.id,
-                "order_side": OrderSide.BUY.value,
-            }
+        return self.trade_repository.count(
+            {"portfolio_id": portfolio.id, "status": TradeStatus.OPEN.value}
         )
-
-        for order in orders:
-            if order.get_trade_closed_at() is not None:
-                number_of_trades_closed += 1
-
-        return number_of_trades_closed
 
     def get_number_of_trades_open(self, portfolio_id):
         """
@@ -68,19 +61,9 @@ class PerformanceService:
         return: The number of trades open
         """
         portfolio = self.portfolio_repository.find({"id": portfolio_id})
-        number_of_trades_open = 0
-        orders = self.order_repository.get_all(
-            {
-                "portfolio_id": portfolio.id,
-                "order_side": OrderSide.BUY.value,
-            }
+        return self.trade_repository.count(
+            {"portfolio_id": portfolio.id, "status": TradeStatus.OPEN.value}
         )
-
-        for order in orders:
-            if order.get_trade_closed_at() is None:
-                number_of_trades_open += 1
-
-        return number_of_trades_open
 
     def get_percentage_positive_trades(self, portfolio_id):
         """
@@ -95,19 +78,19 @@ class PerformanceService:
         return: The percentage of positive trades
         """
         portfolio = self.portfolio_repository.find({"id": portfolio_id})
-        orders = self.order_repository.get_all(
+        trades = self.trade_repository.get_all(
             {"portfolio_id": portfolio.id, "status": OrderStatus.CLOSED.value}
         )
-        total_number_of_orders = len(orders)
+        total_number_of_trades = len(trades)
 
-        if total_number_of_orders == 0:
+        if total_number_of_trades == 0:
             return 0.0
 
-        positive_orders = [
-            order for order in orders if order.get_net_gain() > 0
+        positive_trades = [
+            trade for trade in trades if trade.net_gain > 0
         ]
-        total_number_of_positive_orders = len(positive_orders)
-        return total_number_of_positive_orders / total_number_of_orders * 100
+        total_number_of_positive_trades = len(positive_trades)
+        return total_number_of_positive_trades / total_number_of_trades * 100
 
     def get_percentage_negative_trades(self, portfolio_id):
         """
@@ -123,19 +106,19 @@ class PerformanceService:
         """
 
         portfolio = self.portfolio_repository.find({"id": portfolio_id})
-        orders = self.order_repository.get_all(
-            {"portfolio_id": portfolio.id, "status": OrderStatus.CLOSED.value}
+        trades = self.trade_repository.get_all(
+            {"portfolio_id": portfolio.id, "status": TradeStatus.CLOSED.value}
         )
-        total_number_of_orders = len(orders)
+        total_number_of_trades = len(trades)
 
-        if total_number_of_orders == 0:
+        if total_number_of_trades == 0:
             return 0.0
 
-        negative_orders = [
-            order for order in orders if order.get_net_gain() < 0
+        negative_trades = [
+            trade for trade in trades if trade.net_gain < 0
         ]
-        total_number_of_negative_orders = len(negative_orders)
-        return total_number_of_negative_orders / total_number_of_orders * 100
+        total_number_of_negative_trades = len(negative_trades)
+        return total_number_of_negative_trades / total_number_of_trades * 100
 
     def get_growth_rate_of_backtest(
         self, portfolio_id, tickers, backtest_profile
@@ -298,27 +281,20 @@ class PerformanceService:
         return: The average trade duration
         """
         portfolio = self.portfolio_repository.find({"id": portfolio_id})
-        buy_orders = self.order_repository.get_all(
-            {
-                "portfolio_id": portfolio.id,
-                "order_side": OrderSide.BUY.value,
-            }
+        trades = self.trade_repository.get_all(
+            {"portfolio_id": portfolio.id, "status": TradeStatus.CLOSED.value}
         )
-        buy_orders_with_trade_closed = [
-            order for order in buy_orders
-            if order.get_trade_closed_at() is not None
-        ]
 
-        if len(buy_orders_with_trade_closed) == 0:
+        if len(trades) == 0:
             return 0
 
         total_duration = 0
 
-        for order in buy_orders_with_trade_closed:
-            duration = order.get_trade_closed_at() - order.get_created_at()
+        for trade in trades:
+            duration = trade.closed_at - trade.opened_at
             total_duration += duration.total_seconds() / 3600
 
-        return total_duration / len(buy_orders_with_trade_closed)
+        return total_duration / len(trades)
 
     def get_average_trade_size(self, portfolio_id):
         """
@@ -332,23 +308,15 @@ class PerformanceService:
         return: The average trade size
         """
         portfolio = self.portfolio_repository.find({"id": portfolio_id})
-        buy_orders = self.order_repository.get_all(
-            {
-                "portfolio_id": portfolio.id,
-                "order_side": OrderSide.BUY.value,
-            }
-        )
-        closed_buy_orders = [
-            order for order in buy_orders
-            if order.get_trade_closed_at() is not None
-        ]
+        portfolio = self.portfolio_repository.find({"id": portfolio_id})
+        trades = self.trade_repository.get_all({"portfolio_id": portfolio.id})
 
-        if len(closed_buy_orders) == 0:
+        if len(trades) == 0:
             return 0
 
         total_size = 0
 
-        for order in closed_buy_orders:
-            total_size += order.get_amount() * order.get_price()
+        for trade in trades:
+            total_size += trade.amount * trade.open_price
 
-        return total_size / len(closed_buy_orders)
+        return total_size / len(trades)

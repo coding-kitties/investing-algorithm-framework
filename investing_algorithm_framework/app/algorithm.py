@@ -4,7 +4,7 @@ from typing import List, Dict
 import re
 
 from investing_algorithm_framework.domain import OrderStatus, \
-    Position, Order, Portfolio, OrderType, OrderSide, \
+    Position, Order, Portfolio, OrderType, OrderSide, TradeStatus, \
     BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, MarketService, TimeUnit, \
     OperationalException, random_string, RoundingService, Trade
 from investing_algorithm_framework.services import MarketCredentialService, \
@@ -61,7 +61,7 @@ class Algorithm:
         self.market_service: MarketService
         self.configuration_service: ConfigurationService
         self.portfolio_configuration_service: PortfolioConfigurationService
-        self.strategy_orchestrator_service: StrategyOrchestratorService
+        self.strategy_orchestrator_service: StrategyOrchestratorService = None
         self._data_sources = {}
         self._strategies = []
         self._market_credential_service: MarketCredentialService
@@ -173,7 +173,9 @@ class Algorithm:
         Returns:
             None
         """
-        self.strategy_orchestrator_service.stop()
+
+        if self.strategy_orchestrator_service is not None:
+            self.strategy_orchestrator_service.stop()
 
     @property
     def name(self):
@@ -348,7 +350,7 @@ class Algorithm:
         order and execute it if the execute parameter is set to True. If the
         validate parameter is set to True, the order will be validated
 
-        Parameters:
+        Args:
             target_symbol: The symbol of the asset to trade
             price: The price of the asset
             order_side: The side of the order
@@ -509,7 +511,7 @@ class Algorithm:
         """
 
         if market is None:
-            return self.portfolio_service.find({})
+            return self.portfolio_service.get_all()[0]
 
         return self.portfolio_service.find({{"market": market}})
 
@@ -530,7 +532,7 @@ class Algorithm:
         If the market parameter is specified, the unallocated balance
         of the specified market will be returned.
 
-        Parameters:
+        Args:
             market: The market of the portfolio
 
         Returns:
@@ -540,7 +542,7 @@ class Algorithm:
         if market:
             portfolio = self.portfolio_service.find({{"market": market}})
         else:
-            portfolio = self.portfolio_service.find({})
+            portfolio = self.portfolio_service.get_all()[0]
 
         trading_symbol = portfolio.trading_symbol
         return self.position_service.find(
@@ -572,6 +574,19 @@ class Algorithm:
         order_side=None,
         order_type=None
     ) -> Order:
+        """
+        Function to retrieve an order.
+
+        Exception is thrown when no param has been provided.
+
+        Args:
+            reference_id [optional] (int): id given by the external
+                market or exchange.
+            market [optional] (str): the market that the order was
+                executed on.
+            target_symbol [optional] (str): the symbol of the asset
+                that the order was executed
+        """
         query_params = {}
 
         if reference_id:
@@ -595,6 +610,11 @@ class Algorithm:
                 {"portfolio": portfolio.id}
             )
             query_params["position"] = [position.id for position in positions]
+
+        if not query_params:
+            raise OperationalException(
+                "No parameters provided to get order."
+            )
 
         return self.order_service.find(query_params)
 
@@ -1202,25 +1222,95 @@ class Algorithm:
         query_params["status"] = OrderStatus.OPEN.value
         return self.order_service.exists(query_params)
 
-    def check_pending_orders(self):
-        """
-        Function to check pending orders
-        """
-        self.order_service.check_pending_orders()
-
-    def get_trades(self, market=None) -> List[Trade]:
+    def get_trade(
+        self,
+        target_symbol=None,
+        trading_symbol=None,
+        market=None,
+        portfolio=None,
+        status=None,
+        order_id=None
+    ) -> List[Trade]:
         """
         Function to get all trades. This function will return all trades
         that match the specified query parameters. If the market parameter
         is specified, the trades with the specified market will be returned.
 
-        Parameters:
+        Args:
             market: The market of the asset
+            portfolio: The portfolio of the asset
+            status: The status of the trade
+            order_id: The order id of the trade
+            target_symbol: The symbol of the asset
+            trading_symbol: The trading symbol of the asset
 
         Returns:
             List[Trade]: A list of trades that match the query parameters
         """
-        return self.trade_service.get_trades(market)
+        query_params = {}
+
+        if market is not None:
+            query_params["market"] = market
+
+        if portfolio is not None:
+            query_params["portfolio"] = portfolio
+
+        if status is not None:
+            query_params["status"] = status
+
+        if order_id is not None:
+            query_params["order_id"] = order_id
+
+        if target_symbol is not None:
+            query_params["target_symbol"] = target_symbol
+
+        if trading_symbol is not None:
+            query_params["trading_symbol"] = trading_symbol
+
+        return self.trade_service.find(query_params)
+
+    def get_trades(
+        self,
+        target_symbol=None,
+        trading_symbol=None,
+        market=None,
+        portfolio=None,
+        status=None,
+    ) -> List[Trade]:
+        """
+        Function to get all trades. This function will return all trades
+        that match the specified query parameters. If the market parameter
+        is specified, the trades with the specified market will be returned.
+
+        Args:
+            market: The market of the asset
+            portfolio: The portfolio of the asset
+            status: The status of the trade
+            target_symbol: The symbol of the asset
+            trading_symbol: The trading symbol of the asset
+
+        Returns:
+            List[Trade]: A list of trades that match the query parameters
+        """
+
+        query_params = {}
+
+        if market is not None:
+            query_params["market"] = market
+
+        if portfolio is not None:
+            query_params["portfolio"] = portfolio
+
+        if status is not None:
+            query_params["status"] = status
+
+        if target_symbol is not None:
+            query_params["target_symbol"] = target_symbol
+
+        if trading_symbol is not None:
+            query_params["trading_symbol"] = trading_symbol
+
+        return self.trade_service.get_all({"market": market})
 
     def get_closed_trades(self) -> List[Trade]:
         """
@@ -1230,7 +1320,44 @@ class Algorithm:
         Returns:
             List[Trade]: A list of closed trades
         """
-        return self.trade_service.get_closed_trades()
+        return self.trade_service.get_all({"status": TradeStatus.CLOSED.value})
+
+    def count_trades(
+        self,
+        target_symbol=None,
+        trading_symbol=None,
+        market=None,
+        portfolio=None
+    ) -> int:
+        """
+        Function to count trades. This function will return the number of
+        trades that match the specified query parameters.
+
+        Args:
+            target_symbol: The symbol of the asset
+            trading_symbol: The trading symbol of the asset
+            market: The market of the asset
+            portfolio: The portfolio of the asset
+
+        Returns:
+            int: The number of trades that match the query parameters
+        """
+
+        query_params = {}
+
+        if market is not None:
+            query_params["market"] = market
+
+        if portfolio is not None:
+            query_params["portfolio"] = portfolio
+
+        if target_symbol is not None:
+            query_params["target_symbol"] = target_symbol
+
+        if trading_symbol is not None:
+            query_params["trading_symbol"] = trading_symbol
+
+        return self.trade_service.count(query_params)
 
     def get_open_trades(self, target_symbol=None, market=None) -> List[Trade]:
         """
@@ -1248,9 +1375,45 @@ class Algorithm:
         Returns:
             List[Trade]: A list of open trades that match the query parameters
         """
-        return self.trade_service.get_open_trades(target_symbol, market)
+        return self.trade_service.get_all(
+            {
+                "status": TradeStatus.OPEN.value,
+                "target_symbol": target_symbol,
+                "market": market
+            }
+        )
 
-    def close_trade(self, trade, market=None, precision=None) -> None:
+    def add_stop_loss(self, trade, percentage: int) -> None:
+        """
+        Function to add a stop loss to a trade. This function will add a
+        stop loss to the specified trade. If the stop loss is triggered,
+        the trade will be closed.
+
+        Args:
+            trade: Trade - The trade to add the stop loss to
+            percentage: int - The stop loss of the trade
+
+        Returns:
+            None
+        """
+        self.trade_service.add_stop_loss(trade, percentage=percentage)
+
+    def add_trailing_stop_loss(self, trade, percentage: int) -> None:
+        """
+        Function to add a trailing stop loss to a trade. This function will
+        add a trailing stop loss to the specified trade. If the trailing
+        stop loss is triggered, the trade will be closed.
+
+        Args:
+            trade: Trade - The trade to add the trailing stop loss to
+            trailing_stop_loss: float - The trailing stop loss of the trade
+
+        Returns:
+            None
+        """
+        self.trade_service.add_trailing_stop_loss(trade, percentage=percentage)
+
+    def close_trade(self, trade, precision = None) -> None:
         """
         Function to close a trade. This function will close a trade by
         creating a market order to sell the position. If the precision
@@ -1259,14 +1422,53 @@ class Algorithm:
 
         Args:
             trade: Trade - The trade to close
-            market: str - The market of the trade
-            precision: float - The precision of the amount
+            precision: int - The precision of the amount
 
         Returns:
             None
         """
-        self.trade_service.close_trade(
-            trade=trade, market=market, precision=precision
+
+        trade = self.trade_service.get(trade.id)
+
+        if TradeStatus.CLOSED.equals(trade.status):
+            raise OperationalException("Trade already closed.")
+
+        if trade.remaining <= 0:
+            raise OperationalException("Trade has no amount to close.")
+
+        position_id = trade.orders[0].position_id
+        portfolio = self.portfolio_service.find({"position": position_id})
+        position = self.position_service.find(
+            {"portfolio": portfolio.id, "symbol": trade.target_symbol}
+        )
+        amount = trade.remaining
+
+        if precision is not None:
+            amount = RoundingService.round_down(amount, precision)
+
+        if position.get_amount() < amount:
+            logger.warning(
+                f"Order amount {amount} is larger then amount "
+                f"of available {position.symbol} "
+                f"position: {position.get_amount()}, "
+                f"changing order amount to size of position"
+            )
+            amount = position.get_amount()
+
+        ticker = self._market_data_source_service.get_ticker(
+            symbol=trade.symbol, market=portfolio.market
+        )
+
+        self.order_service.create(
+            {
+                "portfolio_id": portfolio.id,
+                "trading_symbol": trade.trading_symbol,
+                "target_symbol": trade.target_symbol,
+                "amount": amount,
+                "order_side": OrderSide.SELL.value,
+                "order_type": OrderType.LIMIT.value,
+                "price": ticker["bid"],
+            }
         )
 
     def get_number_of_positions(self):

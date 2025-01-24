@@ -368,6 +368,12 @@ def get_ema(
         named 'EMA_{period}' or named according to the
         result_column_name
     """
+
+    if source_column_name not in data.columns:
+        raise OperationalException(
+            f"Source column {source_column_name} not present in the data."
+        )
+
     ema = tp.ema(data[source_column_name].to_numpy(), period=period)
 
     if result_column_name:

@@ -4,7 +4,9 @@ from tqdm import tqdm
 
 from investing_algorithm_framework.domain import MarketService, \
     BacktestMarketDataSource, BACKTESTING_END_DATE, BACKTESTING_START_DATE, \
-    BACKTESTING_INDEX_DATETIME, OperationalException
+    BACKTESTING_INDEX_DATETIME, OperationalException, OHLCVMarketDataSource, \
+    TickerMarketDataSource, OrderBookMarketDataSource, MarketDataType, \
+    TimeFrame
 from investing_algorithm_framework.services.configuration_service import \
     ConfigurationService
 from investing_algorithm_framework.services.market_credential_service \
@@ -74,6 +76,8 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
                 backtest_end_date=backtest_end_date
             )
 
+        self.market_data_sources = backtest_market_data_sources
+
     def get_data(self, identifier):
         """
         This method is used to get the data for backtesting. It loops
@@ -93,31 +97,63 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
             if market_data_source.get_identifier() == identifier:
                 config = self._configuration_service.get_config()
                 backtest_index_date = config[BACKTESTING_INDEX_DATETIME]
-                return market_data_source.get_data(
-                    self, date=backtest_index_date, config=config
+                data = market_data_source.get_data(
+                    date=backtest_index_date, config=config
                 )
+
+                result = {
+                    "data": data,
+                    "type": None,
+                    "symbol": None,
+                    "time_frame": None
+                }
+
+                # Add metadata to the data
+                if isinstance(market_data_source, OHLCVMarketDataSource):
+                    result["type"] = MarketDataType.OHLCV
+                    time_frame = TimeFrame.from_value(
+                        market_data_source.time_frame
+                    )
+                    result["time_frame"] = time_frame.value
+                    result["symbol"] = market_data_source.symbol
+                    return result
+
+                if isinstance(market_data_source, TickerMarketDataSource):
+                    result["type"] = MarketDataType.TICKER
+                    result["time_frame"] = TimeFrame.CURRENT
+                    result["symbol"] = market_data_source.symbol
+                    return result
+
+                if isinstance(market_data_source, OrderBookMarketDataSource):
+                    result["type"] = MarketDataType.ORDER_BOOK
+                    result["time_frame"] = TimeFrame.CURRENT
+                    result["symbol"] = market_data_source.symbol
+                    return result
+
+                result["type"] = MarketDataType.CUSTOM
+                result["time_frame"] = TimeFrame.CURRENT
+                result["symbol"] = market_data_source.symbol
+                return result
 
         raise OperationalException(
             f"Backtest market data source not found for {identifier}"
         )
 
-    def get_ticker(self, symbol, market):
-        market_data_source = self.get_ticker_market_data_source(
+    def get_ticker(self, symbol, market=None):
+        ticker_market_data_source = self.get_ticker_market_data_source(
             symbol=symbol, market=market
         )
 
-        if market_data_source is None:
+        if ticker_market_data_source is None:
             raise OperationalException(
                 f"Backtest ticker data source "
                 f"not found for {symbol} and market {market}"
             )
 
-        market_data_source.market_credentials_service = \
-            self._market_credential_service
         config = self._configuration_service.get_config()
         backtest_index_date = config[BACKTESTING_INDEX_DATETIME]
-        return market_data_source.get_data(
-            self, date=backtest_index_date, config=config
+        return ticker_market_data_source.get_data(
+            date=backtest_index_date, config=config
         )
 
     def get_order_book(self, symbol, market):
@@ -129,7 +165,7 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
         config = self._configuration_service.get_config()
         backtest_index_date = config[BACKTESTING_INDEX_DATETIME]
         return market_data_source.get_data(
-            self, date=backtest_index_date, config=config
+            date=backtest_index_date, config=config
         )
 
     def get_ohlcv(
@@ -148,7 +184,7 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
         config = self._configuration_service.get_config()
         backtest_index_date = config[BACKTESTING_INDEX_DATETIME]
         return market_data_source.get_data(
-            self, date=backtest_index_date, config=config
+            date=backtest_index_date, config=config
         )
 
     def is_ohlcv_data_source_present(self, symbol, time_frame, market):

@@ -41,13 +41,12 @@ class Test(TestBase):
         )
 
     def test_get_open_trades(self):
-        self.app.algorithm.create_limit_order(
+        order = self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="BUY",
             amount=20
         )
-        order = self.app.algorithm.get_order()
         self.assertIsNotNone(order)
         self.assertEqual(0, len(self.app.algorithm.get_open_trades("BTC")))
         order_service = self.app.container.order_service()
@@ -58,7 +57,6 @@ class Test(TestBase):
         self.assertEqual(20, trade.amount)
         self.assertEqual("BTC", trade.target_symbol)
         self.assertEqual("EUR", trade.trading_symbol)
-        self.assertIsNone(trade.closed_price)
         self.assertIsNone(trade.closed_at)
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
@@ -66,7 +64,7 @@ class Test(TestBase):
             order_side="SELL",
             amount=20
         )
-        self.assertEqual(0, len(self.app.algorithm.get_open_trades("BTC")))
+        self.assertEqual(1, len(self.app.algorithm.get_open_trades("BTC")))
         order_service.check_pending_orders()
         self.assertEqual(0, len(self.app.algorithm.get_open_trades("BTC")))
 
@@ -77,13 +75,12 @@ class Test(TestBase):
             order_side="BUY",
             amount=5
         )
-        self.app.algorithm.create_limit_order(
+        order = self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="BUY",
             amount=5
         )
-        order = self.app.algorithm.get_order()
         self.assertIsNotNone(order)
         self.assertEqual(0, len(self.app.algorithm.get_open_trades("BTC")))
         order_service = self.app.container.order_service()
@@ -94,7 +91,6 @@ class Test(TestBase):
         self.assertEqual(5, trade.amount)
         self.assertEqual("BTC", trade.target_symbol)
         self.assertEqual("EUR", trade.trading_symbol)
-        self.assertIsNone(trade.closed_price)
         self.assertIsNone(trade.closed_at)
         self.assertEqual(
             0,
@@ -113,7 +109,7 @@ class Test(TestBase):
                 self.app.algorithm.get_orders(order_side="SELL", status="OPEN")
             )
         )
-        self.assertEqual(1, len(self.app.algorithm.get_open_trades("BTC")))
+        self.assertEqual(2, len(self.app.algorithm.get_open_trades("BTC")))
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
@@ -123,23 +119,25 @@ class Test(TestBase):
         self.assertEqual(2, len(
             self.app.algorithm.get_orders(order_side="SELL", status="OPEN"))
         )
-        self.assertEqual(0, len(self.app.algorithm.get_open_trades("BTC")))
+        self.assertEqual(2, len(self.app.algorithm.get_open_trades("BTC")))
 
     def test_get_open_trades_with_close_trades_of_partial_buy_orders(self):
-        self.app.algorithm.create_limit_order(
+        order_one = self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="BUY",
             amount=5
         )
-        self.app.algorithm.create_limit_order(
+        order_two = self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="BUY",
             amount=5
         )
-        order = self.app.algorithm.get_order()
-        self.assertIsNotNone(order)
+        order_one_id = order_one.id
+        order_two_id = order_two.id
+        self.assertIsNotNone(order_one)
+        self.assertIsNotNone(order_two)
         self.assertEqual(0, len(self.app.algorithm.get_open_trades("BTC")))
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
@@ -149,7 +147,6 @@ class Test(TestBase):
         self.assertEqual(5, trade.amount)
         self.assertEqual("BTC", trade.target_symbol)
         self.assertEqual("EUR", trade.trading_symbol)
-        self.assertIsNone(trade.closed_price)
         self.assertIsNone(trade.closed_at)
         self.assertEqual(
             0,
@@ -168,13 +165,15 @@ class Test(TestBase):
                 self.app.algorithm.get_orders(order_side="SELL", status="OPEN")
             )
         )
-        open_trades = self.app.algorithm.get_open_trades("BTC")
-        self.assertEqual(2.5, open_trades[0].amount)
-        self.assertEqual(5, open_trades[1].amount)
-        self.app.algorithm.check_pending_orders()
-        open_trades = self.app.algorithm.get_open_trades("BTC")
-        self.assertEqual(2.5, open_trades[0].amount)
-        self.assertEqual(5, open_trades[1].amount)
+        trade_one = self.app.algorithm.get_trade(order_id=order_one_id)
+        trade_two = self.app.algorithm.get_trade(order_id=order_two_id)
+        self.assertEqual(5, trade_one.remaining)
+        self.assertEqual(5, trade_two.remaining)
+        self.app.algorithm.order_service.check_pending_orders()
+        trade_one = self.app.algorithm.get_trade(order_id=order_one_id)
+        trade_two = self.app.algorithm.get_trade(order_id=order_two_id)
+        self.assertEqual(2.5, trade_one.remaining)
+        self.assertEqual(5, trade_two.remaining)
         self.assertEqual(2, len(self.app.algorithm.get_open_trades("BTC")))
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",
@@ -183,9 +182,15 @@ class Test(TestBase):
             amount=5
         )
         trades = self.app.algorithm.get_open_trades()
-        self.assertEqual(1, len(trades))
-        self.assertEqual(2.5, trades[0].amount)
-        self.app.algorithm.check_pending_orders()
+        self.assertEqual(2, len(trades))
+        trade_one = self.app.algorithm.get_trade(order_id=order_one_id)
+        trade_two = self.app.algorithm.get_trade(order_id=order_two_id)
+        self.assertEqual(2.5, trade_one.remaining)
+        self.assertEqual(5, trade_two.remaining)
+        self.app.algorithm.order_service.check_pending_orders()
         trades = self.app.algorithm.get_open_trades()
         self.assertEqual(1, len(trades))
-        self.assertEqual(2.5, trades[0].amount)
+        trade_one = self.app.algorithm.get_trade(order_id=order_one_id)
+        trade_two = self.app.algorithm.get_trade(order_id=order_two_id)
+        self.assertEqual(0, trade_one.remaining)
+        self.assertEqual(2.5, trade_two.remaining)

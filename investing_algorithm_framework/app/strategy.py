@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from investing_algorithm_framework.domain import OperationalException, Position
 from investing_algorithm_framework.domain import \
     TimeUnit, StrategyProfile, Trade, ENVIRONMENT, Environment, \
-    BACKTESTING_INDEX_DATETIME
+    BACKTESTING_INDEX_DATETIME, TradeStatus
 from .algorithm import Algorithm
 
 
@@ -74,16 +74,17 @@ class TradingStrategy:
 
     def run_strategy(self, algorithm, market_data):
         self.algorithm = algorithm
+        config = self.algorithm.get_config()
 
-        # Check if there are any pending orders that need to be executed
-        self._update_trade_prices()
-        self._check_pending_orders(market_data)
-        self._check_stop_losses(market_data)
+        if config[ENVIRONMENT] == Environment.BACKTEST.value:
+            self._update_trades_and_orders_for_backtest(market_data)
+        else:
+            self._update_trades_and_orders(market_data)
+
+        self._check_stop_losses()
 
         # Run user defined strategy
         self.apply_strategy(algorithm=algorithm, market_data=market_data)
-
-        config = self.algorithm.get_config()
 
         if config[ENVIRONMENT] == Environment.BACKTEST.value:
             self._last_run = config[BACKTESTING_INDEX_DATETIME]
@@ -105,37 +106,43 @@ class TradingStrategy:
             market_data_sources=self.market_data_sources
         )
 
+    def _update_trades_and_orders(self, market_data):
+        self.algorithm.order_service.check_pending_orders()
+        self.algorithm.trade_service\
+            .update_trades_with_market_data(market_data)
+
+    def _update_trades_and_orders_for_backtest(self, market_data):
+        self.algorithm.order_service.check_pending_orders(market_data)
+        self.algorithm.trade_service\
+            .update_trades_with_market_data(market_data)
+
     def _check_pending_orders(self, market_data):
         """
         Check if there are any pending orders that need to be executed
         """
-        self.algorithm.check_pending_orders()
+        pass
+        # self.algorithm.check_pending_orders()
 
-    def _check_stop_losses(self, market_data):
+    def _check_stop_losses(self):
         """
-        Check if there are any stop losses that need
-        to be triggered
+        Check if there are any stop losses that result in trades being closed.
         """
-        trades = self.algorithm.get_open_trades()
+        trade_service = self.algorithm.trade_service
+        triggered_trades = trade_service.get_triggered_stop_losses()
 
-    def _update_trade_prices(self):
-        """
-        Update the prices of the trades
-        """
-        trades = self.algorithm.get_open_trades()
-        trade_service = self.algorithm.get_trade_service()
+        for trade in triggered_trades:
+            trade_service.update(trade.id, {"stop_loss_triggered": True})
+            self.algorithm.close_trade(
+                trade
+            )
 
-        for trade in trades:
-            symbol = trade.get_symbol()
-            market_data_source_service = \
-                self.algorithm.get_market_data_source_service()
-            ticker = market_data_source_service.get_ticker(symbol)
-            print(ticker)
+        triggered_trades = trade_service.get_triggered_trailing_stop_losses()
 
-            if ticker is not None:
-                trade_service.update(
-                    trade.id, {"current_price": ticker["last"]}
-                )
+        for trade in triggered_trades:
+            trade_service.update(trade.id, {"stop_loss_triggered": True})
+            self.algorithm.close_trade(
+                trade
+            )
 
     def on_trade_closed(self, algorithm: Algorithm, trade: Trade):
         pass

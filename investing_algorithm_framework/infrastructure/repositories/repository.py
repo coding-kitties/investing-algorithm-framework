@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from abc import ABC, abstractmethod
 from typing import Callable
 
@@ -149,6 +150,9 @@ class Repository(ABC):
                 raise ApiException("Error checking if object exists")
 
     def find(self, query_params):
+
+        if query_params is None or len(query_params) == 0:
+            raise ApiException("Find requires query parameters")
 
         with Session() as db:
             try:

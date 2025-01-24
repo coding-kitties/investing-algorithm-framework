@@ -25,6 +25,10 @@ def convert_polars_to_pandas(
         DataFrame - Pandas DataFrame that has been converted
           from a Polars DataFrame
     """
+
+    if not isinstance(data, PolarsDataFrame):
+        raise ValueError("Data must be a Polars DataFrame")
+
     data = data.to_pandas().copy()
 
     if add_index:

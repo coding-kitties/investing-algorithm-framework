@@ -4,7 +4,7 @@ import polars as pl
 
 from investing_algorithm_framework.domain import BACKTESTING_INDEX_DATETIME, \
     OrderStatus, BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, \
-    OperationalException, OrderSide, Order, TimeFrame
+    OperationalException, OrderSide, Order, TimeFrame, MarketDataType
 from investing_algorithm_framework.services.market_data_source_service \
     import BacktestMarketDataSourceService
 from .order_service import OrderService
@@ -17,6 +17,7 @@ class OrderBacktestService(OrderService):
     def __init__(
         self,
         order_repository,
+        trade_service,
         position_repository,
         portfolio_repository,
         portfolio_configuration_service,
@@ -25,6 +26,7 @@ class OrderBacktestService(OrderService):
         market_data_source_service: BacktestMarketDataSourceService,
     ):
         super(OrderService, self).__init__(order_repository)
+        self.trade_service = trade_service
         self.order_repository = order_repository
         self.position_repository = position_repository
         self.portfolio_repository = portfolio_repository
@@ -56,67 +58,35 @@ class OrderBacktestService(OrderService):
         )
         return order
 
-    def check_pending_orders(self):
+    def check_pending_orders(self, market_data):
         """
-        Function to check if any pending orders have executed.
+        Function to check if any pending orders have executed. It querys the
+        open orders and checks if the order has executed based on the OHLCV
+        data. If the order has executed, the order status is set to CLOSED
+        and the filled amount is set to the order amount.
+
+        Args:
+            market_data (dict): Dictionary containing the market data
+
+        Returns:
+            None
         """
         pending_orders = self.get_all({"status": OrderStatus.OPEN.value})
-        logger.info(f"Checking {len(pending_orders)} open orders")
-        config = self.configuration_service.get_config()
+        meta_data = market_data["metadata"]
 
         for order in pending_orders:
-            symbol = f"{order.target_symbol.upper()}" \
-                     f"/{order.trading_symbol.upper()}"
-            position = self.position_repository.get(order.position_id)
-            portfolio = self.portfolio_repository.get(position.portfolio_id)
-            time_frame = None
+            ohlcv_meta_data = meta_data[MarketDataType.OHLCV]
 
-            if BACKTESTING_PENDING_ORDER_CHECK_INTERVAL in \
-                    self.configuration_service.config:
-                time_frame = self.configuration_service\
-                    .config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]
+            if order.get_symbol() not in ohlcv_meta_data:
+                continue
 
-            # Get the lowest time frame available
-            if time_frame is None:
-                # Loop through all time frames
-                for tf in TimeFrame:
-                    if self._market_data_source_service\
-                            .is_ohlcv_data_source_present(
-                                symbol=symbol,
-                                market=portfolio.market,
-                                time_frame=tf
-                            ):
-                        time_frame = tf
-                        break
+            timeframes = ohlcv_meta_data[order.get_symbol()].keys()
+            sorted_timeframes = sorted(timeframes)
+            most_granular_interval = sorted_timeframes[0]
+            identifier = ohlcv_meta_data[order.get_symbol()][most_granular_interval]
+            data = market_data[identifier]
 
-            if not self._market_data_source_service\
-                    .is_ohlcv_data_source_present(
-                        symbol=symbol,
-                        market=portfolio.market,
-                        time_frame=time_frame
-                    ):
-                raise OperationalException(
-                    f"OHLCV data source not found for {symbol} "
-                    f"and market {portfolio.market} for order check "
-                    f"time frame "
-                    f"{config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]}. "
-                    f"Cannot check pending orders for symbol {symbol} "
-                    f"with market {portfolio.market}. Please add a ohlcv data"
-                    f"source for {symbol} and market {portfolio.market} with "
-                    f"time frame "
-                    f"{config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]} "
-                )
-
-            config = self.configuration_service.get_config()
-            df = self._market_data_source_service.get_ohlcv(
-                symbol=symbol,
-                market=portfolio.market,
-                time_frame=time_frame,
-                to_timestamp=config[BACKTESTING_INDEX_DATETIME],
-                from_timestamp=order.get_created_at(),
-            )
-
-            if self.has_executed(order, df):
+            if self.has_executed(order, data):
                 self.update(
                     order.id,
                     {
@@ -127,7 +97,77 @@ class OrderBacktestService(OrderService):
                         .config[BACKTESTING_INDEX_DATETIME]
                     }
                 )
-                break
+
+
+        # if len(pending_orders) != 0:
+        #     logger.info(f"Checking {len(pending_orders)} open orders")
+
+        # config = self.configuration_service.get_config()
+
+        # for order in pending_orders:
+        #     symbol = f"{order.target_symbol.upper()}" \
+        #              f"/{order.trading_symbol.upper()}"
+        #     position = self.position_repository.get(order.position_id)
+        #     portfolio = self.portfolio_repository.get(position.portfolio_id)
+        #     time_frame = None
+
+        #     if BACKTESTING_PENDING_ORDER_CHECK_INTERVAL in \
+        #             self.configuration_service.config:
+        #         time_frame = self.configuration_service\
+        #             .config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]
+
+        #     # Get the lowest time frame available
+        #     if time_frame is None:
+        #         # Loop through all time frames
+        #         for tf in TimeFrame:
+        #             if self._market_data_source_service\
+        #                     .is_ohlcv_data_source_present(
+        #                         symbol=symbol,
+        #                         market=portfolio.market,
+        #                         time_frame=tf
+        #                     ):
+        #                 time_frame = tf
+        #                 break
+
+        #     if not self._market_data_source_service\
+        #             .is_ohlcv_data_source_present(
+        #                 symbol=symbol,
+        #                 market=portfolio.market,
+        #                 time_frame=time_frame
+        #             ):
+        #         raise OperationalException(
+        #             f"OHLCV data source not found for {symbol} "
+        #             f"and market {portfolio.market} for order check "
+        #             f"time frame "
+        #             f"{config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]}. "
+        #             f"Cannot check pending orders for symbol {symbol} "
+        #             f"with market {portfolio.market}. Please add a ohlcv data"
+        #             f"source for {symbol} and market {portfolio.market} with "
+        #             f"time frame "
+        #             f"{config[BACKTESTING_PENDING_ORDER_CHECK_INTERVAL]} "
+        #         )
+
+        #     config = self.configuration_service.get_config()
+        #     df = self._market_data_source_service.get_ohlcv(
+        #         symbol=symbol,
+        #         market=portfolio.market,
+        #         time_frame=time_frame,
+        #         to_timestamp=config[BACKTESTING_INDEX_DATETIME],
+        #         from_timestamp=order.get_created_at(),
+        #     )
+
+        #     if self.has_executed(order, df):
+        #         self.update(
+        #             order.id,
+        #             {
+        #                 "status": OrderStatus.CLOSED.value,
+        #                 "filled": order.get_amount(),
+        #                 "remaining": 0,
+        #                 "updated_at": self.configuration_service
+        #                 .config[BACKTESTING_INDEX_DATETIME]
+        #             }
+        #         )
+        #         break
 
     def cancel_order(self, order):
         self.check_pending_orders()

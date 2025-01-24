@@ -2,32 +2,47 @@ import os
 from datetime import datetime, timedelta
 from unittest import TestCase
 
-from dateutil.tz import tzutc
 
-from investing_algorithm_framework import CSVOHLCVMarketDataSource, \
-    CSVTickerMarketDataSource
+
+from investing_algorithm_framework import Order
 from investing_algorithm_framework.domain import Trade
 
 
 class Test(TestCase):
 
     def test_trade(self):
+        order = Order(
+            external_id="123",
+            target_symbol="BTC",
+            trading_symbol="EUR",
+            order_side="BUY",
+            order_type="LIMIT",
+            price=10000,
+            amount=1,
+            filled=1,
+            remaining=0,
+            status="OPEN",
+            created_at=datetime(2017, 8, 17, 12, 42, 48),
+        )
+
         trade_opened_at = datetime(2023, 11, 29)
         trade = Trade(
-            buy_order_id=1,
+            id=1,
+            orders=[order],
             target_symbol="BTC",
             trading_symbol="EUR",
             amount=1,
-            open_price=19822.0,
+            remaining=1,
+            open_price=10000,
             opened_at=trade_opened_at,
-            closed_price=None,
             closed_at=None,
+            status="OPEN",
+            cost=10000,
         )
         self.assertEqual(trade.target_symbol, "BTC")
         self.assertEqual(trade.trading_symbol, "EUR")
         self.assertEqual(trade.amount, 1)
-        self.assertEqual(trade.open_price, 19822.0)
-        self.assertEqual(trade.opened_at, trade_opened_at)
+        self.assertEqual(trade.open_price, 10000)
 
     # def test_stop_loss_manual_with_dataframe(self):
     #     """

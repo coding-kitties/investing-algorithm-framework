@@ -199,10 +199,17 @@ class CSVTickerMarketDataSource(TickerMarketDataSource):
     def csv_file_path(self):
         return self._csv_file_path
 
-    def get_data(self, config, date):
+    def get_data(
+        self,
+        start_date: datetime = None,
+        end_date: datetime = None,
+        config=None,
+    ):
 
-        if date is None:
+        if end_date is None:
             raise OperationalException("Date is required to get ticker data")
+
+        date = end_date
 
         if not isinstance(date, datetime):
 

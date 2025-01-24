@@ -37,7 +37,6 @@ Features:
 The following algorithm connects to binance and buys BTC every 5 seconds. It also exposes an REST API that allows you to interact with the algorithm.
 
 ```python
-import logging
 import logging.config
 
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
@@ -90,24 +89,21 @@ def perform_strategy(algorithm: Algorithm, market_data: dict):
     closed_trades = algorithm.get_closed_trades()
 
     # Create a buy oder
-    trade = algorithm.create_limit_order(
+    order = algorithm.create_limit_order(
         target_symbol="BTC/EUR",
         order_side="buy",
         amount=0.01,
         price=ticker_data["ask"],
     )
-
-    # Add a stop loss percentage of 5%
-    algorithm.add_stop_loss(trade.id, percentage=5)
-
-    # Add a take profit percentage of 10%
-    algorithm.add_take_profit(trade.id, percentage=5)
+    trade = algorithm.get_trade(order_id=order.id)
+    algorithm.add_trailing_stop_loss(trade=trade, percentage=5)
 
     # Close a trade
-    algorithm.close_trade(trades[0].id)
+    algorithm.close_trade(trade=trade)
 
     # Close a position
-    algorithm.close_position(positions[0].get_symbol())
+    position = algorithm.get_position(symbol="BTC/EUR")
+    algorithm.close_position(position)
 
 if __name__ == "__main__":
     app.run()
@@ -119,7 +115,14 @@ if __name__ == "__main__":
 
 The framework also supports backtesting and performing backtest experiments. After a backtest, you can print a report that shows the performance of your trading bot.
 
-To run a single backtest you can use the example code that can be found [here](./examples/backtest).
+To run a single backtest you can use the example code that can be found [here](./examples/backtest_example). Simply run:
+
+> Its assumed here that you have cloned the repository, installed the framework and
+> are in the root of the project.
+
+```bash
+python examples/backtest_example/run_backtest.py
+```
 
 ### Backtesting report
 

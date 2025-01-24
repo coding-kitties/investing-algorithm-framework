@@ -1,14 +1,10 @@
 import logging
+from datetime import datetime
 from queue import PriorityQueue
-from typing import List
+from dateutil import parser
 
-from investing_algorithm_framework.domain import OrderStatus, OrderSide, \
-    Trade, PeekableQueue, OrderType, TradeStatus, \
-    OperationalException, Order, RoundingService
-from investing_algorithm_framework.services.market_data_source_service import \
-    MarketDataSourceService
-from investing_algorithm_framework.services.position_service import \
-    PositionService
+from investing_algorithm_framework.domain import OrderStatus, \
+    TradeStatus, Trade, OperationalException, MarketDataType
 from investing_algorithm_framework.services.repository_service import \
     RepositoryService
 
@@ -20,395 +16,327 @@ class TradeService(RepositoryService):
     def __init__(
         self,
         trade_repository,
+        position_repository,
+        portfolio_repository,
+        market_data_source_service,
+        configuration_service
     ):
         super(TradeService, self).__init__(trade_repository)
-
-    # def get_open_trades(self, target_symbol=None, market=None) -> List[Trade]:
-    #     """
-    #     Get open trades method
-
-    #     Args:
-    #         target_symbol: str representing the target symbol
-    #         market: str representing the market
-
-    #     Returns:
-    #         list of Trade objects
-    #     """
-
-    #     return self.get_all({"closed_at": None})
-        # portfolios = self.portfolio_repository.get_all()
-        # trades = []
-
-        # for portfolio in portfolios:
-
-        #     if target_symbol is not None:
-        #         buy_orders = self.order_service.get_all({
-        #             "status": OrderStatus.CLOSED.value,
-        #             "order_side": OrderSide.BUY.value,
-        #             "portfolio_id": portfolio.id,
-        #             "target_symbol": target_symbol
-        #         })
-        #         sell_orders = self.order_service.get_all({
-        #             "status": OrderStatus.OPEN.value,
-        #             "order_side": OrderSide.SELL.value,
-        #             "portfolio_id": portfolio.id,
-        #             "target_symbol": target_symbol
-        #         })
-        #     else:
-        #         buy_orders = self.order_service.get_all({
-        #             "status": OrderStatus.CLOSED.value,
-        #             "order_side": OrderSide.BUY.value,
-        #             "portfolio_id": portfolio.id
-        #         })
-        #         sell_orders = self.order_service.get_all({
-        #             "status": OrderStatus.OPEN.value,
-        #             "order_side": OrderSide.SELL.value,
-        #             "portfolio_id": portfolio.id
-        #         })
-
-        #     buy_orders = [
-        #         buy_order for buy_order in buy_orders
-        #         if buy_order.get_trade_closed_at() is None
-        #     ]
-        #     sell_amount = sum([order.amount for order in sell_orders])
-
-        #     # Subtract the amount of the open sell orders
-        #     # from the amount of the buy orders
-        #     buy_orders_queue = PeekableQueue()
-
-        #     for buy_order in buy_orders:
-        #         buy_orders_queue.enqueue(buy_order)
-
-        #     while sell_amount > 0 and not buy_orders_queue.is_empty():
-        #         first_buy_order = buy_orders_queue.peek()
-        #         available = first_buy_order.get_filled() \
-        #             - first_buy_order.get_trade_closed_amount()
-
-        #         if available > sell_amount:
-        #             remaining = available - sell_amount
-        #             sell_amount = 0
-        #             first_buy_order.set_filled(remaining)
-        #         else:
-        #             sell_amount = sell_amount - available
-        #             buy_orders_queue.dequeue()
-
-        #     for buy_order in buy_orders_queue:
-        #         symbol = buy_order.get_symbol()
-        #         current_price = buy_order.get_price()
-
-        #         try:
-        #             ticker = self.market_data_source_service.get_ticker(
-        #                 symbol=symbol, market=market
-        #             )
-        #             current_price = ticker["bid"]
-        #         except Exception as e:
-        #             logger.error(e)
-
-        #         amount = buy_order.get_filled()
-        #         closed_amount = buy_order.get_trade_closed_amount()
-
-        #         if closed_amount is not None:
-        #             amount = amount - closed_amount
-
-        #         trades.append(
-        #             Trade(
-        #                 buy_order_id=buy_order.id,
-        #                 target_symbol=buy_order.get_target_symbol(),
-        #                 trading_symbol=buy_order.get_trading_symbol(),
-        #                 amount=amount,
-        #                 open_price=buy_order.get_price(),
-        #                 opened_at=buy_order.get_created_at(),
-        #                 current_price=current_price
-        #             )
-        #         )
-
-    # def get_trades(self, market=None) -> List[Trade]:
-    #     """
-    #     Get trades method
-
-    #     Args:
-    #         market: str representing the market
-    #         portfolio_id: str representing the portfolio id
-
-    #     Returns:
-    #         list of Trade objects
-    #     """
-
-    #     portfolios = self.portfolio_repository.get_all()
-    #     trades = []
-
-    #     for portfolio in portfolios:
-    #         buy_orders = self.order_service.get_all({
-    #             "status": OrderStatus.CLOSED.value,
-    #             "order_side": OrderSide.BUY.value,
-    #             "portfolio_id": portfolio.id
-    #         })
-
-    #         for buy_order in buy_orders:
-    #             symbol = buy_order.get_symbol()
-    #             current_price = buy_order.get_price()
-    #             try:
-    #                 ticker = self.market_data_source_service.get_ticker(
-    #                     symbol=symbol, market=market
-    #                 )
-    #                 current_price = ticker["bid"]
-    #             except Exception as e:
-    #                 logger.error(e)
-
-    #             trades.append(
-    #                 Trade(
-    #                     buy_order_id=buy_order.id,
-    #                     target_symbol=buy_order.get_target_symbol(),
-    #                     trading_symbol=buy_order.get_trading_symbol(),
-    #                     amount=buy_order.get_amount(),
-    #                     open_price=buy_order.get_price(),
-    #                     closed_price=buy_order.get_trade_closed_price(),
-    #                     closed_at=buy_order.get_trade_closed_at(),
-    #                     opened_at=buy_order.get_created_at(),
-    #                     current_price=current_price
-    #                 )
-    #             )
-
-    #     return trades
-
-    # def get_closed_trades(self, portfolio_id=None) -> List[Trade]:
-    #     """
-    #     Get closed trades method
-
-    #     :param portfolio_id: str representing the portfolio id
-    #     :return: list of Trade objects
-    #     """
-    #     buy_orders = self.order_service.get_all({
-    #         "status": OrderStatus.CLOSED.value,
-    #         "order_side": OrderSide.BUY.value,
-    #         "portfolio_id": portfolio_id
-    #     })
-    #     return [
-    #         Trade(
-    #             buy_order_id=order.id,
-    #             target_symbol=order.get_target_symbol(),
-    #             trading_symbol=order.get_trading_symbol(),
-    #             amount=order.get_amount(),
-    #             open_price=order.get_price(),
-    #             closed_price=order.get_trade_closed_price(),
-    #             closed_at=order.get_trade_closed_at(),
-    #             opened_at=order.get_created_at()
-    #         ) for order in buy_orders
-    #         if order.get_trade_closed_at() is not None
-    #     ]
-
-    # def close_trade(self, trade, market=None, precision=None) -> None:
-    #     """
-    #     Close trade method
-
-    #     param trade: Trade object
-    #     param market: str representing the market
-    #     raises OperationalException: if trade is already closed
-    #     or if the buy order belonging to the trade has no amount
-
-    #     return: None
-    #     """
-
-    #     if trade.closed_at is not None:
-    #         raise OperationalException("Trade already closed.")
-
-    #     order = self.order_service.get(trade.buy_order_id)
-
-    #     if order.get_filled() <= 0:
-    #         raise OperationalException(
-    #             "Buy order belonging to the trade has no amount."
-    #         )
-
-    #     portfolio = self.portfolio_repository\
-    #         .find({"position": order.position_id})
-    #     position = self.position_service.find(
-    #         {"portfolio": portfolio.id, "symbol": order.get_target_symbol()}
-    #     )
-    #     amount = order.get_amount()
-
-    #     if precision is not None:
-    #         amount = RoundingService.round_down(amount, precision)
-
-    #     if position.get_amount() < amount:
-    #         logger.warning(
-    #             f"Order amount {amount} is larger then amount "
-    #             f"of available {position.symbol} "
-    #             f"position: {position.get_amount()}, "
-    #             f"changing order amount to size of position"
-    #         )
-    #         amount = position.get_amount()
-
-    #     symbol = order.get_symbol()
-    #     ticker = self.market_data_source_service.get_ticker(
-    #         symbol=symbol, market=market
-    #     )
-    #     self.order_service.create(
-    #         {
-    #             "portfolio_id": portfolio.id,
-    #             "trading_symbol": order.get_trading_symbol(),
-    #             "target_symbol": order.get_target_symbol(),
-    #             "amount": amount,
-    #             "order_side": OrderSide.SELL.value,
-    #             "order_type": OrderType.LIMIT.value,
-    #             "price": ticker["bid"],
-    #         }
-    #     )
-
-    # def count(self, query_params=None) -> int:
-    #     """
-    #     Count method
-
-    #     :param query_params: dict representing the query parameters
-    #     :return: int representing the count
-    #     """
-
-    #     portfolios = self.portfolio_repository.get_all()
-    #     trades = []
-
-    #     for portfolio in portfolios:
-    #         buy_orders = self.order_service.get_all({
-    #             "status": OrderStatus.CLOSED.value,
-    #             "order_side": OrderSide.BUY.value,
-    #             "portfolio_id": portfolio.id
-    #         })
-
-    #         for buy_order in buy_orders:
-    #             trades.append(
-    #                 Trade(
-    #                     buy_order_id=buy_order.id,
-    #                     target_symbol=buy_order.get_target_symbol(),
-    #                     trading_symbol=buy_order.get_trading_symbol(),
-    #                     amount=buy_order.get_amount(),
-    #                     open_price=buy_order.get_price(),
-    #                     closed_price=buy_order.get_trade_closed_price(),
-    #                     closed_at=buy_order.get_trade_closed_at(),
-    #                     opened_at=buy_order.get_created_at(),
-    #                 )
-    #             )
-
-    #         if query_params is not None:
-    #             if "status" in query_params:
-
-    #                 trade_status = TradeStatus\
-    #                     .from_value(query_params["status"])
-
-    #                 if trade_status == TradeStatus.OPEN:
-    #                     trades = [
-    #                         trade for trade in trades
-    #                         if trade.closed_at is None
-    #                     ]
-    #                 else:
-    #                     trades = [
-    #                         trade for trade in trades
-    #                         if trade.closed_at is not None
-    #                     ]
-
-    #     return len(trades)
-
-    def close_trades(self, sell_order: Order, amount_to_close: float) -> None:
-        """
-        Close trades method
-
-        Args
-            sell_order: Order object representing the sell order
-            amount_to_close: float representing the amount to close
-
-        Returns
-            None
-        """
-        logger.info(
-            f"Closing trades for sell order {sell_order.get_id()} "
-            f"amount to close: {amount_to_close}"
-        )
-
-        # matching_buy_orders = self.order_service.get_all(
-        #     {
-        #         "position": sell_order.position_id,
-        #         "order_side": OrderSide.BUY.value,
-        #         "status": OrderStatus.CLOSED.value,
-        #         "order_by_created_at_asc": True
-        #     }
-        # )
-
-        # matching_buy_orders = [
-        #     buy_order for buy_order in matching_buy_orders
-        #     if buy_order.get_trade_closed_at() is None
-        # ]
-        # order_queue = PriorityQueue()
-
-        # for order in matching_buy_orders:
-        #     order_queue.put(order)
-
-        # total_net_gain = 0
-        # total_cost = 0
-
-        # while amount_to_close > 0 and not order_queue.empty():
-        #     buy_order = order_queue.get()
-        #     closed_amount = buy_order.get_trade_closed_amount()
-
-        #     # Check if the order has been closed
-        #     if closed_amount is None:
-        #         closed_amount = 0
-
-        #     available_to_close = buy_order.get_filled() - closed_amount
-
-        #     if amount_to_close >= available_to_close:
-        #         to_be_closed = available_to_close
-        #         remaining = amount_to_close - to_be_closed
-        #         cost = buy_order.get_price() * to_be_closed
-        #         net_gain = (sell_order.get_price() - buy_order.get_price()) \
-        #             * to_be_closed
-        #         amount_to_close = remaining
-        #         self.order_service.repository.update(
-        #             buy_order.id,
-        #             {
-        #                 "trade_closed_amount": buy_order.get_filled(),
-        #                 "trade_closed_at": sell_order.get_updated_at(),
-        #                 "trade_closed_price": sell_order.get_price(),
-        #                 "net_gain": buy_order.get_net_gain() + net_gain
-        #             }
-        #         )
-        #     else:
-        #         to_be_closed = amount_to_close
-        #         net_gain = (sell_order.get_price() - buy_order.get_price()) \
-        #             * to_be_closed
-        #         cost = buy_order.get_price() * amount_to_close
-        #         closed_amount = buy_order.get_trade_closed_amount()
-
-        #         if closed_amount is None:
-        #             closed_amount = 0
-
-        #         self.order_service.repository.update(
-        #             buy_order.id,
-        #             {
-        #                 "trade_closed_amount": closed_amount + to_be_closed,
-        #                 "trade_closed_price": sell_order.get_price(),
-        #                 "net_gain": buy_order.get_net_gain() + net_gain
-        #             }
-        #         )
-        #         amount_to_close = 0
-
-        #     total_net_gain += net_gain
-        #     total_cost += cost
-
-        # # Update the sell order
-        # self.order_service.repository.update(
-        #     sell_order.get_id(),
-        #     {
-        #         "trade_closed_amount": sell_order.get_filled(),
-        #         "trade_closed_at": sell_order.get_updated_at(),
-        #         "trade_closed_price": sell_order.get_price(),
-        #         "net_gain": sell_order.get_net_gain() + total_net_gain
-        #     }
-        # )
+        self.portfolio_repository = portfolio_repository
+        self.market_data_source_service = market_data_source_service
+        self.position_repository = position_repository
+        self.configuration_service = configuration_service
 
     def create_trade_from_buy_order(self, buy_order) -> Trade:
+        """
+        Function to create a trade from a buy order. If the given buy
+        order has its status set to CANCELED, EXPIRED, or REJECTED,
+        the trade object will not be created. If the given buy
+        order has its status set to CLOSED or OPEN, the trade object
+        will be created. The amount will be set to the filled amount.
+
+        Args:
+            buy_order: Order object representing the buy order
+
+        Returns:
+            Trade object
+        """
+        status = buy_order.get_status()
+
+        if status in \
+            [
+                OrderStatus.CANCELED.value,
+                OrderStatus.EXPIRED.value,
+                OrderStatus.REJECTED.value
+            ]:
+            return None
+
         data = {
-            "buy_order_id": buy_order.id,
-            "target_symbol": buy_order.get_target_symbol(),
-            "trading_symbol": buy_order.get_trading_symbol(),
-            "amount": buy_order.get_filled(),
-            "open_price": buy_order.get_price(),
-            "opened_at": buy_order.get_created_at()
+            "buy_order": buy_order,
+            "target_symbol": buy_order.target_symbol,
+            "trading_symbol": buy_order.trading_symbol,
+            "amount": buy_order.filled,
+            "remaining": buy_order.filled,
+            "opened_at": buy_order.created_at,
+            "cost": buy_order.filled * buy_order.price
         }
+
+        if buy_order.filled > 0:
+            data["status"] = TradeStatus.OPEN.value
+            data["cost"] = buy_order.filled * buy_order.price
+
         return self.create(data)
+
+    def update_trade_with_buy_order(
+        self, filled_difference, buy_order
+    ) -> Trade:
+        """
+        Function to update a trade from a buy order. This function
+        checks if a trade exists for the buy order. If the given buy
+        order has its status set to CANCLED, EXPIRED, or REJECTED, the
+        trade will object will be removed. If the given buy order has its status set to CLOSED or OPEN, the amount and remaining of
+        the trade object will be updated.
+
+        Args:
+            filled_difference: float representing the difference between the
+                filled amount of the buy order and the filled amount of the trade
+            buy_order: Order object representing the buy order
+
+        Returns:
+            Trade object
+        """
+
+        trade = self.find({"buy_order": buy_order.id})
+
+        if trade is None:
+            raise OperationalException(
+                "Trade does not exist for buy order."
+            )
+
+        status = buy_order.get_status()
+
+        if status in \
+            [
+                OrderStatus.CANCELED.value,
+                OrderStatus.EXPIRED.value,
+                OrderStatus.REJECTED.value
+            ]:
+            return self.delete(trade.id)
+
+        trade = self.find({"order_id": buy_order.id})
+        updated_data = {
+            "amount": trade.amount + filled_difference,
+            "remaining": trade.remaining + filled_difference,
+            "cost": trade.cost + filled_difference * buy_order.price
+        }
+
+        if filled_difference > 0:
+            updated_data["status"] = TradeStatus.OPEN.value
+
+        trade = self.update(trade.id, updated_data)
+        return trade
+
+    def update_trade_with_sell_order_filled(
+        self, filled_amount, sell_order
+    ) -> Trade:
+        """
+        Function to update a trade from a sell order that has been filled.
+        This function checks if a trade exists for the buy order.
+        If the given buy order has its status set to
+        CANCLED, EXPIRED, or REJECTED, the
+        trade will object will be removed. If the given buy order has its status set to CLOSED or OPEN, the amount and remaining of
+        the trade object will be updated.
+
+        Args:
+            sell_order: Order object representing the sell order that has
+                been filled.
+            filled_amount: float representing the filled amount of the sell
+                order
+
+        Returns:
+            Trade object
+        """
+
+        # Only update the trade if the sell order has been filled
+        if sell_order.get_status() != OrderStatus.CLOSED.value:
+            return None
+
+        position = self.position_repository.find({
+            "order_id": sell_order.id
+        })
+        portfolio_id = position.portfolio_id
+        matching_trades = self.get_all({
+            "status": TradeStatus.OPEN.value,
+            "target_symbol": sell_order.target_symbol,
+            "portfolio_id": portfolio_id
+        })
+        target_symbol = sell_order.target_symbol
+        price = sell_order.price
+        updated_at = sell_order.updated_at
+        amount_to_close = filled_amount
+        order_queue = PriorityQueue()
+        total_net_gain = 0
+        total_cost = 0
+        total_remaining = 0
+
+        for trade in matching_trades:
+            if trade.remaining > 0:
+                total_remaining += trade.remaining
+                order_queue.put(trade)
+
+        if total_remaining < amount_to_close:
+            raise OperationalException(
+                "Not enough amount to close in trades."
+            )
+
+        while amount_to_close > 0 and not order_queue.empty():
+            trade = order_queue.get()
+            available_to_close = trade.remaining
+
+            if amount_to_close >= available_to_close:
+                cost = trade.buy_order.price * available_to_close
+                net_gain = (price * available_to_close) - cost
+                amount_to_close = amount_to_close - available_to_close
+                self.update(
+                    trade.id, {
+                        "remaining": 0,
+                        "closed_at": updated_at,
+                        "net_gain": trade.net_gain + net_gain,
+                        "status": TradeStatus.CLOSED.value
+                    }
+                )
+                self.repository.add_order_to_trade(trade, sell_order)
+            else:
+                to_be_closed = amount_to_close
+                cost = trade.buy_order.price * to_be_closed
+                net_gain = (price * to_be_closed) - cost
+                self.update(
+                    trade.id, {
+                        "remaining": trade.remaining - to_be_closed,
+                        "net_gain": trade.net_gain + net_gain,
+                        "orders": trade.orders.append(sell_order)
+                    }
+                )
+                self.repository.add_order_to_trade(trade, sell_order)
+                amount_to_close = 0
+
+            total_net_gain += net_gain
+            total_cost += cost
+
+        portfolio = self.portfolio_repository.get(portfolio_id)
+        self.portfolio_repository.update(
+            portfolio.id,
+            {
+                "total_net_gain": portfolio.total_net_gain + total_net_gain,
+                "cost": portfolio.total_cost - total_cost
+            }
+        )
+        position = self.position_repository.find(
+            {
+                "portfolio": portfolio.id,
+                "symbol": target_symbol
+            }
+        )
+        self.position_repository.update(
+            position.id,
+            {
+                "cost": position.cost - total_cost,
+            }
+        )
+
+    def update_trades_with_market_data(self, market_data):
+        config = self.configuration_service.get_config()
+        open_trades = self.get_all({"status": TradeStatus.OPEN.value})
+        meta_data = market_data["metadata"]
+
+        for open_trade in open_trades:
+            ohlcv_meta_data = meta_data[MarketDataType.OHLCV]
+
+            if open_trade.symbol not in ohlcv_meta_data:
+                continue
+
+            timeframes = ohlcv_meta_data[open_trade.symbol].keys()
+            sorted_timeframes = sorted(timeframes)
+            most_granular_interval = sorted_timeframes[0]
+            identifier = ohlcv_meta_data[open_trade.symbol][most_granular_interval]
+            data = market_data[identifier]
+
+            # Get last row of data
+            last_row = data.tail(1)
+            update_data = {
+                "last_reported_price": last_row["Close"][0],
+                "updated_at": parser.parse(
+                    last_row["Datetime"][0]
+                )
+            }
+            price = last_row["Close"][0]
+
+            if open_trade.trailing_stop_loss_percentage is not None:
+
+                if open_trade.high_water_mark is None or \
+                    open_trade.high_water_mark < price:
+                    update_data["high_water_mark"] = price
+
+            self.update(open_trade.id, update_data)
+
+    def add_stop_loss(self, trade, percentage):
+        """
+        Function to add a stop loss to a trade. The stop loss is
+        represented as a percentage of the open price.
+
+        Args:
+            trade: Trade object representing the trade
+            percentage: float representing the percentage of the open price
+                that the stop loss should be set at
+
+        Returns:
+            None
+        """
+        trade = self.get(trade.id)
+        updated_data = {
+            "stop_loss_percentage": percentage
+        }
+        self.update(trade.id, updated_data)
+
+    def add_trailing_stop_loss(self, trade, percentage):
+        """
+        Function to add a trailing stop loss to a trade. The trailing stop loss
+        is represented as a percentage of the open price.
+
+        Args:
+            trade: Trade object representing the trade
+            percentage: float representing the percentage of the open price
+                that the trailing stop loss should be set at
+
+        Returns:
+            None
+        """
+        trade = self.get(trade.id)
+        updated_data = {
+            "trailing_stop_loss_percentage": percentage
+        }
+        self.update(trade.id, updated_data)
+
+    def get_triggered_stop_losses(self):
+        """
+        Function to check if any trades have hit their stop loss. If a trade
+        has hit its stop loss, the trade is added to a list of triggered trades. This list is then returned.
+
+        Returns:
+            List of Trade objects
+        """
+        triggered_trades = []
+        open_trades = self.get_all(
+            {
+                "status": TradeStatus.OPEN.value, "stop_loss_percentage_not_none": True
+            }
+        )
+
+        for open_trade in open_trades:
+
+            if open_trade.is_stop_loss_triggered():
+                triggered_trades.append(open_trade)
+
+        return triggered_trades
+
+    def get_triggered_trailing_stop_losses(self):
+        """
+        Function to check if any trades have hit their stop loss. If a trade
+        has hit its stop loss, the trade is added to a list of triggered trades. This list is then returned.
+
+        Returns:
+            List of Trade objects
+        """
+        triggered_trades = []
+        open_trades = self.get_all(
+            {
+                "status": TradeStatus.OPEN.value, "trailing_stop_loss_percentage_not_none": True
+            }
+        )
+
+        for open_trade in open_trades:
+
+            if open_trade.is_trailing_stop_loss_triggered():
+                triggered_trades.append(open_trade)
+
+        return triggered_trades

@@ -11,6 +11,7 @@ from investing_algorithm_framework.domain.models.order.order_status import \
     OrderStatus
 from investing_algorithm_framework.domain.models.order.order_type import \
     OrderType
+from investing_algorithm_framework.domain import DATETIME_FORMAT
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -28,16 +29,12 @@ class Order(BaseModel):
         target_symbol=None,
         trading_symbol=None,
         price=None,
-        net_gain=0,
         created_at=None,
         updated_at=None,
-        trade_closed_at=None,
-        trade_closed_price=None,
-        trade_closed_amount=None,
         external_id=None,
+        cost=None,
         filled=None,
         remaining=None,
-        cost=None,
         fee=None,
         position_id=None,
         order_fee=None,
@@ -70,21 +67,17 @@ class Order(BaseModel):
         self.status = OrderStatus.from_value(status).value
         self.position_id = position_id
         self.amount = amount
-        self.net_gain = net_gain
-        self.trade_closed_at = trade_closed_at
-        self.trade_closed_price = trade_closed_price
-        self.trade_closed_amount = trade_closed_amount
         self.created_at = created_at
         self.updated_at = updated_at
         self.filled = filled
         self.remaining = remaining
-        self.cost = cost
         self.fee = fee
         self._available_amount = self.filled
         self.order_fee = order_fee
         self.order_fee_currency = order_fee_currency
         self.order_fee_rate = order_fee_rate
         self.id = id
+        self.cost = cost
 
     def get_id(self):
         return self.id
@@ -149,38 +142,6 @@ class Order(BaseModel):
     def set_external_id(self, external_id):
         self.external_id = external_id
 
-    def get_net_gain(self):
-
-        if self.net_gain is None:
-            return 0
-
-        return self.net_gain
-
-    def set_net_gain(self, net_gain):
-        self.net_gain = net_gain
-
-    def get_trade_closed_at(self):
-        return self.trade_closed_at
-
-    def set_trade_closed_at(self, trade_closed_at):
-        self.trade_closed_at = trade_closed_at
-
-    def get_trade_closed_price(self):
-        return self.trade_closed_price
-
-    def set_trade_closed_price(self, trade_closed_price):
-        self.trade_closed_price = trade_closed_price
-
-    def get_trade_closed_amount(self):
-
-        if self.trade_closed_amount is not None:
-            return self.trade_closed_amount
-
-        return 0
-
-    def set_trade_closed_amount(self, trade_closed_amount):
-        self.trade_closed_amount = trade_closed_amount
-
     def get_created_at(self):
         return self.created_at
 
@@ -212,16 +173,6 @@ class Order(BaseModel):
 
     def set_remaining(self, remaining):
         self.remaining = remaining
-
-    def get_cost(self):
-
-        if self.cost is None:
-            return 0
-
-        return self.cost
-
-    def set_cost(self, cost):
-        self.cost = cost
 
     def get_fee(self):
         return self.fee
@@ -257,12 +208,9 @@ class Order(BaseModel):
                 if self.created_at else None
             updated_at = self.updated_at.strftime(datetime_format) \
                 if self.updated_at else None
-            trade_closed_at = self.trade_closed_at.strftime(datetime_format) \
-                if self.trade_closed_at else None
         else:
             created_at = self.created_at
             updated_at = self.updated_at
-            trade_closed_at = self.trade_closed_at
 
         return {
             "external_id": self.external_id,
@@ -273,14 +221,11 @@ class Order(BaseModel):
             "status": self.status,
             "price": self.price,
             "amount": self.amount,
-            "net_gain": self.net_gain,
-            "trade_closed_at": trade_closed_at,
-            "trade_closed_price": self.trade_closed_price,
             "created_at": created_at,
             "updated_at": updated_at,
+            "cost": self.cost,
             "filled": self.filled,
             "remaining": self.remaining,
-            "cost": self.cost,
             "order_fee_currency": self.order_fee_currency,
             "order_fee_rate": self.order_fee_rate,
             "order_fee": self.order_fee,
@@ -316,7 +261,6 @@ class Order(BaseModel):
             order_side=data.get("order_side", None),
             filled=data.get("filled", None),
             remaining=data.get("remaining", None),
-            cost=data.get("cost", None),
             fee=data.get("fee", None),
             created_at=created_at,
             updated_at=updated_at,
@@ -353,11 +297,11 @@ class Order(BaseModel):
             price=ccxt_order.get("price", None),
             amount=ccxt_order.get("amount", None),
             status=status,
+            cost=ccxt_order.get("cost", None),
             order_type=ccxt_order.get("type", None),
             order_side=ccxt_order.get("side", None),
             filled=ccxt_order.get("filled", None),
             remaining=ccxt_order.get("remaining", None),
-            cost=ccxt_order.get("cost", None),
             order_fee=order_fee,
             order_fee_currency=order_fee_currency,
             order_fee_rate=order_fee_rate,
@@ -375,7 +319,6 @@ class Order(BaseModel):
             id=id_value,
             price=self.get_price(),
             amount=self.get_amount(),
-            net_gain=self.get_net_gain(),
             external_id=self.external_id,
             status=self.status,
             target_symbol=self.target_symbol,
@@ -384,10 +327,6 @@ class Order(BaseModel):
             order_type=self.order_type,
             filled=self.get_filled(),
             remaining=self.get_remaining(),
-            cost=self.get_cost(),
-            trade_closed_at=self.get_trade_closed_at(),
-            trade_closed_price=self.get_trade_closed_price(),
-            trade_closed_amount=self.get_trade_closed_amount(),
             created_at=self.get_created_at(),
             updated_at=self.get_updated_at(),
         )

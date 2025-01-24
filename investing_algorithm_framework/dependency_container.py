@@ -45,7 +45,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         CCXTMarketService,
         market_credential_service=market_credential_service,
     )
-    market_data_source_service = providers.Factory(
+    market_data_source_service = providers.Singleton(
         MarketDataSourceService,
         market_service=market_service,
         market_credential_service=market_credential_service,
@@ -75,7 +75,11 @@ class DependencyContainer(containers.DeclarativeContainer):
     )
     trade_service = providers.Factory(
         TradeService,
+        configuration_service=configuration_service,
         trade_repository=trade_repository,
+        portfolio_repository=portfolio_repository,
+        position_repository=position_repository,
+        market_data_source_service=market_data_source_service,
     )
     order_service = providers.Factory(
         OrderService,
@@ -104,7 +108,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         PortfolioSyncService,
         trade_service=trade_service,
         configuration_service=configuration_service,
-        order_repository=order_repository,
+        order_service=order_service,
         position_repository=position_repository,
         portfolio_repository=portfolio_repository,
         portfolio_configuration_service=portfolio_configuration_service,
@@ -118,6 +122,7 @@ class DependencyContainer(containers.DeclarativeContainer):
     )
     performance_service = providers.Factory(
         PerformanceService,
+        trade_repository=trade_repository,
         order_repository=order_repository,
         position_repository=position_repository,
         portfolio_repository=portfolio_repository

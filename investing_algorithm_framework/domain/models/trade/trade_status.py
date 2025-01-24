@@ -2,6 +2,7 @@ from enum import Enum
 
 
 class TradeStatus(Enum):
+    CREATED = "CREATED"
     OPEN = "OPEN"
     CLOSED = "CLOSED"
 

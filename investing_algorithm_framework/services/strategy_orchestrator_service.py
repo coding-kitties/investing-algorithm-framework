@@ -68,13 +68,8 @@ class StrategyOrchestratorService:
         if matching_thread:
             return
 
-        market_data = {}
-        config = self.configuration_service.get_config()
-        if strategy.market_data_sources is not None \
-                and len(strategy.market_data_sources) > 0:
-
-            market_data = \
-                self.market_data_source_service.get_data_for_strategy(strategy)
+        market_data = \
+            self.market_data_source_service.get_data_for_strategy(strategy)
 
         logger.info(f"Running strategy {strategy.worker_id}")
 
@@ -99,12 +94,8 @@ class StrategyOrchestratorService:
         self.history[strategy.worker_id] = {"last_run": datetime.utcnow()}
 
     def run_backtest_strategy(self, strategy, algorithm, config):
-        data = {}
-
-        if strategy.market_data_sources is not None \
-            and len(strategy.market_data_sources) > 0:
-            data = \
-                self.market_data_source_service.get_data_for_strategy(strategy)
+        data = \
+            self.market_data_source_service.get_data_for_strategy(strategy)
 
         strategy.run_strategy(
             market_data=data,
