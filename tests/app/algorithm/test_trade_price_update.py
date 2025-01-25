@@ -74,7 +74,7 @@ class Test(TestCase):
                 csv_file_path=os.path.join(
                     self.resource_dir,
                     "market_data_sources",
-                    "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07:07:59_2023-12-02:00:00.csv"
+                    "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
                 )
             )
         )
@@ -86,7 +86,7 @@ class Test(TestCase):
                 csv_file_path=os.path.join(
                     self.resource_dir,
                     "market_data_sources",
-                    "TICKER_DOT-EUR_BINANCE_2023-08-23:22:00_2023-12-02:00:00.csv"
+                    "TICKER_DOT-EUR_BINANCE_2023-08-23-22-00_2023-12-02-00-00.csv"
                 )
             )
         )

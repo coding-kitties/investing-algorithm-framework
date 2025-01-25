@@ -7,7 +7,7 @@ from dateutil.tz import tzutc
 from polars import DataFrame
 
 from investing_algorithm_framework.domain import OperationalException, \
-    TimeFrame, DATETIME_FORMAT
+    DATETIME_FORMAT
 from investing_algorithm_framework.infrastructure import \
     CSVOHLCVMarketDataSource
 
@@ -36,7 +36,7 @@ class Test(TestCase):
 
     def test_right_columns(self):
         file_name = "OHLCV_BTC-EUR_BINANCE" \
-                    "_2h_2023-08-07:07:59_2023-12-02:00:00.csv"
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_source = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/market_data_sources/"
                           f"{file_name}",
@@ -50,7 +50,7 @@ class Test(TestCase):
 
     def test_throw_exception_when_missing_column_names_columns(self):
         file_name = "OHLCV_BTC-EUR_BINANCE_2h_NO_COLUMNS_2023-" \
-                    "08-07:07:59_2023-12-02:00:00.csv"
+                    "08-07-07-59_2023-12-02-00-00.csv"
 
         with self.assertRaises(OperationalException):
             CSVOHLCVMarketDataSource(
@@ -63,7 +63,7 @@ class Test(TestCase):
     def test_start_date(self):
         start_date = datetime(2023, 8, 7, 8, 0, tzinfo=tzutc())
         file_name = "OHLCV_BTC-EUR_BINANCE" \
-                    "_2h_2023-08-07:07:59_2023-12-02:00:00.csv"
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         csv_ohlcv_market_data_source = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
@@ -81,7 +81,7 @@ class Test(TestCase):
             year=2023, month=8, day=7, hour=10, minute=0, tzinfo=tzutc()
         )
         file_name = "OHLCV_BTC-EUR_BINANCE" \
-                    "_2h_2023-08-07:07:59_2023-12-02:00:00.csv"
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         csv_ohlcv_market_data_source = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
@@ -101,7 +101,7 @@ class Test(TestCase):
     def test_end_date(self):
         end_date = datetime(2023, 12, 2, 0, 0, tzinfo=tzutc())
         file_name = "OHLCV_BTC-EUR_BINANCE" \
-                    "_2h_2023-08-07:07:59_2023-12-02:00:00.csv"
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         csv_ohlcv_market_data_source = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
@@ -115,7 +115,7 @@ class Test(TestCase):
 
     def test_empty(self):
         file_name = "OHLCV_BTC-EUR_BINANCE" \
-                    "_2h_2023-08-07:07:59_2023-12-02:00:00.csv"
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_source = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
@@ -127,7 +127,7 @@ class Test(TestCase):
 
     def test_get_data(self):
         file_name = \
-            "OHLCV_BTC-EUR_BITVAVO_2h_2023-07-21:14:00_2024-06-07:10:00.csv"
+            "OHLCV_BTC-EUR_BITVAVO_2h_2023-07-21-14-00_2024-06-07-10-00.csv"
         datasource = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources_for_testing/"
@@ -149,7 +149,7 @@ class Test(TestCase):
 
     def test_get_identifier(self):
         file_name = "OHLCV_BTC-EUR_BINANCE" \
-                    "_2h_2023-08-07:07:59_2023-12-02:00:00.csv"
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         datasource = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
@@ -161,7 +161,7 @@ class Test(TestCase):
 
     def test_get_market(self):
         file_name = "OHLCV_BTC-EUR_BINANCE" \
-                    "_2h_2023-08-07:07:59_2023-12-02:00:00.csv"
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         datasource = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"
@@ -172,7 +172,7 @@ class Test(TestCase):
 
     def test_get_symbol(self):
         file_name = "OHLCV_BTC-EUR_BINANCE" \
-                    "_2h_2023-08-07:07:59_2023-12-02:00:00.csv"
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         datasource = CSVOHLCVMarketDataSource(
             csv_file_path=f"{self.resource_dir}/"
                           "market_data_sources/"

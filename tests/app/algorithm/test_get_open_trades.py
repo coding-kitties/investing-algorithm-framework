@@ -35,7 +35,7 @@ class Test(TestBase):
                 csv_file_path=os.path.join(
                     self.resource_directory,
                     "market_data_sources_for_testing",
-                    "TICKER_BTC-EUR_BINANCE_2023-08-23:22:00_2023-12-02:00:00.csv"
+                    "TICKER_BTC-EUR_BINANCE_2023-08-23-22-00_2023-12-02-00-00.csv"
                 )
             )
         )
