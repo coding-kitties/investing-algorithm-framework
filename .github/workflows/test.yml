@@ -73,6 +73,13 @@ jobs:
           virtualenvs-create: true
           virtualenvs-in-project: true
       #----------------------------------------------
+      #  -----  Add poetry to path on windows -----
+      #----------------------------------------------
+      - name: Configure Poetry on Windows
+        if: matrix.os == 'windows-latest'
+        run: |
+          $env:PATH = "C:\Python${{ matrix.python-version }};C:\Python${{ matrix.python-version }}\Scripts;$env:PATH"
+      #----------------------------------------------
       #       load cached venv if cache exists
       #----------------------------------------------
       - name: Load cached venv
