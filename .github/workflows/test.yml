@@ -42,6 +42,9 @@ jobs:
       matrix:
         os: [ "ubuntu-latest", "macos-latest", "windows-latest" ]
         python-version: [ "3.8", "3.9", "3.10", "3.11" ]
+    defaults:
+      run:
+        shell: bash
     runs-on: ${{ matrix.os }}
     steps:
       #----------------------------------------------
@@ -72,14 +75,6 @@ jobs:
           version: 1.7.1
           virtualenvs-create: true
           virtualenvs-in-project: true
-      #----------------------------------------------
-      #       Add Poetry to PATH on Windows
-      #----------------------------------------------
-      - name: Add Poetry to PATH (Windows)
-        if: matrix.os == 'windows-latest'
-        run: |
-          $env:Path += ";C:\Users\runneradmin\AppData\Roaming\Python\Scripts"
-          echo "PATH updated for Poetry"
       #----------------------------------------------
       #       load cached venv if cache exists
       #----------------------------------------------
