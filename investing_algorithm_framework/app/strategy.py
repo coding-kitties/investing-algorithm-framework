@@ -1,9 +1,12 @@
 from typing import List
+import pandas as pd
+from datetime import datetime, timezone
+
 from investing_algorithm_framework.domain import OperationalException, Position
 from investing_algorithm_framework.domain import \
-    TimeUnit, StrategyProfile, Trade
+    TimeUnit, StrategyProfile, Trade, ENVIRONMENT, Environment, \
+    BACKTESTING_INDEX_DATETIME
 from .algorithm import Algorithm
-import pandas as pd
 
 
 class TradingStrategy:
@@ -67,15 +70,26 @@ class TradingStrategy:
 
         # context initialization
         self._context = None
+        self._last_run = None
 
     def run_strategy(self, algorithm, market_data):
         self.algorithm = algorithm
+        config = self.algorithm.get_config()
 
-        # Check pending orders before running the strategy
-        algorithm.check_pending_orders()
+        if config[ENVIRONMENT] == Environment.BACKTEST.value:
+            self._update_trades_and_orders_for_backtest(market_data)
+        else:
+            self._update_trades_and_orders(market_data)
+
+        self._check_stop_losses()
 
         # Run user defined strategy
         self.apply_strategy(algorithm=algorithm, market_data=market_data)
+
+        if config[ENVIRONMENT] == Environment.BACKTEST.value:
+            self._last_run = config[BACKTESTING_INDEX_DATETIME]
+        else:
+            self._last_run = datetime.now(tz=timezone.utc)
 
     def apply_strategy(self, algorithm, market_data):
         if self.decorated:
@@ -91,6 +105,44 @@ class TradingStrategy:
             time_unit=self.time_unit,
             market_data_sources=self.market_data_sources
         )
+
+    def _update_trades_and_orders(self, market_data):
+        self.algorithm.order_service.check_pending_orders()
+        self.algorithm.trade_service\
+            .update_trades_with_market_data(market_data)
+
+    def _update_trades_and_orders_for_backtest(self, market_data):
+        self.algorithm.order_service.check_pending_orders(market_data)
+        self.algorithm.trade_service\
+            .update_trades_with_market_data(market_data)
+
+    def _check_pending_orders(self, market_data):
+        """
+        Check if there are any pending orders that need to be executed
+        """
+        pass
+        # self.algorithm.check_pending_orders()
+
+    def _check_stop_losses(self):
+        """
+        Check if there are any stop losses that result in trades being closed.
+        """
+        trade_service = self.algorithm.trade_service
+        triggered_trades = trade_service.get_triggered_stop_losses()
+
+        for trade in triggered_trades:
+            trade_service.update(trade.id, {"stop_loss_triggered": True})
+            self.algorithm.close_trade(
+                trade
+            )
+
+        triggered_trades = trade_service.get_triggered_trailing_stop_losses()
+
+        for trade in triggered_trades:
+            trade_service.update(trade.id, {"stop_loss_triggered": True})
+            self.algorithm.close_trade(
+                trade
+            )
 
     def on_trade_closed(self, algorithm: Algorithm, trade: Trade):
         pass
@@ -222,7 +274,7 @@ class TradingStrategy:
         """
         Check if there are open orders for a given symbol
 
-        Parameters:
+        Args:
             target_symbol (str): The symbol of the asset e.g BTC if the
               asset is BTC/USDT
             identifier (str): The identifier of the portfolio
@@ -256,7 +308,7 @@ class TradingStrategy:
         a limit order and execute it if the execute parameter is set to True.
         If the validate parameter is set to True, the order will be validated
 
-        Parameters:
+        Args:
             target_symbol: The symbol of the asset to trade
             price: The price of the asset
             order_side: The side of the order
@@ -313,7 +365,7 @@ class TradingStrategy:
         order and execute it if the execute parameter is set to True. If the
         validate parameter is set to True, the order will be validated
 
-        Parameters:
+        Args:
             target_symbol: The symbol of the asset to trade
             order_side: The side of the order
             amount: The amount of the asset to trade
@@ -345,7 +397,7 @@ class TradingStrategy:
         parameter is specified, the amount of the order will be rounded
         down to the specified precision.
 
-        Parameters:
+        Args:
             symbol: The symbol of the asset
             market: The market of the asset
             identifier: The identifier of the portfolio
@@ -385,7 +437,7 @@ class TradingStrategy:
         If the amount_lte parameter is specified, the positions with an
         amount less than or equal to the specified amount will be returned.
 
-        Parameters:
+        Args:
             market: The market of the portfolio where the positions are
             identifier: The identifier of the portfolio
             amount_gt: The amount of the asset must be greater than this
@@ -413,7 +465,7 @@ class TradingStrategy:
         that match the specified query parameters. If the market parameter
         is specified, the trades with the specified market will be returned.
 
-        Parameters:
+        Args:
             market: The market of the asset
 
         Returns:
@@ -440,7 +492,7 @@ class TradingStrategy:
         is specified, the open trades with the specified market will be
         returned.
 
-        Parameters:
+        Args:
             target_symbol: The symbol of the asset
             market: The market of the asset
 
@@ -456,7 +508,7 @@ class TradingStrategy:
         parameter is specified, the amount of the order will be rounded
         down to the specified precision.
 
-        Parameters:
+        Args:
             trade: Trade - The trade to close
             market: str - The market of the trade
             precision: float - The precision of the amount
@@ -488,7 +540,7 @@ class TradingStrategy:
         specified, the position of the specified portfolio will be
         returned.
 
-        Parameters:
+        Args:
             symbol: The symbol of the asset that represents the position
             market: The market of the portfolio where the position is located
             identifier: The identifier of the portfolio
@@ -517,7 +569,7 @@ class TradingStrategy:
         True if a position exists, False otherwise. This function will check
         if the amount > 0 condition by default.
 
-        Parameters:
+        Args:
             param symbol: The symbol of the asset
             param market: The market of the asset
             param identifier: The identifier of the portfolio
@@ -548,7 +600,7 @@ class TradingStrategy:
         portfolio has enough balance to create an order, False
         otherwise.
 
-        Parameters:
+        Args:
             symbol: The symbol of the asset
             amount: The amount of the asset
             market: The market of the asset
@@ -557,3 +609,12 @@ class TradingStrategy:
             Boolean: True if the portfolio has enough balance
         """
         return self.algorithm.has_balance(symbol, amount, market)
+
+    def last_run(self) -> datetime:
+        """
+        Function to get the last run of the strategy
+
+        Returns:
+            DateTime: The last run of the strategy
+        """
+        return self.algorithm.last_run()

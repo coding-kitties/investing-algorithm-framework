@@ -20,6 +20,7 @@ class SQLPositionRepository(Repository):
         amount_lte_query_param = self.get_query_param(
             "amount_lte", query_params
         )
+        order_id_query_param = self.get_query_param("order_id", query_params)
 
         if amount_query_param:
             query = query.filter(
@@ -50,6 +51,12 @@ class SQLPositionRepository(Repository):
         if amount_lte_query_param:
             query = query.filter(
                 cast(SQLPosition.amount, Numeric) <= amount_lte_query_param
+            )
+        # Filter by order_id, orders is a one-to-many relationship
+        # with 3 position
+        if order_id_query_param:
+            query = query.filter(
+                SQLPosition.orders.any(id=order_id_query_param)
             )
 
         return query

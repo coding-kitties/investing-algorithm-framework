@@ -123,3 +123,24 @@ class TimeFrame(Enum):
 
         if self.equals(TimeFrame.ONE_MONTH):
             return 40320
+
+    # Add comparison methods for ordering
+    def __lt__(self, other):
+        if isinstance(other, TimeFrame):
+            return self.amount_of_minutes < other.amount_of_minutes
+        raise TypeError(f"Cannot compare TimeFrame with {type(other)}")
+
+    def __le__(self, other):
+        if isinstance(other, TimeFrame):
+            return self.amount_of_minutes <= other.amount_of_minutes
+        raise TypeError(f"Cannot compare TimeFrame with {type(other)}")
+
+    def __gt__(self, other):
+        if isinstance(other, TimeFrame):
+            return self.amount_of_minutes > other.amount_of_minutes
+        raise TypeError(f"Cannot compare TimeFrame with {type(other)}")
+
+    def __ge__(self, other):
+        if isinstance(other, TimeFrame):
+            return self.amount_of_minutes >= other.amount_of_minutes
+        raise TypeError(f"Cannot compare TimeFrame with {type(other)}")

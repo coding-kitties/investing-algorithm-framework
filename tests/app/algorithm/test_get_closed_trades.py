@@ -2,7 +2,7 @@ import os
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     CSVTickerMarketDataSource, MarketCredential
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -23,6 +23,7 @@ class Test(TestBase):
             secret_key="secret_key"
         )
     ]
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def setUp(self) -> None:
         super(Test, self).setUp()
@@ -33,18 +34,17 @@ class Test(TestBase):
             csv_file_path=os.path.join(
                 self.resource_directory,
                 "market_data_sources",
-                "TICKER_BTC-EUR_BINANCE_2023-08-23:22:00_2023-12-02:00:00.csv"
+                "TICKER_BTC-EUR_BINANCE_2023-08-23-22-00_2023-12-02-00-00.csv"
             )
         ))
 
     def test_get_open_trades(self):
-        self.app.algorithm.create_limit_order(
+        order = self.app.algorithm.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="BUY",
             amount=20
         )
-        order = self.app.algorithm.get_order()
         self.assertIsNotNone(order)
         self.assertEqual(0, len(self.app.algorithm.get_closed_trades()))
         order_service = self.app.container.order_service()
@@ -55,7 +55,6 @@ class Test(TestBase):
         self.assertEqual(20, trade.amount)
         self.assertEqual("BTC", trade.target_symbol)
         self.assertEqual("EUR", trade.trading_symbol)
-        self.assertIsNone(trade.closed_price)
         self.assertIsNone(trade.closed_at)
         self.app.algorithm.create_limit_order(
             target_symbol="BTC",

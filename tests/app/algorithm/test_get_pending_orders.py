@@ -1,7 +1,7 @@
 from investing_algorithm_framework import PortfolioConfiguration, Order, \
-    MarketCredential, SYMBOLS
+    MarketCredential
 from investing_algorithm_framework.services import PortfolioService
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class TestPortfolioService(TestBase):
@@ -68,6 +68,7 @@ class TestPortfolioService(TestBase):
     external_balances = {
         "EUR": 700,
     }
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_get_pending_orders(self):
         """
@@ -101,7 +102,7 @@ class TestPortfolioService(TestBase):
 
         # Check that the portfolio has the correct amount of trades
         trade_service = self.app.container.trade_service()
-        self.assertEqual(1, trade_service.count())
+        self.assertEqual(3, trade_service.count())
         self.assertEqual(
             1, trade_service.count(
                 {"portfolio_id": portfolio.id, "status": "OPEN"}

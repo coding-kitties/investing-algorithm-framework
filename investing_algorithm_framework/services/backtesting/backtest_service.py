@@ -57,7 +57,8 @@ class BacktestService:
         position_repository,
         performance_service,
         configuration_service,
-        portfolio_configuration_service
+        portfolio_configuration_service,
+        strategy_orchestrator_service,
     ):
         self._resource_directory = None
         self._order_service = order_service
@@ -73,6 +74,7 @@ class BacktestService:
         self._backtest_market_data_sources = []
         self._configuration_service = configuration_service
         self._portfolio_configuration_service = portfolio_configuration_service
+        self._strategy_orchestrator_service = strategy_orchestrator_service
 
     @property
     def resource_directory(self):
@@ -97,8 +99,6 @@ class BacktestService:
 
         Also, all backtest data is downloaded (if not already downloaded) and
         the backtest is run for each date in the schedule.
-
-        At the end of the run all traces
 
         Args:
             algorithm: The algorithm to run the backtest for
@@ -163,10 +163,17 @@ class BacktestService:
                 strategy_profiles, row['id']
             )
             index_date = parser.parse(str(index))
-            self.run_backtest_for_profile(
+            self._configuration_service.add_value(
+                BACKTESTING_INDEX_DATETIME, index_date
+            )
+            # self.run_backtest_for_profile(
+            #     algorithm=algorithm,
+            #     strategy=algorithm.get_strategy(strategy_profile.strategy_id),
+            #     index_date=index_date,
+            # )
+            self.run_backtest_v2(
                 algorithm=algorithm,
-                strategy=algorithm.get_strategy(strategy_profile.strategy_id),
-                index_date=index_date,
+                strategy=algorithm.get_strategy(strategy_profile.strategy_id)
             )
 
         report = self.create_backtest_report(
@@ -238,6 +245,12 @@ class BacktestService:
 
         strategy.context = algorithm.context
         strategy.run_strategy(algorithm=algorithm, market_data=market_data)
+
+    def run_backtest_v2(self, strategy, algorithm):
+        config = self._configuration_service.get_config()
+        self._strategy_orchestrator_service.run_backtest_strategy(
+            algorithm=algorithm, strategy=strategy, config=config
+        )
 
     def generate_schedule(
         self, strategies, start_date, end_date

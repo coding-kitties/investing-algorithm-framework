@@ -17,28 +17,23 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
     from a csv file. Market data source that reads OHLCV data from a csv file.
     """
 
-    def empty(self, start_date, end_date=None):
-        if end_date is None:
-            end_date = self.create_end_date(
-                start_date, self.time_frame, self.window_size
-            )
-        data = self.get_data(start_date=start_date, end_date=end_date)
+    def empty(self, end_date):
+        data = self.get_data(end_date=end_date, config={})
         return len(data) == 0
 
     def __init__(
         self,
         csv_file_path,
-        identifier=None,
         market=None,
         symbol=None,
-        time_frame=None,
+        identifier=None,
         window_size=None,
     ):
         super().__init__(
             identifier=identifier,
             market=market,
             symbol=symbol,
-            time_frame=time_frame,
+            time_frame=None,
             window_size=window_size,
         )
         self._csv_file_path = csv_file_path
@@ -67,7 +62,12 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
     def csv_file_path(self):
         return self._csv_file_path
 
-    def get_data(self, **kwargs):
+    def get_data(
+        self,
+        start_date: datetime = None,
+        end_date: datetime = None,
+        config=None,
+    ):
         """
         Get the data from the csv file. The data can be filtered by
         the start_date and end_date in the kwargs. backtest_index_date
@@ -84,60 +84,70 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
         Returns:
             df (polars.DataFrame): The data from the csv file.
         """
-        start_date = kwargs.get("start_date")
-        end_date = kwargs.get("end_date")
-        backtest_index_date = kwargs.get("backtest_index_date")
 
-        if "window_size" in kwargs:
-            self.window_size = kwargs["window_size"]
-
-        if start_date is None \
-                and end_date is None \
-                and backtest_index_date is None:
+        if start_date is None and end_date is None:
             return polars.read_csv(
                 self.csv_file_path, columns=self._columns, separator=","
             )
 
-        if backtest_index_date is not None:
-            end_date = backtest_index_date
+        if end_date is not None and start_date is not None:
 
-            if self.window_size is None:
+            if end_date < start_date:
                 raise OperationalException(
-                    "Either end_date or window_size "
-                    "should be passed as a "
-                    "parameter for CCXTOHLCVMarketDataSource"
+                    f"End date {end_date} is before the start date "
+                    f"{start_date}"
                 )
 
-            start_date = self.create_start_date(
-                end_date, self.time_frame, self.window_size
+            if start_date > self._end_date_data_source:
+                return polars.DataFrame()
+
+            df = polars.read_csv(
+                self.csv_file_path, columns=self._columns, separator=","
             )
-        else:
-            if start_date is None:
 
-                if self.window_size is None:
-                    raise OperationalException(
-                        "Either end_date or window_size "
-                        "should be passed as a "
-                        "parameter for CCXTOHLCVMarketDataSource"
-                    )
+            df = df.filter(
+                (df['Datetime'] >= start_date.strftime(DATETIME_FORMAT))
+                & (df['Datetime'] <= end_date.strftime(DATETIME_FORMAT))
+            )
+            return df
 
-                start_date = self.create_start_date(
-                    end_date, self.time_frame, self.window_size
-                )
+        if start_date is not None:
 
-            if end_date is None:
-                end_date = self.create_end_date(
-                    start_date, self.time_frame, self.window_size
-                )
+            if start_date < self._start_date_data_source:
+                return polars.DataFrame()
 
-        df = polars.read_csv(
+            if start_date > self._end_date_data_source:
+                return polars.DataFrame()
+
+            df = polars.read_csv(
+                self.csv_file_path, columns=self._columns, separator=","
+            )
+            df = df.filter(
+                (df['Datetime'] >= start_date.strftime(DATETIME_FORMAT))
+            )
+            df = df.head(self.window_size)
+            return df
+
+        if end_date is not None:
+
+            if end_date < self._start_date_data_source:
+                return polars.DataFrame()
+
+            if end_date > self._end_date_data_source:
+                return polars.DataFrame()
+
+            df = polars.read_csv(
+                self.csv_file_path, columns=self._columns, separator=","
+            )
+            df = df.filter(
+                (df['Datetime'] <= end_date.strftime(DATETIME_FORMAT))
+            )
+            df = df.tail(self.window_size)
+            return df
+
+        return polars.read_csv(
             self.csv_file_path, columns=self._columns, separator=","
         )
-        df = df.filter(
-            (df['Datetime'] >= start_date.strftime(DATETIME_FORMAT))
-            & (df['Datetime'] <= end_date.strftime(DATETIME_FORMAT))
-        )
-        return df
 
     def dataframe_to_list_of_lists(self, dataframe, columns):
         # Extract selected columns from DataFrame and convert
@@ -188,20 +198,17 @@ class CSVTickerMarketDataSource(TickerMarketDataSource):
     def csv_file_path(self):
         return self._csv_file_path
 
-    def get_data(self, **kwargs):
-        date = None
+    def get_data(
+        self,
+        start_date: datetime = None,
+        end_date: datetime = None,
+        config=None,
+    ):
 
-        if "index_datetime" in kwargs:
-            date = kwargs["index_datetime"]
-
-        if "start_date" in kwargs:
-            date = kwargs["start_date"]
-
-        if 'date' in kwargs:
-            date = kwargs['date']
-
-        if date is None:
+        if end_date is None:
             raise OperationalException("Date is required to get ticker data")
+
+        date = end_date
 
         if not isinstance(date, datetime):
 

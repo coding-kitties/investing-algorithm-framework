@@ -1,6 +1,9 @@
+from dotenv import load_dotenv
+import logging.config
+
 from investing_algorithm_framework import MarketCredential, TimeUnit, \
     CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, TradingStrategy, \
-    create_app, PortfolioConfiguration, Algorithm
+    create_app, PortfolioConfiguration, Algorithm, DEFAULT_LOGGING_CONFIG
 
 """
 Bitvavo trading bot example with market data sources of bitvavo.
@@ -11,11 +14,14 @@ you need to add a market credential to the app, that accesses your
 account on bitvavo.
 """
 
-# Define your market credential for bitvavo
+logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
+
+# Load the environment variables from the .env file
+load_dotenv()
+
+# Define your market credential for bitvavo, keys are read from .env file
 bitvavo_market_credential = MarketCredential(
     market="bitvavo",
-    api_key="your_api_key",
-    secret_key="your_secret_key"
 )
 # Define your market data sources for coinbase
 bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
@@ -48,8 +54,6 @@ algorithm.add_strategy(BitvavoTradingStrategy)
 # Create an app and add the market data sources and market credentials to it
 app = create_app()
 app.add_market_credential(bitvavo_market_credential)
-app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
-app.add_market_data_source(bitvavo_btc_eur_ticker)
 
 # Register your algorithm and portfolio configuration to the app
 app.add_algorithm(algorithm)

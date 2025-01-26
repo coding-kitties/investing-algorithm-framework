@@ -12,7 +12,7 @@ from investing_algorithm_framework.domain import ApiException, \
     RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT, \
     load_backtest_report, BacktestDateRange, convert_polars_to_pandas, \
     DateRange, get_backtest_report, DEFAULT_LOGGING_CONFIG, \
-    BacktestReport
+    BacktestReport, TradeStatus, MarketDataType
 from investing_algorithm_framework.infrastructure import \
     CCXTOrderBookMarketDataSource, CCXTOHLCVMarketDataSource, \
     CCXTTickerMarketDataSource, CSVOHLCVMarketDataSource, \
@@ -90,5 +90,7 @@ __all__ = [
     "get_backtest_report",
     "AzureBlobStorageStateHandler",
     "DEFAULT_LOGGING_CONFIG",
-    "BacktestReport"
+    "BacktestReport",
+    "TradeStatus",
+    "MarketDataType"
 ]

@@ -91,21 +91,30 @@ class BacktestMarketDataSource(ABC):
         config,
         backtest_start_date,
         backtest_end_date,
-        **kwargs
     ):
+        """
+        Function to prepare the data for the backtest.
+        This function needs to be implemented by the child class.
+
+        Args:
+            config: dict - the configuration of the application
+            backtest_start_date: datetime - the start date of the backtest
+            backtest_end_date: datetime - the end date of the backtest
+
+        Returns:
+            None
+        """
         pass
 
     @abstractmethod
-    def get_data(self, **kwargs):
+    def get_data(self, date, config):
         """
-        Get data from the market data source.
-        :param kwargs: Additional arguments to get the data. Common arguments
-        - start_date: datetime
-        - end_date: datetime
-        - time_frame: str
-        - backtest_start_date: datetime
-        - backtest_end_date: datetime
-        - backtest_data_index_date: datetime
+        Function to get the data for the backtest. This function needs to be
+        implemented by the child class.
+
+        Args:
+            date: datetime - the date for which the data is required
+            config: dict - the configuration of the application
         """
         pass
 
@@ -222,15 +231,22 @@ class MarketDataSource(ABC):
         return self.storage_path
 
     @abstractmethod
-    def get_data(self, **kwargs):
+    def get_data(
+        self,
+        start_date: datetime = None,
+        end_date: datetime = None,
+        config=None,
+    ):
         """
         Get data from the market data source.
-        :param kwargs: Additional arguments to get the data. Common arguments
-        - start_date: datetime
-        - end_date: datetime
-        - time_frame: str
 
-        :return: Object with the data
+        Args:
+            config (dict): the configuration of the application
+            start_date (optional) (datetime): the start date of the data
+            end_date (optional) (datetime): the end date of the data
+
+        Returns:
+            DataFrame: the data from the market data source
         """
         pass
 

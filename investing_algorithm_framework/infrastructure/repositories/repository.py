@@ -150,6 +150,9 @@ class Repository(ABC):
 
     def find(self, query_params):
 
+        if query_params is None or len(query_params) == 0:
+            raise ApiException("Find requires query parameters")
+
         with Session() as db:
             try:
                 query = db.query(self.base_class)

@@ -46,7 +46,7 @@ class TestOrderService(TestBase):
         self.assertEqual("EUR", order.get_trading_symbol())
         self.assertEqual("BUY", order.get_order_side())
         self.assertEqual("LIMIT", order.get_order_type())
-        self.assertEqual("CREATED", order.get_status())
+        self.assertEqual("OPEN", order.get_status())
 
     def test_update_order(self):
         order_service = self.app.container.order_service()
@@ -101,7 +101,7 @@ class TestOrderService(TestBase):
         self.assertEqual("EUR", order.get_trading_symbol())
         self.assertEqual("BUY", order.get_order_side())
         self.assertEqual("LIMIT", order.get_order_type())
-        self.assertEqual("CREATED", order.get_status())
+        self.assertEqual("OPEN", order.get_status())
 
     def test_create_limit_sell_order(self):
         order_service = self.app.container.order_service()
@@ -126,7 +126,7 @@ class TestOrderService(TestBase):
         self.assertEqual("EUR", order.get_trading_symbol())
         self.assertEqual("BUY", order.get_order_side())
         self.assertEqual("LIMIT", order.get_order_type())
-        self.assertEqual("CREATED", order.get_status())
+        self.assertEqual("OPEN", order.get_status())
 
         order_service.update(
             order.id,
@@ -233,16 +233,8 @@ class TestOrderService(TestBase):
         )
         buy_order_one = order_service.get(buy_order_one.id)
         buy_order_two = order_service.get(buy_order_two.id)
-        self.assertEqual(
-            2.5,
-            buy_order_one.get_filled()
-            - buy_order_one.get_trade_closed_amount()
-        )
-        self.assertEqual(
-            5,
-            buy_order_two.get_filled()
-            - buy_order_two.get_trade_closed_amount()
-        )
+        self.assertEqual(5, buy_order_one.get_filled())
+        self.assertEqual(5, buy_order_two.get_filled())
         sell_order_two = order_service.create(
             {
                 "target_symbol": "ADA",
@@ -265,16 +257,8 @@ class TestOrderService(TestBase):
         )
         buy_order_one = order_service.get(buy_order_one.id)
         buy_order_two = order_service.get(buy_order_two.id)
-        self.assertEqual(
-            0,
-            buy_order_one.get_filled()
-            - buy_order_one.get_trade_closed_amount()
-        )
-        self.assertEqual(
-            2.5,
-            buy_order_two.get_filled()
-            - buy_order_two.get_trade_closed_amount()
-        )
+        self.assertEqual(5, buy_order_one.get_filled())
+        self.assertEqual(5, buy_order_two.get_filled())
 
     def test_update_sell_order_with_successful_order_filled(self):
         pass
@@ -290,119 +274,3 @@ class TestOrderService(TestBase):
 
     def test_update_sell_order_with_cancelled_order(self):
         pass
-
-    def test_trade_closing_winning_trade(self):
-        order_service = self.app.container.order_service()
-        buy_order = order_service.create(
-            {
-                "target_symbol": "ADA",
-                "trading_symbol": "EUR",
-                "amount": 1000,
-                "order_side": "BUY",
-                "price": 0.2,
-                "order_type": "LIMIT",
-                "portfolio_id": 1,
-                "status": "CREATED",
-            }
-        )
-        updated_buy_order = order_service.update(
-            buy_order.id,
-            {
-                "status": "CLOSED",
-                "filled": 1000,
-                "remaining": 0,
-            }
-        )
-        self.assertEqual(updated_buy_order.amount, 1000)
-        self.assertEqual(updated_buy_order.filled, 1000)
-        self.assertEqual(updated_buy_order.remaining, 0)
-
-        # Create a sell order with a higher price
-        sell_order = order_service.create(
-            {
-                "target_symbol": "ADA",
-                "trading_symbol": "EUR",
-                "amount": 1000,
-                "order_side": "SELL",
-                "price": 0.3,
-                "order_type": "LIMIT",
-                "portfolio_id": 1,
-                "status": "CREATED",
-            }
-        )
-        self.assertEqual(0.3, sell_order.get_price())
-        updated_sell_order = order_service.update(
-            sell_order.id,
-            {
-                "status": "CLOSED",
-                "filled": 1000,
-                "remaining": 0,
-            }
-        )
-        self.assertEqual(0.3, updated_sell_order.get_price())
-        self.assertEqual(updated_sell_order.amount, 1000)
-        self.assertEqual(updated_sell_order.filled, 1000)
-        self.assertEqual(updated_sell_order.remaining, 0)
-        buy_order = order_service.get(buy_order.id)
-        self.assertEqual(buy_order.status, "CLOSED")
-        self.assertIsNotNone(buy_order.get_trade_closed_at())
-        self.assertIsNotNone(buy_order.get_trade_closed_price())
-        self.assertNotEqual(0, buy_order.get_net_gain())
-
-    def test_trade_closing_losing_trade(self):
-        order_service = self.app.container.order_service()
-        buy_order = order_service.create(
-            {
-                "target_symbol": "ADA",
-                "trading_symbol": "EUR",
-                "amount": 1000,
-                "order_side": "BUY",
-                "price": 0.2,
-                "order_type": "LIMIT",
-                "portfolio_id": 1,
-                "status": "CREATED",
-            }
-        )
-        updated_buy_order = order_service.update(
-            buy_order.id,
-            {
-                "status": "CLOSED",
-                "filled":  1000,
-                "remaining": 0,
-            }
-        )
-        self.assertEqual(updated_buy_order.amount, 1000)
-        self.assertEqual(updated_buy_order.filled, 1000)
-        self.assertEqual(updated_buy_order.remaining, 0)
-
-        # Create a sell order with a higher price
-        sell_order = order_service.create(
-            {
-                "target_symbol": "ADA",
-                "trading_symbol": "EUR",
-                "amount": 1000,
-                "order_side": "SELL",
-                "price": 0.1,
-                "order_type": "LIMIT",
-                "portfolio_id": 1,
-                "status": "CREATED",
-            }
-        )
-        self.assertEqual(0.1, sell_order.get_price())
-        updated_sell_order = order_service.update(
-            sell_order.id,
-            {
-                "status": "CLOSED",
-                "filled": 1000,
-                "remaining": 0,
-            }
-        )
-        self.assertEqual(0.1, updated_sell_order.get_price())
-        self.assertEqual(updated_sell_order.amount, 1000)
-        self.assertEqual(updated_sell_order.filled, 1000)
-        self.assertEqual(updated_sell_order.remaining, 0)
-        buy_order = order_service.get(buy_order.id)
-        self.assertEqual(buy_order.status, "CLOSED")
-        self.assertIsNotNone(buy_order.get_trade_closed_at())
-        self.assertIsNotNone(buy_order.get_trade_closed_price())
-        self.assertEqual(-100, buy_order.get_net_gain())

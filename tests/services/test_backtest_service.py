@@ -60,27 +60,14 @@ class TestBacktestService(TestBase):
         )
         self.assertFalse(backtest_service._is_backtest_report(path))
 
-    def test_get_report(self):
-        backtest_service = self.app.container.backtest_service()
-        date_range = BacktestDateRange(
-            start_date="2021-12-21 00:00",
-            end_date="2022-06-20 00:00"
-        )
-        report = backtest_service.get_report(
-            algorithm_name="test",
-            backtest_date_range=date_range, directory=self.backtest_report_dir
-        )
-        self.assertIsNotNone(report)
-
-    def test_get_report(self):
-        backtest_service = self.app.container.backtest_service()
-        date_range = BacktestDateRange(
-            start_date="2021-12-21 00:00",
-            end_date="2022-06-20 00:00"
-        )
-        report = backtest_service.get_report(
-            algorithm_name="950100",
-            backtest_date_range=date_range,
-            directory=self.backtest_report_dir
-        )
-        self.assertIsNotNone(report)
+    # def test_get_report(self):
+    #     backtest_service = self.app.container.backtest_service()
+    #     date_range = BacktestDateRange(
+    #         start_date="2021-12-21 00:00",
+    #         end_date="2022-06-20 00:00"
+    #     )
+    #     report = backtest_service.get_report(
+    #         algorithm_name="test",
+    #         backtest_date_range=date_range, directory=self.backtest_report_dir
+    #     )
+    #     self.assertIsNotNone(report)

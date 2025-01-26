@@ -18,7 +18,7 @@ class OrderStatus(Enum):
                 if value.upper() == order_type.value:
                     return order_type
 
-        raise ValueError("Could not convert value to OrderStatus")
+        raise ValueError(f"Could not convert value {value} to OrderStatus")
 
     @staticmethod
     def from_value(value):

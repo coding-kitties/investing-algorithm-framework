@@ -3,7 +3,8 @@ from decimal import Decimal
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     CSVTickerMarketDataSource, MarketCredential, OperationalException
-from tests.resources import TestBase, RandomPriceMarketDataSourceServiceStub
+from tests.resources import TestBase, RandomPriceMarketDataSourceServiceStub, \
+    MarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -28,6 +29,7 @@ class Test(TestBase):
         None,
         None
     )
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def setUp(self) -> None:
         super().setUp()
@@ -38,7 +40,7 @@ class Test(TestBase):
             csv_file_path=os.path.join(
                 self.resource_directory,
                 "market_data_sources",
-                "TICKER_BTC-EUR_BINANCE_2023-08-23:22:00_2023-12-02:00:00.csv"
+                "TICKER_BTC-EUR_BINANCE_2023-08-23-22-00_2023-12-02-00-00.csv"
             )
         ))
 
@@ -54,14 +56,14 @@ class Test(TestBase):
         btc_position = self.app.algorithm.get_position("BTC")
         self.assertIsNotNone(btc_position)
         self.assertEqual(0, btc_position.get_amount())
-        self.assertEqual(0, len(self.app.algorithm.get_trades()))
+        self.assertEqual(1, len(self.app.algorithm.get_trades()))
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
         self.assertEqual(1, len(self.app.algorithm.get_trades()))
         trades = self.app.algorithm.get_trades()
         trade = trades[0]
-        self.assertIsNotNone(trade.get_amount())
-        self.assertEqual(Decimal(1), trade.get_amount())
+        self.assertIsNotNone(trade.amount)
+        self.assertEqual(Decimal(1), trade.amount)
         self.app.algorithm.close_trade(trade)
         self.assertEqual(1, len(self.app.algorithm.get_trades()))
         order_service.check_pending_orders()
@@ -80,14 +82,14 @@ class Test(TestBase):
         btc_position = self.app.algorithm.get_position("BTC")
         self.assertIsNotNone(btc_position)
         self.assertEqual(0, btc_position.get_amount())
-        self.assertEqual(0, len(self.app.algorithm.get_trades()))
+        self.assertEqual(1, len(self.app.algorithm.get_trades()))
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
         self.assertEqual(1, len(self.app.algorithm.get_trades()))
         trades = self.app.algorithm.get_trades()
         trade = trades[0]
-        self.assertIsNotNone(trade.get_amount())
-        self.assertEqual(Decimal(1), trade.get_amount())
+        self.assertIsNotNone(trade.amount)
+        self.assertEqual(Decimal(1), trade.amount)
         self.app.algorithm.close_trade(trade)
         self.assertEqual(1, len(self.app.algorithm.get_trades()))
         order_service.check_pending_orders()

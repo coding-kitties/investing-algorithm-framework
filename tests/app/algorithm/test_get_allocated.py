@@ -1,6 +1,7 @@
 from investing_algorithm_framework import TradingStrategy, TimeUnit, \
     MarketCredential, PortfolioConfiguration
-from tests.resources import TestBase, RandomPriceMarketDataSourceServiceStub
+from tests.resources import TestBase, RandomPriceMarketDataSourceServiceStub, \
+    MarketDataSourceServiceStub
 
 
 class StrategyOne(TradingStrategy):
@@ -39,6 +40,7 @@ class Test(TestBase):
             secret_key="secret_key"
         )
     ]
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_get_allocated(self):
         self.app.container.market_data_source_service.override(

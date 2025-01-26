@@ -1,12 +1,12 @@
 from .database import setup_sqlalchemy, Session, \
     create_all_tables
 from .models import SQLPortfolio, SQLOrder, SQLPosition, \
-    SQLPortfolioSnapshot, SQLPositionSnapshot, \
+    SQLPortfolioSnapshot, SQLPositionSnapshot, SQLTrade, \
     CCXTOHLCVBacktestMarketDataSource, CCXTOrderBookMarketDataSource, \
     CCXTTickerMarketDataSource, CCXTOHLCVMarketDataSource, \
     CSVOHLCVMarketDataSource, CSVTickerMarketDataSource
 from .repositories import SQLOrderRepository, SQLPositionRepository, \
-    SQLPortfolioRepository, \
+    SQLPortfolioRepository, SQLTradeRepository, \
     SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository
 from .services import PerformanceService, CCXTMarketService, \
     AzureBlobStorageStateHandler
@@ -21,6 +21,7 @@ __all__ = [
     "setup_sqlalchemy",
     "Session",
     "SQLPortfolio",
+    "SQLTrade",
     "SQLOrder",
     "SQLPosition",
     "PerformanceService",
@@ -35,5 +36,6 @@ __all__ = [
     "CSVTickerMarketDataSource",
     "CCXTOHLCVBacktestMarketDataSource",
     "CCXTOrderBookMarketDataSource",
-    "AzureBlobStorageStateHandler"
+    "AzureBlobStorageStateHandler",
+    "SQLTradeRepository"
 ]

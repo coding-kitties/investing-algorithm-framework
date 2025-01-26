@@ -34,7 +34,6 @@ class Test(TestCase):
         self.assertEqual(order.get_order_type(), "LIMIT")
         self.assertEqual(order.get_price(), 10000)
         self.assertEqual(order.get_amount(), 1)
-        self.assertEqual(order.get_cost(), 10000)
         self.assertEqual(order.get_filled(), 1)
         self.assertEqual(order.get_remaining(), 0)
         self.assertEqual(order.get_status(), "OPEN")

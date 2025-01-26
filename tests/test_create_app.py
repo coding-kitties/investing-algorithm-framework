@@ -69,6 +69,7 @@ class TestCreateApp(TestCase):
         app.container.market_service.override(
             market_service
         )
+        app.initialize_config()
         app.initialize()
         self.assertIsNotNone(app)
         self.assertIsNotNone(app._flask_app)

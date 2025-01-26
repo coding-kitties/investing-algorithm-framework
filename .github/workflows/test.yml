@@ -41,7 +41,10 @@ jobs:
       fail-fast: true
       matrix:
         os: [ "ubuntu-latest", "macos-latest" ]
-        python-version: [ "3.8", "3.9", "3.10", "3.11" ]
+        python-version: [ "3.9", "3.10", "3.11" ]
+    defaults:
+      run:
+        shell: bash
     runs-on: ${{ matrix.os }}
     steps:
       #----------------------------------------------
@@ -99,7 +102,7 @@ jobs:
       #----------------------------------------------
       - name: Run tests
         run: |
-          source .venv/bin/activate
+          source $VENV
           coverage run -m unittest discover -s tests
 #      #----------------------------------------------
 #      #             upload coverage stats

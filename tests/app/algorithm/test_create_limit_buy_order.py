@@ -1,6 +1,6 @@
 from investing_algorithm_framework import PortfolioConfiguration, \
     OrderStatus, MarketCredential
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -20,6 +20,7 @@ class Test(TestBase):
     external_balances = {
         "EUR": 1000
     }
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def count_decimals(self, number):
         decimal_str = str(number)

@@ -2,7 +2,7 @@ import logging
 
 from investing_algorithm_framework.domain import OperationalException, \
     AbstractPortfolioSyncService, RESERVED_BALANCES, SYMBOLS, \
-    OrderSide, OrderStatus
+    ENVIRONMENT, Environment
 from investing_algorithm_framework.services.trade_service import TradeService
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
         self,
         trade_service: TradeService,
         configuration_service,
-        order_repository,
+        order_service,
         position_repository,
         portfolio_repository,
         portfolio_configuration_service,
@@ -26,7 +26,7 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
     ):
         self.trade_service = trade_service
         self.configuration_service = configuration_service
-        self.order_repository = order_repository
+        self.order_service = order_service
         self.position_repository = position_repository
         self.portfolio_repository = portfolio_repository
         self.market_credential_service = market_credential_service
@@ -221,44 +221,13 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
             None
         """
 
-        open_orders = self.order_repository.get_all(
-            {
-                "portfolio": portfolio.identifier,
-                "status": OrderStatus.OPEN.value
-            }
-        )
+        config = self.configuration_service.get_config()
 
-        for order in open_orders:
-            external_orders = self.market_service.get_orders(
-                symbol=order.get_symbol(),
-                since=order.created_at,
-                market=portfolio.market
-            )
+        if ENVIRONMENT in config \
+                and Environment.BACKTEST.equals(config[ENVIRONMENT]):
+            return
 
-            for external_order in external_orders:
-
-                if order.external_id == external_order.external_id:
-                    self.order_repository.update(
-                        order.id, external_order.to_dict()
-                    )
-
-    def sync_trades(self, portfolio):
-        orders = self.order_repository.get_all(
-            {
-                "portfolio": portfolio.identifier,
-                "order_by_created_at_asc": True
-            }
-        )
-
-        sell_orders = [
-            order for order in orders
-            if OrderSide.SELL.equals(order.order_side)
-        ]
-
-        for sell_order in sell_orders:
-            self.trade_service.close_trades(
-                sell_order, sell_order.get_filled()
-            )
+        self.order_service.check_pending_orders(portfolio=portfolio)
 
     def _get_symbols(self, portfolio):
         config = self.configuration_service.config
