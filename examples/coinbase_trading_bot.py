@@ -1,9 +1,8 @@
-import os
-
+from dotenv import load_dotenv
+import logging.config
 from investing_algorithm_framework import MarketCredential, TimeUnit, \
     CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, TradingStrategy, \
-    create_app, PortfolioConfiguration, Algorithm, SYMBOLS, RESOURCE_DIRECTORY
-
+    create_app, PortfolioConfiguration, Algorithm, DEFAULT_LOGGING_CONFIG
 """
 Coinbase market data sources example. Coinbase requires you to have an API key
 and secret key to access their market data. You can create them here:
@@ -13,6 +12,12 @@ You need to add a market credential to the app, and then add market
 data sources to the app. You can then use the market data
 sources in your trading strategy.
 """
+
+logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
+
+# Load the environment variables from the .env file
+load_dotenv()
+
 # Define your market credential for coinbase, keys are read from .env file
 coinbase_market_credential = MarketCredential(
     market="coinbase",

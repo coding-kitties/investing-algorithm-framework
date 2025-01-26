@@ -1,8 +1,9 @@
 from dotenv import load_dotenv
+import logging.config
 
 from investing_algorithm_framework import MarketCredential, TimeUnit, \
     CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, TradingStrategy, \
-    create_app, PortfolioConfiguration, Algorithm
+    create_app, PortfolioConfiguration, Algorithm, DEFAULT_LOGGING_CONFIG
 
 """
 Bitvavo trading bot example with market data sources of bitvavo.
@@ -12,6 +13,8 @@ you don't need to add a market credential. If your running your strategy live,
 you need to add a market credential to the app, that accesses your
 account on bitvavo.
 """
+
+logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
 
 # Load the environment variables from the .env file
 load_dotenv()
