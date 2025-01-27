@@ -2,7 +2,7 @@ import os
 import re
 import json
 from datetime import datetime
-from typing import List, Tuple
+from typing import List
 
 from tabulate import tabulate
 
