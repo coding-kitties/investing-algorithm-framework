@@ -1,3 +1,5 @@
+from dateutil.parser import parse
+
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.order import OrderSide
 from investing_algorithm_framework.domain.models.trade.trade_status import \
@@ -154,7 +156,9 @@ class Trade(BaseModel):
     def net_gain_percentage(self):
 
         if TradeStatus.CLOSED.equals(self.status):
-            return (self.net_gain / self.cost) * 100
+
+            if self.cost != 0:
+                return (self.net_gain / self.cost) * 100
 
         else:
             gain = 0
@@ -170,7 +174,7 @@ class Trade(BaseModel):
             if self.cost != 0:
                 return (gain / self.cost) * 100
 
-            return 0
+        return 0
 
     @property
     def percentage_change(self):
@@ -254,11 +258,25 @@ class Trade(BaseModel):
             "opened_at": opened_at,
             "closed_at": closed_at,
             "updated_at": updated_at,
-            "net_gain": self.net_gain
+            "net_gain": self.net_gain,
+            "cost": self.cost,
         }
 
     @staticmethod
     def from_dict(data):
+        opened_at = None
+        closed_at = None
+        updated_at = None
+
+        if "opened_at" in data and data["opened_at"] is not None:
+            opened_at = parse(data["opened_at"])
+
+        if "closed_at" in data and data["closed_at"] is not None:
+            closed_at = parse(data["closed_at"])
+
+        if "updated_at" in data and data["updated_at"] is not None:
+            updated_at = parse(data["updated_at"])
+
         return Trade(
             id=data.get("id", None),
             orders=data.get("orders", None),
@@ -266,14 +284,14 @@ class Trade(BaseModel):
             trading_symbol=data["trading_symbol"],
             amount=data["amount"],
             open_price=data["open_price"],
-            opened_at=data["opened_at"],
-            closed_at=data["closed_at"],
+            opened_at=opened_at,
+            closed_at=closed_at,
             remaining=data.get("remaining", 0),
             net_gain=data.get("net_gain", 0),
             last_reported_price=data.get("last_reported_price"),
             status=data["status"],
             cost=data.get("cost", 0),
-            updated_at=data.get("updated_at"),
+            updated_at=updated_at,
         )
 
     def __repr__(self):

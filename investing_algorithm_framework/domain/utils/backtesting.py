@@ -43,14 +43,14 @@ def pretty_print_profit_evaluation(reports, precision=4):
         report.name for report in reports
     ]
     profit_table["Profit"] = [
-        f"{report.total_net_gain:.{precision}f} {report.trading_symbol}"
+        f"{float(report.total_net_gain):.{precision}f} {report.trading_symbol}"
         for report in reports
     ]
     profit_table["Profit percentage"] = [
-        f"{report.total_net_gain_percentage:.{precision}f}%" for report in reports
+        f"{float(report.total_net_gain_percentage):.{precision}f}%" for report in reports
     ]
     profit_table["Percentage positive trades"] = [
-        f"{report.percentage_positive_trades:.{0}f}%"
+        f"{float(report.percentage_positive_trades):.{0}f}%"
         for report in reports
     ]
     profit_table["Date range"] = [
@@ -58,7 +58,7 @@ def pretty_print_profit_evaluation(reports, precision=4):
         for report in reports
     ]
     profit_table["Total value"] = [
-        f"{report.total_value:.{precision}f}" for report in reports
+        f"{float(report.total_value):.{precision}f}" for report in reports
     ]
     print(tabulate(profit_table, headers="keys", tablefmt="rounded_grid"))
 
@@ -69,13 +69,13 @@ def pretty_print_growth_evaluation(reports, precision=4):
         report.name for report in reports
     ]
     growth_table["Growth"] = [
-        f"{report.growth:.{precision}f} {report.trading_symbol}" for report in reports
+        f"{float(report.growth):.{precision}f} {report.trading_symbol}" for report in reports
     ]
     growth_table["Growth percentage"] = [
-        f"{report.growth_rate:.{precision}f}%" for report in reports
+        f"{float(report.growth_rate):.{precision}f}%" for report in reports
     ]
     growth_table["Percentage positive trades"] = [
-        f"{report.percentage_positive_trades:.{0}f}%"
+        f"{float(report.percentage_positive_trades):.{0}f}%"
         for report in reports
     ]
     growth_table["Date range"] = [
@@ -83,7 +83,7 @@ def pretty_print_growth_evaluation(reports, precision=4):
         for report in reports
     ]
     growth_table["Total value"] = [
-        f"{report.total_value:.{precision}f}" for report in reports
+        f"{float(report.total_value):.{precision}f}" for report in reports
     ]
     print(
         tabulate(growth_table, headers="keys", tablefmt="rounded_grid")
@@ -102,7 +102,7 @@ def pretty_print_percentage_positive_trades_evaluation(
         report.name for report in order[:number_of_reports]
     ]
     profit_table["Percentage positive trades"] = [
-        f"{report.percentage_positive_trades:.{precision}f}%"
+        f"{float(report.percentage_positive_trades):.{precision}f}%"
         for report in order[:number_of_reports]
     ]
     profit_table["Total amount of trades"] = [
@@ -118,7 +118,7 @@ def pretty_print_percentage_positive_trades_evaluation(
         report.name for report in least
     ]
     table["Percentage positive trades"] = [
-        f"{report.percentage_positive_trades:.{precision}f}%"
+        f"{float(report.percentage_positive_trades):.{precision}f}%"
         for report in least
     ]
     table["Total amount of trades"] = [
@@ -177,7 +177,7 @@ def pretty_print_price_efficiency(reports, precision=4):
             for symbol in price_efficiency:
                 row = {}
                 row["Symbol"] = symbol
-                row["Efficiency ratio / Noise"] = f"{price_efficiency[symbol]:.{precision}f}"
+                row["Efficiency ratio / Noise"] = f"{float(price_efficiency[symbol]):.{precision}f}"
                 row["Date"] = f"{report.backtest_start_date} - {report.backtest_end_date}"
 
 
@@ -228,7 +228,7 @@ def pretty_print_most_profitable(
 ):
     profits = evaluation.get_profit_order(backtest_date_range=backtest_date_range)
     profit = profits[0]
-    print(f"{COLOR_YELLOW}Most profitable:{COLOR_RESET} {COLOR_GREEN}Algorithm {profit.name} {profit.total_net_gain:.{precision}f} {profit.trading_symbol} {profit.total_net_gain_percentage:.{precision}f}%{COLOR_RESET}")
+    print(f"{COLOR_YELLOW}Most profitable:{COLOR_RESET} {COLOR_GREEN}Algorithm {profit.name} {float(profit.total_net_gain):.{precision}f} {profit.trading_symbol} {float(profit.total_net_gain_percentage):.{precision}f}%{COLOR_RESET}")
 
 
 def pretty_print_most_growth(
@@ -238,7 +238,7 @@ def pretty_print_most_growth(
 ):
     profits = evaluation.get_growth_order(backtest_date_range=backtest_date_range)
     profit = profits[0]
-    print(f"{COLOR_YELLOW}Most growth:{COLOR_RESET} {COLOR_GREEN}Algorithm {profit.name} {profit.growth:.{precision}f} {profit.trading_symbol} {profit.growth_rate:.{precision}f}%{COLOR_RESET}")
+    print(f"{COLOR_YELLOW}Most growth:{COLOR_RESET} {COLOR_GREEN}Algorithm {profit.name} {float(profit.growth):.{precision}f} {profit.trading_symbol} {float(profit.growth_rate):.{precision}f}%{COLOR_RESET}")
 
 
 def pretty_print_percentage_positive_trades(
@@ -248,7 +248,7 @@ def pretty_print_percentage_positive_trades(
 ):
     percentages = evaluation.get_percentage_positive_trades_order(backtest_date_range=backtest_date_range)
     percentages = percentages[0]
-    print(f"{COLOR_YELLOW}Most positive trades:{COLOR_RESET} {COLOR_GREEN}Algorithm {percentages.name} {percentages.percentage_positive_trades:.{precision}f}%{COLOR_RESET}")
+    print(f"{COLOR_YELLOW}Most positive trades:{COLOR_RESET} {COLOR_GREEN}Algorithm {percentages.name} {float(percentages.percentage_positive_trades):.{precision}f}%{COLOR_RESET}")
 
 
 def pretty_print_trades(backtest_report, precision=4):
@@ -268,14 +268,14 @@ def pretty_print_trades(backtest_report, precision=4):
         trade.duration for trade in backtest_report.trades
     ]
     trades_table[f"Size ({backtest_report.trading_symbol})"] = [
-        f"{trade.size:.{precision}f}" for trade in backtest_report.trades
+        f"{float(trade.size):.{precision}f}" for trade in backtest_report.trades
     ]
     trades_table[f"Net gain ({backtest_report.trading_symbol})"] = [
-        f"{trade.net_gain:.{precision}f}" + (" (unrealized)" if trade.closed_price is None else "")
+        f"{float(trade.net_gain):.{precision}f}" + (" (unrealized)" if trade.closed_price is None else "")
         for trade in backtest_report.trades
     ]
     trades_table["Net gain percentage"] = [
-        f"{trade.net_gain_percentage:.{precision}f}%" + (" (unrealized)" if trade.closed_price is None else "")
+        f"{float(trade.net_gain_percentage):.{precision}f}%" + (" (unrealized)" if trade.closed_price is None else "")
         for trade in backtest_report.trades
     ]
     trades_table[f"Open price ({backtest_report.trading_symbol})"] = [
@@ -312,8 +312,8 @@ def pretty_print_backtest_reports_evaluation(
               :%%%#+-          .=*#%%%      {COLOR_GREEN}Backtest reports evaluation{COLOR_RESET}
               *%%%%%%%+------=*%%%%%%%-     {COLOR_GREEN}---------------------------{COLOR_RESET}
               *%%%%%%%%%%%%%%%%%%%%%%%-     {COLOR_YELLOW}Number of reports:{COLOR_RESET} {COLOR_GREEN}{number_of_backtest_reports} backtest reports{COLOR_RESET}
-              .%%%%%%%%%%%%%%%%%%%%%%#      {COLOR_YELLOW}Largest overall profit:{COLOR_RESET}{COLOR_GREEN}{COLOR_RESET}{COLOR_GREEN} (Algorithm {most_profitable.name}) {most_profitable.total_net_gain:.{precision}f} {most_profitable.trading_symbol} {most_profitable.total_net_gain_percentage:.{precision}f}% ({most_profitable.backtest_date_range.name} {most_profitable.backtest_date_range.start_date} - {most_profitable.backtest_date_range.end_date}){COLOR_RESET}
-               #%%%####%%%%%%%%**#%%%+      {COLOR_YELLOW}Largest overall growth:{COLOR_RESET}{COLOR_GREEN} (Algorithm {most_profitable.name}) {most_growth.growth:.{precision}f} {most_growth.trading_symbol} {most_growth.growth_rate:.{precision}f}% ({most_growth.backtest_date_range.name} {most_growth.backtest_date_range.start_date} - {most_growth.backtest_date_range.end_date}){COLOR_RESET}
+              .%%%%%%%%%%%%%%%%%%%%%%#      {COLOR_YELLOW}Largest overall profit:{COLOR_RESET}{COLOR_GREEN}{COLOR_RESET}{COLOR_GREEN} (Algorithm {most_profitable.name}) {float(most_profitable.total_net_gain):.{precision}f} {most_profitable.trading_symbol} {float(most_profitable.total_net_gain_percentage):.{precision}f}% ({most_profitable.backtest_date_range.name} {most_profitable.backtest_date_range.start_date} - {most_profitable.backtest_date_range.end_date}){COLOR_RESET}
+               #%%%####%%%%%%%%**#%%%+      {COLOR_YELLOW}Largest overall growth:{COLOR_RESET}{COLOR_GREEN} (Algorithm {most_profitable.name}) {float(most_growth.growth):.{precision}f} {most_growth.trading_symbol} {float(most_growth.growth_rate):.{precision}f}% ({most_growth.backtest_date_range.name} {most_growth.backtest_date_range.start_date} - {most_growth.backtest_date_range.end_date}){COLOR_RESET}
          .:-+*%%%%- {COLOR_PURPLE}-+..#{COLOR_RESET}%%%+.{COLOR_PURPLE}+-  +{COLOR_RESET}%%%#*=-:
           .:-=*%%%%. {COLOR_PURPLE}+={COLOR_RESET} .%%#  {COLOR_PURPLE}-+.-{COLOR_RESET}%%%%=-:..
           .:=+#%%%%%*###%%%%#*+#%%%%%%*+-:
@@ -381,14 +381,14 @@ def pretty_print_backtest(
              .:-+*%%%%- {COLOR_PURPLE}-+..#{COLOR_RESET}%%%+.{COLOR_PURPLE}+-  +{COLOR_RESET}%%%#*=-:   {COLOR_YELLOW}Number of runs:{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_runs}{COLOR_RESET}
               .:-=*%%%%. {COLOR_PURPLE}+={COLOR_RESET} .%%#  {COLOR_PURPLE}-+.-{COLOR_RESET}%%%%=-:..   {COLOR_YELLOW}Number of orders:{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_orders}{COLOR_RESET}
               .:=+#%%%%%*###%%%%#*+#%%%%%%*+-:    {COLOR_YELLOW}Initial balance:{COLOR_RESET}{COLOR_GREEN} {backtest_report.initial_unallocated}{COLOR_RESET}
-                    +%%%%%%%%%%%%%%%%%%%=         {COLOR_YELLOW}Final balance:{COLOR_RESET}{COLOR_GREEN} {backtest_report.total_value:.{precision}f}{COLOR_RESET}
-                :++  .=#%%%%%%%%%%%%%*-           {COLOR_YELLOW}Total net gain:{COLOR_RESET}{COLOR_GREEN} {backtest_report.total_net_gain:.{precision}f} {backtest_report.total_net_gain_percentage:.{precision}}%{COLOR_RESET}
-               :++:      :+%%%%%%#-.              {COLOR_YELLOW}Growth:{COLOR_RESET}{COLOR_GREEN} {backtest_report.growth:.{precision}f} {backtest_report.growth_rate:.{precision}}%{COLOR_RESET}
+                    +%%%%%%%%%%%%%%%%%%%=         {COLOR_YELLOW}Final balance:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.total_value):.{precision}f}{COLOR_RESET}
+                :++  .=#%%%%%%%%%%%%%*-           {COLOR_YELLOW}Total net gain:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.total_net_gain):.{precision}f} {float(backtest_report.total_net_gain_percentage):.{precision}}%{COLOR_RESET}
+               :++:      :+%%%%%%#-.              {COLOR_YELLOW}Growth:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.growth):.{precision}f} {float(backtest_report.growth_rate):.{precision}}%{COLOR_RESET}
               :++:        .%%%%%#=                {COLOR_YELLOW}Number of trades closed:{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_trades_closed}{COLOR_RESET}
              :++:        .#%%%%%#*=               {COLOR_YELLOW}Number of trades open(end of backtest):{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_trades_open}{COLOR_RESET}
             :++-        :%%%%%%%%%+=              {COLOR_YELLOW}Percentage positive trades:{COLOR_RESET}{COLOR_GREEN} {backtest_report.percentage_positive_trades}%{COLOR_RESET}
            .++-        -%%%%%%%%%%%+=             {COLOR_YELLOW}Percentage negative trades:{COLOR_RESET}{COLOR_GREEN} {backtest_report.percentage_negative_trades}%{COLOR_RESET}
-          .++-        .%%%%%%%%%%%%%+=            {COLOR_YELLOW}Average trade size:{COLOR_RESET}{COLOR_GREEN} {backtest_report.average_trade_size:.{precision}f} {backtest_report.trading_symbol}{COLOR_RESET}
+          .++-        .%%%%%%%%%%%%%+=            {COLOR_YELLOW}Average trade size:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.average_trade_size):.{precision}f} {backtest_report.trading_symbol}{COLOR_RESET}
          .++-         *%%%%%%%%%%%%%*+:           {COLOR_YELLOW}Average trade duration:{COLOR_RESET}{COLOR_GREEN} {backtest_report.average_trade_duration} hours{COLOR_RESET}
         .++-          %%%%%%%%%%%%%%#+=
         =++........:::%%%%%%%%%%%%%%*+-
@@ -405,35 +405,35 @@ def pretty_print_backtest(
             position.symbol for position in backtest_report.positions
         ]
         position_table["Amount"] = [
-            f"{position.amount:.{precision}f}" for position in
+            f"{float(position.amount):.{precision}f}" for position in
             backtest_report.positions
         ]
         position_table["Pending buy amount"] = [
-            f"{position.amount_pending_buy:.{precision}f}"
+            f"{float(position.amount_pending_buy):.{precision}f}"
             for position in backtest_report.positions
         ]
         position_table["Pending sell amount"] = [
-            f"{position.amount_pending_sell:.{precision}f}"
+            f"{float(position.amount_pending_sell):.{precision}f}"
             for position in backtest_report.positions
         ]
         position_table[f"Cost ({backtest_report.trading_symbol})"] = [
-            f"{position.cost:.{precision}f}"
+            f"{float(position.cost):.{precision}f}"
             for position in backtest_report.positions
         ]
         position_table[f"Value ({backtest_report.trading_symbol})"] = [
-            f"{position.value:.{precision}f}"
+            f"{float(position.value):.{precision}f}"
             for position in backtest_report.positions
         ]
         position_table["Percentage of portfolio"] = [
-            f"{position.percentage_of_portfolio:.{precision}f}%"
+            f"{float(position.percentage_of_portfolio):.{precision}f}%"
             for position in backtest_report.positions
         ]
         position_table[f"Growth ({backtest_report.trading_symbol})"] = [
-            f"{position.growth:.{precision}f}"
+            f"{float(position.growth):.{precision}f}"
             for position in backtest_report.positions
         ]
         position_table["Growth_rate"] = [
-            f"{position.growth_rate:.{precision}f}%"
+            f"{float(position.growth_rate):.{precision}f}%"
             for position in backtest_report.positions
         ]
         print(
@@ -457,20 +457,20 @@ def pretty_print_backtest(
             trade.duration for trade in backtest_report.trades
         ]
         trades_table[f"Cost ({backtest_report.trading_symbol})"] = [
-            f"{trade.cost:.{precision}f}" for trade in backtest_report.trades
+            f"{float(trade.cost):.{precision}f}" for trade in backtest_report.trades
         ]
         trades_table[f"Net gain ({backtest_report.trading_symbol})"] = [
-            f"{trade.net_gain:.{precision}f}"
+            f"{float(trade.net_gain):.{precision}f}"
             for trade in backtest_report.trades
         ]
 
         # Add (unrealized) to the net gain if the trade is still open
         trades_table[f"Net gain ({backtest_report.trading_symbol})"] = [
-            f"{trade.net_gain_absolute:.{precision}f}" + (" (unrealized)" if not TradeStatus.CLOSED.equals(trade.status) else "")
+            f"{float(trade.net_gain_absolute):.{precision}f}" + (" (unrealized)" if not TradeStatus.CLOSED.equals(trade.status) else "")
             for trade in backtest_report.trades
         ]
         trades_table["Net gain percentage"] = [
-            f"{trade.net_gain_percentage:.{precision}f}%" + (" (unrealized)" if not TradeStatus.CLOSED.equals(trade.status) else "")
+            f"{float(trade.net_gain_percentage):.{precision}f}%" + (" (unrealized)" if not TradeStatus.CLOSED.equals(trade.status) else "")
             for trade in backtest_report.trades
         ]
         trades_table[f"Open price ({backtest_report.trading_symbol})"] = [
