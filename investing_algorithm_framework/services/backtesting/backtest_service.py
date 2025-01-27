@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from dateutil import parser
 import re
 import os
 import json
@@ -612,10 +613,15 @@ class BacktestService:
 
         # Get the backtest start date from the file name
         backtest_start_date = os.path.basename(path).split("_")[3]
-        # Parse the backtest start date
-        return datetime.strptime(
-            backtest_start_date, DATETIME_FORMAT_BACKTESTING
-        )
+
+        try:
+            # Parse the backtest start date
+            return datetime.strptime(
+                backtest_start_date, DATETIME_FORMAT_BACKTESTING
+            )
+        except ValueError:
+            # Try to parse the backtest start date with a different format
+            return parser.parse(backtest_start_date)
 
     def _get_end_date_from_backtest_report_file(self, path: str) -> datetime:
         """
@@ -630,10 +636,15 @@ class BacktestService:
 
         # Get the backtest end date from the file name
         backtest_end_date = os.path.basename(path).split("_")[5]
-        # Parse the backtest end date
-        return datetime.strptime(
-            backtest_end_date, DATETIME_FORMAT_BACKTESTING
-        )
+
+        try:
+            # Parse the backtest end date
+            return datetime.strptime(
+                backtest_end_date, DATETIME_FORMAT_BACKTESTING
+            )
+        except ValueError:
+            # Try to parse the backtest end date with a different format
+            return parser.parse(backtest_end_date)
 
     def _get_algorithm_name_from_backtest_report_file(self, path: str) -> str:
         """
