@@ -27,7 +27,7 @@ class Test(TestCase):
     def test_pretty_print(self):
         path = os.path.join(
             self.resource_dir,
-            "backtest_reports_for_testing/report_GoldenCrossStrategy_backtest-start-date_2023-08-24-00-00_backtest-end-date_2023-12-02-00-00_created-at_2025-01-26-23-24.json"
+            "backtest_reports_for_testing/report_GoldenCrossStrategy_backtest-start-date_2023-08-24-00-00_backtest-end-date_2023-12-02-00-00_created-at_2025-01-27-08-21.json"
         )
         report = load_backtest_report(path)
         pretty_print_backtest(report)

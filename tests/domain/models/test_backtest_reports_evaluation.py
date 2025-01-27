@@ -28,5 +28,4 @@ class Test(TestCase):
         path = os.path.join(self.resource_dir, "backtest_reports_for_testing")
         reports = load_backtest_reports(path)
         evaluation = BacktestReportsEvaluation(reports)
-        self.assertEqual(len(evaluation.backtest_reports), 2)
-        # self.assertEqual("10-50-100", evaluation.profit_order[0].name)
+        self.assertEqual(len(evaluation.backtest_reports), 3)
