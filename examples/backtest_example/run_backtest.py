@@ -1,3 +1,4 @@
+import time
 import logging.config
 from datetime import datetime, timedelta
 
@@ -156,13 +157,17 @@ app.add_portfolio_configuration(
 
 if __name__ == "__main__":
     end_date = datetime(2023, 12, 2)
-    start_date = end_date - timedelta(days=100)
+    start_date = end_date - timedelta(days=400)
     date_range = BacktestDateRange(
         start_date=start_date,
         end_date=end_date
     )
+    start_time = time.time()
+
     backtest_report = app.run_backtest(
         algorithm=algorithm,
         backtest_date_range=date_range,
     )
     pretty_print_backtest(backtest_report)
+    end_time = time.time()
+    print(f"Execution Time: {end_time - start_time:.6f} seconds")

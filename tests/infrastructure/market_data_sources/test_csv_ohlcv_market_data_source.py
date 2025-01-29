@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 
 from dateutil import parser
@@ -42,7 +42,7 @@ class Test(TestCase):
                           f"{file_name}",
             window_size=10,
         )
-        date = datetime(2023, 8, 7, 8, 0, tzinfo=tzutc())
+        date = datetime(2023, 8, 7, 8, 0, tzinfo=timezone.utc)
         df = data_source.get_data(start_date=date)
         self.assertEqual(
             ["Datetime", "Open", "High", "Low", "Close", "Volume"], df.columns
@@ -61,7 +61,7 @@ class Test(TestCase):
             )
 
     def test_start_date(self):
-        start_date = datetime(2023, 8, 7, 8, 0, tzinfo=tzutc())
+        start_date = datetime(2023, 8, 7, 8, 0, tzinfo=timezone.utc)
         file_name = "OHLCV_BTC-EUR_BINANCE" \
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         csv_ohlcv_market_data_source = CSVOHLCVMarketDataSource(
@@ -78,7 +78,7 @@ class Test(TestCase):
 
     def test_start_date_with_window_size(self):
         start_date = datetime(
-            year=2023, month=8, day=7, hour=10, minute=0, tzinfo=tzutc()
+            year=2023, month=8, day=7, hour=10, minute=0, tzinfo=timezone.utc
         )
         file_name = "OHLCV_BTC-EUR_BINANCE" \
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
@@ -92,7 +92,7 @@ class Test(TestCase):
             start_date=start_date
         )
         self.assertEqual(12, len(data))
-        first_date = parser.parse(data["Datetime"][0])
+        first_date = data["Datetime"][0]
         self.assertEqual(
             start_date.strftime(DATETIME_FORMAT),
             first_date.strftime(DATETIME_FORMAT)
@@ -122,7 +122,7 @@ class Test(TestCase):
                           f"{file_name}",
             window_size=10,
         )
-        start_date = datetime(2023, 12, 2, 0, 0, tzinfo=tzutc())
+        start_date = datetime(2023, 12, 2, 0, 0, tzinfo=timezone.utc)
         self.assertFalse(data_source.empty(start_date))
 
     def test_get_data(self):

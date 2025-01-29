@@ -1,6 +1,5 @@
 import logging
 from queue import PriorityQueue
-from dateutil import parser
 
 from investing_algorithm_framework.domain import OrderStatus, \
     TradeStatus, Trade, OperationalException, MarketDataType
@@ -248,9 +247,7 @@ class TradeService(RepositoryService):
             last_row = data.tail(1)
             update_data = {
                 "last_reported_price": last_row["Close"][0],
-                "updated_at": parser.parse(
-                    last_row["Datetime"][0]
-                )
+                "updated_at": last_row["Datetime"][0]
             }
             price = last_row["Close"][0]
 
