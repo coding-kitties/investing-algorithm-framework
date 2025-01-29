@@ -1,7 +1,6 @@
 import logging
 import os
 from datetime import timedelta, datetime, timezone
-from dateutil.parser import parse
 import polars
 from dateutil import parser
 
@@ -57,6 +56,9 @@ class CCXTOHLCVBacktestMarketDataSource(
         self.data = None
         self._start_date_data_source = None
         self._end_date_data_source = None
+        self.backtest_end_index = self.window_size
+        self.backtest_start_index = 0
+        self.window_cache = {}
 
     def prepare_data(
         self,
@@ -99,8 +101,6 @@ class CCXTOHLCVBacktestMarketDataSource(
             )
 
         self.backtest_data_start_date = backtest_data_start_date\
-            .replace(microsecond=0)
-        self.backtest_data_index_date = backtest_data_start_date\
             .replace(microsecond=0)
         self.backtest_data_end_date = backtest_end_date.replace(microsecond=0)
 
@@ -148,14 +148,30 @@ class CCXTOHLCVBacktestMarketDataSource(
             self.write_data_to_file_path(file_path, ohlcv)
 
         self.load_data()
+        self._precompute_sliding_windows()  # Precompute sliding windows!
+
+    def _precompute_sliding_windows(self):
+        """
+        Precompute all sliding windows for fast retrieval.
+        """
+        self.window_cache = {}
+        timestamps = self.data["Datetime"].to_list()
+
+        for i in range(len(timestamps) - self.window_size + 1):
+            # Use last timestamp as key
+            end_time = timestamps[i + self.window_size - 1]
+            self.window_cache[end_time] = self.data.slice(i, self.window_size)
 
     def load_data(self):
         file_path = self._create_file_path()
-        self.data = polars.read_csv(file_path)
+        self.data = polars.read_csv(
+            file_path, dtypes={"Datetime": polars.Datetime}, low_memory=True
+        )  # Faster parsing
         first_row = self.data.head(1)
         last_row = self.data.tail(1)
-        self._start_date_data_source = parse(first_row["Datetime"][0])
-        self._end_date_data_source = parse(last_row["Datetime"][0])
+
+        self._start_date_data_source = first_row["Datetime"][0]
+        self._end_date_data_source = last_row["Datetime"][0]
 
     def _create_file_path(self):
         """
@@ -190,38 +206,21 @@ class CCXTOHLCVBacktestMarketDataSource(
         source. This implementation will use polars to load and filter the
         data.
         """
-        if self.data is None:
-            self.load_data()
 
-        end_date = date
+        data = self.window_cache.get(date)
+        if data is not None:
+            return data
 
-        if end_date is None:
-            return self.data
+        # Find closest previous timestamp
+        sorted_timestamps = sorted(self.window_cache.keys())
 
-        start_date = self.create_start_date(
-            end_date, self.time_frame, self.window_size
-        )
+        closest_date = None
+        for ts in reversed(sorted_timestamps):
+            if ts < date:
+                closest_date = ts
+                break
 
-        if start_date < self._start_date_data_source:
-            raise OperationalException(
-                f"Start date {start_date} is before the start date "
-                f"of the data source {self._start_date_data_source}"
-            )
-
-        if end_date > self._end_date_data_source:
-            raise OperationalException(
-                f"End date {end_date} is after the end date "
-                f"of the data source {self._end_date_data_source}"
-            )
-
-        time_frame = TimeFrame.from_string(self.time_frame)
-        start_date = start_date - \
-            timedelta(minutes=time_frame.amount_of_minutes)
-        selection = self.data.filter(
-            (self.data['Datetime'] >= start_date.strftime(DATETIME_FORMAT))
-            & (self.data['Datetime'] <= end_date.strftime(DATETIME_FORMAT))
-        )
-        return selection
+        return self.window_cache.get(closest_date) if closest_date else None
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
         # Ignore this method for now

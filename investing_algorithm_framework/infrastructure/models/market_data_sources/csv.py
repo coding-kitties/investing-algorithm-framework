@@ -40,7 +40,8 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
         self._columns = [
             "Datetime", "Open", "High", "Low", "Close", "Volume"
         ]
-        df = polars.read_csv(csv_file_path)
+
+        df = polars.read_csv(self._csv_file_path)
 
         # Check if all column names are in the csv file
         if not all(column in df.columns for column in self._columns):
@@ -53,14 +54,24 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
                 f"Missing columns: {missing_columns}"
             )
 
-        first_row = df.head(1)
-        last_row = df.tail(1)
-        self._start_date_data_source = parse(first_row["Datetime"][0])
-        self._end_date_data_source = parse(last_row["Datetime"][0])
+        self.data = self._load_data(self.csv_file_path)
+        first_row = self.data.head(1)
+        last_row = self.data.tail(1)
+        self._start_date_data_source = first_row["Datetime"][0]
+        self._end_date_data_source = last_row["Datetime"][0]
 
     @property
     def csv_file_path(self):
         return self._csv_file_path
+
+    def _load_data(self, file_path):
+        return polars.read_csv(
+            file_path, dtypes={"Datetime": polars.Datetime}, low_memory=True
+        ).with_columns(
+            polars.col("Datetime").cast(
+                polars.Datetime(time_unit="ms", time_zone="UTC")
+            )
+        )
 
     def get_data(
         self,
@@ -86,9 +97,7 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
         """
 
         if start_date is None and end_date is None:
-            return polars.read_csv(
-                self.csv_file_path, columns=self._columns, separator=","
-            )
+            return self.data
 
         if end_date is not None and start_date is not None:
 
@@ -101,13 +110,10 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
             if start_date > self._end_date_data_source:
                 return polars.DataFrame()
 
-            df = polars.read_csv(
-                self.csv_file_path, columns=self._columns, separator=","
-            )
-
+            df = self.data
             df = df.filter(
-                (df['Datetime'] >= start_date.strftime(DATETIME_FORMAT))
-                & (df['Datetime'] <= end_date.strftime(DATETIME_FORMAT))
+                (df['Datetime'] >= start_date)
+                & (df['Datetime'] <= end_date)
             )
             return df
 
@@ -119,11 +125,9 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
             if start_date > self._end_date_data_source:
                 return polars.DataFrame()
 
-            df = polars.read_csv(
-                self.csv_file_path, columns=self._columns, separator=","
-            )
+            df = self.data
             df = df.filter(
-                (df['Datetime'] >= start_date.strftime(DATETIME_FORMAT))
+                (df['Datetime'] >= start_date)
             )
             df = df.head(self.window_size)
             return df
@@ -136,11 +140,9 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
             if end_date > self._end_date_data_source:
                 return polars.DataFrame()
 
-            df = polars.read_csv(
-                self.csv_file_path, columns=self._columns, separator=","
-            )
+            df = self.data
             df = df.filter(
-                (df['Datetime'] <= end_date.strftime(DATETIME_FORMAT))
+                (df['Datetime'] <= end_date)
             )
             df = df.tail(self.window_size)
             return df
