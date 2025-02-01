@@ -1413,6 +1413,51 @@ class Algorithm:
         """
         self.trade_service.add_trailing_stop_loss(trade, percentage=percentage)
 
+    def add_take_profit(self, trade, percentage: int) -> None:
+        """
+        Function to add a take profit to a trade. This function will add a
+        take profit to the specified trade. If the take profit is triggered,
+        the trade will be closed.
+
+        Example of take profit:
+            * You buy BTC at $40,000.
+            * You set a TP of 5% → TP level at $42,000 (40,000 + 5%).
+            * BTC rises to $42,000 → TP level reached, trade
+                closes, securing profit.
+
+        Args:
+            trade: Trade - The trade to add the take profit to
+            percentage: int - The take profit of the trade
+
+        Returns:
+            None
+        """
+        self.trade_service.add_take_profit(trade, percentage=percentage)
+
+    def add_trailing_take_profit(self, trade, percentage: int) -> None:
+        """
+        Function to add a trailing take profit to a trade. This function will
+        add a trailing take profit to the specified trade. If the trailing
+        take profit is triggered, the trade will be closed.
+
+        Example of trailing take profit:
+            * You buy BTC at $40,000.
+            * You set a TTP of 5%.
+            * BTC rises to $42,000 → New TTP level at $39,900 (42,000 - 5%).
+            * BTC rises to $45,000 → New TTP level at $42,750.
+            * BTC drops to $42,750 → Trade closes, securing profit.
+
+        Args:
+            trade: Trade - The trade to add the trailing take profit to
+            percentage: int - The trailing take profit of the trade
+
+        Returns:
+            None
+        """
+        self.trade_service.add_trailing_take_profit(
+            trade, percentage=percentage
+        )
+
     def close_trade(self, trade, precision=None) -> None:
         """
         Function to close a trade. This function will close a trade by

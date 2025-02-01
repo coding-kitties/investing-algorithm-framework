@@ -4,7 +4,8 @@ from investing_algorithm_framework.app.algorithm import Algorithm
 from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPositionRepository, SQLPortfolioRepository, \
     SQLPortfolioSnapshotRepository, SQLTradeRepository, \
-    SQLPositionSnapshotRepository, PerformanceService, CCXTMarketService
+    SQLPositionSnapshotRepository, PerformanceService, CCXTMarketService, \
+    SQLTradeStopLossRepository, SQLTradeTakeProfitRepository
 from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, StrategyOrchestratorService, \
     PortfolioConfigurationService, MarketDataSourceService, BacktestService, \
@@ -41,6 +42,10 @@ class DependencyContainer(containers.DeclarativeContainer):
         SQLPortfolioSnapshotRepository
     )
     trade_repository = providers.Factory(SQLTradeRepository)
+    trade_take_profit_repository = providers\
+        .Factory(SQLTradeTakeProfitRepository)
+    trade_stop_loss_repository = providers.Factory(SQLTradeStopLossRepository)
+
     market_service = providers.Factory(
         CCXTMarketService,
         market_credential_service=market_credential_service,
@@ -75,6 +80,8 @@ class DependencyContainer(containers.DeclarativeContainer):
     )
     trade_service = providers.Factory(
         TradeService,
+        trade_take_profit_repository=trade_take_profit_repository,
+        trade_stop_loss_repository=trade_stop_loss_repository,
         configuration_service=configuration_service,
         trade_repository=trade_repository,
         portfolio_repository=portfolio_repository,

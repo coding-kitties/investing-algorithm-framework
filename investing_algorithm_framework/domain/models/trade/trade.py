@@ -36,10 +36,8 @@ class Trade(BaseModel):
         created_at (datetime): the datetime when the trade was created
         updated_at (datetime): the datetime when the trade was last updated
         status (str): the status of the trade
-        stop_loss_percentage (float): the stop loss percentage of
-            the trade
-        trailing_stop_loss_percentage (float): the trailing stop
-            loss percentage
+        stop_losses (List[TradeStopLoss]): the stop losses of the trade
+        take_profits (List[TradeTakeProfit]): the take profits of the trade
     """
 
     def __init__(
@@ -59,9 +57,8 @@ class Trade(BaseModel):
         last_reported_price=None,
         high_water_mark=None,
         updated_at=None,
-        stop_loss_percentage=None,
-        trailing_stop_loss_percentage=None,
-        stop_loss_triggered=False,
+        stop_losses=None,
+        take_profits=None,
     ):
         self.id = id
         self.orders = orders
@@ -78,9 +75,8 @@ class Trade(BaseModel):
         self.high_water_mark = high_water_mark
         self.status = status
         self.updated_at = updated_at
-        self.stop_loss_percentage = stop_loss_percentage
-        self.trailing_stop_loss_percentage = trailing_stop_loss_percentage
-        self.stop_loss_triggered = stop_loss_triggered
+        self.stop_losses = stop_losses
+        self.take_profits = take_profits
 
     @property
     def closed_prices(self):
@@ -227,6 +223,49 @@ class Trade(BaseModel):
             (1 - (self.trailing_stop_loss_percentage / 100))
 
         return self.last_reported_price <= stop_loss_price
+
+    def is_take_profit_triggered(self):
+
+        if self.take_profit_percentage is None:
+            return False
+
+        if self.last_reported_price is None:
+            return False
+
+        if self.open_price is None:
+            return False
+
+        take_profit_price = self.open_price * \
+            (1 + (self.take_profit_percentage / 100))
+
+        return self.last_reported_price >= take_profit_price
+
+    def is_trailing_take_profit_triggered(self):
+        """
+        Function to check if the trailing take profit is triggered.
+        The trailing take profit is triggered when the last reported price
+        is greater than or equal to the high water mark times the trailing
+        take profit percentage.
+        """
+
+        if self.trailing_take_profit_percentage is None:
+            return False
+
+        if self.last_reported_price is None:
+            return False
+
+        if self.high_water_mark is None:
+
+            if self.open_price is not None:
+                self.high_water_mark = self.open_price
+            else:
+                return False
+
+        take_profit_price = self.high_water_mark * \
+            (1 + (self.trailing_take_profit_percentage / 100))
+
+        return self.last_reported_price >= take_profit_price
+
 
     def to_dict(self, datetime_format=None):
 

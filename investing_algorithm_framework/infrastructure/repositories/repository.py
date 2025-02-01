@@ -259,3 +259,16 @@ class Repository(ABC):
                 logger.error(e)
                 db.rollback()
                 raise ApiException("Error saving object")
+
+    def save_objects(self, objects):
+
+        with Session() as db:
+            try:
+                for object in objects:
+                    db.add(object)
+                db.commit()
+                return objects
+            except SQLAlchemyError as e:
+                logger.error(e)
+                db.rollback()
+                raise ApiException("Error saving objects")

@@ -2,7 +2,7 @@ import logging
 from queue import PriorityQueue
 
 from investing_algorithm_framework.domain import OrderStatus, \
-    TradeStatus, Trade, OperationalException, MarketDataType
+    TradeStatus, Trade, OperationalException, MarketDataType, TradeRiskType
 from investing_algorithm_framework.services.repository_service import \
     RepositoryService
 
@@ -14,6 +14,8 @@ class TradeService(RepositoryService):
     def __init__(
         self,
         trade_repository,
+        trade_stop_loss_repository,
+        trade_take_profit_repository,
         position_repository,
         portfolio_repository,
         market_data_source_service,
@@ -24,6 +26,8 @@ class TradeService(RepositoryService):
         self.market_data_source_service = market_data_source_service
         self.position_repository = position_repository
         self.configuration_service = configuration_service
+        self.trade_stop_loss_repository = trade_stop_loss_repository
+        self.trade_take_profit_repository = trade_take_profit_repository
 
     def create_trade_from_buy_order(self, buy_order) -> Trade:
         """
@@ -259,7 +263,13 @@ class TradeService(RepositoryService):
 
             self.update(open_trade.id, update_data)
 
-    def add_stop_loss(self, trade, percentage):
+    def add_stop_loss(
+        self,
+        trade,
+        percentage: float,
+        take_risk_type: TradeRiskType = TradeRiskType.FIXED,
+        sell_percentage: float = 100,
+    ):
         """
         Function to add a stop loss to a trade. The stop loss is
         represented as a percentage of the open price.
@@ -273,29 +283,86 @@ class TradeService(RepositoryService):
             None
         """
         trade = self.get(trade.id)
-        updated_data = {
-            "stop_loss_percentage": percentage
-        }
-        self.update(trade.id, updated_data)
 
-    def add_trailing_stop_loss(self, trade, percentage):
+        # Check if the sell percentage + the existing stop losses is
+        # greater than 100
+        existing_sell_percentage = 0
+        for stop_loss in trade.stop_losses:
+            existing_sell_percentage += stop_loss.sell_percentage
+
+        if existing_sell_percentage + sell_percentage > 100:
+            raise OperationalException(
+                "Combined sell percentages of stop losses belonging "
+                "to trade exceeds 100."
+            )
+
+        creation_data = {
+            "trade_id": trade.id,
+            "take_risk_type": take_risk_type,
+            "percentage": percentage,
+            "open_price": trade.open_price,
+            "total_amount_trade": trade.amount,
+            "sell_percentage": sell_percentage,
+            "active": True
+        }
+        return self.trade_stop_loss_repository.create(creation_data)
+
+    def add_take_profit(
+        self,
+        trade,
+        percentage: float,
+        take_risk_type: TradeRiskType = TradeRiskType.FIXED,
+        sell_percentage: float = 100,
+    ) -> None:
         """
-        Function to add a trailing stop loss to a trade. The trailing stop loss
-        is represented as a percentage of the open price.
+        Function to add a take profit to a trade. This function will add a
+        take profit to the specified trade. If the take profit is triggered,
+        the trade will be closed.
+
+        Example of take profit:
+            * You buy BTC at $40,000.
+            * You set a TP of 5% → TP level at $42,000 (40,000 + 5%).
+            * BTC rises to $42,000 → TP level reached, trade
+                closes, securing profit.
+
+        Example of trailing take profit:
+            * You buy BTC at $40,000
+            * You set a TTP of 5%, setting the sell price at
+            * BTC rises to $42,000 → New TTP level at $39,900 (42,000 - 5%).
+            * BTC rises to $45,000 → New TTP level at $42,750.
+            * BTC drops to $42,750 → Trade closes, securing profit.
 
         Args:
-            trade: Trade object representing the trade
-            percentage: float representing the percentage of the open price
-                that the trailing stop loss should be set at
+            trade: Trade - The trade to add the take profit to
+            percentage: int - The take profit of the trade
 
         Returns:
             None
         """
         trade = self.get(trade.id)
-        updated_data = {
-            "trailing_stop_loss_percentage": percentage
+
+        # Check if the sell percentage + the existing stop losses is
+        # greater than 100
+        existing_sell_percentage = 0
+        for take_profit in trade.take_profits:
+            existing_sell_percentage += take_profit.sell_percentage
+
+        if existing_sell_percentage + sell_percentage > 100:
+            raise OperationalException(
+                "Combined sell percentages of stop losses belonging "
+                "to trade exceeds 100."
+            )
+
+        creation_data = {
+            "trade_id": trade.id,
+            "take_risk_type": take_risk_type,
+            "percentage": percentage,
+            "open_price": trade.open_price,
+            "total_amount_trade": trade.amount,
+            "sell_percentage": sell_percentage,
+            "active": True
         }
-        self.update(trade.id, updated_data)
+        return self.trade_take_profit_repository.create(creation_data)
 
     def get_triggered_stop_losses(self):
         """
@@ -304,41 +371,87 @@ class TradeService(RepositoryService):
         triggered trades. This list is then returned.
 
         Returns:
-            List of Trade objects
+            Dictionary objects with the trade id as a key and the
+            amount to sell as value.
         """
-        triggered_trades = []
+        triggered_trades = {}
         query = {
             "status": TradeStatus.OPEN.value,
-            "stop_loss_percentage_not_none": True
         }
         open_trades = self.get_all(query)
+        to_be_saved_objects = []
 
         for open_trade in open_trades:
+            stop_losses = open_trade.stop_losses
 
-            if open_trade.is_stop_loss_triggered():
-                triggered_trades.append(open_trade)
+            for stop_loss in stop_losses:
+                if stop_loss.has_triggered(open_trade.last_reported_price):
+                    sell_amount = stop_loss.get_sell_amount(open_trade)
+                    sold_amount = stop_loss.sold_amount + sell_amount
+                    update_data = {
+                        "active": True,
+                        "sold_amount": sold_amount
+                    }
 
+                    if sold_amount == stop_loss.sell_amount:
+                        update_data["active"] = False
+
+                    self.trade_stop_loss_repository.update(
+                        stop_loss.id, update_data
+                    )
+
+                    if open_trade.id not in triggered_trades:
+                        triggered_trades[open_trade.id] = sell_amount
+                    else:
+                        triggered_trades[open_trade.id] += sell_amount
+
+                to_be_saved_objects.append(stop_loss)
+
+        self.trade_stop_loss_repository.save_objects(to_be_saved_objects)
         return triggered_trades
 
-    def get_triggered_trailing_stop_losses(self):
+    def get_triggered_take_profits(self):
         """
-        Function to check if any trades have hit their stop loss. If a trade
-        has hit its stop loss, the trade is added to a list of
+        Function to check if any trades have hit their take profits. If a
+        trade has hit its take profit, the trade is added to a list of
         triggered trades. This list is then returned.
 
         Returns:
-            List of Trade objects
+            Dictionary objects with the trade id as a key and the
+            amount to sell as value.
         """
-        triggered_trades = []
+        triggered_trades = {}
         query = {
             "status": TradeStatus.OPEN.value,
-            "trailing_stop_loss_percentage_not_none": True
         }
         open_trades = self.get_all(query)
+        to_be_saved_objects = []
 
         for open_trade in open_trades:
+            take_profits = open_trade.take_profits
 
-            if open_trade.is_trailing_stop_loss_triggered():
-                triggered_trades.append(open_trade)
+            for take_profit in take_profits:
+                if take_profit.has_triggered(open_trade.last_reported_price):
+                    sell_amount = take_profit.get_sell_amount(open_trade)
+                    sold_amount = take_profit.sold_amount + sell_amount
+                    update_data = {
+                        "active": True,
+                        "sold_amount": sold_amount
+                    }
 
+                    if sold_amount == take_profit.sell_amount:
+                        update_data["active"] = False
+
+                    self.trade_stop_loss_repository.update(
+                        take_profit.id, update_data
+                    )
+
+                    if open_trade.id not in triggered_trades:
+                        triggered_trades[open_trade.id] = sell_amount
+                    else:
+                        triggered_trades[open_trade.id] += sell_amount
+
+            to_be_saved_objects.append(take_profit)
+
+        self.trade_take_profit_repository.save_objects(to_be_saved_objects)
         return triggered_trades

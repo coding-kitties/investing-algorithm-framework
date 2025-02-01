@@ -60,9 +60,18 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
     high_water_mark = Column(Float, default=None)
     updated_at = Column(DateTime, default=None)
     status = Column(String, default=TradeStatus.CREATED.value)
-    stop_loss_percentage = Column(Float, default=None)
-    trailing_stop_loss_percentage = Column(Float, default=None)
-    stop_loss_triggered = Column(Boolean, default=False)
+    # Stop losses should be actively loaded
+    stop_losses = relationship(
+        'SQLTradeStopLoss',
+        back_populates='trade',
+        lazy='joined'
+    )
+    # Take profits should be actively loaded
+    take_profits = relationship(
+        'SQLTradeTakeProfit',
+        back_populates='trade',
+        lazy='joined'
+    )
 
     def __init__(
         self,
@@ -80,9 +89,8 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         last_reported_price=None,
         high_water_mark=None,
         sell_orders=[],
-        stop_loss_percentage=None,
-        trailing_stop_loss_percentage=None,
-        stop_loss_triggered=False
+        stop_losses=[],
+        take_profits=[],
     ):
         self.orders = [buy_order]
         self.open_price = buy_order.price
@@ -98,9 +106,8 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         self.opened_at = opened_at
         self.updated_at = updated_at
         self.status = status
-        self.stop_loss_percentage = stop_loss_percentage
-        self.trailing_stop_loss_percentage = trailing_stop_loss_percentage
-        self.stop_loss_triggered = stop_loss_triggered
+        self.stop_losses = stop_losses
+        self.take_profits = take_profits
 
         if sell_orders is not None:
             self.orders.extend(sell_orders)

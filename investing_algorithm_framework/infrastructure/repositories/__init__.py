@@ -4,6 +4,8 @@ from .portfolio_snapshot_repository import SQLPortfolioSnapshotRepository
 from .position_repository import SQLPositionRepository
 from .position_snapshot_repository import SQLPositionSnapshotRepository
 from .trade_repository import SQLTradeRepository
+from .trade_stop_loss_repository import SQLTradeStopLossRepository
+from .trade_take_profit_repository import SQLTradeTakeProfitRepository
 
 __all__ = [
     "SQLOrderRepository",
@@ -11,5 +13,7 @@ __all__ = [
     "SQLPositionSnapshotRepository",
     "SQLPortfolioRepository",
     "SQLPortfolioSnapshotRepository",
-    "SQLTradeRepository"
+    "SQLTradeRepository",
+    "SQLTradeTakeProfitRepository",
+    "SQLTradeStopLossRepository",
 ]
