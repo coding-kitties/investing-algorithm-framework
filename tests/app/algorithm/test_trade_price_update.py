@@ -13,7 +13,7 @@ class StrategyOne(TradingStrategy):
     interval = 2
     market_data_sources = ["BTC/EUR-ohlcv", "BTC/EUR-ticker"]
 
-    def apply_strategy(self, algorithm, market_data):
+    def apply_strategy(self, context, market_data):
         pass
 
 
@@ -22,7 +22,7 @@ class StrategyTwo(TradingStrategy):
     interval = 2
     market_data_sources = ["BTC/EUR-ohlcv", "BTC/EUR-ticker"]
 
-    def apply_strategy(self, algorithm, market_data):
+    def apply_strategy(self, context, market_data):
         pass
 
 
