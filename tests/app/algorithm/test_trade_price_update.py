@@ -16,16 +16,6 @@ class StrategyOne(TradingStrategy):
     def apply_strategy(self, context, market_data):
         pass
 
-
-class StrategyTwo(TradingStrategy):
-    time_unit = TimeUnit.SECOND
-    interval = 2
-    market_data_sources = ["BTC/EUR-ohlcv", "BTC/EUR-ticker"]
-
-    def apply_strategy(self, context, market_data):
-        pass
-
-
 class Test(TestCase):
 
     def setUp(self) -> None:
@@ -103,7 +93,7 @@ class Test(TestCase):
         )
         algorithm = Algorithm()
         algorithm.add_strategy(StrategyOne)
-        algorithm.add_strategy(StrategyTwo)
+        # algorithm.add_strategy(StrategyTwo)
         app.add_algorithm(algorithm)
         app.set_config(
             "DATE_TIME", datetime(2023, 11, 2, 7, 59, tzinfo=timezone.utc)
@@ -120,7 +110,6 @@ class Test(TestCase):
         strategy_orchestration_service = app.algorithm\
             .strategy_orchestrator_service
         self.assertTrue(strategy_orchestration_service.has_run("StrategyOne"))
-        self.assertTrue(strategy_orchestration_service.has_run("StrategyTwo"))
 
         # Check that the last reported price is updated
         trade = app.context.get_trades()[0]

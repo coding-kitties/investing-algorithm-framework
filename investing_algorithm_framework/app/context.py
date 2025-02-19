@@ -74,7 +74,7 @@ class Context:
         execute=True,
         validate=True,
         sync=True
-    ):
+    ) -> Order:
         """
         Function to create an order. This function will create an order
         and execute it if the execute parameter is set to True. If the
@@ -157,7 +157,7 @@ class Context:
         execute=True,
         validate=True,
         sync=True
-    ):
+    ) -> Order:
         """
         Function to create a limit order. This function will create a limit
         order and execute it if the execute parameter is set to True. If the
@@ -516,7 +516,7 @@ class Context:
         amount_gte=None,
         amount_lt=None,
         amount_lte=None
-    ):
+    ) -> bool:
         """
         Function to check if a position exists. This function will return
         True if a position exists, False otherwise. This function will check
@@ -677,7 +677,7 @@ class Context:
 
     def close_position(
         self, symbol, market=None, identifier=None, precision=None
-    ):
+    ) -> Order:
         """
         Function to close a position. This function will close a position
         by creating a market order to sell the position. If the precision
@@ -716,7 +716,7 @@ class Context:
         ticker = self.market_data_source_service.get_ticker(
             symbol=symbol, market=market
         )
-        self.create_limit_order(
+        return self.create_limit_order(
             target_symbol=position.symbol,
             amount=position.get_amount(),
             order_side=OrderSide.SELL.value,
@@ -1137,7 +1137,7 @@ class Context:
         )
         return self.trade_service.get(trade.id)
 
-    def close_trade(self, trade, precision=None) -> None:
+    def close_trade(self, trade, precision=None) -> Order:
         """
         Function to close a trade. This function will close a trade by
         creating a market order to sell the position. If the precision
@@ -1183,7 +1183,7 @@ class Context:
             symbol=trade.symbol, market=portfolio.market
         )
 
-        self.order_service.create(
+        return self.order_service.create(
             {
                 "portfolio_id": portfolio.id,
                 "trading_symbol": trade.trading_symbol,
