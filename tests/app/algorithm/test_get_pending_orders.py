@@ -137,10 +137,10 @@ class TestPortfolioService(TestBase):
         )
         self.assertEqual(400, eur_position.amount)
 
-        pending_orders = self.app.algorithm.get_pending_orders()
+        pending_orders = self.app.context.get_pending_orders()
         self.assertEqual(2, len(pending_orders))
 
-        pending_order = self.app.algorithm\
+        pending_order = self.app.context\
             .get_pending_orders(target_symbol="ETH")[0]
 
         order_service = self.app.container.order_service()
@@ -153,5 +153,5 @@ class TestPortfolioService(TestBase):
             }
         )
 
-        pending_orders = self.app.algorithm.get_pending_orders()
+        pending_orders = self.app.context.get_pending_orders()
         self.assertEqual(1, len(pending_orders))

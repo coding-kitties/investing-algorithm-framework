@@ -202,9 +202,10 @@ class MarketDataSourceService:
                     time_frame = market_data_source.time_frame
 
                     if time_frame is not None:
+                        time_frame = TimeFrame.from_value(time_frame)
                         result["time_frame"] = time_frame.value
                     else:
-                        result["time_frame"] = TimeFrame.CURRENT
+                        result["time_frame"] = TimeFrame.CURRENT.value
 
                     result["symbol"] = market_data_source.symbol
                     return result

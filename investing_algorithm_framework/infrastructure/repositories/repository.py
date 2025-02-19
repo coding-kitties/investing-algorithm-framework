@@ -217,7 +217,7 @@ class Repository(ABC):
     def get_query_param(self, key, params, default=None, many=False):
         boolean_array = ["true", "false"]
 
-        if params is None:
+        if params is None or key not in params:
             return default
 
         params = self.normalize_query(params)
@@ -254,8 +254,21 @@ class Repository(ABC):
             try:
                 db.add(object)
                 db.commit()
-                return self.get(object)
+                return self.get(object.id)
             except SQLAlchemyError as e:
                 logger.error(e)
                 db.rollback()
                 raise ApiException("Error saving object")
+
+    def save_objects(self, objects):
+
+        with Session() as db:
+            try:
+                for object in objects:
+                    db.add(object)
+                db.commit()
+                return objects
+            except SQLAlchemyError as e:
+                logger.error(e)
+                db.rollback()
+                raise ApiException("Error saving objects")

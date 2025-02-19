@@ -24,7 +24,7 @@ class Test(FlaskTestBase):
     }
 
     def test_list_portfolios(self):
-        self.iaf_app.algorithm.create_limit_order(
+        self.iaf_app.context.create_limit_order(
             amount=10,
             target_symbol="KSM",
             price=10,

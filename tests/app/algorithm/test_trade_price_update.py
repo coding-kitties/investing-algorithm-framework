@@ -6,9 +6,7 @@ from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
     Algorithm, MarketCredential, CSVOHLCVMarketDataSource, \
     CSVTickerMarketDataSource
-from tests.resources import random_string, MarketServiceStub, \
-    MarketDataSourceServiceStub
-
+from tests.resources import random_string, MarketServiceStub
 
 class StrategyOne(TradingStrategy):
     time_unit = TimeUnit.SECOND
@@ -112,7 +110,7 @@ class Test(TestCase):
         )
         app.initialize_config()
         app.initialize()
-        app.algorithm.create_limit_order(
+        app.context.create_limit_order(
             target_symbol="btc",
             amount=20,
             price=20,
@@ -125,6 +123,6 @@ class Test(TestCase):
         self.assertTrue(strategy_orchestration_service.has_run("StrategyTwo"))
 
         # Check that the last reported price is updated
-        trade = app.algorithm.get_trades()[0]
+        trade = app.context.get_trades()[0]
         self.assertIsNotNone(trade)
         self.assertIsNotNone(trade.last_reported_price)

@@ -40,10 +40,9 @@ class AppHook:
 
 class App:
 
-    def __init__(self, state_handler=None):
+    def __init__(self, state_handler=None, name=None):
         self._flask_app: Optional[Flask] = None
         self.container = None
-        self._algorithm: Optional[Algorithm] = None
         self._started = False
         self._tasks = []
         self._configuration_service = None
@@ -55,6 +54,47 @@ class App:
         self._on_initialize_hooks = []
         self._on_after_initialize_hooks = []
         self._state_handler = state_handler
+        self._name = name
+        self._algorithm = Algorithm()
+
+    @property
+    def algorithm(self) -> Algorithm:
+        return self._algorithm
+
+    @property
+    def context(self):
+        return self.container.context()
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, name):
+        self._name = name
+
+    @property
+    def started(self):
+        return self._started
+
+    @property
+    def config(self):
+        """
+        Function to get a config instance. This allows users when
+        having access to the app instance also to read the
+        configs of the app.
+        """
+        configuration_service = self.container.configuration_service()
+        return configuration_service.config
+
+    @config.setter
+    def config(self, config: dict):
+        configuration_service = self.container.configuration_service()
+        configuration_service.initialize_from_dict(config)
+
+    @property
+    def running(self):
+        return self.algorithm.running
 
     def add_algorithm(self, algorithm: Algorithm) -> None:
         """
@@ -78,10 +118,6 @@ class App:
             self.container.market_data_source_service()
         self._market_credential_service = \
             self.container.market_credential_service()
-
-    @property
-    def algorithm(self) -> Algorithm:
-        return self._algorithm
 
     @algorithm.setter
     def algorithm(self, algorithm: Algorithm) -> None:
@@ -289,6 +325,7 @@ class App:
             raise OperationalException("No portfolios configured")
 
         self.algorithm.initialize_services(
+            context=self.container.context(),
             configuration_service=self.container.configuration_service(),
             market_data_source_service=self._market_data_source_service,
             market_credential_service=self.container
@@ -474,11 +511,13 @@ class App:
                         logger.info("Checking pending orders")
                         number_of_iterations_since_last_orders_check = 1
 
-                    self.algorithm.run_jobs()
+                    self.algorithm.run_jobs(context=self.container.context())
                     number_of_iterations_since_last_orders_check += 1
                     sleep(1)
             except KeyboardInterrupt:
                 exit(0)
+        except Exception as e:
+            logger.error(e)
         finally:
             self.algorithm.stop()
 
@@ -488,25 +527,6 @@ class App:
                 config = self.container.configuration_service().get_config()
                 self._state_handler.save(config[RESOURCE_DIRECTORY])
 
-    @property
-    def started(self):
-        return self._started
-
-    @property
-    def config(self):
-        """
-        Function to get a config instance. This allows users when
-        having access to the app instance also to read the
-        configs of the app.
-        """
-        configuration_service = self.container.configuration_service()
-        return configuration_service.config
-
-    @config.setter
-    def config(self, config: dict):
-        configuration_service = self.container.configuration_service()
-        configuration_service.initialize_from_dict(config)
-
     def reset(self):
         self._started = False
         self.algorithm.reset()
@@ -515,10 +535,6 @@ class App:
         portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
         portfolio_configuration_service.add(portfolio_configuration)
-
-    @property
-    def running(self):
-        return self.algorithm.running
 
     def task(
         self,
@@ -863,6 +879,10 @@ class App:
 
         self._on_after_initialize_hooks.append(app_hook)
 
-    def clear(self) -> None:
-        self.algorithm = Algorithm()
-        self.mark
+    def add_strategy(self, strategy):
+        """
+        """
+        if self.algorithm is None:
+            self.algorithm = Algorithm(name=self._name)
+
+        self.algorithm.add_strategy(strategy)

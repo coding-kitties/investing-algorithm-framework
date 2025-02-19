@@ -24,7 +24,7 @@ class Test(TestBase):
 
     def test_create_limit_sell_order(self):
         self.app.run(number_of_iterations=1)
-        self.app.algorithm.create_limit_order(
+        self.app.context.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="BUY",
@@ -40,13 +40,13 @@ class Test(TestBase):
         self.assertEqual(OrderStatus.OPEN.value, order.status)
         self.assertEqual(20, order.get_amount())
         self.assertEqual(10, order.get_price())
-        portfolio = self.app.algorithm.get_portfolio()
+        portfolio = self.app.context.get_portfolio()
         self.assertEqual(1000, portfolio.get_net_size())
         self.assertEqual(800, portfolio.get_unallocated())
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
-        self.app.algorithm.get_position("BTC")
-        order = self.app.algorithm.create_limit_order(
+        self.app.context.get_position("BTC")
+        order = self.app.context.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="SELL",
@@ -56,7 +56,7 @@ class Test(TestBase):
 
     def test_create_limit_sell_order_with_percentage_position(self):
         self.app.run(number_of_iterations=1)
-        self.app.algorithm.create_limit_order(
+        self.app.context.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="BUY",
@@ -72,12 +72,12 @@ class Test(TestBase):
         self.assertEqual(OrderStatus.OPEN.value, order.status)
         self.assertEqual(20, order.get_amount())
         self.assertEqual(10, order.get_price())
-        portfolio = self.app.algorithm.get_portfolio()
+        portfolio = self.app.context.get_portfolio()
         self.assertEqual(1000, portfolio.get_net_size())
         self.assertEqual(800, portfolio.get_unallocated())
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
-        order = self.app.algorithm.create_limit_order(
+        order = self.app.context.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="SELL",

@@ -4,10 +4,13 @@ from .models import SQLPortfolio, SQLOrder, SQLPosition, \
     SQLPortfolioSnapshot, SQLPositionSnapshot, SQLTrade, \
     CCXTOHLCVBacktestMarketDataSource, CCXTOrderBookMarketDataSource, \
     CCXTTickerMarketDataSource, CCXTOHLCVMarketDataSource, \
-    CSVOHLCVMarketDataSource, CSVTickerMarketDataSource
+    CSVOHLCVMarketDataSource, CSVTickerMarketDataSource, SQLTradeTakeProfit, \
+    SQLTradeStopLoss
 from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLPortfolioRepository, SQLTradeRepository, \
-    SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository
+    SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository, \
+    SQLTradeTakeProfitRepository, SQLTradeStopLossRepository, \
+    SQLOrderMetadataRepository
 from .services import PerformanceService, CCXTMarketService, \
     AzureBlobStorageStateHandler
 
@@ -37,5 +40,10 @@ __all__ = [
     "CCXTOHLCVBacktestMarketDataSource",
     "CCXTOrderBookMarketDataSource",
     "AzureBlobStorageStateHandler",
-    "SQLTradeRepository"
+    "SQLTradeRepository",
+    "SQLTradeTakeProfit",
+    "SQLTradeStopLoss",
+    "SQLTradeTakeProfitRepository",
+    "SQLTradeStopLossRepository",
+    "SQLOrderMetadataRepository"
 ]

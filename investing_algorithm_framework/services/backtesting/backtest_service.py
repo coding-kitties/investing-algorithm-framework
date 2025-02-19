@@ -172,7 +172,7 @@ class BacktestService:
             #     index_date=index_date,
             # )
             self.run_backtest_v2(
-                algorithm=algorithm,
+                context=algorithm.context,
                 strategy=algorithm.get_strategy(strategy_profile.strategy_id)
             )
 
@@ -243,13 +243,13 @@ class BacktestService:
                     market_data[data_id] = \
                         self._market_data_source_service.get_data(data_id)
 
-        strategy.context = algorithm.context
-        strategy.run_strategy(algorithm=algorithm, market_data=market_data)
+        context = self.algorithm.context
+        strategy.run_strategy(context=context, market_data=market_data)
 
-    def run_backtest_v2(self, strategy, algorithm):
+    def run_backtest_v2(self, strategy, context):
         config = self._configuration_service.get_config()
         self._strategy_orchestrator_service.run_backtest_strategy(
-            algorithm=algorithm, strategy=strategy, config=config
+            context=context, strategy=strategy, config=config
         )
 
     def generate_schedule(
@@ -487,9 +487,8 @@ class BacktestService:
                     backtest_position.price = ticker["bid"]
                 backtest_positions.append(backtest_position)
             backtest_report.positions = backtest_positions
-            backtest_report.trades = algorithm.get_trades()
+            backtest_report.trades = algorithm.context.get_trades()
             backtest_report.orders = orders
-            backtest_report.context = algorithm.context
             traces = {}
 
             # Add traces to the backtest report

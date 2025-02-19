@@ -13,7 +13,7 @@ class TestStrategy(TradingStrategy):
     time_unit = TimeUnit.MINUTE
     interval = 1
 
-    def run_strategy(self, algorithm, market_data):
+    def run_strategy(self, context, market_data):
         pass
 
 
@@ -128,7 +128,7 @@ class Test(TestCase):
         algorithm.add_strategy(strategy)
 
         @algorithm.strategy()
-        def run_strategy(algorithm, market_data):
+        def run_strategy(context, market_data):
             pass
 
         app.add_portfolio_configuration(
@@ -164,7 +164,7 @@ class Test(TestCase):
         algorithm = Algorithm()
 
         @algorithm.strategy()
-        def run_strategy(algorithm, market_data):
+        def run_strategy(context, market_data):
             pass
 
         algorithm.add_strategy(TestStrategy)

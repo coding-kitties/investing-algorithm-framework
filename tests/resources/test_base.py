@@ -32,7 +32,6 @@ class StrategyOne(TradingStrategy):
 class TestBase(TestCase):
     portfolio_configurations = []
     config = {}
-    algorithm = Algorithm()
     external_balances = {}
     external_orders = []
     initial_orders = []
@@ -63,8 +62,6 @@ class TestBase(TestCase):
                     portfolio_configuration
                 )
 
-        self.app.add_algorithm(self.algorithm)
-
         # Add all market credentials
         if len(self.market_credentials) > 0:
             for market_credential in self.market_credentials:
@@ -77,7 +74,7 @@ class TestBase(TestCase):
 
         if self.initial_orders is not None:
             for order in self.initial_orders:
-                created_order = self.app.algorithm.create_order(
+                created_order = self.app.context.create_order(
                     target_symbol=order.get_target_symbol(),
                     amount=order.get_amount(),
                     price=order.get_price(),
@@ -142,7 +139,6 @@ class FlaskTestBase(FlaskTestCase):
     market_credentials = []
     iaf_app = None
     config = {}
-    algorithm = Algorithm()
     external_balances = {}
     initial_orders = []
     external_orders = []
@@ -168,8 +164,6 @@ class FlaskTestBase(FlaskTestCase):
                         portfolio_configuration
                     )
 
-                self.iaf_app.add_algorithm(self.algorithm)
-
                 # Add all market credentials
                 if len(self.market_credentials) > 0:
                     for market_credential in self.market_credentials:
@@ -181,7 +175,7 @@ class FlaskTestBase(FlaskTestCase):
 
         if self.initial_orders is not None:
             for order in self.initial_orders:
-                created_order = self.app.algorithm.create_order(
+                created_order = self.app.context.create_order(
                     target_symbol=order.get_target_symbol(),
                     amount=order.get_amount(),
                     price=order.get_price(),

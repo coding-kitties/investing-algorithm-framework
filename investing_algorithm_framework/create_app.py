@@ -11,7 +11,8 @@ logger = logging.getLogger("investing_algorithm_framework")
 def create_app(
     config: dict = None,
     state_handler=None,
-    web: bool = False
+    web: bool = False,
+    name=None
 ) -> App:
     """
     Factory method to create an app instance.
@@ -35,6 +36,7 @@ def create_app(
     )
     # After the container is setup, initialize the services
     app.initialize_services()
+    app.name = name
 
     if config is not None:
         app.set_config_with_dict(config)
@@ -43,4 +45,5 @@ def create_app(
         app.set_config("APP_MODE", AppMode.WEB.value)
 
     logger.info("Investing algoritm framework app created")
+
     return app

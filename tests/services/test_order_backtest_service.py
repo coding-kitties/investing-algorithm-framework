@@ -246,7 +246,9 @@ class TestOrderBacktestService(TestBase):
         self.assertEqual("EUR", order.get_trading_symbol())
         self.assertEqual("SELL", order.get_order_side())
         self.assertEqual("LIMIT", order.get_order_type())
-        self.assertEqual("CREATED", order.get_status())
+
+        # Order is synced so is OPEN
+        self.assertEqual("OPEN", order.get_status())
 
     def test_update_buy_order_with_successful_order(self):
         pass

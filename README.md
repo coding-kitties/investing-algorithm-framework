@@ -6,43 +6,58 @@
 <a href="https://www.reddit.com/r/InvestingBots/"><img src="https://img.shields.io/reddit/subreddit-subscribers/investingbots?style=social"></a> <br/>
 [![GitHub stars](https://img.shields.io/github/stars/coding-kitties/investing-algorithm-framework.svg?style=social&label=Star&maxAge=1)](https://github.com/SeaQL/sea-orm/stargazers/) If you like what we do, consider starring, sharing and contributing!
 
-###### Sponsors
-
-<p align="left">
-<a href="https://finterion.com">
-  <img alt="Finterion" src="static/sponsors/finterion.png" width="200px" />
-</a>
-</p>
-
 # [Investing Algorithm Framework](https://github.com/coding-kitties/investing-algorithm-framework)
 
-The Investing Algorithm Framework is a Python framework that enables swift and elegant development of trading bots. It comes with all the necessary components for creating trading strategies, including data management, portfolio, order, position and trades management.
+The Investing Algorithm Framework is a Python framework that enables swift and elegant development of trading bots.
 
-Features:
+## Sponsors
 
-* Indicators module: A collection of indicators and utility functions that can be used in your trading strategies.
-* Order execution and tracking
-* Broker and exchange connections through [ccxt](https://github.com/ccxt/ccxt)
-* Backtesting and performance analysis reports [example](./examples/backtest_example)
-* Backtesting multiple algorithms with different backtest date ranges [example](./examples/backtests_example)
-* Portfolio management and tracking
-* Tracing for analyzing and debugging your trading bot
-* Web API for interacting with your deployed trading bot
-* Data persistence through sqlite db or an in-memory db
-* Stateless running for cloud function deployments
-* Polars dataframes support out of the box for fast data processing [pola.rs](https://pola.rs/)
+<a href="https://www.finterion.com/" target="_blank">
+    <picture style="height: 30px;">
+    <source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png">
+    <source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png">
+    <img src="static/sponsors/finterion-light.svg" alt="Finterion Logo" width="200px" height="50px">
+    </picture>
+</a>
+
+## Features and planned features:
+
+- [x] **Based on Python 3.9+**: Windows, macOS and Linux.
+- [x] **Documentation**: [Documentation](https://investing-algorithm-framework.com)
+- [x] **Persistence of portfolios, orders, positions and trades**: Persistence is achieved through sqlite.
+- [x] **Limit orders**: Create limit orders for buying and selling.
+- [x] **Trade models**: Models and functionality for trades, trades stop losses (fixed and trailing) and take profits (fixed and trailing).
+- [x] **Market data sources**: Market data sources for OHLCV data and ticker data, and extendible with custom data and events.
+- [x] **Polars and Pandas dataframes support** Out of the box dataframes support for fast data processing ([pola.rs](https://pola.rs/), [pandas](https://pandas.pydata.org/)).
+- [x] **Azure Functions support**: Stateless running for cloud function deployments in Azure.
+- [x] **Live trading**: Live trading.
+- [x] **Backtesting and performance analysis reports** [example](./examples/backtest_example)
+- [x] **Backtesting multiple algorithms with different backtest date ranges** [example](./examples/backtests_example)
+- [x] **Backtest comparison and experiments**: Compare multiple backtests and run experiments.
+- [x] **Order execution**: Currently support for a wide range of crypto exchanges through [ccxt](https://github.com/ccxt/ccxt) (Support for traditional asset brokers is planned).
+- [x] **Web API**: Rest API for interacting with your deployed trading bot
+- [x] **PyIndicators**: Works natively with [PyIndicators](https://github.com/coding-kitties/PyIndicators) for technical analysis on your Pandas and Polars dataframes.
+- [ ] **Builtin WebUI (Planned)**: Builtin web UI to manage your bot and evaluate your backtests.
+- [ ] **Manageable via Telegram (Planned)**: Manage the bot with Telegram.
+- [ ] **Performance status report via Web UI and telegram(Planned)**: Provide a performance status of your current trades.
+- [ ] **CI/CD integration (Planned)**: Tools for continuous integration and deployment (version tracking, comparison of backtests, automatic deployments).
+- [ ] **Tracing and replaying of strategies in backtests (Planned)**: Tracing and replaying of strategies in backtests for specific dates and date ranges so you can evaluate your strategy step by step.
+- [ ] **AWS Lambda support (Planned)**: Stateless running for cloud function deployments in AWS.
+- [ ] **Azure App services support (Planned)**: deployments in Azure app services with Web UI.
 
 ## Example implementation
 
-The following algorithm connects to binance and buys BTC every 5 seconds. It also exposes an REST API that allows you to interact with the algorithm.
+The following algorithm connects to binance and buys BTC every 2 hours.
 
 ```python
 import logging.config
+from dotenv import load_dotenv
 
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, \
-    CCXTTickerMarketDataSource, MarketCredential, DEFAULT_LOGGING_CONFIG
+    TimeUnit, CCXTOHLCVMarketDataSource, Context, CCXTTickerMarketDataSource, \
+    MarketCredential, DEFAULT_LOGGING_CONFIG, Algorithm, Context
 
+load_dotenv()
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
 
 # OHLCV data for candles
@@ -60,50 +75,35 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     symbol="BTC/EUR",
 )
 app = create_app()
-# Bitvavo market credentials are read from .env file
+
+# Bitvavo market credentials are read from .env file, or you can
+# set them  manually as params
 app.add_market_credential(MarketCredential(market="bitvavo"))
 app.add_portfolio_configuration(
     PortfolioConfiguration(
-        market="bitvavo",
-        trading_symbol="EUR",
-        initial_balance=400
+        market="bitvavo", trading_symbol="EUR", initial_balance=40
     )
 )
 
-# Run every two hours and register the data sources
-@app.strategy(
-    time_unit=TimeUnit.HOUR,
-    interval=2,
+algorithm = Algorithm(name="test_algorithm")
+
+# Define a strategy for the algorithm that will run every 10 seconds
+@algorithm.strategy(
+    time_unit=TimeUnit.SECOND,
+    interval=10,
     market_data_sources=[bitvavo_btc_eur_ticker, bitvavo_btc_eur_ohlcv_2h]
 )
-def perform_strategy(algorithm: Algorithm, market_data: dict):
+def perform_strategy(context: Context, market_data: dict):
     # Access the data sources with the indentifier
     polars_df = market_data["BTC-ohlcv"]
-    # Convert the polars dataframe to a pandas dataframe
-    pandas_df = polars_df.to_pandas()
     ticker_data = market_data["BTC-ticker"]
-    unallocated_balance = algorithm.get_unallocated()
-    positions = algorithm.get_positions()
-    trades = algorithm.get_trades()
-    open_trades = algorithm.get_open_trades()
-    closed_trades = algorithm.get_closed_trades()
+    unallocated_balance = context.get_unallocated()
+    positions = context.get_positions()
+    trades = context.get_trades()
+    open_trades = context.get_open_trades()
+    closed_trades = context.get_closed_trades()
 
-    # Create a buy oder
-    order = algorithm.create_limit_order(
-        target_symbol="BTC/EUR",
-        order_side="buy",
-        amount=0.01,
-        price=ticker_data["ask"],
-    )
-    trade = algorithm.get_trade(order_id=order.id)
-    algorithm.add_trailing_stop_loss(trade=trade, percentage=5)
-
-    # Close a trade
-    algorithm.close_trade(trade=trade)
-
-    # Close a position
-    position = algorithm.get_position(symbol="BTC/EUR")
-    algorithm.close_position(position)
+app.add_algorithm(algorithm)
 
 if __name__ == "__main__":
     app.run()
@@ -127,7 +127,7 @@ python examples/backtest_example/run_backtest.py
 ### Backtesting report
 
 You can use the ```pretty_print_backtest``` function to print a backtest report.
-For example if you run the [moving average example trading bot](./examples/crossover_moving_average_trading_bot)
+For example if you run the [moving average example trading bot](./examples/backtest_example/run_backtest.py)
 you will get the following backtesting report:
 
 ```bash
@@ -138,77 +138,91 @@ you will get the following backtesting report:
                   .%%%%%%%%%%%%%%%%%%%%%%#        End date: 2023-12-02 00:00:00
                    #%%%####%%%%%%%%**#%%%+        Number of days: 100
              .:-+*%%%%- -+..#%%%+.+-  +%%%#*=-:   Number of runs: 1201
-              .:-=*%%%%. += .%%#  -+.-%%%%=-:..   Number of orders: 40
+              .:-=*%%%%. += .%%#  -+.-%%%%=-:..   Number of orders: 14
               .:=+#%%%%%*###%%%%#*+#%%%%%%*+-:    Initial balance: 400.0
-                    +%%%%%%%%%%%%%%%%%%%=         Final balance: 428.2434
-                :++  .=#%%%%%%%%%%%%%*-           Total net gain: 28.2434 7.061%
-               :++:      :+%%%%%%#-.              Growth: 28.2434 7.061%
-              :++:        .%%%%%#=                Number of trades closed: 20
-             :++:        .#%%%%%#*=               Number of trades open(end of backtest): 0
-            :++-        :%%%%%%%%%+=              Percentage positive trades: 30.0%
-           .++-        -%%%%%%%%%%%+=             Percentage negative trades: 70.0%
-          .++-        .%%%%%%%%%%%%%+=            Average trade size: 100.9692 EUR
-         .++-         *%%%%%%%%%%%%%*+:           Average trade duration: 83.6 hours
+                    +%%%%%%%%%%%%%%%%%%%=         Final balance: 417.8982
+                :++  .=#%%%%%%%%%%%%%*-           Total net gain: 15.4755 3.869%
+               :++:      :+%%%%%%#-.              Growth: 17.8982 4.475%
+              :++:        .%%%%%#=                Number of trades closed: 2
+             :++:        .#%%%%%#*=               Number of trades open(end of backtest): 2
+            :++-        :%%%%%%%%%+=              Percentage positive trades: 75.0%
+           .++-        -%%%%%%%%%%%+=             Percentage negative trades: 25.0%
+          .++-        .%%%%%%%%%%%%%+=            Average trade size: 98.8050 EUR
+         .++-         *%%%%%%%%%%%%%*+:           Average trade duration: 11665.866590240556 hours
         .++-          %%%%%%%%%%%%%%#+=
         =++........:::%%%%%%%%%%%%%%*+-
         .=++++++++++**#%%%%%%%%%%%%%++.
-
-Price noise
 
 Positions overview
 ╭────────────┬──────────┬──────────────────────┬───────────────────────┬──────────────┬───────────────┬───────────────────────────┬────────────────┬───────────────╮
 │ Position   │   Amount │   Pending buy amount │   Pending sell amount │   Cost (EUR) │   Value (EUR) │ Percentage of portfolio   │   Growth (EUR) │ Growth_rate   │
 ├────────────┼──────────┼──────────────────────┼───────────────────────┼──────────────┼───────────────┼───────────────────────────┼────────────────┼───────────────┤
-│ EUR        │  428.243 │                    0 │                     0 │      428.243 │       428.243 │ 100.0000%                 │              0 │ 0.0000%       │
+│ EUR        │ 218.062  │                    0 │                     0 │     218.062  │      218.062  │ 52.1806%                  │         0      │ 0.0000%       │
 ├────────────┼──────────┼──────────────────────┼───────────────────────┼──────────────┼───────────────┼───────────────────────────┼────────────────┼───────────────┤
-│ DOT        │    0     │                    0 │                     0 │        0     │         0     │ 0.0000%                   │              0 │ 0.0000%       │
+│ BTC        │   0.0028 │                    0 │                     0 │      97.4139 │       99.7171 │ 23.8616%                  │         2.3032 │ 2.3644%       │
 ├────────────┼──────────┼──────────────────────┼───────────────────────┼──────────────┼───────────────┼───────────────────────────┼────────────────┼───────────────┤
-│ BTC        │    0     │                    0 │                     0 │        0     │         0     │ 0.0000%                   │              0 │ 0.0000%       │
+│ DOT        │  19.9084 │                    0 │                     0 │      99.9999 │      100.119  │ 23.9578%                  │         0.1195 │ 0.1195%       │
 ╰────────────┴──────────┴──────────────────────┴───────────────────────┴──────────────┴───────────────┴───────────────────────────┴────────────────┴───────────────╯
 Trades overview
-╭─────────┬─────────────────────┬─────────────────────┬────────────────────┬──────────────┬──────────────────┬───────────────────────┬────────────────────┬─────────────────────╮
-│ Pair    │ Open date           │ Close date          │   Duration (hours) │   Size (EUR) │   Net gain (EUR) │ Net gain percentage   │   Open price (EUR) │   Close price (EUR) │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-11-24 12:00:00 │ 2023-11-27 14:00:00 │                 74 │     107.55   │          -1.9587 │ -1.8212%              │             4.777  │              4.69   │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-11-20 00:00:00 │ 2023-11-21 08:00:00 │                 32 │     109.39   │          -4.5949 │ -4.2005%              │             4.9875 │              4.778  │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ BTC-EUR │ 2023-11-19 22:00:00 │ 2023-11-22 00:00:00 │                 50 │     109.309  │          -2.7624 │ -2.5272%              │         34159.1    │          33295.9    │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ BTC-EUR │ 2023-11-06 12:00:00 │ 2023-11-13 14:00:00 │                170 │     107.864  │           6.1015 │ 5.6567%               │         32685.9    │          34534.9    │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-10-20 12:00:00 │ 2023-10-27 08:00:00 │                164 │      99.085  │          10.9799 │ 11.0813%              │             3.5465 │              3.9395 │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ BTC-EUR │ 2023-10-14 04:00:00 │ 2023-10-27 22:00:00 │                330 │      97.4278 │          24.137  │ 24.7742%              │         25638.9    │          31990.7    │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-10-14 04:00:00 │ 2023-10-17 14:00:00 │                 82 │      99.5572 │          -1.8877 │ -1.8961%              │             3.56   │              3.4925 │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-10-07 08:00:00 │ 2023-10-08 08:00:00 │                 24 │      99.9498 │          -1.5708 │ -1.5716%              │             3.8815 │              3.8205 │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ BTC-EUR │ 2023-09-27 10:00:00 │ 2023-10-05 20:00:00 │                202 │      98.2888 │           3.433  │ 3.4927%               │         25202.2    │          26082.5    │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-09-27 10:00:00 │ 2023-10-03 20:00:00 │                154 │      98.7893 │           1.2085 │ 1.2233%               │             3.842  │              3.889  │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-09-25 12:00:00 │ 2023-09-27 04:00:00 │                 40 │      98.9193 │          -0.5194 │ -0.5251%              │             3.809  │              3.789  │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-09-14 16:00:00 │ 2023-09-18 02:00:00 │                 82 │      98.9419 │          -0.0912 │ -0.0921%              │             3.799  │              3.7955 │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ BTC-EUR │ 2023-09-07 06:00:00 │ 2023-09-10 16:00:00 │                 82 │      98.6093 │           0.3412 │ 0.3460%               │         24051      │          24134.3    │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-09-07 00:00:00 │ 2023-09-09 02:00:00 │                 50 │      98.9158 │          -0.2358 │ -0.2383%              │             3.986  │              3.9765 │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-09-05 14:00:00 │ 2023-09-06 12:00:00 │                 22 │      99.2132 │          -1.1909 │ -1.2003%              │             3.999  │              3.951  │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-09-04 16:00:00 │ 2023-09-04 22:00:00 │                  6 │      99.355  │          -0.5671 │ -0.5708%              │             3.942  │              3.9195 │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-09-04 10:00:00 │ 2023-09-04 14:00:00 │                  4 │      99.4774 │          -0.4889 │ -0.4914%              │             3.968  │              3.9485 │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ BTC-EUR │ 2023-08-26 10:00:00 │ 2023-08-26 18:00:00 │                  8 │      99.0829 │          -0.03   │ -0.0302%              │         24166.6    │          24159.3    │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-08-25 10:00:00 │ 2023-08-28 10:00:00 │                 72 │      99.659  │          -0.6975 │ -0.6999%              │             4.1435 │              4.1145 │
-├─────────┼─────────────────────┼─────────────────────┼────────────────────┼──────────────┼──────────────────┼───────────────────────┼────────────────────┼─────────────────────┤
-│ DOT-EUR │ 2023-08-24 00:00:00 │ 2023-08-25 00:00:00 │                 24 │      99.9999 │          -1.3626 │ -1.3626%              │             4.1465 │              4.09   │
-╰─────────┴─────────────────────┴─────────────────────┴────────────────────┴──────────────┴──────────────────┴───────────────────────┴────────────────────┴─────────────────────╯
+╭───────────────────┬────────────┬─────────────────────────────────┬─────────────────────┬────────────────────────────┬──────────────────────────┬────────────────────┬─────────────────────────────────╮
+│ Pair (Trade id)   │ Status     │ Net gain (EUR)                  │ Open date           │ Close date                 │ Duration                 │   Open price (EUR) │ Close price's (EUR)             │
+├───────────────────┼────────────┼─────────────────────────────────┼─────────────────────┼────────────────────────────┼──────────────────────────┼────────────────────┼─────────────────────────────────┤
+│ BTC/EUR (1)       │ CLOSED, TP │ 2.9820 (3.0460%)                │ 2023-09-13 14:00:00 │ 2025-02-19 15:21:54.823674 │ 12601.365228798333 hours │         24474.4    │ 25427.69, 25012.105             │
+├───────────────────┼────────────┼─────────────────────────────────┼─────────────────────┼────────────────────────────┼──────────────────────────┼────────────────────┼─────────────────────────────────┤
+│ DOT/EUR (2)       │ CLOSED, TP │ 9.3097 (9.3097%)                │ 2023-10-30 04:00:00 │ 2025-02-19 15:22:02.227035 │ 11483.3672852875 hours   │             4.0565 │ 4.233, 4.377, 4.807499999999999 │
+├───────────────────┼────────────┼─────────────────────────────────┼─────────────────────┼────────────────────────────┼──────────────────────────┼────────────────────┼─────────────────────────────────┤
+│ BTC/EUR (3)       │ CLOSED     │ -0.4248 (-0.4322%)              │ 2023-11-06 14:00:00 │ 2025-02-19 15:21:59.823557 │ 11305.366617654721 hours │         32761.8    │ 32620.225                       │
+├───────────────────┼────────────┼─────────────────────────────────┼─────────────────────┼────────────────────────────┼──────────────────────────┼────────────────────┼─────────────────────────────────┤
+│ BTC/EUR (4)       │ CLOSED, TP │ 3.6086 (3.6364%)                │ 2023-11-07 22:00:00 │ 2025-02-19 15:22:02.025198 │ 11273.367229221665 hours │         33077.9    │ 34637.09, 33924.39              │
+├───────────────────┼────────────┼─────────────────────────────────┼─────────────────────┼────────────────────────────┼──────────────────────────┼────────────────────┼─────────────────────────────────┤
+│ BTC/EUR (5)       │ OPEN       │ 2.3880 (2.4514%) (unrealized)   │ 2023-11-29 12:00:00 │                            │ 60.0 hours               │         34790.7    │                                 │
+├───────────────────┼────────────┼─────────────────────────────────┼─────────────────────┼────────────────────────────┼──────────────────────────┼────────────────────┼─────────────────────────────────┤
+│ DOT/EUR (6)       │ OPEN       │ -0.0398 (-0.0398%) (unrealized) │ 2023-11-30 18:00:00 │                            │ 30.0 hours               │             5.023  │                                 │
+╰───────────────────┴────────────┴─────────────────────────────────┴─────────────────────┴────────────────────────────┴──────────────────────────┴────────────────────┴─────────────────────────────────╯
+Stop losses overview
+╭────────────────────┬───────────────┬──────────┬────────┬──────────────────────┬────────────────┬────────────────┬───────────────────┬──────────────┬─────────────┬───────────────╮
+│ Trade (Trade id)   │ Status        │ Active   │ Type   │ stop loss            │ Open price     │ Sell price's   │   High water mark │ Percentage   │ Size        │ Sold amount   │
+├────────────────────┼───────────────┼──────────┼────────┼──────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────┤
+│ BTC/EUR (1)        │ NOT TRIGGERED │ True     │ FIXED  │ 23250.6847(5.0%) EUR │ 24474.4050 EUR │ None           │        24474.4    │ 50.0%        │ 0.0020 BTC  │               │
+├────────────────────┼───────────────┼──────────┼────────┼──────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────┤
+│ DOT/EUR (2)        │ NOT TRIGGERED │ True     │ FIXED  │ 3.8537(5.0%) EUR     │ 4.0565 EUR     │ None           │            4.0565 │ 50.0%        │ 12.3259 DOT │               │
+├────────────────────┼───────────────┼──────────┼────────┼──────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────┤
+│ BTC/EUR (3)        │ NOT TRIGGERED │ True     │ FIXED  │ 31123.7242(5.0%) EUR │ 32761.8150 EUR │ None           │        32761.8    │ 50.0%        │ 0.0015 BTC  │               │
+├────────────────────┼───────────────┼──────────┼────────┼──────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────┤
+│ BTC/EUR (4)        │ NOT TRIGGERED │ True     │ FIXED  │ 31423.9908(5.0%) EUR │ 33077.8850 EUR │ None           │        33077.9    │ 50.0%        │ 0.0015 BTC  │               │
+├────────────────────┼───────────────┼──────────┼────────┼──────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────┤
+│ BTC/EUR (5)        │ NOT TRIGGERED │ True     │ FIXED  │ 33051.1460(5.0%) EUR │ 34790.6800 EUR │ None           │        34790.7    │ 50.0%        │ 0.0014 BTC  │               │
+├────────────────────┼───────────────┼──────────┼────────┼──────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────┤
+│ DOT/EUR (6)        │ NOT TRIGGERED │ True     │ FIXED  │ 4.7718(5.0%) EUR     │ 5.0230 EUR     │ None           │            5.023  │ 50.0%        │ 9.9542 DOT  │               │
+╰────────────────────┴───────────────┴──────────┴────────┴──────────────────────┴────────────────┴────────────────┴───────────────────┴──────────────┴─────────────┴───────────────╯
+Take profits overview
+╭────────────────────┬───────────────┬──────────┬──────────┬───────────────────────┬────────────────┬────────────────┬───────────────────┬──────────────┬─────────────┬───────────────────╮
+│ Trade (Trade id)   │ Status        │ Active   │ Type     │ Take profit           │ Open price     │ Sell price's   │ High water mark   │ Percentage   │ Size        │ Sold amount       │
+├────────────────────┼───────────────┼──────────┼──────────┼───────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────────┤
+│ BTC/EUR (1)        │ TRIGGERED     │ False    │ TRAILING │ 25698.1253(5.0)% EUR  │ 24474.4050 EUR │ 25427.69       │ 25703.77          │ 50.0%        │ 0.0020 BTC  │ 0.002             │
+├────────────────────┼───────────────┼──────────┼──────────┼───────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────────┤
+│ BTC/EUR (1)        │ NOT TRIGGERED │ True     │ TRAILING │ 26921.8455(10.0)% EUR │ 24474.4050 EUR │ None           │                   │ 20.0%        │ 0.0008 BTC  │                   │
+├────────────────────┼───────────────┼──────────┼──────────┼───────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────────┤
+│ DOT/EUR (2)        │ TRIGGERED     │ False    │ TRAILING │ 5.1756(5.0)% EUR      │ 4.0565 EUR     │ 4.233          │ 5.448             │ 50.0%        │ 12.3259 DOT │ 12.32585          │
+├────────────────────┼───────────────┼──────────┼──────────┼───────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────────┤
+│ DOT/EUR (2)        │ TRIGGERED     │ False    │ TRAILING │ 4.9032(10.0)% EUR     │ 4.0565 EUR     │ 4.377          │ 5.448             │ 20.0%        │ 4.9303 DOT  │ 4.930340000000001 │
+├────────────────────┼───────────────┼──────────┼──────────┼───────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────────┤
+│ BTC/EUR (3)        │ NOT TRIGGERED │ True     │ TRAILING │ 34399.9057(5.0)% EUR  │ 32761.8150 EUR │ None           │                   │ 50.0%        │ 0.0015 BTC  │                   │
+├────────────────────┼───────────────┼──────────┼──────────┼───────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────────┤
+│ BTC/EUR (3)        │ NOT TRIGGERED │ True     │ TRAILING │ 36037.9965(10.0)% EUR │ 32761.8150 EUR │ None           │                   │ 20.0%        │ 0.0006 BTC  │                   │
+├────────────────────┼───────────────┼──────────┼──────────┼───────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────────┤
+│ BTC/EUR (4)        │ TRIGGERED     │ False    │ TRAILING │ 34731.7793(5.0)% EUR  │ 33077.8850 EUR │ 34637.09       │ 34967.12          │ 50.0%        │ 0.0015 BTC  │ 0.0015            │
+├────────────────────┼───────────────┼──────────┼──────────┼───────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────────┤
+│ BTC/EUR (4)        │ NOT TRIGGERED │ True     │ TRAILING │ 36385.6735(10.0)% EUR │ 33077.8850 EUR │ None           │                   │ 20.0%        │ 0.0006 BTC  │                   │
+├────────────────────┼───────────────┼──────────┼──────────┼───────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────────┤
+│ BTC/EUR (5)        │ NOT TRIGGERED │ True     │ TRAILING │ 36530.2140(5.0)% EUR  │ 34790.6800 EUR │ None           │                   │ 50.0%        │ 0.0014 BTC  │                   │
+├────────────────────┼───────────────┼──────────┼──────────┼───────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────────┤
+│ BTC/EUR (5)        │ NOT TRIGGERED │ True     │ TRAILING │ 38269.7480(10.0)% EUR │ 34790.6800 EUR │ None           │                   │ 20.0%        │ 0.0006 BTC  │                   │
+├────────────────────┼───────────────┼──────────┼──────────┼───────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────────┤
+│ DOT/EUR (6)        │ NOT TRIGGERED │ True     │ TRAILING │ 5.2741(5.0)% EUR      │ 5.0230 EUR     │ None           │                   │ 50.0%        │ 9.9542 DOT  │                   │
+├────────────────────┼───────────────┼──────────┼──────────┼───────────────────────┼────────────────┼────────────────┼───────────────────┼──────────────┼─────────────┼───────────────────┤
+│ DOT/EUR (6)        │ NOT TRIGGERED │ True     │ TRAILING │ 5.5253(10.0)% EUR     │ 5.0230 EUR     │ None           │                   │ 20.0%        │ 3.9817 DOT  │                   │
+╰────────────────────┴───────────────┴──────────┴──────────┴───────────────────────┴────────────────┴────────────────┴───────────────────┴──────────────┴─────────────┴───────────────────╯
 ```
 
 ### Backtest experiments
@@ -325,4 +339,4 @@ You can pick up a task by assigning yourself to it.
 **Note** before starting any major new feature work, *please open an issue describing what you are planning to do*.
 This will ensure that interested parties can give valuable feedback on the feature, and let others know that you are working on it.
 
-**Important:** Always create your feature or hotfix against the `develop` branch, not `master`.
+**Important:** Always create your feature or hotfix against the `develop` branch, not `main`.

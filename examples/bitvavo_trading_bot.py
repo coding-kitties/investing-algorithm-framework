@@ -3,7 +3,8 @@ import logging.config
 
 from investing_algorithm_framework import MarketCredential, TimeUnit, \
     CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, TradingStrategy, \
-    create_app, PortfolioConfiguration, Algorithm, DEFAULT_LOGGING_CONFIG
+    create_app, PortfolioConfiguration, Algorithm, DEFAULT_LOGGING_CONFIG, \
+    Context
 
 """
 Bitvavo trading bot example with market data sources of bitvavo.
@@ -43,7 +44,7 @@ class BitvavoTradingStrategy(TradingStrategy):
     interval = 10
     market_data_sources = [bitvavo_btc_eur_ohlcv_2h, bitvavo_btc_eur_ticker]
 
-    def apply_strategy(self, algorithm, market_data):
+    def apply_strategy(self, context: Context, market_data):
         print(market_data["BTC/EUR-ohlcv"])
         print(market_data["BTC/EUR-ticker"])
 
@@ -59,7 +60,7 @@ app.add_market_credential(bitvavo_market_credential)
 app.add_algorithm(algorithm)
 app.add_portfolio_configuration(
     PortfolioConfiguration(
-        initial_balance=1000,
+        initial_balance=41,
         trading_symbol="EUR",
         market="bitvavo"
     )

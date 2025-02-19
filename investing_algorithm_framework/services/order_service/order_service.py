@@ -23,7 +23,7 @@ class OrderService(RepositoryService):
         portfolio_configuration_service,
         portfolio_snapshot_service,
         market_credential_service,
-        trade_service
+        trade_service,
     ):
         super(OrderService, self).__init__(order_repository)
         self.configuration_service = configuration_service
@@ -37,8 +37,100 @@ class OrderService(RepositoryService):
         self.trade_service = trade_service
 
     def create(self, data, execute=True, validate=True, sync=True) -> Order:
+        """
+        Function to create an order. The function will create the order and
+        execute it if execute is set to True. The function will also validate
+        the order if validate is set to True. The function will also sync the
+        portfolio with the order if sync is set to True.
+
+        The following only applies if the order is a sell order:
+
+        If stop_losses, or take_profits are in the data, we assume that the
+        order has been created by a stop loss or take profit. We will then
+        create for the order one or more metadata objects with the
+        amount and stop loss id or take profit id. These objects can later
+        be used to restore the stop loss or take profit to its original state
+        if the order is cancelled or rejected.
+
+        If trades are in the data, we assume that the order has
+        been created by a closing a specific trade. We will then create for
+        the order one metadata object with the amount and trade id. This
+        objects can later be used to restore the trade to its original
+        state if the order is cancelled or rejected.
+
+        If there are no trades in the data, we rely on the trade service to
+        create the metadata objects for the order.
+
+        The metadata objects are needed because for trades, stop losses and
+        take profits we need to know how much of the order has been
+        filled at any given time. If the order is cancelled or rejected we
+        need to add the pending amount back to the trade, stop loss or take
+        profit.
+
+        Args:
+            data: dict - the data to create the order with. Data should have
+                the following format:
+                {
+                    "target_symbol": str,
+                    "trading_symbol": str,
+                    "order_side": str,
+                    "order_type": str,
+                    "amount": float,
+                    "filled" (optional): float, // If set, trades
+                        and positions are synced
+                    "remaining" (optional): float, // Same as filled
+                    "price": float,
+                    "portfolio_id": int
+                    "stop_losses" (optional): list[dict] - list of stop
+                      losses with the following format:
+                        {
+                            "stop_loss_id": float,
+                            "amount": float
+                        }
+                    "take_profits" (optional): list[dict] - list of
+                        take profits with the following format:
+                        {
+                            "take_profit_id": float,
+                            "amount": float
+                        }
+                    "trades" (optional): list[dict] - list of trades
+                        with the following format:
+                        {
+                            "trade_id": int,
+                            "amount": float
+                        }
+                }
+
+            execute: bool - if True the order will be executed
+            validate: bool - if True the order will be validated
+            sync: bool - if True the portfolio will be synced with the order
+
+        Returns:
+            Order: Order object
+        """
         portfolio_id = data["portfolio_id"]
         portfolio = self.portfolio_repository.get(portfolio_id)
+        trades = data.get("trades", [])
+        stop_losses = data.get("stop_losses", [])
+        take_profits = data.get("take_profits", [])
+        filled = data.get("filled", 0)
+        remaining = data.get("remaining", 0)
+        amount = data.get("amount", 0)
+
+        if "filled" in data:
+            del data["filled"]
+
+        if "remaining" in data:
+            del data["remaining"]
+
+        if "trades" in data:
+            del data["trades"]
+
+        if "stop_losses" in data:
+            del data["stop_losses"]
+
+        if "take_profits" in data:
+            del data["take_profits"]
 
         if validate:
             self.validate_order(data, portfolio)
@@ -49,33 +141,91 @@ class OrderService(RepositoryService):
         if validate:
             self.validate_order(data, portfolio)
 
+        # Get the position
         position = self._create_position_if_not_exists(symbol, portfolio)
         data["position_id"] = position.id
         data["remaining"] = data["amount"]
         data["status"] = OrderStatus.CREATED.value
         order = self.order_repository.create(data)
         order_id = order.id
+        created_at = order.created_at
+        order_side = order.order_side
+
+        if OrderSide.SELL.equals(order_side):
+            # Create order metadata if their is a key in the data
+            # for trades, stop_losses or take_profits
+            self.trade_service.create_order_metadata_with_trade_context(
+                sell_order=order,
+                trades=trades,
+                stop_losses=stop_losses,
+                take_profits=take_profits
+            )
+        else:
+            self.trade_service.create_trade_from_buy_order(order)
 
         if sync:
-            if OrderSide.BUY.equals(order.get_order_side()):
+            order = self.get(order_id)
+            if OrderSide.BUY.equals(order_side):
                 self._sync_portfolio_with_created_buy_order(order)
             else:
                 self._sync_portfolio_with_created_sell_order(order)
 
-        self.create_snapshot(portfolio.id, created_at=order.created_at)
+        self.create_snapshot(portfolio.id, created_at=created_at)
+
+        if sync:
+
+            if filled or remaining:
+
+                if filled == 0:
+                    filled = amount - remaining
+
+                if remaining == 0:
+                    remaining = amount - filled
+
+                status = OrderStatus.OPEN.value
+
+                if filled == amount:
+                    status = OrderStatus.CLOSED.value
+
+                order = self.update(
+                    order_id,
+                    {
+                        "filled": filled,
+                        "remaining": remaining,
+                        "status": status
+                    }
+                )
 
         if execute:
             portfolio.configuration = self.portfolio_configuration_service\
                 .get(portfolio.identifier)
             self.execute_order(order_id, portfolio)
 
-        # Create trade from buy order if buy order
-        if OrderSide.BUY.equals(order.get_order_side()):
-            self.trade_service.create_trade_from_buy_order(order)
-
+        order = self.get(order_id)
         return order
 
     def update(self, object_id, data):
+        """
+        Function to update an order. The function will update the order and
+        sync the portfolio, position and trades if the order has been filled.
+
+        If the order has been cancelled, expired or rejected the function will
+        sync the portfolio, position, trades, stop losses, and
+        take profits with the order.
+
+        Args:
+            object_id: int - the id of the order to update
+            data: dict - the data to update the order with
+              the following format:
+                {
+                    "filled" (optional): float,
+                    "remaining" (optional): float,
+                    "status" (optional): str,
+                }
+
+        Returns:
+            Order: Order object that has been updated
+        """
         previous_order = self.order_repository.get(object_id)
         trading_symbol_position = self.position_repository.find(
             {
@@ -91,7 +241,6 @@ class OrderService(RepositoryService):
             - previous_order.get_filled()
 
         if filled_difference:
-
             if OrderSide.BUY.equals(new_order.get_order_side()):
                 self._sync_with_buy_order_filled(previous_order, new_order)
             else:
@@ -100,7 +249,6 @@ class OrderService(RepositoryService):
         if "status" in data:
 
             if OrderStatus.CANCELED.equals(new_order.get_status()):
-
                 if OrderSide.BUY.equals(new_order.get_order_side()):
                     self._sync_with_buy_order_cancelled(new_order)
                 else:
@@ -373,12 +521,16 @@ class OrderService(RepositoryService):
     def _sync_portfolio_with_created_sell_order(self, order):
         """
         Function to sync the portfolio with a created sell order. The
-        function will subtract the amount of the order from the position.
+        function will subtract the amount of the order from the position and
+        the trade amount.
+
         The portfolio will not be updated because the sell order has not been
         filled.
 
         Args:
             order: Order object representing the sell order
+            stop_loss_ids: List of stop loss order ids
+            take_profit_ids: List of take profit order ids
 
         Returns:
             None
@@ -470,11 +622,12 @@ class OrderService(RepositoryService):
         self.position_repository.update(
             trading_symbol_position.id,
             {
-                "amount": trading_symbol_position.get_amount()
-                + filled_size
+                "amount":
+                    trading_symbol_position.get_amount() + filled_size
             }
         )
-        self.trade_service.update_trade_with_sell_order_filled(
+
+        self.trade_service.update_trade_with_filled_sell_order(
             filled_difference, current_order
         )
 
@@ -520,6 +673,7 @@ class OrderService(RepositoryService):
                 "amount": position.get_amount() + remaining
             }
         )
+        self.trade_service.update_trade_with_removed_sell_order(order)
 
     def _sync_with_buy_order_failed(self, order):
         remaining = order.get_amount() - order.get_filled()
@@ -564,6 +718,8 @@ class OrderService(RepositoryService):
             }
         )
 
+        self.trade_service.update_trade_with_removed_sell_order(order)
+
     def _sync_with_buy_order_expired(self, order):
         remaining = order.get_amount() - order.get_filled()
         size = remaining * order.get_price()
@@ -607,6 +763,8 @@ class OrderService(RepositoryService):
             }
         )
 
+        self.trade_service.update_trade_with_removed_sell_order(order)
+
     def _sync_with_buy_order_rejected(self, order):
         remaining = order.get_amount() - order.get_filled()
         size = remaining * order.get_price()
@@ -649,6 +807,8 @@ class OrderService(RepositoryService):
                 "amount": position.get_amount() + remaining
             }
         )
+
+        self.trade_service.update_trade_with_removed_sell_order(order)
 
     def create_snapshot(self, portfolio_id, created_at=None):
 

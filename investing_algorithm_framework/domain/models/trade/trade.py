@@ -1,9 +1,13 @@
 from dateutil.parser import parse
 
 from investing_algorithm_framework.domain.models.base_model import BaseModel
-from investing_algorithm_framework.domain.models.order import OrderSide
+from investing_algorithm_framework.domain.models.order import OrderSide, Order
 from investing_algorithm_framework.domain.models.trade.trade_status import \
     TradeStatus
+from investing_algorithm_framework.domain.models.trade.trade_stop_loss import \
+    TradeStopLoss
+from investing_algorithm_framework.domain.models.trade\
+    .trade_take_profit import TradeTakeProfit
 
 
 class Trade(BaseModel):
@@ -36,10 +40,8 @@ class Trade(BaseModel):
         created_at (datetime): the datetime when the trade was created
         updated_at (datetime): the datetime when the trade was last updated
         status (str): the status of the trade
-        stop_loss_percentage (float): the stop loss percentage of
-            the trade
-        trailing_stop_loss_percentage (float): the trailing stop
-            loss percentage
+        stop_losses (List[TradeStopLoss]): the stop losses of the trade
+        take_profits (List[TradeTakeProfit]): the take profits of the trade
     """
 
     def __init__(
@@ -59,9 +61,8 @@ class Trade(BaseModel):
         last_reported_price=None,
         high_water_mark=None,
         updated_at=None,
-        stop_loss_percentage=None,
-        trailing_stop_loss_percentage=None,
-        stop_loss_triggered=False,
+        stop_losses=None,
+        take_profits=None,
     ):
         self.id = id
         self.orders = orders
@@ -78,9 +79,8 @@ class Trade(BaseModel):
         self.high_water_mark = high_water_mark
         self.status = status
         self.updated_at = updated_at
-        self.stop_loss_percentage = stop_loss_percentage
-        self.trailing_stop_loss_percentage = trailing_stop_loss_percentage
-        self.stop_loss_triggered = stop_loss_triggered
+        self.stop_losses = stop_losses
+        self.take_profits = take_profits
 
     @property
     def closed_prices(self):
@@ -107,7 +107,9 @@ class Trade(BaseModel):
     @property
     def duration(self):
         if TradeStatus.CLOSED.equals(self.status):
-            return self.closed_at - self.opened_at
+            # Get the total hours between the closed and opened datetime
+            diff = self.closed_at - self.opened_at
+            return diff.total_seconds() / 3600
 
         if self.opened_at is None:
             return None
@@ -115,7 +117,8 @@ class Trade(BaseModel):
         if self.updated_at is None:
             return None
 
-        return self.updated_at - self.opened_at
+        diff = self.updated_at - self.opened_at
+        return diff.total_seconds() / 3600
 
     @property
     def size(self):
@@ -228,6 +231,48 @@ class Trade(BaseModel):
 
         return self.last_reported_price <= stop_loss_price
 
+    def is_take_profit_triggered(self):
+
+        if self.take_profit_percentage is None:
+            return False
+
+        if self.last_reported_price is None:
+            return False
+
+        if self.open_price is None:
+            return False
+
+        take_profit_price = self.open_price * \
+            (1 + (self.take_profit_percentage / 100))
+
+        return self.last_reported_price >= take_profit_price
+
+    def is_trailing_take_profit_triggered(self):
+        """
+        Function to check if the trailing take profit is triggered.
+        The trailing take profit is triggered when the last reported price
+        is greater than or equal to the high water mark times the trailing
+        take profit percentage.
+        """
+
+        if self.trailing_take_profit_percentage is None:
+            return False
+
+        if self.last_reported_price is None:
+            return False
+
+        if self.high_water_mark is None:
+
+            if self.open_price is not None:
+                self.high_water_mark = self.open_price
+            else:
+                return False
+
+        take_profit_price = self.high_water_mark * \
+            (1 + (self.trailing_take_profit_percentage / 100))
+
+        return self.last_reported_price >= take_profit_price
+
     def to_dict(self, datetime_format=None):
 
         if datetime_format is not None:
@@ -260,6 +305,14 @@ class Trade(BaseModel):
             "updated_at": updated_at,
             "net_gain": self.net_gain,
             "cost": self.cost,
+            "stop_losses": [
+                stop_loss.to_dict(datetime_format=datetime_format)
+                for stop_loss in self.stop_losses
+            ] if self.stop_losses else None,
+            "take_profits": [
+                take_profit.to_dict(datetime_format=datetime_format)
+                for take_profit in self.take_profits
+            ] if self.take_profits else None,
         }
 
     @staticmethod
@@ -267,6 +320,9 @@ class Trade(BaseModel):
         opened_at = None
         closed_at = None
         updated_at = None
+        stop_losses = None
+        take_profits = None
+        orders = None
 
         if "opened_at" in data and data["opened_at"] is not None:
             opened_at = parse(data["opened_at"])
@@ -277,9 +333,27 @@ class Trade(BaseModel):
         if "updated_at" in data and data["updated_at"] is not None:
             updated_at = parse(data["updated_at"])
 
+        if "stop_losses" in data and data["stop_losses"] is not None:
+            stop_losses = [
+                TradeStopLoss.from_dict(stop_loss)
+                for stop_loss in data["stop_losses"]
+            ]
+
+        if "take_profits" in data and data["take_profits"] is not None:
+            take_profits = [
+                TradeTakeProfit.from_dict(take_profit)
+                for take_profit in data["take_profits"]
+            ]
+
+        if "orders" in data and data["orders"] is not None:
+            orders = [
+                Order.from_dict(order)
+                for order in data["orders"]
+            ]
+
         return Trade(
             id=data.get("id", None),
-            orders=data.get("orders", None),
+            orders=orders,
             target_symbol=data["target_symbol"],
             trading_symbol=data["trading_symbol"],
             amount=data["amount"],
@@ -292,6 +366,8 @@ class Trade(BaseModel):
             status=data["status"],
             cost=data.get("cost", 0),
             updated_at=updated_at,
+            stop_losses=stop_losses,
+            take_profits=take_profits,
         )
 
     def __repr__(self):
@@ -301,6 +377,7 @@ class Trade(BaseModel):
             trading_symbol=self.trading_symbol,
             status=self.status,
             amount=self.amount,
+            filled_amount=self.filled_amount,
             remaining=self.remaining,
             open_price=self.open_price,
             opened_at=self.opened_at,

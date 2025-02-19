@@ -27,9 +27,9 @@ class Test(TestBase):
     market_data_source_service = MarketDataSourceServiceStub()
 
     def test_has_open_buy_orders(self):
-        trading_symbol_position = self.app.algorithm.get_position("EUR")
+        trading_symbol_position = self.app.context.get_position("EUR")
         self.assertEqual(Decimal(1000), trading_symbol_position.get_amount())
-        order = self.app.algorithm.create_limit_order(
+        order = self.app.context.create_limit_order(
             target_symbol="BTC",
             amount=1,
             price=10,
@@ -39,6 +39,6 @@ class Test(TestBase):
         order = order_service.find({"symbol": "BTC/EUR"})
         position_service = self.app.container.position_service()
         position = position_service.find({"symbol": "BTC"})
-        self.assertTrue(self.app.algorithm.has_open_buy_orders("BTC"))
+        self.assertTrue(self.app.context.has_open_buy_orders("BTC"))
         order_service.check_pending_orders()
-        self.assertFalse(self.app.algorithm.has_open_buy_orders("BTC"))
+        self.assertFalse(self.app.context.has_open_buy_orders("BTC"))

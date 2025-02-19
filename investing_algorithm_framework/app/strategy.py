@@ -6,10 +6,27 @@ from investing_algorithm_framework.domain import OperationalException, Position
 from investing_algorithm_framework.domain import \
     TimeUnit, StrategyProfile, Trade, ENVIRONMENT, Environment, \
     BACKTESTING_INDEX_DATETIME
-from .algorithm import Algorithm
+from .context import Context
 
 
 class TradingStrategy:
+    """
+    TradingStrategy is the base class for all trading strategies. A trading
+    strategy is a set of rules that defines when to buy or sell an asset.
+
+    Attributes:
+        time_unit: TimeUnit - the time unit of the strategy that defines
+            when the strategy should run e.g. HOUR, DAY, WEEK, MONTH
+        interval: int - the interval of the strategy that defines how often
+            the strategy should run within the time unit e.g. every 5 hours,
+            every 2 days, every 3 weeks, every 4 months
+        worker_id (optional): str - the id of the worker
+        strategy_id (optional): str - the id of the strategy
+        decorated (optional): function - the decorated function
+        market_data_sources (optional): list - the list of market data
+            sources to use for the strategy. This will be passed to the
+            run_strategy function.
+    """
     time_unit: str = None
     interval: int = None
     worker_id: str = None
@@ -17,7 +34,7 @@ class TradingStrategy:
     decorated = None
     market_data_sources = None
     traces = None
-    algorithm: Algorithm = None
+    context: Context = None
 
     def __init__(
         self,
@@ -72,9 +89,9 @@ class TradingStrategy:
         self._context = None
         self._last_run = None
 
-    def run_strategy(self, algorithm, market_data):
-        self.algorithm = algorithm
-        config = self.algorithm.get_config()
+    def run_strategy(self, context, market_data):
+        self.context = context
+        config = self.context.get_config()
 
         if config[ENVIRONMENT] == Environment.BACKTEST.value:
             self._update_trades_and_orders_for_backtest(market_data)
@@ -82,18 +99,19 @@ class TradingStrategy:
             self._update_trades_and_orders(market_data)
 
         self._check_stop_losses()
+        self._check_take_profits()
 
         # Run user defined strategy
-        self.apply_strategy(algorithm=algorithm, market_data=market_data)
+        self.apply_strategy(context=context, market_data=market_data)
 
         if config[ENVIRONMENT] == Environment.BACKTEST.value:
             self._last_run = config[BACKTESTING_INDEX_DATETIME]
         else:
             self._last_run = datetime.now(tz=timezone.utc)
 
-    def apply_strategy(self, algorithm, market_data):
+    def apply_strategy(self, context, market_data):
         if self.decorated:
-            self.decorated(algorithm=algorithm, market_data=market_data)
+            self.decorated(context=context, market_data=market_data)
         else:
             raise NotImplementedError("Apply strategy is not implemented")
 
@@ -107,88 +125,86 @@ class TradingStrategy:
         )
 
     def _update_trades_and_orders(self, market_data):
-        self.algorithm.order_service.check_pending_orders()
-        self.algorithm.trade_service\
+        self.context.order_service.check_pending_orders()
+        self.context.trade_service\
             .update_trades_with_market_data(market_data)
 
     def _update_trades_and_orders_for_backtest(self, market_data):
-        self.algorithm.order_service.check_pending_orders(market_data)
-        self.algorithm.trade_service\
+        self.context.order_service.check_pending_orders(market_data)
+        self.context.trade_service\
             .update_trades_with_market_data(market_data)
-
-    def _check_pending_orders(self, market_data):
-        """
-        Check if there are any pending orders that need to be executed
-        """
-        pass
-        # self.algorithm.check_pending_orders()
 
     def _check_stop_losses(self):
         """
         Check if there are any stop losses that result in trades being closed.
         """
-        trade_service = self.algorithm.trade_service
-        triggered_trades = trade_service.get_triggered_stop_losses()
+        trade_service = self.context.trade_service
 
-        for trade in triggered_trades:
-            trade_service.update(trade.id, {"stop_loss_triggered": True})
-            self.algorithm.close_trade(
-                trade
-            )
+        stop_losses_orders_data = trade_service\
+            .get_triggered_stop_loss_orders()
 
-        triggered_trades = trade_service.get_triggered_trailing_stop_losses()
+        order_service = self.context.order_service
 
-        for trade in triggered_trades:
-            trade_service.update(trade.id, {"stop_loss_triggered": True})
-            self.algorithm.close_trade(
-                trade
-            )
+        for stop_loss_order in stop_losses_orders_data:
+            order_service.create(stop_loss_order)
 
-    def on_trade_closed(self, algorithm: Algorithm, trade: Trade):
+    def _check_take_profits(self):
+        """
+        Check if there are any take profits that result in trades being closed.
+        """
+        trade_service = self.context.trade_service
+        take_profit_orders_data = trade_service.\
+            get_triggered_take_profit_orders()
+        order_service = self.context.order_service
+
+        for take_profit_order in take_profit_orders_data:
+            order_service.create(take_profit_order)
+
+    def on_trade_closed(self, context: Context, trade: Trade):
         pass
 
-    def on_trade_updated(self, algorithm: Algorithm, trade: Trade):
+    def on_trade_updated(self, context: Context, trade: Trade):
         pass
 
-    def on_trade_created(self, algorithm: Algorithm, trade: Trade):
+    def on_trade_created(self, context: Context, trade: Trade):
         pass
 
-    def on_trade_opened(self, algorithm: Algorithm, trade: Trade):
+    def on_trade_opened(self, context: Context, trade: Trade):
         pass
 
-    def on_trade_stop_loss_triggered(self, algorithm: Algorithm, trade: Trade):
+    def on_trade_stop_loss_triggered(self, context: Context, trade: Trade):
         pass
 
     def on_trade_trailing_stop_loss_triggered(
-        self, algorithm: Algorithm, trade: Trade
+        self, context: Context, trade: Trade
     ):
         pass
 
     def on_trade_take_profit_triggered(
-        self, algorithm: Algorithm, trade: Trade
+        self, context: Context, trade: Trade
     ):
         pass
 
-    def on_trade_stop_loss_updated(self, algorithm: Algorithm, trade: Trade):
+    def on_trade_stop_loss_updated(self, context: Context, trade: Trade):
         pass
 
     def on_trade_trailing_stop_loss_updated(
-        self, algorithm: Algorithm, trade: Trade
+        self, context: Context, trade: Trade
     ):
         pass
 
-    def on_trade_take_profit_updated(self, algorithm: Algorithm, trade: Trade):
+    def on_trade_take_profit_updated(self, context: Context, trade: Trade):
         pass
 
-    def on_trade_stop_loss_created(self, algorithm: Algorithm, trade: Trade):
+    def on_trade_stop_loss_created(self, context: Context, trade: Trade):
         pass
 
     def on_trade_trailing_stop_loss_created(
-        self, algorithm: Algorithm, trade: Trade
+        self, context: Context, trade: Trade
     ):
         pass
 
-    def on_trade_take_profit_created(self, algorithm: Algorithm, trade: Trade):
+    def on_trade_take_profit_created(self, context: Context, trade: Trade):
         pass
 
     @property
@@ -198,14 +214,6 @@ class TradingStrategy:
             return self.strategy_id
 
         return self.worker_id
-
-    @property
-    def context(self):
-        return self._context
-
-    @context.setter
-    def context(self, context):
-        self._context = context
 
     def add_trace(
         self,
@@ -283,7 +291,7 @@ class TradingStrategy:
         Returns:
             bool: True if there are open orders, False otherwise
         """
-        return self.algorithm.has_open_orders(
+        return self.context.has_open_orders(
             target_symbol=target_symbol, identifier=identifier, market=market
         )
 
@@ -329,12 +337,12 @@ class TradingStrategy:
             validate (optional): Default True. If set to True, the order
               will be validated
             sync (optional): Default True. If set to True, the created
-              order will be synced with the portfolio of the algorithm
+              order will be synced with the portfolio of the context
 
         Returns:
             Order: Instance of the order created
         """
-        self.algorithm.create_limit_order(
+        self.context.create_limit_order(
             target_symbol=target_symbol,
             price=price,
             order_side=order_side,
@@ -373,12 +381,12 @@ class TradingStrategy:
             execute: If set to True, the order will be executed
             validate: If set to True, the order will be validated
             sync: If set to True, the created order will be synced with the
-                portfolio of the algorithm
+                portfolio of the context
 
         Returns:
             Order: Instance of the order created
         """
-        self.algorithm.create_market_order(
+        self.context.create_market_order(
             target_symbol=target_symbol,
             order_side=order_side,
             amount=amount,
@@ -406,7 +414,7 @@ class TradingStrategy:
         Returns:
             None
         """
-        self.algorithm.close_position(
+        self.context.close_position(
             symbol=symbol,
             market=market,
             identifier=identifier,
@@ -450,7 +458,7 @@ class TradingStrategy:
         Returns:
             List[Position]: A list of positions that match the query parameters
         """
-        return self.algorithm.get_positions(
+        return self.context.get_positions(
             market=market,
             identifier=identifier,
             amount_gt=amount_gt,
@@ -471,17 +479,17 @@ class TradingStrategy:
         Returns:
             List[Trade]: A list of trades that match the query parameters
         """
-        return self.algorithm.get_trades(market)
+        return self.context.get_trades(market)
 
     def get_closed_trades(self) -> List[Trade]:
         """
         Function to get all closed trades. This function will return all
-        closed trades of the algorithm.
+        closed trades of the context.
 
         Returns:
             List[Trade]: A list of closed trades
         """
-        return self.algorithm.get_closed_trades()
+        return self.context.get_closed_trades()
 
     def get_open_trades(self, target_symbol=None, market=None) -> List[Trade]:
         """
@@ -499,7 +507,7 @@ class TradingStrategy:
         Returns:
             List[Trade]: A list of open trades that match the query parameters
         """
-        return self.algorithm.get_open_trades(target_symbol, market)
+        return self.context.get_open_trades(target_symbol, market)
 
     def close_trade(self, trade, market=None, precision=None) -> None:
         """
@@ -516,7 +524,7 @@ class TradingStrategy:
         Returns:
             None
         """
-        self.algorithm.close_trade(
+        self.context.close_trade(
             trade=trade, market=market, precision=precision
         )
 
@@ -527,7 +535,7 @@ class TradingStrategy:
         Returns:
             int: The number of positions
         """
-        return self.algorithm.get_number_of_positions()
+        return self.context.get_number_of_positions()
 
     def get_position(
         self, symbol, market=None, identifier=None
@@ -548,7 +556,7 @@ class TradingStrategy:
         Returns:
             Position: The position that matches the query parameters
         """
-        return self.algorithm.get_position(
+        return self.context.get_position(
             symbol=symbol,
             market=market,
             identifier=identifier
@@ -583,7 +591,7 @@ class TradingStrategy:
         Returns:
             Boolean: True if a position exists, False otherwise
         """
-        return self.algorithm.has_position(
+        return self.context.has_position(
             symbol=symbol,
             market=market,
             identifier=identifier,
@@ -608,7 +616,7 @@ class TradingStrategy:
         Returns:
             Boolean: True if the portfolio has enough balance
         """
-        return self.algorithm.has_balance(symbol, amount, market)
+        return self.context.has_balance(symbol, amount, market)
 
     def last_run(self) -> datetime:
         """
@@ -617,4 +625,4 @@ class TradingStrategy:
         Returns:
             DateTime: The last run of the strategy
         """
-        return self.algorithm.last_run()
+        return self.context.last_run()
