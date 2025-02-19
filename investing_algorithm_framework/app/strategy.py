@@ -2,10 +2,9 @@ from typing import List
 import pandas as pd
 from datetime import datetime, timezone
 
-from investing_algorithm_framework.domain import OperationalException, Position
-from investing_algorithm_framework.domain import \
-    TimeUnit, StrategyProfile, Trade, ENVIRONMENT, Environment, \
-    BACKTESTING_INDEX_DATETIME, Order, Position
+from investing_algorithm_framework.domain import TimeUnit, StrategyProfile, \
+    Trade, ENVIRONMENT, Environment, BACKTESTING_INDEX_DATETIME, Order, \
+    OperationalException, Position
 from .context import Context
 
 
