@@ -26,5 +26,5 @@ class Test(TestBase):
     market_data_source_service = MarketDataSourceServiceStub()
 
     def test_get_portfolio(self):
-        portfolio = self.app.algorithm.get_portfolio()
+        portfolio = self.app.context.get_portfolio()
         self.assertEqual(Decimal(1000), portfolio.get_unallocated())

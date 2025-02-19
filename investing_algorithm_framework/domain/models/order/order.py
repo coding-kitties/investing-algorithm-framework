@@ -249,7 +249,7 @@ class Order(BaseModel):
         if updated_at is not None:
             updated_at = parse(updated_at)
 
-        return Order(
+        order = Order(
             external_id=data.get("id", None),
             target_symbol=target_symbol,
             trading_symbol=trading_symbol,
@@ -268,6 +268,7 @@ class Order(BaseModel):
             order_fee_rate=data.get("order_fee_rate", None),
             id=data.get("id", None)
         )
+        return order
 
     @staticmethod
     def from_ccxt_order(ccxt_order):

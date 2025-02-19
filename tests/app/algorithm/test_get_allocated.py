@@ -52,7 +52,7 @@ class Test(TestBase):
         )
         self.app.run(number_of_iterations=1)
         order_service = self.app.container.order_service()
-        self.app.algorithm.create_limit_order(
+        self.app.context.create_limit_order(
             target_symbol="BTC",
             amount=1,
             price=10,
@@ -60,6 +60,6 @@ class Test(TestBase):
         )
         self.assertEqual(1, order_service.count())
         order_service.check_pending_orders()
-        self.assertNotEqual(0, self.app.algorithm.get_allocated())
-        self.assertNotEqual(0, self.app.algorithm.get_allocated("BITVAVO"))
-        self.assertNotEqual(0, self.app.algorithm.get_allocated("bitvavo"))
+        self.assertNotEqual(0, self.app.context.get_allocated())
+        self.assertNotEqual(0, self.app.context.get_allocated("BITVAVO"))
+        self.assertNotEqual(0, self.app.context.get_allocated("bitvavo"))

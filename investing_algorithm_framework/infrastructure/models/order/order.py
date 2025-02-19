@@ -16,6 +16,9 @@ logger = logging.getLogger("investing_algorithm_framework")
 
 
 class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
+    """
+    SQLOrder model based on the Order domain model.
+    """
     __tablename__ = "orders"
     id = Column(Integer, primary_key=True, unique=True)
     external_id = Column(Integer)
@@ -39,27 +42,15 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     order_fee = Column(Float, default=None)
     order_fee_currency = Column(String)
     order_fee_rate = Column(Float, default=None)
+    sell_order_metadata_id = Column(Integer, ForeignKey('orders.id'))
+    order_metadata = relationship(
+        'SQLOrderMetadata', back_populates='order'
+    )
 
     def update(self, data):
 
-        if 'amount' in data and data['amount'] is not None:
-            amount = data.pop('amount')
-            self.amount = amount
-
-        if 'price' in data and data['price'] is not None:
-            price = data.pop('price')
-            self.price = price
-
-        if 'remaining' in data and data['remaining'] is not None:
-            remaining = data.pop('remaining')
-            self.remaining = remaining
-
-        if 'filled' in data and data['filled'] is not None:
-            filled = data.pop('filled')
-            self.filled = filled
-
         if "status" in data and data["status"] is not None:
-            self.status = OrderStatus.from_value(data.pop("status")).value
+            data["status"] = OrderStatus.from_value(data["status"]).value
 
         super().update(data)
 

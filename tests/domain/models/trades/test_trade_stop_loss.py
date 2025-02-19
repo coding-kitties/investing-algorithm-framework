@@ -6,14 +6,14 @@ class TestTradeStopLoss(TestCase):
     def test_model_creation(self):
         stop_loss = TradeStopLoss(
             trade_id=1,
-            take_risk_type="fixed",
+            trade_risk_type="fixed",
             percentage=10,
             open_price=20,
             sell_percentage=50,
             total_amount_trade=100
         )
         self.assertEqual(stop_loss.trade_id, 1)
-        self.assertEqual(stop_loss.take_risk_type, "fixed")
+        self.assertEqual(stop_loss.trade_risk_type, "fixed")
         self.assertEqual(stop_loss.percentage, 10)
         self.assertEqual(stop_loss.sell_percentage, 50)
         self.assertEqual(stop_loss.high_water_mark, 20)
@@ -21,7 +21,7 @@ class TestTradeStopLoss(TestCase):
     def test_is_triggered_default(self):
         stop_loss = TradeStopLoss(
             trade_id=1,
-            take_risk_type="fixed",
+            trade_risk_type="fixed",
             percentage=10,
             open_price=20,
             sell_percentage=50,
@@ -36,7 +36,7 @@ class TestTradeStopLoss(TestCase):
     def test_is_triggered_trailing(self):
         stop_loss = TradeStopLoss(
             trade_id=1,
-            take_risk_type="trailing",
+            trade_risk_type="trailing",
             percentage=10,
             open_price=20,
             sell_percentage=50,

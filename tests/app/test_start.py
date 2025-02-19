@@ -4,7 +4,7 @@ from unittest import TestCase
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration, Algorithm, \
     MarketCredential
-from tests.resources import TestBase, MarketServiceStub
+from tests.resources import MarketServiceStub
 
 
 class StrategyOne(TradingStrategy):
@@ -33,7 +33,7 @@ class StrategyOne(TradingStrategy):
 
     def apply_strategy(
         self,
-        algorithm,
+        context,
         market_date=None,
         **kwargs
     ):
@@ -66,7 +66,7 @@ class StrategyTwo(TradingStrategy):
 
     def apply_strategy(
         self,
-        algorithm,
+        context,
         market_date=None,
         **kwargs
     ):

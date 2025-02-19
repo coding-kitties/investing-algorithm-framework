@@ -39,32 +39,32 @@ class Test(TestBase):
         ))
 
     def test_get_trades(self):
-        order = self.app.algorithm.create_limit_order(
+        order = self.app.context.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="BUY",
             amount=20
         )
         self.assertIsNotNone(order)
-        self.assertEqual(1, len(self.app.algorithm.get_trades()))
+        self.assertEqual(1, len(self.app.context.get_trades()))
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
-        self.assertEqual(1, len(self.app.algorithm.get_trades()))
-        trade = self.app.algorithm.get_trades()[0]
+        self.assertEqual(1, len(self.app.context.get_trades()))
+        trade = self.app.context.get_trades()[0]
         self.assertEqual(10, trade.open_price)
         self.assertEqual(20, trade.amount)
         self.assertEqual("BTC", trade.target_symbol)
         self.assertEqual("EUR", trade.trading_symbol)
         self.assertIsNone(trade.closed_at)
-        self.app.algorithm.create_limit_order(
+        self.app.context.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="SELL",
             amount=20
         )
         order_service.check_pending_orders()
-        self.assertEqual(1, len(self.app.algorithm.get_trades()))
-        trade = self.app.algorithm.get_trades()[0]
+        self.assertEqual(1, len(self.app.context.get_trades()))
+        trade = self.app.context.get_trades()[0]
         self.assertEqual(10, trade.open_price)
         self.assertEqual(20, trade.amount)
         self.assertEqual("BTC", trade.target_symbol)

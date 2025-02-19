@@ -1,6 +1,6 @@
 class PeekableQueue:
-    def __init__(self):
-        self.queue = []
+    def __init__(self, items=[]):
+        self.queue = items
         self.index = 0
 
     def enqueue(self, item):
@@ -24,6 +24,7 @@ class PeekableQueue:
     def __len__(self):
         return len(self.queue)
 
+    @property
     def size(self):
         return len(self.queue)
 

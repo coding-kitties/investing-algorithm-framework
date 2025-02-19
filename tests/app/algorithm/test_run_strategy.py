@@ -12,7 +12,7 @@ class StrategyOne(TradingStrategy):
     time_unit = TimeUnit.SECOND
     interval = 2
 
-    def apply_strategy(self, algorithm, market_data):
+    def apply_strategy(self, context, market_data):
         pass
 
 
@@ -20,7 +20,7 @@ class StrategyTwo(TradingStrategy):
     time_unit = TimeUnit.SECOND
     interval = 2
 
-    def apply_strategy(self, algorithm, market_data):
+    def apply_strategy(self, context, market_data):
         pass
 
 

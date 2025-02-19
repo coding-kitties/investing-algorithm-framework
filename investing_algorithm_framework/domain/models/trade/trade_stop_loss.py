@@ -1,7 +1,6 @@
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.trade.trade_risk_type import \
     TradeRiskType
-from investing_algorithm_framework.domain.models.trade.trade import Trade
 
 
 class TradeStopLoss(BaseModel):
@@ -11,7 +10,7 @@ class TradeStopLoss(BaseModel):
     Attributes:
         trade: Trade - the trade that the take profit is for
         take_profit: float - the take profit percentage
-        take_risk_type: TradeRiskType - the type of trade risk, either
+        trade_risk_type: TradeRiskType - the type of trade risk, either
             trailing or fixed
         percentage: float - the stop loss percentage
         sell_percentage: float - the percentage of the trade to sell when the
@@ -48,23 +47,52 @@ class TradeStopLoss(BaseModel):
     def __init__(
         self,
         trade_id: int,
-        take_risk_type: TradeRiskType,
+        trade_risk_type: TradeRiskType,
         percentage: float,
         open_price: float,
         total_amount_trade: float,
         sell_percentage: float = 100,
-        active: bool = True
+        active: bool = True,
+        sell_prices: str = None
     ):
         self.trade_id = trade_id
-        self.take_risk_type = take_risk_type
+        self.trade_risk_type = trade_risk_type
         self.percentage = percentage
         self.sell_percentage = sell_percentage
         self.high_water_mark = open_price
+        self.open_price = open_price
         self.stop_loss_price = self.high_water_mark * \
             (1 - (self.percentage / 100))
         self.sell_amount = total_amount_trade * (self.sell_percentage / 100)
         self.sold_amount = 0
         self.active = active
+        self.sell_prices = sell_prices
+
+    def update_with_last_reported_price(self, current_price: float):
+        """
+        Function to update the take profit price based on the last reported price.
+        The take profit price is only updated when the trade risk type is trailing.
+        The take profit price is updated based on the current price and the percentage
+        of the take profit.
+
+        Args:
+            current_price: float - the last reported price of the trade
+        """
+
+        if not self.active or self.sold_amount == self.sell_amount:
+            return
+
+        if TradeRiskType.FIXED.equals(self.trade_risk_type):
+            # Check if the current price is less than the high water mark
+            return
+        else:
+            # Check if the current price is less than the stop loss price
+            if current_price <= self.stop_loss_price:
+                return
+            elif current_price > self.high_water_mark:
+                self.high_water_mark = current_price
+                self.stop_loss_price = self.high_water_mark * \
+                    (1 - (self.percentage / 100))
 
     def has_triggered(self, current_price: float) -> bool:
         """
@@ -78,11 +106,10 @@ class TradeStopLoss(BaseModel):
         Returns:
             bool - True if the stop loss has triggered, False otherwise
         """
-
         if not self.active or self.sold_amount == self.sell_amount:
             return False
 
-        if TradeRiskType.FIXED.equals(self.take_risk_type):
+        if TradeRiskType.FIXED.equals(self.trade_risk_type):
             # Check if the current price is less than the high water mark
             return current_price <= self.stop_loss_price
         else:
@@ -96,7 +123,7 @@ class TradeStopLoss(BaseModel):
 
         return False
 
-    def get_sell_amount(self, trade: Trade) -> float:
+    def get_sell_amount(self) -> float:
         """
         Function to calculate the amount to sell based on the
         sell percentage and the remaining amount of the trade.
@@ -115,14 +142,34 @@ class TradeStopLoss(BaseModel):
         if not self.active:
             return 0
 
-        return trade.remaining * (self.sell_percentage / 100)
+        return self.sell_amount - self.sold_amount
 
-    def __str__(self) -> str:
-        return (
-            f"TradeStopLoss(trade_id={self.trade_id}, "
-            f"take_profit_type={self.take_profit_type}, "
-            f"percentage={self.percentage}, "
-            f"sell_percentage={self.sell_percentage})"
-            f"high_water_mark={self.high_water_mark}, "
-            f"stop_loss_price={self.stop_loss_price}"
+    def to_dict(self, datetime_format=None):
+        return {
+            "trade_id": self.trade_id,
+            "trade_risk_type": self.trade_risk_type,
+            "percentage": self.percentage,
+            "open_price": self.open_price,
+            "sell_percentage": self.sell_percentage,
+            "high_water_mark": self.high_water_mark,
+            "stop_loss_price": self.stop_loss_price,
+            "sell_amount": self.sell_amount,
+            "sold_amount": self.sold_amount,
+            "active": self.active,
+            "sell_prices": self.sell_prices
+        }
+
+    def __repr__(self):
+        return self.repr(
+            trade_id=self.trade_id,
+            trade_risk_type=self.trade_risk_type,
+            percentage=self.percentage,
+            sell_percentage=self.sell_percentage,
+            high_water_mark=self.high_water_mark,
+            open_price=self.open_price,
+            stop_loss_price=self.stop_loss_price,
+            sell_amount=self.sell_amount,
+            sold_amount=self.sold_amount,
+            sell_prices=self.sell_prices,
+            active=self.active
         )

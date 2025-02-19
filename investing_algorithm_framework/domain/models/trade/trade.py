@@ -1,9 +1,12 @@
 from dateutil.parser import parse
 
 from investing_algorithm_framework.domain.models.base_model import BaseModel
-from investing_algorithm_framework.domain.models.order import OrderSide
+from investing_algorithm_framework.domain.models.order import OrderSide, Order
 from investing_algorithm_framework.domain.models.trade.trade_status import \
     TradeStatus
+from investing_algorithm_framework.domain.models.trade.trade_stop_loss import \
+    TradeStopLoss
+from investing_algorithm_framework.domain.models.trade.trade_take_profit import TradeTakeProfit
 
 
 class Trade(BaseModel):
@@ -103,7 +106,9 @@ class Trade(BaseModel):
     @property
     def duration(self):
         if TradeStatus.CLOSED.equals(self.status):
-            return self.closed_at - self.opened_at
+            # Get the total hours between the closed and opened datetime
+            diff = self.closed_at - self.opened_at
+            return diff.total_seconds() / 3600
 
         if self.opened_at is None:
             return None
@@ -111,7 +116,8 @@ class Trade(BaseModel):
         if self.updated_at is None:
             return None
 
-        return self.updated_at - self.opened_at
+        diff = self.updated_at - self.opened_at
+        return diff.total_seconds() / 3600
 
     @property
     def size(self):
@@ -299,6 +305,14 @@ class Trade(BaseModel):
             "updated_at": updated_at,
             "net_gain": self.net_gain,
             "cost": self.cost,
+            "stop_losses": [
+                stop_loss.to_dict(datetime_format=datetime_format)
+                for stop_loss in self.stop_losses
+            ] if self.stop_losses else None,
+            "take_profits": [
+                take_profit.to_dict(datetime_format=datetime_format)
+                for take_profit in self.take_profits
+            ] if self.take_profits else None,
         }
 
     @staticmethod
@@ -306,6 +320,9 @@ class Trade(BaseModel):
         opened_at = None
         closed_at = None
         updated_at = None
+        stop_losses = None
+        take_profits = None
+        orders = None
 
         if "opened_at" in data and data["opened_at"] is not None:
             opened_at = parse(data["opened_at"])
@@ -316,9 +333,27 @@ class Trade(BaseModel):
         if "updated_at" in data and data["updated_at"] is not None:
             updated_at = parse(data["updated_at"])
 
+        if "stop_losses" in data and data["stop_losses"] is not None:
+            stop_losses = [
+                TradeStopLoss.from_dict(stop_loss)
+                for stop_loss in data["stop_losses"]
+            ]
+
+        if "take_profits" in data and data["take_profits"] is not None:
+            take_profits = [
+                TradeTakeProfit.from_dict(take_profit)
+                for take_profit in data["take_profits"]
+            ]
+
+        if "orders" in data and data["orders"] is not None:
+            orders = [
+                Order.from_dict(order)
+                for order in data["orders"]
+            ]
+
         return Trade(
             id=data.get("id", None),
-            orders=data.get("orders", None),
+            orders=orders,
             target_symbol=data["target_symbol"],
             trading_symbol=data["trading_symbol"],
             amount=data["amount"],
@@ -331,6 +366,8 @@ class Trade(BaseModel):
             status=data["status"],
             cost=data.get("cost", 0),
             updated_at=updated_at,
+            stop_losses=stop_losses,
+            take_profits=take_profits,
         )
 
     def __repr__(self):
@@ -340,6 +377,7 @@ class Trade(BaseModel):
             trading_symbol=self.trading_symbol,
             status=self.status,
             amount=self.amount,
+            filled_amount=self.filled_amount,
             remaining=self.remaining,
             open_price=self.open_price,
             opened_at=self.opened_at,

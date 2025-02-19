@@ -53,6 +53,7 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
     opened_at = Column(DateTime, default=None)
     open_price = Column(Float, default=None)
     amount = Column(Float, default=None)
+    filled_amount = Column(Float, default=None)
     remaining = Column(Float, default=None)
     net_gain = Column(Float, default=0)
     cost = Column(Float, default=0)
@@ -80,6 +81,7 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         trading_symbol,
         opened_at,
         amount,
+        filled_amount,
         remaining,
         status=TradeStatus.CREATED.value,
         closed_at=None,
@@ -98,6 +100,7 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         self.trading_symbol = trading_symbol
         self.closed_at = closed_at
         self.amount = amount
+        self.filled_amount = filled_amount
         self.remaining = remaining
         self.net_gain = net_gain
         self.cost = cost

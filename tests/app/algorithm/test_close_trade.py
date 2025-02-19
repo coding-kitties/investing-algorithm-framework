@@ -45,58 +45,58 @@ class Test(TestBase):
         ))
 
     def test_close_trade(self):
-        trading_symbol_position = self.app.algorithm.get_position("EUR")
+        trading_symbol_position = self.app.context.get_position("EUR")
         self.assertEqual(1000, trading_symbol_position.get_amount())
-        self.app.algorithm.create_limit_order(
+        self.app.context.create_limit_order(
             target_symbol="BTC",
             amount=1,
             price=10,
             order_side="BUY",
         )
-        btc_position = self.app.algorithm.get_position("BTC")
+        btc_position = self.app.context.get_position("BTC")
         self.assertIsNotNone(btc_position)
         self.assertEqual(0, btc_position.get_amount())
-        self.assertEqual(1, len(self.app.algorithm.get_trades()))
+        self.assertEqual(1, len(self.app.context.get_trades()))
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
-        self.assertEqual(1, len(self.app.algorithm.get_trades()))
-        trades = self.app.algorithm.get_trades()
+        self.assertEqual(1, len(self.app.context.get_trades()))
+        trades = self.app.context.get_trades()
         trade = trades[0]
         self.assertIsNotNone(trade.amount)
         self.assertEqual(Decimal(1), trade.amount)
-        self.app.algorithm.close_trade(trade)
-        self.assertEqual(1, len(self.app.algorithm.get_trades()))
+        self.app.context.close_trade(trade)
+        self.assertEqual(1, len(self.app.context.get_trades()))
         order_service.check_pending_orders()
-        self.assertEqual(1, len(self.app.algorithm.get_trades()))
-        self.assertEqual(0, len(self.app.algorithm.get_open_trades()))
+        self.assertEqual(1, len(self.app.context.get_trades()))
+        self.assertEqual(0, len(self.app.context.get_open_trades()))
 
     def test_close_trade_with_already_closed_trade(self):
-        trading_symbol_position = self.app.algorithm.get_position("EUR")
+        trading_symbol_position = self.app.context.get_position("EUR")
         self.assertEqual(1000, trading_symbol_position.get_amount())
-        self.app.algorithm.create_limit_order(
+        self.app.context.create_limit_order(
             target_symbol="BTC",
             amount=1,
             price=10,
             order_side="BUY",
         )
-        btc_position = self.app.algorithm.get_position("BTC")
+        btc_position = self.app.context.get_position("BTC")
         self.assertIsNotNone(btc_position)
         self.assertEqual(0, btc_position.get_amount())
-        self.assertEqual(1, len(self.app.algorithm.get_trades()))
+        self.assertEqual(1, len(self.app.context.get_trades()))
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
-        self.assertEqual(1, len(self.app.algorithm.get_trades()))
-        trades = self.app.algorithm.get_trades()
+        self.assertEqual(1, len(self.app.context.get_trades()))
+        trades = self.app.context.get_trades()
         trade = trades[0]
         self.assertIsNotNone(trade.amount)
         self.assertEqual(Decimal(1), trade.amount)
-        self.app.algorithm.close_trade(trade)
-        self.assertEqual(1, len(self.app.algorithm.get_trades()))
+        self.app.context.close_trade(trade)
+        self.assertEqual(1, len(self.app.context.get_trades()))
         order_service.check_pending_orders()
-        self.assertEqual(1, len(self.app.algorithm.get_trades()))
-        self.assertEqual(0, len(self.app.algorithm.get_open_trades()))
-        trades = self.app.algorithm.get_trades()
+        self.assertEqual(1, len(self.app.context.get_trades()))
+        self.assertEqual(0, len(self.app.context.get_open_trades()))
+        trades = self.app.context.get_trades()
         trade = trades[0]
 
         with self.assertRaises(OperationalException):
-            self.app.algorithm.close_trade(trade)
+            self.app.context.close_trade(trade)

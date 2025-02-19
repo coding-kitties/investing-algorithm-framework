@@ -22,10 +22,10 @@ class Test(TestBase):
     }
 
     def test_add(self):
-        self.assertEqual(1, self.app.algorithm.portfolio_service.count())
-        self.assertEqual(1, self.app.algorithm.position_service.count())
-        self.assertEqual(1000, self.app.algorithm.get_unallocated())
+        self.assertEqual(1, self.app.context.portfolio_service.count())
+        self.assertEqual(1, self.app.context.position_service.count())
+        self.assertEqual(1000, self.app.context.get_unallocated())
 
         # Make sure that the portfolio is initialized
-        portfolio = self.app.algorithm.get_portfolio()
+        portfolio = self.app.context.get_portfolio()
         self.assertTrue(portfolio.initialized)

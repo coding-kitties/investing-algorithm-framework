@@ -75,7 +75,7 @@ class TestConfig(TestBase):
         )
 
         @self.app.algorithm.strategy(interval=1, time_unit="SECOND")
-        def test_strategy(algorithm, market_data):
+        def test_strategy(context, market_data):
             pass
 
         self.app.run_backtest(

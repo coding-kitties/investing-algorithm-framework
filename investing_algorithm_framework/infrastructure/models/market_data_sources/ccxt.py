@@ -165,7 +165,7 @@ class CCXTOHLCVBacktestMarketDataSource(
     def load_data(self):
         file_path = self._create_file_path()
         self.data = polars.read_csv(
-            file_path, dtypes={"Datetime": polars.Datetime}, low_memory=True
+            file_path, schema_overrides={"Datetime": polars.Datetime}, low_memory=True
         )  # Faster parsing
         first_row = self.data.head(1)
         last_row = self.data.tail(1)

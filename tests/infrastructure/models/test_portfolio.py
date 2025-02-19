@@ -45,7 +45,7 @@ class TestPortfolioModel(TestBase):
         self.assertIsNone(portfolio.get_updated_at())
 
     def test_created_by_app(self):
-        portfolio = self.app.algorithm.get_portfolio()
+        portfolio = self.app.context.get_portfolio()
         self.assertEqual("BINANCE", portfolio.get_market())
         self.assertEqual("USDT", portfolio.get_trading_symbol())
         self.assertEqual(10000, portfolio.get_unallocated())

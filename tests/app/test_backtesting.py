@@ -3,7 +3,7 @@ from unittest import TestCase
 
 from investing_algorithm_framework import TradingStrategy, Algorithm, \
     create_app, RESOURCE_DIRECTORY, PortfolioConfiguration, \
-    BacktestDateRange, BacktestReport
+    BacktestDateRange, BacktestReport, Context
 from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI
 
 
@@ -11,7 +11,7 @@ class SimpleTradingStrategy(TradingStrategy):
     interval = 2
     time_unit = "hour"
 
-    def apply_strategy(self, algorithm: Algorithm, market_data):
+    def apply_strategy(self, context: Context, market_data):
         pass
 
 class Test(TestCase):
@@ -49,7 +49,7 @@ class Test(TestCase):
             backtest_date_range=date_range,
             initial_amount=1000
         )
-        portfolios = app.algorithm.get_portfolios()
+        portfolios = app.context.get_portfolios()
         self.assertEqual(report.get_initial_unallocated(), 1000)
         self.assertEqual(len(portfolios), 0)
         self.assertEqual(report.get_growth(), 0)
@@ -81,7 +81,7 @@ class Test(TestCase):
         report: BacktestReport = app.run_backtest(
             backtest_date_range=date_range,
         )
-        portfolios = app.algorithm.get_portfolios()
+        portfolios = app.context.get_portfolios()
         self.assertEqual(len(portfolios), 0)
         self.assertEqual(report.get_initial_unallocated(), 500)
         self.assertEqual(report.get_growth(), 0)

@@ -12,7 +12,7 @@ class TestStrategy(TradingStrategy):
     time_unit = TimeUnit.MINUTE
     interval = 1
 
-    def run_strategy(self, algorithm, market_data):
+    def run_strategy(self, context, market_data):
         pass
 
 

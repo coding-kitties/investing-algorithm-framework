@@ -57,7 +57,7 @@ class StrategyOrchestratorService:
                 stoppable.done = True
         self.threads = [t for t in self.threads if not t.done]
 
-    def run_strategy(self, strategy, algorithm, sync=False):
+    def run_strategy(self, strategy, context, sync=False):
         self.cleanup_threads()
         matching_thread = next(
             (t for t in self.threads if t.name == strategy.worker_id),
@@ -76,7 +76,7 @@ class StrategyOrchestratorService:
         if sync:
             strategy.run_strategy(
                 market_data=market_data,
-                algorithm=algorithm,
+                context=context,
             )
         else:
             self.iterations += 1
@@ -84,7 +84,7 @@ class StrategyOrchestratorService:
                 target=strategy.run_strategy,
                 kwargs={
                     "market_data": market_data,
-                    "algorithm": algorithm,
+                    "context": context,
                 }
             )
             thread.name = strategy.worker_id
@@ -93,16 +93,16 @@ class StrategyOrchestratorService:
 
         self.history[strategy.worker_id] = {"last_run": datetime.utcnow()}
 
-    def run_backtest_strategy(self, strategy, algorithm, config):
+    def run_backtest_strategy(self, strategy, context, config):
         data = \
             self.market_data_source_service.get_data_for_strategy(strategy)
 
         strategy.run_strategy(
             market_data=data,
-            algorithm=algorithm,
+            context=context,
         )
 
-    def run_task(self, task, algorithm, sync=False):
+    def run_task(self, task, context, sync=False):
         self.cleanup_threads()
 
         matching_thread = next(
@@ -117,12 +117,12 @@ class StrategyOrchestratorService:
         logger.info(f"Running task {task.worker_id}")
 
         if sync:
-            task.run(algorithm=algorithm)
+            task.run(context=context)
         else:
             self.iterations += 1
             thread = StoppableThread(
                 target=task.run,
-                kwargs={"algorithm": algorithm}
+                kwargs={"context": context}
             )
             thread.name = task.worker_id
             thread.start()
@@ -130,7 +130,7 @@ class StrategyOrchestratorService:
 
         self.history[task.worker_id] = {"last_run": datetime.utcnow()}
 
-    def start(self, algorithm, number_of_iterations=None):
+    def start(self, context, number_of_iterations=None):
         """
         Function to start and schedule the strategies and tasks
 
@@ -149,24 +149,24 @@ class StrategyOrchestratorService:
         for strategy in self.strategies:
             if TimeUnit.SECOND.equals(strategy.time_unit):
                 schedule.every(strategy.interval)\
-                    .seconds.do(self.run_strategy, strategy, algorithm)
+                    .seconds.do(self.run_strategy, strategy, context)
             elif TimeUnit.MINUTE.equals(strategy.time_unit):
                 schedule.every(strategy.interval)\
-                    .minutes.do(self.run_strategy, strategy, algorithm)
+                    .minutes.do(self.run_strategy, strategy, context)
             elif TimeUnit.HOUR.equals(strategy.time_unit):
                 schedule.every(strategy.interval)\
-                    .hours.do(self.run_strategy, strategy, algorithm)
+                    .hours.do(self.run_strategy, strategy, context)
 
         for task in self.tasks:
             if TimeUnit.SECOND.equals(task.time_unit):
                 schedule.every(task.interval)\
-                    .seconds.do(self.run_task, task, algorithm)
+                    .seconds.do(self.run_task, task, context)
             elif TimeUnit.MINUTE.equals(task.time_unit):
                 schedule.every(task.interval)\
-                    .minutes.do(self.run_task, task, algorithm)
+                    .minutes.do(self.run_task, task, context)
             elif TimeUnit.HOUR.equals(task.time_unit):
                 schedule.every(task.interval)\
-                    .hours.do(self.run_task, task, algorithm)
+                    .hours.do(self.run_task, task, context)
 
     def stop(self):
         for thread in self.threads:

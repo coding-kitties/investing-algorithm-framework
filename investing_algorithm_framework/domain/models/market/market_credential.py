@@ -35,7 +35,8 @@ class MarketCredential:
 
             if self.api_key is None:
                 raise OperationalException(
-                    "Market credential requires an api key, either"
+                    f"Market credential for market {self.market}"
+                    " requires an api key, either"
                     " as an argument or as an environment variable"
                     f" named as {self._market.upper()}_API_KEY"
                 )
@@ -52,7 +53,8 @@ class MarketCredential:
 
             if self.secret_key is None:
                 raise OperationalException(
-                    "Market credential requires a secret key, either"
+                    f"Market credential for market {self.market}"
+                    " requires a secret key, either"
                     " as an argument or as an environment variable"
                     f" named as {self._market.upper()}_SECRET_KEY"
                 )

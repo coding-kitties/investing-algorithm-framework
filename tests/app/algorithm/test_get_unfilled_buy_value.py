@@ -148,14 +148,14 @@ class Test(TestBase):
         )
         self.assertEqual(700, eur_position.amount)
 
-        pending_orders = self.app.algorithm.get_pending_orders()
+        pending_orders = self.app.context.get_pending_orders()
         self.assertEqual(2, len(pending_orders))
 
         # Check the unfilled buy value
-        unfilled_buy_value = self.app.algorithm.get_unfilled_buy_value()
+        unfilled_buy_value = self.app.context.get_unfilled_buy_value()
         self.assertEqual(200, unfilled_buy_value)
 
-        pending_order = self.app.algorithm\
+        pending_order = self.app.context\
             .get_pending_orders(target_symbol="ETH")[0]
 
         order_service = self.app.container.order_service()
@@ -168,9 +168,9 @@ class Test(TestBase):
             }
         )
 
-        pending_orders = self.app.algorithm.get_pending_orders()
+        pending_orders = self.app.context.get_pending_orders()
         self.assertEqual(1, len(pending_orders))
 
         # Check the unfilled buy value
-        unfilled_buy_value = self.app.algorithm.get_unfilled_buy_value()
+        unfilled_buy_value = self.app.context.get_unfilled_buy_value()
         self.assertEqual(100, unfilled_buy_value)

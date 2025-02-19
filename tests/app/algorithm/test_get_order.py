@@ -26,7 +26,7 @@ class Test(TestBase):
     market_data_source_service = MarketDataSourceServiceStub()
 
     def test_create_limit_buy_order_with_percentage_of_portfolio(self):
-        order = self.app.algorithm.create_limit_order(
+        order = self.app.context.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="BUY",

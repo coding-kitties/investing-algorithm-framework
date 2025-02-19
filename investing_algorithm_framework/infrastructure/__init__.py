@@ -9,7 +9,8 @@ from .models import SQLPortfolio, SQLOrder, SQLPosition, \
 from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLPortfolioRepository, SQLTradeRepository, \
     SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository, \
-    SQLTradeTakeProfitRepository, SQLTradeStopLossRepository
+    SQLTradeTakeProfitRepository, SQLTradeStopLossRepository, \
+    SQLOrderMetadataRepository
 from .services import PerformanceService, CCXTMarketService, \
     AzureBlobStorageStateHandler
 
@@ -44,4 +45,5 @@ __all__ = [
     "SQLTradeStopLoss",
     "SQLTradeTakeProfitRepository",
     "SQLTradeStopLossRepository",
+    "SQLOrderMetadataRepository"
 ]
