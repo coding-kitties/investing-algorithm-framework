@@ -14,9 +14,10 @@ class TradeStopLoss(BaseModel):
             trailing or fixed
         percentage: float - the stop loss percentage
         sell_percentage: float - the percentage of the trade to sell when the
-            take profit is hit. Default is 100% of the trade. If the take profit percentage is lower than 100% a check must be made that
-            the combined sell percentage of all take profits is less or
-            equal than 100%.
+            take profit is hit. Default is 100% of the trade. If the
+            take profit percentage is lower than 100% a check must
+            be made that the combined sell percentage of all
+            take profits is less or equal than 100%.
         sell_amount: float - the amount to sell when the stop loss triggers
         sold_amount: float - the amount that has been sold
         high_water_mark: float - the highest price of the trade
@@ -30,7 +31,8 @@ class TradeStopLoss(BaseModel):
         But if the price keeps falling to $95, the stop loss triggers,
             and you exit with a $5 loss.
 
-    if trade_risk_type is trailing, the stop loss price is calculated as follows:
+    if trade_risk_type is trailing, the stop loss price is
+    calculated as follows:
         You buy a stock at $100.
         You set a 5% trailing stop loss, meaning you will sell if
             the price drops 5% from its peak at $96
@@ -70,10 +72,12 @@ class TradeStopLoss(BaseModel):
 
     def update_with_last_reported_price(self, current_price: float):
         """
-        Function to update the take profit price based on the last reported price.
-        The take profit price is only updated when the trade risk type is trailing.
-        The take profit price is updated based on the current price and the percentage
-        of the take profit.
+        Function to update the take profit price based on the last
+        reported price.
+        The take profit price is only updated when the trade risk
+        type is trailing.
+        The take profit price is updated based on the current price
+        and the percentage of the take profit.
 
         Args:
             current_price: float - the last reported price of the trade

@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime, timezone
 from queue import PriorityQueue
 
 from investing_algorithm_framework.domain import OrderStatus, TradeStatus, \
@@ -57,11 +56,11 @@ class TradeService(RepositoryService):
         """
 
         if buy_order.status in \
-            [
-                OrderStatus.CANCELED.value,
-                OrderStatus.EXPIRED.value,
-                OrderStatus.REJECTED.value
-            ]:
+                [
+                    OrderStatus.CANCELED.value,
+                    OrderStatus.EXPIRED.value,
+                    OrderStatus.REJECTED.value
+                ]:
             return None
 
         data = {
@@ -315,7 +314,8 @@ class TradeService(RepositoryService):
 
         If also stop losses and take profits are provided, we assume that
         the sell order is initiated a stop loss or take profit. In this case
-        we create metadata objects for the trades, stop losses, and take profits.
+        we create metadata objects for the trades, stop losses,
+        and take profits.
 
         If the trades param is provided, we assume that the sell order is
         based on either a stop loss or take profit or a closing of a trade.
@@ -328,13 +328,15 @@ class TradeService(RepositoryService):
         - Update the position cost
 
         Scenario 2: Sell order with trades
-        - We assume that the sell amount is same as the total amount of the trades
+        - We assume that the sell amount is same as the total amount
+            of the trades
         - Use the trades to create all trade metadata objects
         - Update trade object remaining amount
         - Update the position cost
 
         Scenario 3: Sell order with trades, stop losses, and take profits
-        - We assume that the sell amount is same as the total amount of the trades
+        - We assume that the sell amount is same as the total
+            amount of the trades
         - Use the trades to create all metadata objects
         - Update trade object remaining amount
         - Use the stop losses to create all metadata objects
@@ -352,8 +354,8 @@ class TradeService(RepositoryService):
         sell_price = sell_order.price
 
         if (trades is None or len(trades) == 0) \
-            and (stop_losses is None or len(stop_losses) == 0) \
-            and (take_profits is None or len(take_profits) == 0):
+                and (stop_losses is None or len(stop_losses) == 0) \
+                and (take_profits is None or len(take_profits) == 0):
             self._create_trade_metadata_with_sell_order(sell_order)
         else:
 
@@ -466,7 +468,6 @@ class TradeService(RepositoryService):
         portfolio.total_net_gain -= total_net_gain
         self.portfolio_repository.save(portfolio)
 
-
     def update_trade_with_buy_order(
         self, filled_difference, buy_order
     ) -> Trade:
@@ -535,7 +536,7 @@ class TradeService(RepositoryService):
         for metadata_object in metadata_objects:
 
             if metadata_object.trade_id is not None \
-                and trade_filled_difference > 0:
+                    and trade_filled_difference > 0:
 
                 if metadata_object.amount_pending >= trade_filled_difference:
                     amount = trade_filled_difference
@@ -548,9 +549,12 @@ class TradeService(RepositoryService):
                 self.order_metadata_repository.save(metadata_object)
 
             if metadata_object.stop_loss_id is not None \
-                and stop_loss_filled_difference > 0:
+                    and stop_loss_filled_difference > 0:
 
-                if metadata_object.amount_pending >= stop_loss_filled_difference:
+                if (
+                    metadata_object.amount_pending >=
+                    stop_loss_filled_difference
+                ):
                     amount = stop_loss_filled_difference
                     stop_loss_filled_difference = 0
                 else:
@@ -561,9 +565,12 @@ class TradeService(RepositoryService):
                 self.order_metadata_repository.save(metadata_object)
 
             if metadata_object.take_profit_id is not None \
-                and take_profit_filled_difference > 0:
+                    and take_profit_filled_difference > 0:
 
-                if metadata_object.amount_pending >= take_profit_filled_difference:
+                if (
+                    metadata_object.amount_pending >=
+                    take_profit_filled_difference
+                ):
                     amount = take_profit_filled_difference
                     take_profit_filled_difference = 0
                 else:
@@ -618,7 +625,8 @@ class TradeService(RepositoryService):
         Example of trailing stop loss:
             * You buy BTC at $40,000.
             * You set a TSL of 5%, setting the sell price at $38,000.
-            * BTC price increases to $42,000 → New TSL level at $39,900 (42,000 - 5%).
+            * BTC price increases to $42,000 → New TSL level at
+                $39,900 (42,000 - 5%).
             * BTC price drops to $39,900 → SL level reached, trade closes.
 
         Args:
@@ -742,8 +750,10 @@ class TradeService(RepositoryService):
 
             for stop_loss in open_trade.stop_losses:
 
-                if stop_loss.active and \
-                    stop_loss.has_triggered(open_trade.last_reported_price):
+                if (
+                    stop_loss.active
+                    and stop_loss.has_triggered(open_trade.last_reported_price)
+                ):
                     triggered_stop_losses.append(stop_loss)
 
                 to_be_saved_stop_loss_objects.append(stop_loss)
@@ -842,8 +852,10 @@ class TradeService(RepositoryService):
 
             for take_proft in open_trade.take_profits:
 
-                if take_proft.active and \
-                    take_proft.has_triggered(open_trade.last_reported_price):
+                if (
+                    take_proft.active and
+                    take_proft.has_triggered(open_trade.last_reported_price)
+                ):
                     triggered_take_profits.append(take_proft)
 
                 to_be_saved_take_profit_objects.append(take_proft)

@@ -3,7 +3,6 @@ from investing_algorithm_framework.infrastructure.models import \
 from .repository import Repository
 
 
-
 class SQLOrderMetadataRepository(Repository):
     base_class = SQLOrderMetadata
     DEFAULT_NOT_FOUND_MESSAGE = "The requested order metadata was not found"

@@ -622,7 +622,7 @@ class OrderService(RepositoryService):
         self.position_repository.update(
             trading_symbol_position.id,
             {
-                "amount": \
+                "amount":
                     trading_symbol_position.get_amount() + filled_size
             }
         )
@@ -720,7 +720,6 @@ class OrderService(RepositoryService):
 
         self.trade_service.update_trade_with_removed_sell_order(order)
 
-
     def _sync_with_buy_order_expired(self, order):
         remaining = order.get_amount() - order.get_filled()
         size = remaining * order.get_price()
@@ -810,7 +809,6 @@ class OrderService(RepositoryService):
         )
 
         self.trade_service.update_trade_with_removed_sell_order(order)
-
 
     def create_snapshot(self, portfolio_id, created_at=None):
 

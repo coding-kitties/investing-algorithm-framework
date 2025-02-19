@@ -7,7 +7,9 @@ from investing_algorithm_framework.infrastructure.models.model_extension \
     import SQLAlchemyModelExtension
 
 
-class SQLTradeTakeProfit(TradeTakeProfit, SQLBaseModel, SQLAlchemyModelExtension):
+class SQLTradeTakeProfit(
+    TradeTakeProfit, SQLBaseModel, SQLAlchemyModelExtension
+):
     """
     SQLTradeTakeProfit model
 
@@ -31,7 +33,7 @@ class SQLTradeTakeProfit(TradeTakeProfit, SQLBaseModel, SQLAlchemyModelExtension
     open_price = Column(Float)
     high_water_mark = Column(Float)
     sell_prices = Column(String)
-    take_profit_price =  Column(Float)
+    take_profit_price = Column(Float)
     sell_amount = Column(Float)
     sold_amount = Column(Float)
     active = Column(Boolean)

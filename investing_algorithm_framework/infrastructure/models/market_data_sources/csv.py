@@ -66,7 +66,9 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
 
     def _load_data(self, file_path):
         return polars.read_csv(
-            file_path, schema_overrides={"Datetime": polars.Datetime}, low_memory=True
+            file_path,
+            schema_overrides={"Datetime": polars.Datetime},
+            low_memory=True
         ).with_columns(
             polars.col("Datetime").cast(
                 polars.Datetime(time_unit="ms", time_zone="UTC")

@@ -31,7 +31,7 @@ class SQLTradeStopLoss(TradeStopLoss, SQLBaseModel, SQLAlchemyModelExtension):
     sell_percentage = Column(Float)
     open_price = Column(Float)
     high_water_mark = Column(Float)
-    stop_loss_price =  Column(Float)
+    stop_loss_price = Column(Float)
     sell_prices = Column(String)
     sell_amount = Column(Float)
     sold_amount = Column(Float)

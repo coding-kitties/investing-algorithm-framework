@@ -1068,7 +1068,8 @@ class Context:
         Example of trailing stop loss:
             * You buy BTC at $40,000.
             * You set a TSL of 5%, setting the sell price at $38,000.
-            * BTC price increases to $42,000 → New TSL level at $39,900 (42,000 - 5%).
+            * BTC price increases to $42,000 → New TSL level
+                at $39,900 (42,000 - 5%).
             * BTC price drops to $39,900 → SL level reached, trade closes.
 
         Args:

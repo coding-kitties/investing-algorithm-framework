@@ -6,7 +6,8 @@ from investing_algorithm_framework.domain.models.trade.trade_status import \
     TradeStatus
 from investing_algorithm_framework.domain.models.trade.trade_stop_loss import \
     TradeStopLoss
-from investing_algorithm_framework.domain.models.trade.trade_take_profit import TradeTakeProfit
+from investing_algorithm_framework.domain.models.trade\
+    .trade_take_profit import TradeTakeProfit
 
 
 class Trade(BaseModel):
@@ -271,7 +272,6 @@ class Trade(BaseModel):
             (1 + (self.trailing_take_profit_percentage / 100))
 
         return self.last_reported_price >= take_profit_price
-
 
     def to_dict(self, datetime_format=None):
 

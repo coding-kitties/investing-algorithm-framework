@@ -215,14 +215,6 @@ class TradingStrategy:
 
         return self.worker_id
 
-    @property
-    def context(self):
-        return self._context
-
-    @context.setter
-    def context(self, context):
-        self._context = context
-
     def add_trace(
         self,
         symbol: str,

@@ -12,7 +12,7 @@ def create_app(
     config: dict = None,
     state_handler=None,
     web: bool = False,
-    name = None
+    name=None
 ) -> App:
     """
     Factory method to create an app instance.

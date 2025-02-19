@@ -21,15 +21,14 @@ class SQLOrderMetadata(SQLBaseModel, SQLAlchemyModelExtension):
     amount = Column(Float)
     amount_pending = Column(Float)
 
-
     def __init__(
         self,
         order_id,
         amount,
         amount_pending,
-        trade_id = None,
-        stop_loss_id = None,
-        take_profit_id = None,
+        trade_id=None,
+        stop_loss_id=None,
+        take_profit_id=None,
     ):
         self.order_id = order_id
         self.trade_id = trade_id
