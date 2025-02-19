@@ -4,9 +4,9 @@ from datetime import datetime, timedelta
 
 
 from investing_algorithm_framework import CCXTOHLCVMarketDataSource, \
-    CCXTTickerMarketDataSource, Algorithm, PortfolioConfiguration, \
+    CCXTTickerMarketDataSource, PortfolioConfiguration, \
     create_app, pretty_print_backtest, BacktestDateRange, TimeUnit, \
-    TradingStrategy, OrderSide, DEFAULT_LOGGING_CONFIG
+    TradingStrategy, OrderSide, DEFAULT_LOGGING_CONFIG, Context
 
 import tulipy as ti
 
@@ -96,12 +96,12 @@ class CrossOverStrategy(TradingStrategy):
     trend = 150
     stop_loss_percentage = 7
 
-    def apply_strategy(self, algorithm: Algorithm, market_data):
+    def apply_strategy(self, context: Context, market_data):
 
         for symbol in self.symbols:
             target_symbol = symbol.split('/')[0]
 
-            if algorithm.has_open_orders(target_symbol):
+            if context.has_open_orders(target_symbol):
                 continue
 
             df = market_data[f"{symbol}-ohlcv"]
@@ -111,36 +111,47 @@ class CrossOverStrategy(TradingStrategy):
             trend = ti.sma(df['Close'].to_numpy(), self.trend)
             price = ticker_data["bid"]
 
-            if not algorithm.has_position(target_symbol) \
+            if not context.has_position(target_symbol) \
                     and is_crossover(fast, slow) \
                     and is_above_trend(fast, trend):
-                order = algorithm.create_limit_order(
+                order = context.create_limit_order(
                     target_symbol=target_symbol,
                     order_side=OrderSide.BUY,
                     price=price,
                     percentage_of_portfolio=25,
                     precision=4,
                 )
-                trade = algorithm.get_trade(order_id=order.id)
-                algorithm.add_trailing_stop_loss(
-                    trade=trade, percentage=5
+                trade = context.get_trade(order_id=order.id)
+                context.add_stop_loss(
+                    trade=trade,
+                    percentage=5,
+                    sell_percentage=50
+                )
+                context.add_take_profit(
+                    trade=trade,
+                    percentage=5,
+                    trade_risk_type="trailing",
+                    sell_percentage=50
+                )
+                context.add_take_profit(
+                    trade=trade,
+                    percentage=10,
+                    trade_risk_type="trailing",
+                    sell_percentage=20
                 )
 
-
-            if algorithm.has_position(target_symbol) \
+            if context.has_position(target_symbol) \
                     and is_below_trend(fast, slow):
-                open_trades = algorithm.get_open_trades(
+                open_trades = context.get_open_trades(
                     target_symbol=target_symbol
                 )
 
                 for trade in open_trades:
-                    algorithm.close_trade(trade)
+                    context.close_trade(trade)
 
 
-app = create_app()
-algorithm = Algorithm("GoldenCrossStrategy")
-algorithm.add_strategy(CrossOverStrategy)
-app.add_algorithm(algorithm)
+app = create_app(name="GoldenCrossStrategy")
+app.add_strategy(CrossOverStrategy)
 app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
 app.add_market_data_source(bitvavo_dot_eur_ohlcv_2h)
 app.add_market_data_source(bitvavo_btc_eur_ticker)
@@ -157,17 +168,13 @@ app.add_portfolio_configuration(
 
 if __name__ == "__main__":
     end_date = datetime(2023, 12, 2)
-    start_date = end_date - timedelta(days=400)
+    start_date = end_date - timedelta(days=100)
     date_range = BacktestDateRange(
         start_date=start_date,
         end_date=end_date
     )
     start_time = time.time()
-
-    backtest_report = app.run_backtest(
-        algorithm=algorithm,
-        backtest_date_range=date_range,
-    )
+    backtest_report = app.run_backtest(backtest_date_range=date_range)
     pretty_print_backtest(backtest_report)
     end_time = time.time()
     print(f"Execution Time: {end_time - start_time:.6f} seconds")

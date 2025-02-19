@@ -2,7 +2,8 @@ from dotenv import load_dotenv
 import logging.config
 from investing_algorithm_framework import MarketCredential, TimeUnit, \
     CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, TradingStrategy, \
-    create_app, PortfolioConfiguration, Algorithm, DEFAULT_LOGGING_CONFIG
+    create_app, PortfolioConfiguration, Algorithm, DEFAULT_LOGGING_CONFIG, \
+    Context
 """
 Coinbase market data sources example. Coinbase requires you to have an API key
 and secret key to access their market data. You can create them here:
@@ -37,24 +38,32 @@ coinbase_btc_eur_ticker = CCXTTickerMarketDataSource(
 )
 
 
-class CoinBaseTradingStrategy(TradingStrategy):
+class BitvavoTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.SECOND
-    interval = 5
-    market_data_sources = [coinbase_btc_eur_ticker, coinbase_btc_eur_ohlcv_2h]
+    interval = 10
+    market_data_sources = [coinbase_btc_eur_ohlcv_2h, coinbase_btc_eur_ticker]
 
-    def apply_strategy(self, algorithm, market_data):
-        pass
+    def apply_strategy(self, context: Context, market_data):
+        print(market_data["BTC/EUR-ohlcv"])
+        print(market_data["BTC/EUR-ticker"])
 
+# Create an algorithm and link your trading strategy to it
 algorithm = Algorithm()
-algorithm.add_strategy(CoinBaseTradingStrategy)
+algorithm.add_strategy(BitvavoTradingStrategy)
+
+# Create an app and add the market data sources and market credentials to it
 app = create_app()
-app.add_algorithm(algorithm)
 app.add_market_credential(coinbase_market_credential)
-app.add_portfolio_configuration(PortfolioConfiguration(
-    initial_balance=1000,
-    trading_symbol="EUR",
-    market="coinbase"
-))
+
+# Register your algorithm and portfolio configuration to the app
+app.add_algorithm(algorithm)
+app.add_portfolio_configuration(
+    PortfolioConfiguration(
+        initial_balance=41,
+        trading_symbol="EUR",
+        market="coinbase"
+    )
+)
 
 if __name__ == "__main__":
     app.run()
