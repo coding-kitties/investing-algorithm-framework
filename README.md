@@ -13,10 +13,10 @@ The Investing Algorithm Framework is a Python framework that enables swift and e
 ## Sponsors
 
 <a href="https://www.finterion.com/" target="_blank">
-    <picture>
+    <picture style="height: 30px;">
     <source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png">
-    <img src="static/sponsors/finterion-light.svg" alt="Finterion Logo" style="height: 55px;">
+    <img src="static/sponsors/finterion-light.svg" alt="Finterion Logo" width="200px" height="50px">
     </picture>
 </a>
 
