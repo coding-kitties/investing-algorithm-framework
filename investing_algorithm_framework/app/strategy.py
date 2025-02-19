@@ -2,10 +2,9 @@ from typing import List
 import pandas as pd
 from datetime import datetime, timezone
 
-from investing_algorithm_framework.domain import OperationalException, Position
-from investing_algorithm_framework.domain import \
-    TimeUnit, StrategyProfile, Trade, ENVIRONMENT, Environment, \
-    BACKTESTING_INDEX_DATETIME
+from investing_algorithm_framework.domain import TimeUnit, StrategyProfile, \
+    Trade, ENVIRONMENT, Environment, BACKTESTING_INDEX_DATETIME, Order, \
+    OperationalException, Position
 from .context import Context
 
 
@@ -310,7 +309,7 @@ class TradingStrategy:
         execute=True,
         validate=True,
         sync=True
-    ):
+    ) -> Order:
         """
         Function to create a limit order. This function will create
         a limit order and execute it if the execute parameter is set to True.
@@ -342,7 +341,7 @@ class TradingStrategy:
         Returns:
             Order: Instance of the order created
         """
-        self.context.create_limit_order(
+        return self.context.create_limit_order(
             target_symbol=target_symbol,
             price=price,
             order_side=order_side,
@@ -358,47 +357,9 @@ class TradingStrategy:
             sync=sync
         )
 
-    def create_market_order(
-        self,
-        target_symbol,
-        order_side,
-        amount,
-        market=None,
-        execute=False,
-        validate=False,
-        sync=True
-    ):
-        """
-        Function to create a market order. This function will create a market
-        order and execute it if the execute parameter is set to True. If the
-        validate parameter is set to True, the order will be validated
-
-        Args:
-            target_symbol: The symbol of the asset to trade
-            order_side: The side of the order
-            amount: The amount of the asset to trade
-            market: The market to trade the asset
-            execute: If set to True, the order will be executed
-            validate: If set to True, the order will be validated
-            sync: If set to True, the created order will be synced with the
-                portfolio of the context
-
-        Returns:
-            Order: Instance of the order created
-        """
-        self.context.create_market_order(
-            target_symbol=target_symbol,
-            order_side=order_side,
-            amount=amount,
-            market=market,
-            execute=execute,
-            validate=validate,
-            sync=sync
-        )
-
     def close_position(
         self, symbol, market=None, identifier=None, precision=None
-    ):
+    ) -> Order:
         """
         Function to close a position. This function will close a position
         by creating a market order to sell the position. If the precision
@@ -414,7 +375,7 @@ class TradingStrategy:
         Returns:
             None
         """
-        self.context.close_position(
+        return self.context.close_position(
             symbol=symbol,
             market=market,
             identifier=identifier,
@@ -509,7 +470,7 @@ class TradingStrategy:
         """
         return self.context.get_open_trades(target_symbol, market)
 
-    def close_trade(self, trade, market=None, precision=None) -> None:
+    def close_trade(self, trade, market=None, precision=None) -> Order:
         """
         Function to close a trade. This function will close a trade by
         creating a market order to sell the position. If the precision
@@ -524,11 +485,11 @@ class TradingStrategy:
         Returns:
             None
         """
-        self.context.close_trade(
+        return self.context.close_trade(
             trade=trade, market=market, precision=precision
         )
 
-    def get_number_of_positions(self):
+    def get_number_of_positions(self) -> int:
         """
         Returns the number of positions that have a positive amount.
 
@@ -571,7 +532,7 @@ class TradingStrategy:
         amount_gte=None,
         amount_lt=None,
         amount_lte=None
-    ):
+    ) -> bool:
         """
         Function to check if a position exists. This function will return
         True if a position exists, False otherwise. This function will check
@@ -601,7 +562,7 @@ class TradingStrategy:
             amount_lte=amount_lte
         )
 
-    def has_balance(self, symbol, amount, market=None):
+    def has_balance(self, symbol, amount, market=None) -> bool:
         """
         Function to check if the portfolio has enough balance to
         create an order. This function will return True if the
