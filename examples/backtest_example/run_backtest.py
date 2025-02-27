@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 import logging.config
 from datetime import datetime, timedelta
 
@@ -114,6 +115,16 @@ class CrossOverStrategy(TradingStrategy):
             if not context.has_position(target_symbol) \
                     and is_crossover(fast, slow) \
                     and is_above_trend(fast, trend):
+
+                # print(context.config["BACKTESTING_INDEX_DATETIME"])
+                date = context.config["BACKTESTING_INDEX_DATETIME"]
+
+                # Check if date equals 2023-10-30 04:00
+                if date == datetime(2023, 10, 30, 4, 0):
+                    print("opening trade")
+                    print(price)
+                    print(df[-1]["Close"])
+
                 order = context.create_limit_order(
                     target_symbol=target_symbol,
                     order_side=OrderSide.BUY,

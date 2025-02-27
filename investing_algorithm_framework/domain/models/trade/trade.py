@@ -59,7 +59,9 @@ class Trade(BaseModel):
         status,
         net_gain=0,
         last_reported_price=None,
+        last_reported_price_datetime=None,
         high_water_mark=None,
+        high_water_mark_datetime=None,
         updated_at=None,
         stop_losses=None,
         take_profits=None,
@@ -76,11 +78,46 @@ class Trade(BaseModel):
         self.remaining = remaining
         self.net_gain = net_gain
         self.last_reported_price = last_reported_price
+        self.last_reported_price_datetime = last_reported_price_datetime
         self.high_water_mark = high_water_mark
+        self.high_water_mark_datetime = high_water_mark_datetime
         self.status = status
         self.updated_at = updated_at
         self.stop_losses = stop_losses
         self.take_profits = take_profits
+
+    def update(self, data):
+
+        if "status" in data:
+            self.status = TradeStatus.from_value(data["status"])
+
+            if TradeStatus.CLOSED.equals(self.status):
+
+                # Set all stop losses to inactive
+                if self.stop_losses is not None:
+                    for stop_loss in self.stop_losses:
+                        stop_loss.active = False
+
+                # set all take profits to inactive
+                if self.take_profits is not None:
+                    for take_profit in self.take_profits:
+                        take_profit.active = False
+
+        if "last_reported_price" in data:
+            self.last_reported_price = data["last_reported_price"]
+
+            if self.high_water_mark is None:
+                self.high_water_mark = data["last_reported_price"]
+                self.high_water_mark_datetime = \
+                    data["last_reported_price_datetime"]
+            else:
+
+                if data["last_reported_price"] > self.high_water_mark:
+                    self.high_water_mark = data["last_reported_price"]
+                    self.high_water_mark_datetime = \
+                        data["last_reported_price_datetime"]
+
+        return super().update(data)
 
     @property
     def closed_prices(self):

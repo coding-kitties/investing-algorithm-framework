@@ -26,6 +26,20 @@ BACKTEST_REPORT_FILE_NAME_PATTERN = (
     r"created-at_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}\.json$"
 )
 
+def format_date(date) -> str:
+    """
+    Format the date to the format YYYY-MM-DD HH:MM:SS
+    """
+
+    if date is None:
+        return ""
+
+    if isinstance(date, datetime):
+        return date.strftime("%Y-%m-%d %H:%M")
+    else:
+        date = datetime.strptime(date, "%Y-%m-%d %H:%M:%S")
+        return date.strftime("%Y-%m-%d %H:%M")
+
 def is_positive(number) -> bool:
     """
     Check if a number is positive.
@@ -91,8 +105,11 @@ def pretty_print_growth_evaluation(reports, precision=4):
 
 def pretty_print_stop_losses(
     backtest_report,
-    precision=4,
-    triggered_only=False
+    triggered_only=False,
+    amount_precesion=4,
+    price_precision=2,
+    time_precision=1,
+    percentage_precision=0
 ):
     print(f"{COLOR_YELLOW}Stop losses overview{COLOR_RESET}")
     stop_loss_table = {}
@@ -101,7 +118,7 @@ def pretty_print_stop_losses(
 
     def get_sold_amount(stop_loss):
         if stop_loss["sold_amount"] > 0:
-            return float(stop_loss["sold_amount"])
+            return f"{float(stop_loss['sold_amount']):.{amount_precesion}f} {stop_loss['target_symbol']}"
 
         return ""
 
@@ -118,9 +135,20 @@ def pretty_print_stop_losses(
 
     def get_high_water_mark(stop_loss):
         if stop_loss["high_water_mark"] is not None:
-            return float(stop_loss["high_water_mark"])
+            return f"{float(stop_loss['high_water_mark']):.{price_precision}f} {stop_loss['trading_symbol']} {format_date(stop_loss['high_water_mark_date'])}"
 
         return ""
+
+    def get_stop_loss_price(take_profit):
+
+        if take_profit["trade_risk_type"] == "trailing":
+            initial_price = take_profit["open_price"]
+            percentage = take_profit["percentage"]
+            initial_stop_loss_price = \
+                initial_price * (1 - (percentage / 100))
+            return f"{float(take_profit['stop_loss_price']):.{price_precision}f}({take_profit['percentage']})% ({initial_stop_loss_price}:.{price_precision}) {take_profit['trading_symbol']}"
+        else:
+            return f"{float(take_profit['stop_loss_price']):.{price_precision}f}({take_profit['percentage']})% {take_profit['trading_symbol']}"
 
     if triggered_only:
         for trade in trades:
@@ -138,6 +166,7 @@ def pretty_print_stop_losses(
                         "open_price": stop_loss.open_price,
                         "sell_percentage": stop_loss.sell_percentage,
                         "high_water_mark": stop_loss.high_water_mark,
+                        "high_water_mark_date": stop_loss.high_water_mark_date,
                         "stop_loss_price": stop_loss.stop_loss_price,
                         "sell_amount": stop_loss.sell_amount,
                         "sold_amount": stop_loss.sold_amount,
@@ -163,6 +192,8 @@ def pretty_print_stop_losses(
                             "open_price": stop_loss.open_price,
                             "sell_percentage": stop_loss.sell_percentage,
                             "high_water_mark": stop_loss.high_water_mark,
+                            "high_water_mark_date": \
+                                stop_loss.high_water_mark_date,
                             "stop_loss_price": stop_loss.stop_loss_price,
                             "sell_amount": stop_loss.sell_amount,
                             "sold_amount": stop_loss.sold_amount,
@@ -186,23 +217,23 @@ def pretty_print_stop_losses(
     stop_loss_table["Type"] = [
         f"{stop_loss['trade_risk_type']}" for stop_loss in selection
     ]
-    stop_loss_table["stop loss"] = [
-        f"{float(stop_loss['stop_loss_price']):.{precision}f}({stop_loss['percentage']}%) {stop_loss['trading_symbol']}" for stop_loss in selection
+    stop_loss_table["Stop Loss"] = [
+        get_stop_loss_price(stop_loss) for stop_loss in selection
     ]
     stop_loss_table["Open price"] = [
-        f"{float(stop_loss['open_price']):.{precision}f} {stop_loss['trading_symbol']}" for stop_loss in selection if stop_loss['open_price'] is not None
+        f"{float(stop_loss['open_price']):.{price_precision}f} {stop_loss['trading_symbol']}" for stop_loss in selection if stop_loss['open_price'] is not None
     ]
     stop_loss_table["Sell price's"] = [
         f"{stop_loss['sell_prices']}" for stop_loss in selection
     ]
     stop_loss_table["High water mark"] = [
-        get_high_water_mark(stop_loss) for stop_loss in selection
+        f"{get_high_water_mark(stop_loss)}" for stop_loss in selection
     ]
     stop_loss_table["Percentage"] = [
         f"{float(stop_loss['sell_percentage'])}%" for stop_loss in selection
     ]
     stop_loss_table["Size"] = [
-        f"{float(stop_loss['sell_amount']):.{precision}f} {stop_loss['target_symbol']}" for stop_loss in selection
+        f"{float(stop_loss['sell_amount']):.{price_precision}f} {stop_loss['target_symbol']}" for stop_loss in selection
     ]
     stop_loss_table["Sold amount"] = [
         get_sold_amount(stop_loss) for stop_loss in selection
@@ -211,7 +242,12 @@ def pretty_print_stop_losses(
 
 
 def pretty_print_take_profits(
-    backtest_report, precision=4, triggered_only=False
+    backtest_report,
+    triggered_only=False,
+    amount_precesion=4,
+    price_precision=2,
+    time_precision=1,
+    percentage_precision=0
 ):
     print(f"{COLOR_YELLOW}Take profits overview{COLOR_RESET}")
     take_profit_table = {}
@@ -220,15 +256,26 @@ def pretty_print_take_profits(
 
     def get_high_water_mark(take_profit):
         if take_profit["high_water_mark"] is not None:
-            return float(take_profit["high_water_mark"])
+            return f"{float(take_profit['high_water_mark']):.{price_precision}f} {take_profit['trading_symbol']} ({format_date(take_profit['high_water_mark_date'])})"
 
         return ""
 
     def get_sold_amount(take_profit):
         if take_profit["sold_amount"] > 0:
-            return float(take_profit["sold_amount"])
+            return f"{float(take_profit['sold_amount']):.{amount_precesion}f} {take_profit['target_symbol']}"
 
         return ""
+
+    def get_take_profit_price(take_profit):
+
+        if take_profit["trade_risk_type"] == "TRAILING":
+            initial_price = take_profit["open_price"]
+            percentage = take_profit["percentage"]
+            initial_take_profit_price = \
+                initial_price * (1 + (percentage / 100))
+            return f"{float(take_profit['take_profit_price']):.{price_precision}f}({take_profit['percentage']})% ({initial_take_profit_price}) {take_profit['trading_symbol']}"
+        else:
+            return f"{float(take_profit['take_profit_price']):.{price_precision}f}({take_profit['percentage']})% {take_profit['trading_symbol']}"
 
     def get_status(take_profit):
 
@@ -257,6 +304,8 @@ def pretty_print_take_profits(
                         "open_price": take_profit.open_price,
                         "sell_percentage": take_profit.sell_percentage,
                         "high_water_mark": take_profit.high_water_mark,
+                        "high_water_mark_date": \
+                            take_profit.high_water_mark_date,
                         "take_profit_price": take_profit.take_profit_price,
                         "sell_amount": take_profit.sell_amount,
                         "sold_amount": take_profit.sold_amount,
@@ -280,6 +329,8 @@ def pretty_print_take_profits(
                         "open_price": take_profit.open_price,
                         "sell_percentage": take_profit.sell_percentage,
                         "high_water_mark": take_profit.high_water_mark,
+                        "high_water_mark_date": \
+                            take_profit.high_water_mark_date,
                         "take_profit_price": take_profit.take_profit_price,
                         "sell_amount": take_profit.sell_amount,
                         "sold_amount": take_profit.sold_amount,
@@ -305,23 +356,23 @@ def pretty_print_take_profits(
         in selection
     ]
     take_profit_table["Take profit"] = [
-        f"{float(take_profit['take_profit_price']):.{precision}f}({take_profit['percentage']})% {take_profit['trading_symbol']}" for take_profit in selection
+        get_take_profit_price(stop_loss) for stop_loss in selection
     ]
     take_profit_table["Open price"] = [
-        f"{float(stop_loss['open_price']):.{precision}f} {stop_loss['trading_symbol']}" for stop_loss in selection if stop_loss['open_price'] is not None
+        f"{float(stop_loss['open_price']):.{price_precision}f} {stop_loss['trading_symbol']}" for stop_loss in selection if stop_loss['open_price'] is not None
     ]
     take_profit_table["Sell price's"] = [
         f"{stop_loss['sell_prices']}" for stop_loss in selection
     ]
     # Print nothing if high water mark is None
     take_profit_table["High water mark"] = [
-        get_high_water_mark(stop_loss) for stop_loss in selection
+        f"{get_high_water_mark(stop_loss)}" for stop_loss in selection
     ]
     take_profit_table["Percentage"] = [
         f"{float(stop_loss['sell_percentage'])}%" for stop_loss in selection
     ]
     take_profit_table["Size"] = [
-        f"{float(stop_loss['sell_amount']):.{precision}f} {stop_loss['target_symbol']}" for stop_loss in selection
+        f"{float(stop_loss['sell_amount']):.{amount_precesion}f} {stop_loss['target_symbol']}" for stop_loss in selection
     ]
     take_profit_table["Sold amount"] = [
         get_sold_amount(stop_loss) for stop_loss in selection
@@ -491,7 +542,13 @@ def pretty_print_percentage_positive_trades(
     print(f"{COLOR_YELLOW}Most positive trades:{COLOR_RESET} {COLOR_GREEN}Algorithm {percentages.name} {float(percentages.percentage_positive_trades):.{precision}f}%{COLOR_RESET}")
 
 
-def pretty_print_trades(backtest_report, precision=4):
+def pretty_print_trades(
+    backtest_report,
+    amount_precesion=4,
+    price_precision=2,
+    time_precision=1,
+    percentage_precision=2
+):
 
     def get_status(trade):
         status = "OPEN"
@@ -521,7 +578,7 @@ def pretty_print_trades(backtest_report, precision=4):
             if number_of_sell_orders > 0:
                 text += ", "
 
-            text += f"{sell_order.price}"
+            text += f"{float(sell_order.price):.{price_precision}f}"
             number_of_sell_orders += 1
 
         return text
@@ -547,6 +604,12 @@ def pretty_print_trades(backtest_report, precision=4):
         ]
         return len(triggered) > 0
 
+    def get_high_water_mark(trade):
+        if trade.high_water_mark is not None:
+            return f"{float(trade.high_water_mark):.{price_precision}f} {trade.trading_symbol} ({format_date(trade.high_water_mark_datetime)})"
+
+        return ""
+
     print(f"{COLOR_YELLOW}Trades overview{COLOR_RESET}")
     trades_table = {}
     trades_table["Pair (Trade id)"] = [
@@ -556,38 +619,48 @@ def pretty_print_trades(backtest_report, precision=4):
     trades_table["Status"] = [
         get_status(trade) for trade in backtest_report.trades
     ]
+    trades_table["Amount (remaining)"] = [
+        f"{float(trade.amount):.{amount_precesion}f} ({float(trade.remaining):.{amount_precesion}f}) {trade.target_symbol}"
+        for trade in backtest_report.trades
+    ]
     trades_table[f"Net gain ({backtest_report.trading_symbol})"] = [
-        f"{float(trade.net_gain):.{precision}f}"
+        f"{float(trade.net_gain):.{price_precision}f}"
         for trade in backtest_report.trades
     ]
     trades_table["Open date"] = [
-        trade.opened_at for trade in backtest_report.trades
+        trade.opened_at.strftime("%Y-%m-%d %H:%M") for trade in backtest_report.trades if trade.opened_at is not None
     ]
     trades_table["Close date"] = [
-        trade.closed_at for trade in backtest_report.trades
+        trade.closed_at.strftime("%Y-%m-%d %H:%M") for trade in backtest_report.trades if trade.closed_at is not None
     ]
     trades_table["Duration"] = [
-        f"{trade.duration} hours" for trade in backtest_report.trades
+        f"{trade.duration:.{time_precision}f} hours" for trade in backtest_report.trades
     ]
     # Add (unrealized) to the net gain if the trade is still open
     trades_table[f"Net gain ({backtest_report.trading_symbol})"] = [
-        f"{float(trade.net_gain_absolute):.{precision}f} ({float(trade.net_gain_percentage):.{precision}f}%)" + (" (unrealized)" if not TradeStatus.CLOSED.equals(trade.status) else "")
+        f"{float(trade.net_gain_absolute):.{price_precision}f} ({float(trade.net_gain_percentage):.{percentage_precision}f}%)" + (" (unrealized)" if not TradeStatus.CLOSED.equals(trade.status) else "")
         for trade in backtest_report.trades
     ]
     trades_table[f"Open price ({backtest_report.trading_symbol})"] = [
-        trade.open_price for trade in backtest_report.trades
+        f"{trade.open_price:.{price_precision}f}"  for trade in backtest_report.trades
     ]
     trades_table[
         f"Close price's ({backtest_report.trading_symbol})"
     ] = [
         get_close_prices(trade) for trade in backtest_report.trades
     ]
+    trades_table["High water mark"] = [
+        get_high_water_mark(trade) for trade in backtest_report.trades
+    ]
     print(tabulate(trades_table, headers="keys", tablefmt="rounded_grid"))
 
 
 def pretty_print_backtest_reports_evaluation(
     backtest_reports_evaluation: BacktestReportsEvaluation,
-    precision=4,
+    amount_precesion=4,
+    price_precision=2,
+    time_precision=1,
+    percentage_precision=2,
     backtest_date_range: BacktestDateRange = None
 ) -> None:
     """
@@ -666,7 +739,10 @@ def pretty_print_backtest(
     show_triggered_stop_losses_only=False,
     show_take_profits=True,
     show_triggered_take_profits_only=False,
-    precision=4
+    amount_precesion=4,
+    price_precision=2,
+    time_precision=1,
+    percentage_precision=2
 ):
     """
     Pretty print the backtest report to the console.
@@ -694,14 +770,14 @@ def pretty_print_backtest(
              .:-+*%%%%- {COLOR_PURPLE}-+..#{COLOR_RESET}%%%+.{COLOR_PURPLE}+-  +{COLOR_RESET}%%%#*=-:   {COLOR_YELLOW}Number of runs:{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_runs}{COLOR_RESET}
               .:-=*%%%%. {COLOR_PURPLE}+={COLOR_RESET} .%%#  {COLOR_PURPLE}-+.-{COLOR_RESET}%%%%=-:..   {COLOR_YELLOW}Number of orders:{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_orders}{COLOR_RESET}
               .:=+#%%%%%*###%%%%#*+#%%%%%%*+-:    {COLOR_YELLOW}Initial balance:{COLOR_RESET}{COLOR_GREEN} {backtest_report.initial_unallocated}{COLOR_RESET}
-                    +%%%%%%%%%%%%%%%%%%%=         {COLOR_YELLOW}Final balance:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.total_value):.{precision}f}{COLOR_RESET}
-                :++  .=#%%%%%%%%%%%%%*-           {COLOR_YELLOW}Total net gain:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.total_net_gain):.{precision}f} {float(backtest_report.total_net_gain_percentage):.{precision}}%{COLOR_RESET}
-               :++:      :+%%%%%%#-.              {COLOR_YELLOW}Growth:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.growth):.{precision}f} {float(backtest_report.growth_rate):.{precision}}%{COLOR_RESET}
+                    +%%%%%%%%%%%%%%%%%%%=         {COLOR_YELLOW}Final balance:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.total_value):.{price_precision}f}{COLOR_RESET}
+                :++  .=#%%%%%%%%%%%%%*-           {COLOR_YELLOW}Total net gain:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.total_net_gain):.{price_precision}f} {float(backtest_report.total_net_gain_percentage):.{percentage_precision}}%{COLOR_RESET}
+               :++:      :+%%%%%%#-.              {COLOR_YELLOW}Growth:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.growth):.{price_precision}f} {float(backtest_report.growth_rate):.{percentage_precision}}%{COLOR_RESET}
               :++:        .%%%%%#=                {COLOR_YELLOW}Number of trades closed:{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_trades_closed}{COLOR_RESET}
              :++:        .#%%%%%#*=               {COLOR_YELLOW}Number of trades open(end of backtest):{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_trades_open}{COLOR_RESET}
             :++-        :%%%%%%%%%+=              {COLOR_YELLOW}Percentage positive trades:{COLOR_RESET}{COLOR_GREEN} {backtest_report.percentage_positive_trades}%{COLOR_RESET}
            .++-        -%%%%%%%%%%%+=             {COLOR_YELLOW}Percentage negative trades:{COLOR_RESET}{COLOR_GREEN} {backtest_report.percentage_negative_trades}%{COLOR_RESET}
-          .++-        .%%%%%%%%%%%%%+=            {COLOR_YELLOW}Average trade size:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.average_trade_size):.{precision}f} {backtest_report.trading_symbol}{COLOR_RESET}
+          .++-        .%%%%%%%%%%%%%+=            {COLOR_YELLOW}Average trade size:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.average_trade_size):.{price_precision}f} {backtest_report.trading_symbol}{COLOR_RESET}
          .++-         *%%%%%%%%%%%%%*+:           {COLOR_YELLOW}Average trade duration:{COLOR_RESET}{COLOR_GREEN} {backtest_report.average_trade_duration} hours{COLOR_RESET}
         .++-          %%%%%%%%%%%%%%#+=
         =++........:::%%%%%%%%%%%%%%*+-
@@ -718,35 +794,35 @@ def pretty_print_backtest(
             position.symbol for position in backtest_report.positions
         ]
         position_table["Amount"] = [
-            f"{float(position.amount):.{precision}f}" for position in
+            f"{float(position.amount):.{amount_precesion}f}" for position in
             backtest_report.positions
         ]
         position_table["Pending buy amount"] = [
-            f"{float(position.amount_pending_buy):.{precision}f}"
+            f"{float(position.amount_pending_buy):.{amount_precesion}f}"
             for position in backtest_report.positions
         ]
         position_table["Pending sell amount"] = [
-            f"{float(position.amount_pending_sell):.{precision}f}"
+            f"{float(position.amount_pending_sell):.{amount_precesion}f}"
             for position in backtest_report.positions
         ]
         position_table[f"Cost ({backtest_report.trading_symbol})"] = [
-            f"{float(position.cost):.{precision}f}"
+            f"{float(position.cost):.{price_precision}f}"
             for position in backtest_report.positions
         ]
         position_table[f"Value ({backtest_report.trading_symbol})"] = [
-            f"{float(position.value):.{precision}f}"
+            f"{float(position.value):.{price_precision}f} {backtest_report.trading_symbol}"
             for position in backtest_report.positions
         ]
         position_table["Percentage of portfolio"] = [
-            f"{float(position.percentage_of_portfolio):.{precision}f}%"
+            f"{float(position.percentage_of_portfolio):.{percentage_precision}f}%"
             for position in backtest_report.positions
         ]
         position_table[f"Growth ({backtest_report.trading_symbol})"] = [
-            f"{float(position.growth):.{precision}f}"
+            f"{float(position.growth):.{price_precision}f} {backtest_report.trading_symbol}"
             for position in backtest_report.positions
         ]
         position_table["Growth_rate"] = [
-            f"{float(position.growth_rate):.{precision}f}%"
+            f"{float(position.growth_rate):.{percentage_precision}f}%"
             for position in backtest_report.positions
         ]
         print(
@@ -764,20 +840,32 @@ def pretty_print_backtest(
         return len(triggered) > 0
 
     if show_trades:
-        pretty_print_trades(backtest_report, precision=precision)
+        pretty_print_trades(
+            backtest_report,
+            amount_precesion=amount_precesion,
+            price_precision=price_precision,
+            time_precision=time_precision,
+            percentage_precision=percentage_precision
+        )
 
     if show_stop_losses:
         pretty_print_stop_losses(
             backtest_report=backtest_report,
-            precision=precision,
-            triggered_only=show_triggered_stop_losses_only
+            triggered_only=show_triggered_stop_losses_only,
+            amount_precesion=amount_precesion,
+            price_precision=price_precision,
+            time_precision=time_precision,
+            percentage_precision=percentage_precision
         )
 
     if show_take_profits:
         pretty_print_take_profits(
             backtest_report=backtest_report,
-            precision=precision,
-            triggered_only=show_triggered_take_profits_only
+            triggered_only=show_triggered_take_profits_only,
+            amount_precesion=amount_precesion,
+            price_precision=price_precision,
+            time_precision=time_precision,
+            percentage_precision=percentage_precision
         )
 
 

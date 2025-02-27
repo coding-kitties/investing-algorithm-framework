@@ -36,10 +36,24 @@ class OrderBacktestService(OrderService):
             market_data_source_service
 
     def create(self, data, execute=True, validate=True, sync=True) -> Order:
+        """
+        Override the create method to set the created_at and
+        updated_at attributes to the current backtest time.
+
+        Args:
+            data (dict): Dictionary containing the order data
+            execute (bool): Flag to execute the order
+            validate (bool): Flag to validate the order
+            sync (bool): Flag to sync the order
+
+        Returns:
+            Order: Created order object
+        """
         config = self.configuration_service.get_config()
 
         # Make sure the created_at is set to the current backtest time
         data["created_at"] = config[BACKTESTING_INDEX_DATETIME]
+        data["updated_at"] = config[BACKTESTING_INDEX_DATETIME]
         # Call super to have standard behavior
         return super(OrderBacktestService, self)\
             .create(data, execute, validate, sync)
