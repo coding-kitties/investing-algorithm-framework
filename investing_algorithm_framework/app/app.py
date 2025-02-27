@@ -11,7 +11,7 @@ from flask import Flask
 from investing_algorithm_framework.app.algorithm import Algorithm
 from investing_algorithm_framework.app.stateless import ActionHandler
 from investing_algorithm_framework.app.task import Task
-from investing_algorithm_framework.app.web import create_flask_app
+from investing_algorithm_framework.app.web import WebApp
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
     SQLALCHEMY_DATABASE_URI, OperationalException, \
@@ -292,10 +292,10 @@ class App:
                 )
             )
 
-        # Initialize all market credentials
-        self._market_credential_service = self.container.\
-            market_credential_service()
-        self._market_credential_service.initialize()
+        # # Initialize all market credentials
+        # self._market_credential_service = self.container.\
+        #     market_credential_service()
+        # self._market_credential_service.initialize()
 
         # Add all market data sources of the strategies to the market data
         # source service
@@ -391,10 +391,10 @@ class App:
 
             portfolios = portfolio_service.get_all()
 
-            for portfolio in portfolios:
+            # for portfolio in portfolios:
 
-                if portfolio not in synced_portfolios:
-                    self.sync(portfolio)
+            #     if portfolio not in synced_portfolios:
+            #         # self.sync(portfolio)
 
     def sync(self, portfolio):
         """
@@ -494,13 +494,14 @@ class App:
 
             if AppMode.WEB.equals(config[APP_MODE]):
                 logger.info("Running web")
-                flask_thread = threading.Thread(
-                    name='Web App',
-                    target=self._flask_app.run,
-                    kwargs={"port": 8080}
-                )
-                flask_thread.daemon = True
-                flask_thread.start()
+                self.web_app.run()
+                # flask_thread = threading.Thread(
+                #     name='Web App',
+                #     target=self._flask_app.run,
+                #     kwargs={"port": 8080}
+                # )
+                # flask_thread.daemon = True
+                # flask_thread.start()
 
             self.algorithm.start(number_of_iterations=number_of_iterations)
             number_of_iterations_since_last_orders_check = 1
@@ -577,7 +578,9 @@ class App:
             - Algorithm
         """
         configuration_service = self.container.configuration_service()
-        self._flask_app = create_flask_app(configuration_service)
+        # self._fastapi_app = create_fastapi_app(configuration_service)
+        self.web_app = WebApp(configuration_service)
+        # self._flask_app = create_flask_app(configuration_service)
 
     def _create_resources_if_not_exists(self):
         """
