@@ -16,7 +16,7 @@ class WebApp:
         self.app.mount(
             "/",
             StaticFiles(
-                directory="static/build", html=True
+                directory="static/out", html=True
             ),
             name="static"
         )
