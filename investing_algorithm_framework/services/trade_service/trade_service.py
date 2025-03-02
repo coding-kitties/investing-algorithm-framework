@@ -902,7 +902,6 @@ class TradeService(RepositoryService):
                 take_profit = take_profit_que.dequeue()
                 take_profit_sell_amount = take_profit.get_sell_amount()
 
-
                 if take_profit_sell_amount <= available_amount:
                     available_amount = available_amount - \
                         take_profit_sell_amount
