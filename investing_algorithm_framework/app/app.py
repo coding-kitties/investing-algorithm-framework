@@ -55,7 +55,7 @@ class App:
         self._on_after_initialize_hooks = []
         self._state_handler = state_handler
         self._name = name
-        self._algorithm = Algorithm()
+        self._algorithm = Algorithm(name=self.name)
 
     @property
     def algorithm(self) -> Algorithm:
@@ -630,6 +630,8 @@ class App:
         output_directory=None,
         algorithm: Algorithm = None
     ) -> BacktestReport:
+        print(self.name)
+        print(self.algorithm.name)
         """
         Run a backtest for an algorithm. This method should be called when
         running a backtest.
@@ -696,8 +698,13 @@ class App:
                 config[RESOURCE_DIRECTORY], "backtest_reports"
             )
 
-        backtest_service.write_report_to_json(
-            report=report, output_directory=output_directory
+        # backtest_service.write_report_to_json(
+        #     report=report, output_directory=output_directory
+        # )
+        backtest_service.save_report(
+            report=report,
+            algorithm=self.algorithm,
+            output_directory=output_directory
         )
         return report
 
@@ -815,9 +822,14 @@ class App:
                         self.config[RESOURCE_DIRECTORY], "backtest_reports"
                     )
 
-                backtest_service.write_report_to_json(
-                    report=report, output_directory=output_directory
+                backtest_service.save_report(
+                    report=report,
+                    algorithm=algorithm,
+                    output_directory=output_directory
                 )
+                # backtest_service.write_report_to_json(
+                #     report=report, output_directory=output_directory
+                # )
                 reports.append(report)
 
         return reports

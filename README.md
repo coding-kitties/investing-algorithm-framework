@@ -45,6 +45,38 @@ The Investing Algorithm Framework is a Python framework that enables swift and e
 - [ ] **AWS Lambda support (Planned)**: Stateless running for cloud function deployments in AWS.
 - [ ] **Azure App services support (Planned)**: deployments in Azure app services with Web UI.
 
+## Quickstart
+
+1. First install the framework using `pip`. The Investing Algorithm Framework is hosted on [PyPi](https://pypi.org/project/Blankly/).
+
+```bash
+$ pip install investing-algorithm-framework
+```
+
+2. Next, just run:
+
+```bash
+$ investing-algorithm-framewor init
+```
+
+or if you want the web version:
+
+```bash
+$ investing-algorithm-framework init --web
+```
+> You can always change the app to the web version by changing the `app.py` file.
+
+The command will create the file `app.py` and an example script called `strategy.py`.
+
+From there, you start building your trading bot in the `strategy.py`.
+
+More information can be found on our [docs](https://docs.blankly.finance)
+
+> Make sure you leave the `app.py` file as is, as it is the entry point for the framework.
+> You can change the `bot.py` file to your liking and add other files to the working directory.
+> The framework will automatically pick up the files in the working directory.
+```
+
 ## Example implementation
 
 The following algorithm connects to binance and buys BTC every 2 hours.
@@ -261,14 +293,6 @@ app.add_portfolio_configuration(
 
 We are continuously working on improving the performance of the framework. If
 you have any suggestions, please let us know.
-
-## How to install
-
-You can download the framework with pypi.
-
-```bash
-pip install investing-algorithm-framework
-```
 
 ## Installation for local development
 

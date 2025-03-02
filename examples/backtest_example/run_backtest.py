@@ -4,10 +4,9 @@ import logging.config
 from datetime import datetime, timedelta
 
 
-from investing_algorithm_framework import CCXTOHLCVMarketDataSource, \
-    CCXTTickerMarketDataSource, PortfolioConfiguration, \
-    create_app, pretty_print_backtest, BacktestDateRange, TimeUnit, \
-    TradingStrategy, OrderSide, DEFAULT_LOGGING_CONFIG, Context
+from investing_algorithm_framework import (
+    CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, PortfolioConfiguration, create_app, pretty_print_backtest, BacktestDateRange, TimeUnit, TradingStrategy, OrderSide, DEFAULT_LOGGING_CONFIG, Context
+)
 
 import tulipy as ti
 
