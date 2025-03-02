@@ -881,12 +881,6 @@ class TradeService(RepositoryService):
                     take_profit.active and
                     take_profit.has_triggered(open_trade.last_reported_price)
                 ):
-                    print("Triggered take profit")
-                    print(f"take profit id: {take_profit.id}")
-                    print(f"take profit price: {take_profit.take_profit_price}")
-                    print(open_trade.last_reported_price)
-                    print(open_trade.last_reported_price_datetime)
-
                     triggered_take_profits.append(take_profit)
 
                 to_be_saved_take_profit_objects.append(take_profit)

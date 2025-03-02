@@ -7,7 +7,7 @@ from typing import List
 from tabulate import tabulate
 
 from investing_algorithm_framework.domain import DATETIME_FORMAT, \
-    BacktestDateRange, TradeStatus, OrderSide
+    BacktestDateRange, TradeStatus, OrderSide, TradeRiskType
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
 from investing_algorithm_framework.domain.models.backtesting import \
@@ -141,12 +141,12 @@ def pretty_print_stop_losses(
 
     def get_stop_loss_price(take_profit):
 
-        if take_profit["trade_risk_type"] == "trailing":
+        if TradeRiskType.TRAILING.equals(take_profit["trade_risk_type"]):
             initial_price = take_profit["open_price"]
             percentage = take_profit["percentage"]
             initial_stop_loss_price = \
                 initial_price * (1 - (percentage / 100))
-            return f"{float(take_profit['stop_loss_price']):.{price_precision}f}({take_profit['percentage']})% ({initial_stop_loss_price}:.{price_precision}) {take_profit['trading_symbol']}"
+            return f"{float(take_profit['stop_loss_price']):.{price_precision}f} ({(initial_stop_loss_price):.{price_precision}f}) ({take_profit['percentage']})% {take_profit['trading_symbol']}"
         else:
             return f"{float(take_profit['stop_loss_price']):.{price_precision}f}({take_profit['percentage']})% {take_profit['trading_symbol']}"
 
@@ -217,7 +217,7 @@ def pretty_print_stop_losses(
     stop_loss_table["Type"] = [
         f"{stop_loss['trade_risk_type']}" for stop_loss in selection
     ]
-    stop_loss_table["Stop Loss"] = [
+    stop_loss_table["Stop Loss (Initial Stop Loss)"] = [
         get_stop_loss_price(stop_loss) for stop_loss in selection
     ]
     stop_loss_table["Open price"] = [
@@ -268,12 +268,12 @@ def pretty_print_take_profits(
 
     def get_take_profit_price(take_profit):
 
-        if take_profit["trade_risk_type"] == "TRAILING":
+        if TradeRiskType.TRAILING.equals(take_profit["trade_risk_type"]):
             initial_price = take_profit["open_price"]
             percentage = take_profit["percentage"]
             initial_take_profit_price = \
                 initial_price * (1 + (percentage / 100))
-            return f"{float(take_profit['take_profit_price']):.{price_precision}f}({take_profit['percentage']})% ({initial_take_profit_price}) {take_profit['trading_symbol']}"
+            return f"{float(take_profit['take_profit_price']):.{price_precision}f} ({(initial_take_profit_price):.{price_precision}f}) ({take_profit['percentage']})% {take_profit['trading_symbol']}"
         else:
             return f"{float(take_profit['take_profit_price']):.{price_precision}f}({take_profit['percentage']})% {take_profit['trading_symbol']}"
 
@@ -355,7 +355,7 @@ def pretty_print_take_profits(
         f"{stop_loss['trade_risk_type']}" for stop_loss
         in selection
     ]
-    take_profit_table["Take profit"] = [
+    take_profit_table["Take profit (Initial Take Profit)"] = [
         get_take_profit_price(stop_loss) for stop_loss in selection
     ]
     take_profit_table["Open price"] = [
@@ -772,7 +772,7 @@ def pretty_print_backtest(
               .:=+#%%%%%*###%%%%#*+#%%%%%%*+-:    {COLOR_YELLOW}Initial balance:{COLOR_RESET}{COLOR_GREEN} {backtest_report.initial_unallocated}{COLOR_RESET}
                     +%%%%%%%%%%%%%%%%%%%=         {COLOR_YELLOW}Final balance:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.total_value):.{price_precision}f}{COLOR_RESET}
                 :++  .=#%%%%%%%%%%%%%*-           {COLOR_YELLOW}Total net gain:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.total_net_gain):.{price_precision}f} {float(backtest_report.total_net_gain_percentage):.{percentage_precision}}%{COLOR_RESET}
-               :++:      :+%%%%%%#-.              {COLOR_YELLOW}Growth:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.growth):.{price_precision}f} {float(backtest_report.growth_rate):.{percentage_precision}}%{COLOR_RESET}
+               :++:      :+%%%%%%#-.              {COLOR_YELLOW}Growth:{COLOR_RESET}{COLOR_GREEN} {float(backtest_report.growth):.{price_precision}f} {float(backtest_report.growth_rate):.{percentage_precision}f}%{COLOR_RESET}
               :++:        .%%%%%#=                {COLOR_YELLOW}Number of trades closed:{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_trades_closed}{COLOR_RESET}
              :++:        .#%%%%%#*=               {COLOR_YELLOW}Number of trades open(end of backtest):{COLOR_RESET}{COLOR_GREEN} {backtest_report.number_of_trades_open}{COLOR_RESET}
             :++-        :%%%%%%%%%+=              {COLOR_YELLOW}Percentage positive trades:{COLOR_RESET}{COLOR_GREEN} {backtest_report.percentage_positive_trades}%{COLOR_RESET}

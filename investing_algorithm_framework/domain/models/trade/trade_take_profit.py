@@ -89,6 +89,17 @@ class TradeTakeProfit(BaseModel):
 
         # Do nothing for fixed take profit
         if TradeRiskType.FIXED.equals(self.trade_risk_type):
+
+            if self.high_water_mark is not None:
+                if current_price > self.high_water_mark:
+                    self.high_water_mark = current_price
+                    self.high_water_mark_date = date
+            else:
+                if current_price >= self.take_profit_price:
+                    self.high_water_mark = current_price
+                    self.high_water_mark_date = date
+                return
+
             return
         else:
 
@@ -107,10 +118,6 @@ class TradeTakeProfit(BaseModel):
 
             # Check if the current price is less than the take profit price
             if current_price < self.take_profit_price:
-                print("trigger for take profit")
-                print(self.id)
-                print(f"current price: {current_price}")
-                print(f"take profit price: {self.take_profit_price}")
                 return
 
             # Increase the high water mark and take profit price

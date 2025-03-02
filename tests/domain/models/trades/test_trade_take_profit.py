@@ -52,6 +52,16 @@ class TestTradeStopLoss(TestCase):
         self.assertTrue(take_profit.has_triggered(22))
 
     def test_is_triggered_trailing(self):
+        """
+        Test the trailing stop loss
+
+        * Open price: 20
+        * Percentage: 10%
+        * Sell percentage: 50%
+
+        Initial take profit price: 22
+
+        """
         take_profit = TradeTakeProfit(
             trade_id=1,
             trade_risk_type="trailing",

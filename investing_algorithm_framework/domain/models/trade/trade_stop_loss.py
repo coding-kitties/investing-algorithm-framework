@@ -92,6 +92,8 @@ class TradeStopLoss(BaseModel):
 
         if TradeRiskType.FIXED.equals(self.trade_risk_type):
             # Check if the current price is less than the high water mark
+            if current_price > self.high_water_mark:
+                self.high_water_mark = current_price
             return
         else:
             # Check if the current price is less than the stop loss price
@@ -131,12 +133,6 @@ class TradeStopLoss(BaseModel):
                     (1 - (self.percentage / 100))
 
         return False
-
-    @property
-    def active(self):
-
-        self.tra
-        return self._active
 
     def get_sell_amount(self) -> float:
         """
