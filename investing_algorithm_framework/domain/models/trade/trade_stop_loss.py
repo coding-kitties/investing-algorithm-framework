@@ -55,13 +55,16 @@ class TradeStopLoss(BaseModel):
         total_amount_trade: float,
         sell_percentage: float = 100,
         active: bool = True,
-        sell_prices: str = None
+        sell_prices: str = None,
+        sell_price_dates: str = None,
+        high_water_mark_date: str = None,
     ):
         self.trade_id = trade_id
         self.trade_risk_type = trade_risk_type
         self.percentage = percentage
         self.sell_percentage = sell_percentage
         self.high_water_mark = open_price
+        self.high_water_mark_date = high_water_mark_date
         self.open_price = open_price
         self.stop_loss_price = self.high_water_mark * \
             (1 - (self.percentage / 100))
@@ -69,8 +72,9 @@ class TradeStopLoss(BaseModel):
         self.sold_amount = 0
         self.active = active
         self.sell_prices = sell_prices
+        self.sell_price_dates = sell_price_dates
 
-    def update_with_last_reported_price(self, current_price: float):
+    def update_with_last_reported_price(self, current_price: float, date):
         """
         Function to update the take profit price based on the last
         reported price.
@@ -88,6 +92,8 @@ class TradeStopLoss(BaseModel):
 
         if TradeRiskType.FIXED.equals(self.trade_risk_type):
             # Check if the current price is less than the high water mark
+            if current_price > self.high_water_mark:
+                self.high_water_mark = current_price
             return
         else:
             # Check if the current price is less than the stop loss price
@@ -95,6 +101,7 @@ class TradeStopLoss(BaseModel):
                 return
             elif current_price > self.high_water_mark:
                 self.high_water_mark = current_price
+                self.high_water_mark_date = date
                 self.stop_loss_price = self.high_water_mark * \
                     (1 - (self.percentage / 100))
 

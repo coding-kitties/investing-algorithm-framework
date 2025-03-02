@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 import logging.config
 from datetime import datetime, timedelta
 
@@ -124,6 +125,7 @@ class CrossOverStrategy(TradingStrategy):
                 trade = context.get_trade(order_id=order.id)
                 context.add_stop_loss(
                     trade=trade,
+                    trade_risk_type="trailing",
                     percentage=5,
                     sell_percentage=50
                 )

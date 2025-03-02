@@ -1,9 +1,11 @@
 import logging
+from datetime import datetime, timezone
 from queue import PriorityQueue
 
 from investing_algorithm_framework.domain import OrderStatus, TradeStatus, \
     Trade, OperationalException, TradeRiskType, PeekableQueue, OrderType, \
-    OrderSide, MarketDataType
+    OrderSide, MarketDataType, Environment, ENVIRONMENT, \
+    BACKTESTING_INDEX_DATETIME
 from investing_algorithm_framework.services.repository_service import \
     RepositoryService
 
@@ -224,6 +226,7 @@ class TradeService(RepositoryService):
         Returns:
             Trade object
         """
+
         # Update the stop losses and take profits if last reported price
         # is updated
         if "last_reported_price" in data:
@@ -233,17 +236,38 @@ class TradeService(RepositoryService):
             take_profits = trade.take_profits
             to_be_saved_take_profits = []
 
+            # Check if 'update_at' attribute is in data
+
+            if 'last_reported_price_date' in data:
+                last_reported_price_date = data["last_reported_price_date"]
+            else:
+
+                # Check if config environment has value BACKTEST
+                config = self.configuration_service.get_config()
+                environment = config[ENVIRONMENT]
+
+                if Environment.BACKTEST.equals(environment):
+                    last_reported_price_date = \
+                        config[BACKTESTING_INDEX_DATETIME]
+                else:
+                    last_reported_price_date = \
+                        datetime.now(tz=timezone.utc)
+
             for stop_loss in stop_losses:
-                stop_loss.update_with_last_reported_price(
-                    data["last_reported_price"]
-                )
-                to_be_saved_stop_losses.append(stop_loss)
+
+                if stop_loss.active:
+                    stop_loss.update_with_last_reported_price(
+                        data["last_reported_price"], last_reported_price_date
+                    )
+                    to_be_saved_stop_losses.append(stop_loss)
 
             for take_profit in take_profits:
-                take_profit.update_with_last_reported_price(
-                    data["last_reported_price"]
-                )
-                to_be_saved_take_profits.append(take_profit)
+
+                if take_profit.active:
+                    take_profit.update_with_last_reported_price(
+                        data["last_reported_price"], last_reported_price_date
+                    )
+                    to_be_saved_take_profits.append(take_profit)
 
             self.trade_stop_loss_repository\
                 .save_objects(to_be_saved_stop_losses)
@@ -359,11 +383,6 @@ class TradeService(RepositoryService):
             self._create_trade_metadata_with_sell_order(sell_order)
         else:
 
-            if trades is not None:
-                self._create_trade_metadata_with_sell_order_and_trades(
-                    sell_order, trades
-                )
-
             if stop_losses is not None:
                 self._create_stop_loss_metadata_with_sell_order(
                     sell_order_id, stop_losses
@@ -372,6 +391,11 @@ class TradeService(RepositoryService):
             if take_profits is not None:
                 self._create_take_profit_metadata_with_sell_order(
                     sell_order_id, take_profits
+                )
+
+            if trades is not None:
+                self._create_trade_metadata_with_sell_order_and_trades(
+                    sell_order, trades
                 )
 
         # Retrieve all trades metadata objects
@@ -602,6 +626,7 @@ class TradeService(RepositoryService):
             last_row = data.tail(1)
             update_data = {
                 "last_reported_price": last_row["Close"][0],
+                "last_reported_price_datetime": last_row["Datetime"][0],
                 "updated_at": last_row["Datetime"][0]
             }
             self.update(open_trade.id, update_data)
@@ -850,15 +875,15 @@ class TradeService(RepositoryService):
             if available_amount == 0:
                 continue
 
-            for take_proft in open_trade.take_profits:
+            for take_profit in open_trade.take_profits:
 
                 if (
-                    take_proft.active and
-                    take_proft.has_triggered(open_trade.last_reported_price)
+                    take_profit.active and
+                    take_profit.has_triggered(open_trade.last_reported_price)
                 ):
-                    triggered_take_profits.append(take_proft)
+                    triggered_take_profits.append(take_profit)
 
-                to_be_saved_take_profit_objects.append(take_proft)
+                to_be_saved_take_profit_objects.append(take_profit)
 
             if len(triggered_take_profits) > 0:
                 take_profits_by_target_symbol[open_trade] = \

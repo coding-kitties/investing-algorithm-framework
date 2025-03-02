@@ -410,6 +410,12 @@ class CCXTTickerBacktestMarketDataSource(
 
         first_row_datetime = parser.parse(first_row["Datetime"][0])
 
+        return {
+            "symbol": self.symbol,
+            "bid": float(first_row["Close"][0]),
+            "ask": float(first_row["Close"][0]),
+            "datetime": first_row_datetime,
+        }
         # Calculate the bid and ask price based on the high and low price
         return {
             "symbol": self.symbol,

@@ -55,13 +55,16 @@ class TradeTakeProfit(BaseModel):
         total_amount_trade: float,
         sell_percentage: float = 100,
         active: bool = True,
-        sell_prices: str = None
+        sell_prices: str = None,
+        sell_price_dates: str = None,
+        high_water_mark_date: str = None,
     ):
         self.trade_id = trade_id
         self.trade_risk_type = trade_risk_type
         self.percentage = percentage
         self.sell_percentage = sell_percentage
         self.high_water_mark = None
+        self.high_water_mark_date = high_water_mark_date
         self.open_price = open_price
         self.take_profit_price = open_price * \
             (1 + (self.percentage / 100))
@@ -69,8 +72,9 @@ class TradeTakeProfit(BaseModel):
         self.sold_amount = 0
         self.active = active
         self.sell_prices = sell_prices
+        self.sell_price_dates = sell_price_dates
 
-    def update_with_last_reported_price(self, current_price: float):
+    def update_with_last_reported_price(self, current_price: float, date):
         """
         Function to update the take profit price based on
             the last reported price.
@@ -85,6 +89,17 @@ class TradeTakeProfit(BaseModel):
 
         # Do nothing for fixed take profit
         if TradeRiskType.FIXED.equals(self.trade_risk_type):
+
+            if self.high_water_mark is not None:
+                if current_price > self.high_water_mark:
+                    self.high_water_mark = current_price
+                    self.high_water_mark_date = date
+            else:
+                if current_price >= self.take_profit_price:
+                    self.high_water_mark = current_price
+                    self.high_water_mark_date = date
+                return
+
             return
         else:
 
@@ -92,8 +107,10 @@ class TradeTakeProfit(BaseModel):
 
                 if current_price >= self.take_profit_price:
                     self.high_water_mark = current_price
+                    self.high_water_mark_date = date
                     new_take_profit_price = self.high_water_mark * \
                         (1 - (self.percentage / 100))
+
                     if self.take_profit_price <= new_take_profit_price:
                         self.take_profit_price = new_take_profit_price
 
@@ -106,6 +123,7 @@ class TradeTakeProfit(BaseModel):
             # Increase the high water mark and take profit price
             elif current_price > self.high_water_mark:
                 self.high_water_mark = current_price
+                self.high_water_mark_date = date
                 new_take_profit_price = self.high_water_mark * \
                     (1 - (self.percentage / 100))
 

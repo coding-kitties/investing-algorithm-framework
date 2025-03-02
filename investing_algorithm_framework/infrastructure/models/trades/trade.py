@@ -32,6 +32,11 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
     * remaining: float, the remaining amount of the trade
     * net_gain: float, the net gain of the trade
     * last_reported_price: float, the last reported price of the trade
+    * last_reported_price_datetime: datetime, the datetime when the last
+        reported price was reported
+    * high_water_mark: float, the high water mark of the trade
+    * high_water_mark_datetime: datetime, the datetime when the high water
+        mark was reported
     * created_at: datetime, the datetime when the trade was created
     * updated_at: datetime, the datetime when the trade was last updated
     * status: str, the status of the trade
@@ -58,7 +63,9 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
     net_gain = Column(Float, default=0)
     cost = Column(Float, default=0)
     last_reported_price = Column(Float, default=None)
+    last_reported_price_datetime = Column(DateTime, default=None)
     high_water_mark = Column(Float, default=None)
+    high_water_mark_datetime = Column(DateTime, default=None)
     updated_at = Column(DateTime, default=None)
     status = Column(String, default=TradeStatus.CREATED.value)
     # Stop losses should be actively loaded
@@ -89,7 +96,9 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         net_gain=0,
         cost=0,
         last_reported_price=None,
+        last_reported_price_datetime=None,
         high_water_mark=None,
+        high_water_mark_datetime=None,
         sell_orders=[],
         stop_losses=[],
         take_profits=[],
@@ -105,7 +114,9 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         self.net_gain = net_gain
         self.cost = cost
         self.last_reported_price = last_reported_price
+        self.last_reported_price_datetime = last_reported_price_datetime
         self.high_water_mark = high_water_mark
+        self.high_water_mark_datetime = high_water_mark_datetime
         self.opened_at = opened_at
         self.updated_at = updated_at
         self.status = status

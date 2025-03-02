@@ -1,3 +1,4 @@
+from datetime import datetime
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential, OrderStatus, TradeStatus, TradeRiskType
 from tests.resources import TestBase
@@ -1050,12 +1051,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 17,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 7,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         sell_order_data = trade_service.get_triggered_stop_loss_orders()
@@ -1166,12 +1169,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 17,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 7,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         sell_order_data = trade_service.get_triggered_stop_loss_orders()
@@ -1292,12 +1297,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 17,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 7,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         sell_order_data = trade_service.get_triggered_stop_loss_orders()
@@ -1530,12 +1537,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 17,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 7,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         sell_order_data = trade_service.get_triggered_stop_loss_orders()
@@ -1685,12 +1694,13 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 22,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_service.update(
             trade_two_id,
             {
-                "last_reported_price": 11,
+                "last_reported_price": 11,            "last_reported_price_datetime": datetime.now(),
             }
         )
         sell_order_data = trade_service.get_triggered_take_profit_orders()
@@ -1711,12 +1721,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 25,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_two = trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 14,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
 
@@ -1747,12 +1759,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 22.4,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_two = trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 12.5,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
 
@@ -1876,12 +1890,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 22,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 11,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         sell_order_data = trade_service.get_triggered_take_profit_orders()
@@ -1902,12 +1918,12 @@ class TestTradeService(TestBase):
         for data in sell_order_data:
             order_service.create(data)
 
-               # Take profit 2
+        # Take profit 2
         take_profit_one = trade_take_profit_repository.get(
             take_profit_one.id
         )
         self.assertEqual(22, take_profit_one.take_profit_price)
-        self.assertEqual(None, take_profit_one.high_water_mark)
+        self.assertEqual(22, take_profit_one.high_water_mark)
         self.assertEqual(10, take_profit_one.sold_amount)
 
         trade_one = self.app.container.trade_service().find(
@@ -1921,12 +1937,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 25,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_two = trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 14,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
 
@@ -1957,12 +1975,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 22.4,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_two = trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 12.5,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
 
@@ -2089,12 +2109,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 22,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 11,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         sell_order_data = trade_service.get_triggered_take_profit_orders()
@@ -2137,12 +2159,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 25,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_two = trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 14,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
 
@@ -2173,12 +2197,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 22.4,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_two = trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 12.5,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
 
@@ -2432,12 +2458,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 22,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 11,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         sell_order_data = trade_service.get_triggered_take_profit_orders()
@@ -2480,12 +2508,14 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 25,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
         trade_two = trade_service.update(
             trade_two_id,
             {
                 "last_reported_price": 14,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
 
@@ -2516,8 +2546,426 @@ class TestTradeService(TestBase):
             trade_one_id,
             {
                 "last_reported_price": 22.4,
+                "last_reported_price_datetime": datetime.now(),
             }
         )
 
         sell_order_data = trade_service.get_triggered_take_profit_orders()
         self.assertEqual(0, len(sell_order_data))
+
+    def test_deactivation_of_take_profits_when_stop_losses_are_triggered(self):
+        """
+        Test for triggered stop loss orders:
+
+        1. Create a buy order for ADA with amount 20 at 20 EUR
+        2. Create a stop loss with fixed percentage of 10 and
+            sell percentage 50 for the trade. This is a stop loss price
+            of 18 EUR
+        3. Create a take profit with a trailing percentage of 10 and
+            sell percentage 25 for the trade.
+
+            The first take profit will trigger at 22 EUR, and the second
+            take profit will set its high water mark and take profit price at 22 EUR, and only trigger if the price goes down from take profit price.
+
+        4. Create a buy order for DOT with amount 20 at 10 EUR
+        5. Create a trailing stop loss with percentage of 10 and
+            sell percentage 25 for the trade. This is a stop loss price
+            initially set at 7 EUR
+        6. Update the last reported price of ada to 17 EUR, triggering 2
+            stop loss orders
+        7. Update the last reported price of dot to 7 EUR, triggering 1
+            stop loss order
+        8. Check that the triggered stop loss orders are correct
+
+        """
+        order_service = self.app.container.order_service()
+        trade_take_profit_repository = self.app.container.\
+            trade_take_profit_repository()
+        buy_order_one = order_service.create(
+            {
+                "target_symbol": "ADA",
+                "trading_symbol": "EUR",
+                "amount": 20,
+                "filled": 20,
+                "remaining": 0,
+                "order_side": "BUY",
+                "price": 20,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CLOSED",
+            }
+        )
+
+        trade_service = self.app.container.trade_service()
+        trade_one = self.app.container.trade_service().find(
+            {"order_id": buy_order_one.id}
+        )
+        trade_one_id = trade_one.id
+        stop_loss_one = trade_service.add_stop_loss(
+            trade_one,
+            10,
+            "fixed",
+            sell_percentage=100,
+        )
+        self.assertEqual(18, stop_loss_one.stop_loss_price)
+        take_profit_one = trade_service.add_take_profit(
+            trade_one,
+            10,
+            "trailing",
+            sell_percentage=25,
+        )
+
+        # Update the last reported price of ada to 17 EUR, triggering 1
+        # stop loss order
+        trade_service.update(
+            trade_one_id,
+            {
+                "last_reported_price": 17,
+                "last_reported_price_datetime": datetime.now(),
+            }
+        )
+        sell_order_data = trade_service.get_triggered_stop_loss_orders()
+        self.assertEqual(1, len(sell_order_data))
+
+        for order_data in sell_order_data:
+            self.assertEqual("SELL", order_data["order_side"])
+            self.assertEqual("EUR", order_data["trading_symbol"])
+            self.assertEqual(1, order_data["portfolio_id"])
+            self.assertEqual("LIMIT", order_data["order_type"])
+            self.assertEqual(17, order_data["price"])
+            self.assertEqual(20, order_data["amount"])
+            self.assertEqual("ADA", order_data["target_symbol"])
+            sell_order = order_service.create(order_data)
+
+        # Trade should be closed
+        trade_one = trade_service.get(trade_one_id)
+        self.assertEqual(0, trade_one.remaining)
+        self.assertEqual(20, trade_one.amount)
+        self.assertEqual("CLOSED", trade_one.status)
+
+        # All stop losses should be deactivated
+        for stop_loss in trade_one.stop_losses:
+            self.assertFalse(stop_loss.active)
+
+        # All take profits should be deactivated
+        for take_profit in trade_one.take_profits:
+            self.assertFalse(take_profit.active)
+
+    def test_deactivation_of_stop_losses_when_take_profits_are_triggered(self):
+        """
+        Test for triggered stop loss orders:
+
+        1. Create a buy order for ADA with amount 20 at 20 EUR
+        2. Create a stop loss with fixed percentage of 10 and
+            sell percentage 50 for the trade. This is a stop loss price
+            of 18 EUR
+        3. Create a take profit with a trailing percentage of 10 and
+            sell percentage 25 for the trade.
+
+            The first take profit will trigger at 22 EUR, and the second
+            take profit will set its high water mark and take profit price at 22 EUR, and only trigger if the price goes down from take profit price.
+
+        4. Create a buy order for DOT with amount 20 at 10 EUR
+        5. Create a trailing stop loss with percentage of 10 and
+            sell percentage 25 for the trade. This is a stop loss price
+            initially set at 7 EUR
+        6. Update the last reported price of ada to 17 EUR, triggering 2
+            stop loss orders
+        7. Update the last reported price of dot to 7 EUR, triggering 1
+            stop loss order
+        8. Check that the triggered stop loss orders are correct
+
+        """
+        order_service = self.app.container.order_service()
+        trade_take_profit_repository = self.app.container.\
+            trade_take_profit_repository()
+        buy_order_one = order_service.create(
+            {
+                "target_symbol": "ADA",
+                "trading_symbol": "EUR",
+                "amount": 20,
+                "filled": 20,
+                "remaining": 0,
+                "order_side": "BUY",
+                "price": 20,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CLOSED",
+            }
+        )
+
+        trade_service = self.app.container.trade_service()
+        trade_one = self.app.container.trade_service().find(
+            {"order_id": buy_order_one.id}
+        )
+        trade_one_id = trade_one.id
+        take_profit_one = trade_service.add_take_profit(
+            trade_one,
+            10,
+            "fixed",
+            sell_percentage=100,
+        )
+        self.assertEqual(22, take_profit_one.take_profit_price)
+        stop_loss_one = trade_service.add_stop_loss(
+            trade_one,
+            10,
+            "trailing",
+            sell_percentage=25,
+        )
+
+        # Update the last reported price of ada to 17 EUR, triggering 1
+        # stop loss order
+        trade_service.update(
+            trade_one_id,
+            {
+                "last_reported_price": 22,
+                "last_reported_price_datetime": datetime.now(),
+            }
+        )
+        sell_order_data = trade_service.get_triggered_take_profit_orders()
+        self.assertEqual(1, len(sell_order_data))
+
+        for order_data in sell_order_data:
+            self.assertEqual("SELL", order_data["order_side"])
+            self.assertEqual("EUR", order_data["trading_symbol"])
+            self.assertEqual(1, order_data["portfolio_id"])
+            self.assertEqual("LIMIT", order_data["order_type"])
+            self.assertEqual(22, order_data["price"])
+            self.assertEqual(20, order_data["amount"])
+            self.assertEqual("ADA", order_data["target_symbol"])
+            sell_order = order_service.create(order_data)
+
+        # Trade should be closed
+        trade_one = trade_service.get(trade_one_id)
+        self.assertEqual(0, trade_one.remaining)
+        self.assertEqual(20, trade_one.amount)
+        self.assertEqual("CLOSED", trade_one.status)
+
+        # All stop losses should be deactivated
+        for stop_loss in trade_one.stop_losses:
+            self.assertFalse(stop_loss.active)
+
+        # All take profits should be deactivated
+        for take_profit in trade_one.take_profits:
+            self.assertFalse(take_profit.active)
+
+    def test_update_stop_losses_trailing_price_increase(self):
+        """
+        Test if the stop losses are triggered correctly when the last reported
+        price is updated. This test will check for both fixed and trailing
+        stop losses if they are triggered correctly and also if the high water
+        mark is updated correctly.
+
+        1. Create a buy order for ADA with amount 20 at 20 EUR
+        2. Create a stop loss with fixed percentage of 10 and
+            sell percentage 10 for the trade. This is a stop loss price
+            of 18 EUR
+        3. Create a stop loss with trailing percentage of 10 and
+            sell percentage 25 for the trade. This is a stop loss price
+            initially set at 18 EUR
+        4. Update the last reported price of ada to 21 EUR, triggering 0
+            stop loss orders. The trailing stop loss should be updated to
+            19.8 EUR. Both stop losses should have their high water mark
+            set to 21 EUR
+        5. Update the last reported price of ada to 22 EUR. The trailing
+            stop loss should be updated to 20 EUR, and the fixed stop loss
+            should not be triggered. Both stop losses should have their
+            high water mark set to 22 EUR.
+        """
+        order_service = self.app.container.order_service()
+        stop_loss_repository = self.app.container.\
+            trade_stop_loss_repository()
+        buy_order_one = order_service.create(
+            {
+                "target_symbol": "ADA",
+                "trading_symbol": "EUR",
+                "amount": 20,
+                "filled": 20,
+                "remaining": 0,
+                "order_side": "BUY",
+                "price": 20,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CLOSED",
+            }
+        )
+
+        trade_service = self.app.container.trade_service()
+        trade_one = self.app.container.trade_service().find(
+            {"order_id": buy_order_one.id}
+        )
+        trade_one_id = trade_one.id
+        stop_loss_one = trade_service.add_stop_loss(
+            trade_one,
+            10,
+            "fixed",
+            sell_percentage=25,
+        )
+        self.assertEqual(18, stop_loss_one.stop_loss_price)
+
+        # Create a stop loss with a trailing percentage of 10 and
+        # sell percentage 25 for the trade.
+        stop_loss_two = trade_service.add_stop_loss(
+            trade_one,
+            10,
+            "trailing",
+            sell_percentage=25,
+        )
+        self.assertEqual(18, stop_loss_two.stop_loss_price)
+        self.assertEqual(20, stop_loss_two.high_water_mark)
+
+        # Update the last reported price of ada to 21 EUR, triggering 0
+        # stop loss orders. The trailing stop loss should be updated to
+        # 18.9. Both stop losses should have their high water mark
+        # set to 21 EUR
+
+        trade_service.update(
+            trade_one_id,
+            {
+                "last_reported_price": 21,
+                "last_reported_price_datetime": datetime.now(),
+            }
+        )
+
+        stop_loss_one = stop_loss_repository.get(
+            stop_loss_one.id
+        )
+        self.assertEqual(18, stop_loss_one.stop_loss_price)
+        self.assertEqual(21, stop_loss_one.high_water_mark)
+
+        stop_loss_two = stop_loss_repository.get(
+            stop_loss_two.id
+        )
+        self.assertAlmostEqual(18.9, stop_loss_two.stop_loss_price)
+        self.assertEqual(21, stop_loss_two.high_water_mark)
+
+        trade_service.update(
+            trade_one_id,
+            {
+                "last_reported_price": 22,
+                "last_reported_price_datetime": datetime.now(),
+            }
+        )
+
+        stop_loss_one = stop_loss_repository.get(
+            stop_loss_one.id
+        )
+        self.assertEqual(18, stop_loss_one.stop_loss_price)
+        self.assertEqual(22, stop_loss_one.high_water_mark)
+
+        stop_loss_two = stop_loss_repository.get(
+            stop_loss_two.id
+        )
+        self.assertAlmostEqual(19.8, stop_loss_two.stop_loss_price)
+        self.assertEqual(22, stop_loss_two.high_water_mark)
+
+    def test_update_latest_price_and_take_profits(self):
+        """
+        Test if the stop losses are triggered correctly when the last reported
+        price is updated. This test will check for both fixed and trailing
+        stop losses if they are triggered correctly and also if the high water
+        mark is updated correctly.
+
+        1. Create a buy order for ADA with amount 20 at 20 EUR
+        2. Create a stop loss with fixed percentage of 10 and
+            sell percentage 10 for the trade. This is a stop loss price
+            of 18 EUR
+        3. Create a stop loss with trailing percentage of 10 and
+            sell percentage 25 for the trade. This is a stop loss price
+            initially set at 18 EUR
+        4. Update the last reported price of ada to 21 EUR, triggering 0
+            stop loss orders. The trailing stop loss should be updated to
+            19.8 EUR. Both stop losses should have their high water mark
+            set to 21 EUR
+        5. Update the last reported price of ada to 22 EUR. The trailing
+            stop loss should be updated to 20 EUR, and the fixed stop loss
+            should not be triggered. Both stop losses should have their
+            high water mark set to 22 EUR.
+        """
+        order_service = self.app.container.order_service()
+        take_profit_repository = self.app.container.\
+            trade_take_profit_repository()
+        buy_order_one = order_service.create(
+            {
+                "target_symbol": "ADA",
+                "trading_symbol": "EUR",
+                "amount": 20,
+                "filled": 20,
+                "remaining": 0,
+                "order_side": "BUY",
+                "price": 20,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CLOSED",
+            }
+        )
+
+        trade_service = self.app.container.trade_service()
+        trade_one = self.app.container.trade_service().find(
+            {"order_id": buy_order_one.id}
+        )
+        trade_one_id = trade_one.id
+        take_profit_one = trade_service.add_take_profit(
+            trade_one,
+            10,
+            "fixed",
+            sell_percentage=25,
+        )
+        self.assertEqual(22, take_profit_one.take_profit_price)
+
+        # Create a stop loss with a trailing percentage of 10 and
+        # sell percentage 25 for the trade.
+        take_profit_two = trade_service.add_take_profit(
+            trade_one,
+            10,
+            "trailing",
+            sell_percentage=25,
+        )
+        self.assertEqual(22, take_profit_two.take_profit_price)
+        self.assertEqual(None, take_profit_two.high_water_mark)
+
+        # Update the last reported price of ada to 21 EUR, triggering 0
+        # stop loss orders. The trailing stop loss should be updated to
+        # 18.9. Both stop losses should have their high water mark
+        # set to 21 EUR
+
+        trade_service.update(
+            trade_one_id,
+            {
+                "last_reported_price": 21,
+                "last_reported_price_datetime": datetime.now(),
+            }
+        )
+
+        take_profit_one = take_profit_repository.get(
+            take_profit_one.id
+        )
+        self.assertEqual(22, take_profit_one.take_profit_price)
+        self.assertEqual(None, take_profit_one.high_water_mark)
+
+        take_profit_two = take_profit_repository.get(
+            take_profit_two.id
+        )
+
+        self.assertAlmostEqual(22, take_profit_two.take_profit_price)
+        self.assertEqual(None, take_profit_two.high_water_mark)
+
+        trade_service.update(
+            trade_one_id,
+            {
+                "last_reported_price": 25,
+                "last_reported_price_datetime": datetime.now(),
+            }
+        )
+
+        take_profit_one = take_profit_repository.get(
+            take_profit_one.id
+        )
+        self.assertEqual(22, take_profit_one.take_profit_price)
+        self.assertEqual(25, take_profit_one.high_water_mark)
+
+        take_profit_two = take_profit_repository.get(
+            take_profit_two.id
+        )
+        self.assertAlmostEqual(22.5, take_profit_two.take_profit_price)
+        self.assertEqual(25, take_profit_two.high_water_mark)
