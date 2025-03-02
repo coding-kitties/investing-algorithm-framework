@@ -51,17 +51,19 @@ def is_positive(number) -> bool:
     return number > 0
 
 
-def pretty_print_profit_evaluation(reports, precision=4):
+def pretty_print_profit_evaluation(
+    reports, price_precision=2, percentage_precision=4
+):
     profit_table = {}
     profit_table["Algorithm name"] = [
         report.name for report in reports
     ]
     profit_table["Profit"] = [
-        f"{float(report.total_net_gain):.{precision}f} {report.trading_symbol}"
+        f"{float(report.total_net_gain):.{price_precision}f} {report.trading_symbol}"
         for report in reports
     ]
     profit_table["Profit percentage"] = [
-        f"{float(report.total_net_gain_percentage):.{precision}f}%" for report in reports
+        f"{float(report.total_net_gain_percentage):.{percentage_precision}f}%" for report in reports
     ]
     profit_table["Percentage positive trades"] = [
         f"{float(report.percentage_positive_trades):.{0}f}%"
@@ -72,21 +74,25 @@ def pretty_print_profit_evaluation(reports, precision=4):
         for report in reports
     ]
     profit_table["Total value"] = [
-        f"{float(report.total_value):.{precision}f}" for report in reports
+        f"{float(report.total_value):.{price_precision}f}" for report in reports
     ]
     print(tabulate(profit_table, headers="keys", tablefmt="rounded_grid"))
 
 
-def pretty_print_growth_evaluation(reports, precision=4):
+def pretty_print_growth_evaluation(
+    reports,
+    price_precision=2,
+    percentage_precision=4
+):
     growth_table = {}
     growth_table["Algorithm name"] = [
         report.name for report in reports
     ]
     growth_table["Growth"] = [
-        f"{float(report.growth):.{precision}f} {report.trading_symbol}" for report in reports
+        f"{float(report.growth):.{price_precision}f} {report.trading_symbol}" for report in reports
     ]
     growth_table["Growth percentage"] = [
-        f"{float(report.growth_rate):.{precision}f}%" for report in reports
+        f"{float(report.growth_rate):.{percentage_precision}f}%" for report in reports
     ]
     growth_table["Percentage positive trades"] = [
         f"{float(report.percentage_positive_trades):.{0}f}%"
@@ -97,7 +103,7 @@ def pretty_print_growth_evaluation(reports, precision=4):
         for report in reports
     ]
     growth_table["Total value"] = [
-        f"{float(report.total_value):.{precision}f}" for report in reports
+        f"{float(report.total_value):.{price_precision}f}" for report in reports
     ]
     print(
         tabulate(growth_table, headers="keys", tablefmt="rounded_grid")
@@ -683,8 +689,8 @@ def pretty_print_backtest_reports_evaluation(
               :%%%#+-          .=*#%%%      {COLOR_GREEN}Backtest reports evaluation{COLOR_RESET}
               *%%%%%%%+------=*%%%%%%%-     {COLOR_GREEN}---------------------------{COLOR_RESET}
               *%%%%%%%%%%%%%%%%%%%%%%%-     {COLOR_YELLOW}Number of reports:{COLOR_RESET} {COLOR_GREEN}{number_of_backtest_reports} backtest reports{COLOR_RESET}
-              .%%%%%%%%%%%%%%%%%%%%%%#      {COLOR_YELLOW}Largest overall profit:{COLOR_RESET}{COLOR_GREEN}{COLOR_RESET}{COLOR_GREEN} (Algorithm {most_profitable.name}) {float(most_profitable.total_net_gain):.{precision}f} {most_profitable.trading_symbol} {float(most_profitable.total_net_gain_percentage):.{precision}f}% ({most_profitable.backtest_date_range.name} {most_profitable.backtest_date_range.start_date} - {most_profitable.backtest_date_range.end_date}){COLOR_RESET}
-               #%%%####%%%%%%%%**#%%%+      {COLOR_YELLOW}Largest overall growth:{COLOR_RESET}{COLOR_GREEN} (Algorithm {most_profitable.name}) {float(most_growth.growth):.{precision}f} {most_growth.trading_symbol} {float(most_growth.growth_rate):.{precision}f}% ({most_growth.backtest_date_range.name} {most_growth.backtest_date_range.start_date} - {most_growth.backtest_date_range.end_date}){COLOR_RESET}
+              .%%%%%%%%%%%%%%%%%%%%%%#      {COLOR_YELLOW}Largest overall profit:{COLOR_RESET}{COLOR_GREEN}{COLOR_RESET}{COLOR_GREEN} (Algorithm {most_profitable.name}) {float(most_profitable.total_net_gain):.{price_precision}f} {most_profitable.trading_symbol} {float(most_profitable.total_net_gain_percentage):.{percentage_precision}f}% ({most_profitable.backtest_date_range.name} {most_profitable.backtest_date_range.start_date} - {most_profitable.backtest_date_range.end_date}){COLOR_RESET}
+               #%%%####%%%%%%%%**#%%%+      {COLOR_YELLOW}Largest overall growth:{COLOR_RESET}{COLOR_GREEN} (Algorithm {most_profitable.name}) {float(most_growth.growth):.{price_precision}f} {most_growth.trading_symbol} {float(most_growth.growth_rate):.{percentage_precision}f}% ({most_growth.backtest_date_range.name} {most_growth.backtest_date_range.start_date} - {most_growth.backtest_date_range.end_date}){COLOR_RESET}
          .:-+*%%%%- {COLOR_PURPLE}-+..#{COLOR_RESET}%%%+.{COLOR_PURPLE}+-  +{COLOR_RESET}%%%#*=-:
           .:-=*%%%%. {COLOR_PURPLE}+={COLOR_RESET} .%%#  {COLOR_PURPLE}-+.-{COLOR_RESET}%%%%=-:..
           .:=+#%%%%%*###%%%%#*+#%%%%%%*+-:
@@ -711,14 +717,18 @@ def pretty_print_backtest_reports_evaluation(
         pretty_print_date_ranges(backtest_reports_evaluation.get_date_ranges())
         print("")
 
-    pretty_print_price_efficiency(reports, precision=precision)
+    pretty_print_price_efficiency(reports, precision=price_precision)
     print(f"{COLOR_YELLOW}All profits ordered{COLOR_RESET}")
     pretty_print_profit_evaluation(
-        backtest_reports_evaluation.get_profit_order(backtest_date_range), precision
+        backtest_reports_evaluation.get_profit_order(backtest_date_range),
+        price_precision=price_precision,
+        percentage_precision=percentage_precision
     )
     print(f"{COLOR_YELLOW}All growths ordered{COLOR_RESET}")
     pretty_print_growth_evaluation(
-        backtest_reports_evaluation.get_growth_order(backtest_date_range), precision
+        backtest_reports_evaluation.get_growth_order(backtest_date_range),
+        percentage_precision=percentage_precision,
+        price_precision=price_precision
     )
 
 
@@ -755,7 +765,10 @@ def pretty_print_backtest(
         show_triggered_stop_losses_only: bool - show only the triggered stop losses
         show_take_profits: bool - show the take profits
         show_triggered_take_profits_only: bool - show only the triggered take profits
-        precision: int - the precision of the floats
+        amount_precesion: int - the amount precision
+        price_precision: int - the price precision
+        time_precision: int - the time precision
+        percentage_precision: int - the percentage precision
 
     Returns:
         None
@@ -785,7 +798,6 @@ def pretty_print_backtest(
         """
 
     print(ascii_art)
-    # pretty_print_price_efficiency([backtest_report], precision=precision)
 
     if show_positions:
         print(f"{COLOR_YELLOW}Positions overview{COLOR_RESET}")
