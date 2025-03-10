@@ -59,17 +59,6 @@ def create_file_from_template(template_path, output_path):
 
 def command(path = None, web = False):
     """
-    Command-line tool for creating an azure function enabled app skeleton.
-
-    Args:
-        add_app_template (bool): Flag to create an app skeleton.
-        add_requirements_template (bool): Flag to create a
-        requirements template.
-
-    Returns:
-        None
-    """
-    """
     Function to create an azure function app skeleton.
 
     Args:
@@ -90,12 +79,20 @@ def command(path = None, web = False):
     # Get the path of this script (command.py)
     current_script_path = os.path.abspath(__file__)
 
-    # Construct the path to the template file
-    template_app_file_path = os.path.join(
-        os.path.dirname(current_script_path),
-        "templates",
-        "app.py.template"
-    )
+    if web:
+        # Construct the path to the template file
+        template_app_file_path = os.path.join(
+            os.path.dirname(current_script_path),
+            "templates",
+            "app-web.py.template"
+        )
+    else:
+        # Construct the path to the template file
+        template_app_file_path = os.path.join(
+            os.path.dirname(current_script_path),
+            "templates",
+            "app.py.template"
+        )
     requirements_path = os.path.join(
         os.path.dirname(current_script_path),
         "templates",
