@@ -22,6 +22,11 @@ BACKTEST_REPORT_FILE_NAME_PATTERN = (
     r"backtest-end-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
     r"created-at_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}\.json$"
 )
+BACKTEST_REPORT_DIRECTORY_PATTERN = (
+    r"^report_\w+_backtest-start-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
+    r"backtest-end-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
+    r"created-at_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}$"
+)
 
 
 def validate_algorithm_name(name, illegal_chars=r"[\/:*?\"<>|]"):
@@ -690,7 +695,27 @@ class BacktestService:
         algorithm,
         output_directory: str
     ) -> None:
-        output_directory = os.path.join(output_directory, algorithm.name)
+        output_directory = self.create_report_directory(
+            report, output_directory, algorithm.name
+        )
+
+
+        if self.is_running_in_notebook():
+            strategys = algorithm.strategies
+
+            for strategy in strategys:
+                self.save_strategy(strategy, output_directory)
+        else:
+            # Copy over all files in the strategy directory
+            # to the output directory
+            strategy_directory = os.path.dirname(
+                inspect.getfile(algorithm.__class__)
+            )
+            strategy_files = os.listdir(strategy_directory)
+
+
+
+
         collected_imports = set()
         class_definitions = []
         self.write_report_to_json(report, output_directory)
@@ -838,3 +863,44 @@ class BacktestService:
             f"{backtest_end_date}_created-at_{created_at}{extension}"
         )
         return file_path
+
+    @staticmethod
+    def create_report_directory(
+        report, output_directory, algorithm_name
+    ) -> str:
+        """
+        Function to create a directory for a backtest report.
+
+        Args:
+            report: BacktestReport - The backtest report to create a
+                directory for.
+            output_directory: str - The directory to store the backtest
+                report file.
+            algorithm_name: str - The name of the algorithm to
+                create a directory for.
+
+        Returns:
+            directory_path: str The directory path for the
+                backtest report file.
+        """
+
+        backtest_start_date = report.backtest_start_date \
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        backtest_end_date = report.backtest_end_date \
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        created_at = report.created_at.strftime(DATETIME_FORMAT_BACKTESTING)
+        directory_path = os.path.join(
+            output_directory,
+            f"{algorithm_name}_backtest-start-date_"
+            f"{backtest_start_date}_backtest-end-date_"
+            f"{backtest_end_date}_created-at_{created_at}"
+        )
+        return directory_path
+
+    def is_running_in_notebook():
+        try:
+            # Jupyter-specific modules
+            from IPython import get_ipython
+            return get_ipython() is not None
+        except ImportError:
+            return False

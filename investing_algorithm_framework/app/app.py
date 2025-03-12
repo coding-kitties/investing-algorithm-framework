@@ -630,8 +630,6 @@ class App:
         output_directory=None,
         algorithm: Algorithm = None
     ) -> BacktestReport:
-        print(self.name)
-        print(self.algorithm.name)
         """
         Run a backtest for an algorithm. This method should be called when
         running a backtest.
