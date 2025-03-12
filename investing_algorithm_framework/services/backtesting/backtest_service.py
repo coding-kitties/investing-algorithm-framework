@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import re
 import os
+import inspect
 import json
 import pandas as pd
 from dateutil import parser
@@ -20,6 +21,11 @@ BACKTEST_REPORT_FILE_NAME_PATTERN = (
     r"^report_\w+_backtest-start-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
     r"backtest-end-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
     r"created-at_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}\.json$"
+)
+BACKTEST_REPORT_DIRECTORY_PATTERN = (
+    r"^report_\w+_backtest-start-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
+    r"backtest-end-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
+    r"created-at_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}$"
 )
 
 
@@ -683,6 +689,104 @@ class BacktestService:
 
         return False
 
+    def save_report(
+        self,
+        report: BacktestReport,
+        algorithm,
+        output_directory: str
+    ) -> None:
+        output_directory = self.create_report_directory(
+            report, output_directory, algorithm.name
+        )
+
+
+        if self.is_running_in_notebook():
+            strategys = algorithm.strategies
+
+            for strategy in strategys:
+                self.save_strategy(strategy, output_directory)
+        else:
+            # Copy over all files in the strategy directory
+            # to the output directory
+            strategy_directory = os.path.dirname(
+                inspect.getfile(algorithm.__class__)
+            )
+            strategy_files = os.listdir(strategy_directory)
+
+
+
+
+        collected_imports = set()
+        class_definitions = []
+        self.write_report_to_json(report, output_directory)
+
+        collected_imports = []
+        class_definitions = []
+
+        for strategy in algorithm.strategies:
+            cls = strategy.__class__
+            file_path = inspect.getfile(cls)
+
+            if os.path.exists(file_path):
+                with open(file_path, "r") as f:
+                    lines = f.readlines()
+
+                class_started = False
+                class_code = []
+                current_import = []
+
+                for line in lines:
+                    stripped_line = line.strip()
+
+                    # Start collecting an import line
+                    if stripped_line.startswith(("import ", "from ")):
+                        current_import.append(line.rstrip())
+
+                        # Handle single-line import directly
+                        if not stripped_line.endswith(("\\", "(")):
+                            collected_imports.append(" ".join(current_import))
+                            current_import = []
+
+                    # Continue collecting multi-line imports
+                    elif current_import:
+                        current_import.append(line.rstrip())
+
+                        # Stop when the multi-line import finishes
+                        if not stripped_line.endswith(("\\", ",")):
+                            collected_imports.append(" ".join(current_import))
+                            current_import = []
+
+                    # Catch any unfinished import (just in case)
+                    if current_import:
+                        collected_imports.append(" ".join(current_import))
+
+                    # Capture class definitions and functions
+                    if stripped_line.startswith("class ") or stripped_line.startswith("def "):
+                        class_started = True
+
+                    if class_started:
+                        class_code.append(line)
+
+                if class_code:
+                    class_definitions.append("".join(class_code))
+
+        filename = os.path.join(
+            output_directory,
+            f"algorithm.py"
+        )
+
+        # Save everything to a single file
+        with open(filename, "w") as f:
+            # Write unique imports at the top
+            for imp in collected_imports:
+                f.write(imp)
+
+            f.write("\n\n")
+
+            # Write class and function definitions
+            for class_def in class_definitions:
+                f.write(class_def + "\n\n")
+
     def write_report_to_json(
         self, report: BacktestReport, output_directory: str
     ) -> None:
@@ -759,3 +863,44 @@ class BacktestService:
             f"{backtest_end_date}_created-at_{created_at}{extension}"
         )
         return file_path
+
+    @staticmethod
+    def create_report_directory(
+        report, output_directory, algorithm_name
+    ) -> str:
+        """
+        Function to create a directory for a backtest report.
+
+        Args:
+            report: BacktestReport - The backtest report to create a
+                directory for.
+            output_directory: str - The directory to store the backtest
+                report file.
+            algorithm_name: str - The name of the algorithm to
+                create a directory for.
+
+        Returns:
+            directory_path: str The directory path for the
+                backtest report file.
+        """
+
+        backtest_start_date = report.backtest_start_date \
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        backtest_end_date = report.backtest_end_date \
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        created_at = report.created_at.strftime(DATETIME_FORMAT_BACKTESTING)
+        directory_path = os.path.join(
+            output_directory,
+            f"{algorithm_name}_backtest-start-date_"
+            f"{backtest_start_date}_backtest-end-date_"
+            f"{backtest_end_date}_created-at_{created_at}"
+        )
+        return directory_path
+
+    def is_running_in_notebook():
+        try:
+            # Jupyter-specific modules
+            from IPython import get_ipython
+            return get_ipython() is not None
+        except ImportError:
+            return False

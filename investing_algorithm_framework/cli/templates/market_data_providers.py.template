@@ -1,0 +1,9 @@
+from investing_algorithm_framework import CCXTOHLCVMarketDataSource
+
+btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
+    identifier="BTC/EUR-ohlcv",
+    market="BINANCE",
+    symbol="BTC/EUR",
+    time_frame="2h",
+    window_size=200
+)

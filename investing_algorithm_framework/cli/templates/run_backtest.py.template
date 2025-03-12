@@ -1,0 +1,13 @@
+from datetime import datetime
+from investing_algorithm_framework import BacktestDateRange, \
+    pretty_print_backtest
+
+from app import app
+
+if __name__ == "__main__":
+    backtest_date_range = BacktestDateRange(
+        start_date=datetime(2023, 1, 1),
+        end_date=datetime(2023, 12, 31),
+    )
+    report = app.run_backtest(backtest_date_range=backtest_date_range)
+    pretty_print_backtest(report)
