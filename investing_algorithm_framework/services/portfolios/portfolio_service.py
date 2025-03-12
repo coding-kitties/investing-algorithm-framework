@@ -120,7 +120,7 @@ class PortfolioService(RepositoryService):
         )
 
     def create_portfolio_from_configuration(
-        self, portfolio_configuration
+        self, portfolio_configuration, initial_amount=None
     ) -> Portfolio:
         """
         Method to create a portfolio based on a portfolio configuration.
@@ -132,6 +132,7 @@ class PortfolioService(RepositoryService):
         Args:
             portfolio_configuration (PortfolioConfiguration)
                 Portfolio configuration to create the portfolio from
+            initial_amount (Decimal): Initial balance for the portfolio
 
         Returns:
             Portfolio: Portfolio created from the configuration
@@ -166,6 +167,10 @@ class PortfolioService(RepositoryService):
                 portfolio_configuration
             )
             data = portfolio.to_dict()
+
+            if initial_amount is not None:
+                data["unallocated"] = initial_amount
+
             self.create(data)
 
         return portfolio

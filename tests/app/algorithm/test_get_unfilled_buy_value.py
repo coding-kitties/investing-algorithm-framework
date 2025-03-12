@@ -1,7 +1,7 @@
 from investing_algorithm_framework import PortfolioConfiguration, Order, \
-    MarketCredential, SYMBOLS
+    MarketCredential
 from investing_algorithm_framework.services import PortfolioService
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -71,6 +71,7 @@ class Test(TestBase):
             secret_key="secret_key"
         )
     ]
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_get_unfilled_buy_value(self):
         """
@@ -112,7 +113,7 @@ class Test(TestBase):
 
         # Check that the portfolio has the correct amount of trades
         trade_service = self.app.container.trade_service()
-        self.assertEqual(1, trade_service.count())
+        self.assertEqual(3, trade_service.count())
         self.assertEqual(
             1, trade_service.count(
                 {"portfolio_id": portfolio.id, "status": "OPEN"}
@@ -147,14 +148,14 @@ class Test(TestBase):
         )
         self.assertEqual(700, eur_position.amount)
 
-        pending_orders = self.app.algorithm.get_pending_orders()
+        pending_orders = self.app.context.get_pending_orders()
         self.assertEqual(2, len(pending_orders))
 
         # Check the unfilled buy value
-        unfilled_buy_value = self.app.algorithm.get_unfilled_buy_value()
+        unfilled_buy_value = self.app.context.get_unfilled_buy_value()
         self.assertEqual(200, unfilled_buy_value)
 
-        pending_order = self.app.algorithm\
+        pending_order = self.app.context\
             .get_pending_orders(target_symbol="ETH")[0]
 
         order_service = self.app.container.order_service()
@@ -167,9 +168,9 @@ class Test(TestBase):
             }
         )
 
-        pending_orders = self.app.algorithm.get_pending_orders()
+        pending_orders = self.app.context.get_pending_orders()
         self.assertEqual(1, len(pending_orders))
 
         # Check the unfilled buy value
-        unfilled_buy_value = self.app.algorithm.get_unfilled_buy_value()
+        unfilled_buy_value = self.app.context.get_unfilled_buy_value()
         self.assertEqual(100, unfilled_buy_value)

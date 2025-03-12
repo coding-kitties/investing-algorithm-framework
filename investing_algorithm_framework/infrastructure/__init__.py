@@ -1,13 +1,16 @@
 from .database import setup_sqlalchemy, Session, \
     create_all_tables
 from .models import SQLPortfolio, SQLOrder, SQLPosition, \
-    SQLPortfolioSnapshot, SQLPositionSnapshot, \
+    SQLPortfolioSnapshot, SQLPositionSnapshot, SQLTrade, \
     CCXTOHLCVBacktestMarketDataSource, CCXTOrderBookMarketDataSource, \
     CCXTTickerMarketDataSource, CCXTOHLCVMarketDataSource, \
-    CSVOHLCVMarketDataSource, CSVTickerMarketDataSource
+    CSVOHLCVMarketDataSource, CSVTickerMarketDataSource, SQLTradeTakeProfit, \
+    SQLTradeStopLoss
 from .repositories import SQLOrderRepository, SQLPositionRepository, \
-    SQLPortfolioRepository, \
-    SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository
+    SQLPortfolioRepository, SQLTradeRepository, \
+    SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository, \
+    SQLTradeTakeProfitRepository, SQLTradeStopLossRepository, \
+    SQLOrderMetadataRepository
 from .services import PerformanceService, CCXTMarketService, \
     AzureBlobStorageStateHandler
 
@@ -21,6 +24,7 @@ __all__ = [
     "setup_sqlalchemy",
     "Session",
     "SQLPortfolio",
+    "SQLTrade",
     "SQLOrder",
     "SQLPosition",
     "PerformanceService",
@@ -35,5 +39,11 @@ __all__ = [
     "CSVTickerMarketDataSource",
     "CCXTOHLCVBacktestMarketDataSource",
     "CCXTOrderBookMarketDataSource",
-    "AzureBlobStorageStateHandler"
+    "AzureBlobStorageStateHandler",
+    "SQLTradeRepository",
+    "SQLTradeTakeProfit",
+    "SQLTradeStopLoss",
+    "SQLTradeTakeProfitRepository",
+    "SQLTradeStopLossRepository",
+    "SQLOrderMetadataRepository"
 ]

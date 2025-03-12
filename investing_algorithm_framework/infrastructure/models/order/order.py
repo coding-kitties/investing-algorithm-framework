@@ -9,11 +9,16 @@ from investing_algorithm_framework.domain import OrderType, \
 from investing_algorithm_framework.infrastructure.database import SQLBaseModel
 from investing_algorithm_framework.infrastructure.models.model_extension \
     import SQLAlchemyModelExtension
+from investing_algorithm_framework.infrastructure.models.\
+    order_trade_association import order_trade_association
 
 logger = logging.getLogger("investing_algorithm_framework")
 
 
 class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
+    """
+    SQLOrder model based on the Order domain model.
+    """
     __tablename__ = "orders"
     id = Column(Integer, primary_key=True, unique=True)
     external_id = Column(Integer)
@@ -21,59 +26,31 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     trading_symbol = Column(String)
     order_side = Column(String, nullable=False, default=OrderSide.BUY.value)
     order_type = Column(String, nullable=False, default=OrderType.LIMIT.value)
+    trades = relationship(
+        'SQLTrade', secondary=order_trade_association, back_populates='orders'
+    )
     price = Column(Float)
     amount = Column(Float)
-    filled = Column(Float)
-    remaining = Column(Float)
-    cost = Column(Float)
+    remaining = Column(Float, default=0)
+    filled = Column(Float, default=0)
+    cost = Column(Float, default=0)
     status = Column(String)
     position_id = Column(Integer, ForeignKey('positions.id'))
     position = relationship("SQLPosition", back_populates="orders")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow)
-    trade_closed_at = Column(DateTime, default=None)
-    trade_closed_price = Column(Float, default=None)
-    trade_closed_amount = Column(Float, default=None)
-    net_gain = Column(Float, default=0)
     order_fee = Column(Float, default=None)
     order_fee_currency = Column(String)
     order_fee_rate = Column(Float, default=None)
-    _available_amount = None
+    sell_order_metadata_id = Column(Integer, ForeignKey('orders.id'))
+    order_metadata = relationship(
+        'SQLOrderMetadata', back_populates='order'
+    )
 
     def update(self, data):
 
-        if 'amount' in data and data['amount'] is not None:
-            amount = data.pop('amount')
-            self.amount = amount
-
-        if 'price' in data and data['price'] is not None:
-            price = data.pop('price')
-            self.price = price
-
-        if 'filled' in data and data['filled'] is not None:
-            filled = data.pop('filled')
-            self.filled = filled
-
-        if 'remaining' in data and data['remaining'] is not None:
-            remaining = data.pop('remaining')
-            self.remaining = remaining
-
-        if 'net_gain' in data and data['net_gain'] is not None:
-            net_gain = data.pop('net_gain')
-            self.net_gain = net_gain
-
-        if 'trade_closed_price' in data and \
-                data['trade_closed_price'] is not None:
-            trade_closed_price = data.pop('trade_closed_price')
-            self.trade_closed_price = trade_closed_price
-
-        if 'trade_closed_amount' in data and \
-                data['trade_closed_amount'] is not None:
-            trade_closed_amount = data.pop('trade_closed_amount')
-            self.trade_closed_amount = trade_closed_amount
-
         if "status" in data and data["status"] is not None:
-            self.status = OrderStatus.from_value(data.pop("status")).value
+            data["status"] = OrderStatus.from_value(data["status"]).value
 
         super().update(data)
 
@@ -82,6 +59,8 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
         return SQLOrder(
             external_id=order.external_id,
             amount=order.get_amount(),
+            filled=order.get_filled(),
+            remaining=order.get_remaining(),
             price=order.price,
             order_type=order.get_order_type(),
             order_side=order.get(),
@@ -90,17 +69,18 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
             trading_symbol=order.get_trading_symbol(),
             created_at=order.get_created_at(),
             updated_at=order.get_updated_at(),
-            trade_closed_at=order.get_trade_closed_at(),
-            trade_closed_price=order.get_trade_closed_price(),
-            trade_closed_amount=order.get_trade_closed_amount(),
-            net_gain=order.get_net_gain(),
         )
 
     @staticmethod
     def from_ccxt_order(ccxt_order):
         """
         Create an Order object from a CCXT order object
-        :param ccxt_order: CCXT order object
+
+        Args:
+            ccxt_order: CCXT order object
+
+        Returns:
+            Order: Order object
         """
         status = OrderStatus.from_value(ccxt_order["status"])
         target_symbol = ccxt_order.get("symbol").split("/")[0]

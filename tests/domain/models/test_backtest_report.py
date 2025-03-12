@@ -27,13 +27,13 @@ class Test(TestCase):
         path = os.path.join(
             self.resource_dir,
             "backtest_reports_for_testing",
-            "report_9-50-100_backtest-start-date_2021-12-21:00:00_"
-            "backtest-end-date_2022-06-20:00:00"
-            "_created-at_2024-04-25:13:52.json"
+            "report_950100_backtest-start-date_2021-12-21-00-00_"
+            "backtest-end-date_2022-06-20-00-00"
+            "_created-at_2024-04-25-13-52.json"
         )
         report = load_backtest_report(path)
         self.assertEqual(
-            report.name, "9-50-100"
+            report.name, "950100"
         )
         self.assertEqual(
             datetime(year=2021, month=12, day=21),

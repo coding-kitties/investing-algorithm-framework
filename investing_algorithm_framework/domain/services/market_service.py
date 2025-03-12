@@ -140,7 +140,7 @@ class MarketService(ABC):
 
         for market_data_credentials in self.market_credentials:
 
-            if market_data_credentials.market.lower() == market.lower():
+            if market_data_credentials.market.upper() == market.upper():
                 return market_data_credentials
 
         return None

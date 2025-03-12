@@ -5,7 +5,7 @@ from unittest import TestCase
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm, \
     BacktestDateRange
-from investing_algorithm_framework.services import BacktestReportWriterService
+from investing_algorithm_framework.services import BacktestService
 
 
 class TestStrategy(TradingStrategy):
@@ -13,7 +13,7 @@ class TestStrategy(TradingStrategy):
     time_unit = TimeUnit.MINUTE
     interval = 1
 
-    def run_strategy(self, algorithm, market_data):
+    def run_strategy(self, context, market_data):
         pass
 
 
@@ -70,10 +70,10 @@ class Test(TestCase):
             end_date=datetime.utcnow()
         )
         report = app.run_backtest(
-            algorithm,
+            algorithm=algorithm,
             backtest_date_range=backtest_date_range
         )
-        file_path = BacktestReportWriterService.create_report_name(
+        file_path = BacktestService.create_report_name(
             report, os.path.join(self.resource_dir, "backtest_reports")
         )
         # Check if the backtest report exists
@@ -92,7 +92,7 @@ class Test(TestCase):
         algorithm = Algorithm()
 
         @algorithm.strategy()
-        def run_strategy(algorithm, market_data):
+        def run_strategy(context, market_data):
             pass
 
         algorithm.add_strategy(TestStrategy)
@@ -111,7 +111,7 @@ class Test(TestCase):
         report = app.run_backtest(
             algorithm=algorithm, backtest_date_range=backtest_range
         )
-        file_path = BacktestReportWriterService.create_report_name(
+        file_path = BacktestService.create_report_name(
             report, os.path.join(self.resource_dir, "backtest_reports")
         )
         # Check if the backtest report exists

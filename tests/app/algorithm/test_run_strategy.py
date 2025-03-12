@@ -4,14 +4,15 @@ from unittest import TestCase
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
     Algorithm, MarketCredential
-from tests.resources import random_string, MarketServiceStub
+from tests.resources import random_string, MarketServiceStub, \
+    MarketDataSourceServiceStub
 
 
 class StrategyOne(TradingStrategy):
     time_unit = TimeUnit.SECOND
     interval = 2
 
-    def apply_strategy(self, algorithm, market_data):
+    def apply_strategy(self, context, market_data):
         pass
 
 
@@ -19,7 +20,7 @@ class StrategyTwo(TradingStrategy):
     time_unit = TimeUnit.SECOND
     interval = 2
 
-    def apply_strategy(self, algorithm, market_data):
+    def apply_strategy(self, context, market_data):
         pass
 
 
@@ -41,6 +42,7 @@ class Test(TestCase):
     external_balances = {
         "EUR": 1000,
     }
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def setUp(self) -> None:
         super(Test, self).setUp()

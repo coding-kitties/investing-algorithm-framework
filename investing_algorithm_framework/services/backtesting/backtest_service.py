@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
-
 import re
 import os
 import json
 import pandas as pd
 from dateutil import parser
 from tqdm import tqdm
+import logging
 
 from investing_algorithm_framework.domain import BacktestReport, \
     BACKTESTING_INDEX_DATETIME, TimeUnit, BacktestPosition, \
@@ -15,11 +15,33 @@ from investing_algorithm_framework.services.market_data_source_service import \
     MarketDataSourceService
 
 
+logger = logging.getLogger(__name__)
 BACKTEST_REPORT_FILE_NAME_PATTERN = (
     r"^report_\w+_backtest-start-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
     r"backtest-end-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
     r"created-at_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}\.json$"
 )
+
+
+def validate_algorithm_name(name, illegal_chars=r"[\/:*?\"<>|]"):
+    """
+    Validate a algorithm name for illegal characters and throw an
+        exception if any are found.
+
+    Args:
+        name (str): The name to validate.
+        illegal_chars (str): A regex pattern for characters considered
+            illegal (default: r"[/:*?\"<>|]").
+
+    Raises:
+        ValueError: If illegal characters are found in the filename.
+    """
+    # Check for illegal characters
+    if re.search(illegal_chars, name):
+        raise OperationalException(
+            f"Illegal characters detected in filename: {name}. "
+            f"Illegal characters: / \\ : * ? \" < > |"
+        )
 
 
 class BacktestService:
@@ -28,17 +50,19 @@ class BacktestService:
     """
 
     def __init__(
-            self,
-            market_data_source_service: MarketDataSourceService,
-            order_service,
-            portfolio_repository,
-            position_repository,
-            performance_service,
-            configuration_service
+        self,
+        market_data_source_service: MarketDataSourceService,
+        order_service,
+        portfolio_service,
+        position_repository,
+        performance_service,
+        configuration_service,
+        portfolio_configuration_service,
+        strategy_orchestrator_service,
     ):
         self._resource_directory = None
         self._order_service = order_service
-        self._portfolio_repository = portfolio_repository
+        self._portfolio_service = portfolio_service
         self._data_index = {
             TradingDataType.OHLCV: {},
             TradingDataType.TICKER: {}
@@ -49,6 +73,8 @@ class BacktestService:
             = market_data_source_service
         self._backtest_market_data_sources = []
         self._configuration_service = configuration_service
+        self._portfolio_configuration_service = portfolio_configuration_service
+        self._strategy_orchestrator_service = strategy_orchestrator_service
 
     @property
     def resource_directory(self):
@@ -59,7 +85,10 @@ class BacktestService:
         self._resource_directory = resource_directory
 
     def run_backtest(
-        self, algorithm, backtest_date_range: BacktestDateRange
+        self,
+        algorithm,
+        backtest_date_range: BacktestDateRange,
+        initial_amount=None
     ) -> BacktestReport:
         """
         Run a backtest for the given algorithm. This function will run
@@ -71,17 +100,42 @@ class BacktestService:
         Also, all backtest data is downloaded (if not already downloaded) and
         the backtest is run for each date in the schedule.
 
-        At the end of the run all traces
-
-        Parameters:
+        Args:
             algorithm: The algorithm to run the backtest for
             backtest_date_range: The backtest date range
+            initial_amount: The initial amount of the backtest portfolio
 
         Returns:
             BacktestReport - The backtest report
         """
+        validate_algorithm_name(algorithm.name)
+
+        logging.info(
+            f"Running backtest for algorithm with name {algorithm.name}"
+        )
+
+        # Create backtest portfolio
+        portfolio_configurations = \
+            self._portfolio_configuration_service.get_all()
+
+        for portfolio_configuration in portfolio_configurations:
+
+            if self._portfolio_service.exists(
+                {"identifier": portfolio_configuration.identifier}
+            ):
+                # Delete existing portfolio
+                portfolio = self._portfolio_service.find(
+                    {"identifier": portfolio_configuration.identifier}
+                )
+                self._portfolio_service.delete(portfolio.id)
+
+            # Check if the portfolio configuration has a initial balance
+            self._portfolio_service.create_portfolio_from_configuration(
+                portfolio_configuration, initial_amount=initial_amount
+            )
+
         strategy_profiles = []
-        portfolios = self._portfolio_repository.get_all()
+        portfolios = self._portfolio_service.get_all()
         initial_unallocated = 0
 
         for portfolio in portfolios:
@@ -109,14 +163,34 @@ class BacktestService:
                 strategy_profiles, row['id']
             )
             index_date = parser.parse(str(index))
-            self.run_backtest_for_profile(
-                algorithm=algorithm,
-                strategy=algorithm.get_strategy(strategy_profile.strategy_id),
-                index_date=index_date,
+            self._configuration_service.add_value(
+                BACKTESTING_INDEX_DATETIME, index_date
             )
-        return self.create_backtest_report(
+            # self.run_backtest_for_profile(
+            #     algorithm=algorithm,
+            #     strategy=algorithm.get_strategy(strategy_profile.strategy_id),
+            #     index_date=index_date,
+            # )
+            self.run_backtest_v2(
+                context=algorithm.context,
+                strategy=algorithm.get_strategy(strategy_profile.strategy_id)
+            )
+
+        report = self.create_backtest_report(
             algorithm, len(schedule), backtest_date_range, initial_unallocated
         )
+
+        # Cleanup backtest portfolio
+        portfolio_configurations = \
+            self._portfolio_configuration_service.get_all()
+
+        for portfolio_configuration in portfolio_configurations:
+            portfolio = self._portfolio_service.find(
+                {"identifier": portfolio_configuration.identifier}
+            )
+            self._portfolio_service.delete(portfolio.id)
+
+        return report
 
     def run_backtests(
         self, algorithms, backtest_date_range: BacktestDateRange
@@ -126,14 +200,18 @@ class BacktestService:
         backtests for the given algorithms and return a list of backtest
         reports.
 
-        Parameters
-            - algorithms: The algorithms to run the backtests for
-            - backtest_date_range: The backtest date range of the backtests
+        Args:
+            algorithms: The algorithms to run the backtests for
+            backtest_date_range: The backtest date range of the backtests
 
         Returns:
             List - A list of backtest reports
         """
         backtest_reports = []
+
+        # Check algorithm names for illegal characters
+        for algorithm in algorithms:
+            validate_algorithm_name(algorithm.name)
 
         for algorithm in algorithms:
             backtest_reports.append(
@@ -146,6 +224,9 @@ class BacktestService:
         return backtest_reports
 
     def run_backtest_for_profile(self, algorithm, strategy, index_date):
+        self._configuration_service.add_value(
+            BACKTESTING_INDEX_DATETIME, index_date
+        )
         algorithm.config[BACKTESTING_INDEX_DATETIME] = index_date
         market_data = {}
 
@@ -162,8 +243,14 @@ class BacktestService:
                     market_data[data_id] = \
                         self._market_data_source_service.get_data(data_id)
 
-        strategy.context = algorithm.context
-        strategy.run_strategy(algorithm=algorithm, market_data=market_data)
+        context = self.algorithm.context
+        strategy.run_strategy(context=context, market_data=market_data)
+
+    def run_backtest_v2(self, strategy, context):
+        config = self._configuration_service.get_config()
+        self._strategy_orchestrator_service.run_backtest_strategy(
+            context=context, strategy=strategy, config=config
+        )
 
     def generate_schedule(
         self, strategies, start_date, end_date
@@ -173,7 +260,7 @@ class BacktestService:
         calculate when the strategies should run based on the given start
         and end date. The schedule will be stored in a pandas DataFrame.
 
-        Parameters:
+        Args:
             strategies: The strategies to generate the schedule for
             start_date: The start date of the schedule
             end_date: The end date of the schedule
@@ -207,6 +294,7 @@ class BacktestService:
                     raise ValueError(f"Unsupported time unit: {time_unit}")
 
         schedule_df = pd.DataFrame(data)
+
         if schedule_df.empty:
             raise OperationalException(
                 "Could not generate schedule "
@@ -243,7 +331,7 @@ class BacktestService:
         Also, it will add all traces to the backtest report. The traces
         are collected from each strategy that was run during the backtest.
 
-        Parameters:
+        Args:
             algorithm: The algorithm to create the backtest report for
             number_of_runs: The number of runs
             backtest_date_range: The backtest date range of the backtest
@@ -253,7 +341,7 @@ class BacktestService:
             BacktestReport: The backtest report instance of BacktestReport
         """
 
-        for portfolio in self._portfolio_repository.get_all():
+        for portfolio in self._portfolio_service.get_all():
             ids = [strategy.strategy_id for strategy in algorithm.strategies]
 
             # Check if strategy_id is None
@@ -399,9 +487,8 @@ class BacktestService:
                     backtest_position.price = ticker["bid"]
                 backtest_positions.append(backtest_position)
             backtest_report.positions = backtest_positions
-            backtest_report.trades = algorithm.get_trades()
+            backtest_report.trades = algorithm.context.get_trades()
             backtest_report.orders = orders
-            backtest_report.context = algorithm.context
             traces = {}
 
             # Add traces to the backtest report
@@ -467,7 +554,7 @@ class BacktestService:
         Function to get a report based on the algorithm name and
         backtest date range if it exists.
 
-        Parameters:
+        Args:
             algorithm_name: str - The name of the algorithm
             backtest_date_range: BacktestDateRange - The backtest date range
             directory: str - The output directory
@@ -516,7 +603,7 @@ class BacktestService:
         """
         Function to get the backtest start date from a backtest report file.
 
-        Parameters:
+        Args:
             path: str - The path to the backtest report file
 
         Returns:
@@ -525,16 +612,21 @@ class BacktestService:
 
         # Get the backtest start date from the file name
         backtest_start_date = os.path.basename(path).split("_")[3]
-        # Parse the backtest start date
-        return datetime.strptime(
-            backtest_start_date, DATETIME_FORMAT_BACKTESTING
-        )
+
+        try:
+            # Parse the backtest start date
+            return datetime.strptime(
+                backtest_start_date, DATETIME_FORMAT_BACKTESTING
+            )
+        except ValueError:
+            # Try to parse the backtest start date with a different format
+            return parser.parse(backtest_start_date)
 
     def _get_end_date_from_backtest_report_file(self, path: str) -> datetime:
         """
         Function to get the backtest end date from a backtest report file.
 
-        Parameters:
+        Args:
             path: str - The path to the backtest report file
 
         Returns:
@@ -543,16 +635,21 @@ class BacktestService:
 
         # Get the backtest end date from the file name
         backtest_end_date = os.path.basename(path).split("_")[5]
-        # Parse the backtest end date
-        return datetime.strptime(
-            backtest_end_date, DATETIME_FORMAT_BACKTESTING
-        )
+
+        try:
+            # Parse the backtest end date
+            return datetime.strptime(
+                backtest_end_date, DATETIME_FORMAT_BACKTESTING
+            )
+        except ValueError:
+            # Try to parse the backtest end date with a different format
+            return parser.parse(backtest_end_date)
 
     def _get_algorithm_name_from_backtest_report_file(self, path: str) -> str:
         """
         Function to get the algorithm name from a backtest report file.
 
-        Parameters:
+        Args:
             path: str - The path to the backtest report file
 
         Returns:
@@ -568,7 +665,7 @@ class BacktestService:
         """
         Function to check if a file is a backtest report file.
 
-        Parameters:
+        Args:
             path: str - The path to the file
 
         Returns:
@@ -586,3 +683,80 @@ class BacktestService:
                 return True
 
         return False
+
+    def write_report_to_json(
+        self, report: BacktestReport, output_directory: str
+    ) -> None:
+        """
+        Function to write a backtest report to a JSON file.
+
+        Args:
+            - report: BacktestReport
+                The backtest report to write to a file.
+            - output_directory: str
+                The directory to store the backtest report file.
+
+        Returns:
+            - None
+        """
+
+        if not os.path.exists(output_directory):
+            os.makedirs(output_directory)
+
+        json_file_path = self.create_report_file_path(
+            report, output_directory, extension=".json"
+        )
+
+        report_dict = report.to_dict()
+        # Convert dictionary to JSON
+        json_data = json.dumps(report_dict, indent=4)
+
+        # Write JSON data to a .json file
+        with open(json_file_path, "w") as json_file:
+            json_file.write(json_data)
+
+    @staticmethod
+    def create_report_name(report, output_directory, extension=".json"):
+        backtest_start_date = report.backtest_start_date \
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        backtest_end_date = report.backtest_end_date \
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        created_at = report.created_at.strftime(DATETIME_FORMAT_BACKTESTING)
+        file_path = os.path.join(
+            output_directory,
+            f"report_{report.name}_backtest-start-date_"
+            f"{backtest_start_date}_backtest-end-date_"
+            f"{backtest_end_date}_created-at_{created_at}{extension}"
+        )
+        return file_path
+
+    @staticmethod
+    def create_report_file_path(
+        report, output_directory, extension=".json"
+    ) -> str:
+        """
+        Function to create a file path for a backtest report.
+
+        Args:
+            - report: BacktestReport
+                The backtest report to create a file path for.
+            - output_directory: str
+                The directory to store the backtest report file.
+            - extension: str (default=".json") - optional
+                The file extension to use for the backtest report file.
+        Returns:
+            - file_path: str
+                The file path for the backtest report file.
+        """
+        backtest_start_date = report.backtest_start_date \
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        backtest_end_date = report.backtest_end_date \
+            .strftime(DATETIME_FORMAT_BACKTESTING)
+        created_at = report.created_at.strftime(DATETIME_FORMAT_BACKTESTING)
+        file_path = os.path.join(
+            output_directory,
+            f"report_{report.name}_backtest-start-date_"
+            f"{backtest_start_date}_backtest-end-date_"
+            f"{backtest_end_date}_created-at_{created_at}{extension}"
+        )
+        return file_path

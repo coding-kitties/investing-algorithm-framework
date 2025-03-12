@@ -1,13 +1,13 @@
-from datetime import datetime
-from typing import List
+from dateutil.parser import parse
 
-import polars as pl
-from polars import DataFrame
-
-from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
-from investing_algorithm_framework.domain.exceptions import \
-    OperationalException
 from investing_algorithm_framework.domain.models.base_model import BaseModel
+from investing_algorithm_framework.domain.models.order import OrderSide, Order
+from investing_algorithm_framework.domain.models.trade.trade_status import \
+    TradeStatus
+from investing_algorithm_framework.domain.models.trade.trade_stop_loss import \
+    TradeStopLoss
+from investing_algorithm_framework.domain.models.trade\
+    .trade_take_profit import TradeTakeProfit
 
 
 class Trade(BaseModel):
@@ -24,264 +24,405 @@ class Trade(BaseModel):
 
     A single sell order can close multiple buy orders. Also, a single
     buy order can be closed by multiple sell orders.
+
+    Attributes:
+        id (int): the id of the trade
+        orders (List[Order]): the orders of the trade
+        target_symbol (str): the target symbol of the trade
+        trading_symbol (str): the trading symbol of the trade
+        closed_at (datetime): the datetime when the trade was closed
+        opened_at (datetime): the datetime when the trade was opened
+        open_price (float): the open price of the trade
+        amount (float): the amount of the trade
+        remaining (float): the remaining amount of the trade
+        net_gain (float): the net gain of the trade
+        last_reported_price (float): the last reported price of the trade
+        created_at (datetime): the datetime when the trade was created
+        updated_at (datetime): the datetime when the trade was last updated
+        status (str): the status of the trade
+        stop_losses (List[TradeStopLoss]): the stop losses of the trade
+        take_profits (List[TradeTakeProfit]): the take profits of the trade
     """
+
     def __init__(
         self,
-        buy_order_id,
+        id,
+        orders,
         target_symbol,
         trading_symbol,
-        amount,
-        open_price,
+        closed_at,
         opened_at,
-        closed_price=None,
-        closed_at=None,
-        current_price=None,
-        sell_order_id=None,
+        open_price,
+        amount,
+        cost,
+        remaining,
+        status,
+        net_gain=0,
+        last_reported_price=None,
+        last_reported_price_datetime=None,
+        high_water_mark=None,
+        high_water_mark_datetime=None,
+        updated_at=None,
+        stop_losses=None,
+        take_profits=None,
     ):
-        self._target_symbol = target_symbol
-        self._trading_symbol = trading_symbol
-        self._amount = amount
-        self._open_price = open_price
-        self._closed_price = closed_price
-        self._closed_at = closed_at
-        self._opened_at = opened_at
-        self._trading_symbol = trading_symbol
-        self._current_price = current_price
-        self._buy_order_id = buy_order_id
-        self._sell_order_id = sell_order_id,
+        self.id = id
+        self.orders = orders
+        self.target_symbol = target_symbol
+        self.trading_symbol = trading_symbol
+        self.closed_at = closed_at
+        self.opened_at = opened_at
+        self.open_price = open_price
+        self.amount = amount
+        self.cost = cost
+        self.remaining = remaining
+        self.net_gain = net_gain
+        self.last_reported_price = last_reported_price
+        self.last_reported_price_datetime = last_reported_price_datetime
+        self.high_water_mark = high_water_mark
+        self.high_water_mark_datetime = high_water_mark_datetime
+        self.status = status
+        self.updated_at = updated_at
+        self.stop_losses = stop_losses
+        self.take_profits = take_profits
+
+    def update(self, data):
+
+        if "status" in data:
+            self.status = TradeStatus.from_value(data["status"])
+
+            if TradeStatus.CLOSED.equals(self.status):
+
+                # Set all stop losses to inactive
+                if self.stop_losses is not None:
+                    for stop_loss in self.stop_losses:
+                        stop_loss.active = False
+
+                # set all take profits to inactive
+                if self.take_profits is not None:
+                    for take_profit in self.take_profits:
+                        take_profit.active = False
+
+        if "last_reported_price" in data:
+            self.last_reported_price = data["last_reported_price"]
+
+            if self.high_water_mark is None:
+                self.high_water_mark = data["last_reported_price"]
+                self.high_water_mark_datetime = \
+                    data["last_reported_price_datetime"]
+            else:
+
+                if data["last_reported_price"] > self.high_water_mark:
+                    self.high_water_mark = data["last_reported_price"]
+                    self.high_water_mark_datetime = \
+                        data["last_reported_price_datetime"]
+
+        return super().update(data)
 
     @property
-    def buy_order_id(self):
-        return self._buy_order_id
+    def closed_prices(self):
+        return [
+            order.price for order in self.orders
+            if order.order_side == OrderSide.SELL.value
+        ]
 
     @property
-    def sell_order_id(self):
-        return self._sell_order_id
+    def buy_order(self):
 
-    @property
-    def target_symbol(self):
-        return self._target_symbol
+        if self.orders is None:
+            return
 
-    @property
-    def trading_symbol(self):
-        return self._trading_symbol
+        return [
+            order for order in self.orders
+            if order.order_side == OrderSide.BUY.value
+        ][0]
 
     @property
     def symbol(self):
-        return f"{self.target_symbol}/{self.trading_symbol}"
-
-    def get_symbol(self):
-        return f"{self.target_symbol}/{self.trading_symbol}"
+        return f"{self.target_symbol.upper()}/{self.trading_symbol.upper()}"
 
     @property
-    def amount(self):
-        return self._amount
+    def duration(self):
+        if TradeStatus.CLOSED.equals(self.status):
+            # Get the total hours between the closed and opened datetime
+            diff = self.closed_at - self.opened_at
+            return diff.total_seconds() / 3600
 
-    def get_amount(self):
-        return self.amount
+        if self.opened_at is None:
+            return None
 
-    @property
-    def open_price(self):
-        return self._open_price
+        if self.updated_at is None:
+            return None
 
-    @property
-    def closed_price(self):
-        return self._closed_price
-
-    @property
-    def closed_at(self):
-        return self._closed_at
-
-    @property
-    def opened_at(self):
-        return self._opened_at
+        diff = self.updated_at - self.opened_at
+        return diff.total_seconds() / 3600
 
     @property
     def size(self):
         return self.amount * self.open_price
 
     @property
-    def status(self):
-        return "CLOSED" if self.closed_at else "OPEN"
+    def change(self):
+        if TradeStatus.CLOSED.equals(self.status):
+            cost = self.amount * self.open_price
+            return self.net_gain - cost
 
-    @property
-    def net_gain(self):
-
-        if self.closed_at is None:
+        if self.last_reported_price is None:
             return 0
 
-        return self.amount * (self.closed_price - self.open_price)
+        cost = self.remaining * self.open_price
+        gain = (self.remaining * self.last_reported_price) - cost
+        gain += self.net_gain
+        return gain
+
+    @property
+    def net_gain_absolute(self):
+
+        if TradeStatus.CLOSED.equals(self.status):
+            return self.net_gain
+        else:
+            gain = 0
+
+            if self.last_reported_price is not None:
+                gain = (
+                    self.remaining *
+                    (self.last_reported_price - self.open_price)
+                )
+
+            gain += self.net_gain
+            return gain
 
     @property
     def net_gain_percentage(self):
 
-        if self.closed_at is None:
-            return 0
+        if TradeStatus.CLOSED.equals(self.status):
 
-        return self.net_gain / self.size * 100
+            if self.cost != 0:
+                return (self.net_gain / self.cost) * 100
 
-    @property
-    def duration(self):
-        closed_at = self.closed_at
+        else:
+            gain = 0
 
-        if closed_at is None:
-            closed_at = datetime.utcnow()
+            if self.last_reported_price is not None:
+                gain = (
+                    self.remaining *
+                    (self.last_reported_price - self.open_price)
+                )
 
-        return (closed_at - self.opened_at).total_seconds() / 3600
+            gain += self.net_gain
 
-    @property
-    def current_price(self):
-        return self._current_price
+            if self.cost != 0:
+                return (gain / self.cost) * 100
 
-    @current_price.setter
-    def current_price(self, current_price):
-        self._current_price = current_price
-
-    @property
-    def value(self):
-
-        if self.closed_at is not None:
-            return self.amount * self.closed_price
-
-        if self.current_price is None:
-            return None
-
-        return self.amount * self.current_price
+        return 0
 
     @property
     def percentage_change(self):
 
-        if self.closed_at is not None or self.value is None:
-            return 0
-        value = self.value
-        return (value - self.size) / self.size * 100
+        if TradeStatus.CLOSED.equals(self.status):
+            cost = self.amount * self.open_price
+            gain = self.net_gain - cost
+            return (gain / cost) * 100
 
-    def get_percentage_change(self):
-        return self.percentage_change
-
-    @property
-    def absolute_change(self):
-
-        if self.closed_at is None:
+        if self.last_reported_price is None:
             return 0
 
-        value = self.value
-        return value - self.size
+        cost = self.remaining * self.open_price
+        gain = (self.remaining * self.last_reported_price) - cost
+        gain += self.net_gain
+        return (gain / cost) * 100
 
-    def get_absolute_change(self):
-        return self.absolute_change
+    def is_stop_loss_triggered(self):
 
-    def is_manual_stop_loss_trigger(
-        self,
-        current_price,
-        stop_loss_percentage,
-        prices: List[float] = None,
-        ohlcv_df: DataFrame = None
-    ):
+        if self.stop_loss_percentage is None:
+            return False
+
+        if self.last_reported_price is None:
+            return False
+
+        if self.open_price is None:
+            return False
+
+        stop_loss_price = self.open_price * \
+            (1 - (self.stop_loss_percentage / 100))
+
+        return self.last_reported_price <= stop_loss_price
+
+    def is_trailing_stop_loss_triggered(self):
+
+        if self.trailing_stop_loss_percentage is None:
+            return False
+
+        if self.last_reported_price is None:
+            return False
+
+        if self.high_water_mark is None:
+
+            if self.open_price is not None:
+                self.high_water_mark = self.open_price
+            else:
+                return False
+
+        stop_loss_price = self.high_water_mark * \
+            (1 - (self.trailing_stop_loss_percentage / 100))
+
+        return self.last_reported_price <= stop_loss_price
+
+    def is_take_profit_triggered(self):
+
+        if self.take_profit_percentage is None:
+            return False
+
+        if self.last_reported_price is None:
+            return False
+
+        if self.open_price is None:
+            return False
+
+        take_profit_price = self.open_price * \
+            (1 + (self.take_profit_percentage / 100))
+
+        return self.last_reported_price >= take_profit_price
+
+    def is_trailing_take_profit_triggered(self):
         """
-        Function to check if the stop loss is triggered for a given trade.
-
-        You can use either the prices list or the ohlcv_df DataFrame to
-        calculate the stop loss. The dataframe needs to be a Polars
-        DataFrame with the following columns: "Datetime" and "Close".
-
-        You can use the default CCXTOHLCVMarketDataSource to get the ohlcv_df
-        DataFrame.
-
-        Stop loss is triggered when the current price is lower than the
-        calculated stop loss price. The stop loss price is calculated by
-        taking the highest price of the given range. If the highest price
-        is lower than the open price, the stop loss price is calculated by
-        taking the open price and subtracting the stop loss percentage.
-        If the highest price is higher than the open price, the stop loss
-        price is calculated by taking the open price and adding the stop
-        loss percentage.
+        Function to check if the trailing take profit is triggered.
+        The trailing take profit is triggered when the last reported price
+        is greater than or equal to the high water mark times the trailing
+        take profit percentage.
         """
 
-        if prices is None and ohlcv_df is None:
-            raise OperationalException(
-                "Either prices or a polars ohlcv dataframe must be provided"
-            )
+        if self.trailing_take_profit_percentage is None:
+            return False
 
-        if current_price < self.open_price:
-            stop_loss_price = self.open_price * \
-                              (1 - stop_loss_percentage / 100)
-            return current_price <= stop_loss_price
+        if self.last_reported_price is None:
+            return False
+
+        if self.high_water_mark is None:
+
+            if self.open_price is not None:
+                self.high_water_mark = self.open_price
+            else:
+                return False
+
+        take_profit_price = self.high_water_mark * \
+            (1 + (self.trailing_take_profit_percentage / 100))
+
+        return self.last_reported_price >= take_profit_price
+
+    def to_dict(self, datetime_format=None):
+
+        if datetime_format is not None:
+            opened_at = self.opened_at.strftime(datetime_format) \
+                if self.opened_at else None
+            closed_at = self.closed_at.strftime(datetime_format) \
+                if self.closed_at else None
+            updated_at = self.updated_at.strftime(datetime_format) \
+                if self.updated_at else None
         else:
-            # If dataframes are provided, we use the dataframe to calculate
-            # the stop loss price
-            if ohlcv_df is not None:
-                column_type = ohlcv_df['Datetime'].dtype
+            opened_at = self.opened_at
+            closed_at = self.closed_at
+            updated_at = self.updated_at
 
-                if isinstance(column_type, pl.Datetime):
-                    filtered_df = ohlcv_df.filter(
-                        pl.col('Datetime') >= self.opened_at
-                    )
-                else:
-                    filtered_df = ohlcv_df.filter(
-                        pl.col('Datetime') >= self.opened_at.strftime(
-                            DATETIME_FORMAT
-                        )
-                    )
-
-                prices = filtered_df['Close'].to_numpy()
-
-            highest_price = max(prices)
-            stop_loss_price = highest_price * (1 - stop_loss_percentage / 100)
-            return current_price <= stop_loss_price
-
-    def to_dict(self):
         return {
-            "buy_order_id": self.buy_order_id,
-            "sell_order_id": self.sell_order_id,
+            "id": self.id,
+            "orders": [
+                order.to_dict(datetime_format=datetime_format)
+                for order in self.orders
+            ],
             "target_symbol": self.target_symbol,
             "trading_symbol": self.trading_symbol,
             "status": self.status,
             "amount": self.amount,
+            "remaining": self.remaining,
             "open_price": self.open_price,
-            "current_price": self.current_price,
-            "closed_price": self.closed_price,
-            "opened_at": self.opened_at.strftime(DATETIME_FORMAT)
-            if self.opened_at else None,
-            "closed_at": self.closed_at.strftime(DATETIME_FORMAT)
-            if self.closed_at else None,
-            "change": self.percentage_change,
-            "absolute_change": self.absolute_change,
+            "last_reported_price": self.last_reported_price,
+            "opened_at": opened_at,
+            "closed_at": closed_at,
+            "updated_at": updated_at,
+            "net_gain": self.net_gain,
+            "cost": self.cost,
+            "stop_losses": [
+                stop_loss.to_dict(datetime_format=datetime_format)
+                for stop_loss in self.stop_losses
+            ] if self.stop_losses else None,
+            "take_profits": [
+                take_profit.to_dict(datetime_format=datetime_format)
+                for take_profit in self.take_profits
+            ] if self.take_profits else None,
         }
 
     @staticmethod
     def from_dict(data):
+        opened_at = None
+        closed_at = None
+        updated_at = None
+        stop_losses = None
+        take_profits = None
+        orders = None
+
+        if "opened_at" in data and data["opened_at"] is not None:
+            opened_at = parse(data["opened_at"])
+
+        if "closed_at" in data and data["closed_at"] is not None:
+            closed_at = parse(data["closed_at"])
+
+        if "updated_at" in data and data["updated_at"] is not None:
+            updated_at = parse(data["updated_at"])
+
+        if "stop_losses" in data and data["stop_losses"] is not None:
+            stop_losses = [
+                TradeStopLoss.from_dict(stop_loss)
+                for stop_loss in data["stop_losses"]
+            ]
+
+        if "take_profits" in data and data["take_profits"] is not None:
+            take_profits = [
+                TradeTakeProfit.from_dict(take_profit)
+                for take_profit in data["take_profits"]
+            ]
+
+        if "orders" in data and data["orders"] is not None:
+            orders = [
+                Order.from_dict(order)
+                for order in data["orders"]
+            ]
+
         return Trade(
-            buy_order_id=data["buy_order_id"] if "buy_order_id"
-            in data else None,
-            sell_order_id=data["sell_order_id"] if "sell_order_id"
-            in data else None,
+            id=data.get("id", None),
+            orders=orders,
             target_symbol=data["target_symbol"],
             trading_symbol=data["trading_symbol"],
             amount=data["amount"],
             open_price=data["open_price"],
-            opened_at=datetime.strptime(
-                data["opened_at"], DATETIME_FORMAT
-            ),
-            closed_price=data["closed_price"],
-            closed_at=datetime.strptime(
-                data["closed_at"], DATETIME_FORMAT
-            ) if data["closed_at"] else None,
-            current_price=data["current_price"],
+            opened_at=opened_at,
+            closed_at=closed_at,
+            remaining=data.get("remaining", 0),
+            net_gain=data.get("net_gain", 0),
+            last_reported_price=data.get("last_reported_price"),
+            status=data["status"],
+            cost=data.get("cost", 0),
+            updated_at=updated_at,
+            stop_losses=stop_losses,
+            take_profits=take_profits,
         )
 
     def __repr__(self):
         return self.repr(
+            id=self.id,
             target_symbol=self.target_symbol,
             trading_symbol=self.trading_symbol,
             status=self.status,
             amount=self.amount,
+            filled_amount=self.filled_amount,
+            remaining=self.remaining,
             open_price=self.open_price,
-            current_price=self.current_price,
-            closed_price=self.closed_price,
             opened_at=self.opened_at,
             closed_at=self.closed_at,
-            value=self.value,
-            change=self.percentage_change,
-            absolute_change=self.absolute_change,
+            net_gain=self.net_gain,
+            last_reported_price=self.last_reported_price,
         )
+
+    def __lt__(self, other):
+        # Define the less-than comparison based on created_at attribute
+        return self.opened_at < other.opened_at

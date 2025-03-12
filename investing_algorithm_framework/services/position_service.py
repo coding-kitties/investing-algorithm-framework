@@ -8,14 +8,12 @@ class PositionService(RepositoryService):
     def __init__(
         self,
         repository,
-        order_repository,
         market_service: MarketService,
         market_credential_service
     ):
         super().__init__(repository)
         self._market_service: MarketService = market_service
         self._market_credentials_service = market_credential_service
-        self._order_repository = order_repository
 
     def close_position(self, position_id, portfolio):
         self._market_service.market_data_credentials = \

@@ -41,8 +41,14 @@ def is_uptrend(
     if isinstance(data, pd.Series):
 
         # Check if the data keys are present in the data
-        if fast_column not in data.index or slow_column not in data.index:
-            raise OperationalException("Data keys not present in the data.")
+        if fast_column not in data.index:
+            raise OperationalException(
+                f"Data column {fast_column} not present in the data."
+            )
+        if slow_column not in data.index:
+            raise OperationalException(
+                f"Data columns {slow_column} not present in the data."
+            )
 
         return data[fast_column] > data[slow_column]
 
@@ -362,6 +368,12 @@ def get_ema(
         named 'EMA_{period}' or named according to the
         result_column_name
     """
+
+    if source_column_name not in data.columns:
+        raise OperationalException(
+            f"Source column {source_column_name} not present in the data."
+        )
+
     ema = tp.ema(data[source_column_name].to_numpy(), period=period)
 
     if result_column_name:

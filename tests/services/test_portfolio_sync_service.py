@@ -35,7 +35,6 @@ class Test(TestBase):
         self.app.add_algorithm(Algorithm())
         self.app.initialize_config()
         self.app.initialize()
-
         portfolio = self.app.container.portfolio_service()\
             .find({"identifier": "test"})
         self.assertEqual(1000, portfolio.unallocated)

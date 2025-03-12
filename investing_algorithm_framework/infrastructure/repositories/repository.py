@@ -71,6 +71,7 @@ class Repository(ABC):
             try:
                 delete_object = self.get(object_id)
                 db.delete(delete_object)
+                db.commit()
                 return delete_object
             except SQLAlchemyError as e:
                 logger.error(e)
@@ -149,6 +150,9 @@ class Repository(ABC):
 
     def find(self, query_params):
 
+        if query_params is None or len(query_params) == 0:
+            raise ApiException("Find requires query parameters")
+
         with Session() as db:
             try:
                 query = db.query(self.base_class)
@@ -213,7 +217,7 @@ class Repository(ABC):
     def get_query_param(self, key, params, default=None, many=False):
         boolean_array = ["true", "false"]
 
-        if params is None:
+        if params is None or key not in params:
             return default
 
         params = self.normalize_query(params)
@@ -250,8 +254,21 @@ class Repository(ABC):
             try:
                 db.add(object)
                 db.commit()
-                return self.get(object)
+                return self.get(object.id)
             except SQLAlchemyError as e:
                 logger.error(e)
                 db.rollback()
                 raise ApiException("Error saving object")
+
+    def save_objects(self, objects):
+
+        with Session() as db:
+            try:
+                for object in objects:
+                    db.add(object)
+                db.commit()
+                return objects
+            except SQLAlchemyError as e:
+                logger.error(e)
+                db.rollback()
+                raise ApiException("Error saving objects")

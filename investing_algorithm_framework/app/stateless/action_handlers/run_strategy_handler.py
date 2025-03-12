@@ -13,9 +13,10 @@ class RunStrategyHandler(ActionHandlerStrategy):
         tasks = algorithm.strategy_orchestrator_service.get_tasks()
 
         for strategy in strategies:
+            context = algorithm.context
             algorithm.strategy_orchestrator_service.run_strategy(
                 strategy=strategy,
-                algorithm=algorithm,
+                context=context,
                 sync=True
             )
 

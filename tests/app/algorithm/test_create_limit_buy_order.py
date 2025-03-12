@@ -1,6 +1,6 @@
 from investing_algorithm_framework import PortfolioConfiguration, \
     OrderStatus, MarketCredential
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -20,6 +20,7 @@ class Test(TestBase):
     external_balances = {
         "EUR": 1000
     }
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def count_decimals(self, number):
         decimal_str = str(number)
@@ -30,7 +31,7 @@ class Test(TestBase):
 
     def test_create_limit_buy_order(self):
         self.app.run(number_of_iterations=1)
-        self.app.algorithm.create_limit_order(
+        self.app.context.create_limit_order(
             target_symbol="BTC",
             amount=1,
             price=10,
@@ -47,7 +48,7 @@ class Test(TestBase):
         self.assertEqual(OrderStatus.OPEN.value, order.status)
 
     def test_create_limit_buy_order_with_percentage_of_portfolio(self):
-        self.app.algorithm.create_limit_order(
+        self.app.context.create_limit_order(
             target_symbol="BTC",
             price=10,
             order_side="BUY",
@@ -63,6 +64,6 @@ class Test(TestBase):
         self.assertEqual(OrderStatus.OPEN.value, order.status)
         self.assertEqual(20, order.get_amount())
         self.assertEqual(10, order.get_price())
-        portfolio = self.app.algorithm.get_portfolio()
+        portfolio = self.app.context.get_portfolio()
         self.assertEqual(1000, portfolio.get_net_size())
         self.assertEqual(800, portfolio.get_unallocated())

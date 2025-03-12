@@ -9,7 +9,6 @@ from investing_algorithm_framework.domain.metrics import \
 from investing_algorithm_framework.domain.models \
     .backtesting.backtest_date_range import BacktestDateRange
 from investing_algorithm_framework.domain.models.base_model import BaseModel
-from investing_algorithm_framework.domain.models.time_unit import TimeUnit
 from investing_algorithm_framework.domain.models.position import Position
 from investing_algorithm_framework.domain.models.trade import Trade
 from investing_algorithm_framework.domain.models.order import Order
@@ -358,15 +357,7 @@ class BacktestReport(BaseModel):
         self._time_unit = value
 
     def get_runs_per_day(self):
-
-        if self.time_unit is None:
-            return 0
-        elif TimeUnit.SECOND.equals(self.time_unit):
-            return 86400 / self.interval
-        elif TimeUnit.MINUTE.equals(self.time_unit):
-            return 1440 / self.interval
-        else:
-            return 24 / self.interval
+        return self.number_of_runs / self.number_of_days
 
     @property
     def backtest_start_date(self):
@@ -433,7 +424,10 @@ class BacktestReport(BaseModel):
             "average_trade_duration": self.average_trade_duration,
             "average_trade_size": self.average_trade_size,
             "positions": [position.to_dict() for position in self.positions],
-            "trades": [trade.to_dict() for trade in self.trades],
+            "trades": [
+                trade.to_dict(datetime_format=DATETIME_FORMAT)
+                for trade in self.trades
+            ],
             "orders": [
                 order.to_dict(datetime_format=DATETIME_FORMAT)
                 for order in self.orders
@@ -524,6 +518,9 @@ class BacktestReport(BaseModel):
 
     def get_trading_symbol(self) -> str:
         return self.trading_symbol
+
+    def get_initial_unallocated(self) -> float:
+        return self.initial_unallocated
 
     def add_symbol(self, symbol):
 

@@ -6,6 +6,23 @@ from investing_algorithm_framework.domain.models.base_model import BaseModel
 
 
 class PortfolioConfiguration(BaseModel):
+    """
+    This class represents a portfolio configuration. It is used to
+    configure the portfolio that the user wants to create.
+
+    The portfolio configuration will have the following attributes:
+    - market: The market where the portfolio will be created
+    - trading_symbol: The trading symbol of the portfolio
+    - track_from: The date from which the portfolio will be tracked
+    - identifier: The identifier of the portfolio
+    - initial_balance: The initial balance of the portfolio
+
+    For backtesting, a portfolio configuration is used to create a
+    portfolio that will be used to simulate the trading of the algorithm. if
+    the user does not provide an initial balance, the portfolio will be created
+    with a balance of according to the initial balanace of
+        the PortfolioConfiguration class.
+    """
 
     def __init__(
         self,
@@ -22,7 +39,9 @@ class PortfolioConfiguration(BaseModel):
         self._initial_balance = initial_balance
 
         if self.identifier is None:
-            self._identifier = market.lower()
+            self._identifier = market.upper()
+        else:
+            self._identifier = identifier.upper()
 
         if track_from:
             self._track_from = parse(track_from)
@@ -35,8 +54,8 @@ class PortfolioConfiguration(BaseModel):
     @property
     def market(self):
 
-        if hasattr(self._market, "lower"):
-            return self._market.lower()
+        if hasattr(self._market, "upper"):
+            return self._market.upper()
 
         return self._market
 

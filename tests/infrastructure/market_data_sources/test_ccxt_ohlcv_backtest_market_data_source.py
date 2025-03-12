@@ -44,7 +44,7 @@ class Test(TestCase):
         and the end date is the backtest end date.
         """
         correct_file_name = \
-            "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14:21:45_2023-12-25:00:00.csv"
+            "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14-21-45_2023-12-25-00-00.csv"
         data_source = CCXTOHLCVBacktestMarketDataSource(
             identifier="OHLCV_BTC_EUR_BINANCE_15m",
             market="BINANCE",
@@ -66,7 +66,7 @@ class Test(TestCase):
 
     def test_window_size(self):
         correct_file_name = \
-            "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14:21:45_2023-12-25:00:00.csv"
+            "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14-21-45_2023-12-25-00-00.csv"
         data_source = CCXTOHLCVBacktestMarketDataSource(
             identifier="OHLCV_BTC_EUR_BINANCE_15m",
             market="BINANCE",
@@ -87,7 +87,7 @@ class Test(TestCase):
 
     def test_right_columns(self):
         correct_file_name = \
-            "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14:21:45_2023-12-25:00:00.csv"
+            "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14-21-45_2023-12-25-00-00.csv"
         csv_file_path = f"{self.resource_dir}/market_data_sources_for_testing"\
                         f"/{correct_file_name}"
         data_source = CCXTOHLCVBacktestMarketDataSource(
@@ -110,9 +110,10 @@ class Test(TestCase):
         self.assertEqual(csv_file_path, data_source._create_file_path())
         df = data_source\
             .get_data(
-                start_date=datetime(
+                date=datetime(
                     year=2023, month=12, day=17, hour=0, minute=0
-                )
+                ),
+                config={}
             )
         self.assertEqual(
             ["Datetime", "Open", "High", "Low", "Close", "Volume"], df.columns

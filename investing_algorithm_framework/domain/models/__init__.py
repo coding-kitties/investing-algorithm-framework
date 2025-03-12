@@ -9,10 +9,12 @@ from .strategy_profile import StrategyProfile
 from .time_frame import TimeFrame
 from .time_interval import TimeInterval
 from .time_unit import TimeUnit
-from .trade import Trade, TradeStatus
+from .trade import Trade, TradeStatus, TradeStopLoss, TradeTakeProfit, \
+    TradeRiskType
 from .trading_data_types import TradingDataType
 from .trading_time_frame import TradingTimeFrame
 from .date_range import DateRange
+from .market_data_type import MarketDataType
 
 __all__ = [
     "OrderStatus",
@@ -39,4 +41,8 @@ __all__ = [
     "AppMode",
     "BacktestDateRange",
     "DateRange",
+    "MarketDataType",
+    "TradeStopLoss",
+    "TradeTakeProfit",
+    "TradeRiskType",
 ]

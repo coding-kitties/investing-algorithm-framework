@@ -17,7 +17,8 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     SQLALCHEMY_DATABASE_URI, OperationalException, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, BacktestReport, \
     BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, APP_MODE, MarketCredential, \
-    AppMode, BacktestDateRange
+    AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, \
+    BACKTESTING_INITIAL_AMOUNT, MarketDataSource
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables
 from investing_algorithm_framework.services import OrderBacktestService, \
@@ -39,20 +40,61 @@ class AppHook:
 
 class App:
 
-    def __init__(self, state_handler=None):
+    def __init__(self, state_handler=None, name=None):
         self._flask_app: Optional[Flask] = None
         self.container = None
-        self._algorithm: Optional[Algorithm] = None
         self._started = False
         self._tasks = []
         self._configuration_service = None
         self._market_data_source_service: \
             Optional[MarketDataSourceService] = None
+        self._market_data_sources = []
         self._market_credential_service: \
             Optional[MarketCredentialService] = None
         self._on_initialize_hooks = []
         self._on_after_initialize_hooks = []
         self._state_handler = state_handler
+        self._name = name
+        self._algorithm = Algorithm()
+
+    @property
+    def algorithm(self) -> Algorithm:
+        return self._algorithm
+
+    @property
+    def context(self):
+        return self.container.context()
+
+    @property
+    def name(self):
+        return self._name
+
+    @name.setter
+    def name(self, name):
+        self._name = name
+
+    @property
+    def started(self):
+        return self._started
+
+    @property
+    def config(self):
+        """
+        Function to get a config instance. This allows users when
+        having access to the app instance also to read the
+        configs of the app.
+        """
+        configuration_service = self.container.configuration_service()
+        return configuration_service.config
+
+    @config.setter
+    def config(self, config: dict):
+        configuration_service = self.container.configuration_service()
+        configuration_service.initialize_from_dict(config)
+
+    @property
+    def running(self):
+        return self.algorithm.running
 
     def add_algorithm(self, algorithm: Algorithm) -> None:
         """
@@ -71,14 +113,11 @@ class App:
 
     def initialize_services(self) -> None:
         self._configuration_service = self.container.configuration_service()
+        self._configuration_service.initialize()
         self._market_data_source_service = \
             self.container.market_data_source_service()
         self._market_credential_service = \
             self.container.market_credential_service()
-
-    @property
-    def algorithm(self) -> Algorithm:
-        return self._algorithm
 
     @algorithm.setter
     def algorithm(self, algorithm: Algorithm) -> None:
@@ -111,16 +150,39 @@ class App:
                 DATABASE_NAME, "prod-database.sqlite3"
             )
 
-        config = configuration_service.get_config()
-
-        if DATABASE_DIRECTORY_PATH not in config \
-                or config[DATABASE_DIRECTORY_PATH] is None:
-            resource_dir = config[RESOURCE_DIRECTORY]
+        # Set the database directory name
+        if Environment.BACKTEST.equals(config[ENVIRONMENT]):
             configuration_service.add_value(
-                DATABASE_DIRECTORY_PATH,
-                os.path.join(resource_dir, "databases")
+                DATABASE_DIRECTORY_NAME, "backtest_databases"
+            )
+            configuration_service.add_value(
+                DATABASE_NAME, "backtest-database.sqlite3"
+            )
+        else:
+            configuration_service.add_value(
+                DATABASE_DIRECTORY_NAME, "databases"
             )
 
+            if Environment.TEST.equals(config[ENVIRONMENT]):
+                configuration_service.add_value(
+                    DATABASE_NAME, "test-database.sqlite3"
+                )
+            elif Environment.PROD.equals(config[ENVIRONMENT]):
+                configuration_service.add_value(
+                    DATABASE_NAME, "prod-database.sqlite3"
+                )
+            else:
+                configuration_service.add_value(
+                    DATABASE_NAME, "dev-database.sqlite3"
+                )
+
+        config = configuration_service.get_config()
+        resource_dir = config[RESOURCE_DIRECTORY]
+        database_dir_name = config.get(DATABASE_DIRECTORY_NAME)
+        configuration_service.add_value(
+            DATABASE_DIRECTORY_PATH,
+            os.path.join(resource_dir, database_dir_name)
+        )
         config = configuration_service.get_config()
 
         if SQLALCHEMY_DATABASE_URI not in config \
@@ -158,10 +220,114 @@ class App:
             for data_source in self.algorithm.data_sources:
                 self.add_market_data_source(data_source)
 
+        # Ensure that all resource directories exist
+        self._create_resources_if_not_exists()
+
+        # Setup the database
+        setup_sqlalchemy(self)
+        create_all_tables()
+
+        # Check if environment is in backtest mode
+        config = self.container.configuration_service().get_config()
+
+        # Initialize services in backtest
+        if Environment.BACKTEST.equals(config[ENVIRONMENT]):
+
+            configuration_service = self.container.configuration_service()
+            portfolio_conf_service = self.container \
+                .portfolio_configuration_service()
+            portfolio_snap_service = self.container \
+                .portfolio_snapshot_service()
+            market_cred_service = self.container.market_credential_service()
+            # Override the portfolio service with the backtest
+            # portfolio service
+            self.container.portfolio_service.override(
+                BacktestPortfolioService(
+                    configuration_service=configuration_service,
+                    market_credential_service=market_cred_service,
+                    market_service=self.container.market_service(),
+                    position_service=self.container.position_service(),
+                    order_service=self.container.order_service(),
+                    portfolio_repository=self.container.portfolio_repository(),
+                    portfolio_configuration_service=portfolio_conf_service,
+                    portfolio_snapshot_service=portfolio_snap_service
+                )
+            )
+
+            # Get all current market data sources
+            market_data_sources = self._market_data_source_service \
+                .get_market_data_sources()
+
+            # Override the market data source service with the backtest market
+            # data source service
+            self.container.market_data_source_service.override(
+                BacktestMarketDataSourceService(
+                    market_service=self.container.market_service(),
+                    market_credential_service=self.container
+                    .market_credential_service(),
+                    configuration_service=self.container
+                    .configuration_service(),
+                    market_data_sources=market_data_sources
+                )
+            )
+
+            portfolio_conf_service = self.container.\
+                portfolio_configuration_service()
+            portfolio_snap_service = self.container.\
+                portfolio_snapshot_service()
+            configuration_service = self.container.configuration_service()
+            market_data_source_service = self.container.\
+                market_data_source_service()
+            # Override the order service with the backtest order service
+            self.container.order_service.override(
+                OrderBacktestService(
+                    trade_service=self.container.trade_service(),
+                    order_repository=self.container.order_repository(),
+                    position_repository=self.container.position_repository(),
+                    portfolio_repository=self.container.portfolio_repository(),
+                    portfolio_configuration_service=portfolio_conf_service,
+                    portfolio_snapshot_service=portfolio_snap_service,
+                    configuration_service=configuration_service,
+                    market_data_source_service=market_data_source_service
+                )
+            )
+
+        # Initialize all market credentials
+        self._market_credential_service = self.container.\
+            market_credential_service()
+        self._market_credential_service.initialize()
+
+        # Add all market data sources of the strategies to the market data
+        # source service
+        self._market_data_source_service = self.container.\
+            market_data_source_service()
+        self._market_data_source_service.market_data_sources = \
+            self._market_data_sources
+
+        for strategy in self.algorithm.strategies:
+
+            if strategy.market_data_sources is not None:
+                for market_data_source in strategy.market_data_sources:
+                    self._market_data_source_service.add(market_data_source)
+
+        # Initialize the market data source service
+        self._market_data_source_service.initialize_market_data_sources()
+
+        portfolio_configuration_service = self.container \
+            .portfolio_configuration_service()
+
+        # Re-init the market service because the portfolio configuration
+        # service is a singleton
+        portfolio_configuration_service.market_service \
+            = self.container.market_service()
+
+        if portfolio_configuration_service.count() == 0:
+            raise OperationalException("No portfolios configured")
+
         self.algorithm.initialize_services(
+            context=self.container.context(),
             configuration_service=self.container.configuration_service(),
-            market_data_source_service=self.container
-            .market_data_source_service(),
+            market_data_source_service=self._market_data_source_service,
             market_credential_service=self.container
             .market_credential_service(),
             portfolio_service=self.container.portfolio_service(),
@@ -175,27 +341,6 @@ class App:
             trade_service=self.container.trade_service(),
         )
 
-        # Ensure that all resource directories exist
-        self._create_resources_if_not_exists()
-
-        # Setup the database
-        setup_sqlalchemy(self)
-        create_all_tables()
-
-        # Initialize all market credentials
-        market_credential_service = self.container.market_credential_service()
-        market_credential_service.initialize()
-
-        # Initialize all market data sources from registered the strategies
-        market_data_source_service = \
-            self.container.market_data_source_service()
-
-        for strategy in self.algorithm.strategies:
-
-            if strategy.market_data_sources is not None:
-                for market_data_source in strategy.market_data_sources:
-                    market_data_source_service.add(market_data_source)
-
         config = self.container.configuration_service().get_config()
 
         if config[APP_MODE] == AppMode.WEB.value:
@@ -207,32 +352,49 @@ class App:
         # Initialize all portfolios that are registered
         portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
+        portfolio_service = self.container.portfolio_service()
 
         # Throw an error if no portfolios are configured
         if portfolio_configuration_service.count() == 0:
             raise OperationalException("No portfolios configured")
 
-        # Check if all portfolios are configured
-        portfolio_service = self.container.portfolio_service()
-        synced_portfolios = []
+        if Environment.BACKTEST.equals(config[ENVIRONMENT]):
+            initial_backtest_amount = config.get(
+                BACKTESTING_INITIAL_AMOUNT, None
+            )
 
-        for portfolio_configuration \
-                in portfolio_configuration_service.get_all():
+            for portfolio_configuration \
+                    in portfolio_configuration_service.get_all():
 
-            if not portfolio_service.exists(
-                {"identifier": portfolio_configuration.identifier}
-            ):
-                portfolio = portfolio_service\
-                    .create_portfolio_from_configuration(
-                        portfolio_configuration
+                if not portfolio_service.exists(
+                    {"identifier": portfolio_configuration.identifier}
+                ):
+                    portfolio = (
+                        portfolio_service.create_portfolio_from_configuration(
+                            portfolio_configuration,
+                            initial_amount=initial_backtest_amount,
+                        )
                     )
+        else:
+            synced_portfolios = []
 
-        portfolios = portfolio_service.get_all()
+            for portfolio_configuration \
+                    in portfolio_configuration_service.get_all():
 
-        for portfolio in portfolios:
+                if not portfolio_service.exists(
+                    {"identifier": portfolio_configuration.identifier}
+                ):
+                    portfolio = portfolio_service\
+                        .create_portfolio_from_configuration(
+                            portfolio_configuration
+                        )
 
-            if portfolio not in synced_portfolios:
-                self.sync(portfolio)
+            portfolios = portfolio_service.get_all()
+
+            for portfolio in portfolios:
+
+                if portfolio not in synced_portfolios:
+                    self.sync(portfolio)
 
     def sync(self, portfolio):
         """
@@ -255,279 +417,6 @@ class App:
 
         # Sync all orders from exchange with current order history
         portfolio_sync_service.sync_orders(portfolio)
-
-        # Sync all trades from exchange with current trade history
-        portfolio_sync_service.sync_trades(portfolio)
-
-    def _initialize_standard(self):
-        """
-        Initialize the app for standard mode by setting the configuration
-        parameters for standard mode and overriding the services with the
-        standard services equivalents.
-
-        Standard has the following implications:
-        db: sqlite
-        web: False
-        app: Standard
-        algorithm: Standard
-        """
-        configuration_service = self.container.configuration_service()
-        resource_dir = configuration_service.config[RESOURCE_DIRECTORY]
-
-        if resource_dir is None:
-            configuration_service.config[SQLALCHEMY_DATABASE_URI] = "sqlite://"
-        else:
-            resource_dir = self._create_resource_directory_if_not_exists()
-            configuration_service.config[DATABASE_DIRECTORY_PATH] = \
-                os.path.join(resource_dir, "databases")
-            configuration_service.config[DATABASE_NAME] \
-                = "prod-database.sqlite3"
-            configuration_service.config[SQLALCHEMY_DATABASE_URI] = \
-                "sqlite:///" + os.path.join(
-                    configuration_service.config[DATABASE_DIRECTORY_PATH],
-                    configuration_service.config[DATABASE_NAME]
-                )
-            self._create_database_if_not_exists()
-
-    def _initialize_app_for_backtest(
-        self,
-        backtest_date_range: BacktestDateRange,
-        pending_order_check_interval=None,
-    ) -> None:
-        """
-        Initialize the app for backtesting by setting the configuration
-        parameters for backtesting and overriding the services with the
-        backtest services equivalents. This method should only be called
-        before running a backtest or a set of backtests and should be called
-        once.
-
-        Args:
-            backtest_date_range: instance of BacktestDateRange
-            pending_order_check_interval: The interval at which to check
-            pending orders (e.g. 1h, 1d, 1w)
-
-        Return None
-        """
-        # Set all config vars for backtesting
-        configuration_service = self.container.configuration_service()
-        configuration_service.add_value(
-            ENVIRONMENT, Environment.BACKTEST.value
-        )
-        configuration_service.add_value(
-            BACKTESTING_START_DATE, backtest_date_range.start_date
-        )
-        configuration_service.add_value(
-            BACKTESTING_END_DATE, backtest_date_range.end_date
-        )
-        configuration_service.add_value(
-            DATABASE_NAME, "backtest-database.sqlite3"
-        )
-        configuration_service.add_value(
-            DATABASE_DIRECTORY_PATH,
-            os.path.join(
-                configuration_service.config[
-                    RESOURCE_DIRECTORY
-                ],
-                "backtest_databases"
-            )
-        )
-
-        if pending_order_check_interval is not None:
-            configuration_service.add_value(
-                BACKTESTING_PENDING_ORDER_CHECK_INTERVAL,
-                pending_order_check_interval
-            )
-
-        # Create resource dir if not exits
-        self._create_resources_if_not_exists()
-
-    def _create_backtest_database_if_not_exists(self):
-        """
-        Create the backtest database if it does not exist. This method
-        should be called before running a backtest for an algorithm.
-        It creates the database if it does not exist.
-
-        Parameters:
-            None
-
-        Returns
-            None
-        """
-        configuration_service = self.container.configuration_service()
-        resource_dir = configuration_service.config[RESOURCE_DIRECTORY]
-
-        # Create the database if not exists
-        configuration_service.add_value(
-            DATABASE_NAME, "backtest-database.sqlite3"
-        )
-        configuration_service.add_value(
-            DATABASE_DIRECTORY_PATH,
-            os.path.join(resource_dir, "databases")
-        )
-
-        database_path = os.path.join(
-            configuration_service.config[DATABASE_DIRECTORY_PATH],
-            configuration_service.config[DATABASE_NAME]
-        )
-
-        if os.path.exists(database_path):
-            os.remove(database_path)
-
-        sql_alchemy_uri = \
-            "sqlite:///" + os.path.join(
-                configuration_service.config[DATABASE_DIRECTORY_PATH],
-                configuration_service.config[DATABASE_NAME]
-            )
-
-        configuration_service.add_value(
-            SQLALCHEMY_DATABASE_URI, sql_alchemy_uri
-        )
-        self._create_database_if_not_exists()
-        setup_sqlalchemy(self)
-        create_all_tables()
-
-    def _initialize_backtest_data_sources(self, algorithm):
-        """
-        Initialize the backtest data sources for the algorithm. This method
-        should be called before running a backtest. It initializes the
-        backtest data sources for the algorithm. It takes all registered
-        data sources and converts them to backtest equivalents
-
-        Args:
-            algorithm: The algorithm to initialize for backtesting
-
-        Returns
-            None
-        """
-
-        market_data_sources = self._market_data_source_service \
-            .get_market_data_sources()
-        backtest_market_data_sources = []
-
-        if algorithm.data_sources is not None \
-                and len(algorithm.data_sources) > 0:
-
-            for data_source in algorithm.data_sources:
-                self.add_market_data_source(data_source)
-
-        if market_data_sources is not None:
-            backtest_market_data_sources = [
-                market_data_source.to_backtest_market_data_source()
-                for market_data_source in market_data_sources
-                if market_data_source is not None
-            ]
-
-            for market_data_source in backtest_market_data_sources:
-                if market_data_source is not None:
-                    market_data_source.config = self.config
-
-        # Override the market data source service with the backtest market
-        # data source service
-        self.container.market_data_source_service.override(
-            BacktestMarketDataSourceService(
-                market_data_sources=backtest_market_data_sources,
-                market_service=self.container.market_service(),
-                market_credential_service=self.container
-                .market_credential_service(),
-                configuration_service=self.container
-                .configuration_service(),
-            )
-        )
-
-        # Set all data sources to the algorithm
-        algorithm.add_data_sources(backtest_market_data_sources)
-
-    def _initialize_algorithm_for_backtest(self, algorithm):
-        """
-        Function to initialize the algorithm for backtesting. This method
-        should be called before running a backtest. It initializes the
-        all data sources to backtest data sources and overrides the services
-        with the backtest services equivalents.
-
-        Parameters:
-            algorithm: The algorithm to initialize for backtesting
-
-        Returns
-            None
-        """
-        self._create_backtest_database_if_not_exists()
-        self._initialize_backtest_data_sources(algorithm)
-
-        # Override the portfolio service with the backtest portfolio service
-        self.container.portfolio_service.override(
-            BacktestPortfolioService(
-                configuration_service=self.container.configuration_service(),
-                market_credential_service=self.container
-                .market_credential_service(),
-                market_service=self.container.market_service(),
-                position_service=self.container.position_service(),
-                order_service=self.container.order_service(),
-                portfolio_repository=self.container.portfolio_repository(),
-                portfolio_configuration_service=self.container
-                .portfolio_configuration_service(),
-                portfolio_snapshot_service=self.container
-                .portfolio_snapshot_service(),
-            )
-        )
-
-        # Override the order service with the backtest order service
-        market_data_source_service = self.container \
-            .market_data_source_service()
-        self.container.order_service.override(
-            OrderBacktestService(
-                order_repository=self.container.order_repository(),
-                position_repository=self.container.position_repository(),
-                portfolio_repository=self.container.portfolio_repository(),
-                portfolio_configuration_service=self.container
-                .portfolio_configuration_service(),
-                portfolio_snapshot_service=self.container
-                .portfolio_snapshot_service(),
-                configuration_service=self.container.configuration_service(),
-                market_data_source_service=market_data_source_service
-            )
-        )
-
-        portfolio_configuration_service = self.container \
-            .portfolio_configuration_service()
-
-        # Re-init the market service because the portfolio configuration
-        # service is a singleton
-        portfolio_configuration_service.market_service \
-            = self.container.market_service()
-
-        if portfolio_configuration_service.count() == 0:
-            raise OperationalException("No portfolios configured")
-
-        strategy_orchestrator_service = \
-            self.container.strategy_orchestrator_service()
-        market_credential_service = self.container.market_credential_service()
-        market_data_source_service = \
-            self.container.market_data_source_service()
-        # Initialize all services in the algorithm
-        algorithm.initialize_services(
-            configuration_service=self.container.configuration_service(),
-            portfolio_configuration_service=self.container
-            .portfolio_configuration_service(),
-            portfolio_service=self.container.portfolio_service(),
-            position_service=self.container.position_service(),
-            order_service=self.container.order_service(),
-            market_service=self.container.market_service(),
-            strategy_orchestrator_service=strategy_orchestrator_service,
-            market_credential_service=market_credential_service,
-            market_data_source_service=market_data_source_service,
-            trade_service=self.container.trade_service(),
-        )
-
-        # Create all portfolios
-        portfolio_configuration_service = self.container \
-            .portfolio_configuration_service()
-        portfolio_configurations = portfolio_configuration_service.get_all()
-        portfolio_service = self.container.portfolio_service()
-
-        for portfolio_configuration in portfolio_configurations:
-            portfolio_service.create_portfolio_from_configuration(
-                portfolio_configuration
-            )
 
     def run(
         self,
@@ -566,6 +455,16 @@ class App:
             None
         """
         try:
+            configuration_service = self.container.configuration_service()
+            config = configuration_service.get_config()
+
+            # Run method should never be called with environment set to
+            # backtest, if it is, then set the environment to prod
+            if config[ENVIRONMENT] == Environment.BACKTEST.value:
+                configuration_service.add_value(
+                    ENVIRONMENT, Environment.PROD.value
+                )
+
             self.initialize_config()
 
             # Load the state if a state handler is provided
@@ -600,12 +499,11 @@ class App:
                     target=self._flask_app.run,
                     kwargs={"port": 8080}
                 )
-                flask_thread.setDaemon(True)
+                flask_thread.daemon = True
                 flask_thread.start()
 
             self.algorithm.start(number_of_iterations=number_of_iterations)
             number_of_iterations_since_last_orders_check = 1
-            self.algorithm.check_pending_orders()
 
             try:
                 while self.algorithm.running:
@@ -613,36 +511,21 @@ class App:
                         logger.info("Checking pending orders")
                         number_of_iterations_since_last_orders_check = 1
 
-                    self.algorithm.run_jobs()
+                    self.algorithm.run_jobs(context=self.container.context())
                     number_of_iterations_since_last_orders_check += 1
                     sleep(1)
             except KeyboardInterrupt:
                 exit(0)
+        except Exception as e:
+            logger.error(e)
         finally:
+            self.algorithm.stop()
+
             # Upload state if state handler is provided
             if self._state_handler is not None:
                 logger.info("Detected state handler, saving state")
                 config = self.container.configuration_service().get_config()
                 self._state_handler.save(config[RESOURCE_DIRECTORY])
-
-    @property
-    def started(self):
-        return self._started
-
-    @property
-    def config(self):
-        """
-        Function to get a config instance. This allows users when
-        having access to the app instance also to read the
-        configs of the app.
-        """
-        configuration_service = self.container.configuration_service()
-        return configuration_service.config
-
-    @config.setter
-    def config(self, config: dict):
-        configuration_service = self.container.configuration_service()
-        configuration_service.initialize_from_dict(config)
 
     def reset(self):
         self._started = False
@@ -652,10 +535,6 @@ class App:
         portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
         portfolio_configuration_service.add(portfolio_configuration)
-
-    @property
-    def running(self):
-        return self.algorithm.running
 
     def task(
         self,
@@ -740,54 +619,29 @@ class App:
                     "Could not create database directory"
                 )
 
-    def _create_database_if_not_exists(self):
-        configuration_service = self.container.configuration_service()
-        database_dir = configuration_service.config \
-            .get(DATABASE_DIRECTORY_PATH, None)
-
-        if database_dir is None:
-            return
-
-        config = configuration_service.get_config()
-        database_name = config[DATABASE_NAME]
-
-        if database_name is None:
-            return
-
-        database_path = os.path.join(database_dir, database_name)
-
-        if not os.path.exists(database_path):
-
-            if not os.path.isdir(database_dir):
-                os.makedirs(database_dir)
-
-            try:
-                open(database_path, 'w').close()
-            except OSError as e:
-                logger.error(e)
-                raise OperationalException(
-                    "Could not create database directory"
-                )
-
     def get_portfolio_configurations(self):
         return self.algorithm.get_portfolio_configurations()
 
     def run_backtest(
         self,
-        algorithm,
         backtest_date_range: BacktestDateRange,
+        initial_amount=None,
         pending_order_check_interval=None,
-        output_directory=None
+        output_directory=None,
+        algorithm: Algorithm = None
     ) -> BacktestReport:
         """
         Run a backtest for an algorithm. This method should be called when
         running a backtest.
 
-        Parameters:
-            algorithm: The algorithm to run a backtest for (instance of
-                Algorithm)
+        Args:
             backtest_date_range: The date range to run the backtest for
                 (instance of BacktestDateRange)
+            initial_amount: The initial amount to start the backtest with.
+                This will be the amount of trading currency that the backtest
+                portfolio will start with.
+            algorithm: The algorithm to run a backtest for (instance of
+                Algorithm)
             pending_order_check_interval: str - pending_order_check_interval:
               The interval at which to check pending orders (e.g. 1h, 1d, 1w)
             output_directory: str - The directory to
@@ -796,43 +650,61 @@ class App:
         Returns:
             Instance of BacktestReport
         """
-        logger.info("Initializing backtest")
-        self.algorithm = algorithm
+        if algorithm is not None:
+            self.algorithm = algorithm
 
-        self._initialize_app_for_backtest(
-            backtest_date_range=backtest_date_range,
-            pending_order_check_interval=pending_order_check_interval,
-        )
+        if self.algorithm is None:
+            raise OperationalException("No algorithm registered")
 
-        self._initialize_algorithm_for_backtest(
-            algorithm=self.algorithm
+        # Add backtest configuration to the config
+        self.set_config_with_dict({
+            ENVIRONMENT: Environment.BACKTEST.value,
+            BACKTESTING_START_DATE: backtest_date_range.start_date,
+            BACKTESTING_END_DATE: backtest_date_range.end_date,
+            DATABASE_NAME: "backtest-database.sqlite3",
+            DATABASE_DIRECTORY_NAME: "backtest_databases",
+            BACKTESTING_PENDING_ORDER_CHECK_INTERVAL: (
+                pending_order_check_interval
+            ),
+            BACKTESTING_INITIAL_AMOUNT: initial_amount
+        })
+
+        self.initialize_config()
+        config = self._configuration_service.get_config()
+        path = os.path.join(
+            config[DATABASE_DIRECTORY_PATH],
+            config[DATABASE_NAME]
         )
+        # Remove the previous backtest db
+        if os.path.exists(path):
+            os.remove(path)
+
+        self.initialize()
+
         backtest_service = self.container.backtest_service()
-        configuration_service = self.container.configuration_service()
-        config = configuration_service.get_config()
-        backtest_service.resource_directory = config[RESOURCE_DIRECTORY]
 
         # Run the backtest with the backtest_service and collect the report
         report = backtest_service.run_backtest(
-            algorithm=self.algorithm, backtest_date_range=backtest_date_range
+            algorithm=self.algorithm,
+            initial_amount=initial_amount,
+            backtest_date_range=backtest_date_range
         )
-        backtest_report_writer_service = self.container \
-            .backtest_report_writer_service()
+        config = self.container.configuration_service().get_config()
 
         if output_directory is None:
             output_directory = os.path.join(
                 config[RESOURCE_DIRECTORY], "backtest_reports"
             )
 
-        backtest_report_writer_service.write_report_to_json(
+        backtest_service.write_report_to_json(
             report=report, output_directory=output_directory
         )
-
         return report
 
     def run_backtests(
         self,
         algorithms,
+        initial_amount=None,
         date_ranges: List[BacktestDateRange] = None,
         pending_order_check_interval=None,
         output_directory=None,
@@ -842,10 +714,11 @@ class App:
         Run a backtest for a set algorithm. This method should be called when
         running a backtest.
 
-        Parameters:
+        Args:
             Algorithms: List[Algorithm] - The algorithms to run backtests for
             date_ranges: List[BacktestDateRange] - The date ranges to run the
                 backtests for
+            initial_amount: The initial amount to start the backtest with.
             pending_order_check_interval: str - The interval at which to check
                 pending orders
             output_directory: str - The directory to write the backtest
@@ -866,11 +739,6 @@ class App:
 
         for date_range in date_ranges:
             date_range: BacktestDateRange = date_range
-            self._initialize_app_for_backtest(
-                backtest_date_range=date_range,
-                pending_order_check_interval=pending_order_check_interval,
-            )
-
             print(
                 f"{COLOR_YELLOW}Running backtests for date "
                 f"range:{COLOR_RESET} {COLOR_GREEN}{date_range.name} "
@@ -901,8 +769,30 @@ class App:
                         )
                         reports.append(report)
                         continue
+                self.algorithm = algorithm
+                self.set_config_with_dict({
+                    ENVIRONMENT: Environment.BACKTEST.value,
+                    BACKTESTING_START_DATE: date_range.start_date,
+                    BACKTESTING_END_DATE: date_range.end_date,
+                    DATABASE_NAME: "backtest-database.sqlite3",
+                    DATABASE_DIRECTORY_NAME: "backtest_databases",
+                    BACKTESTING_PENDING_ORDER_CHECK_INTERVAL: (
+                        pending_order_check_interval
+                    )
+                })
+                self.initialize_config()
 
-                self._initialize_algorithm_for_backtest(algorithm)
+                config = self._configuration_service.get_config()
+
+                path = os.path.join(
+                    config[DATABASE_DIRECTORY_PATH],
+                    config[DATABASE_NAME]
+                )
+                # Remove the previous backtest db
+                if os.path.exists(path):
+                    os.remove(path)
+
+                self.initialize()
                 backtest_service = self.container.backtest_service()
                 backtest_service.resource_directory = self.config[
                     RESOURCE_DIRECTORY
@@ -911,22 +801,21 @@ class App:
                 # Run the backtest with the backtest_service
                 # and collect the report
                 report = backtest_service.run_backtest(
-                    algorithm=algorithm, backtest_date_range=date_range
+                    algorithm=self.algorithm,
+                    initial_amount=initial_amount,
+                    backtest_date_range=date_range
                 )
 
                 # Add date range name to report if present
                 if date_range.name is not None:
                     report.date_range_name = date_range.name
 
-                backtest_report_writer_service = self.container \
-                    .backtest_report_writer_service()
-
                 if output_directory is None:
                     output_directory = os.path.join(
                         self.config[RESOURCE_DIRECTORY], "backtest_reports"
                     )
 
-                backtest_report_writer_service.write_report_to_json(
+                backtest_service.write_report_to_json(
                     report=report, output_directory=output_directory
                 )
                 reports.append(report)
@@ -934,8 +823,35 @@ class App:
         return reports
 
     def add_market_data_source(self, market_data_source):
-        market_data_source.config = self.config
-        self._market_data_source_service.add(market_data_source)
+        """
+        Function to add a market data source to the app. The market data
+        source should be an instance of MarketDataSource.
+
+        This is a seperate function from the market data source service. This
+        is because the market data source service can be re-initialized.
+        Therefore we need a persistent list of market data sources in the app.
+
+        Args:
+            market_data_source: Instance of MarketDataSource
+
+        Returns:
+            None
+        """
+
+        # Check if the market data source is an instance of MarketDataSource
+        if not isinstance(market_data_source, MarketDataSource):
+            return
+
+        # Check if there is already a market data source with the same
+        # identifier
+        for existing_market_data_source in self._market_data_sources:
+            if existing_market_data_source.get_identifier() == \
+                    market_data_source.get_identifier():
+                return
+
+        market_data_source.market_credential_service = \
+            self._market_credential_service
+        self._market_data_sources.append(market_data_source)
 
     def add_market_credential(self, market_credential: MarketCredential):
         market_credential.market = market_credential.market.upper()
@@ -962,3 +878,11 @@ class App:
             app_hook = app_hook()
 
         self._on_after_initialize_hooks.append(app_hook)
+
+    def add_strategy(self, strategy):
+        """
+        """
+        if self.algorithm is None:
+            self.algorithm = Algorithm(name=self._name)
+
+        self.algorithm.add_strategy(strategy)

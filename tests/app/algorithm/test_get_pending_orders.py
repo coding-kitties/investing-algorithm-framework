@@ -1,7 +1,7 @@
 from investing_algorithm_framework import PortfolioConfiguration, Order, \
-    MarketCredential, SYMBOLS
+    MarketCredential
 from investing_algorithm_framework.services import PortfolioService
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class TestPortfolioService(TestBase):
@@ -68,6 +68,7 @@ class TestPortfolioService(TestBase):
     external_balances = {
         "EUR": 700,
     }
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_get_pending_orders(self):
         """
@@ -101,7 +102,7 @@ class TestPortfolioService(TestBase):
 
         # Check that the portfolio has the correct amount of trades
         trade_service = self.app.container.trade_service()
-        self.assertEqual(1, trade_service.count())
+        self.assertEqual(3, trade_service.count())
         self.assertEqual(
             1, trade_service.count(
                 {"portfolio_id": portfolio.id, "status": "OPEN"}
@@ -136,10 +137,10 @@ class TestPortfolioService(TestBase):
         )
         self.assertEqual(400, eur_position.amount)
 
-        pending_orders = self.app.algorithm.get_pending_orders()
+        pending_orders = self.app.context.get_pending_orders()
         self.assertEqual(2, len(pending_orders))
 
-        pending_order = self.app.algorithm\
+        pending_order = self.app.context\
             .get_pending_orders(target_symbol="ETH")[0]
 
         order_service = self.app.container.order_service()
@@ -152,5 +153,5 @@ class TestPortfolioService(TestBase):
             }
         )
 
-        pending_orders = self.app.algorithm.get_pending_orders()
+        pending_orders = self.app.context.get_pending_orders()
         self.assertEqual(1, len(pending_orders))

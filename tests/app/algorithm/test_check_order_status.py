@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     OrderStatus, MarketCredential
-from tests.resources import TestBase
+from tests.resources import TestBase, MarketDataSourceServiceStub
 
 
 class Test(TestBase):
@@ -22,11 +22,12 @@ class Test(TestBase):
     external_balances = {
         "EUR": 1000,
     }
+    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_check_order_status(self):
         order_repository = self.app.container.order_repository()
         position_repository = self.app.container.position_repository()
-        self.app.algorithm.create_limit_order(
+        self.app.context.create_limit_order(
             target_symbol="BTC",
             amount=1,
             price=10,
@@ -34,7 +35,7 @@ class Test(TestBase):
         )
         self.assertEqual(1, order_repository.count())
         self.assertEqual(2, position_repository.count())
-        self.app.algorithm.order_service.check_pending_orders()
+        self.app.context.order_service.check_pending_orders()
         self.assertEqual(1, order_repository.count())
         self.assertEqual(2, position_repository.count())
         order = order_repository.find({"target_symbol": "BTC"})

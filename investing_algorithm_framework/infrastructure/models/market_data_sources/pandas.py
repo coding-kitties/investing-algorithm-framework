@@ -1,4 +1,3 @@
-from datetime import datetime
 from pandas import DataFrame
 
 from investing_algorithm_framework.domain import OHLCVMarketDataSource, \
@@ -41,7 +40,7 @@ class PandasOHLCVBacktestMarketDataSource(
     def empty(self):
         pass
 
-    def get_data(self, **kwargs):
+    def get_data(self, config, date):
         pass
 
     def _validate_dataframe_with_ohlcv_structure(self):
@@ -90,7 +89,7 @@ class PandasOHLCVMarketDataSource(OHLCVMarketDataSource):
         self.dataframe = dataframe
         self._validate_dataframe_with_ohlcv_structure()
 
-    def get_data(self, **kwargs):
+    def get_data(self, config, date):
         """
         Implementation of get_data for PandasOHLCVMarketDataSource.
         This implementation uses the dataframe provided in the constructor.
@@ -108,49 +107,12 @@ class PandasOHLCVMarketDataSource(OHLCVMarketDataSource):
         returns:
             Polars Dataframe: a polars.DataFrame with the OHLCV data
         """
-
-        if "window_size" in kwargs:
-            self.window_size = kwargs["window_size"]
-
-        if "start_date" in kwargs:
-            start_date = kwargs["start_date"]
-
-            if not isinstance(start_date, datetime):
-                raise OperationalException(
-                    "start_date should be a datetime object"
-                )
-        else:
-            raise OperationalException(
-                "start_date should be set for CCXTOHLCVMarketDataSource"
-            )
-
-        if "end_date" not in kwargs:
-
-            if self.window_size is None:
-                raise OperationalException(
-                    "Either end_date or window_size "
-                    "should be passed as a "
-                    "parameter for CCXTOHLCVMarketDataSource"
-                )
-
-            end_date = self.create_end_date(
-                start_date, self.time_frame, self.window_size
-            )
-        else:
-            end_date = kwargs["end_date"]
-
-            if not isinstance(end_date, datetime):
-                raise OperationalException(
-                    "end_date should be a datetime object"
-                )
-
-        if not isinstance(start_date, datetime):
-            raise OperationalException(
-                "start_date should be a datetime object"
-            )
+        end_date = self.create_end_date(
+            date, self.time_frame, self.window_size
+        )
 
         # Slice the pandas dataframe object
-        return self.dataframe["Datetime" >= start_date]
+        return self.dataframe["Datetime" >= date & "Datetime" <= end_date]
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
         # return CCXTOHLCVBacktestMarketDataSource(
