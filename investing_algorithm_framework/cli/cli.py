@@ -7,7 +7,8 @@ from investing_algorithm_framework.cli.deploy_to_azure_function import \
 """
 CLI for Investing Algorithm Framework
 
-This module provides a command-line interface (CLI) for the Investing Algorithm Framework.
+This module provides a command-line interface (CLI) for the
+Investing Algorithm Framework.
 """
 
 
@@ -16,11 +17,13 @@ def cli():
     """CLI for Investing Algorithm Framework"""
     pass
 
+
 @click.command()
 @click.option(
     '--type',
     default="default",
-    help="Type of app to create. Options are: 'default', 'default-web', 'azure-function'."
+    help="Type of app to create. "
+    "Options are: 'default', 'default-web', 'azure-function'."
 )
 @click.option(
     '--path', default=None, help="Path to directory to initialize the app in"
@@ -29,7 +32,8 @@ def cli():
     '--replace',
     is_flag=True,
     default=False,
-    help="If True, duplicate files will be replaced. If False, files will not be replaced."
+    help="If True, duplicate files will be replaced."
+    "If False, files will not be replaced."
 )
 def init(type, path, replace):
     """
@@ -128,6 +132,7 @@ def deploy_azure_function(
     Returns:
         None
     """
+    crg = create_resource_group_if_not_exists
     deploy_to_azure_function_command(
         resource_group=resource_group,
         subscription_id=subscription_id,
@@ -135,10 +140,10 @@ def deploy_azure_function(
         container_name=container_name,
         deployment_name=deployment_name,
         region=region,
-        create_resource_group_if_not_exists=\
-            create_resource_group_if_not_exists,
+        create_resource_group_if_not_exists=crg,
         skip_login=skip_login
     )
+
 
 cli.add_command(init)
 cli.add_command(deploy_azure_function)

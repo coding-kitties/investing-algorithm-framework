@@ -12,7 +12,8 @@ class AzureBlobStorageStateHandler(StateHandler):
     """
     A state handler for Azure Blob Storage.
 
-    This class provides methods to save and load state to and from Azure Blob Storage.
+    This class provides methods to save and load state to and from
+    Azure Blob Storage.
 
     Attributes:
         connection_string (str): The connection string for Azure Blob Storage.

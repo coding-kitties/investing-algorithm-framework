@@ -421,7 +421,10 @@ class CCXTMarketService(MarketService):
                     datetime_stamp = datetime_stamp\
                         .strftime(datetime_format)
 
-                    data.append([datetime_stamp] + [float(value) for value in candle[1:]])
+                    data.append(
+                        [datetime_stamp] +
+                        [float(value) for value in candle[1:]]
+                    )
 
             sleep(exchange.rateLimit / 1000)
 

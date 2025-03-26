@@ -5,7 +5,6 @@ import random
 import string
 import asyncio
 import time
-import requests
 
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.resource import ResourceManagementClient
@@ -51,6 +50,7 @@ def ensure_azure_functools():
         print("You can install it using the following command:")
         print("npm install -g azure-functions-core-tools@4 --unsafe-perm true")
         exit(1)
+
 
 async def read_env_file_and_set_function_env_variables(
     function_app_name,

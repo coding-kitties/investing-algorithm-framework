@@ -529,11 +529,11 @@ class App:
                 # Upload state if state handler is provided
                 if self._state_handler is not None:
                     logger.info("Detected state handler, saving state")
-                    config = self.container.configuration_service().get_config()
+                    config = \
+                        self.container.configuration_service().get_config()
                     self._state_handler.save(config[RESOURCE_DIRECTORY])
             except Exception as e:
                 logger.error(e)
-
 
     def reset(self):
         self._started = False

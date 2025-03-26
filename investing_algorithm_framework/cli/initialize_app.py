@@ -99,7 +99,7 @@ def create_file_from_template(template_path, output_path, replace=False):
             file.write(template)
 
 
-def command(path = None, app_type = "default", replace = False):
+def command(path=None, app_type="default", replace=False):
     """
     Function to create an azure function app skeleton.
 
@@ -115,7 +115,7 @@ def command(path = None, app_type = "default", replace = False):
         None
     """
 
-    if path == None:
+    if path is None:
         path = os.getcwd()
     else:
         # check if directory exists
