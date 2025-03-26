@@ -1,0 +1,17 @@
+from investing_algorithm_framework import CCXTOHLCVMarketDataSource, \
+    CCXTTickerMarketDataSource
+
+btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
+    identifier="BTC/EUR-ohlcv-2h",
+    market="BITVAVO",
+    symbol="BTC/EUR",
+    time_frame="2h",
+    window_size=200
+)
+
+btc_eur_ticker = CCXTTickerMarketDataSource(
+    identifier="BTC/EUR-ticker",
+    market="BITVAVO",
+    symbol="BTC/EUR",
+    backtest_time_frame="2h",
+)

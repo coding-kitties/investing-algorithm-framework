@@ -4,6 +4,7 @@ from .market_data_sources import MarketDataSource, TickerMarketDataSource, \
 from .market_service import MarketService
 from .portfolios import AbstractPortfolioSyncService
 from .rounding_service import RoundingService
+from .state_handler import StateHandler
 
 __all__ = [
     "MarketDataSource",
@@ -15,4 +16,5 @@ __all__ = [
     "MarketCredentialService",
     "AbstractPortfolioSyncService",
     "RoundingService",
+    "StateHandler"
 ]

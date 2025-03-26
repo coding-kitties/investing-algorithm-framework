@@ -1,32 +1,65 @@
 import azure.functions as func
 import logging
+import logging.config
 from investing_algorithm_framework import DEFAULT_LOGGING_CONFIG,\
-    StatelessAction
-from app_entry import app as trading_bot_app
+    StatelessAction, AzureBlobStorageStateHandler
+from app import app as trading_bot_app
+
+trading_bot_app.add_state_handler(
+    state_handler=AzureBlobStorageStateHandler
+)
 
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
-
 app = func.FunctionApp()
 
-@app.route(route="trading_bot", auth_level=func.AuthLevel.ANONYMOUS)
+@app.route(route="ping", auth_level=func.AuthLevel.ANONYMOUS)
 def trading_bot(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info('Python HTTP trigger function processed a request.')
+    logging.info("Ping request received.")
 
-    name = req.params.get('name')
-
-    trading_bot_app.run(payload={"action": StatelessAction.RUN_STRATEGY.value})
-    if not name:
-        try:
-            req_body = req.get_json()
-        except ValueError:
-            pass
-        else:
-            name = req_body.get('name')
-
-    if name:
-        return func.HttpResponse(f"Hello, {name}. This HTTP triggered function executed successfully.")
-    else:
-        return func.HttpResponse(
-             "This HTTP triggered function executed successfully. Pass a name in the query string or in the request body for a personalized response.",
-             status_code=200
+    try:
+        response = trading_bot_app.run(
+            payload={"action": StatelessAction.RUN_STRATEGY.value}
         )
+        return func.HttpResponse(response, status_code=200)
+    except Exception as e:
+        return func.HttpResponse(
+            f"Error running ping action: {e}",
+            status_code=500
+        )
+
+
+@app.route(route="run", auth_level=func.AuthLevel.ANONYMOUS)
+def run_trading_bot(req: func.HttpRequest) -> func.HttpResponse:
+    logging.info("Run request received.")
+    try:
+        trading_bot_app.run(
+            payload={"action": StatelessAction.RUN_STRATEGY.value}
+        )
+    except Exception as e:
+        return func.HttpResponse(
+            f"Error running trading bot: {e}",
+            status_code=500
+        )
+
+    return func.HttpResponse(
+        "Trading bot executed successfully.",
+        status_code=200
+    )
+
+@app.function_name(name="scheduled_trading_bot_run")
+@app.schedule(
+    schedule="*/30 * * * * *",  # Every 30 seconds Change as needed
+    arg_name="timer",
+    auth_level=func.AuthLevel.ANONYMOUS,
+    run_on_startup=True
+)
+def scheduled_trading_bot(timer: func.TimerRequest) -> None:
+    logging.info("Scheduled trading bot triggered.")
+    try:
+        trading_bot_app.run(
+            payload={"action": StatelessAction.RUN_STRATEGY.value}
+        )
+    except Exception as e:
+        logging.error(f"Error running scheduled trading bot: {e}")
+        raise e
+    logging.info("Scheduled trading bot executed successfully.")

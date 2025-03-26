@@ -7,7 +7,7 @@ from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
     ENVIRONMENT, Environment, BacktestDateRange
 from tests.resources import random_string, TestBase
 
-# TEST_VALUE = random_string(10)
+TEST_VALUE = random_string(10)
 
 
 

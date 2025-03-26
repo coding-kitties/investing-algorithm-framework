@@ -1,0 +1,135 @@
+# README created by investing_algorithm_framework
+
+You can find the documentation for the investing_algorithm_framework
+[here](https://investing-algorithm-framework.readthedocs.io/en/latest/).
+
+
+## Getting Started
+
+This project was created using the investing_algorithm_framework CLI. It provides a template for building a trading algorithm using the investing_algorithm_framework.
+
+This repository contains a simple trading algorithm that uses the
+`investing_algorithm_framework` to fetch data from [bitvavo](https://www.bitvavo.com/en/) and execute trades on the [bitvavo exchange](https://www.bitvavo.com/en/).
+
+The trading strategy is a simple moving average crossover strategy that uses the 50 and 100 day moving averages and the 200 day moving average as a trend filter. The strategy is implemented in the `strategy.py` file. The data provider is implemented in the `data_providers.py` file.
+
+All indicators are implemented with the [pyindicators](https://github.com/coding-kitties/PyIndicators) library.
+
+
+#### 1. Install the requirements
+
+You can install the requirements using the following command:
+```bash
+pip install -r requirements.txt
+```
+
+This will install the `investing_algorithm_framework`, `pyindicators`, and
+`python-dotenv` libraries. If you use the azure functions type option, it will also install the `azure-functions` library.
+
+
+#### 2. Create a `.env` file
+You need to create a `.env` file in the root of the project. You can use the `.env.example` file as a template. The `.env` file should contain the following environment variables:
+
+```bash
+BITVAVO_API_KEY=your_api_key
+BITVAVO_API_SECRET=your_api_secret
+```
+
+##### 2.1 Changing the exchange
+You can change the exchange in the `app.py` file. The default is set to `bitvavo`, but you can change it to any exchange you want. You can find the list of supported exchanges [here](https://investing-algorithm-framework.com/Getting%20Started/markets).
+
+##### 2.2 Azure Functions `.env` file
+If you are using the azure functions type option, you also need to add the following environment variables:
+
+```
+AZURE_STORAGE_CONNECTION_STRING=your_azure_storage_connection_string
+AZURE_STORAGE_CONTAINER_NAME=your_azure_storage_container_name
+```
+
+If you would like to have guidance on how to create the azure storage connection string, you can find it [here](https://learn.microsoft.com/en-us/azure/storage/common/storage-account-create?tabs=azure-portal).
+
+#### 3. Run the app (Skip this step if you have not backtested your strategy)
+> This will run the app as if it was run in production. It will execute live
+> trades on your connected exchange. Please only run this if you are
+> comfortable with this and have backtested your strategy.
+
+You can run the app using the following command:
+```bash
+python app.py
+```
+
+This will start the app and run the trading algorithm. The app will fetch data from the bitvavo exchange and execute trades based on the trading strategy.
+
+#### 3.1 Run the app with azure functions locally
+> Make sure to have the azure functions core tools installed. You can find the
+> installation instructions [here](https://learn.microsoft.com/en-us/azure/azure-functions/functions-run-local).
+
+If you are using the azure functions type option, you can run the app locally using the following command:
+```bash
+func start
+```
+
+#### 4. Run the backtest
+You can run the backtest using the following command:
+
+```bash
+python run_backtest.py
+```
+
+#### 5. Deployment
+You can deploy your trading bot in varous ways.
+
+##### 5.1 Azure Functions
+You can deploy your trading bot to azure functions using the following command:
+
+```bash
+investing-algorithm-framework deploy --type function --cloud azure
+```
+This will deploy your trading bot to azure functions. You can find the deployment instructions [here](https://investing-algorithm-framework.com/Getting%20Started/deployment).
+
+## Project Structure
+
+> We highly recommend to keep the file structure as is, as it is
+> designed to work with the investing_algorithm_framework CLI.
+> You can add your own files and folders as needed, however, we
+> recommend to keep the `strategies` folder for your strategies
+> and the `app.py` file for your app entry point.
+
+```yaml
+.
+├── app.py
+├── requirements.txt
+├── strategies
+│   ├── data_providers.py
+│   └── strategy.py
+├── .gitignore
+├── .env.example
+└── README.md
+```
+
+If you're using the azure functions type option, you will also have an `function_app.py`, `local.settings.json`, and `function.json` file. The `function_app.py` file is the entry point for the azure function, and the `local.settings.json` file is used to configure the local environment for the azure function. The `function.json` file is used to configure the function itself.
+
+> You can change the time trigger in the `function_app.py` when
+> using the azure functions type option. The default is set to
+> every 30 seconds. You can change it to any time you want,
+> but make sure to use the correct format for the time trigger.
+
+## Requirements
+
+The project requires Python 3.10 or higher. You can create a virtual environment and install the requirements using the following commands:
+
+```bash
+virtualenv venv
+source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+pip install -r requirements.txt
+```
+
+By default pyindicators is installed as its specified in the requirements.txt file. This is a requirement for the example strategy in the `strategy.py` file. You can always remove it from the requirements.txt file if you don't need it.
+
+## Deployment
+
+You can deploy your trading bot to azure functions using the following cli command:
+
+```bash
+investing-algorithm-framework deploy --type function --cloud azure
+```

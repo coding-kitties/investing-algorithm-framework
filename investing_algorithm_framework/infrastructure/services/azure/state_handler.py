@@ -2,21 +2,30 @@ import os
 import logging
 
 from azure.storage.blob import ContainerClient
-from investing_algorithm_framework.domain import OperationalException
+from investing_algorithm_framework.domain import OperationalException, \
+    StateHandler
 
 logger = logging.getLogger("investing_algorithm_framework")
 
 
-class AzureBlobStorageStateHandler:
+class AzureBlobStorageStateHandler(StateHandler):
+    """
+    A state handler for Azure Blob Storage.
+
+    This class provides methods to save and load state to and from Azure Blob Storage.
+
+    Attributes:
+        connection_string (str): The connection string for Azure Blob Storage.
+        container_name (str): The name of the Azure Blob Storage container.
+    """
 
     def __init__(
         self, connection_string: str = None, container_name: str = None
     ):
         self.connection_string = connection_string
         self.container_name = container_name
-        self._initialize()
 
-    def _initialize(self):
+    def initialize(self):
         """
         Internal helper to initialize the state handler.
         """
@@ -31,7 +40,7 @@ class AzureBlobStorageStateHandler:
                 raise OperationalException(
                     "Azure Blob Storage state handler requires" +
                     " a connection string or an environment" +
-                    " variable AZURE_STORAGE_CONNECTION_STRING to be set"
+                    " variable AZURE_STORAGE_CONNECTION_STRING to be set."
                 )
 
         if self.container_name is None:
@@ -43,7 +52,7 @@ class AzureBlobStorageStateHandler:
                 raise OperationalException(
                     "Azure Blob Storage state handler requires a" +
                     " container name or an environment" +
-                    " variable AZURE_STORAGE_CONTAINER_NAME to be set"
+                    " variable AZURE_STORAGE_CONTAINER_NAME to be set."
                 )
 
     def save(self, source_directory: str):

@@ -300,7 +300,10 @@ class CCXTTickerBacktestMarketDataSource(
 
         When downloading the data it will use the ccxt library.
         """
-        config = self.config
+
+        if config is None:
+            config = self.config
+
         total_minutes = TimeFrame.from_string(self.time_frame)\
             .amount_of_minutes
         self.backtest_data_start_date = \
@@ -415,15 +418,6 @@ class CCXTTickerBacktestMarketDataSource(
             "symbol": self.symbol,
             "bid": float(first_row["Close"][0]),
             "ask": float(first_row["Close"][0]),
-            "datetime": first_row_datetime,
-        }
-        # Calculate the bid and ask price based on the high and low price
-        return {
-            "symbol": self.symbol,
-            "bid": float((first_row["Low"][0])
-                         + float(first_row["High"][0]))/2,
-            "ask": float((first_row["Low"][0])
-                         + float(first_row["High"][0]))/2,
             "datetime": first_row_datetime,
         }
 

@@ -11,10 +11,11 @@ from flask import Flask
 from investing_algorithm_framework.app.algorithm import Algorithm
 from investing_algorithm_framework.app.stateless import ActionHandler
 from investing_algorithm_framework.app.task import Task
+from investing_algorithm_framework.app.strategy import TradingStrategy
 from investing_algorithm_framework.app.web import create_flask_app
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
-    SQLALCHEMY_DATABASE_URI, OperationalException, \
+    SQLALCHEMY_DATABASE_URI, OperationalException, StateHandler, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, BacktestReport, \
     BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, APP_MODE, MarketCredential, \
     AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, \
@@ -470,6 +471,7 @@ class App:
             # Load the state if a state handler is provided
             if self._state_handler is not None:
                 logger.info("Detected state handler, loading state")
+                self._state_handler.initialize()
                 config = self.container.configuration_service().get_config()
                 self._state_handler.load(config[RESOURCE_DIRECTORY])
 
@@ -518,14 +520,20 @@ class App:
                 exit(0)
         except Exception as e:
             logger.error(e)
+            raise e
         finally:
-            self.algorithm.stop()
 
-            # Upload state if state handler is provided
-            if self._state_handler is not None:
-                logger.info("Detected state handler, saving state")
-                config = self.container.configuration_service().get_config()
-                self._state_handler.save(config[RESOURCE_DIRECTORY])
+            try:
+                self.algorithm.stop()
+
+                # Upload state if state handler is provided
+                if self._state_handler is not None:
+                    logger.info("Detected state handler, saving state")
+                    config = self.container.configuration_service().get_config()
+                    self._state_handler.save(config[RESOURCE_DIRECTORY])
+            except Exception as e:
+                logger.error(e)
+
 
     def reset(self):
         self._started = False
@@ -881,8 +889,47 @@ class App:
 
     def add_strategy(self, strategy):
         """
+        Function to add a strategy to the app. The strategy should be an
+        instance of TradingStrategy.
+
+        Args:
+            strategy: Instance of TradingStrategy
+
+        Returns:
+            None
         """
+
+        if inspect.isclass(strategy):
+            strategy = strategy()
+
+        if not isinstance(strategy, TradingStrategy):
+            raise OperationalException(
+                "Strategy should be an instance of TradingStrategy"
+            )
+
         if self.algorithm is None:
             self.algorithm = Algorithm(name=self._name)
 
         self.algorithm.add_strategy(strategy)
+
+    def add_state_handler(self, state_handler):
+        """
+        Function to add a state handler to the app. The state handler should
+        be an instance of StateHandler.
+
+        Args:
+            state_handler: Instance of StateHandler
+
+        Returns:
+            None
+        """
+
+        if inspect.isclass(state_handler):
+            state_handler = state_handler()
+
+        if not isinstance(state_handler, StateHandler):
+            raise OperationalException(
+                "State handler should be an instance of StateHandler"
+            )
+
+        self._state_handler = state_handler

@@ -1,0 +1,124 @@
+from investing_algorithm_framework import TimeUnit, TradingStrategy, Context, \
+    OrderSide
+from .data_providers import btc_eur_ohlcv_2h, btc_eur_ticker
+from pyindicators import ema, is_crossover, is_above, is_below, is_crossunder
+
+
+class MyTradingStrategy(TradingStrategy):
+    """
+    A simple trading strategy that uses EMA crossovers to generate buy and
+    sell signals. The strategy uses a 50-period EMA and a 100-period EMA
+    to detect golden and death crosses. It also uses a 200-period EMA to
+    determine the overall trend direction. The strategy trades BTC/EUR
+    on a 2-hour timeframe. The strategy is designed to be used with the
+    Investing Algorithm Framework and uses the PyIndicators library
+    to calculate the EMAs and crossover signals.
+
+    The strategy uses a trailing stop loss and take profit to manage
+    risk. The stop loss is set to 5% below the entry price and the
+    take profit is set to 10% above the entry price. The stop loss and
+    take profit are both trailing, meaning that they will move up
+    with the price when the price goes up.
+    """
+    time_unit = TimeUnit.HOUR
+    interval = 2
+    symbol_pairs = ["BTC/EUR"]
+    market_data_sources = [btc_eur_ohlcv_2h, btc_eur_ticker]
+    fast = 50
+    slow = 100
+    trend = 200
+    stop_loss_percentage = 2
+    stop_loss_sell_size = 50
+    take_profit_percentage = 8
+    take_profit_sell_size = 50
+
+    def apply_strategy(self, context: Context, market_data):
+
+        for pair in self.symbol_pairs:
+            symbol = pair.split('/')[0]
+
+            # Don't trade if there are open orders for the symbol
+            # This is important to avoid placing new orders while there are
+            # existing orders that are not yet filled
+            if context.has_open_orders(symbol):
+                continue
+
+            ohlvc_data = market_data[f"{pair}-ohlcv-2h"]
+            # ticker_data = market_data[f"{symbol}-ticker"]
+            # Add fast, slow, and trend EMAs to the data
+            ohlvc_data = ema(
+                ohlvc_data,
+                source_column="Close",
+                period=self.fast,
+                result_column=f"ema_{self.fast}"
+            )
+            ohlvc_data = ema(
+                ohlvc_data,
+                source_column="Close",
+                period=self.slow,
+                result_column=f"ema_{self.slow}"
+            )
+            ohlvc_data = ema(
+                ohlvc_data,
+                source_column="Close",
+                period=self.trend,
+                result_column=f"ema_{self.trend}"
+            )
+
+            price = ohlvc_data["Close"][-1]
+
+            if not context.has_position(symbol) \
+                    and self._is_buy_signal(ohlvc_data):
+                order = context.create_limit_order(
+                    target_symbol=symbol,
+                    order_side=OrderSide.BUY,
+                    price=price,
+                    percentage_of_portfolio=25,
+                    precision=4,
+                )
+                trade = context.get_trade(order_id=order.id)
+                context.add_stop_loss(
+                    trade=trade,
+                    trade_risk_type="trailing",
+                    percentage=self.stop_loss_percentage,
+                    sell_percentage=self.stop_loss_sell_size
+                )
+                context.add_take_profit(
+                    trade=trade,
+                    percentage=self.take_profit_percentage,
+                    trade_risk_type="trailing",
+                    sell_percentage=self.take_profit_sell_size
+                )
+
+            if context.has_position(symbol) \
+                    and self._is_sell_signal(ohlvc_data):
+                open_trades = context.get_open_trades(
+                    target_symbol=symbol
+                )
+
+                for trade in open_trades:
+                    context.close_trade(trade)
+
+    def _is_sell_signal(self, data):
+        return is_crossunder(
+            data,
+            first_column=f"ema_{self.fast}",
+            second_column=f"ema_{self.slow}",
+            number_of_data_points=2
+        ) and is_below(
+            data,
+            first_column=f"ema_{self.fast}",
+            second_column=f"ema_{self.trend}",
+        )
+
+    def _is_buy_signal(self, data):
+        return is_crossover(
+            data=data,
+            first_column=f"ema_{self.fast}",
+            second_column=f"ema_{self.slow}",
+            number_of_data_points=2
+        ) and is_above(
+            data=data,
+            first_column=f"ema_{self.fast}",
+            second_column=f"ema_{self.trend}",
+        )

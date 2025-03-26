@@ -7,9 +7,9 @@ from investing_algorithm_framework import TradingStrategy, Algorithm, \
 from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI
 
 
-# class SimpleTradingStrategy(TradingStrategy):
-#     interval = 2
-#     time_unit = "hour"
+class SimpleTradingStrategy(TradingStrategy):
+    interval = 2
+    time_unit = "hour"
 
     def apply_strategy(self, context: Context, market_data):
         pass
