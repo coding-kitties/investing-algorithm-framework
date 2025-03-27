@@ -138,7 +138,7 @@ class TestAppInitialize(TestCase):
         self.assertTrue(
             self.is_same_file_content(
                 readme_file_path,
-                os.path.join(self.template_dir, "README.md.template")
+                os.path.join(self.template_dir, "readme.md.template")
             )
         )
 
@@ -245,7 +245,7 @@ class TestAppInitialize(TestCase):
         self.assertTrue(
             self.is_same_file_content(
                 readme_file_path,
-                os.path.join(self.template_dir, "README.md.template")
+                os.path.join(self.template_dir, "readme.md.template")
             )
         )
 
@@ -352,7 +352,7 @@ class TestAppInitialize(TestCase):
         self.assertTrue(
             self.is_same_file_content(
                 readme_file_path,
-                os.path.join(self.template_dir, "README.md.template")
+                os.path.join(self.template_dir, "readme.md.template")
             )
         )
 
