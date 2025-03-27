@@ -1,10 +1,7 @@
 import os
 from unittest import TestCase
 
-from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    MarketCredential, Algorithm, AppMode, APP_MODE, RESOURCE_DIRECTORY
 from investing_algorithm_framework.cli.initialize_app import command
-from tests.resources import MarketServiceStub
 
 
 class TestAppInitialize(TestCase):
@@ -100,7 +97,7 @@ class TestAppInitialize(TestCase):
 
         # Check if market_data_providers.py file exists
         market_data_providers_file_path = os.path.join(
-            strategy_dir_path, "market_data_providers.py"
+            strategy_dir_path, "data_providers.py"
         )
         self.assertTrue(os.path.exists(market_data_providers_file_path))
 
@@ -108,7 +105,7 @@ class TestAppInitialize(TestCase):
         self.assertTrue(
             self.is_same_file_content(
                 market_data_providers_file_path,
-                os.path.join(self.template_dir, "market_data_providers.py.template")
+                os.path.join(self.template_dir, "data_providers.py.template")
             )
         )
 
@@ -207,7 +204,7 @@ class TestAppInitialize(TestCase):
 
         # Check if market_data_providers.py file exists
         market_data_providers_file_path = os.path.join(
-            strategy_dir_path, "market_data_providers.py"
+            strategy_dir_path, "data_providers.py"
         )
         self.assertTrue(os.path.exists(market_data_providers_file_path))
 
@@ -215,7 +212,7 @@ class TestAppInitialize(TestCase):
         self.assertTrue(
             self.is_same_file_content(
                 market_data_providers_file_path,
-                os.path.join(self.template_dir, "market_data_providers.py.template")
+                os.path.join(self.template_dir, "data_providers.py.template")
             )
         )
 
@@ -314,7 +311,7 @@ class TestAppInitialize(TestCase):
 
         # Check if market_data_providers.py file exists
         market_data_providers_file_path = os.path.join(
-            strategy_dir_path, "market_data_providers.py"
+            strategy_dir_path, "data_providers.py"
         )
         self.assertTrue(os.path.exists(market_data_providers_file_path))
 
@@ -322,7 +319,7 @@ class TestAppInitialize(TestCase):
         self.assertTrue(
             self.is_same_file_content(
                 market_data_providers_file_path,
-                os.path.join(self.template_dir, "market_data_providers.py.template")
+                os.path.join(self.template_dir, "data_providers.py.template")
             )
         )
 
@@ -366,10 +363,11 @@ class TestAppInitialize(TestCase):
         self.assertTrue(
             self.is_same_file_content(
                 env_example_file_path,
-                os.path.join(self.template_dir, "env.example.template")
+                os.path.join(
+                    self.template_dir, "env_azure_function.example.template"
+                )
             )
         )
-
 
     def is_same_file_content(self, file1, file2):
         with open(file1, 'r') as f1, open(file2, 'r') as f2:
