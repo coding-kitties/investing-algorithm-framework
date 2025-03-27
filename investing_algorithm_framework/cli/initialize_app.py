@@ -302,7 +302,7 @@ def command(path=None, app_type="default", replace=False):
     readme_template_path = os.path.join(
         os.path.dirname(current_script_path),
         "templates",
-        "README.md.template"
+        "readme.md.template"
     )
     create_file_from_template(
         readme_template_path,
