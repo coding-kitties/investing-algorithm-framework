@@ -23,7 +23,7 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
 from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
     OHLCVMarketDataSource, BacktestMarketDataSource, MarketDataSource, \
     MarketService, MarketCredentialService, AbstractPortfolioSyncService, \
-    RoundingService
+    RoundingService, StateHandler
 from .singleton import Singleton
 from .stateless_actions import StatelessActions
 from .strategy import Strategy
@@ -128,4 +128,5 @@ __all__ = [
     "TradeRiskType",
     "TradeTakeProfit",
     "TradeStopLoss",
+    "StateHandler"
 ]

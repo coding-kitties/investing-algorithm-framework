@@ -1,0 +1,20 @@
+from dotenv import load_dotenv
+
+from investing_algorithm_framework import create_app, PortfolioConfiguration, \
+    TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, \
+    CCXTTickerMarketDataSource, MarketCredential, AzureBlobStorageStateHandler
+from strategies.strategy import MyTradingStrategy
+
+load_dotenv()
+
+app = create_app()
+app.add_portfolio_configuration(
+    PortfolioConfiguration(
+        initial_balance=1000,
+        trading_symbol="EUR",
+        market="bitvavo"
+    )
+)
+algorithm = Algorithm(name="MyTradingBot")
+algorithm.add_strategy(MyTradingStrategy)
+app.add_algorithm(algorithm)

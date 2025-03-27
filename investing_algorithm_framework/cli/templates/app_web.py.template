@@ -1,0 +1,24 @@
+import logging.config
+from dotenv import load_dotenv
+
+from investing_algorithm_framework import create_app, \
+    DEFAULT_LOGGING_CONFIG, Algorithm
+from strategies.strategy import MyTradingStrategy
+
+load_dotenv()
+logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
+
+app = create_app(web=True)
+app.add_portfolio_configuration(
+    PortfolioConfiguration(
+        initial_balance=1000,
+        trading_symbol="EUR",
+        market="bitvavo"
+    )
+)
+algorithm = Algorithm(name="MyTradingBot")
+algorithm.add_strategy(MyTradingStrategy)
+app.add_algorithm(algorithm)
+
+if __name__ == "__main__":
+    app.run()

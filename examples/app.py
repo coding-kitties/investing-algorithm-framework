@@ -6,7 +6,8 @@ from investing_algorithm_framework import create_app, PortfolioConfiguration, \
 
 load_dotenv()
 
-# Define market data sources OHLCV data for candles
+# Define market data sources
+# OHLCV data for candles
 bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
     identifier="BTC-ohlcv",
     market="BITVAVO",
