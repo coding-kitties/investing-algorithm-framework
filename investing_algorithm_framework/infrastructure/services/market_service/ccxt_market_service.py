@@ -432,8 +432,7 @@ class CCXTMarketService(MarketService):
         col_names = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
 
         # Combine the Series into a DataFrame with given column names
-        df = pl.DataFrame(data, schema=col_names)
-
+        df = pl.DataFrame(data, schema=col_names, orient="row")
         return df
 
     def get_ohlcvs(
