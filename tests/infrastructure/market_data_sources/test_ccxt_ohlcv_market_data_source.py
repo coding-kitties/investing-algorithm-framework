@@ -4,6 +4,7 @@ from unittest import TestCase, mock
 
 from investing_algorithm_framework.infrastructure import \
     CCXTOHLCVMarketDataSource
+from investing_algorithm_framework.domain import OperationalException
 
 
 class Test(TestCase):
@@ -78,6 +79,21 @@ class Test(TestCase):
         data = data_source.get_data()
         self.assertIsNotNone(data)
         self.assertEqual(data_source.window_size, 200)
+
+    def test_get_data_with_no_params_and_window_size(self):
+        """
+        This should raise an exception because the window size needs to be
+        defined if no start date or end date is provided.
+        """
+        data_source = CCXTOHLCVMarketDataSource(
+            identifier="BTC/EUR",
+            time_frame="15m",
+            market="BITVAVO",
+            symbol="BTC/EUR",
+        )
+
+        with self.assertRaises(OperationalException) as context:
+            data_source.get_data()
 
     @mock.patch('investing_algorithm_framework.infrastructure.services.market_service.ccxt_market_service.CCXTMarketService.get_ohlcv')
     def test_get_data_with_only_start_date(self, mock):
