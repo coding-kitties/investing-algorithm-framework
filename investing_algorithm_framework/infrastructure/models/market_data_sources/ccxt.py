@@ -472,6 +472,15 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
                 if end_date is None:
                     end_date = datetime.now(tz=timezone.utc)
 
+                if self.window_size is None:
+                    raise OperationalException(
+                        "Window_size should be defined before the " +
+                        "get_data method can be called. Make sure to set " +
+                        "the window_size attribute on your " +
+                        "CCXTOHLCVMarketDataSource or provide a start_date " +
+                        "and end_date to the get_data method."
+                    )
+
                 start_date = self.create_start_date(
                     end_date=end_date,
                     time_frame=self.time_frame,
