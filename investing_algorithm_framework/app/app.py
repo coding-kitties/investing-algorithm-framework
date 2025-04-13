@@ -17,9 +17,9 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
     SQLALCHEMY_DATABASE_URI, OperationalException, StateHandler, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, BacktestReport, \
-    BACKTESTING_PENDING_ORDER_CHECK_INTERVAL, APP_MODE, MarketCredential, \
-    AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, \
-    BACKTESTING_INITIAL_AMOUNT, MarketDataSource
+    APP_MODE, MarketCredential, AppMode, BacktestDateRange, \
+    DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT, \
+    MarketDataSource, APPLICATION_DIRECTORY
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables
 from investing_algorithm_framework.services import OrderBacktestService, \
@@ -56,7 +56,7 @@ class App:
         self._on_after_initialize_hooks = []
         self._state_handler = state_handler
         self._name = name
-        self._algorithm = Algorithm()
+        self._algorithm = Algorithm(name=self.name)
 
     @property
     def algorithm(self) -> Algorithm:
@@ -634,9 +634,11 @@ class App:
         self,
         backtest_date_range: BacktestDateRange,
         initial_amount=None,
-        pending_order_check_interval=None,
         output_directory=None,
-        algorithm: Algorithm = None
+        algorithm: Algorithm = None,
+        save_strategy=False,
+        save_in_memory_strategies: bool = False,
+        strategy_directory: str = None
     ) -> BacktestReport:
         """
         Run a backtest for an algorithm. This method should be called when
@@ -650,10 +652,13 @@ class App:
                 portfolio will start with.
             algorithm: The algorithm to run a backtest for (instance of
                 Algorithm)
-            pending_order_check_interval: str - pending_order_check_interval:
-              The interval at which to check pending orders (e.g. 1h, 1d, 1w)
             output_directory: str - The directory to
               write the backtest report to
+            save_strategy: bool - Whether to save the strategy
+            save_strategies_directory: bool - Whether to save the
+                strategies directory
+            strategies_directory_name: str - The name of the directory
+                that contains the strategies
 
         Returns:
             Instance of BacktestReport
@@ -664,6 +669,32 @@ class App:
         if self.algorithm is None:
             raise OperationalException("No algorithm registered")
 
+        if save_strategy:
+            # Check if the strategies directory exists
+            if not save_in_memory_strategies:
+
+                if strategy_directory is None:
+                    strategy_directory = os.path.join(
+                        self.config[APPLICATION_DIRECTORY], "strategies"
+                    )
+                else:
+                    strategy_directory = os.path.join(
+                        self.config[APPLICATION_DIRECTORY], strategy_directory
+                    )
+
+                if not os.path.isdir(strategy_directory):
+                    raise OperationalException(
+                        "The backtest run is enabled with the "
+                        "`include_strategy` flag  but the strategies"
+                        " directory: "
+                        f"{strategy_directory} does not exist. "
+                        "Please create the strategies directory or set "
+                        "include_strategy to False. If you want to save the "
+                        "strategies in memory, set save_in_memory_strategies "
+                        "to True. This can be helpfull when running your "
+                        "strategies in a notebook environment."
+                    )
+
         # Add backtest configuration to the config
         self.set_config_with_dict({
             ENVIRONMENT: Environment.BACKTEST.value,
@@ -671,9 +702,6 @@ class App:
             BACKTESTING_END_DATE: backtest_date_range.end_date,
             DATABASE_NAME: "backtest-database.sqlite3",
             DATABASE_DIRECTORY_NAME: "backtest_databases",
-            BACKTESTING_PENDING_ORDER_CHECK_INTERVAL: (
-                pending_order_check_interval
-            ),
             BACKTESTING_INITIAL_AMOUNT: initial_amount
         })
 
@@ -697,15 +725,14 @@ class App:
             initial_amount=initial_amount,
             backtest_date_range=backtest_date_range
         )
-        config = self.container.configuration_service().get_config()
 
-        if output_directory is None:
-            output_directory = os.path.join(
-                config[RESOURCE_DIRECTORY], "backtest_reports"
-            )
-
-        backtest_service.write_report_to_json(
-            report=report, output_directory=output_directory
+        backtest_service.save_report(
+            report=report,
+            algorithm=self.algorithm,
+            output_directory=output_directory,
+            save_strategy=save_strategy,
+            save_in_memory_strategies=save_in_memory_strategies,
+            strategy_directory=strategy_directory
         )
         return report
 
@@ -713,10 +740,10 @@ class App:
         self,
         algorithms,
         initial_amount=None,
-        date_ranges: List[BacktestDateRange] = None,
-        pending_order_check_interval=None,
+        backtest_date_ranges: List[BacktestDateRange] = None,
         output_directory=None,
-        checkpoint=False
+        checkpoint=False,
+        save_strategy=False,
     ) -> List[BacktestReport]:
         """
         Run a backtest for a set algorithm. This method should be called when
@@ -724,11 +751,9 @@ class App:
 
         Args:
             Algorithms: List[Algorithm] - The algorithms to run backtests for
-            date_ranges: List[BacktestDateRange] - The date ranges to run the
-                backtests for
+            backtest_date_ranges: List[BacktestDateRange] - The date ranges
+                to run the backtests for
             initial_amount: The initial amount to start the backtest with.
-            pending_order_check_interval: str - The interval at which to check
-                pending orders
             output_directory: str - The directory to write the backtest
               report to.
             checkpoint: bool - Whether to checkpoint the backtest,
@@ -738,6 +763,11 @@ class App:
                 when running backtests for a large number of algorithms
                 and date ranges where some of the backtests may fail
                 and you want to re-run only the failed backtests.
+            save_strategy: bool - Whether to save the strategy as part
+                of the backtest report. You can only save in-memory strategies
+                when running multiple backtests. This is because we can't
+                differentiate between which folders belong to a specific
+                strategy.
 
         Returns
             List of BacktestReport intances
@@ -745,8 +775,7 @@ class App:
         logger.info("Initializing backtests")
         reports = []
 
-        for date_range in date_ranges:
-            date_range: BacktestDateRange = date_range
+        for date_range in backtest_date_ranges:
             print(
                 f"{COLOR_YELLOW}Running backtests for date "
                 f"range:{COLOR_RESET} {COLOR_GREEN}{date_range.name} "
@@ -783,10 +812,7 @@ class App:
                     BACKTESTING_START_DATE: date_range.start_date,
                     BACKTESTING_END_DATE: date_range.end_date,
                     DATABASE_NAME: "backtest-database.sqlite3",
-                    DATABASE_DIRECTORY_NAME: "backtest_databases",
-                    BACKTESTING_PENDING_ORDER_CHECK_INTERVAL: (
-                        pending_order_check_interval
-                    )
+                    DATABASE_DIRECTORY_NAME: "backtest_databases"
                 })
                 self.initialize_config()
 
@@ -818,13 +844,12 @@ class App:
                 if date_range.name is not None:
                     report.date_range_name = date_range.name
 
-                if output_directory is None:
-                    output_directory = os.path.join(
-                        self.config[RESOURCE_DIRECTORY], "backtest_reports"
-                    )
-
-                backtest_service.write_report_to_json(
-                    report=report, output_directory=output_directory
+                backtest_service.save_report(
+                    report=report,
+                    algorithm=algorithm,
+                    output_directory=output_directory,
+                    save_strategy=save_strategy,
+                    save_in_memory_strategies=True,
                 )
                 reports.append(report)
 

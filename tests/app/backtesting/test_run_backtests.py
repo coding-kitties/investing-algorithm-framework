@@ -78,13 +78,14 @@ class Test(TestCase):
         )
         reports = app.run_backtests(
             algorithms=[algorithm_one, algorithm_two, algorithm_three],
-            date_ranges=[backtest_date_range]
+            backtest_date_ranges=[backtest_date_range],
         )
         backtest_service = app.container.backtest_service()
 
         # Check if the backtest reports exist
         for report in reports:
-            file_path = backtest_service.create_report_name(
-                report, os.path.join(self.resource_dir, "backtest_reports")
+            dir_name = backtest_service.create_report_directory_name(report)
+            path = os.path.join(
+                self.resource_dir, "backtest_reports", dir_name
             )
-            self.assertTrue(os.path.isfile(file_path))
+            self.assertTrue(os.path.isdir(path))

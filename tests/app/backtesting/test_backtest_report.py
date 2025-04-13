@@ -71,15 +71,16 @@ class Test(TestCase):
         )
         report = app.run_backtest(
             algorithm=algorithm,
-            backtest_date_range=backtest_date_range
+            backtest_date_range=backtest_date_range,
+            save_in_memory_strategies=True
         )
-        file_path = BacktestService.create_report_name(
-            report, os.path.join(self.resource_dir, "backtest_reports")
-        )
+        dir_name = BacktestService.create_report_directory_name(report)
+
+        path = os.path.join(self.resource_dir, "backtest_reports", dir_name)
+
         # Check if the backtest report exists
-        self.assertTrue(
-            os.path.isfile(os.path.join(self.resource_dir, file_path))
-        )
+        self.assertTrue(os.path.isdir(path))
+
 
     def test_report_json_creation_with_multiple_strategies_with_id(self):
         """
@@ -109,12 +110,13 @@ class Test(TestCase):
             end_date=datetime.utcnow()
         )
         report = app.run_backtest(
-            algorithm=algorithm, backtest_date_range=backtest_range
+            algorithm=algorithm,
+            backtest_date_range=backtest_range,
+            save_in_memory_strategies=True
         )
-        file_path = BacktestService.create_report_name(
-            report, os.path.join(self.resource_dir, "backtest_reports")
-        )
+        dir_name = BacktestService.create_report_directory_name(report)
+
+        path = os.path.join(self.resource_dir, "backtest_reports", dir_name)
+
         # Check if the backtest report exists
-        self.assertTrue(
-            os.path.isfile(os.path.join(self.resource_dir, file_path))
-        )
+        self.assertTrue(os.path.isdir(path))

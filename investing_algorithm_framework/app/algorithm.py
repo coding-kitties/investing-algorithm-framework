@@ -22,7 +22,7 @@ class Algorithm:
     them in the correct order.
 
     Args:
-        name (str): The name of the algorithm
+        name (str): (Optional) The name of the algorithm
         description (str): The description of the algorithm
         context (dict): The context of the algorithm, for backtest
           references
