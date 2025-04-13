@@ -703,8 +703,9 @@ class BacktestService:
         Function to save the backtest report to a file. If the
         `save_in_memory_strategies` flag is set to True, the function
         tries to get the strategy class defintion that are loaded in
-        memory and save them to the output directory(this is usefull when experimenting in notebooks). Otherwise, it copies the
-        strategy directory to the output directory.
+        memory and save them to the output directory(this is usefull
+        when experimenting in notebooks). Otherwise, it copies
+        the strategy directory to the output directory.
 
         Args:
             report: BacktestReport - The backtest report to save
@@ -749,7 +750,7 @@ class BacktestService:
                     )
 
                     if not os.path.exists(strategy_directory) or \
-                        not os.path.isdir(strategy_directory):
+                            not os.path.isdir(strategy_directory):
                         raise OperationalException(
                             "Default strategy directory 'strategies' does "
                             "not exist. If you have your strategies placed in "
@@ -761,7 +762,7 @@ class BacktestService:
 
                     # Check if the strategy directory exists
                     if not os.path.exists(strategy_directory) or \
-                        not os.path.isdir(strategy_directory):
+                            not os.path.isdir(strategy_directory):
                         raise OperationalException(
                             f"Strategy directory {strategy_directory} "
                             "does not "
@@ -925,7 +926,8 @@ class BacktestService:
                     collected_imports.append(" ".join(current_import))
 
                 # Capture class definitions and functions
-                if stripped_line.startswith("class ") or stripped_line.startswith("def "):
+                if stripped_line.startswith("class ") \
+                        or stripped_line.startswith("def "):
                     class_started = True
 
                 if class_started:
