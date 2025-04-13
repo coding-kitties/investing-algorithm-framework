@@ -1,2 +1,2 @@
-investing-algorithm-framework
-pyindicators
+investing-algorithm-framework>=6.2.1
+pyindicators>=0.5.4

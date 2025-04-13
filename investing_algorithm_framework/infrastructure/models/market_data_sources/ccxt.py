@@ -300,6 +300,10 @@ class CCXTTickerBacktestMarketDataSource(
 
         When downloading the data it will use the ccxt library.
         """
+
+        if config is None:
+            config = self.config
+
         total_minutes = TimeFrame.from_string(self.time_frame)\
             .amount_of_minutes
         self.backtest_data_start_date = \
@@ -416,15 +420,6 @@ class CCXTTickerBacktestMarketDataSource(
             "ask": float(first_row["Close"][0]),
             "datetime": first_row_datetime,
         }
-        # Calculate the bid and ask price based on the high and low price
-        return {
-            "symbol": self.symbol,
-            "bid": float((first_row["Low"][0])
-                         + float(first_row["High"][0]))/2,
-            "ask": float((first_row["Low"][0])
-                         + float(first_row["High"][0]))/2,
-            "datetime": first_row_datetime,
-        }
 
     def write_data_to_file_path(self, data_file, data: polars.DataFrame):
         data.write_csv(data_file)
@@ -476,6 +471,15 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
 
                 if end_date is None:
                     end_date = datetime.now(tz=timezone.utc)
+
+                if self.window_size is None:
+                    raise OperationalException(
+                        "Window_size should be defined before the " +
+                        "get_data method can be called. Make sure to set " +
+                        "the window_size attribute on your " +
+                        "CCXTOHLCVMarketDataSource or provide a start_date " +
+                        "and end_date to the get_data method."
+                    )
 
                 start_date = self.create_start_date(
                     end_date=end_date,

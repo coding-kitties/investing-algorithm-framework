@@ -1,10 +1,10 @@
 import os
 import subprocess
 import re
-import click
 import random
 import string
 import asyncio
+import time
 
 from azure.identity import DefaultAzureCredential
 from azure.mgmt.resource import ResourceManagementClient
@@ -52,6 +52,62 @@ def ensure_azure_functools():
         exit(1)
 
 
+async def read_env_file_and_set_function_env_variables(
+    function_app_name,
+    storage_connection_string,
+    storage_container_name,
+    resource_group_name
+):
+    """
+    Function to read the .env file in the working directory
+    and set the environment variables for the Function App.
+
+    Returns:
+        None
+    """
+    env_file_path = os.path.join(os.getcwd(), ".env")
+    entries = {}
+    if os.path.exists(env_file_path):
+        with open(env_file_path, "r") as file:
+            for line in file:
+                if "=" in line:
+                    key, value = line.strip().split("=", 1)
+                    entries[key] = value
+
+        # Convert dictionary to CLI format
+        settings = [f"{key}={value}" for key, value in entries.items()]
+
+        # Construct the command
+        command = [
+            "az", "functionapp", "config", "appsettings", "set",
+            "--name", function_app_name,
+            "--resource-group", resource_group_name,
+            "--settings"
+        ] + settings  # Append all settings
+
+        # Run the Azure CLI command asynchronously
+        process = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE
+        )
+
+        stdout, stderr = await process.communicate()
+
+        if process.returncode == 0:
+            print(
+                "Environment variables successfully set for the function app."
+            )
+        else:
+            print(
+                "Error setting environment variables: " +
+                f"{stderr.decode().strip()}"
+            )
+
+    else:
+        print(f".env file not found at {env_file_path}")
+
+
 async def publish_function_app(
     function_app_name,
     storage_connection_string,
@@ -71,6 +127,9 @@ async def publish_function_app(
         None
     """
     print(f"Publishing Function App {function_app_name}")
+
+    # Wait for 60 seconds to ensure the Function App is ready
+    time.sleep(60)
 
     try:
         # Step 1: Publish the Azure Function App
@@ -556,12 +615,6 @@ def create_storage_and_function(
         template_settings_path, os.path.join(cwd, "local.settings.json")
     )
 
-    # Ensure the user is logged in
-    ensure_az_login(skip_check=skip_login)
-
-    # ensure_azure_functools()
-    ensure_azure_functools()
-
     # Fetch default subscription ID if not provided
     if not subscription_id:
         subscription_id = get_default_subscription_id()
@@ -618,51 +671,7 @@ def create_storage_and_function(
     )
 
 
-@click.command()
-@click.option(
-    '--resource_group',
-    required=True,
-    help='The name of the resource group.',
-)
-@click.option(
-    '--subscription_id',
-    required=False,
-    help='The subscription ID. If not provided, the default will be used.'
-)
-@click.option(
-    '--storage_account_name',
-    required=False,
-    help='The name of the storage account.',
-)
-@click.option(
-    '--container_name',
-    required=False,
-    help='The name of the blob container.',
-    default='iafcontainer'
-)
-@click.option(
-    '--deployment_name',
-    required=True,
-    help='The name of the deployment. This will be" + \
-        "used as the name of the Function App.'
-)
-@click.option(
-    '--region',
-    required=True,
-    help='The Azure region for the resources.'
-)
-@click.option(
-    '--create_resource_group_if_not_exists',
-    is_flag=True,
-    help='Flag to create the resource group if it does not exist.'
-)
-@click.option(
-    '--skip_login',
-    is_flag=True,
-    help='Flag to create the resource group if it does not exist.',
-    default=False
-)
-def cli(
+def command(
     resource_group,
     subscription_id,
     storage_account_name,
@@ -689,6 +698,15 @@ def cli(
     Returns:
         None
     """
+
+    print("logging in to Azure...")
+    # Ensure the user is logged in
+    ensure_az_login(skip_check=skip_login)
+
+    print("Checking functools...")
+    # Ensure azure functions core tools are installed
+    ensure_azure_functools()
+
     create_storage_and_function(
         resource_group_name=resource_group,
         storage_account_name=storage_account_name,

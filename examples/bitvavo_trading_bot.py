@@ -23,6 +23,8 @@ load_dotenv()
 # Define your market credential for bitvavo, keys are read from .env file
 bitvavo_market_credential = MarketCredential(
     market="bitvavo",
+    api_key="your_api_key",
+    secret_key="your_secret_key"
 )
 # Define your market data sources for coinbase
 bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(

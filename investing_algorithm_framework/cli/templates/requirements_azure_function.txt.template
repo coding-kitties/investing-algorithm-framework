@@ -1,0 +1,3 @@
+investing-algorithm-framework>=6.2.0
+azure-functions==1.17.0
+pyindicators>=0.5.4

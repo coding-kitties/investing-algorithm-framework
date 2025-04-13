@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "investing-algorithm-framework"
-version = "v6.1.0"
+version = "v6.2.0"
 description = "A framework for creating trading bots"
 authors = ["MDUYN"]
 readme = "README.md"
@@ -8,25 +8,21 @@ exclude = ["tests", "static", "examples", "docs"]
 
 
 [tool.poetry.dependencies]
-python = ">=3.9"
-wrapt = "^1.16.0"
-Flask = "^2.3.2"
-Flask-Migrate = "^2.6.0"
+python = ">=3.10"
+wrapt = ">=1.16.0"
+Flask = ">=2.3.2"
+Flask-Migrate = ">=2.6.0"
 Flask-Cors = ">=3.0.9,<5.0.0"
-SQLAlchemy = "^2.0.18"
-marshmallow = "^3.5.0"
-ccxt = "^4.2.48"
-python-dateutil = "^2.8.2"
-plotly = "^5.22.0"
-MarkupSafe = "^2.1.2"
-dependency-injector= "^4.40.0"
-schedule = "^1.1.0"
-tqdm = "^4.66.1"
-tabulate = "^0.9.0"
-polars = { version = "^0.20.10", extras = ["numpy", "pandas"] }
-jupyter = "^1.0.0"
-scipy = "^1.14.1"
-tulipy = "^0.4.0"
+SQLAlchemy = ">=2.0.18"
+marshmallow = ">=3.5.0"
+ccxt = ">=4.2.48"
+python-dateutil = ">=2.8.2"
+dependency-injector= ">=4.40.0"
+schedule = ">=1.1.0"
+tqdm = ">=4.66.1"
+tabulate = ">=0.9.0"
+polars = { version = ">=0.20.10", extras = ["numpy", "pandas"] }
+jupyter = ">=1.0.0"
 azure-storage-blob = "^12.24.0"
 azure-identity = "^1.19.0"
 azure-mgmt-storage = "^21.2.1"
@@ -48,5 +44,3 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 investing-algorithm-framework = "investing_algorithm_framework.cli.cli:cli"
-deploy_to_azure_function = "investing_algorithm_framework.cli.deploy_to_azure_function:cli"
-create_azure_function_app_skeleton = "investing_algorithm_framework.cli.create_azure_function_app_skeleton:cli"

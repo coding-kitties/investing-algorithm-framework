@@ -1,3 +1,21 @@
+<br/>
+<div align="center">
+   <h1><a href="https://investing-algorithm-framework.com" target="_blank">Investing Algorithm Framework</a></h4>
+</div>
+<br/>
+
+<div align="center">
+  <b>Rapidly build and deploy quantitative strategies and trading bots</b>
+</div>
+<br/>
+
+<p align="center">
+    <a target="_blank" href="https://investing-algorithm-framework.com">View Docs</a>
+    <a href="https://investing-algorithm-framework.com/Getting%20Started/installation)">Getting Started</a>
+</p>
+
+---
+
 <a href=https://investing-algorithm-framework.com><img src="https://img.shields.io/badge/docs-website-brightgreen"></a>
 [![Build](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/publish.yml/badge.svg)](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/publish.yml)
 [![Tests](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml)
@@ -5,10 +23,6 @@
 [![Current Version](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)
 <a href="https://www.reddit.com/r/InvestingBots/"><img src="https://img.shields.io/reddit/subreddit-subscribers/investingbots?style=social"></a> <br/>
 [![GitHub stars](https://img.shields.io/github/stars/coding-kitties/investing-algorithm-framework.svg?style=social&label=Star&maxAge=1)](https://github.com/SeaQL/sea-orm/stargazers/) If you like what we do, consider starring, sharing and contributing!
-
-# [Investing Algorithm Framework](https://github.com/coding-kitties/investing-algorithm-framework)
-
-The Investing Algorithm Framework is a Python framework that enables swift and elegant development of trading bots.
 
 ## Sponsors
 
@@ -22,7 +36,7 @@ The Investing Algorithm Framework is a Python framework that enables swift and e
 
 ## Features and planned features:
 
-- [x] **Based on Python 3.9+**: Windows, macOS and Linux.
+- [x] **Based on Python 3.10+**: Windows, macOS and Linux.
 - [x] **Documentation**: [Documentation](https://investing-algorithm-framework.com)
 - [x] **Persistence of portfolios, orders, positions and trades**: Persistence is achieved through sqlite.
 - [x] **Limit orders**: Create limit orders for buying and selling.
@@ -33,7 +47,7 @@ The Investing Algorithm Framework is a Python framework that enables swift and e
 - [x] **Live trading**: Live trading.
 - [x] **Backtesting and performance analysis reports** [example](./examples/backtest_example)
 - [x] **Backtesting multiple algorithms with different backtest date ranges** [example](./examples/backtests_example)
-- [x] **Backtest comparison and experiments**: Compare multiple backtests and run experiments.
+- [x] **Backtesting and results evaluation**: Compare multiple backtests and run experiments. Save and load backtests. Save strategies as part of the backtest. [docs](https://investing-algorithm-framework.com/Getting%20Started/backtesting)
 - [x] **Order execution**: Currently support for a wide range of crypto exchanges through [ccxt](https://github.com/ccxt/ccxt) (Support for traditional asset brokers is planned).
 - [x] **Web API**: Rest API for interacting with your deployed trading bot
 - [x] **PyIndicators**: Works natively with [PyIndicators](https://github.com/coding-kitties/PyIndicators) for technical analysis on your Pandas and Polars dataframes.

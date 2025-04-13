@@ -421,7 +421,10 @@ class CCXTMarketService(MarketService):
                     datetime_stamp = datetime_stamp\
                         .strftime(datetime_format)
 
-                    data.append([datetime_stamp] + candle[1:])
+                    data.append(
+                        [datetime_stamp] +
+                        [float(value) for value in candle[1:]]
+                    )
 
             sleep(exchange.rateLimit / 1000)
 
@@ -429,14 +432,7 @@ class CCXTMarketService(MarketService):
         col_names = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
 
         # Combine the Series into a DataFrame with given column names
-        df = pl.DataFrame(data)
-
-        # Check if DataFrame is empty (either rows or columns)
-        if df.shape[0] == 0 or df.shape[1] == 0:
-            return df
-
-        # Assign column names after DataFrame creation
-        df.columns = col_names
+        df = pl.DataFrame(data, schema=col_names, orient="row")
         return df
 
     def get_ohlcvs(
