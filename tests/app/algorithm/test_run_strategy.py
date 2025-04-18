@@ -124,7 +124,7 @@ class Test(TestCase):
         algorithm = Algorithm()
 
         @algorithm.strategy(time_unit=TimeUnit.SECOND, interval=1)
-        def run_strategy(algorithm, market_data):
+        def run_strategy(context, market_data):
             pass
 
         app.add_algorithm(algorithm)
