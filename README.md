@@ -61,7 +61,7 @@
 
 ## Quickstart
 
-1. First install the framework using `pip`. The Investing Algorithm Framework is hosted on [PyPi](https://pypi.org/project/Blankly/).
+1. First install the framework using `pip`. The Investing Algorithm Framework is hosted on [PyPi](https://pypi.org/project/investing-algorithm-framework/).
 
 ```bash
 $ pip install investing-algorithm-framework
@@ -84,7 +84,7 @@ The command will create the file `app.py` and an example script called `strategy
 
 From there, you start building your trading bot in the `strategy.py`.
 
-More information can be found on our [docs](https://docs.blankly.finance)
+More information can be found on our [docs](https://investing-algorithm-framework.com/)
 
 > Make sure you leave the `app.py` file as is, as it is the entry point for the framework.
 > You can change the `bot.py` file to your liking and add other files to the working directory.
