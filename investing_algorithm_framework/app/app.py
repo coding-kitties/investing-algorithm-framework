@@ -19,7 +19,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, BacktestReport, \
     APP_MODE, MarketCredential, AppMode, BacktestDateRange, \
     DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT, \
-    MarketDataSource, APPLICATION_DIRECTORY
+    MarketDataSource, APPLICATION_DIRECTORY, PortfolioConfiguration
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables
 from investing_algorithm_framework.services import OrderBacktestService, \
@@ -292,11 +292,11 @@ class App:
                     market_data_source_service=market_data_source_service
                 )
             )
-
-        # Initialize all market credentials
-        self._market_credential_service = self.container.\
-            market_credential_service()
-        self._market_credential_service.initialize()
+        else:
+            # Initialize all market credentials
+            self._market_credential_service = self.container.\
+                market_credential_service()
+            self._market_credential_service.initialize()
 
         # Add all market data sources of the strategies to the market data
         # source service
@@ -540,6 +540,16 @@ class App:
         self.algorithm.reset()
 
     def add_portfolio_configuration(self, portfolio_configuration):
+        """
+        Function to add a portfolio configuration to the app. The portfolio
+        configuration should be an instance of PortfolioConfiguration.
+
+        Args:
+            portfolio_configuration: Instance of PortfolioConfiguration
+
+        Returns:
+            None
+        """
         portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
         portfolio_configuration_service.add(portfolio_configuration)
@@ -628,7 +638,21 @@ class App:
                 )
 
     def get_portfolio_configurations(self):
-        return self.algorithm.get_portfolio_configurations()
+        portfolio_configuration_service = self.container \
+            .portfolio_configuration_service()
+        return portfolio_configuration_service.get_all()
+
+    def get_market_credentials(self):
+        """
+        Function to get all market credentials from the app. This method
+        should be called when you want to get all market credentials.
+
+        Returns:
+            List of MarketCredential instances
+        """
+        market_credential_service = self.container \
+            .market_credential_service()
+        return market_credential_service.get_all()
 
     def run_backtest(
         self,
@@ -958,3 +982,41 @@ class App:
             )
 
         self._state_handler = state_handler
+
+    def add_market(
+        self,
+        market,
+        trading_symbol,
+        api_key=None,
+        secret_key=None,
+        initial_balance=None
+    ):
+        """
+        Function to add a market to the app. This function is a utility
+        function to add a portfolio configuration and market credential
+        to the app.
+
+        Args:
+            market: String representing the market name
+            trading_symbol: Trading symbol for the portfolio
+            api_key: API key for the market
+            secret_key: Secret key for the market
+            initial_balance: Initial balance for the market
+
+        Returns:
+            None
+        """
+
+        portfolio_configuration = PortfolioConfiguration(
+            market=market,
+            trading_symbol=trading_symbol,
+            initial_balance=initial_balance
+        )
+
+        self.add_portfolio_configuration(portfolio_configuration)
+        market_credential = MarketCredential(
+            market=market,
+            api_key=api_key,
+            secret_key=secret_key
+        )
+        self.add_market_credential(market_credential)

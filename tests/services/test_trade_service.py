@@ -2969,3 +2969,273 @@ class TestTradeService(TestBase):
         )
         self.assertAlmostEqual(22.5, take_profit_two.take_profit_price)
         self.assertEqual(25, take_profit_two.high_water_mark)
+
+    def test_add_stop_loss_100_percent_and_take_profit_sell(self):
+        """
+        Test if the stop loss is triggered correctly and scaled down if
+        the take profits are triggered before the stop loss.
+
+        1. Create a buy order for ADA with amount 20 at 20 EUR
+        2. Create a take profit with fixed percentage of 5 and
+            sell percentage 25 for the trade. This is a tp price
+            of 21 EUR
+        3. Create a take profit with fixed percentage of 10 and
+            sell percentage 25 for the trade. This is a tp price
+            of 22 EUR
+        4. Create a stop loss with fixed percentage of 10 and
+            sell percentage 100 for the trade. This is a stop loss price
+            of 18 EUR
+        5. Update the last reported price of ada to 21 EUR, triggering 1
+            tp orders
+        6. Update the last reported price of ada to 22 EUR, triggering 1
+            tp orders
+        7. Update the last reported price of ada to 18 EUR, triggering 1
+            stop loss order
+        8. Check that the triggered tp orders are correct
+        """
+
+        order_service = self.app.container.order_service()
+        take_profit_repository = self.app.container.\
+            trade_take_profit_repository()
+        stop_loss_repository = self.app.container.\
+            trade_stop_loss_repository()
+        buy_order_one = order_service.create(
+            {
+                "target_symbol": "ADA",
+                "trading_symbol": "EUR",
+                "amount": 20,
+                "filled": 20,
+                "remaining": 0,
+                "order_side": "BUY",
+                "price": 20,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CLOSED",
+            }
+        )
+
+        trade_service = self.app.container.trade_service()
+        trade_one = self.app.container.trade_service().find(
+            {"order_id": buy_order_one.id}
+        )
+        trade_one_id = trade_one.id
+        take_profit_one = trade_service.add_take_profit(
+            trade_one,
+            5,
+            "fixed",
+            sell_percentage=25,
+        )
+        self.assertEqual(21, take_profit_one.take_profit_price)
+
+        take_profit_two = trade_service.add_take_profit(
+            trade_one,
+            10,
+            "fixed",
+            sell_percentage=25,
+        )
+        self.assertEqual(22, take_profit_two.take_profit_price)
+
+        # Create a stop loss with a trailing percentage of 10 and
+        # sell percentage 100 for the trade.
+        stop_loss_one = trade_service.add_stop_loss(
+            trade_one,
+            10,
+            "fixed",
+            sell_percentage=100,
+        )
+        self.assertEqual(18, stop_loss_one.stop_loss_price)
+
+        # Update the last reported price of ada to 21 EUR, triggering 0
+        # stop loss orders. Both stop losses should have their high water mark
+        # set to 21 EUR
+
+        trade_service.update(
+            trade_one_id,
+            {
+                "last_reported_price": 21,
+                "last_reported_price_datetime": datetime.now(),
+            }
+        )
+
+        take_profit_one = take_profit_repository.get(
+            take_profit_one.id
+        )
+        self.assertEqual(21, take_profit_one.take_profit_price)
+
+        take_profit_two = take_profit_repository.get(
+            take_profit_two.id
+        )
+
+        self.assertEqual(22, take_profit_two.take_profit_price)
+
+        trade_service.update(
+            trade_one_id,
+            {
+                "last_reported_price": 25,
+                "last_reported_price_datetime": datetime.now(),
+            }
+        )
+
+        sell_order_data = trade_service.get_triggered_take_profit_orders()
+        self.assertEqual(2, len(sell_order_data[0]['take_profits']))
+
+        for order_data in sell_order_data:
+            self.assertEqual("SELL", order_data["order_side"])
+            self.assertEqual("EUR", order_data["trading_symbol"])
+            self.assertEqual(1, order_data["portfolio_id"])
+            self.assertEqual("LIMIT", order_data["order_type"])
+            self.assertEqual(25, order_data["price"])
+            self.assertEqual(10, order_data["amount"])
+            self.assertEqual("ADA", order_data["target_symbol"])
+            sell_order = order_service.create(order_data)
+
+        # Trigger the stop loss
+        trade_service.update(
+            trade_one_id,
+            {
+                "last_reported_price": 18,
+                "last_reported_price_datetime": datetime.now(),
+            }
+        )
+
+        sell_order_data = trade_service.get_triggered_stop_loss_orders()
+        self.assertEqual(1, len(sell_order_data))
+
+        # Amount should be 10 not 20 (100%), because the take
+        # profits have been triggered before the stop loss
+        for order_data in sell_order_data:
+            self.assertEqual("SELL", order_data["order_side"])
+            self.assertEqual("EUR", order_data["trading_symbol"])
+            self.assertEqual(1, order_data["portfolio_id"])
+            self.assertEqual("LIMIT", order_data["order_type"])
+            self.assertEqual(18, order_data["price"])
+            self.assertEqual(10, order_data["amount"])
+            self.assertEqual("ADA", order_data["target_symbol"])
+            sell_order = order_service.create(order_data)
+
+        stop_loss_one = stop_loss_repository.get(
+            stop_loss_one.id
+        )
+        self.assertFalse(stop_loss_one.active)
+
+    def test_add_stop_loss_and_take_profit_sell_100_percent(self):
+        """
+        Test if the stop loss is triggered correctly and scaled down if
+        the take profits are triggered before the stop loss.
+
+        1. Create a buy order for ADA with amount 20 at 20 EUR
+        2. Create a stop loss with fixed percentage of 5 and
+            sell percentage 25 for the trade. This is a stop loss price
+            of 19 EUR
+        3. Create a stop loss with fixed percentage of 10 and
+            sell percentage 25 for the trade. This is a stop loss price
+            of 18 EUR
+        4. Create a take profit with fixed percentage of 5 and
+            sell percentage 100 for the trade. This is a tp price
+            of 21 EUR
+        5. Update the last reported price of ada to 18 EUR, triggering 2
+            stop loss orders
+        6. Update the last reported price of ada to 21 EUR, triggering 1
+            tp orders
+        """
+
+        order_service = self.app.container.order_service()
+        take_profit_repository = self.app.container.\
+            trade_take_profit_repository()
+        stop_loss_repository = self.app.container.\
+            trade_stop_loss_repository()
+        buy_order_one = order_service.create(
+            {
+                "target_symbol": "ADA",
+                "trading_symbol": "EUR",
+                "amount": 20,
+                "filled": 20,
+                "remaining": 0,
+                "order_side": "BUY",
+                "price": 20,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CLOSED",
+            }
+        )
+
+        trade_service = self.app.container.trade_service()
+        trade_one = self.app.container.trade_service().find(
+            {"order_id": buy_order_one.id}
+        )
+        trade_one_id = trade_one.id
+        stop_loss_one = trade_service.add_stop_loss(
+            trade_one,
+            5,
+            "fixed",
+            sell_percentage=25,
+        )
+        self.assertEqual(19, stop_loss_one.stop_loss_price)
+
+        stop_loss_two = trade_service.add_stop_loss(
+            trade_one,
+            10,
+            "fixed",
+            sell_percentage=25,
+        )
+        self.assertEqual(18, stop_loss_two.stop_loss_price)
+
+        # Create a take profit with a trailing percentage of 10 and
+        # sell percentage 100 for the trade.
+        take_profit_one = trade_service.add_take_profit(
+            trade_one,
+            5,
+            "fixed",
+            sell_percentage=100,
+        )
+        self.assertEqual(21, take_profit_one.take_profit_price)
+
+        trade_service.update(
+            trade_one_id,
+            {
+                "last_reported_price": 18,
+                "last_reported_price_datetime": datetime.now(),
+            }
+        )
+
+        sell_order_data = trade_service.get_triggered_stop_loss_orders()
+        self.assertEqual(2, len(sell_order_data[0]['stop_losses']))
+
+        for order_data in sell_order_data:
+            self.assertEqual("SELL", order_data["order_side"])
+            self.assertEqual("EUR", order_data["trading_symbol"])
+            self.assertEqual(1, order_data["portfolio_id"])
+            self.assertEqual("LIMIT", order_data["order_type"])
+            self.assertEqual(18, order_data["price"])
+            self.assertEqual(10, order_data["amount"])
+            self.assertEqual("ADA", order_data["target_symbol"])
+            sell_order = order_service.create(order_data)
+
+        # Trigger the take profit
+        trade_service.update(
+            trade_one_id,
+            {
+                "last_reported_price": 21,
+                "last_reported_price_datetime": datetime.now(),
+            }
+        )
+
+        sell_order_data = trade_service.get_triggered_take_profit_orders()
+        self.assertEqual(1, len(sell_order_data))
+
+        # Amount should be 10 not 20 (100%), because the take
+        # profits have been triggered before the stop loss
+        for order_data in sell_order_data:
+            self.assertEqual("SELL", order_data["order_side"])
+            self.assertEqual("EUR", order_data["trading_symbol"])
+            self.assertEqual(1, order_data["portfolio_id"])
+            self.assertEqual("LIMIT", order_data["order_type"])
+            self.assertEqual(21, order_data["price"])
+            self.assertEqual(10, order_data["amount"])
+            self.assertEqual("ADA", order_data["target_symbol"])
+            sell_order = order_service.create(order_data)
+
+        take_profit_one = take_profit_repository.get(
+            take_profit_one.id
+        )
+        self.assertFalse(take_profit_one.active)

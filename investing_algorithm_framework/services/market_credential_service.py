@@ -4,7 +4,14 @@ from investing_algorithm_framework.domain import MarketCredential
 
 
 class MarketCredentialService:
-    _market_credentials = {}
+    """
+    Service to manage market credentials.
+
+    This service is responsible for adding, retrieving, and
+    initializing market credentials.
+    """
+    def __init__(self):
+        self._market_credentials = {}
 
     def add(self, market_data_credential: MarketCredential):
         self._market_credentials[market_data_credential.market.upper()] \

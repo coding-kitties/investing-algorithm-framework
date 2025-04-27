@@ -1,28 +1,13 @@
-<br/>
-<div align="center">
-   <h1><a href="https://investing-algorithm-framework.com" target="_blank">Investing Algorithm Framework</a></h4>
-</div>
-<br/>
-
-<div align="center">
-  <b>Rapidly build and deploy quantitative strategies and trading bots</b>
-</div>
-<br/>
-
-<p align="center">
-    <a target="_blank" href="https://investing-algorithm-framework.com">View Docs</a>
-    <a href="https://investing-algorithm-framework.com/Getting%20Started/installation)">Getting Started</a>
-</p>
+<div align="center"> <h1><a href="https://investing-algorithm-framework.com" target="_blank">Investing Algorithm Framework</a></h1> <p><b>Rapidly build, backtest, and deploy quantitative strategies and trading bots</b></p> <a target="_blank" href="https://investing-algorithm-framework.com">📖 View Documentation</a> | <a href="https://investing-algorithm-framework.com/Getting%20Started/installation">🚀 Getting Started</a> </div>
 
 ---
 
-<a href=https://investing-algorithm-framework.com><img src="https://img.shields.io/badge/docs-website-brightgreen"></a>
-[![Build](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/publish.yml/badge.svg)](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/publish.yml)
-[![Tests](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml/badge.svg?branch=master)](https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml)
-[![Downloads](https://pepy.tech/badge/investing-algorithm-framework)](https://pepy.tech/badge/investing-algorithm-framework)
-[![Current Version](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)](https://img.shields.io/pypi/v/investing_algorithm_framework.svg)
-<a href="https://www.reddit.com/r/InvestingBots/"><img src="https://img.shields.io/reddit/subreddit-subscribers/investingbots?style=social"></a> <br/>
-[![GitHub stars](https://img.shields.io/github/stars/coding-kitties/investing-algorithm-framework.svg?style=social&label=Star&maxAge=1)](https://github.com/SeaQL/sea-orm/stargazers/) If you like what we do, consider starring, sharing and contributing!
+<div align="center"> <a href="https://investing-algorithm-framework.com">
+<a target="_blank" href="https://discord.gg/dQsRmGZP"><img src="https://img.shields.io/discord/1345358169777635410.svg?color=7289da&label=TradeBotLab%20Discord&logo=discord&style=flat"></a>
+<img src="https://img.shields.io/badge/docs-website-brightgreen"></a> <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/publish.yml"><img src="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/publish.yml/badge.svg"></a> <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml"><img src="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml/badge.svg"></a> <a href="https://pepy.tech/project/investing-algorithm-framework"><img src="https://pepy.tech/badge/investing-algorithm-framework"></a> <a href="https://pypi.org/project/investing-algorithm-framework/"><img src="https://img.shields.io/pypi/v/investing-algorithm-framework.svg"></a> <a href="https://www.reddit.com/r/InvestingBots/"><img src="https://img.shields.io/reddit/subreddit-subscribers/investingbots?style=social"></a> <a href="https://github.com/coding-kitties/investing-algorithm-framework/stargazers"><img src="https://img.shields.io/github/stars/coding-kitties/investing-algorithm-framework.svg?style=social&label=Star"></a>
+ </div>
+
+> If you like what we do, consider starring, sharing and contributing!
 
 ## Sponsors
 
@@ -34,66 +19,54 @@
     </picture>
 </a>
 
-## Features and planned features:
 
-- [x] **Based on Python 3.10+**: Windows, macOS and Linux.
-- [x] **Documentation**: [Documentation](https://investing-algorithm-framework.com)
-- [x] **Persistence of portfolios, orders, positions and trades**: Persistence is achieved through sqlite.
-- [x] **Limit orders**: Create limit orders for buying and selling.
-- [x] **Trade models**: Models and functionality for trades, trades stop losses (fixed and trailing) and take profits (fixed and trailing).
-- [x] **Market data sources**: Market data sources for OHLCV data and ticker data, and extendible with custom data and events.
-- [x] **Polars and Pandas dataframes support** Out of the box dataframes support for fast data processing ([pola.rs](https://pola.rs/), [pandas](https://pandas.pydata.org/)).
-- [x] **Azure Functions support**: Stateless running for cloud function deployments in Azure.
-- [x] **Live trading**: Live trading.
-- [x] **Backtesting and performance analysis reports** [example](./examples/backtest_example)
-- [x] **Backtesting multiple algorithms with different backtest date ranges** [example](./examples/backtests_example)
-- [x] **Backtesting and results evaluation**: Compare multiple backtests and run experiments. Save and load backtests. Save strategies as part of the backtest. [docs](https://investing-algorithm-framework.com/Getting%20Started/backtesting)
-- [x] **Order execution**: Currently support for a wide range of crypto exchanges through [ccxt](https://github.com/ccxt/ccxt) (Support for traditional asset brokers is planned).
-- [x] **Web API**: Rest API for interacting with your deployed trading bot
-- [x] **PyIndicators**: Works natively with [PyIndicators](https://github.com/coding-kitties/PyIndicators) for technical analysis on your Pandas and Polars dataframes.
-- [ ] **Builtin WebUI (Planned)**: Builtin web UI to manage your bot and evaluate your backtests.
-- [ ] **Manageable via Telegram (Planned)**: Manage the bot with Telegram.
-- [ ] **Performance status report via Web UI and telegram(Planned)**: Provide a performance status of your current trades.
-- [ ] **CI/CD integration (Planned)**: Tools for continuous integration and deployment (version tracking, comparison of backtests, automatic deployments).
-- [ ] **Tracing and replaying of strategies in backtests (Planned)**: Tracing and replaying of strategies in backtests for specific dates and date ranges so you can evaluate your strategy step by step.
-- [ ] **AWS Lambda support (Planned)**: Stateless running for cloud function deployments in AWS.
-- [ ] **Azure App services support (Planned)**: deployments in Azure app services with Web UI.
+## 🌟 Features
 
-## Quickstart
+- [x] Python 3.10+: Cross-platform support for Windows, macOS, and Linux.
+- [x] Backtesting: Simulate strategies with detailed performance reports.
+- [x] Live Trading: Execute trades in real-time with support for multiple exchanges via ccxt.
+- [x] Portfolio Management: Manage portfolios, trades, and positions with persistence via SQLite.
+- [x] Market Data Sources: Fetch OHLCV, ticker, and custom data with support for Polars and Pandas.
+- [x] Azure Functions Support: Deploy stateless trading bots to Azure.
+- [x] Web API: Interact with your bot via REST API.
+- [x] PyIndicators Integration: Perform technical analysis directly on your dataframes.
+- [x] Extensibility: Add custom strategies, data providers, order executors so you can connect your trading bot to your favorite exchange or broker.
 
-1. First install the framework using `pip`. The Investing Algorithm Framework is hosted on [PyPi](https://pypi.org/project/investing-algorithm-framework/).
+## 🚀 Quickstart
+
+Installation
+Install the framework via [PyPI](https://pypi.org/project/investing-algorithm-framework/):
+
+1. First install the framework using `pip`. The Investing Algorithm Framework is hosted on [PyPi].
 
 ```bash
-$ pip install investing-algorithm-framework
+pip install investing-algorithm-framework
 ```
 
-2. Next, just run:
+Run the following command to set up your project:
 
 ```bash
-$ investing-algorithm-framewor init
+investing-algorithm-framewor init
 ```
 
-or if you want the web version:
+For a web-enabled version:
 
 ```bash
-$ investing-algorithm-framework init --web
+investing-algorithm-framework init --web
 ```
+
+This will create:
+
+* app.py: The entry point for your bot.
+* strategy.py: A sample strategy file to get started.
+
+> Note: Keep the app.py file as is. You can modify strategy.py and add additional files to build your bot.
 > You can always change the app to the web version by changing the `app.py` file.
 
-The command will create the file `app.py` and an example script called `strategy.py`.
+---
 
-From there, you start building your trading bot in the `strategy.py`.
-
-More information can be found on our [docs](https://investing-algorithm-framework.com/)
-
-> Make sure you leave the `app.py` file as is, as it is the entry point for the framework.
-> You can change the `bot.py` file to your liking and add other files to the working directory.
-> The framework will automatically pick up the files in the working directory.
-```
-
-## Example implementation
-
-The following algorithm connects to binance and buys BTC every 2 hours.
+## 📈 Example: A Simple Trading Bot
+The following example connects to Binance and buys BTC every 2 hours.
 
 ```python
 import logging.config
@@ -157,7 +130,7 @@ if __name__ == "__main__":
 
 > You can find more examples [here](./examples) folder.
 
-## Backtesting and experiments
+## 🔍 Backtesting
 
 The framework also supports backtesting and performing backtest experiments. After a backtest, you can print a report that shows the performance of your trading bot.
 
@@ -270,45 +243,38 @@ Take profits overview
 ╰────────────────────┴───────────────┴──────────┴──────────┴─────────────────────────────────────┴──────────────┴────────────────┴─────────────────────────────────┴──────────────┴─────────────┴───────────────╯
 ```
 
-### Backtest experiments
+## 🌐 Deployment to Azure
 
-The framework also supports backtest experiments. Backtest experiments allows you to
-compare multiple algorithms and evaluate their performance. Ideally,
-you would do this by parameterizing your strategy and creating a factory function that
-creates the algorithm with the different parameters. You can find an example of this
-in the [backtest experiments example](./examples/backtest_experiment).
+Prerequisites
 
-## Broker/Exchange configuration
+Ensure Azure Functions Core Tools are installed:
 
-The framework has by default support for [ccxt](https://github.com/ccxt/ccxt).
-This should allow you to connect to a lot of brokers/exchanges.
+```bash
+npm install -g azure-functions-core-tools@4 --unsafe-perm true
+```
+Deploying to Azure
+Use the provided deployment script:
 
-```python
-from investing_algorithm_framework import PortfolioConfiguration, \
-    MarketCredential, create_app
-app = create_app()
-app.add_market_credential(
-    MarketCredential(
-        market="<your market>",
-        api_key="<your api key>",
-        secret_key="<your secret key>",
-    )
-)
-app.add_portfolio_configuration(
-    PortfolioConfiguration(
-        market="<your market>",
-        initial_balance=400,
-        trading_symbol="EUR"
-    )
-)
+This script:
+
+```
+investing-algorithm-framework deploy
 ```
 
-## Performance
+This script:
 
-We are continuously working on improving the performance of the framework. If
-you have any suggestions, please let us know.
+* Creates Azure resources (e.g., storage accounts, function apps).
+* Sets environment variables for the Azure Function.
+* Deploys your bot to Azure.
 
-## Installation for local development
+## 📚 Documentation
+Comprehensive documentation is available at [investing-algorithm-framework.com](https://investing-algorithm-framework.com).
+
+## 🛠️ Development
+
+Local Development
+
+Clone the repository and install dependencies using Poetry:
 
 The framework is built with poetry. To install the framework for local development, you can run the following commands:
 
@@ -329,11 +295,11 @@ To run the tests, you can run the following command:
 python -m unittest discover -s tests
 ```
 
-## Disclaimer
+## ⚠️ Disclaimer
+
 
 If you use this framework for your investments, do not risk money
-which you are afraid to lose, until you have clear understanding how
-the framework works. We can't stress this enough:
+which you are afraid to lose, until you have clear understanding how the framework works. We can't stress this enough:
 
 BEFORE YOU START USING MONEY WITH THE FRAMEWORK, MAKE SURE THAT YOU TESTED
 YOUR COMPONENTS THOROUGHLY. USE THE SOFTWARE AT YOUR OWN RISK.
@@ -341,6 +307,8 @@ THE AUTHORS AND ALL AFFILIATES ASSUME NO RESPONSIBILITY FOR YOUR INVESTMENT RESU
 
 Also, make sure that you read the source code of any plugin you use or
 implementation of an algorithm made with this framework.
+
+We welcome contributions! Check out the project board and issues to get started.
 
 ## Documentation
 
@@ -354,17 +322,7 @@ contributing page at the website.
 If you'd like to chat with investing-algorithm-framework users
 and developers, [join us on Slack](https://inv-algo-framework.slack.com) or [join us on reddit](https://www.reddit.com/r/InvestingBots/)
 
-## Acknowledgements
-
-We want to thank all contributors to this project. A full list of all the people that contributed to the project can be
-found [here](https://github.com/investing-algorithms/investing-algorithm-framework/blob/master/AUTHORS.md)
-
-### [Bugs / Issues](https://github.com/investing-algorithms/investing-algorithm-framework/issues?q=is%3Aissue)
-
-If you discover a bug in the framework, please [search our issue tracker](https://github.com/investing-algorithms/investing-algorithm-framework/issues?q=is%3Aissue)
-first. If it hasn't been reported, please [create a new issue](https://github.com/investing-algorithms/investing-algorithm-framework/issues/new).
-
-### Contributing
+## 🤝 Contributing
 
 The investing algorithm framework is a community driven project.
 We welcome you to participate, contribute and together help build the future trading bots developed in python.
@@ -377,3 +335,19 @@ You can pick up a task by assigning yourself to it.
 This will ensure that interested parties can give valuable feedback on the feature, and let others know that you are working on it.
 
 **Important:** Always create your feature or hotfix against the `develop` branch, not `main`.
+
+## 📬 Support
+
+* Slack Community
+* Reddit Community
+
+
+## 🏆 Acknowledgements
+
+We want to thank all contributors to this project. A full list of all the people that contributed to the project can be
+found [here](https://github.com/investing-algorithms/investing-algorithm-framework/blob/master/AUTHORS.md)
+
+### [Bugs / Issues](https://github.com/investing-algorithms/investing-algorithm-framework/issues?q=is%3Aissue)
+
+If you discover a bug in the framework, please [search our issue tracker](https://github.com/investing-algorithms/investing-algorithm-framework/issues?q=is%3Aissue)
+first. If it hasn't been reported, please [create a new issue](https://github.com/investing-algorithms/investing-algorithm-framework/issues/new).

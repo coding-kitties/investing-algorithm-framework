@@ -364,7 +364,7 @@ class CCXTMarketService(MarketService):
         Function to retrieve ohlcv data for a symbol, time frame and market
 
         Args:
-            symbol: The symbol to retrieve ohlcv data for
+            symbol (str): The symbol to retrieve ohlcv data for
             time_frame: The time frame to retrieve ohlcv data for
             from_timestamp: The start date to retrieve ohlcv data from
             market: The market to retrieve ohlcv data from

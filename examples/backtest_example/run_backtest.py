@@ -174,18 +174,15 @@ class CrossOverStrategy(TradingStrategy):
 
 
 app = create_app(name="GoldenCrossStrategy")
+app.add_market(
+    market="BINANCE", trading_symbol="EUR", initial_balance=400,
+)
 app.add_strategy(CrossOverStrategy)
 app.add_market_data_source(bitvavo_btc_eur_ohlcv_2h)
 app.add_market_data_source(bitvavo_dot_eur_ohlcv_2h)
 app.add_market_data_source(bitvavo_btc_eur_ticker)
 app.add_market_data_source(bitvavo_dot_eur_ticker)
 
-# Add a portfolio configuration of 400 euro initial balance
-app.add_portfolio_configuration(
-    PortfolioConfiguration(
-        market="BINANCE", trading_symbol="EUR", initial_balance=400,
-    )
-)
 
 if __name__ == "__main__":
     end_date = datetime(2023, 12, 2)

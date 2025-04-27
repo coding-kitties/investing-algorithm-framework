@@ -18,6 +18,7 @@ from investing_algorithm_framework.infrastructure import \
     CCXTTickerMarketDataSource, CSVOHLCVMarketDataSource, \
     CSVTickerMarketDataSource, AzureBlobStorageStateHandler
 from .create_app import create_app
+from .download_data import download
 
 __all__ = [
     "Algorithm",
@@ -75,5 +76,6 @@ __all__ = [
     "MarketDataType",
     "TradeRiskType",
     "Context",
-    "APPLICATION_DIRECTORY"
+    "APPLICATION_DIRECTORY",
+    "download"
 ]

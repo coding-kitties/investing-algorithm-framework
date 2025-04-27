@@ -12,7 +12,7 @@ from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
 from .data_structures import PeekableQueue
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
 from .exceptions import OperationalException, ApiException, \
-    PermissionDeniedApiException, ImproperlyConfigured
+    PermissionDeniedApiException, ImproperlyConfigured, NetworkError
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, \
     PortfolioConfiguration, Portfolio, Position, Order, TradeStatus, \
@@ -24,7 +24,6 @@ from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
     OHLCVMarketDataSource, BacktestMarketDataSource, MarketDataSource, \
     MarketService, MarketCredentialService, AbstractPortfolioSyncService, \
     RoundingService, StateHandler
-from .singleton import Singleton
 from .stateless_actions import StatelessActions
 from .strategy import Strategy
 from .utils import random_string, append_dict_as_row_to_csv, \
@@ -32,8 +31,10 @@ from .utils import random_string, append_dict_as_row_to_csv, \
     load_backtest_report, convert_polars_to_pandas, \
     csv_to_list, StoppableThread, pretty_print_backtest_reports_evaluation, \
     pretty_print_backtest, load_csv_into_dict, load_backtest_reports, \
-    get_backtest_report
+    get_backtest_report, pretty_print_positions, pretty_print_trades, \
+    pretty_print_orders
 from .metrics import get_price_efficiency_ratio
+from .data_provider import DataProvider
 
 __all__ = [
     "OrderStatus",
@@ -55,7 +56,6 @@ __all__ = [
     "SQLALCHEMY_DATABASE_URI",
     "TradingDataType",
     "TradingTimeFrame",
-    "Singleton",
     "random_string",
     "append_dict_as_row_to_csv",
     "add_column_headers_to_csv",
@@ -128,5 +128,10 @@ __all__ = [
     "TradeTakeProfit",
     "TradeStopLoss",
     "StateHandler",
-    "APPLICATION_DIRECTORY"
+    "APPLICATION_DIRECTORY",
+    "pretty_print_positions",
+    "pretty_print_trades",
+    "pretty_print_orders",
+    "DataProvider",
+    "NetworkError"
 ]

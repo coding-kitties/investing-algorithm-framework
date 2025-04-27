@@ -1,3 +1,4 @@
+from typing import List, Set, Dict
 from datetime import datetime
 from logging import getLogger
 
@@ -10,8 +11,11 @@ from investing_algorithm_framework.domain.models \
     .backtesting.backtest_date_range import BacktestDateRange
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.position import Position
-from investing_algorithm_framework.domain.models.trade import Trade
+from investing_algorithm_framework.domain.models.trade import Trade, \
+    TradeStatus
 from investing_algorithm_framework.domain.models.order import Order
+from investing_algorithm_framework.domain.models.order import OrderSide, \
+    OrderStatus
 
 logger = getLogger(__name__)
 
@@ -381,6 +385,12 @@ class BacktestReport(BaseModel):
         """
         Convert the backtest report to a dictionary. So it can be
         saved to a file.
+
+        Args:
+            None
+
+        Returns:
+            dict: The backtest report as a dictionary
         """
 
         # Convert context to a dictionary
@@ -597,3 +607,123 @@ class BacktestReport(BaseModel):
                 )
 
         return None
+
+    def get_orders(
+        self,
+        target_symbol=None,
+        order_side=None,
+        order_status=None,
+        created_at_lt=None,
+    ) -> List[Order]:
+        """
+        Get the orders of a backtest report
+
+        Args:
+            target_symbol (str): The target_symbol
+            order_side (str): The order side
+            status (str): The order status
+            created_at_lt (datetime): The created_at date to filter the orders
+
+        Returns:
+            list: The orders of the backtest report
+        """
+        selection = self.orders
+
+        if created_at_lt is not None:
+            selection = [
+                order for order in selection
+                if order.created_at < created_at_lt
+            ]
+
+
+        if target_symbol is not None:
+            selection = [
+                order for order in selection
+                if order.target_symbol == target_symbol
+            ]
+
+        if order_side is not None:
+            order_side = OrderSide.from_value(order_side)
+            selection = [
+                order for order in selection
+                if order.order_side == order_side.value
+            ]
+
+        if order_status is not None:
+            status = OrderStatus.from_value(order_status)
+            selection = [
+                order for order in selection
+                if order.status == status.value
+            ]
+
+        return selection
+
+    def get_trades(self, target_symbol=None, trade_status=None) -> List[Trade]:
+        """
+        Get the trades of a backtest report
+
+        Args:
+            target_symbol (str): The target_symbol
+            trade_status (str): The trade_status
+
+        Returns:
+            list: The trades of the backtest report
+        """
+        selection = self.trades
+
+        if target_symbol is not None:
+            selection = [
+                trade for trade in selection
+                if trade.target_symbol == target_symbol
+            ]
+
+        if trade_status is not None:
+            trade_status = TradeStatus.from_value(trade_status)
+            selection = [
+                trade for trade in selection
+                if trade.status == trade_status.value
+            ]
+
+        return selection
+
+    def get_symbols(self) -> Set[str]:
+        """
+        Get all the unique symbols of the backtest. The unique
+        symbols are all the assets that are being traded in
+        the backtest.
+
+        Args:
+            None
+
+        Returns:
+            set: The unique symbols of the backtest
+        """
+        unique_symbols = set()
+
+
+        for order in self.orders:
+            if order.target_symbol not in self.symbols:
+                unique_symbols.add(order.target_symbol)
+
+        return unique_symbols
+
+    def get_positions(self, symbol=None) -> List[Position]:
+        """
+        Get the positions of the backtest report
+
+        Args:
+            symbol (str): The symbol
+
+        Returns:
+            list: The positions of the backtest report
+        """
+
+        selection = self.positions
+
+        if symbol is not None:
+            selection = [
+                position for position in selection
+                if position.symbol == symbol
+            ]
+
+        return selection

@@ -2,7 +2,7 @@ from .backtesting import BacktestService
 from .configuration_service import ConfigurationService
 from .market_credential_service import MarketCredentialService
 from .market_data_source_service import MarketDataSourceService, \
-    BacktestMarketDataSourceService
+    BacktestMarketDataSourceService, DataProviderService
 from .order_service import OrderService, OrderBacktestService
 from .portfolios import PortfolioService, BacktestPortfolioService, \
     PortfolioConfigurationService, PortfolioSyncService, \
@@ -31,4 +31,5 @@ __all__ = [
     "BacktestMarketDataSourceService",
     "BacktestPortfolioService",
     "TradeService",
+    "DataProviderService"
 ]
