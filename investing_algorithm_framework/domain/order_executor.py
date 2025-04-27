@@ -29,8 +29,7 @@ class OrderExecutor(ABC):
         Args:
             value (dict): A dictionary containing the market credentials.
         """
-        self._market_credentials = value
-
+        self._market_credentials = credentials
 
     @abstractmethod
     def execute_order(self, order):

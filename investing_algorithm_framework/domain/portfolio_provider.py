@@ -8,9 +8,11 @@ class PortfolioProvider(ABC):
 
     Attributes:
         portfolio_id (str): The unique identifier for the portfolio.
-        user_id (str): The unique identifier for the user associated with the portfolio.
+        user_id (str): The unique identifier for the user associated
+            with the portfolio.
         balance (float): The current balance of the portfolio.
-        assets (dict): A dictionary containing the assets in the portfolio and their quantities.
+        assets (dict): A dictionary containing the assets in the
+            portfolio and their quantities.
     """
 
     @abstractmethod

@@ -12,6 +12,7 @@ def get_default_data_providers():
         CCXTDataProvider(),
     ]
 
+
 __all__ = [
     'CCXTDataProvider',
     'get_default_data_providers',

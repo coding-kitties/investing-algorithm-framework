@@ -1,5 +1,4 @@
 from dateutil import parser
-from datetime import datetime
 from investing_algorithm_framework.services import DataProviderService, \
     ConfigurationService, MarketCredentialService
 from investing_algorithm_framework.infrastructure import \
@@ -8,8 +7,8 @@ from investing_algorithm_framework.infrastructure import \
 
 def download(
     symbol: str,
-    market = None,
-    date = None,
+    market=None,
+    date=None,
     time_frame: str = None,
     data_type: str = "ohlcv",
     start_date: str = None,
@@ -69,17 +68,3 @@ def download(
         save=save,
         storage_path=storage_path
     )
-
-if __name__ == "__main__":
-    # Example usage
-    data = download(
-        symbol="DOT/EUR",
-        market="bitvavo",
-        data_type="ohlcv",
-        window_size=200,
-        pandas=False,
-        save=False,
-        storage_path="./data",
-        time_frame="1d",
-    )
-    print(len(data))

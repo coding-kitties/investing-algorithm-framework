@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import List
 from abc import ABC, abstractmethod
 from datetime import datetime
 from investing_algorithm_framework.domain import TradingDataType, TimeFrame
@@ -45,9 +45,9 @@ class DataProvider(ABC):
         symbol: str = None,
         markets: list = None,
         priority: int = 0,
-        time_frame = None,
-        window_size = None,
-        storage_path = None,
+        time_frame=None,
+        window_size=None,
+        storage_path=None,
         market_credentials: List = None,
     ):
         """
@@ -113,7 +113,7 @@ class DataProvider(ABC):
         time_frame: str = None,
         start_date: datetime = None,
         end_date: datetime = None,
-        window_size = None,
+        window_size=None,
     ) -> None:
         """
         Checks if the data provider has data for the given parameters.
@@ -130,9 +130,9 @@ class DataProvider(ABC):
         time_frame: str = None,
         start_date: datetime = None,
         end_date: datetime = None,
-        storage_path = None,
-        window_size = None,
-        pandas = False,
+        storage_path=None,
+        window_size=None,
+        pandas=False,
     ):
         """
         Fetches data for a given symbol and date range.
@@ -147,7 +147,7 @@ class DataProvider(ABC):
         symbol: str = None,
         market: str = None,
         time_frame: str = None,
-        window_size = None,
+        window_size=None,
     ) -> None:
         """
         Prepares backtest data for a given symbol and date range.
@@ -163,8 +163,8 @@ class DataProvider(ABC):
         time_frame: str = None,
         backtest_start_date: datetime = None,
         backtest_end_date: datetime = None,
-        window_size = None,
-        pandas = False,
+        window_size=None,
+        pandas=False,
     ) -> None:
         """
         Fetches backtest data for a given symbol and date range.

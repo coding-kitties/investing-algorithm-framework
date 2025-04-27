@@ -1,4 +1,4 @@
-from typing import List, Set, Dict
+from typing import List, Set
 from datetime import datetime
 from logging import getLogger
 
@@ -503,17 +503,6 @@ class BacktestReport(BaseModel):
 
         return report
 
-    def get_trades(self, symbol=None):
-        """
-        Function to get trades. If a symbol is provided, it will
-        return the trades for that symbol. If no symbol is provided,
-        it will return all the trades.
-        """
-        if symbol is None:
-            return self.trades
-
-        return [trade for trade in self.trades if trade.symbol == symbol]
-
     def get_profit(self) -> float:
         return self._total_net_gain
 
@@ -635,7 +624,6 @@ class BacktestReport(BaseModel):
                 if order.created_at < created_at_lt
             ]
 
-
         if target_symbol is not None:
             selection = [
                 order for order in selection
@@ -699,7 +687,6 @@ class BacktestReport(BaseModel):
             set: The unique symbols of the backtest
         """
         unique_symbols = set()
-
 
         for order in self.orders:
             if order.target_symbol not in self.symbols:

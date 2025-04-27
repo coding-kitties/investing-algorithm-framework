@@ -46,9 +46,9 @@ class DataProviderIndex:
                     time_frame=time_frame,
                 ):
                     matching_providers.append(provider)
-        except NetworkError as e:
+        except NetworkError:
             number_of_network_errors += 1
-        except Exception as e:
+        except Exception:
             pass
 
         if len(matching_providers) == 0 and number_of_network_errors > 0:
@@ -60,6 +60,7 @@ class DataProviderIndex:
         # Sort by priority (lower priority number is better)
         matching_providers.sort(key=lambda p: p.priority)
         return matching_providers[0] if matching_providers else None
+
 
 class DataProviderService:
     data_providers: List[DataProvider] = []
@@ -86,42 +87,18 @@ class DataProviderService:
         self.configuration_service = configuration_service
         self.market_credentials_service = market_credentials_service
 
-    def _initialize_data_providers(self):
-        """
-        Initialize all data providers.
-
-        This function will call the load_markets and load_symbols
-        methods of all data providers to load the markets and
-        symbols for each data provider. It will also create a
-        DataProviderIndex to index the data providers by symbol
-        and market.
-        """
-        pass
-
-        # if len(self.data_providers) == 0:
-        #     logger.info(
-        #         "No custom data providers found, using default data providers"
-        #     )
-
-        # for provider in self.default_data_providers:
-        #     provider.load_markets()
-        #     provider.load_symbols()
-
-        # Create all indexes
-        # self.data_provider_index = DataProviderIndex(self.data_providers)
-
     def get_data(
         self,
         symbol: str,
-        data_type = None,
+        data_type=None,
         date: datetime = None,
         market: str = None,
         time_frame: str = None,
         start_date: datetime = None,
         end_date: datetime = None,
-        storage_path = None,
-        window_size = None,
-        pandas = False,
+        storage_path=None,
+        window_size=None,
+        pandas=False,
         save: bool = False,
     ):
         """
@@ -188,7 +165,9 @@ class DataProviderService:
             f"No data provider found for the given parameters: {params}"
         )
 
-    def add_data_provider(self, data_provider: DataProvider, priority: int = 0):
+    def add_data_provider(
+        self, data_provider: DataProvider, priority: int = 0
+    ):
         """
         Add a data provider to the service.
 

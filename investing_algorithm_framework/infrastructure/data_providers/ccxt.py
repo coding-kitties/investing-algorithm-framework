@@ -13,7 +13,6 @@ from investing_algorithm_framework.domain import OperationalException, \
 logger = logging.getLogger("investing_algorithm_framework")
 
 
-
 class CCXTDataProvider(DataProvider):
     """
     """
@@ -29,7 +28,7 @@ class CCXTDataProvider(DataProvider):
         symbol=None,
         time_frame=None,
         window_size=None,
-        priority = 1
+        priority=1
     ):
         super().__init__(
             data_type=data_type,
@@ -134,12 +133,13 @@ class CCXTDataProvider(DataProvider):
             symbols = list(symbols.keys())
             return symbol in symbols
 
-        except ccxt.NetworkError as e:
+        except ccxt.NetworkError:
             raise NetworkError(
                 "Network error occurred, make sure you have "
                 "an active internet connection"
             )
-        except Exception as e:
+
+        except Exception:
             return False
 
     def get_data(
@@ -161,7 +161,8 @@ class CCXTDataProvider(DataProvider):
 
         if market is None:
             raise OperationalException(
-                "Market is not set. Please set the market before calling get_data."
+                "Market is not set. Please set the market "
+                "before calling get_data."
             )
 
         if symbol is None:
@@ -169,7 +170,8 @@ class CCXTDataProvider(DataProvider):
 
         if symbol is None:
             raise OperationalException(
-                "Symbol is not set. Please set the symbol before calling get_data."
+                "Symbol is not set. Please set the symbol "
+                "before calling get_data."
             )
 
         if data_type is None:
@@ -194,7 +196,6 @@ class CCXTDataProvider(DataProvider):
 
             if end_date is None:
                 end_date = datetime.now(tz=timezone.utc)
-
 
             if start_date is None:
 

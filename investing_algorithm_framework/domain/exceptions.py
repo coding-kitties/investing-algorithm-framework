@@ -61,6 +61,7 @@ class OperationalException(Exception):
             "message": self.error_message
         }
 
+
 class NetworkError(Exception):
     """
     Class NetworkError: Exception class indicating a problem occurred
