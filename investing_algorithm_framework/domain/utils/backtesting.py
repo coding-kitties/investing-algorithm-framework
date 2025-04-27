@@ -548,13 +548,165 @@ def pretty_print_percentage_positive_trades(
     print(f"{COLOR_YELLOW}Most positive trades:{COLOR_RESET} {COLOR_GREEN}Algorithm {percentages.name} {float(percentages.percentage_positive_trades):.{precision}f}%{COLOR_RESET}")
 
 
+def pretty_print_orders(
+    backtest_report,
+    target_symbol = None,
+    order_status = None,
+    amount_precesion=4,
+    price_precision=2,
+    time_precision=1,
+    percentage_precision=2
+) -> None:
+    """
+    Pretty print the orders of the backtest report to the console.
+
+    Args:
+        backtest_report: The backtest report
+        target_symbol: The target symbol of the orders
+        order_status: The status of the orders
+        amount_precesion: The precision of the amount
+        price_precision: The precision of the price
+        time_precision: The precision of the time
+        percentage_precision: The precision of the percentage
+
+    Returns:
+        None
+    """
+
+    selection = backtest_report.get_orders(
+        target_symbol=target_symbol,
+        order_status=order_status
+    )
+
+    print(f"{COLOR_YELLOW}Orders overview{COLOR_RESET}")
+    orders_table = {}
+    orders_table["Pair (Order id)"] = [
+        f"{order.target_symbol}/{order.trading_symbol} ({order.id})"
+        for order in selection
+    ]
+    orders_table["Status"] = [
+        order.status for order in selection
+    ]
+    orders_table["Side"] = [
+        order.order_side for order in selection
+    ]
+    orders_table["Size"] = [
+        f"{float(order.get_size()):.{amount_precesion}f} {order.trading_symbol}"
+        for order in selection
+    ]
+    orders_table["Price"] = [
+        f"{float(order.price):.{amount_precesion}f} {order.trading_symbol}"
+        for order in selection
+    ]
+    orders_table["Amount"] = [
+        f"{float(order.amount):.{amount_precesion}f} {order.target_symbol}"
+        for order in selection
+    ]
+    orders_table["Filled"] = [
+        f"{float(order.filled):.{amount_precesion}f} {order.target_symbol}"
+        for order in selection
+    ]
+    orders_table["Created at"] = [
+        order.created_at.strftime("%Y-%m-%d %H:%M") for order in selection if order.created_at is not None
+    ]
+    print(tabulate(orders_table, headers="keys", tablefmt="rounded_grid"))
+
+
+def pretty_print_positions(
+    backtest_report,
+    symbol = None,
+    amount_precesion=4,
+    price_precision=2,
+    time_precision=1,
+    percentage_precision=2
+) -> None:
+    """
+    Pretty print the positions of the backtest report to the console.
+
+    Args:
+        backtest_report: The backtest report
+        target_symbol: The target symbol of the orders
+        order_status: The status of the orders
+        amount_precesion: The precision of the amount
+        price_precision: The precision of the price
+        time_precision: The precision of the time
+        percentage_precision: The precision of the percentage
+
+    Returns:
+        None
+    """
+    selection = backtest_report.get_positions(symbol=symbol)
+
+    print(f"{COLOR_YELLOW}Positions overview{COLOR_RESET}")
+    position_table = {}
+    position_table["Position"] = [
+        position.symbol for position in selection
+    ]
+    position_table["Amount"] = [
+        f"{float(position.amount):.{amount_precesion}f}" for position in
+        selection
+    ]
+    position_table["Pending buy amount"] = [
+        f"{float(position.amount_pending_buy):.{amount_precesion}f}"
+        for position in selection
+    ]
+    position_table["Pending sell amount"] = [
+        f"{float(position.amount_pending_sell):.{amount_precesion}f}"
+        for position in selection
+    ]
+    position_table[f"Cost ({backtest_report.trading_symbol})"] = [
+        f"{float(position.cost):.{price_precision}f}"
+        for position in selection
+    ]
+    position_table[f"Value ({backtest_report.trading_symbol})"] = [
+        f"{float(position.value):.{price_precision}f} {backtest_report.trading_symbol}"
+        for position in selection
+    ]
+    position_table["Percentage of portfolio"] = [
+        f"{float(position.percentage_of_portfolio):.{percentage_precision}f}%"
+        for position in selection
+    ]
+    position_table[f"Growth ({backtest_report.trading_symbol})"] = [
+        f"{float(position.growth):.{price_precision}f} {backtest_report.trading_symbol}"
+        for position in selection
+    ]
+    position_table["Growth_rate"] = [
+        f"{float(position.growth_rate):.{percentage_precision}f}%"
+        for position in selection
+    ]
+    print(
+        tabulate(position_table, headers="keys", tablefmt="rounded_grid")
+    )
+
+
 def pretty_print_trades(
     backtest_report,
+    target_symbol = None,
+    status = None,
     amount_precesion=4,
     price_precision=2,
     time_precision=1,
     percentage_precision=2
 ):
+    """
+    Pretty print the trades of the backtest report to the console.
+
+    Args:
+        backtest_report: The backtest report
+        target_symbol: The target symbol of the trades
+        status: The status of the trades
+        amount_precesion: The precision of the amount
+        price_precision: The precision of the price
+        time_precision: The precision of the time
+        percentage_precision: The precision of the percentage
+
+    Returns:
+        None
+    """
+    selection = backtest_report.get_trades(
+        target_symbol=target_symbol,
+        trade_status=status
+    )
 
     def get_status(trade):
         status = "OPEN"
@@ -620,43 +772,43 @@ def pretty_print_trades(
     trades_table = {}
     trades_table["Pair (Trade id)"] = [
         f"{trade.target_symbol}/{trade.trading_symbol} ({trade.id})"
-        for trade in backtest_report.trades
+        for trade in selection
     ]
     trades_table["Status"] = [
-        get_status(trade) for trade in backtest_report.trades
+        get_status(trade) for trade in selection
     ]
     trades_table["Amount (remaining)"] = [
         f"{float(trade.amount):.{amount_precesion}f} ({float(trade.remaining):.{amount_precesion}f}) {trade.target_symbol}"
-        for trade in backtest_report.trades
+        for trade in selection
     ]
     trades_table[f"Net gain ({backtest_report.trading_symbol})"] = [
         f"{float(trade.net_gain):.{price_precision}f}"
-        for trade in backtest_report.trades
+        for trade in selection
     ]
     trades_table["Open date"] = [
-        trade.opened_at.strftime("%Y-%m-%d %H:%M") for trade in backtest_report.trades if trade.opened_at is not None
+        trade.opened_at.strftime("%Y-%m-%d %H:%M") for trade in selection if trade.opened_at is not None
     ]
     trades_table["Close date"] = [
-        trade.closed_at.strftime("%Y-%m-%d %H:%M") for trade in backtest_report.trades if trade.closed_at is not None
+        trade.closed_at.strftime("%Y-%m-%d %H:%M") for trade in selection if trade.closed_at is not None
     ]
     trades_table["Duration"] = [
-        f"{trade.duration:.{time_precision}f} hours" for trade in backtest_report.trades
+        f"{trade.duration:.{time_precision}f} hours" for trade in selection
     ]
     # Add (unrealized) to the net gain if the trade is still open
     trades_table[f"Net gain ({backtest_report.trading_symbol})"] = [
         f"{float(trade.net_gain_absolute):.{price_precision}f} ({float(trade.net_gain_percentage):.{percentage_precision}f}%)" + (" (unrealized)" if not TradeStatus.CLOSED.equals(trade.status) else "")
-        for trade in backtest_report.trades
+        for trade in selection
     ]
     trades_table[f"Open price ({backtest_report.trading_symbol})"] = [
-        f"{trade.open_price:.{price_precision}f}"  for trade in backtest_report.trades
+        f"{trade.open_price:.{price_precision}f}"  for trade in selection
     ]
     trades_table[
         f"Close price's ({backtest_report.trading_symbol})"
     ] = [
-        get_close_prices(trade) for trade in backtest_report.trades
+        get_close_prices(trade) for trade in selection
     ]
     trades_table["High water mark"] = [
-        get_high_water_mark(trade) for trade in backtest_report.trades
+        get_high_water_mark(trade) for trade in selection
     ]
     print(tabulate(trades_table, headers="keys", tablefmt="rounded_grid"))
 
@@ -885,12 +1037,26 @@ def load_backtest_report(file_path: str) -> BacktestReport:
     """
     Load a backtest report from a file.
 
-    param file_path: The file path
-    :return: The backtest report
+    Args:
+        file_path (str): The path to the backtest report file or folder
+
+    Returns:
+        BacktestReport: The backtest report
     """
 
+    if not os.path.exists(file_path):
+        raise OperationalException(
+            "Backtest rerport file or folder does not exist"
+        )
+
+    if os.path.isdir(file_path):
+        file_path = os.path.join(file_path, "report.json")
+        return load_backtest_report(file_path)
+
     if not os.path.isfile(file_path):
-        raise OperationalException("File does not exist")
+        raise OperationalException(
+            f"Backtest report file {file_path} does not exist"
+        )
 
     if not file_path.endswith(".json"):
         raise OperationalException("File is not a json file")

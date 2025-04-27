@@ -152,3 +152,5 @@ bumpversion.egg-info/
 **/backtest_reports/*
 **/databases/
 .vscode/
+.logs
+venv

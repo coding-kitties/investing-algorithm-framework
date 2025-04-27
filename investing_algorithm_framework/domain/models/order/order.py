@@ -201,6 +201,17 @@ class Order(BaseModel):
         self.set_available_amount(available_amount)
 
     def to_dict(self, datetime_format=None):
+        """
+        Convert the Order object to a dictionary
+
+        Args:
+            datetime_format (str): The format to use for the datetime fields.
+                If None, the datetime fields will be returned as is.
+                Defaults to None.
+
+        Returns:
+            dict: A dictionary representation of the Order object.
+        """
 
         if datetime_format is not None:
             created_at = self.created_at.strftime(datetime_format) \
@@ -212,6 +223,7 @@ class Order(BaseModel):
             updated_at = self.updated_at
 
         return {
+            "id": self.id,
             "external_id": self.external_id,
             "target_symbol": self.target_symbol,
             "trading_symbol": self.trading_symbol,
@@ -330,3 +342,13 @@ class Order(BaseModel):
             created_at=self.get_created_at(),
             updated_at=self.get_updated_at(),
         )
+
+    def get_size(self):
+        """
+        Get the size of the order
+
+        Returns:
+            float: The size of the order
+        """
+        return self.get_amount() * self.get_price() \
+            if self.get_price() is not None else 0

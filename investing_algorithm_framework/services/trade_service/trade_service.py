@@ -807,10 +807,18 @@ class TradeService(RepositoryService):
                     order_amount += stop_loss_sell_amount
                 else:
                     stop_loss.sold_amount += available_amount
-                    stop_loss.active = True
-                    stop_loss.sold_amount += stop_loss_sell_amount
-                    available_amount = 0
+
+                    # Deactivate stop loss if the filled amount is equal
+                    # to the amount of the trade, meaning that there is
+                    # nothing left to sell
+                    if trade.filled_amount == trade.amount:
+                        stop_loss.active = False
+                    else:
+                        stop_loss.active = True
+
                     order_amount += available_amount
+                    stop_loss_sell_amount = available_amount
+                    available_amount = 0
 
                 stop_loss_metadata.append({
                     "stop_loss_id": stop_loss.id,
@@ -910,10 +918,18 @@ class TradeService(RepositoryService):
                     order_amount += take_profit_sell_amount
                 else:
                     take_profit.sold_amount += available_amount
-                    take_profit.active = True
-                    take_profit.sold_amount += take_profit_sell_amount
-                    available_amount = 0
+
+                    # Deactivate take profit if the filled amount is equal
+                    # to the amount of the trade, meaning that there is
+                    # nothing left to sell
+                    if trade.filled_amount == trade.amount:
+                        take_profit.active = False
+                    else:
+                        take_profit.active = True
+
                     order_amount += available_amount
+                    take_profit_sell_amount = available_amount
+                    available_amount = 0
 
                 take_profit_metadata.append({
                     "take_profit_id": take_profit.id,

@@ -60,3 +60,20 @@ class OperationalException(Exception):
             "status": "error",
             "message": self.error_message
         }
+
+
+class NetworkError(Exception):
+    """
+    Class NetworkError: Exception class indicating a problem occurred
+    during making a netwok request
+    """
+
+    def __init__(self, message) -> None:
+        super(NetworkError, self).__init__(message)
+        self.error_message = message
+
+    def to_response(self):
+        return {
+            "status": "error",
+            "message": self.error_message
+        }
