@@ -176,7 +176,7 @@ class PortfolioService(RepositoryService):
         Returns:
             None
         """
-        filled_size = filled_amount  * order.get_price()
+        filled_size = filled_amount * order.get_price()
 
         if filled_size <= 0:
             return
@@ -194,7 +194,7 @@ class PortfolioService(RepositoryService):
             portfolio.id,
             {
                 "unallocated": portfolio.get_unallocated() + filled_size,
-                "total_trade_volume": portfolio.get_total_trade_volume()
-                                      + filled_size,
+                "total_trade_volume":
+                    portfolio.get_total_trade_volume() + filled_size,
             }
         )

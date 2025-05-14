@@ -35,7 +35,9 @@ class CCXTPortfolioProvider(PortfolioProvider):
         Returns:
             None
         """
-        exchange = self.initialize_exchange(portfolio.market, market_credential)
+        exchange = self.initialize_exchange(
+            portfolio.market, market_credential
+        )
 
         if not exchange.has['fetchOrder']:
             raise OperationalException(
@@ -90,7 +92,7 @@ class CCXTPortfolioProvider(PortfolioProvider):
             amount = exchange.fetchBalance()["free"]
 
             if symbol not in amount:
-               return None
+                return None
 
             return Position(
                 symbol=symbol,

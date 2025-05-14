@@ -1,5 +1,4 @@
 from dateutil.parser import parse
-from numpy.ma.core import filled
 
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.order import OrderSide, Order

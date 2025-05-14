@@ -243,6 +243,8 @@ class App:
             portfolio_snap_service = self.container \
                 .portfolio_snapshot_service()
             market_cred_service = self.container.market_credential_service()
+            portfolio_provider_lookup = \
+                self.container.portfolio_provider_lookup()
             # Override the portfolio service with the backtest
             # portfolio service
             self.container.portfolio_service.override(
@@ -254,8 +256,7 @@ class App:
                     portfolio_repository=self.container.portfolio_repository(),
                     portfolio_configuration_service=portfolio_conf_service,
                     portfolio_snapshot_service=portfolio_snap_service,
-                    portfolio_provider_lookup=self.container\
-                        .portfolio_provider_lookup()
+                    portfolio_provider_lookup=portfolio_provider_lookup
                 )
             )
 
@@ -1080,7 +1081,8 @@ class App:
                 # Check if there are matching portfolio configurations
                 for portfolio in portfolios:
                     logger.info(
-                        f"Checking if there is an matching portfolio configuration "
+                        f"Checking if there is an matching portfolio "
+                        "configuration "
                         f"for portfolio {portfolio.identifier}"
                     )
                     portfolio_configuration = \
@@ -1094,7 +1096,7 @@ class App:
                             f"existing portfolio {portfolio.market}, "
                             f"please make sure that you have configured your "
                             f"app with the right portfolio configurations "
-                            f"for the existing portfolios." 
+                            f"for the existing portfolios."
                             f"If you want to create a new portfolio, please "
                             f"remove the existing database (WARNING!!: this "
                             f"will remove all existing history of your "
@@ -1118,8 +1120,8 @@ class App:
                         # Register a portfolio provider for the portfolio
                         portfolio_provider_lookup \
                             .register_portfolio_provider_for_market(
-                            portfolio_configuration.market
-                        )
+                                portfolio_configuration.market
+                            )
                         initial_balance = portfolio_configuration\
                             .initial_balance
 
@@ -1167,7 +1169,8 @@ class App:
                 if market_credential is None:
                     raise ImproperlyConfigured(
                         f"No market credential found for existing "
-                        f"portfolio {portfolio_configuration.market} with market "
+                        f"portfolio {portfolio_configuration.market} "
+                        "with market "
                         "Cannot initialize portfolio configuration."
                     )
 

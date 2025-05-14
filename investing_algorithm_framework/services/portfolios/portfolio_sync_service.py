@@ -1,8 +1,7 @@
 import logging
 
 from investing_algorithm_framework.domain import OperationalException, \
-    AbstractPortfolioSyncService, OrderStatus, \
-    ENVIRONMENT, Environment, Order
+    AbstractPortfolioSyncService, ENVIRONMENT, Environment
 from investing_algorithm_framework.services.trade_service import TradeService
 
 logger = logging.getLogger(__name__)

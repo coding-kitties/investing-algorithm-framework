@@ -39,7 +39,8 @@ class CCXTOrderExecutor(OrderExecutor):
             if OrderType.LIMIT.equals(order_type):
                 if OrderSide.BUY.equals(order_side):
 
-                    # Check if the exchange supports the createLimitBuyOrder method
+                    # Check if the exchange supports the
+                    # createLimitBuyOrder method
                     if not hasattr(exchange, "createLimitBuyOrder"):
                         raise OperationalException(
                             f"Exchange {market} does not support "
@@ -51,7 +52,8 @@ class CCXTOrderExecutor(OrderExecutor):
                         symbol, amount, price,
                     )
                 else:
-                    # Check if the exchange supports the createLimitSellOrder method
+                    # Check if the exchange supports
+                    # the createLimitSellOrder method
                     if not hasattr(exchange, "createLimitSellOrder"):
                         raise OperationalException(
                             f"Exchange {market} does not support "

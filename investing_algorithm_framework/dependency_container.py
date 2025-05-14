@@ -14,6 +14,7 @@ from investing_algorithm_framework.services import OrderService, \
     MarketCredentialService, TradeService, PortfolioSyncService, \
     OrderExecutorLookup, PortfolioProviderLookup
 
+
 def setup_dependency_container(app, modules=None, packages=None):
     app.container = DependencyContainer()
     app.container.wire(modules=modules, packages=packages)

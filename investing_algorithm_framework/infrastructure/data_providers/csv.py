@@ -1,6 +1,5 @@
 import polars
 from datetime import datetime
-from typing import List
 from investing_algorithm_framework.domain import DataProvider, \
     TradingDataType, OperationalException
 
@@ -53,7 +52,7 @@ class CSVOHLCVDataProvider(DataProvider):
     ) -> bool:
 
         if symbol == self.symbol and market == self.market and \
-            data_type == self.data_type and time_frame == self.time_frame:
+                data_type == self.data_type and time_frame == self.time_frame:
             return True
 
         return False

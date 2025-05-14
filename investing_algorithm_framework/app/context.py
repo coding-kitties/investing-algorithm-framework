@@ -729,12 +729,12 @@ class Context:
             )
 
         for order in self.order_service \
-            .get_all(
-                {
-                    "position": position.id,
-                    "status": OrderStatus.OPEN.value
-                }
-            ):
+                .get_all(
+                    {
+                        "position": position.id,
+                        "status": OrderStatus.OPEN.value
+                    }
+                ):
             self.order_service.cancel_order(order)
 
         target_symbol = position.get_symbol()
@@ -1150,7 +1150,9 @@ class Context:
 
         return self.trade_service.count(query_params)
 
-    def get_pending_trades(self, target_symbol=None, market=None) -> List[Trade]:
+    def get_pending_trades(
+            self, target_symbol=None, market=None
+    ) -> List[Trade]:
         """
         Function to get all pending trades. This function will return all
         pending trades that match the specified query parameters. If the
@@ -1164,7 +1166,8 @@ class Context:
             market: The market of the asset
 
         Returns:
-            List[Trade]: A list of pending trades that match the query parameters
+            List[Trade]: A list of pending trades that match
+                the query parameters
         """
         return self.trade_service.get_all(
             {

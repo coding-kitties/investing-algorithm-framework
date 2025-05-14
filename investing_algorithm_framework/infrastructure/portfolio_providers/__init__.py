@@ -1,5 +1,6 @@
 from .ccxt_portfolio_provider import CCXTPortfolioProvider
 
+
 def get_default_portfolio_providers():
     """
     Function to get the default portfolio providers.

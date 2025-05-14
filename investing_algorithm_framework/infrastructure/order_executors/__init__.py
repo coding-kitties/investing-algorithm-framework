@@ -1,5 +1,6 @@
 from .ccxt_order_executor import CCXTOrderExecutor
 
+
 def get_default_order_executors():
     """
     Function to get the default order executors.
@@ -10,6 +11,7 @@ def get_default_order_executors():
     return [
         CCXTOrderExecutor(),
     ]
+
 
 __all__ = [
     'CCXTOrderExecutor',

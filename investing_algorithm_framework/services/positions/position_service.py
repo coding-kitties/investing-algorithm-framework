@@ -1,12 +1,11 @@
 import logging
 
-from investing_algorithm_framework.domain import MarketService, OrderStatus, \
-    OrderSide
 from investing_algorithm_framework.services.repository_service import \
     RepositoryService
 
 
 logger = logging.getLogger("investing_algorithm_framework")
+
 
 class PositionService(RepositoryService):
 
@@ -137,7 +136,6 @@ class PositionService(RepositoryService):
         """
         position = self.get(order.position_id)
         portfolio = self.portfolio_repository.get(position.portfolio_id)
-        size = order.get_size()
         filled = order.get_filled()
         filled_size = filled * order.get_price()
 
@@ -169,7 +167,8 @@ class PositionService(RepositoryService):
             self.update(
                 trading_symbol_position.id,
                 {
-                    "amount": trading_symbol_position.get_amount() + filled_size
+                    "amount":
+                        trading_symbol_position.get_amount() + filled_size
                 }
             )
 
@@ -195,7 +194,8 @@ class PositionService(RepositoryService):
         filled_size = filled_amount * order.get_price()
 
         logger.info(
-            f"Syncing trading symbol position {portfolio.get_trading_symbol()} "
+            "Syncing trading symbol position "
+            f"{portfolio.get_trading_symbol()} "
             f"with filled sell "
             f"order {order.get_id()} with filled size "
             f"{filled_size} {portfolio.get_trading_symbol()}"

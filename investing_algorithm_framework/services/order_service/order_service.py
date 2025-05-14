@@ -5,8 +5,7 @@ from typing import List
 from dateutil.tz import tzutc
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
-    OperationalException, OrderStatus, Order, OrderExecutor, random_number, \
-    random_string
+    OperationalException, OrderStatus, Order, OrderExecutor, random_number
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
@@ -566,7 +565,7 @@ class OrderService(RepositoryService):
         """
         logger.info("Syncing portfolio with filled buy order")
         filled_difference = current_order.get_filled() - \
-                            previous_order.get_filled()
+            previous_order.get_filled()
         filled_size = filled_difference * current_order.get_price()
 
         if filled_difference <= 0:
@@ -607,7 +606,7 @@ class OrderService(RepositoryService):
             None
         """
         filled_difference = current_order.get_filled() - \
-                            previous_order.get_filled()
+            previous_order.get_filled()
         filled_size = filled_difference * current_order.get_price()
 
         if filled_difference <= 0:
