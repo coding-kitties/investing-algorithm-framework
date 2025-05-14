@@ -25,23 +25,23 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
     buy order can be closed by multiple sell orders.
 
     Attributes:
-    * orders: str, the id of the buy order
-    * target_symbol: str, the target symbol of the trade
-    * trading_symbol: str, the trading symbol of the trade
-    * closed_at: datetime, the datetime when the trade was closed
-    * remaining: float, the remaining amount of the trade
-    * net_gain: float, the net gain of the trade
-    * last_reported_price: float, the last reported price of the trade
-    * last_reported_price_datetime: datetime, the datetime when the last
-        reported price was reported
-    * high_water_mark: float, the high water mark of the trade
-    * high_water_mark_datetime: datetime, the datetime when the high water
-        mark was reported
-    * created_at: datetime, the datetime when the trade was created
-    * updated_at: datetime, the datetime when the trade was last updated
-    * status: str, the status of the trade
-    * stop_loss_percentage: float, the stop loss percentage of the trade
-    * trailing_stop_loss_percentage: float, the trailing stop loss percentage
+    orders: str, the id of the buy order
+        target_symbol: str, the target symbol of the trade
+        trading_symbol: str, the trading symbol of the trade
+        closed_at: datetime, the datetime when the trade was closed
+        amount: float, the amount of the trade
+        available_amount: float, the available amount of the trade
+        remaining: float, the remaining amount that is not filled by the
+            buy order that opened the trade.
+        filled_amount: float, the filled amount of the trade by the buy
+            order that opened the trade.
+        net_gain: float, the net gain of the trade
+        last_reported_price: float, the last reported price of the trade
+        last_reported_price_datetime: datetime, the datetime when the last
+            reported price was reported
+        created_at: datetime, the datetime when the trade was created
+        updated_at: datetime, the datetime when the trade was last updated
+        status: str, the status of the trade
     """
 
     __tablename__ = "trades"
@@ -58,6 +58,7 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
     opened_at = Column(DateTime, default=None)
     open_price = Column(Float, default=None)
     amount = Column(Float, default=None)
+    available_amount = Column(Float, default=None)
     filled_amount = Column(Float, default=None)
     remaining = Column(Float, default=None)
     net_gain = Column(Float, default=0)
@@ -88,6 +89,7 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         trading_symbol,
         opened_at,
         amount,
+        available_amount,
         filled_amount,
         remaining,
         status=TradeStatus.CREATED.value,
@@ -109,6 +111,7 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         self.trading_symbol = trading_symbol
         self.closed_at = closed_at
         self.amount = amount
+        self.available_amount = available_amount
         self.filled_amount = filled_amount
         self.remaining = remaining
         self.net_gain = net_gain

@@ -56,7 +56,7 @@ class TradeTakeProfit(BaseModel):
         sell_percentage: float = 100,
         active: bool = True,
         sell_prices: str = None,
-        sell_price_dates: str = None,
+        sell_dates: str = None,
         high_water_mark_date: str = None,
     ):
         self.trade_id = trade_id
@@ -72,7 +72,7 @@ class TradeTakeProfit(BaseModel):
         self.sold_amount = 0
         self.active = active
         self.sell_prices = sell_prices
-        self.sell_price_dates = sell_price_dates
+        self.sell_dates = sell_dates
 
     def update_with_last_reported_price(self, current_price: float, date):
         """
@@ -158,7 +158,7 @@ class TradeTakeProfit(BaseModel):
             if current_price < self.take_profit_price:
                 return True
 
-            # Increase the high water mark and take profit price
+            # Increase the high watermark and take profit price
             elif current_price > self.high_water_mark:
                 self.high_water_mark = current_price
                 new_take_profit_price = self.high_water_mark * \
@@ -178,7 +178,7 @@ class TradeTakeProfit(BaseModel):
         sell percentage and the remaining amount of the trade.
         Keep in mind the moment the take profit triggers, the remaining
             amount of the trade is used to calculate the sell amount.
-        If the remaining amount is smaller then the trade amount, the
+        If the remaining amount is smaller than the trade amount, the
             trade stop loss stays active. The client that uses the
             trade stop loss is responsible for setting the trade stop
             loss to inactive.
@@ -192,6 +192,61 @@ class TradeTakeProfit(BaseModel):
             return 0
 
         return self.sell_amount - self.sold_amount
+
+    def add_sell_price(self, price: float, date: str):
+        """
+        Function to add a sell price to the list of sell prices.
+        The sell price is added to the list of sell prices and the
+        date is added to the list of sell dates.
+
+        Args:
+            price: float - the price at which the trade was sold
+            date: str - the date at which the trade was sold
+
+        Returns:
+            None
+        """
+        if self.sell_prices is None:
+            self.sell_prices = str(price)
+            self.sell_dates = str(date)
+        else:
+            self.sell_prices += f", {price}"
+            self.sell_dates += f", {date}"
+
+    def remove_sell_price(self, price: float, date: str):
+        """
+        Function to remove a sell price from the list of sell prices.
+        The sell price is removed from the list of sell prices and the
+        date is removed from the list of sell dates.
+
+        Args:
+            price: float - the price at which the trade was sold
+            date: str - the date at which the trade was sold
+
+        Returns:
+            None
+        """
+        if self.sell_prices is not None:
+
+            # Split the sell prices into a list and convert to float
+            sell_prices_list = self.sell_prices.split(", ")
+            sell_prices_list = [float(p) for p in sell_prices_list]
+
+            if price in sell_prices_list:
+                sell_prices_list.remove(price)
+                self.sell_prices = ", ".join(sell_prices_list)
+
+            if self.sell_prices == "":
+                self.sell_prices = None
+
+            # Split the sell dates into a list
+            sell_dates_list = self.sell_dates.split(", ")
+            if date in sell_dates_list:
+                sell_dates_list.remove(date)
+                self.sell_dates = ", ".join(sell_dates_list)
+        else:
+            self.sell_prices = None
+            self.sell_dates = None
 
     def to_dict(self, datetime_format=None):
         return {

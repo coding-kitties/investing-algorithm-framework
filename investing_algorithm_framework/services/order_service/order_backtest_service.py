@@ -17,7 +17,7 @@ class OrderBacktestService(OrderService):
         self,
         order_repository,
         trade_service,
-        position_repository,
+        position_service,
         portfolio_repository,
         portfolio_configuration_service,
         portfolio_snapshot_service,
@@ -27,7 +27,7 @@ class OrderBacktestService(OrderService):
         super(OrderService, self).__init__(order_repository)
         self.trade_service = trade_service
         self.order_repository = order_repository
-        self.position_repository = position_repository
+        self.position_service = position_service
         self.portfolio_repository = portfolio_repository
         self.portfolio_configuration_service = portfolio_configuration_service
         self.portfolio_snapshot_service = portfolio_snapshot_service
@@ -58,17 +58,13 @@ class OrderBacktestService(OrderService):
         return super(OrderBacktestService, self)\
             .create(data, execute, validate, sync)
 
-    def execute_order(self, order_id, portfolio):
-        order = self.get(order_id)
-        order = self.update(
-            order_id,
-            {
-                "status": OrderStatus.OPEN.value,
-                "remaining": order.remaining,
-                "updated_at": self.configuration_service
-                .config[BACKTESTING_INDEX_DATETIME]
-            }
-        )
+    def execute_order(self, order, portfolio):
+        order.status = OrderStatus.OPEN.value
+        order.remaining = order.get_amount()
+        order.filled = 0
+        order.updated_at = self.configuration_service.config[
+            BACKTESTING_INDEX_DATETIME
+        ]
         return order
 
     def check_pending_orders(self, market_data):

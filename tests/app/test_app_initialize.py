@@ -3,8 +3,8 @@ from unittest import TestCase
 
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
     MarketCredential, Algorithm, AppMode, APP_MODE, RESOURCE_DIRECTORY
-from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI
-from tests.resources import MarketServiceStub
+from tests.resources import MarketServiceStub, PortfolioProviderTest, \
+    OrderExecutorTest
 
 
 class TestAppInitialize(TestCase):
@@ -43,6 +43,8 @@ class TestAppInitialize(TestCase):
         app = create_app(
             config={RESOURCE_DIRECTORY: self.resource_dir}
         )
+        app.add_portfolio_provider(PortfolioProviderTest)
+        app.add_order_executor(OrderExecutorTest)
         app.container.market_service.override(
             MarketServiceStub(app.container.market_credential_service())
         )
@@ -74,6 +76,8 @@ class TestAppInitialize(TestCase):
             config={RESOURCE_DIRECTORY: self.resource_dir},
             web=True
         )
+        app.add_portfolio_provider(PortfolioProviderTest)
+        app.add_order_executor(OrderExecutorTest)
         app.container.market_service.override(MarketServiceStub(None))
         app.add_portfolio_configuration(
             PortfolioConfiguration(

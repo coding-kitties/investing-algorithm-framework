@@ -309,4 +309,3 @@ def command(path=None, app_type="default", replace=False):
         os.path.join(path, "README.md"),
         replace=replace
     )
-    print("App initialized successfully.")

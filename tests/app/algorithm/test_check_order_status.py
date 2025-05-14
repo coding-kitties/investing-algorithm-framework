@@ -41,4 +41,4 @@ class Test(TestBase):
         order = order_repository.find({"target_symbol": "BTC"})
         self.assertEqual(OrderStatus.CLOSED.value, order.status)
         position = position_repository.find({"symbol": "BTC"})
-        self.assertEqual(Decimal(1), position.get_amount())
+        self.assertEqual(1, position.get_amount())

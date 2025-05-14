@@ -1,10 +1,12 @@
 import logging
 from datetime import datetime
+from typing import List
 
 from dateutil.tz import tzutc
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
-    OperationalException, OrderStatus, MarketService, Order
+    OperationalException, OrderStatus, Order, OrderExecutor, random_number, \
+    random_string
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
@@ -12,29 +14,81 @@ logger = logging.getLogger("investing_algorithm_framework")
 
 
 class OrderService(RepositoryService):
+    """
+    Service to manage orders. This service will use the provided
+    order executors to execute the orders. The order service is
+    responsible for creating, updating, canceling and deleting orders.
+
+    Attributes:
+        configuration_service (ConfigurationService): The service
+            responsible for managing configurations.
+        order_repository (OrderRepository): The repository
+            responsible for managing orders.
+        position_service (PositionService): The service
+            responsible for managing positions.
+        portfolio_repository (PortfolioRepository): The repository
+            responsible for managing portfolios.
+        portfolio_configuration_service (PortfolioConfigurationService):
+            service responsible for managing portfolio configurations.
+        portfolio_snapshot_service (PortfolioSnapshotService):
+            service responsible for managing portfolio snapshots.
+        market_credential_service (MarketCredentialService):
+            service responsible for managing market credentials.
+        trade_service (TradeService): The service responsible for
+            managing trades.
+    """
 
     def __init__(
         self,
         configuration_service,
         order_repository,
-        market_service: MarketService,
-        position_repository,
+        position_service,
         portfolio_repository,
         portfolio_configuration_service,
         portfolio_snapshot_service,
         market_credential_service,
         trade_service,
+        order_executor_lookup,
+        portfolio_provider_lookup
     ):
         super(OrderService, self).__init__(order_repository)
         self.configuration_service = configuration_service
         self.order_repository = order_repository
-        self.market_service: MarketService = market_service
-        self.position_repository = position_repository
+        self.position_service = position_service
         self.portfolio_repository = portfolio_repository
         self.portfolio_configuration_service = portfolio_configuration_service
         self.portfolio_snapshot_service = portfolio_snapshot_service
         self.market_credential_service = market_credential_service
         self.trade_service = trade_service
+        self._order_executors = None
+        self._order_executor_lookup = order_executor_lookup
+        self._portfolio_provider_lookup = portfolio_provider_lookup
+
+    @property
+    def order_executors(self) -> List[OrderExecutor]:
+        """
+        Returns the order executors for the order service.
+        """
+        return self._order_executors
+
+    @order_executors.setter
+    def order_executors(self, value) -> None:
+        """
+        Sets the order executors for the order service.
+        """
+        self._order_executors = value
+
+    def get_order_executor(self, market) -> OrderExecutor:
+        """
+        Returns the order executor for the given market.
+
+        Args:
+            market (str): The market for which to get the order executor.
+
+        Returns:
+            OrderExecutor: The order executor for the given market.
+        """
+        return self._order_executor_lookup.get_order_executor(market)
 
     def create(self, data, execute=True, validate=True, sync=True) -> Order:
         """
@@ -113,9 +167,6 @@ class OrderService(RepositoryService):
         trades = data.get("trades", [])
         stop_losses = data.get("stop_losses", [])
         take_profits = data.get("take_profits", [])
-        filled = data.get("filled", 0)
-        remaining = data.get("remaining", 0)
-        amount = data.get("amount", 0)
 
         if "filled" in data:
             del data["filled"]
@@ -137,22 +188,25 @@ class OrderService(RepositoryService):
 
         del data["portfolio_id"]
         symbol = data["target_symbol"]
+        data["id"] = self._create_order_id()
+
+        order = self.repository.create(data, save=False)
 
         if validate:
             self.validate_order(data, portfolio)
 
-        # Get the position
+        if execute:
+            order = self.execute_order(order, portfolio)
+
         position = self._create_position_if_not_exists(symbol, portfolio)
-        data["position_id"] = position.id
-        data["remaining"] = data["amount"]
-        data["status"] = OrderStatus.CREATED.value
-        order = self.order_repository.create(data)
+        order.position_id = position.id
+        order = self.order_repository.save(order)
         order_id = order.id
         created_at = order.created_at
         order_side = order.order_side
 
         if OrderSide.SELL.equals(order_side):
-            # Create order metadata if their is a key in the data
+            # Create order metadata if there is a key in the data
             # for trades, stop_losses or take_profits
             self.trade_service.create_order_metadata_with_trade_context(
                 sell_order=order,
@@ -171,36 +225,6 @@ class OrderService(RepositoryService):
                 self._sync_portfolio_with_created_sell_order(order)
 
         self.create_snapshot(portfolio.id, created_at=created_at)
-
-        if sync:
-
-            if filled or remaining:
-
-                if filled == 0:
-                    filled = amount - remaining
-
-                if remaining == 0:
-                    remaining = amount - filled
-
-                status = OrderStatus.OPEN.value
-
-                if filled == amount:
-                    status = OrderStatus.CLOSED.value
-
-                order = self.update(
-                    order_id,
-                    {
-                        "filled": filled,
-                        "remaining": remaining,
-                        "status": status
-                    }
-                )
-
-        if execute:
-            portfolio.configuration = self.portfolio_configuration_service\
-                .get(portfolio.identifier)
-            self.execute_order(order_id, portfolio)
-
         order = self.get(order_id)
         return order
 
@@ -218,6 +242,7 @@ class OrderService(RepositoryService):
             data: dict - the data to update the order with
               the following format:
                 {
+                    "amount": float,
                     "filled" (optional): float,
                     "remaining" (optional): float,
                     "status" (optional): str,
@@ -227,20 +252,13 @@ class OrderService(RepositoryService):
             Order: Order object that has been updated
         """
         previous_order = self.order_repository.get(object_id)
-        trading_symbol_position = self.position_repository.find(
-            {
-                "id": previous_order.position_id,
-                "symbol": previous_order.trading_symbol
-            }
-        )
-        portfolio = self.portfolio_repository.get(
-            trading_symbol_position.portfolio_id
-        )
+        position = self.position_service.get(previous_order.position_id)
+        portfolio = self.portfolio_repository.get(position.portfolio_id)
         new_order = self.order_repository.update(object_id, data)
         filled_difference = new_order.get_filled() \
             - previous_order.get_filled()
 
-        if filled_difference:
+        if filled_difference > 0:
             if OrderSide.BUY.equals(new_order.get_order_side()):
                 self._sync_with_buy_order_filled(previous_order, new_order)
             else:
@@ -276,57 +294,39 @@ class OrderService(RepositoryService):
         self.create_snapshot(portfolio.id, created_at=created_at)
         return new_order
 
-    def execute_order(self, order_id, portfolio):
-        order = self.get(order_id)
+    def execute_order(self, order, portfolio) -> Order:
+        """
+        Function to execute an order. The function will execute the order
+        with a matching order executor. The function will also update
+        the order attributes with the external order attributes.
 
-        try:
-            if OrderType.LIMIT.equals(order.get_order_type()):
+        Args:
+            order: Order object representing the order to be executed
+            portfolio: Portfolio object representing the portfolio in which
 
-                if OrderSide.BUY.equals(order.get_order_side()):
-                    external_order = self.market_service\
-                        .create_limit_buy_order(
-                            target_symbol=order.get_target_symbol(),
-                            trading_symbol=order.get_trading_symbol(),
-                            amount=order.get_amount(),
-                            price=order.get_price(),
-                            market=portfolio.get_market()
-                        )
-                else:
-                    external_order = self.market_service\
-                        .create_limit_sell_order(
-                            target_symbol=order.get_target_symbol(),
-                            trading_symbol=order.get_trading_symbol(),
-                            amount=order.get_amount(),
-                            price=order.get_price(),
-                            market=portfolio.get_market()
-                        )
-            else:
-                if OrderSide.BUY.equals(order.get_order_side()):
-                    raise OperationalException(
-                        "Market buy order not supported"
-                    )
-                else:
-                    external_order = self.market_service\
-                        .create_market_sell_order(
-                            target_symbol=order.get_target_symbol(),
-                            trading_symbol=order.get_trading_symbol(),
-                            amount=order.get_amount(),
-                            market=portfolio.get_market()
-                        )
+        Returns:
+            order: Order object representing the executed order
+        """
+        logger.info(
+            f"Executing order {order.get_symbol()} with "
+            f"amount {order.get_amount()} "
+            f"and price {order.get_price()}"
+        )
 
-            data = external_order.to_dict()
-            data["status"] = OrderStatus.OPEN.value
-            data["updated_at"] = datetime.now(tz=tzutc())
-            return self.update(order_id, data)
-        except Exception as e:
-            logger.error("Error executing order: {}".format(e))
-            return self.update(
-                order_id,
-                {
-                    "status": OrderStatus.REJECTED.value,
-                    "updated_at": datetime.now(tz=tzutc())
-                }
-            )
+        order_executor = self.get_order_executor(portfolio.market)
+        market_credential = self.market_credential_service.get(
+            portfolio.market
+        )
+        external_order = order_executor.execute_order(
+            portfolio, order, market_credential
+        )
+        logger.info(f"Executed order: {external_order.to_dict()}")
+        order.set_external_id(external_order.get_external_id())
+        order.set_status(external_order.get_status())
+        order.set_filled(external_order.get_filled())
+        order.set_remaining(external_order.get_remaining())
+        order.updated_at = datetime.now(tz=tzutc())
+        return order
 
     def validate_order(self, order_data, portfolio):
 
@@ -338,10 +338,13 @@ class OrderService(RepositoryService):
         if OrderType.LIMIT.equals(order_data["order_type"]):
             self.validate_limit_order(order_data, portfolio)
         else:
-            self.validate_market_order(order_data, portfolio)
+            raise OperationalException(
+                f"Order type {order_data['order_type']} is not supported"
+            )
 
     def validate_sell_order(self, order_data, portfolio):
-        if not self.position_repository.exists(
+
+        if not self.position_service.exists(
             {
                 "symbol": order_data["target_symbol"],
                 "portfolio": portfolio.id
@@ -351,7 +354,7 @@ class OrderService(RepositoryService):
                 "Can't add sell order to non existing position"
             )
 
-        position = self.position_repository\
+        position = self.position_service\
             .find(
                 {
                     "symbol": order_data["target_symbol"],
@@ -386,13 +389,20 @@ class OrderService(RepositoryService):
 
         if OrderSide.SELL.equals(order_data["order_side"]):
             amount = order_data["amount"]
-            position = self.position_repository\
+            position = self.position_service\
                 .find(
                     {
                         "portfolio": portfolio.id,
                         "symbol": order_data["target_symbol"]
                     }
                 )
+
+            if amount <= 0:
+                raise OperationalException(
+                    f"Order amount: {amount} {position.symbol}, is "
+                    f"less or equal to 0"
+                )
+
             if amount > position.get_amount():
                 raise OperationalException(
                     f"Order amount: {amount} {position.symbol}, is "
@@ -401,7 +411,7 @@ class OrderService(RepositoryService):
                 )
         else:
             total_price = order_data["amount"] * order_data["price"]
-            unallocated_position = self.position_repository\
+            unallocated_position = self.position_service\
                 .find(
                     {
                         "portfolio": portfolio.id,
@@ -425,48 +435,10 @@ class OrderService(RepositoryService):
                     f"{portfolio.trading_symbol} of the portfolio"
                 )
 
-    def validate_market_order(self, order_data, portfolio):
-
-        if OrderSide.BUY.equals(order_data["order_side"]):
-
-            if "amount" not in order_data:
-                raise OperationalException(
-                    f"Market order needs an amount specified in the trading "
-                    f"symbol {order_data['trading_symbol']}"
-                )
-
-            if order_data['amount'] > portfolio.unallocated:
-                raise OperationalException(
-                    f"Market order amount "
-                    f"{order_data['amount']}"
-                    f"{portfolio.trading_symbol.upper()} is larger then "
-                    f"unallocated {portfolio.unallocated} "
-                    f"{portfolio.trading_symbol.upper()}"
-                )
-        else:
-            position = self.position_repository\
-                .find(
-                    {
-                        "symbol": order_data["target_symbol"],
-                        "portfolio": portfolio.id
-                    }
-                )
-
-            if position is None:
-                raise OperationalException(
-                    "Can't add market sell order to non existing position"
-                )
-
-            if order_data['amount'] > position.get_amount():
-                raise OperationalException(
-                    "Sell order amount larger then position size"
-                )
-
     def check_pending_orders(self, portfolio=None):
         """
         Function to check if
         """
-
         if portfolio is not None:
             pending_orders = self.get_all(
                 {
@@ -478,70 +450,90 @@ class OrderService(RepositoryService):
             pending_orders = self.get_all({"status": OrderStatus.OPEN.value})
 
         for order in pending_orders:
-            position = self.position_repository.get(order.position_id)
+            position = self.position_service.get(order.position_id)
             portfolio = self.portfolio_repository.get(position.portfolio_id)
-            external_order = self.market_service\
-                .get_order(order, market=portfolio.get_market())
+            portfolio_provider = self._portfolio_provider_lookup\
+                .get_portfolio_provider(portfolio.market)
+            market_credential = self.market_credential_service.get(
+                portfolio.market
+            )
+            logger.info(
+                f"Checking {order.get_order_side()} order {order.get_id()} "
+                f"with external id: {order.get_external_id()} "
+                f"at market {portfolio.market}"
+            )
+            external_order = portfolio_provider.get_order(
+                portfolio, order, market_credential
+            )
             self.update(order.id, external_order.to_dict())
 
     def _create_position_if_not_exists(self, symbol, portfolio):
-        if not self.position_repository.exists(
+        if not self.position_service.exists(
             {"portfolio": portfolio.id, "symbol": symbol}
         ):
-            self.position_repository \
+            self.position_service \
                 .create({"portfolio_id": portfolio.id, "symbol": symbol})
-            position = self.position_repository \
+            position = self.position_service \
                 .find({"portfolio": portfolio.id, "symbol": symbol})
         else:
-            position = self.position_repository \
+            position = self.position_service \
                 .find({"portfolio": portfolio.id, "symbol": symbol})
 
         return position
 
     def _sync_portfolio_with_created_buy_order(self, order):
-        position = self.position_repository.get(order.position_id)
+        """
+        Function to sync the portfolio and positions with a created buy order.
+
+        Args:
+            order: the order object representing the buy order
+
+        Returns:
+            None
+        """
+        self.position_service.update_positions_with_created_buy_order(
+            order
+        )
+        position = self.position_service.get(order.position_id)
         portfolio = self.portfolio_repository.get(position.portfolio_id)
-        size = order.get_amount() * order.get_price()
-        trading_symbol_position = self.position_repository.find(
-            {
-                "portfolio": portfolio.id,
-                "symbol": portfolio.trading_symbol
-            }
-        )
-        portfolio = self.portfolio_repository.update(
+        size = order.get_size()
+        self.portfolio_repository.update(
             portfolio.id, {"unallocated": portfolio.get_unallocated() - size}
-        )
-        position = self.position_repository.update(
-            trading_symbol_position.id,
-            {
-                "amount": trading_symbol_position.get_amount() - size
-            }
         )
 
     def _sync_portfolio_with_created_sell_order(self, order):
         """
         Function to sync the portfolio with a created sell order. The
         function will subtract the amount of the order from the position and
-        the trade amount.
+        the trade amount. If the sell order is already filled, then
+        the function will also update the portfolio and the
+        trading symbol position.
 
         The portfolio will not be updated because the sell order has not been
         filled.
 
         Args:
             order: Order object representing the sell order
-            stop_loss_ids: List of stop loss order ids
-            take_profit_ids: List of take profit order ids
 
         Returns:
             None
         """
-        position = self.position_repository.get(order.position_id)
-        self.position_repository.update(
-            position.id,
-            {
-                "amount": position.get_amount() - order.get_amount()
-            }
+        self.position_service.update_positions_with_created_sell_order(
+            order
         )
+
+        filled = order.get_filled()
+
+        if filled > 0:
+            position = self.position_service.get(order.position_id)
+            portfolio = self.portfolio_repository.get(position.portfolio_id)
+            size = filled * order.get_price()
+            self.portfolio_repository.update(
+                portfolio.id,
+                {
+                    "unallocated": portfolio.get_unallocated() + size
+                }
+            )
 
     def cancel_order(self, order):
         self.check_pending_orders()
@@ -552,11 +544,27 @@ class OrderService(RepositoryService):
             if OrderStatus.OPEN.equals(order.status):
                 portfolio = self.portfolio_repository\
                     .find({"position": order.position_id})
-                self.market_service.cancel_order(
-                    order, market=portfolio.get_market()
+                market_credential = self.market_credential_service.get(
+                    portfolio.market
                 )
+                order_executor = self.get_order_executor(portfolio.market)
+                order = order_executor\
+                    .cancel_order(portfolio, order, market_credential)
+                self.update(order.id, order.to_dict())
 
     def _sync_with_buy_order_filled(self, previous_order, current_order):
+        """
+        Function to sync the portfolio, position and trades with the
+        filled buy order.
+
+        Args:
+            previous_order: the previous order object
+            current_order:  the current order object
+
+        Returns:
+            None
+        """
+        logger.info("Syncing portfolio with filled buy order")
         filled_difference = current_order.get_filled() - \
                             previous_order.get_filled()
         filled_size = filled_difference * current_order.get_price()
@@ -564,16 +572,10 @@ class OrderService(RepositoryService):
         if filled_difference <= 0:
             return
 
-        # Update position
-        position = self.position_repository.get(current_order.position_id)
-
-        self.position_repository.update(
-            position.id,
-            {
-                "amount": position.get_amount() + filled_difference,
-                "cost": position.get_cost() + filled_size,
-            }
+        self.position_service.update_positions_with_buy_order_filled(
+            current_order, filled_difference
         )
+        position = self.position_service.get(current_order.position_id)
 
         # Update portfolio
         portfolio = self.portfolio_repository.get(position.portfolio_id)
@@ -591,6 +593,19 @@ class OrderService(RepositoryService):
         )
 
     def _sync_with_sell_order_filled(self, previous_order, current_order):
+        """
+        Function to sync the portfolio, position and trades with the
+        filled sell order. The function will update the portfolio and
+        position with the filled amount of the order. The function will
+        also update the trades with the filled amount of the order.
+
+        Args:
+            previous_order: Order object representing the previous order
+            current_order: Order object representing the current order
+
+        Returns:
+            None
+        """
         filled_difference = current_order.get_filled() - \
                             previous_order.get_filled()
         filled_size = filled_difference * current_order.get_price()
@@ -598,8 +613,14 @@ class OrderService(RepositoryService):
         if filled_difference <= 0:
             return
 
+        logger.info(
+            f"Syncing portfolio with filled sell "
+            f"order {current_order.get_id()} with filled amount "
+            f"{filled_difference}"
+        )
+
         # Get position
-        position = self.position_repository.get(current_order.position_id)
+        position = self.position_service.get(current_order.position_id)
 
         # Update the portfolio
         portfolio = self.portfolio_repository.get(position.portfolio_id)
@@ -613,19 +634,31 @@ class OrderService(RepositoryService):
         )
 
         # Update the trading symbol position
-        trading_symbol_position = self.position_repository.find(
+        trading_symbol_position = self.position_service.find(
             {
                 "symbol": portfolio.trading_symbol,
                 "portfolio": portfolio.id
             }
         )
-        self.position_repository.update(
+        self.position_service.update(
             trading_symbol_position.id,
             {
                 "amount":
                     trading_symbol_position.get_amount() + filled_size
             }
         )
+
+        # Update the position if the amount has changed
+        if current_order.amount != previous_order.amount:
+            difference = current_order.amount - previous_order.amount
+            cost = difference * current_order.get_price()
+            self.position_service.update(
+                position.id,
+                {
+                    "amount": position.get_amount() - difference,
+                    "cost": position.get_cost() - cost
+                }
+            )
 
         self.trade_service.update_trade_with_filled_sell_order(
             filled_difference, current_order
@@ -649,13 +682,13 @@ class OrderService(RepositoryService):
         )
 
         # Add the remaining amount to the trading symbol position
-        trading_symbol_position = self.position_repository.find(
+        trading_symbol_position = self.position_service.find(
             {
                 "symbol": portfolio.trading_symbol,
                 "portfolio": portfolio.id
             }
         )
-        self.position_repository.update(
+        self.position_service.update(
             trading_symbol_position.id,
             {
                 "amount": trading_symbol_position.get_amount() + remaining
@@ -666,8 +699,8 @@ class OrderService(RepositoryService):
         remaining = order.get_amount() - order.get_filled()
 
         # Add the remaining back to the position
-        position = self.position_repository.get(order.position_id)
-        self.position_repository.update(
+        position = self.position_service.get(order.position_id)
+        self.position_service.update(
             position.id,
             {
                 "amount": position.get_amount() + remaining
@@ -693,13 +726,13 @@ class OrderService(RepositoryService):
         )
 
         # Add the remaining amount to the trading symbol position
-        trading_symbol_position = self.position_repository.find(
+        trading_symbol_position = self.position_service.find(
             {
                 "symbol": portfolio.trading_symbol,
                 "portfolio": portfolio.id
             }
         )
-        self.position_repository.update(
+        self.position_service.update(
             trading_symbol_position.id,
             {
                 "amount": trading_symbol_position.get_amount() + remaining
@@ -710,8 +743,8 @@ class OrderService(RepositoryService):
         remaining = order.get_amount() - order.get_filled()
 
         # Add the remaining back to the position
-        position = self.position_repository.get(order.position_id)
-        self.position_repository.update(
+        position = self.position_service.get(order.position_id)
+        self.position_service.update(
             position.id,
             {
                 "amount": position.get_amount() + remaining
@@ -738,13 +771,13 @@ class OrderService(RepositoryService):
         )
 
         # Add the remaining amount to the trading symbol position
-        trading_symbol_position = self.position_repository.find(
+        trading_symbol_position = self.position_service.find(
             {
                 "symbol": portfolio.trading_symbol,
                 "portfolio": portfolio.id
             }
         )
-        self.position_repository.update(
+        self.position_service.update(
             trading_symbol_position.id,
             {
                 "amount": trading_symbol_position.get_amount() + remaining
@@ -755,8 +788,8 @@ class OrderService(RepositoryService):
         remaining = order.get_amount() - order.get_filled()
 
         # Add the remaining back to the position
-        position = self.position_repository.get(order.position_id)
-        self.position_repository.update(
+        position = self.position_service.get(order.position_id)
+        self.position_service.update(
             position.id,
             {
                 "amount": position.get_amount() + remaining
@@ -783,13 +816,13 @@ class OrderService(RepositoryService):
         )
 
         # Add the remaining amount to the trading symbol position
-        trading_symbol_position = self.position_repository.find(
+        trading_symbol_position = self.position_service.find(
             {
                 "symbol": portfolio.trading_symbol,
                 "portfolio": portfolio.id
             }
         )
-        self.position_repository.update(
+        self.position_service.update(
             trading_symbol_position.id,
             {
                 "amount": trading_symbol_position.get_amount() + remaining
@@ -800,8 +833,8 @@ class OrderService(RepositoryService):
         remaining = order.get_amount() - order.get_filled()
 
         # Add the remaining back to the position
-        position = self.position_repository.get(order.position_id)
-        self.position_repository.update(
+        position = self.position_service.get(order.position_id)
+        self.position_service.update(
             position.id,
             {
                 "amount": position.get_amount() + remaining
@@ -836,3 +869,23 @@ class OrderService(RepositoryService):
             created_orders=created_orders,
             created_at=created_at
         )
+
+    def _create_order_id(self):
+        """
+        Function to create a new order id. The function will
+        create a new order id and return it.
+
+        Returns:
+            int: The new order id
+        """
+
+        unique = False
+        order_id = None
+
+        while not unique:
+            order_id = random_number(12)
+
+            if not self.repository.exists({"id": order_id}):
+                unique = True
+
+        return order_id

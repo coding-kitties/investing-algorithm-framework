@@ -1,8 +1,8 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from investing_algorithm_framework.domain import OrderSide, OrderStatus, \
-    OperationalException, MarketService, MarketCredentialService, Portfolio, \
+    OperationalException, MarketCredentialService, Portfolio, \
     Environment, ENVIRONMENT
 from investing_algorithm_framework.services.configuration_service import \
     ConfigurationService
@@ -22,22 +22,22 @@ class PortfolioService(RepositoryService):
     def __init__(
         self,
         configuration_service: ConfigurationService,
-        market_service: MarketService,
         market_credential_service: MarketCredentialService,
         order_service,
-        portfolio_repository,
         portfolio_configuration_service,
         portfolio_snapshot_service,
-        position_service
+        position_service,
+        portfolio_repository,
+        portfolio_provider_lookup
     ):
+        super(PortfolioService, self).__init__(portfolio_repository)
         self.configuration_service = configuration_service
         self.market_credential_service = market_credential_service
-        self.market_service = market_service
         self.portfolio_configuration_service = portfolio_configuration_service
         self.order_service = order_service
         self.portfolio_snapshot_service = portfolio_snapshot_service
         self.position_service = position_service
-        super(PortfolioService, self).__init__(portfolio_repository)
+        self.portfolio_provider_lookup = portfolio_provider_lookup
 
     def find(self, query_params):
         portfolio = self.repository.find(query_params)
@@ -45,16 +45,6 @@ class PortfolioService(RepositoryService):
             .get(portfolio.identifier)
         portfolio.configuration = portfolio_configuration
         return portfolio
-
-    def get_all(self, query_params=None):
-        selection = super().get_all(query_params)
-
-        for portfolio in selection:
-            portfolio_configuration = self.portfolio_configuration_service\
-                .get(portfolio.identifier)
-            portfolio.configuration = portfolio_configuration
-
-        return selection
 
     def create(self, data):
         unallocated = data.get("unallocated", 0)
@@ -103,7 +93,7 @@ class PortfolioService(RepositoryService):
     def create_snapshot(self, portfolio_id, created_at=None):
 
         if created_at is None:
-            created_at = datetime.utcnow()
+            created_at = datetime.now(tz=timezone.utc)
 
         portfolio = self.get(portfolio_id)
         pending_orders = self.order_service.get_all(
@@ -174,3 +164,37 @@ class PortfolioService(RepositoryService):
             self.create(data)
 
         return portfolio
+
+    def update_portfolio_with_filled_order(self, order, filled_amount) -> None:
+        """
+        Function to update the portfolio with filled order.
+
+        Args:
+            order: Order object
+            filled_amount: float
+
+        Returns:
+            None
+        """
+        filled_size = filled_amount  * order.get_price()
+
+        if filled_size <= 0:
+            return
+
+        logger.info(
+            f"Syncing portfolio with filled sell "
+            f"order {order.get_id()} with filled amount "
+            f"{filled_amount}"
+        )
+
+        position = self.position_service.get(order.position_id)
+        portfolio = self.get(position.portfolio_id)
+
+        self.update(
+            portfolio.id,
+            {
+                "unallocated": portfolio.get_unallocated() + filled_size,
+                "total_trade_volume": portfolio.get_total_trade_volume()
+                                      + filled_size,
+            }
+        )

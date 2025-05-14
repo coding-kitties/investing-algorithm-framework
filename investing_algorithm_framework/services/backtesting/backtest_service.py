@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import re
 import os
 import inspect
@@ -362,7 +362,7 @@ class BacktestService:
                 backtest_date_range=backtest_date_range,
                 initial_unallocated=initial_unallocated,
                 trading_symbol=portfolio.trading_symbol,
-                created_at=datetime.utcnow(),
+                created_at=datetime.now(tz=timezone.utc)
             )
             backtest_report.number_of_runs = number_of_runs
             backtest_report.number_of_orders = self._order_service.count({

@@ -1,4 +1,5 @@
 from dateutil.parser import parse
+from numpy.ma.core import filled
 
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.order import OrderSide, Order
@@ -26,22 +27,23 @@ class Trade(BaseModel):
     buy order can be closed by multiple sell orders.
 
     Attributes:
-        id (int): the id of the trade
-        orders (List[Order]): the orders of the trade
-        target_symbol (str): the target symbol of the trade
-        trading_symbol (str): the trading symbol of the trade
-        closed_at (datetime): the datetime when the trade was closed
-        opened_at (datetime): the datetime when the trade was opened
-        open_price (float): the open price of the trade
-        amount (float): the amount of the trade
-        remaining (float): the remaining amount of the trade
-        net_gain (float): the net gain of the trade
-        last_reported_price (float): the last reported price of the trade
-        created_at (datetime): the datetime when the trade was created
-        updated_at (datetime): the datetime when the trade was last updated
-        status (str): the status of the trade
-        stop_losses (List[TradeStopLoss]): the stop losses of the trade
-        take_profits (List[TradeTakeProfit]): the take profits of the trade
+        orders: str, the id of the buy order
+        target_symbol: str, the target symbol of the trade
+        trading_symbol: str, the trading symbol of the trade
+        closed_at: datetime, the datetime when the trade was closed
+        amount: float, the amount of the trade
+        available_amount: float, the available amount of the trade
+        remaining: float, the remaining amount that is not filled by the
+            buy order that opened the trade.
+        filled_amount: float, the filled amount of the trade by the buy
+            order that opened the trade.
+        net_gain: float, the net gain of the trade
+        last_reported_price: float, the last reported price of the trade
+        last_reported_price_datetime: datetime, the datetime when the last
+            reported price was reported
+        created_at: datetime, the datetime when the trade was created
+        updated_at: datetime, the datetime when the trade was last updated
+        status: str, the status of the trade
     """
 
     def __init__(
@@ -54,8 +56,10 @@ class Trade(BaseModel):
         opened_at,
         open_price,
         amount,
+        available_amount,
         cost,
         remaining,
+        filled_amount,
         status,
         net_gain=0,
         last_reported_price=None,
@@ -74,8 +78,10 @@ class Trade(BaseModel):
         self.opened_at = opened_at
         self.open_price = open_price
         self.amount = amount
+        self.available_amount = available_amount
         self.cost = cost
         self.remaining = remaining
+        self.filled_amount = filled_amount
         self.net_gain = net_gain
         self.last_reported_price = last_reported_price
         self.last_reported_price_datetime = last_reported_price_datetime
@@ -397,6 +403,8 @@ class Trade(BaseModel):
             open_price=data["open_price"],
             opened_at=opened_at,
             closed_at=closed_at,
+            filled_amount=data.get("filled_amount", 0),
+            available_amount=data.get("available_amount", 0),
             remaining=data.get("remaining", 0),
             net_gain=data.get("net_gain", 0),
             last_reported_price=data.get("last_reported_price"),
@@ -414,6 +422,7 @@ class Trade(BaseModel):
             trading_symbol=self.trading_symbol,
             status=self.status,
             amount=self.amount,
+            available_amount=self.available_amount,
             filled_amount=self.filled_amount,
             remaining=self.remaining,
             open_price=self.open_price,

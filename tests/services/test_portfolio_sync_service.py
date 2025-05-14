@@ -69,15 +69,24 @@ class Test(TestBase):
                 secret_key="test"
             )
         )
-        self.market_service.balances = {"EUR": 0}
         self.app.add_algorithm(Algorithm())
+
+        portfolio_provider_lookup = \
+            self.app.container.portfolio_provider_lookup()
+        portfolio_provider_lookup\
+            .register_portfolio_provider_for_market(
+                "binance"
+            )
+        portfolio_provider = \
+            portfolio_provider_lookup.get_portfolio_provider("binance")
+        portfolio_provider.external_balances = {"EUR": 400}
 
         with self.assertRaises(OperationalException) as context:
             self.app.initialize_config()
             self.app.initialize()
 
         self.assertEqual(
-            "The initial balance of the portfolio configuration (1000.0 EUR) is more than the available balance on the exchange. Please make sure that the initial balance of the portfolio configuration is less than the available balance on the exchange 0.0 EUR.",
+            "The initial balance of the portfolio configuration (1000.0 EUR) is more than the available balance on the exchange. Please make sure that the initial balance of the portfolio configuration is less than the available balance on the exchange 400 EUR.",
             str(context.exception)
         )
 

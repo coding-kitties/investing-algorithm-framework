@@ -1,7 +1,7 @@
 from unittest import TestCase
 from polars import DataFrame
 from pandas import Timestamp
-from investing_algorithm_framework import convert_pandas_to_polars
+from investing_algorithm_framework import convert_polars_to_pandas
 
 class TestConvertPandasToPolars(TestCase):
     
@@ -11,9 +11,12 @@ class TestConvertPandasToPolars(TestCase):
             "Close": [1, 2, 3]
         })
 
-        polars_df_converted = convert_pandas_to_polars(polars_df)
-        self.assertEqual(polars_df_converted.shape, (3, 1))
-        self.assertEqual(polars_df_converted.columns, ["Close"])
+        polars_df_converted = convert_polars_to_pandas(polars_df)
+        self.assertEqual(polars_df_converted.shape, (3, 2))
+
+        # Check if the columns are as expected
+        column_names = polars_df_converted.columns.tolist()
+        self.assertEqual(column_names, ['Close', 'Datetime'])
 
         # Check if the index is a datetime object
         self.assertEqual(polars_df_converted.index.dtype, "datetime64[ns]") 

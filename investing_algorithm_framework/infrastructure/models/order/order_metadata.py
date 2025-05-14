@@ -36,3 +36,9 @@ class SQLOrderMetadata(SQLBaseModel, SQLAlchemyModelExtension):
         self.take_profit_id = take_profit_id
         self.amount = amount
         self.amount_pending = amount_pending
+
+    def __repr__(self):
+        return f"<SQLOrderMetadata(id={self.id}, order_id={self.order_id}, " \
+               f"trade_id={self.trade_id}, stop_loss_id={self.stop_loss_id}, "\
+               f"take_profit_id={self.take_profit_id}, amount={self.amount}, "\
+               f"amount_pending={self.amount_pending})>"

@@ -169,13 +169,13 @@ class Test(TestBase):
         )
         trade_one = self.app.context.get_trade(order_id=order_one_id)
         trade_two = self.app.context.get_trade(order_id=order_two_id)
-        self.assertEqual(2.5, trade_one.remaining)
-        self.assertEqual(5, trade_two.remaining)
+        self.assertEqual(2.5, trade_one.available_amount)
+        self.assertEqual(5, trade_two.available_amount)
         self.app.context.order_service.check_pending_orders()
         trade_one = self.app.context.get_trade(order_id=order_one_id)
         trade_two = self.app.context.get_trade(order_id=order_two_id)
-        self.assertEqual(2.5, trade_one.remaining)
-        self.assertEqual(5, trade_two.remaining)
+        self.assertEqual(2.5, trade_one.available_amount)
+        self.assertEqual(5, trade_two.available_amount)
         self.assertEqual(2, len(self.app.context.get_open_trades("BTC")))
         self.app.context.create_limit_order(
             target_symbol="BTC",
@@ -183,16 +183,18 @@ class Test(TestBase):
             order_side="SELL",
             amount=5
         )
+
         trades = self.app.context.get_open_trades()
         self.assertEqual(1, len(trades))
         trade_one = self.app.context.get_trade(order_id=order_one_id)
         trade_two = self.app.context.get_trade(order_id=order_two_id)
-        self.assertEqual(0, trade_one.remaining)
-        self.assertEqual(2.5, trade_two.remaining)
+        self.assertEqual(0, trade_one.available_amount)
+        self.assertEqual(2.5, trade_two.available_amount)
+
         self.app.context.order_service.check_pending_orders()
         trades = self.app.context.get_open_trades()
         self.assertEqual(1, len(trades))
         trade_one = self.app.context.get_trade(order_id=order_one_id)
         trade_two = self.app.context.get_trade(order_id=order_two_id)
-        self.assertEqual(0, trade_one.remaining)
-        self.assertEqual(2.5, trade_two.remaining)
+        self.assertEqual(0, trade_one.available_amount)
+        self.assertEqual(2.5, trade_two.available_amount)

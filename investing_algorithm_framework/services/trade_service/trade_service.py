@@ -1,11 +1,12 @@
 import logging
 from datetime import datetime, timezone
 from queue import PriorityQueue
+from typing import Union
 
 from investing_algorithm_framework.domain import OrderStatus, TradeStatus, \
-    Trade, OperationalException, TradeRiskType, PeekableQueue, OrderType, \
-    OrderSide, MarketDataType, Environment, ENVIRONMENT, \
-    BACKTESTING_INDEX_DATETIME
+    Trade, OperationalException, TradeRiskType, OrderType, \
+    OrderSide, MarketDataType, Environment, ENVIRONMENT, PeekableQueue, \
+    BACKTESTING_INDEX_DATETIME, random_number, random_string
 from investing_algorithm_framework.services.repository_service import \
     RepositoryService
 
@@ -42,7 +43,7 @@ class TradeService(RepositoryService):
         self.trade_take_profit_repository = trade_take_profit_repository
         self.order_metadata_repository = order_metadata_repository
 
-    def create_trade_from_buy_order(self, buy_order) -> Trade:
+    def create_trade_from_buy_order(self, buy_order) -> Union[Trade, None]:
         """
         Function to create a trade from a buy order. If the given buy
         order has its status set to CANCELED, EXPIRED, or REJECTED,
@@ -54,7 +55,7 @@ class TradeService(RepositoryService):
             buy_order: Order object representing the buy order
 
         Returns:
-            Trade object
+            Union[Trade, None] Representing the created trade object or None
         """
 
         if buy_order.status in \
@@ -69,14 +70,15 @@ class TradeService(RepositoryService):
             "buy_order": buy_order,
             "target_symbol": buy_order.target_symbol,
             "trading_symbol": buy_order.trading_symbol,
-            "amount": buy_order.amount,
-            "filled_amount": buy_order.filled,
-            "remaining": buy_order.filled,
+            "amount": buy_order.get_amount(),
+            "available_amount": buy_order.get_filled(),
+            "filled_amount": buy_order.get_filled(),
+            "remaining": buy_order.get_remaining(),
             "opened_at": buy_order.created_at,
-            "cost": buy_order.filled * buy_order.price
+            "cost": buy_order.get_filled() * buy_order.price
         }
 
-        if buy_order.filled > 0:
+        if buy_order.get_filled() > 0:
             data["status"] = TradeStatus.OPEN.value
             data["cost"] = buy_order.filled * buy_order.price
 
@@ -104,18 +106,18 @@ class TradeService(RepositoryService):
             "portfolio_id": portfolio_id
         })
         updated_at = sell_order.updated_at
+        total_available_to_close = 0
         amount_to_close = sell_order.amount
         trade_queue = PriorityQueue()
-        total_remaining = 0
         sell_order_id = sell_order.id
         sell_price = sell_order.price
 
         for trade in matching_trades:
-            if trade.remaining > 0:
-                total_remaining += trade.remaining
+            if trade.available_amount > 0:
+                total_available_to_close += trade.available_amount
                 trade_queue.put(trade)
 
-        if total_remaining < amount_to_close:
+        if total_available_to_close < amount_to_close:
             raise OperationalException(
                 "Not enough amount to close in trades."
             )
@@ -124,23 +126,21 @@ class TradeService(RepositoryService):
         while amount_to_close > 0 and not trade_queue.empty():
             trade = trade_queue.get()
             trade_id = trade.id
-            available_to_close = trade.remaining
-            cost = 0
+            available_to_close = trade.available_amount
 
             if amount_to_close >= available_to_close:
                 amount_to_close = amount_to_close - available_to_close
                 cost = trade.open_price * available_to_close
                 net_gain = (sell_price * available_to_close) - cost
-
                 update_data = {
-                    "remaining": 0,
+                    "available_amount": 0,
                     "orders": trade.orders.append(sell_order),
                     "updated_at": updated_at,
                     "closed_at": updated_at,
                     "net_gain": trade.net_gain + net_gain
                 }
 
-                if trade.filled_amount == trade.amount:
+                if trade.remaining == 0:
                     update_data["status"] = TradeStatus.CLOSED.value
 
                 self.update(trade_id, update_data)
@@ -161,7 +161,8 @@ class TradeService(RepositoryService):
 
                 self.update(
                     trade_id, {
-                        "remaining": trade.remaining - to_be_closed,
+                        "available_amount":
+                            trade.available_amount - to_be_closed,
                         "orders": trade.orders.append(sell_order),
                         "updated_at": updated_at,
                         "net_gain": trade.net_gain + net_gain
@@ -169,7 +170,7 @@ class TradeService(RepositoryService):
                 )
                 self.repository.add_order_to_trade(trade, sell_order)
 
-                # Create a order metadata object
+                # Create an order metadata object
                 self.order_metadata_repository.\
                     create({
                         "order_id": sell_order_id,
@@ -281,6 +282,18 @@ class TradeService(RepositoryService):
         self, sell_order, trades
     ):
         """
+        Function to create trade metadata with a sell order and trades.
+
+        The metadata objects function as a link between the trades and
+        the sell order. The metadata objects are used to keep track
+        of the trades that are closed with the sell order.
+
+        A single sell order can close or partially close multiple trades.
+        Therefore it is important to keep track of the trades that are
+        closed with the sell order. The metadata objects are used to
+        keep track of this relationship.
+
+
         """
         sell_order_id = sell_order.id
         updated_at = sell_order.updated_at
@@ -291,8 +304,8 @@ class TradeService(RepositoryService):
             trade = self.get(trade_data["trade_id"])
             trade_id = trade.id
             open_price = trade.open_price
-            remaining = trade.remaining
             old_net_gain = trade.net_gain
+            available_amount = trade.available_amount
             filled_amount = trade.filled_amount
             amount = trade.amount
 
@@ -309,14 +322,14 @@ class TradeService(RepositoryService):
 
             # Update the trade
             net_gain = (sell_price * sell_amount) - open_price * sell_amount
-            remaining = remaining - trade_data["amount"]
+            available_amount = available_amount - trade_data["amount"]
             trade_updated_data = {
-                "remaining": remaining,
+                "available_amount": available_amount,
                 "updated_at": updated_at,
                 "net_gain": old_net_gain + net_gain
             }
 
-            if remaining == 0 and filled_amount == amount:
+            if available_amount == 0 and filled_amount == amount:
                 trade_updated_data["status"] = TradeStatus.CLOSED.value
                 trade_updated_data["closed_at"] = updated_at
             else:
@@ -429,11 +442,20 @@ class TradeService(RepositoryService):
         self, sell_order
     ) -> Trade:
         """
-        This function updates a trade with a removed sell order. It does
-        this by removing the sell transaction object from the trade object.
+        This function updates a trade with a removed sell order that belongs
+        to the trade. This function uses the order metadata objects to
+        update the trade object. The function will update the trade object
+        available amount, cost, and net gain. The function will also
+        update the stop loss and take profit objects that are associated
+        with the trade object. The function will update the position cost
+        and the portfolio net gain.
 
-        At time of removing, the remaining amount of the sell transaction
-        is added back to the trade object.
+        Args:
+            sell_order (Order): Order object representing the sell order
+                that has been removed
+
+        Returns:
+            Trade: Trade object representing the updated trade object
         """
         position_cost = 0
         total_net_gain = 0
@@ -450,7 +472,7 @@ class TradeService(RepositoryService):
                 trade = self.get(metadata.trade_id)
                 cost = metadata.amount_pending * trade.open_price
                 net_gain = (sell_order.price * metadata.amount_pending) - cost
-                trade.remaining += metadata.amount_pending
+                trade.available_amount += metadata.amount_pending
                 trade.status = TradeStatus.OPEN.value
                 trade.updated_at = sell_order.updated_at
                 trade.net_gain -= net_gain
@@ -465,18 +487,27 @@ class TradeService(RepositoryService):
                 stop_loss = self.trade_stop_loss_repository\
                     .get(metadata.stop_loss_id)
                 stop_loss.sold_amount -= metadata.amount_pending
+                stop_loss.remove_sell_price(
+                    sell_order.price, sell_order.created_at
+                )
 
                 if stop_loss.sold_amount < stop_loss.sell_amount:
                     stop_loss.active = True
+                    stop_loss.high_water_mark = None
+
                 self.trade_stop_loss_repository.save(stop_loss)
 
             if metadata.take_profit_id is not None:
                 take_profit = self.trade_take_profit_repository\
                     .get(metadata.take_profit_id)
                 take_profit.sold_amount -= metadata.amount_pending
+                take_profit.remove_sell_price(
+                    sell_order.price, sell_order.created_at
+                )
 
                 if take_profit.sold_amount < take_profit.sell_amount:
                     take_profit.active = True
+                    take_profit.high_water_mark = None
 
                 self.trade_take_profit_repository.save(take_profit)
 
@@ -491,6 +522,7 @@ class TradeService(RepositoryService):
         portfolio = self.portfolio_repository.get(position.portfolio_id)
         portfolio.total_net_gain -= total_net_gain
         self.portfolio_repository.save(portfolio)
+        return trade
 
     def update_trade_with_buy_order(
         self, filled_difference, buy_order
@@ -512,8 +544,17 @@ class TradeService(RepositoryService):
         Returns:
             Trade object
         """
-
         trade = self.find({"buy_order": buy_order.id})
+        filled = buy_order.get_filled()
+        amount = buy_order.get_amount()
+
+        if filled is None:
+            filled = trade.filled_amount + filled_difference
+
+        remaining = buy_order.get_remaining()
+
+        if remaining is None:
+            remaining = trade.remaining - filled_difference
 
         if trade is None:
             raise OperationalException(
@@ -532,10 +573,15 @@ class TradeService(RepositoryService):
 
         trade = self.find({"order_id": buy_order.id})
         updated_data = {
-            "filled_amount": trade.filled_amount + filled_difference,
-            "remaining": trade.remaining + filled_difference,
+            "available_amount": trade.available_amount + filled_difference,
+            "filled_amount": filled,
+            "remaining": remaining,
             "cost": trade.cost + filled_difference * buy_order.price
         }
+
+        if amount != trade.amount:
+            updated_data["amount"] = amount
+            updated_data["cost"] = amount * buy_order.price
 
         if filled_difference > 0:
             updated_data["status"] = TradeStatus.OPEN.value
@@ -547,6 +593,11 @@ class TradeService(RepositoryService):
         self, filled_difference, sell_order
     ) -> Trade:
         """
+        Function to update a trade with a filled sell order. This
+        function will update all the metadata objects that where
+        created by the sell order.
+
+
         """
         # Update all metadata objects
         metadata_objects = self.order_metadata_repository.get_all({
@@ -556,11 +607,16 @@ class TradeService(RepositoryService):
         trade_filled_difference = filled_difference
         stop_loss_filled_difference = filled_difference
         take_profit_filled_difference = filled_difference
+        total_amount_in_metadata = 0
+        trade_metadata_objects = []
 
         for metadata_object in metadata_objects:
-
+            # Update the trade metadata object
             if metadata_object.trade_id is not None \
                     and trade_filled_difference > 0:
+
+                trade_metadata_objects.append(metadata_object)
+                total_amount_in_metadata += metadata_object.amount
 
                 if metadata_object.amount_pending >= trade_filled_difference:
                     amount = trade_filled_difference
@@ -604,7 +660,42 @@ class TradeService(RepositoryService):
                 metadata_object.amount_pending -= amount
                 self.order_metadata_repository.save(metadata_object)
 
+        # Update trade available amount if the total amount in metadata
+        # is not equal to the sell order amount
+        if total_amount_in_metadata != sell_order.amount:
+            difference = sell_order.amount - total_amount_in_metadata
+            trades = []
+
+            for metadata_object in trade_metadata_objects:
+                trade = self.get(metadata_object.trade_id)
+                trades.append(trade)
+
+            # Sort trades by created_at with the most recent first
+            trades = sorted(
+                trades,
+                key=lambda x: x.updated_at,
+                reverse=True
+            )
+            queue = PeekableQueue(trades)
+
+            while difference != 0 and not queue.is_empty():
+                trade = queue.dequeue()
+                trade.available_amount -= difference
+                self.save(trade)
+
     def update_trades_with_market_data(self, market_data):
+        """
+        Function to update trades with market data. This function will
+        update the last reported price and last reported price date of the
+        trade.
+
+        Args:
+            market_data: dict representing the market data
+                that will be used to update the trades
+
+        Returns:
+            None
+        """
         open_trades = self.get_all({"status": TradeStatus.OPEN.value})
         meta_data = market_data["metadata"]
 
@@ -789,7 +880,7 @@ class TradeService(RepositoryService):
 
         for trade in stop_losses_by_target_symbol:
             stop_losses = stop_losses_by_target_symbol[trade]
-            available_amount = trade.remaining
+            available_amount = trade.available_amount
             stop_loss_que = PeekableQueue(stop_losses)
             order_amount = 0
             stop_loss_metadata = []
@@ -824,14 +915,10 @@ class TradeService(RepositoryService):
                     "stop_loss_id": stop_loss.id,
                     "amount": stop_loss_sell_amount
                 })
-
-                if stop_loss.sell_prices is None:
-                    stop_loss.sell_prices = trade.last_reported_price
-                else:
-                    stop_loss.sell_prices = (
-                        f"{stop_loss.sell_prices},"
-                        f"{trade.last_reported_price}"
-                    )
+                stop_loss.add_sell_price(
+                    trade.last_reported_price,
+                    trade.last_reported_price_datetime
+                )
 
             position = self.position_repository.find({
                 "order_id": trade.orders[0].id
@@ -864,7 +951,8 @@ class TradeService(RepositoryService):
         return a list of trade ids that have triggered stop losses.
 
         Returns:
-            List of trade ids
+            List of trade objects. A trade object is a dictionary
+
         """
         triggered_take_profits = {}
         sell_orders_data = []
@@ -877,7 +965,7 @@ class TradeService(RepositoryService):
 
         for open_trade in open_trades:
             triggered_take_profits = []
-            available_amount = open_trade.remaining
+            available_amount = open_trade.available_amount
 
             # Skip if there is no available amount
             if available_amount == 0:
@@ -899,7 +987,7 @@ class TradeService(RepositoryService):
 
         for trade in take_profits_by_target_symbol:
             take_profits = take_profits_by_target_symbol[trade]
-            available_amount = trade.remaining
+            available_amount = trade.available_amount
             take_profit_que = PeekableQueue(take_profits)
             order_amount = 0
             take_profit_metadata = []
@@ -936,13 +1024,10 @@ class TradeService(RepositoryService):
                     "amount": take_profit_sell_amount
                 })
 
-                if take_profit.sell_prices is None:
-                    take_profit.sell_prices = trade.last_reported_price
-                else:
-                    take_profit.sell_prices = (
-                        f"{take_profit.sell_prices},"
-                        f"{trade.last_reported_price}"
-                    )
+                take_profit.add_sell_price(
+                    trade.last_reported_price,
+                    trade.last_reported_price_datetime
+                )
 
             position = self.position_repository.find({
                 "order_id": trade.orders[0].id
@@ -968,3 +1053,23 @@ class TradeService(RepositoryService):
         self.trade_take_profit_repository\
             .save_objects(to_be_saved_take_profit_objects)
         return sell_orders_data
+
+    def _create_order_id(self) -> str:
+        """
+        Function to create a unique order id. This function will
+        create a unique order id based on the current time and
+        the order id counter.
+
+        Returns:
+            str: Unique order id
+        """
+        unique = False
+        order_id = None
+
+        while not unique:
+            order_id = f"{random_number(8)}-{random_string(8)}"
+
+            if not self.exists({"order_id": order_id}):
+                unique = True
+
+        return order_id

@@ -62,7 +62,7 @@ class Test(TestBase):
         self.assertIsNotNone(btc_position.get_amount())
         self.assertEqual(Decimal(1), btc_position.get_amount())
         self.assertNotEqual(Decimal(990), trading_symbol_position.get_amount())
-        self.app.context.close_position("BTC")
+        self.app.context.close_position(btc_position)
         self.app.run(number_of_iterations=1)
         btc_position = self.app.context.get_position("BTC")
         self.assertEqual(Decimal(0), btc_position.get_amount())

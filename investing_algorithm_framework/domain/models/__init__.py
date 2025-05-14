@@ -15,6 +15,7 @@ from .trading_data_types import TradingDataType
 from .trading_time_frame import TradingTimeFrame
 from .date_range import DateRange
 from .market_data_type import MarketDataType
+from .data_source import DataSource
 
 __all__ = [
     "OrderStatus",
@@ -45,4 +46,5 @@ __all__ = [
     "TradeStopLoss",
     "TradeTakeProfit",
     "TradeRiskType",
+    "DataSource"
 ]

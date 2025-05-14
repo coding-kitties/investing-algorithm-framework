@@ -1,6 +1,5 @@
 from .ccxt import CCXTDataProvider
 
-
 def get_default_data_providers():
     """
     Function to get the default data providers.
@@ -11,7 +10,6 @@ def get_default_data_providers():
     return [
         CCXTDataProvider(),
     ]
-
 
 __all__ = [
     'CCXTDataProvider',

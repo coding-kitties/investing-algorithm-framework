@@ -1,7 +1,7 @@
 import os
 
-from investing_algorithm_framework import create_app, Algorithm, \
-    PortfolioConfiguration, MarketCredential
+from investing_algorithm_framework import PortfolioConfiguration, \
+    MarketCredential
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
     DATABASE_DIRECTORY_NAME, DATABASE_DIRECTORY_PATH, DATABASE_NAME, \
     ENVIRONMENT, Environment, BacktestDateRange

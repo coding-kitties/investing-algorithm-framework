@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import schedule
 
@@ -91,7 +91,8 @@ class StrategyOrchestratorService:
             thread.start()
             self.threads.append(thread)
 
-        self.history[strategy.worker_id] = {"last_run": datetime.utcnow()}
+        self.history[strategy.worker_id] = \
+            {"last_run": datetime.now(tz=timezone.utc)}
 
     def run_backtest_strategy(self, strategy, context, config):
         data = \
@@ -128,7 +129,8 @@ class StrategyOrchestratorService:
             thread.start()
             self.threads.append(thread)
 
-        self.history[task.worker_id] = {"last_run": datetime.utcnow()}
+        self.history[task.worker_id] = \
+            {"last_run": datetime.now(tz=timezone.utc)}
 
     def start(self, context, number_of_iterations=None):
         """

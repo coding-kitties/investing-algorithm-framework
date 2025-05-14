@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Dict, Any
 import pandas as pd
 from datetime import datetime, timezone
 
@@ -76,7 +76,8 @@ class TradingStrategy:
         # Check if time_unit is None
         if self.time_unit is None:
             raise OperationalException(
-                f"Time unit not set for strategy instance {self.strategy_id}"
+                f"Time unit attribute not set for "
+                f"strategy instance {self.strategy_id}"
             )
 
         # Check if interval is None
@@ -89,7 +90,31 @@ class TradingStrategy:
         self._context = None
         self._last_run = None
 
-    def run_strategy(self, context, market_data):
+    def run_strategy(self, context: Context, market_data: Dict[str, Any]):
+        """
+        Main function for running your strategy. This function will be called
+        by the framework when the trigger of your strategy is met.
+
+        During execution of this function, the context and market data
+        will be passed to the function. The context is an instance of
+        the Context class, this class has various methods to do operations
+        with your portfolio, orders, trades, positions and other components.
+
+        The market data is a dictionary containing all the data retrieved
+        from the specified data sources.
+
+        Args:
+            context (Context): The context of the strategy. This is an instance
+                of the Context class, this class has various methods to do
+                operations with your portfolio, orders, trades, positions and
+                other components.
+            market_data (Dict[str, Any]): The data for the strategy.
+                This is a dictionary containing all the data retrieved from the
+                specified data sources.
+
+        Returns:
+            None
+        """
         self.context = context
         config = self.context.get_config()
 

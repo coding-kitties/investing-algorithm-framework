@@ -6,6 +6,7 @@ from investing_algorithm_framework.domain.metrics.price_efficiency import \
     get_price_efficiency_ratio
 
 class TestGetPriceEfficiencyRatio(TestCase):
+
     def test_get_price_efficiency_ratio(self):
         # Given
         data = {

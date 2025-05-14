@@ -218,15 +218,25 @@ class BacktestReport(BaseModel):
 
     @property
     def number_of_trades_closed(self):
-        return self._number_of_trades_closed
+        closed_trades = self.get_trades(
+            trade_status=TradeStatus.CLOSED.value
+        )
+        return len(closed_trades)
 
     @number_of_trades_closed.setter
     def number_of_trades_closed(self, value):
         self._number_of_trades_closed = value
 
     @property
+    def number_of_trades(self):
+        return len(self._trades)
+
+    @property
     def number_of_trades_open(self):
-        return self._number_of_trades_open
+        open_trades = self.get_trades(
+            trade_status=TradeStatus.OPEN.value
+        )
+        return len(open_trades)
 
     @number_of_trades_open.setter
     def number_of_trades_open(self, value):

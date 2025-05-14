@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 
 from dateutil.parser import parse
 
@@ -23,8 +24,8 @@ class Order(BaseModel):
         self,
         order_type,
         order_side,
-        status,
         amount,
+        status=OrderStatus.CREATED.value,
         target_symbol=None,
         trading_symbol=None,
         price=None,
@@ -59,6 +60,15 @@ class Order(BaseModel):
         if status is None:
             raise OperationalException("Status is not set")
 
+        self.created_at = created_at
+        self.updated_at = updated_at
+
+        if self.created_at is None:
+            self.created_at = datetime.now(tz=timezone.utc)
+
+        if self.updated_at is None:
+            self.updated_at = datetime.now(tz=timezone.utc)
+
         self.external_id = external_id
         self.price = price
         self.order_side = OrderSide.from_value(order_side).value
@@ -66,8 +76,6 @@ class Order(BaseModel):
         self.status = OrderStatus.from_value(status).value
         self.position_id = position_id
         self.amount = amount
-        self.created_at = created_at
-        self.updated_at = updated_at
         self.filled = filled
         self.remaining = remaining
         self.fee = fee
@@ -166,7 +174,7 @@ class Order(BaseModel):
     def get_remaining(self):
 
         if self.remaining is None:
-            return self.amount
+            return self.get_amount() - self.get_filled()
 
         return self.remaining
 
@@ -180,7 +188,8 @@ class Order(BaseModel):
         self.fee = order_fee
 
     def get_symbol(self):
-        return self.get_target_symbol() + "/" + self.get_trading_symbol()
+        return (self.get_target_symbol().upper() + "/"
+                + self.get_trading_symbol().upper())
 
     def get_available_amount(self):
 

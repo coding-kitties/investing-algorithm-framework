@@ -4,7 +4,8 @@ from unittest import TestCase
 from investing_algorithm_framework import create_app, \
     PortfolioConfiguration, Algorithm, MarketCredential
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY
-from tests.resources import MarketServiceStub
+from tests.resources import MarketServiceStub, OrderExecutorTest, \
+    PortfolioProviderTest
 
 
 class TestCreateApp(TestCase):
@@ -60,13 +61,9 @@ class TestCreateApp(TestCase):
                 secret_key="secret_key"
             )
         )
-        market_service = MarketServiceStub(app.container.market_credential_service())
-        market_service.balances = {
-            "USDT": 1000
-        }
-        app.container.market_service.override(
-            market_service
-        )
+        #
+        app.add_portfolio_provider(PortfolioProviderTest)
+        app.add_order_executor(OrderExecutorTest)
         app.initialize_config()
         app.initialize()
         self.assertIsNotNone(app)

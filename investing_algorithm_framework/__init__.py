@@ -12,7 +12,8 @@ from investing_algorithm_framework.domain import ApiException, \
     load_backtest_report, BacktestDateRange, convert_polars_to_pandas, \
     DateRange, get_backtest_report, DEFAULT_LOGGING_CONFIG, \
     BacktestReport, TradeStatus, MarketDataType, TradeRiskType, \
-    APPLICATION_DIRECTORY
+    APPLICATION_DIRECTORY, pretty_print_orders, pretty_print_trades, \
+    pretty_print_positions, DataSource
 from investing_algorithm_framework.infrastructure import \
     CCXTOrderBookMarketDataSource, CCXTOHLCVMarketDataSource, \
     CCXTTickerMarketDataSource, CSVOHLCVMarketDataSource, \
@@ -77,5 +78,9 @@ __all__ = [
     "TradeRiskType",
     "Context",
     "APPLICATION_DIRECTORY",
-    "download"
+    "download",
+    "pretty_print_orders",
+    "pretty_print_trades",
+    "pretty_print_positions",
+    "DataSource",
 ]
