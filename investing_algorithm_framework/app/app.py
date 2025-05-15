@@ -34,13 +34,51 @@ COLOR_YELLOW = '\033[93m'
 
 
 class AppHook:
+    """
+    Abstract class for app hooks. App hooks are used to run code before
+    actions of the framework are executed. This is useful for running code
+    that needs to be run before the following events:
+    - App initialization
+    - Strategy run
+    """
 
     @abstractmethod
-    def on_run(self, app, algorithm: Algorithm):
+    def on_run(self, context) -> None:
+        """
+        Method to run the app hook. This method should be implemented
+        by the user. This method will be called when the app is performing
+        a specific action.
+
+        Args:
+            context: The context of the app. This can be used to get the
+                current state of the trading bot, such as portfolios,
+                orders, positions, etc.
+
+        Returns:
+            None
+        """
         raise NotImplementedError()
 
 
 class App:
+    """
+    Class to represent the app. This class is used to initialize the
+    application and run your trading bot.
+
+    Attributes:
+        - container: The dependency container for the app. This is used
+            to store all the services and repositories for the app.
+        - algorithm: The algorithm to run. This is used to run the
+            trading bot.
+        - flask_app: The flask app instance. This is used to run the
+            web app.
+        - state_handler: The state handler for the app. This is used
+            to save and load the state of the app.
+        - name: The name of the app. This is used to identify the app
+            in logs and other places.
+        - started: A boolean value that indicates if the app has been
+            started or not.
+    """
 
     def __init__(self, state_handler=None, name=None):
         self._flask_app: Optional[Flask] = None
@@ -54,6 +92,7 @@ class App:
         self._market_credential_service: \
             Optional[MarketCredentialService] = None
         self._on_initialize_hooks = []
+        self._on_strategy_run_hooks = []
         self._on_after_initialize_hooks = []
         self._state_handler = state_handler
         self._name = name
@@ -114,12 +153,24 @@ class App:
         configuration_service.add_dict(dictionary)
 
     def initialize_services(self) -> None:
-        self._configuration_service = self.container.configuration_service()
-        self._configuration_service.initialize()
+        """
+        Method to initialize the services for the app. This method should
+        be called before running the application. This method initializes
+        all services so that they are ready to be used.
+
+        Returns:
+            None
+        """
         self._market_data_source_service = \
             self.container.market_data_source_service()
         self._market_credential_service = \
             self.container.market_credential_service()
+
+        strategy_orchestrator_service = \
+            self.container.strategy_orchestrator_service()
+
+        for app_hook in self._on_strategy_run_hooks:
+            strategy_orchestrator_service.add_app_hook(app_hook)
 
     @algorithm.setter
     def algorithm(self, algorithm: Algorithm) -> None:
@@ -212,6 +263,7 @@ class App:
             None
         """
         logger.info("Initializing app")
+        self.initialize_services()
         self._initialize_default_order_executors()
         self._initialize_default_portfolio_providers()
 
@@ -418,7 +470,7 @@ class App:
 
             # Run all on_initialize hooks
             for hook in self._on_initialize_hooks:
-                hook.on_run(self, self.algorithm)
+                hook.on_run(self.context)
 
             configuration_service = self.container.configuration_service()
             config = configuration_service.get_config()
@@ -580,7 +632,28 @@ class App:
             .portfolio_configuration_service()
         return portfolio_configuration_service.get_all()
 
-    def get_market_credentials(self):
+    def get_market_credential(self, market: str) -> MarketCredential:
+        """
+        Function to get a market credential from the app. This method
+        should be called when you want to get a market credential.
+
+        Args:
+            market (str): The market to get the credential for
+
+        Returns:
+            MarketCredential: Instance of MarketCredential
+        """
+
+        market_credential_service = self.container \
+            .market_credential_service()
+        market_credential = market_credential_service.get(market)
+        if market_credential is None:
+            raise OperationalException(
+                f"Market credential for {market} not found"
+            )
+        return market_credential
+
+    def get_market_credentials(self) -> List[MarketCredential]:
         """
         Function to get all market credentials from the app. This method
         should be called when you want to get all market credentials.
@@ -852,16 +925,39 @@ class App:
         market_credential.market = market_credential.market.upper()
         self._market_credential_service.add(market_credential)
 
-    def on_initialize(self, app_hook: AppHook):
+    def on_initialize(self, app_hook):
         """
         Function to add a hook that runs when the app is initialized. The hook
         should be an instance of AppHook.
         """
 
+        # Check if the app_hook inherits from AppHook
+        if not issubclass(app_hook, AppHook):
+            raise OperationalException(
+                "App hook should be an instance of AppHook"
+            )
+
         if inspect.isclass(app_hook):
             app_hook = app_hook()
 
         self._on_initialize_hooks.append(app_hook)
+
+    def on_strategy_run(self, app_hook):
+        """
+        Function to add a hook that runs when a strategy is run. The hook
+        should be an instance of AppHook.
+        """
+
+        # Check if the app_hook inherits from AppHook
+        if not issubclass(app_hook, AppHook):
+            raise OperationalException(
+                "App hook should be an instance of AppHook"
+            )
+
+        if inspect.isclass(app_hook):
+            app_hook = app_hook()
+
+        self._on_strategy_run_hooks.append(app_hook)
 
     def after_initialize(self, app_hook: AppHook):
         """

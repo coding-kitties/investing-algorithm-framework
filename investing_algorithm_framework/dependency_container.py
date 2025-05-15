@@ -132,7 +132,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         market_service=market_service,
         portfolio_provider_lookup=portfolio_provider_lookup,
     )
-    strategy_orchestrator_service = providers.Factory(
+    strategy_orchestrator_service = providers.ThreadSafeSingleton(
         StrategyOrchestratorService,
         market_data_source_service=market_data_source_service,
         configuration_service=configuration_service,

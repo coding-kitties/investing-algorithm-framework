@@ -36,8 +36,9 @@ class StrategyOrchestratorService:
     def __init__(
         self,
         market_data_source_service: MarketDataSourceService,
-        configuration_service
+        configuration_service,
     ):
+        self._app_hooks = []
         self.history = {}
         self._strategies = []
         self._tasks = []
@@ -48,6 +49,18 @@ class StrategyOrchestratorService:
         self.market_data_source_service: MarketDataSourceService \
             = market_data_source_service
         self.configuration_service = configuration_service
+
+    def add_app_hook(self, app_hook):
+        """
+        Add an app hook to the list of app hooks
+
+        Args:
+            app_hook (AppHook): The app hook to add
+
+        Returns:
+            None
+        """
+        self._app_hooks.append(app_hook)
 
     def cleanup_threads(self):
 
@@ -72,6 +85,10 @@ class StrategyOrchestratorService:
             self.market_data_source_service.get_data_for_strategy(strategy)
 
         logger.info(f"Running strategy {strategy.worker_id}")
+
+        # Run the app hooks
+        for app_hook in self._app_hooks:
+            app_hook.on_run(context=context)
 
         if sync:
             strategy.run_strategy(

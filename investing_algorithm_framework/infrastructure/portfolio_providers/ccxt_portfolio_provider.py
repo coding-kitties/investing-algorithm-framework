@@ -3,7 +3,7 @@ from logging import getLogger
 from typing import Union
 
 from investing_algorithm_framework.domain import PortfolioProvider, \
-    OperationalException, Order, Position
+    OperationalException, Order, Position, MarketCredential
 
 
 logger = getLogger("investing_algorithm_framework")
@@ -110,6 +110,17 @@ class CCXTPortfolioProvider(PortfolioProvider):
 
     @staticmethod
     def initialize_exchange(market, market_credential):
+        """
+        Function to initialize the exchange for the market.
+
+        Args:
+            market (str): The market to initialize the exchange for
+            market_credential (MarketCredential): The market credential to use
+                for the exchange
+
+        Returns:
+
+        """
         market = market.lower()
 
         if not hasattr(ccxt, market):
@@ -124,11 +135,55 @@ class CCXTPortfolioProvider(PortfolioProvider):
                 f"No market service found for market id {market}"
             )
 
+        # Check the credentials for the exchange
+        (CCXTPortfolioProvider
+         .check_credentials(exchange_class, market_credential))
         exchange = exchange_class({
             'apiKey': market_credential.api_key,
             'secret': market_credential.secret_key,
         })
         return exchange
+
+    @staticmethod
+    def check_credentials(
+        exchange_class, market_credential: MarketCredential
+    ):
+        """
+        Function to check if the credentials are valid for the exchange.
+
+        Args:
+            exchange_class: The exchange class to check the credentials for
+            market_credential: The market credential to use for the exchange
+
+        Raises:
+            OperationalException: If the credentials are not valid
+
+        Returns:
+            None
+        """
+        exchange = exchange_class()
+        credentials_info = exchange.requiredCredentials
+        market = market_credential.get_market()
+
+        if ('apiKey' in credentials_info
+                and credentials_info["apiKey"]
+                and market_credential.get_api_key() is None):
+            raise OperationalException(
+                f"Market credential for market {market}"
+                " requires an api key, either"
+                " as an argument or as an environment variable"
+                f" named as {market.upper()}_API_KEY"
+            )
+
+        if ('secret' in credentials_info
+                and credentials_info["secret"]
+                and market_credential.get_secret_key() is None):
+            raise OperationalException(
+                f"Market credential for market {market}"
+                " requires a secret key, either"
+                " as an argument or as an environment variable"
+                f" named as {market.upper()}_SECRET_KEY"
+            )
 
     def supports_market(self, market):
         """

@@ -51,14 +51,6 @@ class MarketCredential:
             environment_variable = f"{self.market.upper()}_SECRET_KEY"
             self._secret_key = os.getenv(environment_variable)
 
-            if self.secret_key is None:
-                raise OperationalException(
-                    f"Market credential for market {self.market}"
-                    " requires a secret key, either"
-                    " as an argument or as an environment variable"
-                    f" named as {self._market.upper()}_SECRET_KEY"
-                )
-
     def get_api_key(self):
         return self.api_key
 
