@@ -94,14 +94,9 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     symbol="BTC/EUR",
 )
 
-# Bitvavo market credentials are read from .env file, or you can
-# set them  manually as params
 app = create_app()
-app.add_market(
-    market="BITVAVO",
-    trading_symbol="EUR",
-    initial_balance=100
-)
+# Registered bitvavo market, credentials are read from .env file by default
+app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=100)
 algorithm = Algorithm(name="test_algorithm")
 
 # Define a strategy for the algorithm that will run every 10 seconds
