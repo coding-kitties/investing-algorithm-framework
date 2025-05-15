@@ -336,8 +336,8 @@ This will ensure that interested parties can give valuable feedback on the featu
 
 ## 📬 Support
 
-* Slack Community
-* Reddit Community
+* [Reddit Community](https://www.reddit.com/r/InvestingBots/)
+* [Discord Community](https://discord.gg/dQsRmGZP")
 
 
 ## 🏆 Acknowledgements
