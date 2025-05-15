@@ -1459,3 +1459,12 @@ class Context:
             MarketCredential: The market credential for the given market
         """
         return self.market_credential_service.get(market)
+
+    def get_market_credentials(self) -> List[MarketCredential]:
+        """
+        Function to get all market credentials.
+
+        Returns:
+            List[MarketCredential]: A list of all market credentials
+        """
+        return self.market_credential_service.get_all()
