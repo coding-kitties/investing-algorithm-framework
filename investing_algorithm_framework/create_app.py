@@ -23,6 +23,7 @@ def create_app(
         config (dict): Configuration dictionary
         web (bool): Whether to create a web app
         state_handler (StateHandler): State handler for the app
+        name (str): Name of the app
 
     Returns:
         App: App instance

@@ -5,7 +5,7 @@ from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
     Algorithm, MarketCredential
 from tests.resources import random_string, MarketServiceStub, \
-    MarketDataSourceServiceStub
+    MarketDataSourceServiceStub, OrderExecutorTest, PortfolioProviderTest
 
 
 class StrategyOne(TradingStrategy):
@@ -78,6 +78,8 @@ class Test(TestCase):
 
     def test_with_strategy_object(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+        app.add_portfolio_provider(PortfolioProviderTest)
+        app.add_order_executor(OrderExecutorTest)
         app.container.market_service.override(MarketServiceStub(None))
         app.container.portfolio_configuration_service().clear()
         app.add_portfolio_configuration(
@@ -106,6 +108,8 @@ class Test(TestCase):
 
     def test_with_decorator(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+        app.add_portfolio_provider(PortfolioProviderTest)
+        app.add_order_executor(OrderExecutorTest)
         app.container.market_service.override(MarketServiceStub(None))
         app.container.portfolio_configuration_service().clear()
         app.add_portfolio_configuration(
@@ -135,6 +139,8 @@ class Test(TestCase):
 
     def test_stateless(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+        app.add_portfolio_provider(PortfolioProviderTest)
+        app.add_order_executor(OrderExecutorTest)
         app.container.market_service.override(MarketServiceStub(None))
         app.container.portfolio_configuration_service().clear()
         app.add_portfolio_configuration(

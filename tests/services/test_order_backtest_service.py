@@ -65,7 +65,7 @@ class TestOrderBacktestService(TestBase):
             OrderBacktestService(
                 trade_service=self.app.container.trade_service(),
                 order_repository=self.app.container.order_repository(),
-                position_repository=self.app.container.position_repository(),
+                position_service=self.app.container.position_service(),
                 portfolio_repository=self.app.container.portfolio_repository(),
                 portfolio_configuration_service=self.app.container.
                 portfolio_configuration_service(),

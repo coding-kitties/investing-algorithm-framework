@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean
 from sqlalchemy import UniqueConstraint
@@ -31,8 +31,8 @@ class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
         lazy="dynamic",
         cascade="all,delete",
     )
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
-    updated_at = Column(DateTime, nullable=False, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)
     initialized = Column(Boolean, nullable=False, default=False)
 
     __table_args__ = (
@@ -67,7 +67,10 @@ class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
             identifier = market
 
         if created_at is None:
-            created_at = datetime.utcnow()
+            created_at = datetime.now(tz=timezone.utc)
+
+        if updated_at is None:
+            updated_at = datetime.now(tz=timezone.utc)
 
         super().__init__(
             trading_symbol=trading_symbol,

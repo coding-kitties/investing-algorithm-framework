@@ -63,6 +63,9 @@ class Test(TestBase):
         trades = self.app.context.get_trades()
         trade = trades[0]
         self.assertIsNotNone(trade.amount)
+        self.assertEqual(trade.remaining, 0)
+        self.assertEqual(trade.filled_amount, 1)
+        self.assertEqual(trade.available_amount, 1)
         self.assertEqual(Decimal(1), trade.amount)
         self.app.context.close_trade(trade)
         self.assertEqual(1, len(self.app.context.get_trades()))

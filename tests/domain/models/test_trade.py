@@ -32,6 +32,8 @@ class Test(TestCase):
             target_symbol="BTC",
             trading_symbol="EUR",
             amount=1,
+            available_amount=0,
+            filled_amount=0,
             remaining=1,
             open_price=10000,
             opened_at=trade_opened_at,

@@ -11,7 +11,8 @@ from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, StrategyOrchestratorService, \
     PortfolioConfigurationService, MarketDataSourceService, BacktestService, \
     ConfigurationService, PortfolioSnapshotService, PositionSnapshotService, \
-    MarketCredentialService, TradeService, PortfolioSyncService
+    MarketCredentialService, TradeService, PortfolioSyncService, \
+    OrderExecutorLookup, PortfolioProviderLookup
 
 
 def setup_dependency_container(app, modules=None, packages=None):
@@ -34,8 +35,14 @@ class DependencyContainer(containers.DeclarativeContainer):
         MarketCredentialService
     )
     order_repository = providers.Factory(SQLOrderRepository)
+    order_executor_lookup = providers.ThreadSafeSingleton(
+        OrderExecutorLookup
+    )
     order_metadata_repository = providers.Factory(SQLOrderMetadataRepository)
     position_repository = providers.Factory(SQLPositionRepository)
+    portfolio_provider_lookup = providers.ThreadSafeSingleton(
+        PortfolioProviderLookup,
+    )
     portfolio_repository = providers.Factory(SQLPortfolioRepository)
     position_snapshot_repository = providers.Factory(
         SQLPositionSnapshotRepository
@@ -72,12 +79,6 @@ class DependencyContainer(containers.DeclarativeContainer):
         portfolio_repository=portfolio_repository,
         position_repository=position_repository,
     )
-    position_service = providers.Factory(
-        PositionService,
-        repository=position_repository,
-        market_service=market_service,
-        market_credential_service=market_credential_service,
-    )
     trade_service = providers.Factory(
         TradeService,
         order_repository=order_repository,
@@ -90,28 +91,34 @@ class DependencyContainer(containers.DeclarativeContainer):
         market_data_source_service=market_data_source_service,
         order_metadata_repository=order_metadata_repository,
     )
+    position_service = providers.Factory(
+        PositionService,
+        portfolio_repository=portfolio_repository,
+        repository=position_repository,
+    )
     order_service = providers.Factory(
         OrderService,
         configuration_service=configuration_service,
         order_repository=order_repository,
         portfolio_repository=portfolio_repository,
-        position_repository=position_repository,
-        market_service=market_service,
+        position_service=position_service,
         market_credential_service=market_credential_service,
         portfolio_configuration_service=portfolio_configuration_service,
         portfolio_snapshot_service=portfolio_snapshot_service,
         trade_service=trade_service,
+        order_executor_lookup=order_executor_lookup,
+        portfolio_provider_lookup=portfolio_provider_lookup
     )
     portfolio_service = providers.Factory(
         PortfolioService,
         configuration_service=configuration_service,
         market_credential_service=market_credential_service,
-        market_service=market_service,
         order_service=order_service,
         position_service=position_service,
         portfolio_repository=portfolio_repository,
         portfolio_configuration_service=portfolio_configuration_service,
         portfolio_snapshot_service=portfolio_snapshot_service,
+        portfolio_provider_lookup=portfolio_provider_lookup
     )
     portfolio_sync_service = providers.Factory(
         PortfolioSyncService,
@@ -123,6 +130,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         portfolio_configuration_service=portfolio_configuration_service,
         market_credential_service=market_credential_service,
         market_service=market_service,
+        portfolio_provider_lookup=portfolio_provider_lookup,
     )
     strategy_orchestrator_service = providers.Factory(
         StrategyOrchestratorService,

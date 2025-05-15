@@ -1,6 +1,7 @@
 from .stubs import MarketServiceStub, RandomPriceMarketDataSourceServiceStub,\
     MarketDataSourceServiceStub
-from .test_base import TestBase, FlaskTestBase
+from .test_base import TestBase, FlaskTestBase, OrderExecutorTest, \
+    PortfolioProviderTest
 from .utils import random_string
 
 __all__ = [
@@ -9,5 +10,7 @@ __all__ = [
     "MarketServiceStub",
     "FlaskTestBase",
     "RandomPriceMarketDataSourceServiceStub",
-    "MarketDataSourceServiceStub"
+    "MarketDataSourceServiceStub",
+    "OrderExecutorTest",
+    "PortfolioProviderTest",
 ]

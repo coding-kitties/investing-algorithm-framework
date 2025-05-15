@@ -19,7 +19,8 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     BacktestReport, PortfolioSnapshot, StrategyProfile, \
     BacktestPosition, Trade, MarketCredential, PositionSnapshot, \
     BacktestReportsEvaluation, AppMode, BacktestDateRange, DateRange, \
-    MarketDataType, TradeRiskType, TradeTakeProfit, TradeStopLoss
+    MarketDataType, TradeRiskType, TradeTakeProfit, TradeStopLoss, \
+    DataSource
 from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
     OHLCVMarketDataSource, BacktestMarketDataSource, MarketDataSource, \
     MarketService, MarketCredentialService, AbstractPortfolioSyncService, \
@@ -28,13 +29,15 @@ from .stateless_actions import StatelessActions
 from .strategy import Strategy
 from .utils import random_string, append_dict_as_row_to_csv, \
     add_column_headers_to_csv, get_total_amount_of_rows, \
-    load_backtest_report, convert_polars_to_pandas, \
+    load_backtest_report, convert_polars_to_pandas, random_number, \
     csv_to_list, StoppableThread, pretty_print_backtest_reports_evaluation, \
     pretty_print_backtest, load_csv_into_dict, load_backtest_reports, \
     get_backtest_report, pretty_print_positions, pretty_print_trades, \
     pretty_print_orders
 from .metrics import get_price_efficiency_ratio
 from .data_provider import DataProvider
+from .order_executor import OrderExecutor
+from .portfolio_provider import PortfolioProvider
 
 __all__ = [
     "OrderStatus",
@@ -133,5 +136,9 @@ __all__ = [
     "pretty_print_trades",
     "pretty_print_orders",
     "DataProvider",
-    "NetworkError"
+    "NetworkError",
+    "DataSource",
+    "OrderExecutor",
+    "PortfolioProvider",
+    "random_number"
 ]

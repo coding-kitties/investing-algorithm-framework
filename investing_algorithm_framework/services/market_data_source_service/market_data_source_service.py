@@ -119,7 +119,6 @@ class MarketDataSourceService:
               the keys being the identifier of the market data sources
         """
         identifiers = []
-
         if strategy.market_data_sources is not None:
             for market_data_source in strategy.market_data_sources:
 
@@ -165,12 +164,10 @@ class MarketDataSourceService:
         return market_data
 
     def get_data(self, identifier):
-
         for market_data_source in self._market_data_sources:
 
             if market_data_source.get_identifier() == identifier:
                 config = self._configuration_service.get_config()
-
                 config = self._configuration_service.get_config()
                 date = config.get("DATE_TIME", None)
 
@@ -198,7 +195,6 @@ class MarketDataSourceService:
                 # Add metadata to the data
                 if isinstance(market_data_source, OHLCVMarketDataSource):
                     result["type"] = MarketDataType.OHLCV
-
                     time_frame = market_data_source.time_frame
 
                     if time_frame is not None:
@@ -236,7 +232,6 @@ class MarketDataSourceService:
         if self.market_data_sources is not None:
             for market_data_source in self._market_data_sources:
                 if isinstance(market_data_source, TickerMarketDataSource):
-
                     if market is not None:
                         if market_data_source.market.upper() == market.upper()\
                                 and market_data_source.symbol.upper() \

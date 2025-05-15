@@ -147,6 +147,65 @@ class DataProviderService:
             pandas=pandas,
         )
 
+    def get_backtest_data(
+        self,
+        symbol: str,
+        data_type: str,
+        market: str = None,
+        backtest_index_date: datetime = None,
+        time_frame: str = None,
+        start_date: datetime = None,
+        end_date: datetime = None,
+        storage_path=None,
+        window_size=None,
+        pandas=False,
+        save: bool = False,
+    ):
+
+        """
+        Function to get backtest data from the data provider.
+
+        Args:
+            symbol (str): The symbol to get data for.
+            market (str): The market to get data from.
+            time_frame (str): The time frame to get data for.
+            start_date (datetime): The start date for the data.
+            end_date (datetime): The end date for the data.
+            storage_path (str): The path to store the data.
+            window_size (int): The size of the data window.
+            pandas (bool): Whether to return the data as a pandas DataFrame.
+
+        Returns:
+            DataFrame: The backtest data for the given symbol and market.
+        """
+        data_provider = self.data_provider_index.find_data_provider(
+            symbol=symbol,
+            market=market,
+            time_frame=time_frame,
+        )
+
+        if data_provider is None:
+            self._throw_no_data_provider_exception(
+                {
+                    "symbol": symbol,
+                    "market": market,
+                    "data_type": data_type,
+                    "time_frame": time_frame,
+                }
+            )
+
+        return data_provider.get_backtest_data(
+            symbol=symbol,
+            market=market,
+            time_frame=time_frame,
+            backtest_index_date=backtest_index_date,
+            start_date=start_date,
+            end_date=end_date,
+            storage_path=storage_path,
+            window_size=window_size,
+            pandas=pandas,
+        )
+
     def _throw_no_data_provider_exception(self, params):
         """
         Raise an exception if no data provider is found for the given params

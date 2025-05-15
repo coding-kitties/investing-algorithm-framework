@@ -43,12 +43,12 @@ class DataProvider(ABC):
         self,
         data_type: str,
         symbol: str = None,
+        market: str = None,
         markets: list = None,
         priority: int = 0,
         time_frame=None,
         window_size=None,
         storage_path=None,
-        market_credentials: List = None,
     ):
         """
         Initializes the DataProvider with data type, symbols, and markets.
@@ -63,11 +63,12 @@ class DataProvider(ABC):
             self.time_frame = TimeFrame.from_value(time_frame)
 
         self.symbol = symbol
+        self.market = market
         self.markets = markets
         self.priority = priority
         self.window_size = window_size
         self.storage_path = storage_path
-        self.market_credentials = market_credentials
+        self._market_credentials = None
 
     @property
     def data_type(self):
@@ -84,6 +85,20 @@ class DataProvider(ABC):
     @time_frame.setter
     def time_frame(self, value):
         self._time_frame = TimeFrame.from_value(value)
+
+    @property
+    def market_credentials(self):
+        """
+        Returns the market credentials for the data provider.
+        """
+        return self._market_credentials
+
+    @market_credentials.setter
+    def market_credentials(self, value: List):
+        """
+        Sets the market credentials for the data provider.
+        """
+        self._market_credentials = value
 
     def get_credential(self, market: str):
         """
@@ -114,7 +129,7 @@ class DataProvider(ABC):
         start_date: datetime = None,
         end_date: datetime = None,
         window_size=None,
-    ) -> None:
+    ) -> bool:
         """
         Checks if the data provider has data for the given parameters.
         """

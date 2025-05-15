@@ -19,9 +19,10 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, BacktestReport, \
     APP_MODE, MarketCredential, AppMode, BacktestDateRange, \
     DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT, \
-    MarketDataSource, APPLICATION_DIRECTORY, PortfolioConfiguration
+    MarketDataSource, APPLICATION_DIRECTORY, PortfolioConfiguration, \
+    PortfolioProvider, OrderExecutor, ImproperlyConfigured
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
-    create_all_tables
+    create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider
 from investing_algorithm_framework.services import OrderBacktestService, \
     BacktestMarketDataSourceService, BacktestPortfolioService, \
     MarketDataSourceService, MarketCredentialService
@@ -211,6 +212,8 @@ class App:
             None
         """
         logger.info("Initializing app")
+        self._initialize_default_order_executors()
+        self._initialize_default_portfolio_providers()
 
         if self.algorithm is None:
             raise OperationalException("No algorithm registered")
@@ -240,18 +243,20 @@ class App:
             portfolio_snap_service = self.container \
                 .portfolio_snapshot_service()
             market_cred_service = self.container.market_credential_service()
+            portfolio_provider_lookup = \
+                self.container.portfolio_provider_lookup()
             # Override the portfolio service with the backtest
             # portfolio service
             self.container.portfolio_service.override(
                 BacktestPortfolioService(
                     configuration_service=configuration_service,
                     market_credential_service=market_cred_service,
-                    market_service=self.container.market_service(),
                     position_service=self.container.position_service(),
                     order_service=self.container.order_service(),
                     portfolio_repository=self.container.portfolio_repository(),
                     portfolio_configuration_service=portfolio_conf_service,
-                    portfolio_snapshot_service=portfolio_snap_service
+                    portfolio_snapshot_service=portfolio_snap_service,
+                    portfolio_provider_lookup=portfolio_provider_lookup
                 )
             )
 
@@ -284,7 +289,7 @@ class App:
                 OrderBacktestService(
                     trade_service=self.container.trade_service(),
                     order_repository=self.container.order_repository(),
-                    position_repository=self.container.position_repository(),
+                    position_service=self.container.position_service(),
                     portfolio_repository=self.container.portfolio_repository(),
                     portfolio_configuration_service=portfolio_conf_service,
                     portfolio_snapshot_service=portfolio_snap_service,
@@ -350,74 +355,7 @@ class App:
             )
             self._initialize_web()
 
-        # Initialize all portfolios that are registered
-        portfolio_configuration_service = self.container \
-            .portfolio_configuration_service()
-        portfolio_service = self.container.portfolio_service()
-
-        # Throw an error if no portfolios are configured
-        if portfolio_configuration_service.count() == 0:
-            raise OperationalException("No portfolios configured")
-
-        if Environment.BACKTEST.equals(config[ENVIRONMENT]):
-            initial_backtest_amount = config.get(
-                BACKTESTING_INITIAL_AMOUNT, None
-            )
-
-            for portfolio_configuration \
-                    in portfolio_configuration_service.get_all():
-
-                if not portfolio_service.exists(
-                    {"identifier": portfolio_configuration.identifier}
-                ):
-                    portfolio = (
-                        portfolio_service.create_portfolio_from_configuration(
-                            portfolio_configuration,
-                            initial_amount=initial_backtest_amount,
-                        )
-                    )
-        else:
-            synced_portfolios = []
-
-            for portfolio_configuration \
-                    in portfolio_configuration_service.get_all():
-
-                if not portfolio_service.exists(
-                    {"identifier": portfolio_configuration.identifier}
-                ):
-                    portfolio = portfolio_service\
-                        .create_portfolio_from_configuration(
-                            portfolio_configuration
-                        )
-
-            portfolios = portfolio_service.get_all()
-
-            for portfolio in portfolios:
-
-                if portfolio not in synced_portfolios:
-                    self.sync(portfolio)
-
-    def sync(self, portfolio):
-        """
-        Sync the portfolio with the exchange. This method should be called
-        before running the algorithm. It syncs the portfolio with the
-        exchange by syncing the unallocated balance, positions, orders, and
-        trades.
-
-        Args:
-            portfolio (Portfolio): The portfolio to sync
-
-        Returns:
-            None
-        """
-        logger.info(f"Syncing portfolio {portfolio.identifier}")
-        portfolio_sync_service = self.container.portfolio_sync_service()
-
-        # Sync unallocated balance
-        portfolio_sync_service.sync_unallocated(portfolio)
-
-        # Sync all orders from exchange with current order history
-        portfolio_sync_service.sync_orders(portfolio)
+        self._initialize_portfolios()
 
     def run(
         self,
@@ -476,7 +414,7 @@ class App:
                 self._state_handler.load(config[RESOURCE_DIRECTORY])
 
             self.initialize()
-            logger.info("Initialization complete")
+            logger.info("App initialization complete")
 
             # Run all on_initialize hooks
             for hook in self._on_initialize_hooks:
@@ -1020,3 +958,267 @@ class App:
             secret_key=secret_key
         )
         self.add_market_credential(market_credential)
+
+    def add_order_executor(self, order_executor):
+        """
+        Function to add an order executor to the app. The order executor
+        should be an instance of OrderExecutor.
+
+        Args:
+            order_executor: Instance of OrderExecutor
+
+        Returns:
+            None
+        """
+
+        if inspect.isclass(order_executor):
+            order_executor = order_executor()
+
+        if not isinstance(order_executor, OrderExecutor):
+            raise OperationalException(
+                "Order executor should be an instance of OrderExecutor"
+            )
+
+        order_executor_lookup = self.container.order_executor_lookup()
+        order_executor_lookup.add_order_executor(
+            order_executor=order_executor
+        )
+
+    def get_order_executors(self):
+        """
+        Function to get all order executors from the app. This method
+        should be called when you want to get all order executors.
+
+        Returns:
+            List of OrderExecutor instances
+        """
+        order_executor_lookup = self.container.order_executor_lookup()
+        return order_executor_lookup.get_all()
+
+    def add_portfolio_provider(self, portfolio_provider):
+        """
+        Function to add a portfolio provider to the app. The portfolio
+        provider should be an instance of PortfolioProvider.
+
+        Args:
+            portfolio_provider: Instance of PortfolioProvider
+
+        Returns:
+            None
+        """
+
+        if inspect.isclass(portfolio_provider):
+            portfolio_provider = portfolio_provider()
+
+        if not isinstance(portfolio_provider, PortfolioProvider):
+            raise OperationalException(
+                "Portfolio provider should be an instance of "
+                "PortfolioProvider"
+            )
+
+        portfolio_provider_lookup = self.container.portfolio_provider_lookup()
+        portfolio_provider_lookup.add_portfolio_provider(
+            portfolio_provider=portfolio_provider
+        )
+
+    def get_portfolio_providers(self):
+        """
+        Function to get all portfolio providers from the app. This method
+        should be called when you want to get all portfolio providers.
+
+        Returns:
+            List of PortfolioProvider instances
+        """
+        portfolio_provider_lookup = self.container.portfolio_provider_lookup()
+        return portfolio_provider_lookup.get_all()
+
+    def _initialize_portfolios(self):
+        """
+        Function to initialize the portfolios. This function will
+        first check if the app is running in backtest mode or not. If it is
+        running in backtest mode, it will create the portfolios with the
+        initial amount specified in the config. If it is not running in
+        backtest mode, it will check if there are
+
+        """
+        logger.info("Initializing portfolios")
+        config = self.config
+
+        portfolio_configuration_service = self.container \
+            .portfolio_configuration_service()
+        portfolio_service = self.container.portfolio_service()
+
+        # Throw an error if no portfolios are configured
+        if portfolio_configuration_service.count() == 0:
+            raise OperationalException("No portfolios configured")
+
+        if Environment.BACKTEST.equals(config[ENVIRONMENT]):
+            logger.info("Setting up backtest portfolios")
+            initial_backtest_amount = config.get(
+                BACKTESTING_INITIAL_AMOUNT, None
+            )
+
+            for portfolio_configuration \
+                    in portfolio_configuration_service.get_all():
+
+                if not portfolio_service.exists(
+                    {"identifier": portfolio_configuration.identifier}
+                ):
+                    portfolio = (
+                        portfolio_service.create_portfolio_from_configuration(
+                            portfolio_configuration,
+                            initial_amount=initial_backtest_amount,
+                        )
+                    )
+        else:
+            # Check if there are already existing portfolios
+            portfolios = portfolio_service.get_all()
+            portfolio_configurations = portfolio_configuration_service\
+                .get_all()
+
+            if len(portfolios) > 0:
+
+                # Check if there are matching portfolio configurations
+                for portfolio in portfolios:
+                    logger.info(
+                        f"Checking if there is an matching portfolio "
+                        "configuration "
+                        f"for portfolio {portfolio.identifier}"
+                    )
+                    portfolio_configuration = \
+                        portfolio_configuration_service.get(
+                            portfolio.market
+                        )
+
+                    if portfolio_configuration is None:
+                        raise ImproperlyConfigured(
+                            f"No matching portfolio configuration found for "
+                            f"existing portfolio {portfolio.market}, "
+                            f"please make sure that you have configured your "
+                            f"app with the right portfolio configurations "
+                            f"for the existing portfolios."
+                            f"If you want to create a new portfolio, please "
+                            f"remove the existing database (WARNING!!: this "
+                            f"will remove all existing history of your "
+                            f"trading bot.)"
+                        )
+
+                    # Check if the portfolio configuration is still inline
+                    # with the initial balance
+
+                    if portfolio_configuration.initial_balance != \
+                            portfolio.initial_balance:
+                        logger.warning(
+                            "The initial balance of the portfolio "
+                            "configuration is different from the existing "
+                            "portfolio. Checking if the existing portfolio "
+                            "can be updated..."
+                        )
+
+                        portfolio_provider_lookup = \
+                            self.container.portfolio_provider_lookup()
+                        # Register a portfolio provider for the portfolio
+                        portfolio_provider_lookup \
+                            .register_portfolio_provider_for_market(
+                                portfolio_configuration.market
+                            )
+                        initial_balance = portfolio_configuration\
+                            .initial_balance
+
+                        if initial_balance != portfolio.initial_balance:
+                            raise ImproperlyConfigured(
+                                "The initial balance of the portfolio "
+                                "configuration is different then that of "
+                                "the existing portfolio. Please make sure "
+                                "that the initial balance of the portfolio "
+                                "configuration is the same as that of the "
+                                "existing portfolio. "
+                                f"Existing portfolio initial balance: "
+                                f"{portfolio.initial_balance}, "
+                                f"Portfolio configuration initial balance: "
+                                f"{portfolio_configuration.initial_balance}"
+                                "If this is intentional, please remove "
+                                "the database and re-run the app. "
+                                "WARNING!!: this will remove all existing "
+                                "history of your trading bot."
+                            )
+
+            portfolio_provider_lookup = \
+                self.container.portfolio_provider_lookup()
+            order_executor_lookup = self.container.order_executor_lookup()
+
+            # Register portfolio providers and order executors
+            for portfolio_configuration in portfolio_configurations:
+
+                # Register a portfolio provider for the portfolio
+                portfolio_provider_lookup\
+                    .register_portfolio_provider_for_market(
+                        portfolio_configuration.market
+                    )
+
+                # Register an order executor for the portfolio
+                order_executor_lookup.register_order_executor_for_market(
+                    portfolio_configuration.market
+                )
+
+                market_credential = \
+                    self._market_credential_service.get(
+                        portfolio_configuration.market
+                    )
+
+                if market_credential is None:
+                    raise ImproperlyConfigured(
+                        f"No market credential found for existing "
+                        f"portfolio {portfolio_configuration.market} "
+                        "with market "
+                        "Cannot initialize portfolio configuration."
+                    )
+
+                if not portfolio_service.exists(
+                    {"identifier": portfolio_configuration.identifier}
+                ):
+                    portfolio_service.create_portfolio_from_configuration(
+                        portfolio_configuration
+                    )
+
+            logger.info("Portfolio configurations complete")
+            logger.info("Syncing portfolios")
+            portfolio_service = self.container.portfolio_service()
+            portfolio_sync_service = self.container.portfolio_sync_service()
+
+            for portfolio in portfolio_service.get_all():
+                logger.info(f"Syncing portfolio {portfolio.identifier}")
+                portfolio_sync_service.sync_unallocated(portfolio)
+                portfolio_sync_service.sync_orders(portfolio)
+
+    def _initialize_default_portfolio_providers(self):
+        """
+        Function to initialize the default portfolio providers.
+        This function will create a default portfolio provider for
+        each market that is configured in the app. The default portfolio
+        provider will be used to create portfolios for the app.
+
+        Returns:
+            None
+        """
+        logger.info("Adding default portfolio providers")
+        portfolio_provider_lookup = self.container.portfolio_provider_lookup()
+        portfolio_provider_lookup.add_portfolio_provider(
+            CCXTPortfolioProvider()
+        )
+
+    def _initialize_default_order_executors(self):
+        """
+        Function to initialize the default order executors.
+        This function will create a default order executor for
+        each market that is configured in the app. The default order
+        executor will be used to create orders for the app.
+
+        Returns:
+            None
+        """
+        logger.info("Adding default order executors")
+        order_executor_lookup = self.container.order_executor_lookup()
+        order_executor_lookup.add_order_executor(
+            CCXTOrderExecutor()
+        )

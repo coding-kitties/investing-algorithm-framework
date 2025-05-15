@@ -1,8 +1,7 @@
 import logging
 
 from investing_algorithm_framework.domain import OperationalException, \
-    AbstractPortfolioSyncService, RESERVED_BALANCES, SYMBOLS, \
-    ENVIRONMENT, Environment
+    AbstractPortfolioSyncService, ENVIRONMENT, Environment
 from investing_algorithm_framework.services.trade_service import TradeService
 
 logger = logging.getLogger(__name__)
@@ -11,6 +10,19 @@ logger = logging.getLogger(__name__)
 class PortfolioSyncService(AbstractPortfolioSyncService):
     """
     Service to sync the portfolio with the exchange.
+
+    This service will sync the portfolio with the exchange
+
+    Attributes:
+        trade_service: TradeService object
+        configuration_service: ConfigurationService object
+        order_service: OrderService object
+        position_repository: PositionRepository object
+        portfolio_repository: PortfolioRepository object
+        market_credential_service: MarketCredentialService object
+        market_service: MarketService object
+        portfolio_configuration_service: PortfolioConfigurationService object
+        portfolio_provider_lookup: PortfolioProviderLookup object
     """
 
     def __init__(
@@ -22,7 +34,8 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
         portfolio_repository,
         portfolio_configuration_service,
         market_credential_service,
-        market_service
+        market_service,
+        portfolio_provider_lookup
     ):
         self.trade_service = trade_service
         self.configuration_service = configuration_service
@@ -32,6 +45,7 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
         self.market_credential_service = market_credential_service
         self.market_service = market_service
         self.portfolio_configuration_service = portfolio_configuration_service
+        self.portfolio_provider_lookup = portfolio_provider_lookup
 
     def sync_unallocated(self, portfolio):
         """
@@ -71,13 +85,17 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
                 f"{portfolio.market}. Cannot sync unallocated amount."
             )
 
-        # Get the unallocated balance of the portfolio from the exchange
-        balances = self.market_service.get_balance(market=portfolio.market)
+        portfolio_provider = self.portfolio_provider_lookup\
+            .get_portfolio_provider(portfolio.market)
+
+        position = portfolio_provider.get_position(
+            portfolio, portfolio.trading_symbol, market_credential
+        )
 
         if not portfolio.initialized:
             # Check if the portfolio has an initial balance set
             if portfolio.initial_balance is not None:
-                available = float(balances[portfolio.trading_symbol.upper()])
+                available = position.amount
 
                 if portfolio.initial_balance > available:
                     raise OperationalException(
@@ -96,7 +114,7 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
             else:
                 # If the portfolio does not have an initial balance
                 # set, get the available balance on the exchange
-                if portfolio.trading_symbol.upper() not in balances:
+                if position is None:
                     raise OperationalException(
                         f"There is no available balance on the exchange for "
                         f"{portfolio.trading_symbol.upper()} on market "
@@ -106,9 +124,7 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
                         f"{portfolio.market}."
                     )
                 else:
-                    unallocated = float(
-                        balances[portfolio.trading_symbol.upper()]
-                    )
+                    unallocated = position.amount
 
             update_data = {
                 "unallocated": unallocated,
@@ -134,12 +150,10 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
             # Check if the portfolio unallocated balance is
             # available on the exchange
             if portfolio.unallocated > 0:
-                if portfolio.trading_symbol.upper() not in balances \
-                    or portfolio.unallocated > \
-                        float(balances[portfolio.trading_symbol.upper()]):
+                if position is None or portfolio.unallocated > position.amount:
                     raise OperationalException(
                         f"Out of sync: the unallocated balance"
-                        " of the portfolio is more than the available"
+                        " of the exiting portfolio is more than the available"
                         " balance on the exchange. Please make sure"
                         " that you have at least "
                         f"{portfolio.unallocated}"
@@ -148,64 +162,6 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
                     )
 
         return portfolio
-
-    def sync_positions(self, portfolio):
-        """
-        Method to sync the portfolio balances with the balances
-        on the exchange.
-        This method will retrieve the balances from the exchange and update
-        the portfolio balances accordingly.
-
-        If the unallocated balance of the portfolio is less than the available
-        balance on the exchange, the unallocated balance of the portfolio will
-        be updated to match the available balance on the exchange.
-
-        If the unallocated balance of the portfolio is more than the available
-        balance on the exchange, an OperationalException will be raised.
-        """
-        portfolio_configuration = self.portfolio_configuration_service \
-            .get(portfolio.identifier)
-        balances = self.market_service \
-            .get_balance(market=portfolio_configuration.market)
-        reserved_balances = self.configuration_service.config \
-            .get(RESERVED_BALANCES, {})
-        symbols = self._get_symbols(portfolio)
-
-        # If config symbols is set, add the symbols to the balances
-        if SYMBOLS in self.configuration_service.config \
-                and self.configuration_service.config[SYMBOLS] is not None:
-            for symbol in symbols:
-                target_symbol = symbol.split("/")[0]
-
-                if target_symbol not in balances:
-                    balances[target_symbol] = 0
-
-        for key, value in balances.items():
-            logger.info(f"Syncing balance for {key}")
-            amount = float(value)
-
-            if key in reserved_balances:
-                logger.info(
-                    f"{key} has reserved balance of {reserved_balances[key]}"
-                )
-                reserved = float(reserved_balances[key])
-                amount = amount - reserved
-
-            if self.position_repository.exists({"symbol": key}):
-                position = self.position_repository.find({"symbol": key})
-                data = {"amount": amount}
-                self.position_repository.update(position.id, data)
-            else:
-                portfolio = self.portfolio_repository.find(
-                    {"identifier": portfolio.identifier}
-                )
-                self.position_repository.create(
-                    {
-                        "symbol": key,
-                        "amount": amount,
-                        "portfolio_id": portfolio.id
-                    }
-                )
 
     def sync_orders(self, portfolio):
         """
@@ -227,50 +183,4 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
                 and Environment.BACKTEST.equals(config[ENVIRONMENT]):
             return
 
-        self.order_service.check_pending_orders(portfolio=portfolio)
-
-    def _get_symbols(self, portfolio):
-        config = self.configuration_service.config
-        available_symbols = []
-
-        # Check if there already are positions
-        positions = self.position_repository.get_all(
-            {"identifier": portfolio.get_identifier()}
-        )
-
-        if len(positions) > 0:
-            available_symbols = [
-                f"{position.get_symbol()}/{portfolio.get_trading_symbol()}"
-                for position in positions
-                if position.get_symbol() != portfolio.trading_symbol
-            ]
-
-        if SYMBOLS in config and config[SYMBOLS] is not None:
-            symbols = config[SYMBOLS]
-
-            if not isinstance(symbols, list):
-                raise OperationalException(
-                    "The symbols configuration should be a list of strings"
-                )
-
-            market_symbols = self.market_service.get_symbols(portfolio.market)
-
-            for symbol in symbols:
-
-                if symbol not in market_symbols:
-                    raise OperationalException(
-                        f"The symbol {symbol} in the configuration is not "
-                        "available on the exchange. Please make sure that the "
-                        "symbols in the configuration are available on the "
-                        "exchange. The available symbols on the exchange are: "
-                        f"{market_symbols}"
-                    )
-                else:
-
-                    if symbol not in available_symbols:
-                        available_symbols.append(symbol)
-        else:
-            market_symbols = self.market_service.get_symbols(portfolio.market)
-            available_symbols = market_symbols
-
-        return available_symbols
+        self.order_service.check_pending_orders(portfolio)

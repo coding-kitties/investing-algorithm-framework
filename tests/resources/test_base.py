@@ -9,8 +9,8 @@ from investing_algorithm_framework import create_app, Algorithm, App, \
     TradingStrategy, TimeUnit, OrderStatus
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
     ENVIRONMENT, Environment
-from investing_algorithm_framework.infrastructure.database import Session
-from tests.resources.stubs import MarketServiceStub
+from tests.resources.stubs import MarketServiceStub, \
+    PortfolioSyncServiceStub, OrderExecutorTest, PortfolioProviderTest
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class StrategyOne(TradingStrategy):
 class TestBase(TestCase):
     portfolio_configurations = []
     config = {}
-    external_balances = {}
+    external_balances = None
     external_orders = []
     initial_orders = []
     market_credentials = []
@@ -51,6 +51,18 @@ class TestBase(TestCase):
         self.market_service.balances = self.external_balances
         self.market_service.orders = self.external_orders
         self.app.container.market_service.override(self.market_service)
+        order_executor_lookup = self.app.container.order_executor_lookup()
+        order_executor_lookup.reset()
+        portfolio_provider_lookup = self.app.container\
+            .portfolio_provider_lookup()
+        portfolio_provider_lookup.reset()
+        self.app.add_order_executor(OrderExecutorTest())
+        portfolio_provider = PortfolioProviderTest()
+
+        if self.external_balances is not None:
+            portfolio_provider.external_balances = self.external_balances
+
+        self.app.add_portfolio_provider(portfolio_provider)
 
         if self.market_data_source_service is not None:
             self.app.container.market_data_source_service\
@@ -157,6 +169,33 @@ class FlaskTestBase(FlaskTestCase):
         self.market_service.balances = self.external_balances
         self.market_service.orders = self.external_orders
         self.iaf_app.container.market_service.override(self.market_service)
+        order_executor_lookup = self.iaf_app.container.order_executor_lookup()
+        order_executor_lookup.reset()
+        portfolio_provider_lookup = self.iaf_app.container\
+            .portfolio_provider_lookup()
+        portfolio_provider_lookup.reset()
+        self.iaf_app.add_order_executor(OrderExecutorTest())
+        portfolio_provider = PortfolioProviderTest()
+
+        if self.external_balances is not None:
+            portfolio_provider.external_balances = self.external_balances
+
+        self.iaf_app.add_portfolio_provider(portfolio_provider)
+
+        # if self.market_data_source_service is not None:
+        #     self.app.container.market_data_source_service\
+        #         .override(self.market_data_source_service)
+
+        if len(self.portfolio_configurations) > 0:
+            for portfolio_configuration in self.portfolio_configurations:
+                self.iaf_app.add_portfolio_configuration(
+                    portfolio_configuration
+                )
+
+        # Add all market credentials
+        if len(self.market_credentials) > 0:
+            for market_credential in self.market_credentials:
+                self.iaf_app.add_market_credential(market_credential)
 
         if len(self.portfolio_configurations) > 0:
                 for portfolio_configuration in self.portfolio_configurations:

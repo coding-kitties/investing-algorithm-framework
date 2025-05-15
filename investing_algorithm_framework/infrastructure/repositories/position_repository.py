@@ -9,6 +9,7 @@ class SQLPositionRepository(Repository):
     DEFAULT_NOT_FOUND_MESSAGE = "Position not found"
 
     def _apply_query_params(self, db, query, query_params):
+        id_query_param = self.get_query_param("id", query_params)
         amount_query_param = self.get_query_param("amount", query_params)
         symbol_query_param = self.get_query_param("symbol", query_params)
         portfolio_query_param = self.get_query_param("portfolio", query_params)
@@ -21,6 +22,9 @@ class SQLPositionRepository(Repository):
             "amount_lte", query_params
         )
         order_id_query_param = self.get_query_param("order_id", query_params)
+
+        if id_query_param:
+            query = query.filter_by(id=id_query_param)
 
         if amount_query_param:
             query = query.filter(

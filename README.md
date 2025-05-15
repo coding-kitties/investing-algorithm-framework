@@ -72,9 +72,9 @@ The following example connects to Binance and buys BTC every 2 hours.
 import logging.config
 from dotenv import load_dotenv
 
-from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    TimeUnit, CCXTOHLCVMarketDataSource, Context, CCXTTickerMarketDataSource, \
-    MarketCredential, DEFAULT_LOGGING_CONFIG, Algorithm, Context
+from investing_algorithm_framework import create_app, TimeUnit, \
+    CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, \
+    DEFAULT_LOGGING_CONFIG, Algorithm, Context
 
 load_dotenv()
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
@@ -93,17 +93,15 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
     market="BITVAVO",
     symbol="BTC/EUR",
 )
-app = create_app()
 
 # Bitvavo market credentials are read from .env file, or you can
 # set them  manually as params
-app.add_market_credential(MarketCredential(market="bitvavo"))
-app.add_portfolio_configuration(
-    PortfolioConfiguration(
-        market="bitvavo", trading_symbol="EUR", initial_balance=40
-    )
+app = create_app()
+app.add_market(
+    market="BITVAVO",
+    trading_symbol="EUR",
+    initial_balance=100
 )
-
 algorithm = Algorithm(name="test_algorithm")
 
 # Define a strategy for the algorithm that will run every 10 seconds
@@ -338,8 +336,8 @@ This will ensure that interested parties can give valuable feedback on the featu
 
 ## 📬 Support
 
-* Slack Community
-* Reddit Community
+* [Reddit Community](https://www.reddit.com/r/InvestingBots/)
+* [Discord Community](https://discord.gg/dQsRmGZP")
 
 
 ## 🏆 Acknowledgements

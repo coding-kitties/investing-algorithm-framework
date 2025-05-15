@@ -1,4 +1,7 @@
+from typing import Union
 from abc import ABC, abstractmethod
+
+from investing_algorithm_framework.domain import Order, Position
 
 
 class PortfolioProvider(ABC):
@@ -7,56 +10,80 @@ class PortfolioProvider(ABC):
     is responsible for managing and providing access to trading portfolios.
 
     Attributes:
-        portfolio_id (str): The unique identifier for the portfolio.
-        user_id (str): The unique identifier for the user associated
-            with the portfolio.
-        balance (float): The current balance of the portfolio.
-        assets (dict): A dictionary containing the assets in the
-            portfolio and their quantities.
+        priority (int): The priority of the portfolio provider compared to
+            other portfolio providers. The lower the number, the higher the
+            priority. The framework will use this priority when searching
+            for a portfolio provider for a specific symbol or market.
     """
 
-    @abstractmethod
-    def get_order(self, order_id: str):
+    def __init__(self, priority=1):
+        self._priority = priority
+
+    @property
+    def priority(self):
         """
-        Fetches an order by its ID.
+        Returns the priority of the portfolio provider.
+        """
+        return self._priority
+
+    @abstractmethod
+    def get_order(
+        self, portfolio, order, market_credential
+    ) -> Union[Order, None]:
+        """
+        Function to get an order from the exchange or broker. The returned
+        should be an order object that reflects the current state of the
+        order on the exchange or broker.
+
+        !IMPORTANT: This function should return None if the order is
+        not found or if the order is not available on the
+        exchange or broker. Please do not throw an exception if the
+        order is not found.
 
         Args:
-            order_id (str): The unique identifier for the order.
+            portfolio: Portfolio object
+            order: Order object from the database
+            market_credential: Market credential object
 
         Returns:
-            Order: The order object.
+            Order: Order object reflecting the order on the exchange or broker
         """
-        pass
+        raise NotImplementedError("Subclasses must implement this method.")
 
     @abstractmethod
-    def get_orders(self):
+    def get_position(
+        self, portfolio, symbol, market_credential
+    ) -> Union[Position, None]:
         """
-        Fetches all orders in the portfolio.
+        Function to get the position for a given symbol in the portfolio.
+        The returned position should be an object that reflects the current
+        state of the position on the exchange or broker.
 
-        Returns:
-            List[Order]: A list of order objects.
-        """
-        pass
-
-    @abstractmethod
-    def get_position(self, position_id: str):
-        """
-        Fetches a position by its ID.
+        !IMPORTANT: This function should return None if the position is
+        not found or if the position is not available on the
+        exchange or broker. Please do not throw an exception if the
+        position is not found.
 
         Args:
-            position_id (str): The unique identifier for the position.
+            portfolio: Portfolio object
+            symbol: Symbol object
+            market_credential: MarketCredential object
 
         Returns:
-            Position: The position object.
+            float: Position for the given symbol in the portfolio
         """
-        pass
+        raise NotImplementedError("Subclasses must implement this method.")
 
     @abstractmethod
-    def get_positions(self):
+    def supports_market(self, market) -> bool:
         """
-        Fetches all positions in the portfolio.
+        Function to check if the market is supported by the portfolio
+        provider.
+
+        Args:
+            market: Market object
 
         Returns:
-            List[Position]: A list of position objects.
+            bool: True if the market is supported, False otherwise
         """
-        pass
+        raise NotImplementedError("Subclasses must implement this method.")

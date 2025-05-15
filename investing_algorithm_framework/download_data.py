@@ -34,6 +34,10 @@ def download(
         pandas (bool): Whether to return the data as a pandas DataFrame.
         save (bool): Whether to save the downloaded data.
         storage_path (str): The directory to save the downloaded data.
+        time_frame (str): The time frame for the data download.
+        date (str): The date for the data download.
+        window_size (int): The size of the data window.
+        pandas (bool): Whether to return the data as a pandas DataFrame.
 
     Returns:w
         None

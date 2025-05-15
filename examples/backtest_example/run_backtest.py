@@ -1,13 +1,14 @@
-import time
-from datetime import datetime
 import logging.config
+import time
 from datetime import datetime, timedelta
-from investing_algorithm_framework import (
-    CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, PortfolioConfiguration, create_app, pretty_print_backtest, BacktestDateRange, TimeUnit, TradingStrategy, OrderSide, DEFAULT_LOGGING_CONFIG, Context
-)
 
 from pyindicators import ema, is_crossover, is_above, is_below, is_crossunder
 
+from investing_algorithm_framework import (
+    CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, create_app,
+    pretty_print_backtest, BacktestDateRange, TimeUnit, TradingStrategy,
+    OrderSide, DEFAULT_LOGGING_CONFIG, Context
+)
 
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
 

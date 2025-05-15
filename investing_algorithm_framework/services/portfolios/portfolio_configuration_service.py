@@ -30,8 +30,14 @@ class PortfolioConfigurationService:
             None
         )
 
-        if portfolio_configuration is None:
-            raise ApiException('Portfolio configuration not found', 404)
+        # if portfolio_configuration is None:
+        #     raise ApiException(
+        #         f'Portfolio configuration not '
+        #         f'found for {identifier}'
+        #         " Please make sure that you have registered a portfolio "
+        #         "configuration for the portfolio you are trying to use",
+        #         404
+        #     )
 
         return portfolio_configuration
 

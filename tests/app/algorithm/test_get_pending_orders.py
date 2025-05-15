@@ -65,9 +65,6 @@ class TestPortfolioService(TestBase):
             },
         ),
     ]
-    external_balances = {
-        "EUR": 700,
-    }
     market_data_source_service = MarketDataSourceServiceStub()
 
     def test_get_pending_orders(self):
@@ -77,6 +74,7 @@ class TestPortfolioService(TestBase):
         The test should make sure that the portfolio service can sync
         existing orders from the market service to the order service.
         """
+
         portfolio_service: PortfolioService \
             = self.app.container.portfolio_service()
         portfolio = portfolio_service.find({"market": "binance"})
@@ -133,9 +131,9 @@ class TestPortfolioService(TestBase):
 
         # Check if eur position exists
         eur_position = position_service.find(
-            {"portfolio_id": portfolio.id, "symbol": "EUR"}
+            {"portfolio_id": portfolio.id, "symbol": portfolio.trading_symbol}
         )
-        self.assertEqual(400, eur_position.amount)
+        self.assertEqual(700, eur_position.amount)
 
         pending_orders = self.app.context.get_pending_orders()
         self.assertEqual(2, len(pending_orders))

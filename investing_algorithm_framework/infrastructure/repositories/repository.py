@@ -5,7 +5,7 @@ from typing import Callable
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.datastructures import MultiDict
 
-from investing_algorithm_framework.domain import ApiException, \
+from investing_algorithm_framework.domain import OperationalException, \
     DEFAULT_PAGE_VALUE, DEFAULT_PER_PAGE_VALUE
 from investing_algorithm_framework.infrastructure.database import Session
 
@@ -18,18 +18,21 @@ class Repository(ABC):
     DEFAULT_PER_PAGE = DEFAULT_PER_PAGE_VALUE
     DEFAULT_PAGE = DEFAULT_PAGE_VALUE
 
-    def create(self, data):
+    def create(self, data, save=True):
+        created_object = self.base_class(**data)
 
-        with Session() as db:
-            try:
-                created_object = self.base_class(**data)
-                db.add(created_object)
-                db.commit()
-                return self.get(created_object.id)
-            except SQLAlchemyError as e:
-                logger.error(e)
-                db.rollback()
-                raise ApiException("Error creating object")
+        if save:
+            with Session() as db:
+                try:
+                    db.add(created_object)
+                    db.commit()
+                    return self.get(created_object.id)
+                except SQLAlchemyError as e:
+                    logger.error(e)
+                    db.rollback()
+                    raise OperationalException("Error creating object")
+
+        return created_object
 
     def update(self, object_id, data):
 
@@ -43,7 +46,7 @@ class Repository(ABC):
             except SQLAlchemyError as e:
                 logger.error(e)
                 db.rollback()
-                raise ApiException("Error updating object")
+                raise OperationalException("Error updating object")
 
     def update_all(self, query_params, data):
 
@@ -63,7 +66,7 @@ class Repository(ABC):
             except SQLAlchemyError as e:
                 logger.error(e)
                 db.rollback()
-                raise ApiException("Error updating object")
+                raise OperationalException("Error updating object")
 
     def delete(self, object_id):
 
@@ -76,13 +79,13 @@ class Repository(ABC):
             except SQLAlchemyError as e:
                 logger.error(e)
                 db.rollback()
-                raise ApiException("Error deleting object")
+                raise OperationalException("Error deleting object")
 
     def delete_all(self, query_params):
 
         with Session() as db:
             if query_params is None:
-                raise ApiException("No parameters are required")
+                raise OperationalException("No parameters are required")
 
             try:
                 query_set = db.query(self.base_class)
@@ -97,7 +100,7 @@ class Repository(ABC):
             except SQLAlchemyError as e:
                 logger.error(e)
                 db.rollback()
-                raise ApiException("Error deleting all objects")
+                raise OperationalException("Error deleting all objects")
 
     def get_all(self, query_params=None):
         query_params = MultiDict(query_params)
@@ -111,7 +114,7 @@ class Repository(ABC):
                 return query_set.all()
             except SQLAlchemyError as e:
                 logger.error(e)
-                raise ApiException("Error getting all objects")
+                raise OperationalException("Error getting all objects")
 
     def get(self, object_id):
 
@@ -120,8 +123,8 @@ class Repository(ABC):
                 .first()
 
             if not match:
-                raise ApiException(
-                    self.DEFAULT_NOT_FOUND_MESSAGE, status_code=404
+                raise OperationalException(
+                    self.DEFAULT_NOT_FOUND_MESSAGE
                 )
 
             return match
@@ -146,12 +149,12 @@ class Repository(ABC):
                 return query.first() is not None
             except SQLAlchemyError as e:
                 logger.error(e)
-                raise ApiException("Error checking if object exists")
+                raise OperationalException("Error checking if object exists")
 
     def find(self, query_params):
 
         if query_params is None or len(query_params) == 0:
-            raise ApiException("Find requires query parameters")
+            raise OperationalException("Find requires query parameters")
 
         with Session() as db:
             try:
@@ -160,12 +163,12 @@ class Repository(ABC):
                 result = query.first()
 
                 if result is None:
-                    raise ApiException(self.DEFAULT_NOT_FOUND_MESSAGE)
+                    raise OperationalException(self.DEFAULT_NOT_FOUND_MESSAGE)
 
                 return result
             except SQLAlchemyError as e:
                 logger.error(e)
-                raise ApiException(self.DEFAULT_NOT_FOUND_MESSAGE)
+                raise OperationalException(self.DEFAULT_NOT_FOUND_MESSAGE)
 
     def count(self, query_params=None):
 
@@ -176,7 +179,7 @@ class Repository(ABC):
                 return query.count()
             except SQLAlchemyError as e:
                 logger.error(e)
-                raise ApiException("Error counting objects")
+                raise OperationalException("Error counting objects")
 
     def normalize_query_param(self, value):
         """
@@ -197,7 +200,7 @@ class Repository(ABC):
             if not throw_exception:
                 return False
 
-            raise ApiException(f"{key} is not specified")
+            raise OperationalException(f"{key} is not specified")
         else:
             return True
 
@@ -248,17 +251,25 @@ class Repository(ABC):
 
         return new_selection
 
-    def save(self, object):
+    def save(self, object_to_save):
+        """
+        Save an object to the database with SQLAlchemy.
 
+        Args:
+            object_to_save: instance of the object to save.
+
+        Returns:
+            Object: The saved object.
+        """
         with Session() as db:
             try:
-                db.add(object)
+                db.add(object_to_save)
                 db.commit()
-                return self.get(object.id)
+                return self.get(object_to_save.id)
             except SQLAlchemyError as e:
                 logger.error(e)
                 db.rollback()
-                raise ApiException("Error saving object")
+                raise OperationalException("Error saving object")
 
     def save_objects(self, objects):
 
@@ -271,4 +282,4 @@ class Repository(ABC):
             except SQLAlchemyError as e:
                 logger.error(e)
                 db.rollback()
-                raise ApiException("Error saving objects")
+                raise OperationalException("Error saving objects")

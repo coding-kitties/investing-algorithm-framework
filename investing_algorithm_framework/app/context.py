@@ -74,7 +74,7 @@ class Context:
         execute=True,
         validate=True,
         sync=True
-    ):
+    ) -> Order:
         """
         Function to create an order. This function will create an order
         and execute it if the execute parameter is set to True. If the
@@ -157,7 +157,7 @@ class Context:
         execute=True,
         validate=True,
         sync=True
-    ):
+    ) -> Order:
         """
         Function to create a limit order. This function will create a limit
         order and execute it if the execute parameter is set to True. If the
@@ -237,6 +237,10 @@ class Context:
                 "parameter must be specified."
             )
 
+        logger.info(
+            f"Creating limit order: {target_symbol} "
+            f"{order_side} {amount} @ {price}"
+        )
         order_data = {
             "target_symbol": target_symbol,
             "price": price,
@@ -274,7 +278,7 @@ class Context:
         if market is None:
             return self.portfolio_service.get_all()[0]
 
-        return self.portfolio_service.find({{"market": market}})
+        return self.portfolio_service.find({"market": market})
 
     def get_portfolios(self):
         """
@@ -676,32 +680,53 @@ class Context:
         return (position.cost / net_size) * 100
 
     def close_position(
-        self, symbol, market=None, identifier=None, precision=None
-    ):
+        self, position=None, symbol=None, portfolio=None, precision=None
+    ) -> Order:
         """
         Function to close a position. This function will close a position
         by creating a market order to sell the position. If the precision
         parameter is specified, the amount of the order will be rounded
         down to the specified precision.
 
-        Parameters:
-            symbol: The symbol of the asset
-            market: The market of the asset
-            identifier: The identifier of the portfolio
-            precision: The precision of the amount
+        Args:
+            position (Optional): The position to close
+            symbol (Optional): The symbol of the asset
+            portfolio (Optional): The portfolio where the position is located
+            precision (Optional): The precision of the amount
 
         Returns:
-            None
+            Order: The order created to close the position
         """
-        portfolio = self.portfolio_service.find(
-            {"market": market, "identifier": identifier}
-        )
-        position = self.position_service.find(
-            {"portfolio": portfolio.id, "symbol": symbol}
-        )
+        query_params = {}
+
+        if position is None and (symbol is None and portfolio is None):
+            raise OperationalException(
+                "Either position or symbol and portfolio parameters must "
+                "be specified to close a position."
+            )
+
+        if position is not None:
+            query_params["id"] = position.id
+            query_params["symbol"] = position.symbol
+
+        if symbol is not None:
+            query_params["symbol"] = symbol
+
+        if portfolio is not None:
+            query_params["portfolio"] = portfolio.id
+
+        position = self.position_service.find(query_params)
+        portfolio = self.portfolio_service.get(position.portfolio_id)
 
         if position.get_amount() == 0:
-            return
+            logger.warning("Cannot close position. Amount is 0.")
+            return None
+
+        if position.get_symbol() == portfolio.get_trading_symbol():
+            raise OperationalException(
+                "Cannot close position. The position is the same as the "
+                "trading symbol of the portfolio."
+            )
 
         for order in self.order_service \
                 .get_all(
@@ -712,11 +737,17 @@ class Context:
                 ):
             self.order_service.cancel_order(order)
 
-        symbol = f"{symbol.upper()}/{portfolio.trading_symbol.upper()}"
+        target_symbol = position.get_symbol()
+        symbol = f"{target_symbol.upper()}/{portfolio.trading_symbol.upper()}"
         ticker = self.market_data_source_service.get_ticker(
-            symbol=symbol, market=market
+            symbol=symbol, market=portfolio.market
         )
-        self.create_limit_order(
+        logger.info(
+            f"Closing position {position.symbol} "
+            f"with amount {position.get_amount()} "
+            f"at price {ticker['bid']}"
+        )
+        return self.create_limit_order(
             target_symbol=position.symbol,
             amount=position.get_amount(),
             order_side=OrderSide.SELL.value,
@@ -843,6 +874,100 @@ class Context:
         query_params["order_side"] = OrderSide.BUY.value
         query_params["status"] = OrderStatus.OPEN.value
         return self.order_service.exists(query_params)
+
+    def get_sell_orders(self, target_symbol, identifier=None, market=None):
+        query_params = {}
+
+        if identifier is not None:
+            portfolio = self.portfolio_service.find(
+                {"identifier": identifier}
+            )
+            query_params["portfolio"] = portfolio.id
+
+        if market is not None:
+            portfolio = self.portfolio_service.find(
+                {"market": market}
+            )
+            query_params["portfolio"] = portfolio.id
+
+        query_params["target_symbol"] = target_symbol
+        query_params["order_side"] = OrderSide.SELL.value
+        return self.order_service.get_all(query_params)
+
+    def get_open_orders(
+        self, target_symbol=None, identifier=None, market=None
+    ) -> List[Order]:
+        """
+        Function to get all open orders. This function will return all
+        open orders that match the specified query parameters.
+
+        Args:
+            target_symbol (str): the symbol of the asset
+            identifier (str): the identifier of the portfolio
+            market (str): the market of the asset
+
+        Returns:
+            List[Order]: A list of open orders that match the query parameters
+        """
+        query_params = {}
+
+        if identifier is not None:
+            portfolio = self.portfolio_service.find(
+                {"identifier": identifier}
+            )
+            query_params["portfolio"] = portfolio.id
+
+        if market is not None:
+            portfolio = self.portfolio_service.find(
+                {"market": market}
+            )
+            query_params["portfolio"] = portfolio.id
+
+        if target_symbol is not None:
+            query_params["target_symbol"] = target_symbol
+
+        query_params["status"] = OrderStatus.OPEN.value
+        return self.order_service.get_all(query_params)
+
+    def get_closed_orders(
+        self, target_symbol=None, identifier=None, market=None, order_side=None
+    ) -> List[Order]:
+        """
+        Function to get all closed orders. This function will return all
+        closed orders that match the specified query parameters.
+
+        Args:
+            target_symbol (str): the symbol of the asset
+            identifier (str): the identifier of the portfolio
+            market (str): the market of the asset
+            order_side (str): the side of the order
+
+        Returns:
+            List[Order]: A list of closed orders that
+                match the query parameters
+        """
+        query_params = {}
+
+        if identifier is not None:
+            portfolio = self.portfolio_service.find(
+                {"identifier": identifier}
+            )
+            query_params["portfolio"] = portfolio.id
+
+        if order_side is not None:
+            query_params["order_side"] = order_side
+
+        if market is not None:
+            portfolio = self.portfolio_service.find(
+                {"market": market}
+            )
+            query_params["portfolio"] = portfolio.id
+
+        if target_symbol is not None:
+            query_params["target_symbol"] = target_symbol
+
+        query_params["status"] = OrderStatus.CLOSED.value
+        return self.order_service.get_all(query_params)
 
     def has_open_sell_orders(self, target_symbol, identifier=None,
                              market=None):
@@ -1025,6 +1150,33 @@ class Context:
 
         return self.trade_service.count(query_params)
 
+    def get_pending_trades(
+            self, target_symbol=None, market=None
+    ) -> List[Trade]:
+        """
+        Function to get all pending trades. This function will return all
+        pending trades that match the specified query parameters. If the
+        target_symbol parameter is specified, the pending trades with the
+        specified target symbol will be returned. If the market parameter
+        is specified, the pending trades with the specified market will be
+        returned.
+
+        Args:
+            target_symbol: The symbol of the asset
+            market: The market of the asset
+
+        Returns:
+            List[Trade]: A list of pending trades that match
+                the query parameters
+        """
+        return self.trade_service.get_all(
+            {
+                "status": TradeStatus.CREATED.value,
+                "target_symbol": target_symbol,
+                "market": market
+            }
+        )
+
     def get_open_trades(self, target_symbol=None, market=None) -> List[Trade]:
         """
         Function to get all open trades. This function will return all
@@ -1157,7 +1309,7 @@ class Context:
         if TradeStatus.CLOSED.equals(trade.status):
             raise OperationalException("Trade already closed.")
 
-        if trade.remaining <= 0:
+        if trade.available_amount <= 0:
             raise OperationalException("Trade has no amount to close.")
 
         position_id = trade.orders[0].position_id
@@ -1165,7 +1317,7 @@ class Context:
         position = self.position_service.find(
             {"portfolio": portfolio.id, "symbol": trade.target_symbol}
         )
-        amount = trade.remaining
+        amount = trade.available_amount
 
         if precision is not None:
             amount = RoundingService.round_down(amount, precision)
@@ -1183,6 +1335,7 @@ class Context:
             symbol=trade.symbol, market=portfolio.market
         )
 
+        logger.info(f"Closing trade {trade.id} {trade.symbol}")
         self.order_service.create(
             {
                 "portfolio_id": portfolio.id,

@@ -14,6 +14,8 @@ from .repositories import SQLOrderRepository, SQLPositionRepository, \
 from .services import PerformanceService, CCXTMarketService, \
     AzureBlobStorageStateHandler
 from .data_providers import CCXTDataProvider, get_default_data_providers
+from .order_executors import CCXTOrderExecutor
+from .portfolio_providers import CCXTPortfolioProvider
 
 __all__ = [
     "create_all_tables",
@@ -48,5 +50,7 @@ __all__ = [
     "SQLTradeStopLossRepository",
     "SQLOrderMetadataRepository",
     "CCXTDataProvider",
-    "get_default_data_providers"
+    "CCXTOrderExecutor",
+    "CCXTPortfolioProvider",
+    "get_default_data_providers",
 ]

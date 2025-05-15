@@ -6,7 +6,8 @@ from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
     Algorithm, MarketCredential, CSVOHLCVMarketDataSource, \
     CSVTickerMarketDataSource
-from tests.resources import random_string, MarketServiceStub
+from tests.resources import random_string, MarketServiceStub, \
+    PortfolioProviderTest, OrderExecutorTest
 
 class StrategyOne(TradingStrategy):
     time_unit = TimeUnit.SECOND
@@ -15,7 +16,6 @@ class StrategyOne(TradingStrategy):
 
     def apply_strategy(self, context, market_data):
         pass
-
 
 class Test(TestCase):
 
@@ -52,6 +52,8 @@ class Test(TestCase):
 
     def test_trade_recent_price_update(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
+        app.add_portfolio_provider(PortfolioProviderTest)
+        app.add_order_executor(OrderExecutorTest)
         app.container.market_service.override(MarketServiceStub(None))
         app.container.portfolio_configuration_service().clear()
         app.add_market_data_source(
@@ -102,10 +104,12 @@ class Test(TestCase):
         app.initialize()
         app.context.create_limit_order(
             target_symbol="btc",
-            amount=20,
+            amount=1,
             price=20,
             order_side="BUY"
         )
+        order_service = app.container.order_service()
+        order_service.check_pending_orders()
         app.run(number_of_iterations=1)
         strategy_orchestration_service = app.algorithm\
             .strategy_orchestrator_service

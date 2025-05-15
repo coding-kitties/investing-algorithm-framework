@@ -10,6 +10,7 @@ class SQLOrderRepository(Repository):
     DEFAULT_NOT_FOUND_MESSAGE = "The requested order was not found"
 
     def _apply_query_params(self, db, query, query_params):
+        id_query_param = self.get_query_param("id", query_params)
         external_id_query_param = self.get_query_param(
             "external_id", query_params
         )
@@ -33,6 +34,9 @@ class SQLOrderRepository(Repository):
         order_by_created_at_asc = self.get_query_param(
             "order_by_created_at_asc", query_params
         )
+
+        if id_query_param:
+            query = query.filter_by(id=id_query_param)
 
         if portfolio_query_param is not None:
             portfolio = db.query(SQLPortfolio).filter_by(

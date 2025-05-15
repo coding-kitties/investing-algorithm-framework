@@ -3,6 +3,7 @@ from .portfolio_configuration_service import PortfolioConfigurationService
 from .portfolio_service import PortfolioService
 from .portfolio_snapshot_service import PortfolioSnapshotService
 from .portfolio_sync_service import PortfolioSyncService
+from .portfolio_provider_lookup import PortfolioProviderLookup
 
 __all__ = [
     "PortfolioConfigurationService",
@@ -10,5 +11,6 @@ __all__ = [
     "PortfolioSnapshotService",
     "PortfolioService",
     "PortfolioSnapshotService",
-    "BacktestPortfolioService"
+    "BacktestPortfolioService",
+    "PortfolioProviderLookup"
 ]
