@@ -13,7 +13,7 @@ from investing_algorithm_framework.domain import ApiException, \
     DateRange, get_backtest_report, DEFAULT_LOGGING_CONFIG, \
     BacktestReport, TradeStatus, MarketDataType, TradeRiskType, \
     APPLICATION_DIRECTORY, pretty_print_orders, pretty_print_trades, \
-    pretty_print_positions, DataSource
+    pretty_print_positions, DataSource, OrderExecutor, PortfolioProvider
 from investing_algorithm_framework.infrastructure import \
     CCXTOrderBookMarketDataSource, CCXTOHLCVMarketDataSource, \
     CCXTTickerMarketDataSource, CSVOHLCVMarketDataSource, \
@@ -83,4 +83,6 @@ __all__ = [
     "pretty_print_trades",
     "pretty_print_positions",
     "DataSource",
+    "OrderExecutor",
+    "PortfolioProvider",
 ]
