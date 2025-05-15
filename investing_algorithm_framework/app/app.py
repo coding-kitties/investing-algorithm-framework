@@ -165,6 +165,7 @@ class App:
             self.container.market_data_source_service()
         self._market_credential_service = \
             self.container.market_credential_service()
+        self._configuration_service = self.container.configuration_service()
 
         strategy_orchestrator_service = \
             self.container.strategy_orchestrator_service()

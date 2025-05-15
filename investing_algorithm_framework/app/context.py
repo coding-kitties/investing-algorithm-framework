@@ -8,7 +8,7 @@ from investing_algorithm_framework.services import ConfigurationService, \
 from investing_algorithm_framework.domain import OrderStatus, OrderType, \
     OrderSide, OperationalException, Portfolio, RoundingService, \
     BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, TradeRiskType, Order, \
-    Position, Trade, TradeStatus, MarketService
+    Position, Trade, TradeStatus, MarketService, MarketCredential
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -1431,7 +1431,7 @@ class Context:
         )
 
         return sum(
-            [order.get_amount() * order.get_price()
+            [order.get_remaining() * order.get_price()
              for order in pending_orders]
         )
 
@@ -1444,6 +1444,18 @@ class Context:
         )
 
         return sum(
-            [order.get_amount() * order.get_price()
+            [order.get_remaining() * order.get_price()
              for order in pending_orders]
         )
+
+    def get_market_credential(self, market) -> MarketCredential:
+        """
+        Function to get the market credential for a given market.
+
+        Args:
+            market: The market to get the credential for
+
+        Returns:
+            MarketCredential: The market credential for the given market
+        """
+        return self.market_credential_service.get(market)
