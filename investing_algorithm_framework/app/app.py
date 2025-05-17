@@ -24,8 +24,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider
 from investing_algorithm_framework.services import OrderBacktestService, \
-    BacktestMarketDataSourceService, BacktestPortfolioService, \
-    MarketDataSourceService, MarketCredentialService
+    BacktestMarketDataSourceService, BacktestPortfolioService
 
 logger = logging.getLogger("investing_algorithm_framework")
 COLOR_RESET = '\033[0m'
@@ -156,7 +155,6 @@ class App:
         Returns:
             None
         """
-        configuration_service = self.container.configuration_service()
         self._initialize_default_order_executors()
         self._initialize_default_portfolio_providers()
 
