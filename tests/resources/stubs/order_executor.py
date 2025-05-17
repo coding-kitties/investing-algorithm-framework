@@ -15,7 +15,7 @@ class OrderExecutorTest(OrderExecutor):
         self.order_status = None
 
     def execute_order(self, portfolio, order, market_credential) -> Order:
-        order.external_id = random_string(10)
+        order.external_id = random_string(10)  
         order.status = OrderStatus.OPEN
 
         if self.order_amount is not None:

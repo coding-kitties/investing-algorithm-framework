@@ -87,7 +87,6 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
 
         portfolio_provider = self.portfolio_provider_lookup\
             .get_portfolio_provider(portfolio.market)
-
         position = portfolio_provider.get_position(
             portfolio, portfolio.trading_symbol, market_credential
         )

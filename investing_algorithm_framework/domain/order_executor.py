@@ -85,3 +85,9 @@ class OrderExecutor(ABC):
         raise NotImplementedError(
             "Subclasses must implement this method."
         )
+
+    def __repr__(self):
+        """
+        Returns a string representation of the order executor.
+        """
+        return f"{self.__class__.__name__}(priority={self._priority})"

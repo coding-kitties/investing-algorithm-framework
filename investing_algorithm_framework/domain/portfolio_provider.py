@@ -26,6 +26,13 @@ class PortfolioProvider(ABC):
         """
         return self._priority
 
+    @priority.setter
+    def priority(self, value: int):
+        """
+        Sets the priority of the portfolio provider.
+        """
+        self._priority = value
+
     @abstractmethod
     def get_order(
         self, portfolio, order, market_credential
@@ -87,3 +94,6 @@ class PortfolioProvider(ABC):
             bool: True if the market is supported, False otherwise
         """
         raise NotImplementedError("Subclasses must implement this method.")
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(priority={self.priority})"

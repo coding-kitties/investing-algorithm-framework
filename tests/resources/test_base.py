@@ -198,15 +198,15 @@ class FlaskTestBase(FlaskTestCase):
                 self.iaf_app.add_market_credential(market_credential)
 
         if len(self.portfolio_configurations) > 0:
-                for portfolio_configuration in self.portfolio_configurations:
-                    self.iaf_app.add_portfolio_configuration(
-                        portfolio_configuration
-                    )
+            for portfolio_configuration in self.portfolio_configurations:
+                self.iaf_app.add_portfolio_configuration(
+                    portfolio_configuration
+                )
 
-                # Add all market credentials
-                if len(self.market_credentials) > 0:
-                    for market_credential in self.market_credentials:
-                        self.iaf_app.add_market_credential(market_credential)
+            # Add all market credentials
+            if len(self.market_credentials) > 0:
+                for market_credential in self.market_credentials:
+                    self.iaf_app.add_market_credential(market_credential)
 
         if self.initialize:
             self.iaf_app.initialize_config()

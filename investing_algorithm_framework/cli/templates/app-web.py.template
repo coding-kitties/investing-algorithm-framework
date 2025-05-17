@@ -9,6 +9,7 @@ load_dotenv()
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
 
 app = create_app(web=True)
+app.add_market(market="binance", initial_balance=1000, trading_symbol="EUR")
 algorithm = Algorithm(name="MyTradingBot")
 algorithm.add_strategy(MyTradingStrategy)
 app.add_algorithm(algorithm)

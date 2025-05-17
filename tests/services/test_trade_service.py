@@ -3238,7 +3238,6 @@ class TestTradeService(TestBase):
         )
 
         sell_order_data = trade_service.get_triggered_take_profit_orders()
-        print(sell_order_data)
         self.assertEqual(2, len(sell_order_data[0]['take_profits']))
 
         for order_data in sell_order_data:

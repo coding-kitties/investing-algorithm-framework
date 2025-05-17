@@ -23,7 +23,7 @@ def cli():
     '--type',
     default="default",
     help="Type of app to create. "
-    "Options are: 'default', 'default-web', 'azure-function'."
+    "Options are: 'default', 'default_web', 'azure_function'."
 )
 @click.option(
     '--path', default=None, help="Path to directory to initialize the app in"
@@ -43,6 +43,8 @@ def init(type, path, replace):
         type (str): Type of app to create. Options are: 'default',
             'default-web', 'azure-function'.
         path (str): Path to directory to initialize the app in
+        replace (bool): If True, existing files will be replaced.
+            If False, existing files will not be replaced.
 
     Returns:
         None

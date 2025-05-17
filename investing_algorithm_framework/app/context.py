@@ -1205,7 +1205,7 @@ class Context:
         self,
         trade,
         percentage: float,
-        trade_risk_type: TradeRiskType = TradeRiskType.FIXED,
+        trade_risk_type = TradeRiskType.FIXED,
         sell_percentage: float = 100,
     ):
         """
@@ -1248,7 +1248,7 @@ class Context:
         self,
         trade,
         percentage: float,
-        trade_risk_type: TradeRiskType = TradeRiskType.FIXED,
+        trade_risk_type = TradeRiskType.FIXED,
         sell_percentage: float = 100,
     ) -> None:
         """

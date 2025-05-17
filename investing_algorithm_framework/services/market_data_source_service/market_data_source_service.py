@@ -20,6 +20,19 @@ class MarketDataSourceService:
     source that matches the symbol, market and time frame provided by the user.
     If there is, it will use that market data source to get the data. If there
     is not, it will use the MarketService to get the data.
+
+    Attributes:
+        market_service: MarketService - The market service to use to get
+          the data if there is no market data source that matches the
+          symbol, market and time frame provided by the user.
+        market_credential_service: MarketCredentialService - The market
+          credential service to use to get the credentials for the market
+          data sources.
+        configuration_service: ConfigurationService - The configuration
+          service to use to get the configuration for the market data
+          sources.
+        market_data_sources: List[MarketDataSource] - The list of market
+          data sources to use to get the data.
     """
     _market_data_sources: List[MarketDataSource] = []
 

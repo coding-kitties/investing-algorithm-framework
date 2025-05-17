@@ -85,12 +85,7 @@ class App:
         self.container = None
         self._started = False
         self._tasks = []
-        self._configuration_service = None
-        self._market_data_source_service: \
-            Optional[MarketDataSourceService] = None
         self._market_data_sources = []
-        self._market_credential_service: \
-            Optional[MarketCredentialService] = None
         self._on_initialize_hooks = []
         self._on_strategy_run_hooks = []
         self._on_after_initialize_hooks = []
@@ -161,17 +156,91 @@ class App:
         Returns:
             None
         """
-        self._market_data_source_service = \
-            self.container.market_data_source_service()
-        self._market_credential_service = \
-            self.container.market_credential_service()
-        self._configuration_service = self.container.configuration_service()
+        configuration_service = self.container.configuration_service()
+        self._initialize_default_order_executors()
+        self._initialize_default_portfolio_providers()
 
         strategy_orchestrator_service = \
             self.container.strategy_orchestrator_service()
 
         for app_hook in self._on_strategy_run_hooks:
             strategy_orchestrator_service.add_app_hook(app_hook)
+
+        # Initialize all market credentials
+        market_credential_service = self.container.market_credential_service()
+        market_credential_service.initialize()
+
+    def initialize_services_backtest(self) -> None:
+        """
+        Method to initialize the services for the app in backtest mode.
+        This method should be called before running the application.
+        This method initializes all services so that they are ready to
+        be used.
+
+        The method overrides the portfolio service, market data source
+        service and order service with the backtest equivalents.
+
+        App hooks are not added when running in backtest mode.
+        Returns:
+            None
+        """
+        configuration_service = self.container.configuration_service()
+        self._initialize_default_order_executors()
+        self._initialize_default_portfolio_providers()
+        portfolio_conf_service = self.container \
+            .portfolio_configuration_service()
+        portfolio_snap_service = self.container \
+            .portfolio_snapshot_service()
+        market_cred_service = self.container.market_credential_service()
+        portfolio_provider_lookup = \
+            self.container.portfolio_provider_lookup()
+        # Override the portfolio service with the backtest
+        # portfolio service
+        self.container.portfolio_service.override(
+            BacktestPortfolioService(
+                configuration_service=configuration_service,
+                market_credential_service=market_cred_service,
+                position_service=self.container.position_service(),
+                order_service=self.container.order_service(),
+                portfolio_repository=self.container.portfolio_repository(),
+                portfolio_configuration_service=portfolio_conf_service,
+                portfolio_snapshot_service=portfolio_snap_service,
+                portfolio_provider_lookup=portfolio_provider_lookup
+            )
+        )
+
+        # Override the market data source service with the backtest market
+        # data source service
+        self.container.market_data_source_service.override(
+            BacktestMarketDataSourceService(
+                market_service=self.container.market_service(),
+                market_credential_service=self.container
+                .market_credential_service(),
+                configuration_service=self.container
+                .configuration_service(),
+            )
+        )
+
+        portfolio_conf_service = self.container. \
+            portfolio_configuration_service()
+        portfolio_snap_service = self.container. \
+            portfolio_snapshot_service()
+        configuration_service = self.container.configuration_service()
+        market_data_source_service = self.container. \
+            market_data_source_service()
+        # Override the order service with the backtest order service
+        self.container.order_service.override(
+            OrderBacktestService(
+                trade_service=self.container.trade_service(),
+                order_repository=self.container.order_repository(),
+                position_service=self.container.position_service(),
+                portfolio_repository=self.container.portfolio_repository(),
+                portfolio_configuration_service=portfolio_conf_service,
+                portfolio_snapshot_service=portfolio_snap_service,
+                configuration_service=configuration_service,
+                market_data_source_service=market_data_source_service
+            )
+        )
 
     @algorithm.setter
     def algorithm(self, algorithm: Algorithm) -> None:
@@ -252,6 +321,39 @@ class App:
         if APP_MODE not in config:
             configuration_service.add_value(APP_MODE, AppMode.DEFAULT.value)
 
+    def initialize_data_sources(self):
+        """
+        Function to initialize the data sources for the app. This method
+        should be called before running the algorithm. This method
+        initializes all data sources so that they are ready to be used.
+
+        Returns:
+            None
+        """
+        logger.info("Initializing data sources")
+        market_data_source_service = self.container \
+            .market_data_source_service()
+
+        # Add all market data sources of the strategies
+        # to the market data source service
+        market_data_source_service.market_data_sources = \
+            self._market_data_sources
+
+        for strategy in self.algorithm.strategies:
+
+            if strategy.market_data_sources is not None:
+                for market_data_source in strategy.market_data_sources:
+                    market_data_source_service.add(market_data_source)
+
+        # Check if the algorithm has data sources registered
+        if len(self.algorithm.data_sources) == 0:
+
+            for data_source in self.algorithm.data_sources:
+                self.add_market_data_source(data_source)
+
+        # Initialize the market data source service
+        market_data_source_service.initialize_market_data_sources()
+
     def initialize(self):
         """
         Method to initialize the app. This method should be called before
@@ -264,23 +366,14 @@ class App:
             None
         """
         logger.info("Initializing app")
-        self.initialize_services()
-        self._initialize_default_order_executors()
-        self._initialize_default_portfolio_providers()
 
         if self.algorithm is None:
             raise OperationalException("No algorithm registered")
 
-        # Check if the algorithm has data sources registered
-        if len(self.algorithm.data_sources) == 0:
-
-            for data_source in self.algorithm.data_sources:
-                self.add_market_data_source(data_source)
-
         # Ensure that all resource directories exist
         self._create_resources_if_not_exists()
 
-        # Setup the database
+        # Set up the database
         setup_sqlalchemy(self)
         create_all_tables()
 
@@ -289,88 +382,11 @@ class App:
 
         # Initialize services in backtest
         if Environment.BACKTEST.equals(config[ENVIRONMENT]):
-
-            configuration_service = self.container.configuration_service()
-            portfolio_conf_service = self.container \
-                .portfolio_configuration_service()
-            portfolio_snap_service = self.container \
-                .portfolio_snapshot_service()
-            market_cred_service = self.container.market_credential_service()
-            portfolio_provider_lookup = \
-                self.container.portfolio_provider_lookup()
-            # Override the portfolio service with the backtest
-            # portfolio service
-            self.container.portfolio_service.override(
-                BacktestPortfolioService(
-                    configuration_service=configuration_service,
-                    market_credential_service=market_cred_service,
-                    position_service=self.container.position_service(),
-                    order_service=self.container.order_service(),
-                    portfolio_repository=self.container.portfolio_repository(),
-                    portfolio_configuration_service=portfolio_conf_service,
-                    portfolio_snapshot_service=portfolio_snap_service,
-                    portfolio_provider_lookup=portfolio_provider_lookup
-                )
-            )
-
-            # Get all current market data sources
-            market_data_sources = self._market_data_source_service \
-                .get_market_data_sources()
-
-            # Override the market data source service with the backtest market
-            # data source service
-            self.container.market_data_source_service.override(
-                BacktestMarketDataSourceService(
-                    market_service=self.container.market_service(),
-                    market_credential_service=self.container
-                    .market_credential_service(),
-                    configuration_service=self.container
-                    .configuration_service(),
-                    market_data_sources=market_data_sources
-                )
-            )
-
-            portfolio_conf_service = self.container.\
-                portfolio_configuration_service()
-            portfolio_snap_service = self.container.\
-                portfolio_snapshot_service()
-            configuration_service = self.container.configuration_service()
-            market_data_source_service = self.container.\
-                market_data_source_service()
-            # Override the order service with the backtest order service
-            self.container.order_service.override(
-                OrderBacktestService(
-                    trade_service=self.container.trade_service(),
-                    order_repository=self.container.order_repository(),
-                    position_service=self.container.position_service(),
-                    portfolio_repository=self.container.portfolio_repository(),
-                    portfolio_configuration_service=portfolio_conf_service,
-                    portfolio_snapshot_service=portfolio_snap_service,
-                    configuration_service=configuration_service,
-                    market_data_source_service=market_data_source_service
-                )
-            )
+            self.initialize_services_backtest()
         else:
-            # Initialize all market credentials
-            self._market_credential_service = self.container.\
-                market_credential_service()
-            self._market_credential_service.initialize()
+            self.initialize_services()
 
-        # Add all market data sources of the strategies to the market data
-        # source service
-        self._market_data_source_service = self.container.\
-            market_data_source_service()
-        self._market_data_source_service.market_data_sources = \
-            self._market_data_sources
-
-        for strategy in self.algorithm.strategies:
-
-            if strategy.market_data_sources is not None:
-                for market_data_source in strategy.market_data_sources:
-                    self._market_data_source_service.add(market_data_source)
-
-        # Initialize the market data source service
-        self._market_data_source_service.initialize_market_data_sources()
+        self.initialize_data_sources()
 
         portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
@@ -386,7 +402,8 @@ class App:
         self.algorithm.initialize_services(
             context=self.container.context(),
             configuration_service=self.container.configuration_service(),
-            market_data_source_service=self._market_data_source_service,
+            market_data_source_service=self.container
+            .market_data_source_service(),
             market_credential_service=self.container
             .market_credential_service(),
             portfolio_service=self.container.portfolio_service(),
@@ -400,12 +417,10 @@ class App:
             trade_service=self.container.trade_service(),
         )
 
-        config = self.container.configuration_service().get_config()
+        configuration_service = self.container.configuration_service()
 
         if config[APP_MODE] == AppMode.WEB.value:
-            self._configuration_service.add_value(
-                APP_MODE, AppMode.WEB.value
-            )
+            configuration_service.add_value(APP_MODE, AppMode.WEB.value)
             self._initialize_web()
 
         self._initialize_portfolios()
@@ -742,7 +757,8 @@ class App:
         })
 
         self.initialize_config()
-        config = self._configuration_service.get_config()
+        configuration_service = self.container.configuration_service()
+        config = configuration_service.get_config()
         path = os.path.join(
             config[DATABASE_DIRECTORY_PATH],
             config[DATABASE_NAME]
@@ -852,7 +868,8 @@ class App:
                 })
                 self.initialize_config()
 
-                config = self._configuration_service.get_config()
+                configuration_service = self.container.configuration_service()
+                config = configuration_service.get_config()
 
                 path = os.path.join(
                     config[DATABASE_DIRECTORY_PATH],
@@ -898,7 +915,7 @@ class App:
 
         This is a seperate function from the market data source service. This
         is because the market data source service can be re-initialized.
-        Therefore we need a persistent list of market data sources in the app.
+        Therefore, we need a persistent list of market data sources in the app.
 
         Args:
             market_data_source: Instance of MarketDataSource
@@ -918,18 +935,36 @@ class App:
                     market_data_source.get_identifier():
                 return
 
-        market_data_source.market_credential_service = \
-            self._market_credential_service
         self._market_data_sources.append(market_data_source)
 
-    def add_market_credential(self, market_credential: MarketCredential):
+    def add_market_credential(
+        self, market_credential: MarketCredential
+    ) -> None:
+        """
+        Function to add a market credential to the app. The market
+        credential should be an instance of MarketCredential.
+
+        Args:
+            market_credential:
+
+        Returns:
+            None
+        """
         market_credential.market = market_credential.market.upper()
-        self._market_credential_service.add(market_credential)
+        market_credential_service = self.container \
+            .market_credential_service()
+        market_credential_service.add(market_credential)
 
     def on_initialize(self, app_hook):
         """
         Function to add a hook that runs when the app is initialized. The hook
         should be an instance of AppHook.
+
+        Args:
+            app_hook: Instance of AppHook
+
+        Returns:
+            None
         """
 
         # Check if the app_hook inherits from AppHook
@@ -1243,7 +1278,8 @@ class App:
             portfolio_provider_lookup = \
                 self.container.portfolio_provider_lookup()
             order_executor_lookup = self.container.order_executor_lookup()
-
+            market_credential_service = \
+                self.container.market_credential_service()
             # Register portfolio providers and order executors
             for portfolio_configuration in portfolio_configurations:
 
@@ -1259,7 +1295,7 @@ class App:
                 )
 
                 market_credential = \
-                    self._market_credential_service.get(
+                    market_credential_service.get(
                         portfolio_configuration.market
                     )
 
@@ -1280,6 +1316,8 @@ class App:
 
             logger.info("Portfolio configurations complete")
             logger.info("Syncing portfolios")
+            portfolio_provider_lookup = \
+                self.container.portfolio_provider_lookup()
             portfolio_service = self.container.portfolio_service()
             portfolio_sync_service = self.container.portfolio_sync_service()
 
@@ -1301,7 +1339,7 @@ class App:
         logger.info("Adding default portfolio providers")
         portfolio_provider_lookup = self.container.portfolio_provider_lookup()
         portfolio_provider_lookup.add_portfolio_provider(
-            CCXTPortfolioProvider()
+            CCXTPortfolioProvider(priority=2)
         )
 
     def _initialize_default_order_executors(self):
@@ -1317,5 +1355,5 @@ class App:
         logger.info("Adding default order executors")
         order_executor_lookup = self.container.order_executor_lookup()
         order_executor_lookup.add_order_executor(
-            CCXTOrderExecutor()
+            CCXTOrderExecutor(priority=2)
         )
