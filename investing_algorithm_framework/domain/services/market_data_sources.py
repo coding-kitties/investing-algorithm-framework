@@ -56,16 +56,20 @@ class BacktestMarketDataSource(ABC):
         Returns:
             bool - True if the file exists and the column names are correct,
         """
+        print(f"Checking if data source exists for {file_path}")
+
         try:
             if os.path.isfile(file_path):
                 df = polars.read_csv(file_path)
 
+                print("checking column names")
                 if df.columns != self.column_names:
                     raise OperationalException(
                         f"Wrong column names on {file_path}, required "
                         f"column names are {self.column_names}"
                     )
             else:
+                print(f"File {file_path} does not exist")
                 return False
 
             return True
