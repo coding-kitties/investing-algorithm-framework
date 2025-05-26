@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+import time
+from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 
 from investing_algorithm_framework import create_app, BacktestDateRange, \
@@ -12,9 +13,10 @@ class Test(TestCase):
     def test_run(self):
         """
         """
+        start_time = time.time()
         app = create_app(name="GoldenCrossStrategy")
         app.add_market(market="BINANCE", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2023, 12, 2)
+        end_date = datetime(2023, 12, 2, tzinfo=timezone.utc)
         start_date = end_date - timedelta(days=100)
         date_range = BacktestDateRange(
             start_date=start_date, end_date=end_date
@@ -44,3 +46,6 @@ class Test(TestCase):
         self.assertAlmostEqual(
             backtest_report.get_profit_percentage(), 0.8, delta=0.05
         )
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Test completed in {elapsed_time:.2f} seconds")

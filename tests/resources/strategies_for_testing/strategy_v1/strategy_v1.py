@@ -45,6 +45,10 @@ class CrossOverStrategyV1(TradingStrategy):
                 continue
 
             ohlcv_data = market_data[f"{pair}-ohlcv-2h"]
+
+            if ohlcv_data is None:
+                return
+
             # ticker_data = market_data[f"{symbol}-ticker"]
             # Add fast, slow, and trend EMAs to the data
             ohlcv_data = ema(

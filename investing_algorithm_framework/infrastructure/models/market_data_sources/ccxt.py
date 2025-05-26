@@ -1,4 +1,5 @@
 import logging
+import pytz
 import os
 from datetime import timedelta, datetime, timezone
 import polars
@@ -160,6 +161,13 @@ class CCXTOHLCVBacktestMarketDataSource(
         for i in range(len(timestamps) - self.window_size + 1):
             # Use last timestamp as key
             end_time = timestamps[i + self.window_size - 1]
+
+            # Convert end_time datetime object to UTC
+            if isinstance(end_time, str):
+                end_time = parser.parse(end_time).astimezone(pytz.UTC)
+            elif isinstance(end_time, datetime):
+                end_time = end_time.replace(tzinfo=timezone.utc)
+
             self.window_cache[end_time] = self.data.slice(i, self.window_size)
 
     def load_data(self):
@@ -218,6 +226,9 @@ class CCXTOHLCVBacktestMarketDataSource(
 
         closest_date = None
         for ts in reversed(sorted_timestamps):
+            date = date.astimezone(pytz.UTC)
+            ts = ts.astimezone(pytz.UTC)
+
             if ts < date:
                 closest_date = ts
                 break

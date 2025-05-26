@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 
 from investing_algorithm_framework import create_app, BacktestDateRange, \
@@ -16,7 +16,7 @@ class Test(TestCase):
         """
         app = create_app(name="GoldenCrossStrategy")
         app.add_market(market="BINANCE", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2023, 12, 2)
+        end_date = datetime(2023, 12, 2, tzinfo=timezone.utc)
         start_date = end_date - timedelta(days=100)
         date_range = BacktestDateRange(
             start_date=start_date, end_date=end_date
