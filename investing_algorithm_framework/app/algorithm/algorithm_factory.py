@@ -40,7 +40,6 @@ class AlgorithmFactory:
         Returns:
             str: Name of the algorithm.
         """
-        print("creating algorithm name")
         first_strategy = algorithm.strategies[0] \
             if algorithm.strategies else None
 
