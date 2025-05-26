@@ -49,7 +49,7 @@ class Test(TestCase):
             strategy=CrossOverStrategyV1
         )
         self.assertIsInstance(algorithm, Algorithm)
-        self.assertEqual(algorithm.name, "DefaultAlgorithm")
+        self.assertEqual(algorithm.name, "CrossOverStrategyV1")
         self.assertEqual(len(algorithm.strategies), 1)
         self.assertEqual(len(algorithm.tasks), 0)
         self.assertEqual(len(algorithm.on_strategy_run_hooks), 0)
