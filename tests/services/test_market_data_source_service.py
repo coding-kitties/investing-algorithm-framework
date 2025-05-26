@@ -39,8 +39,22 @@ class TestMarketDataSourceService(TestBase):
         ))
 
     def test_get_ticker_market_data_source(self):
+        configuration_service = self.app.container.configuration_service()
+        config = configuration_service.get_config()
         market_data_source_service = self.app.container\
             .market_data_source_service()
+        market_data_source_service.add(
+            CSVTickerMarketDataSource(
+                identifier="BTC/EUR-ticker",
+                market="BITVAVO",
+                symbol="BTC/EUR",
+                csv_file_path=os.path.join(
+                    config[RESOURCE_DIRECTORY],
+                    "market_data_sources",
+                    "TICKER_BTC-EUR_BINANCE_2023-08-23-22-00_2023-12-02-00-00.csv"
+                )
+            )
+        )
         ticker_market_data_source = market_data_source_service\
             .get_ticker_market_data_source(
                 symbol="BTC/EUR",

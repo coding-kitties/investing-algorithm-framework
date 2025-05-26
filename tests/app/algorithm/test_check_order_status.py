@@ -22,7 +22,6 @@ class Test(TestBase):
     external_balances = {
         "EUR": 1000,
     }
-    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_check_order_status(self):
         order_repository = self.app.container.order_repository()

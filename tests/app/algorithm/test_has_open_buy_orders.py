@@ -24,7 +24,6 @@ class Test(TestBase):
     external_balances = {
         "EUR": 1000,
     }
-    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_has_open_buy_orders(self):
         trading_symbol_position = self.app.context.get_position("EUR")

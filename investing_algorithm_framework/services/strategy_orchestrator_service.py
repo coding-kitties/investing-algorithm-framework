@@ -50,17 +50,21 @@ class StrategyOrchestratorService:
             = market_data_source_service
         self.configuration_service = configuration_service
 
-    def add_app_hook(self, app_hook):
+    def initialize(self, algorithm) -> None:
         """
-        Add an app hook to the list of app hooks
+        Initialize the strategy orchestrator service with an algorithm.
+        With the provided algorithm, the service will set the
+        strategies, tasks, and on_strategy_run_hooks.
 
         Args:
-            app_hook (AppHook): The app hook to add
+            algorithm (Algorithm): The algorithm to initialize the service with
 
         Returns:
             None
         """
-        self._app_hooks.append(app_hook)
+        self._app_hooks = algorithm.on_strategy_run_hooks or []
+        self._add_strategies(algorithm.strategies)
+        self._add_tasks(algorithm.tasks)
 
     def cleanup_threads(self):
 
@@ -112,9 +116,7 @@ class StrategyOrchestratorService:
             {"last_run": datetime.now(tz=timezone.utc)}
 
     def run_backtest_strategy(self, strategy, context, config):
-        data = \
-            self.market_data_source_service.get_data_for_strategy(strategy)
-
+        data = self.market_data_source_service.get_data_for_strategy(strategy)
         strategy.run_strategy(
             market_data=data,
             context=context,
@@ -149,13 +151,14 @@ class StrategyOrchestratorService:
         self.history[task.worker_id] = \
             {"last_run": datetime.now(tz=timezone.utc)}
 
-    def start(self, context, number_of_iterations=None):
+    def start(self, context, number_of_iterations=None) -> None:
         """
-        Function to start and schedule the strategies and tasks
+        Function to start and schedule the strategies and tasks. This
+        function will not start the strategies, but will calculate the
+        schedule and queue the jobs.
 
         Args:
-            algorithm (Algorithm): The algorithm that will be used to run the
-                strategies and tasks
+            context (Context): The application context
             number_of_iterations (int): The number of iterations that the
                 strategies and tasks will run. If None, the
                 strategies and tasks
@@ -222,16 +225,7 @@ class StrategyOrchestratorService:
         else:
             schedule.run_pending()
 
-    def add_strategy(self, strategy):
-
-        if strategy.worker_id not in self._strategies:
-            self._strategies.append(strategy)
-        else:
-            raise OperationalException(
-                "Strategy already exists with the same name"
-            )
-
-    def add_strategies(self, strategies):
+    def _add_strategies(self, strategies):
         has_duplicates = False
 
         for i in range(len(strategies)):
@@ -245,9 +239,9 @@ class StrategyOrchestratorService:
                 "There are duplicate strategies with the same name"
             )
 
-        self.strategies = strategies
+        self._strategies = strategies
 
-    def add_tasks(self, tasks):
+    def _add_tasks(self, tasks):
         has_duplicates = False
 
         for i in range(len(tasks)):
@@ -261,23 +255,19 @@ class StrategyOrchestratorService:
                 "There are duplicate tasks with the same name"
             )
 
-        self.tasks = tasks
+        self._tasks = tasks
 
     @property
     def strategies(self):
         return self._strategies
 
-    @strategies.setter
-    def strategies(self, strategies):
-        self._strategies = strategies
+    @property
+    def app_hooks(self):
+        return self._app_hooks
 
     @property
     def tasks(self):
         return self._tasks
-
-    @tasks.setter
-    def tasks(self, tasks):
-        self._tasks = tasks
 
     @property
     def running(self):
@@ -292,3 +282,15 @@ class StrategyOrchestratorService:
 
     def has_run(self, worker_id):
         return worker_id in self.history
+
+    def reset(self):
+        """
+        Reset the strategy orchestrator service
+        """
+        self.clear()
+        self.history = {}
+        self.iterations = 0
+        self.max_iterations = -1
+        self._strategies = []
+        self._tasks = []
+        self._app_hooks = []

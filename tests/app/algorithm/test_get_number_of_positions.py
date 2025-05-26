@@ -23,7 +23,6 @@ class Test(TestBase):
             secret_key="secret_key"
         )
     ]
-    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_get_number_of_positions(self):
         trading_symbol_position = self.app.context.get_position("EUR")

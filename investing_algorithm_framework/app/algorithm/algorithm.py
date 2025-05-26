@@ -5,7 +5,8 @@ import inspect
 
 from investing_algorithm_framework.domain import OperationalException, \
     random_string, MarketDataSource
-from .strategy import TradingStrategy
+from investing_algorithm_framework.app.strategy import TradingStrategy
+from investing_algorithm_framework.app.app_hook import AppHook
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -15,27 +16,27 @@ class Algorithm:
     Class to represent an algorithm. An algorithm is a collection of
     strategies that are executed in a specific order.
 
-    Args:
-        name (str): (Optional) The name of the algorithm
-        description (str): The description of the algorithm
-        context (dict): The context of the algorithm, for backtest
-          references
+    Attributes:
+        _name: The name of the algorithm. It should be a string and
+            can only contain letters and numbers.
+        _description: The description of the algorithm. It should be a string.
+        _strategies: A list of strategies that are part of the algorithm.
+        _tasks: A list of tasks that are part of the algorithm.
+        _data_sources: A list of data sources that are part of the algorithm.
+        _on_strategy_run_hooks: A list of hooks that will be called when a
     """
     def __init__(
         self,
         name: str = None,
         description: str = None,
-        strategy = None,
-        strategies = None,
+        strategy=None,
+        strategies=None,
         tasks: List = None,
         data_sources: List[MarketDataSource] = None,
+        on_strategy_run_hooks=None
     ):
         self._name = name
         self._context = {}
-
-        if name is None:
-            self._name = f"algorithm_{random_string(10)}"
-
         self._description = None
 
         if description is not None:
@@ -44,6 +45,7 @@ class Algorithm:
         self._strategies = []
         self._tasks = []
         self._data_sources = []
+        self._on_strategy_run_hooks = []
 
         if data_sources is not None:
             self._data_sources = data_sources
@@ -56,6 +58,10 @@ class Algorithm:
 
         if strategy is not None:
             self.add_strategy(strategy, throw_exception=True)
+
+        if on_strategy_run_hooks is not None:
+            for hook in on_strategy_run_hooks:
+                self.add_on_strategy_run_hook(hook)
 
     @staticmethod
     def _validate_name(name):
@@ -120,6 +126,10 @@ class Algorithm:
     @property
     def strategies(self):
         return self._strategies
+
+    @property
+    def on_strategy_run_hooks(self):
+        return self._on_strategy_run_hooks
 
     @strategies.setter
     def strategies(self, strategies):
@@ -245,3 +255,21 @@ class Algorithm:
         """
         for data_source in data_sources:
             self.add_data_source(data_source)
+
+    def add_on_strategy_run_hook(self, app_hook):
+        """
+        Function to add a hook that will be called when a strategy is run.
+
+        Args:
+            app_hook: The hook function to be added.
+        """
+        # Check if the app_hook inherits from AppHook
+        if inspect.isclass(app_hook) and not issubclass(app_hook, AppHook):
+            raise OperationalException(
+                "App hook should be an instance of AppHook"
+            )
+
+        if inspect.isclass(app_hook):
+            app_hook = app_hook()
+
+        self._on_strategy_run_hooks.append(app_hook)

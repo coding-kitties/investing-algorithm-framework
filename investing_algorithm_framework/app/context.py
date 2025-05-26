@@ -1228,7 +1228,7 @@ class Context:
             trade: Trade object representing the trade
             percentage: float representing the percentage of the open price
                 that the stop loss should be set at
-            trade_risk_type (TradeRiskType): The type of the stop loss, fixed
+            trade_risk_type: The type of the stop loss, fixed
                 or trailing
             sell_percentage: float representing the percentage of the trade
                 that should be sold if the stop loss is triggered
@@ -1273,7 +1273,7 @@ class Context:
             trade: Trade object representing the trade
             percentage: float representing the percentage of the open price
                 that the stop loss should be set at
-            trade_risk_type (TradeRiskType): The type of the stop loss, fixed
+            trade_risk_type: The type of the stop loss, fixed
                 or trailing
             sell_percentage: float representing the percentage of the trade
                 that should be sold if the stop loss is triggered

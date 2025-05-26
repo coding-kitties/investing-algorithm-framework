@@ -7,6 +7,8 @@ import pandas as pd
 from dateutil import parser
 from tqdm import tqdm
 import logging
+import sys
+
 
 from investing_algorithm_framework.domain import BacktestReport, \
     BACKTESTING_INDEX_DATETIME, TimeUnit, BacktestPosition, \
@@ -28,27 +30,6 @@ BACKTEST_REPORT_DIRECTORY_PATTERN = (
     r"backtest-end-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
     r"created-at_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}$"
 )
-
-
-def validate_algorithm_name(name, illegal_chars=r"[\/:*?\"<>|]"):
-    """
-    Validate a algorithm name for illegal characters and throw an
-        exception if any are found.
-
-    Args:
-        name (str): The name to validate.
-        illegal_chars (str): A regex pattern for characters considered
-            illegal (default: r"[/:*?\"<>|]").
-
-    Raises:
-        ValueError: If illegal characters are found in the filename.
-    """
-    # Check for illegal characters
-    if re.search(illegal_chars, name):
-        raise OperationalException(
-            f"Illegal characters detected in filename: {name}. "
-            f"Illegal characters: / \\ : * ? \" < > |"
-        )
 
 
 class BacktestService:
@@ -94,6 +75,8 @@ class BacktestService:
     def run_backtest(
         self,
         algorithm,
+        context,
+        strategy_orchestrator_service,
         backtest_date_range: BacktestDateRange,
         initial_amount=None
     ) -> BacktestReport:
@@ -111,12 +94,12 @@ class BacktestService:
             algorithm: The algorithm to run the backtest for
             backtest_date_range: The backtest date range
             initial_amount: The initial amount of the backtest portfolio
+            strategy_orchestrator_service: The strategy orchestrator service
+            context (Context): The context of the object of the application
 
         Returns:
             BacktestReport - The backtest report
         """
-        validate_algorithm_name(algorithm.name)
-
         logging.info(
             f"Running backtest for algorithm with name {algorithm.name}"
         )
@@ -136,7 +119,7 @@ class BacktestService:
                 )
                 self._portfolio_service.delete(portfolio.id)
 
-            # Check if the portfolio configuration has a initial balance
+            # Check if the portfolio configuration has an initial balance
             self._portfolio_service.create_portfolio_from_configuration(
                 portfolio_configuration, initial_amount=initial_amount
             )
@@ -160,6 +143,8 @@ class BacktestService:
             end_date=backtest_date_range.end_date
         )
 
+        logger.info(f"Prepared backtests for {len(schedule)} strategies")
+
         for index, row in tqdm(
             schedule.iterrows(),
             total=len(schedule),
@@ -173,18 +158,18 @@ class BacktestService:
             self._configuration_service.add_value(
                 BACKTESTING_INDEX_DATETIME, index_date
             )
-            # self.run_backtest_for_profile(
-            #     algorithm=algorithm,
-            #     strategy=algorithm.get_strategy(strategy_profile.strategy_id),
-            #     index_date=index_date,
-            # )
-            self.run_backtest_v2(
-                context=algorithm.context,
-                strategy=algorithm.get_strategy(strategy_profile.strategy_id)
+            config = self._configuration_service.get_config()
+            strategy = algorithm.get_strategy(strategy_profile.strategy_id)
+            strategy_orchestrator_service.run_backtest_strategy(
+                context=context, strategy=strategy, config=config
             )
 
         report = self.create_backtest_report(
-            algorithm, len(schedule), backtest_date_range, initial_unallocated
+            algorithm,
+            context,
+            len(schedule),
+            backtest_date_range,
+            initial_unallocated
         )
 
         # Cleanup backtest portfolio
@@ -199,38 +184,9 @@ class BacktestService:
 
         return report
 
-    def run_backtests(
-        self, algorithms, backtest_date_range: BacktestDateRange
+    def run_backtest_for_profile(
+        self, context, algorithm, strategy, index_date
     ):
-        """
-        Run backtests for the given algorithms. This function will run
-        backtests for the given algorithms and return a list of backtest
-        reports.
-
-        Args:
-            algorithms: The algorithms to run the backtests for
-            backtest_date_range: The backtest date range of the backtests
-
-        Returns:
-            List - A list of backtest reports
-        """
-        backtest_reports = []
-
-        # Check algorithm names for illegal characters
-        for algorithm in algorithms:
-            validate_algorithm_name(algorithm.name)
-
-        for algorithm in algorithms:
-            backtest_reports.append(
-                self.run_backtest(
-                    algorithm=algorithm,
-                    backtest_date_range=backtest_date_range
-                )
-            )
-
-        return backtest_reports
-
-    def run_backtest_for_profile(self, algorithm, strategy, index_date):
         self._configuration_service.add_value(
             BACKTESTING_INDEX_DATETIME, index_date
         )
@@ -250,7 +206,6 @@ class BacktestService:
                     market_data[data_id] = \
                         self._market_data_source_service.get_data(data_id)
 
-        context = self.algorithm.context
         strategy.run_strategy(context=context, market_data=market_data)
 
     def run_backtest_v2(self, strategy, context):
@@ -325,6 +280,7 @@ class BacktestService:
     def create_backtest_report(
         self,
         algorithm,
+        context,
         number_of_runs,
         backtest_date_range: BacktestDateRange,
         initial_unallocated=0
@@ -494,7 +450,7 @@ class BacktestService:
                     backtest_position.price = ticker["bid"]
                 backtest_positions.append(backtest_position)
             backtest_report.positions = backtest_positions
-            backtest_report.trades = algorithm.context.get_trades()
+            backtest_report.trades = context.get_trades()
             backtest_report.orders = orders
             traces = {}
 
@@ -692,12 +648,10 @@ class BacktestService:
 
     def save_report(
         self,
-        report: BacktestReport,
         algorithm,
+        report: BacktestReport,
         output_directory: str,
         save_strategy=False,
-        save_in_memory_strategies: bool = False,
-        strategy_directory: str = None
     ) -> None:
         """
         Function to save the backtest report to a file. If the
@@ -711,14 +665,9 @@ class BacktestService:
             report: BacktestReport - The backtest report to save
             algorithm: Algorithm - The algorithm to save
             output_directory: str - The directory to save the report in
-            save_in_memory_strategies: bool - Flag to save in-memory strategies
+            save_strategy: bool - Flag to save the strategy files
                 (default: False)
-            save_strateg
-            save_strategy_directory: bool - Flag to save strategy directory
-                (default: False)
-            strategy_directory (optional): str - Full path to
-                the strategy directory
-
+            algorithm: Algorithm - The algorithm to save the report for
         Returns:
             None
         """
@@ -734,43 +683,16 @@ class BacktestService:
         )
 
         if save_strategy:
-            if save_in_memory_strategies:
-                strategys = algorithm.strategies
+            strategies = algorithm.get_strategies()
 
-                for strategy in strategys:
-                    self._save_strategy_class(strategy, output_directory)
-            else:
-                # Copy over all files in the strategy directory
-                # to the output directory
-                app_directory = self._configuration_service.config["APP_DIR"]
+            for strategy in strategies:
+                mod = sys.modules[strategy.__module__]
+                strategy_directory_path = os.path.dirname(mod.__file__)
 
-                if strategy_directory is None:
-                    strategy_directory = os.path.join(
-                        app_directory, "strategies"
-                    )
-
-                    if not os.path.exists(strategy_directory) or \
-                            not os.path.isdir(strategy_directory):
-                        raise OperationalException(
-                            "Default strategy directory 'strategies' does "
-                            "not exist. If you have your strategies placed in "
-                            "a different directory, please provide the "
-                            "full path to the strategy directory as "
-                            "the 'strategy_directory' argument."
-                        )
-                else:
-
-                    # Check if the strategy directory exists
-                    if not os.path.exists(strategy_directory) or \
-                            not os.path.isdir(strategy_directory):
-                        raise OperationalException(
-                            f"Strategy directory {strategy_directory} "
-                            "does not "
-                            f"exist. Please make sure the directory exists."
-                        )
-
-                strategy_directory_name = os.path.basename(strategy_directory)
-                strategy_files = os.listdir(strategy_directory)
+                strategy_directory_name = os.path.basename(
+                    strategy_directory_path
+                )
+                strategy_files = os.listdir(strategy_directory_path)
                 output_strategy_directory = os.path.join(
                     output_directory, strategy_directory_name
                 )
@@ -779,7 +701,7 @@ class BacktestService:
                     os.makedirs(output_strategy_directory)
 
                 for file in strategy_files:
-                    source_file = os.path.join(strategy_directory, file)
+                    source_file = os.path.join(strategy_directory_path, file)
                     destination_file = os.path.join(
                         output_strategy_directory, file
                     )

@@ -23,7 +23,6 @@ class Test(TestBase):
             secret_key="secret_key"
         )
     ]
-    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_create_limit_buy_order_with_percentage_of_portfolio(self):
         order = self.app.context.create_limit_order(

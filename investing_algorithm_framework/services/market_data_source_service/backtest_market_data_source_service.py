@@ -78,6 +78,7 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
                 backtest_end_date=backtest_end_date
             )
 
+        self.clear_market_data_sources()
         self.market_data_sources = backtest_market_data_sources
 
     def get_data(self, identifier):
@@ -94,6 +95,9 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
         Returns:
             The data for the given identifier
         """
+        config = self._configuration_service.get_config()
+        backtest_index_date = config[BACKTESTING_INDEX_DATETIME]
+
         for market_data_source in self._market_data_sources:
 
             if market_data_source.get_identifier() == identifier:
@@ -196,6 +200,9 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
         return market_data_source is not None
 
     def add(self, market_data_source):
+
+        if market_data_source is None:
+            return
 
         # Check if there is already a market data source with the same
         # identifier

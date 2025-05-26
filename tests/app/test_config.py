@@ -74,7 +74,7 @@ class TestConfig(TestBase):
             end_date="2021-01-01 00:30:00"
         )
 
-        @self.app.algorithm.strategy(interval=1, time_unit="SECOND")
+        @self.app.strategy(interval=1, time_unit="SECOND")
         def test_strategy(context, market_data):
             pass
 

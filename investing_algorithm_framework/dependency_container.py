@@ -1,6 +1,7 @@
 from dependency_injector import containers, providers
 
 from investing_algorithm_framework.app.context import Context
+from investing_algorithm_framework.app.algorithm import AlgorithmFactory
 from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPositionRepository, SQLPortfolioRepository, \
     SQLPortfolioSnapshotRepository, SQLTradeRepository, \
@@ -58,7 +59,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         CCXTMarketService,
         market_credential_service=market_credential_service,
     )
-    market_data_source_service = providers.Singleton(
+    market_data_source_service = providers.ThreadSafeSingleton(
         MarketDataSourceService,
         market_service=market_service,
         market_credential_service=market_credential_service,
@@ -132,7 +133,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         market_service=market_service,
         portfolio_provider_lookup=portfolio_provider_lookup,
     )
-    strategy_orchestrator_service = providers.ThreadSafeSingleton(
+    strategy_orchestrator_service = providers.Factory(
         StrategyOrchestratorService,
         market_data_source_service=market_data_source_service,
         configuration_service=configuration_service,
@@ -166,4 +167,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         market_data_source_service=market_data_source_service,
         market_service=market_service,
         trade_service=trade_service,
+    )
+    algorithm_factory = providers.Factory(
+        AlgorithmFactory,
     )

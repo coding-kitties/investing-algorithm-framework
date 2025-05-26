@@ -40,7 +40,6 @@ class Test(TestBase):
             secret_key="secret_key"
         )
     ]
-    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_get_allocated(self):
         self.app.container.market_data_source_service.override(

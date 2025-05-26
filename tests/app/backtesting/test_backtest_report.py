@@ -69,10 +69,12 @@ class Test(TestCase):
             start_date=datetime.utcnow() - timedelta(days=1),
             end_date=datetime.utcnow()
         )
+
+        print(algorithm)
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
-            save_in_memory_strategies=True
+            save_strategy=True
         )
         dir_name = BacktestService.create_report_directory_name(report)
 
@@ -80,7 +82,6 @@ class Test(TestCase):
 
         # Check if the backtest report exists
         self.assertTrue(os.path.isdir(path))
-
 
     def test_report_json_creation_with_multiple_strategies_with_id(self):
         """
@@ -92,7 +93,7 @@ class Test(TestCase):
         )
         algorithm = Algorithm()
 
-        @algorithm.strategy()
+        @app.strategy()
         def run_strategy(context, market_data):
             pass
 
@@ -104,7 +105,7 @@ class Test(TestCase):
                 initial_balance=1000
             )
         )
-        self.assertEqual(2, len(algorithm.strategies))
+        self.assertEqual(1, len(algorithm.strategies))
         backtest_range = BacktestDateRange(
             start_date=datetime.utcnow() - timedelta(days=1),
             end_date=datetime.utcnow()
@@ -112,7 +113,6 @@ class Test(TestCase):
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_range,
-            save_in_memory_strategies=True
         )
         dir_name = BacktestService.create_report_directory_name(report)
 

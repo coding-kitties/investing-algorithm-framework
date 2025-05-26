@@ -1,4 +1,7 @@
 from dateutil import parser
+import pandas
+import polars
+from typing import Union
 from investing_algorithm_framework.services import DataProviderService, \
     ConfigurationService, MarketCredentialService
 from investing_algorithm_framework.infrastructure import \
@@ -17,7 +20,7 @@ def download(
     pandas: bool = True,
     save: bool = True,
     storage_path: str = None,
-):
+) -> Union[pandas.DataFrame, polars.DataFrame]:
     """
     Download market data from the specified source. This function
     uses the MarketDataSourceService to get the data provider
@@ -39,7 +42,7 @@ def download(
         window_size (int): The size of the data window.
         pandas (bool): Whether to return the data as a pandas DataFrame.
 
-    Returns:w
+    Returns:
         None
     """
     configuration_service = ConfigurationService()

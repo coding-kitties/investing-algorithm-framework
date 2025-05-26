@@ -74,7 +74,7 @@ class Test(TestCase):
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
-            save_in_memory_strategies=True
+            save_strategy=True
         )
         dir_name = BacktestService.create_report_directory_name(report)
 
@@ -109,7 +109,7 @@ class Test(TestCase):
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
-            save_in_memory_strategies=True
+            save_strategy=True
         )
         dir_name = BacktestService.create_report_directory_name(report)
         path = os.path.join(self.resource_dir, "backtest_reports", dir_name)
@@ -127,7 +127,7 @@ class Test(TestCase):
         )
         algorithm = Algorithm()
 
-        @algorithm.strategy()
+        @app.strategy()
         def run_strategy(context, market_data):
             pass
 
@@ -140,7 +140,7 @@ class Test(TestCase):
             )
         )
 
-        self.assertEqual(2, len(algorithm.strategies))
+        self.assertEqual(1, len(algorithm.strategies))
         backtest_date_range = BacktestDateRange(
             start_date=datetime.utcnow() - timedelta(days=1),
             end_date=datetime.utcnow()
@@ -148,7 +148,7 @@ class Test(TestCase):
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
-            save_in_memory_strategies=True
+            save_strategy=True
         )
         dir_name = BacktestService.create_report_directory_name(report)
         path = os.path.join(self.resource_dir, "backtest_reports", dir_name)

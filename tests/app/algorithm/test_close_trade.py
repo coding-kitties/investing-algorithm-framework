@@ -24,12 +24,7 @@ class Test(TestBase):
     external_balances = {
         "EUR": 1000
     }
-    market_data_source_service = RandomPriceMarketDataSourceServiceStub(
-        None,
-        None,
-        None
-    )
-    market_data_source_service = MarketDataSourceServiceStub()
+
 
     def setUp(self) -> None:
         super().setUp()

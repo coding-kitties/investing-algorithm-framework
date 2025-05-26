@@ -22,17 +22,16 @@ class MarketDataSourceService:
     is not, it will use the MarketService to get the data.
 
     Attributes:
-        market_service: MarketService - The market service to use to get
-          the data if there is no market data source that matches the
-          symbol, market and time frame provided by the user.
-        market_credential_service: MarketCredentialService - The market
-          credential service to use to get the credentials for the market
-          data sources.
-        configuration_service: ConfigurationService - The configuration
-          service to use to get the configuration for the market data
-          sources.
-        market_data_sources: List[MarketDataSource] - The list of market
-          data sources to use to get the data.
+        - market_service: MarketService
+            The market service that is used to get the data from the market
+        - market_credential_service: MarketCredentialService
+            The market credential service that is used to get the credentials
+            for the market
+        - configuration_service: ConfigurationService
+            The configuration service that is used to get the configuration
+            for the algorithm
+        - _market_data_sources: List[MarketDataSource]
+            The list of market data sources that are used by the algorithm
     """
     _market_data_sources: List[MarketDataSource] = []
 
@@ -181,15 +180,13 @@ class MarketDataSourceService:
 
             if market_data_source.get_identifier() == identifier:
                 config = self._configuration_service.get_config()
-                config = self._configuration_service.get_config()
                 date = config.get("DATE_TIME", None)
 
                 if date is not None:
                     data = market_data_source.get_data(
                         end_date=date, config=config
                     )
-
-                if "DATE_TIME" in config:
+                elif "DATE_TIME" in config:
                     data = market_data_source.get_data(
                         end_date=config["DATE_TIME"], config=config,
                     )
@@ -237,7 +234,7 @@ class MarketDataSourceService:
                 return result
 
         raise OperationalException(
-            f"Backtest market data source not found for {identifier}"
+            f"Market data source not found for {identifier}"
         )
 
     def get_ticker_market_data_source(self, symbol, market=None):
@@ -332,7 +329,15 @@ class MarketDataSourceService:
 
     @market_data_sources.setter
     def market_data_sources(self, market_data_sources):
-        self._market_data_sources = market_data_sources
+
+        for market_data_source in market_data_sources:
+            self.add(market_data_source)
+
+    def clear_market_data_sources(self):
+        """
+        Function to clear the market data sources
+        """
+        self._market_data_sources = []
 
     def add(self, market_data_source):
 

@@ -5,25 +5,31 @@ from investing_algorithm_framework.app.stateless.action_handlers \
 
 
 class RunStrategyHandler(ActionHandlerStrategy):
+    """
+    RunStrategyHandler is an action handler that runs a strategy and its tasks
+    synchronously.
+
+    If the run was successful, it returns a 200 OK response with a message
+    "OK".
+    """
     MESSAGE = {"message": "Ok"}
 
-    def handle_event(self, payload, algorithm):
-        strategies = algorithm.strategy_orchestrator_service\
+    def handle_event(self, payload, context, strategy_orchestrator_service):
+        strategies = strategy_orchestrator_service\
             .get_strategies(payload.get("strategies", None))
-        tasks = algorithm.strategy_orchestrator_service.get_tasks()
+        tasks = strategy_orchestrator_service.get_tasks()
 
         for strategy in strategies:
-            context = algorithm.context
-            algorithm.strategy_orchestrator_service.run_strategy(
+            strategy_orchestrator_service.run_strategy(
                 strategy=strategy,
                 context=context,
                 sync=True
             )
 
         for task in tasks:
-            algorithm.strategy_orchestrator_service.run_task(
+            strategy_orchestrator_service.run_task(
                 task=task,
-                algorithm=algorithm,
+                context=context,
                 sync=True
             )
 

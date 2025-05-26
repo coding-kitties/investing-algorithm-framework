@@ -23,7 +23,6 @@ class Test(TestBase):
             secret_key="secret_key"
         )
     ]
-    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_get_portfolio(self):
         portfolio = self.app.context.get_portfolio()

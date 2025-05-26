@@ -2,16 +2,16 @@ import inspect
 import logging
 import os
 import threading
-from abc import abstractmethod
 from time import sleep
-from typing import List, Optional
+from typing import List, Optional, Any
 
 from flask import Flask
 
-from investing_algorithm_framework.app.algorithm import Algorithm
+from investing_algorithm_framework.app.algorithm import Algorithm, \
+    AlgorithmFactory
 from investing_algorithm_framework.app.stateless import ActionHandler
-from investing_algorithm_framework.app.task import Task
 from investing_algorithm_framework.app.strategy import TradingStrategy
+from investing_algorithm_framework.app.task import Task
 from investing_algorithm_framework.app.web import create_flask_app
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
@@ -19,44 +19,18 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, BacktestReport, \
     APP_MODE, MarketCredential, AppMode, BacktestDateRange, \
     DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT, \
-    MarketDataSource, APPLICATION_DIRECTORY, PortfolioConfiguration, \
+    MarketDataSource, PortfolioConfiguration, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider
 from investing_algorithm_framework.services import OrderBacktestService, \
     BacktestMarketDataSourceService, BacktestPortfolioService
+from .app_hook import AppHook
 
 logger = logging.getLogger("investing_algorithm_framework")
 COLOR_RESET = '\033[0m'
 COLOR_GREEN = '\033[92m'
 COLOR_YELLOW = '\033[93m'
-
-
-class AppHook:
-    """
-    Abstract class for app hooks. App hooks are used to run code before
-    actions of the framework are executed. This is useful for running code
-    that needs to be run before the following events:
-    - App initialization
-    - Strategy run
-    """
-
-    @abstractmethod
-    def on_run(self, context) -> None:
-        """
-        Method to run the app hook. This method should be implemented
-        by the user. This method will be called when the app is performing
-        a specific action.
-
-        Args:
-            context: The context of the app. This can be used to get the
-                current state of the trading bot, such as portfolios,
-                orders, positions, etc.
-
-        Returns:
-            None
-        """
-        raise NotImplementedError()
 
 
 class App:
@@ -65,18 +39,23 @@ class App:
     application and run your trading bot.
 
     Attributes:
-        - container: The dependency container for the app. This is used
+        container: The dependency container for the app. This is used
             to store all the services and repositories for the app.
-        - algorithm: The algorithm to run. This is used to run the
+        algorithm: The algorithm to run. This is used to run the
             trading bot.
-        - flask_app: The flask app instance. This is used to run the
+        _flask_app: The flask app instance. This is used to run the
             web app.
-        - state_handler: The state handler for the app. This is used
+        _state_handler: The state handler for the app. This is used
             to save and load the state of the app.
-        - name: The name of the app. This is used to identify the app
+        _name: The name of the app. This is used to identify the app
             in logs and other places.
-        - started: A boolean value that indicates if the app has been
+        _started: A boolean value that indicates if the app has been
             started or not.
+        _tasks (List[Task]): List of task that need to be run by the
+            application.
+        _algorithm (Algorithm): The algorithm instance. An algorithm is a
+            bundle of tasks and strategies. The algorithm is only
+            initialized when the application in started.
     """
 
     def __init__(self, state_handler=None, name=None):
@@ -84,17 +63,15 @@ class App:
         self.container = None
         self._started = False
         self._tasks = []
+        self._strategies = []
         self._market_data_sources = []
         self._on_initialize_hooks = []
         self._on_strategy_run_hooks = []
         self._on_after_initialize_hooks = []
         self._state_handler = state_handler
+        self._strategy_orchestrator_service = None
+        self._run_history = None
         self._name = name
-        self._algorithm = Algorithm(name=self.name)
-
-    @property
-    def algorithm(self) -> Algorithm:
-        return self._algorithm
 
     @property
     def context(self):
@@ -124,25 +101,63 @@ class App:
 
     @config.setter
     def config(self, config: dict):
+        """
+        Function to set the configuration for the app.
+        Args:
+            config (dict): A dictionary containing the configuration
+
+        Returns:
+            None
+        """
         configuration_service = self.container.configuration_service()
         configuration_service.initialize_from_dict(config)
-
-    @property
-    def running(self):
-        return self.algorithm.running
 
     def add_algorithm(self, algorithm: Algorithm) -> None:
         """
         Method to add an algorithm to the app. This method should be called
         before running the application.
-        """
-        self._algorithm = algorithm
 
-    def set_config(self, key, value) -> None:
+        When adding an algorithm, it will automatically register all
+        strategies, data sources, and tasks of the algorithm. The
+        algorithm itself is not registered.
+
+        Args:
+            algorithm (Algorithm): The algorithm to add to the app.
+                This should be an instance of Algorithm.
+
+        Returns:
+            None
+        """
+        self.add_strategies(algorithm.strategies)
+        self.add_data_sources(algorithm.data_sources)
+        self.add_tasks(algorithm.tasks)
+
+    def set_config(self, key: str, value: Any) -> None:
+        """
+        Function to add a key-value pair to the app's configuration.
+
+        Args:
+            key (string): The key to add to the configuration
+            value (any): The value to add to the configuration
+
+        Returns:
+            None
+        """
         configuration_service = self.container.configuration_service()
         configuration_service.add_value(key, value)
 
     def set_config_with_dict(self, dictionary) -> None:
+        """
+        Function to add a dictionary to the app's configuration.
+        This method is useful for adding multiple configuration values
+
+        Args:
+            dictionary (Dict): A dictionary containing key-value pairs
+                to add to the configuration
+
+        Returns:
+            None
+        """
         configuration_service = self.container.configuration_service()
         configuration_service.add_dict(dictionary)
 
@@ -157,12 +172,6 @@ class App:
         """
         self._initialize_default_order_executors()
         self._initialize_default_portfolio_providers()
-
-        strategy_orchestrator_service = \
-            self.container.strategy_orchestrator_service()
-
-        for app_hook in self._on_strategy_run_hooks:
-            strategy_orchestrator_service.add_app_hook(app_hook)
 
         # Initialize all market credentials
         market_credential_service = self.container.market_credential_service()
@@ -179,6 +188,7 @@ class App:
         service and order service with the backtest equivalents.
 
         App hooks are not added when running in backtest mode.
+
         Returns:
             None
         """
@@ -192,8 +202,7 @@ class App:
         market_cred_service = self.container.market_credential_service()
         portfolio_provider_lookup = \
             self.container.portfolio_provider_lookup()
-        # Override the portfolio service with the backtest
-        # portfolio service
+        # Override the portfolio service with the backtest portfolio service
         self.container.portfolio_service.override(
             BacktestPortfolioService(
                 configuration_service=configuration_service,
@@ -239,10 +248,6 @@ class App:
                 market_data_source_service=market_data_source_service
             )
         )
-
-    @algorithm.setter
-    def algorithm(self, algorithm: Algorithm) -> None:
-        self._algorithm = algorithm
 
     def initialize_config(self):
         """
@@ -319,7 +324,7 @@ class App:
         if APP_MODE not in config:
             configuration_service.add_value(APP_MODE, AppMode.DEFAULT.value)
 
-    def initialize_data_sources(self):
+    def initialize_data_sources(self, algorithm):
         """
         Function to initialize the data sources for the app. This method
         should be called before running the algorithm. This method
@@ -331,23 +336,11 @@ class App:
         logger.info("Initializing data sources")
         market_data_source_service = self.container \
             .market_data_source_service()
+        market_data_source_service.clear_market_data_sources()
 
-        # Add all market data sources of the strategies
-        # to the market data source service
-        market_data_source_service.market_data_sources = \
-            self._market_data_sources
-
-        for strategy in self.algorithm.strategies:
-
-            if strategy.market_data_sources is not None:
-                for market_data_source in strategy.market_data_sources:
-                    market_data_source_service.add(market_data_source)
-
-        # Check if the algorithm has data sources registered
-        if len(self.algorithm.data_sources) == 0:
-
-            for data_source in self.algorithm.data_sources:
-                self.add_market_data_source(data_source)
+        # Add all market data sources of the strategies to the market
+        # data source service
+        market_data_source_service.market_data_sources = algorithm.data_sources
 
         # Initialize the market data source service
         market_data_source_service.initialize_market_data_sources()
@@ -365,9 +358,6 @@ class App:
         """
         logger.info("Initializing app")
 
-        if self.algorithm is None:
-            raise OperationalException("No algorithm registered")
-
         # Ensure that all resource directories exist
         self._create_resources_if_not_exists()
 
@@ -384,8 +374,6 @@ class App:
         else:
             self.initialize_services()
 
-        self.initialize_data_sources()
-
         portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
 
@@ -397,24 +385,6 @@ class App:
         if portfolio_configuration_service.count() == 0:
             raise OperationalException("No portfolios configured")
 
-        self.algorithm.initialize_services(
-            context=self.container.context(),
-            configuration_service=self.container.configuration_service(),
-            market_data_source_service=self.container
-            .market_data_source_service(),
-            market_credential_service=self.container
-            .market_credential_service(),
-            portfolio_service=self.container.portfolio_service(),
-            position_service=self.container.position_service(),
-            order_service=self.container.order_service(),
-            portfolio_configuration_service=self.container
-            .portfolio_configuration_service(),
-            market_service=self.container.market_service(),
-            strategy_orchestrator_service=self.container
-            .strategy_orchestrator_service(),
-            trade_service=self.container.trade_service(),
-        )
-
         configuration_service = self.container.configuration_service()
 
         if config[APP_MODE] == AppMode.WEB.value:
@@ -423,14 +393,10 @@ class App:
 
         self._initialize_portfolios()
 
-    def run(
-        self,
-        payload: dict = None,
-        number_of_iterations: int = None,
-    ):
+    def run(self, payload: dict = None, number_of_iterations: int = None):
         """
         Entry point to run the application. This method should be called to
-        start the algorithm. This method can be called in three modes:
+        start the trading bot. This method can be called in three modes:
 
         - Without any params: In this mode, the app runs until a keyboard
         interrupt is received. This mode is useful when running the app in
@@ -459,6 +425,7 @@ class App:
         Returns:
             None
         """
+
         try:
             configuration_service = self.container.configuration_service()
             config = configuration_service.get_config()
@@ -489,12 +456,28 @@ class App:
             configuration_service = self.container.configuration_service()
             config = configuration_service.get_config()
 
+            algorithm_factory: AlgorithmFactory = \
+                self.container.algorithm_factory()
+            algorithm = algorithm_factory.create_algorithm(
+                name=self._name,
+                strategies=self._strategies,
+                tasks=self._tasks,
+                data_sources=self._market_data_sources,
+                on_strategy_run_hooks=self._on_strategy_run_hooks,
+            )
+            strategy_orchestrator_service = \
+                self.container.strategy_orchestrator_service()
+            strategy_orchestrator_service.initialize(algorithm)
+
             # Run in payload mode if payload is provided
             if payload is not None:
                 logger.info("Running with payload")
+                context = self.container.context()
                 action_handler = ActionHandler.of(payload)
                 response = action_handler.handle(
-                    payload=payload, algorithm=self.algorithm
+                    payload=payload,
+                    context=context,
+                    strategy_orchestrator_service=strategy_orchestrator_service
                 )
                 return response
 
@@ -508,16 +491,18 @@ class App:
                 flask_thread.daemon = True
                 flask_thread.start()
 
-            self.algorithm.start(number_of_iterations=number_of_iterations)
             number_of_iterations_since_last_orders_check = 1
+            strategy_orchestrator_service.start(
+                context=self.context, number_of_iterations=number_of_iterations
+            )
 
             try:
-                while self.algorithm.running:
+                while strategy_orchestrator_service.running:
                     if number_of_iterations_since_last_orders_check == 30:
                         logger.info("Checking pending orders")
                         number_of_iterations_since_last_orders_check = 1
 
-                    self.algorithm.run_jobs(context=self.container.context())
+                    strategy_orchestrator_service.run_pending_jobs()
                     number_of_iterations_since_last_orders_check += 1
                     sleep(1)
             except KeyboardInterrupt:
@@ -526,9 +511,10 @@ class App:
             logger.error(e)
             raise e
         finally:
+            self._run_history = strategy_orchestrator_service.history
 
             try:
-                self.algorithm.stop()
+                strategy_orchestrator_service.stop()
 
                 # Upload state if state handler is provided
                 if self._state_handler is not None:
@@ -538,10 +524,6 @@ class App:
                     self._state_handler.save(config[RESOURCE_DIRECTORY])
             except Exception as e:
                 logger.error(e)
-
-    def reset(self):
-        self._started = False
-        self.algorithm.reset()
 
     def add_portfolio_configuration(self, portfolio_configuration):
         """
@@ -564,16 +546,29 @@ class App:
         time_unit: TimeUnit = TimeUnit.MINUTE,
         interval=10,
     ):
+        """
+        Function to add a task to the application.
+
+        Args:
+            function:
+            time_unit:
+            interval:
+
+        Returns:
+            Union(Task, Function): the task
+        """
+
         if function:
             task = Task(
                 decorated=function,
                 time_unit=time_unit,
                 interval=interval,
             )
-            self.algorithm.add_task(task)
+            self._tasks.append(task)
+            return task
         else:
             def wrapper(f):
-                self.algorithm.add_task(
+                self._tasks.append(
                     Task(
                         decorated=f,
                         time_unit=time_unit,
@@ -583,6 +578,31 @@ class App:
                 return f
 
             return wrapper
+
+    def add_task(self, task):
+        if inspect.isclass(task):
+            task = task()
+
+        assert isinstance(task, Task), \
+            OperationalException(
+                "Task object is not an instance of a Task"
+            )
+
+        self._tasks.append(task)
+
+    def add_tasks(self, tasks: List[Task]):
+        """
+        Function to add a list of tasks to the app. The tasks should be
+        instances of Task.
+
+        Args:
+            tasks: List of Task instances
+
+        Returns:
+            None
+        """
+        for task in tasks:
+            self.add_task(task)
 
     def _initialize_web(self):
         """
@@ -684,14 +704,13 @@ class App:
         backtest_date_range: BacktestDateRange,
         initial_amount=None,
         output_directory=None,
-        algorithm: Algorithm = None,
+        algorithm=None,
+        strategy=None,
+        strategies: List = None,
         save_strategy=False,
-        save_in_memory_strategies: bool = False,
-        strategy_directory: str = None
     ) -> BacktestReport:
         """
-        Run a backtest for an algorithm. This method should be called when
-        running a backtest.
+        Run a backtest for an algorithm. An
 
         Args:
             backtest_date_range: The date range to run the backtest for
@@ -699,50 +718,20 @@ class App:
             initial_amount: The initial amount to start the backtest with.
                 This will be the amount of trading currency that the backtest
                 portfolio will start with.
-            algorithm: The algorithm to run a backtest for (instance of
-                Algorithm)
+            strategy (TradingStrategy) (Optional): The strategy object
+                that needs to be backtested.
+            strategies (List[TradingStrategy) (Optional): List of strategy
+                objects that need to be backtested
+            algorithm:
             output_directory: str - The directory to
               write the backtest report to
             save_strategy: bool - Whether to save the strategy
-            save_strategies_directory: bool - Whether to save the
-                strategies directory
-            strategies_directory_name: str - The name of the directory
-                that contains the strategies
+                as part of the backtest report. You can only save in-memory
+                strategies when running multiple backtests. This is because
 
         Returns:
             Instance of BacktestReport
         """
-        if algorithm is not None:
-            self.algorithm = algorithm
-
-        if self.algorithm is None:
-            raise OperationalException("No algorithm registered")
-
-        if save_strategy:
-            # Check if the strategies directory exists
-            if not save_in_memory_strategies:
-
-                if strategy_directory is None:
-                    strategy_directory = os.path.join(
-                        self.config[APPLICATION_DIRECTORY], "strategies"
-                    )
-                else:
-                    strategy_directory = os.path.join(
-                        self.config[APPLICATION_DIRECTORY], strategy_directory
-                    )
-
-                if not os.path.isdir(strategy_directory):
-                    raise OperationalException(
-                        "The backtest run is enabled with the "
-                        "`include_strategy` flag  but the strategies"
-                        " directory: "
-                        f"{strategy_directory} does not exist. "
-                        "Please create the strategies directory or set "
-                        "include_strategy to False. If you want to save the "
-                        "strategies in memory, set save_in_memory_strategies "
-                        "to True. This can be helpfull when running your "
-                        "strategies in a notebook environment."
-                    )
 
         # Add backtest configuration to the config
         self.set_config_with_dict({
@@ -758,37 +747,56 @@ class App:
         configuration_service = self.container.configuration_service()
         config = configuration_service.get_config()
         path = os.path.join(
-            config[DATABASE_DIRECTORY_PATH],
-            config[DATABASE_NAME]
+            config[DATABASE_DIRECTORY_PATH], config[DATABASE_NAME]
         )
-        # Remove the previous backtest db
+
+        # Remove the previous backtest db if it exists
         if os.path.exists(path):
             os.remove(path)
 
         self.initialize()
 
-        backtest_service = self.container.backtest_service()
+        algorithm_factory = self.container.algorithm_factory()
+        algorithm = algorithm_factory.create_algorithm(
+            name=self.name if self.name is not None else "Backtest Algorithm",
+            strategies=(
+                self._strategies if strategies is None else strategies
+            ),
+            algorithm=algorithm,
+            strategy=strategy,
+            tasks=self._tasks,
+            data_sources=self._market_data_sources,
+            on_strategy_run_hooks=self._on_strategy_run_hooks,
+        )
+        self.initialize_data_sources(algorithm)
 
-        # Run the backtest with the backtest_service and collect the report
+        strategy_orchestrator_service = \
+            self.container.strategy_orchestrator_service()
+        strategy_orchestrator_service.initialize(algorithm)
+        backtest_service = self.container.backtest_service()
+        context = self.container.context()
+
+        # Run the backtest with the backtest_service and collect and
+        # save the report
         report = backtest_service.run_backtest(
-            algorithm=self.algorithm,
+            algorithm=algorithm,
+            context=context,
+            strategy_orchestrator_service=strategy_orchestrator_service,
             initial_amount=initial_amount,
             backtest_date_range=backtest_date_range
         )
-
         backtest_service.save_report(
             report=report,
-            algorithm=self.algorithm,
+            algorithm=algorithm,
             output_directory=output_directory,
             save_strategy=save_strategy,
-            save_in_memory_strategies=save_in_memory_strategies,
-            strategy_directory=strategy_directory
         )
         return report
 
     def run_backtests(
         self,
-        algorithms,
+        algorithms=None,
+        strategies=None,
         initial_amount=None,
         backtest_date_ranges: List[BacktestDateRange] = None,
         output_directory=None,
@@ -800,7 +808,14 @@ class App:
         running a backtest.
 
         Args:
-            Algorithms: List[Algorithm] - The algorithms to run backtests for
+            algorithms (List[Algorithm]) (Optional): The algorithms to run
+                backtests for. This param is optional. Either algorithms or
+                strategies should be provided. If both are provided, then the
+                algorithms will be used.
+            strategies (List[TradingStrategy]) (Optional): The strategies to
+                run backtests for. This param is optional. Either algorithms
+                or strategies should be provided. If both are provided, then
+                the algorithms will be used.
             backtest_date_ranges: List[BacktestDateRange] - The date ranges
                 to run the backtests for
             initial_amount: The initial amount to start the backtest with.
@@ -820,10 +835,36 @@ class App:
                 strategy.
 
         Returns
-            List of BacktestReport intances
+            List of BacktestReport instances
         """
         logger.info("Initializing backtests")
         reports = []
+
+        if algorithms is None and strategies is None:
+            raise OperationalException(
+                "No algorithms or strategies provided for backtest"
+            )
+
+        # Create or validate all algorithms with the algorithm factory
+        algorithm_factory = self.container.algorithm_factory()
+
+        if algorithms is not None:
+            to_be_validated_algorithms = algorithms
+            algorithms = []
+
+            for algorithm in to_be_validated_algorithms:
+                algorithm = algorithm_factory.create_algorithm(
+                    algorithm=algorithm
+                )
+                algorithms.append(algorithm)
+        else:
+            algorithms = []
+
+        if strategies is not None:
+            for strategy in strategies:
+                algorithms.append(
+                    algorithm_factory.create_algorithm(strategy=strategy)
+                )
 
         for date_range in backtest_date_ranges:
             print(
@@ -856,55 +897,58 @@ class App:
                         )
                         reports.append(report)
                         continue
-                self.algorithm = algorithm
-                self.set_config_with_dict({
-                    ENVIRONMENT: Environment.BACKTEST.value,
-                    BACKTESTING_START_DATE: date_range.start_date,
-                    BACKTESTING_END_DATE: date_range.end_date,
-                    DATABASE_NAME: "backtest-database.sqlite3",
-                    DATABASE_DIRECTORY_NAME: "backtest_databases"
-                })
-                self.initialize_config()
 
-                configuration_service = self.container.configuration_service()
-                config = configuration_service.get_config()
-
-                path = os.path.join(
-                    config[DATABASE_DIRECTORY_PATH],
-                    config[DATABASE_NAME]
-                )
-                # Remove the previous backtest db
-                if os.path.exists(path):
-                    os.remove(path)
-
-                self.initialize()
-                backtest_service = self.container.backtest_service()
-                backtest_service.resource_directory = self.config[
-                    RESOURCE_DIRECTORY
-                ]
-
-                # Run the backtest with the backtest_service
-                # and collect the report
-                report = backtest_service.run_backtest(
-                    algorithm=self.algorithm,
+                report = self.run_backtest(
+                    backtest_date_range=date_range,
                     initial_amount=initial_amount,
-                    backtest_date_range=date_range
-                )
-
-                # Add date range name to report if present
-                if date_range.name is not None:
-                    report.date_range_name = date_range.name
-
-                backtest_service.save_report(
-                    report=report,
-                    algorithm=algorithm,
                     output_directory=output_directory,
-                    save_strategy=save_strategy,
-                    save_in_memory_strategies=True,
+                    algorithm=algorithm,
+                    save_strategy=save_strategy
                 )
                 reports.append(report)
 
         return reports
+
+    def add_data_source(self, data_source) -> None:
+        """
+        Function to add a data source to the app. The data source should
+        be an instance of DataSource.
+
+        Args:
+            data_source: Instance of DataSource
+
+        Returns:
+            None
+        """
+        if inspect.isclass(data_source):
+            if not issubclass(data_source, MarketDataSource):
+                raise OperationalException(
+                    "Data source should be an instance of MarketDataSource"
+                )
+
+            data_source = data_source()
+
+        # Check if data source is already registered
+        # for market_data_source in self._market_data_sources:
+        #     if market_data_source.get_identifier() == \
+        #             data_source.get_identifier():
+        #         return
+
+        self._market_data_sources.append(data_source)
+
+    def add_data_sources(self, data_sources) -> None:
+        """
+        Function to add a list of data sources to the app. The data sources
+        should be instances of DataSource.
+
+        Args:
+            data_sources: List of DataSource
+
+        Returns:
+            None
+        """
+        for data_source in data_sources:
+            self.add_data_source(data_source)
 
     def add_market_data_source(self, market_data_source):
         """
@@ -983,7 +1027,7 @@ class App:
         """
 
         # Check if the app_hook inherits from AppHook
-        if not issubclass(app_hook, AppHook):
+        if inspect.isclass(app_hook) and not issubclass(app_hook, AppHook):
             raise OperationalException(
                 "App hook should be an instance of AppHook"
             )
@@ -1004,30 +1048,126 @@ class App:
 
         self._on_after_initialize_hooks.append(app_hook)
 
-    def add_strategy(self, strategy):
+    def strategy(
+        self,
+        function=None,
+        time_unit=TimeUnit.MINUTE,
+        interval=10,
+        market_data_sources=None
+    ):
+        """
+        Decorator for registering a strategy. This decorator can be used
+        to define a trading strategy function and register it in your
+        application.
+
+        Args:
+            function: The wrapped function to should be converted to
+                a TradingStrategy
+            time_unit (TimeUnit): instance of TimeUnit Enum
+            interval (int): interval of the schedule ( interval - TimeUnit )
+            market_data_sources (List): List of data sources that the
+                trading strategy function uses.
+
+        Returns:
+            Function
+        """
+        from .strategy import TradingStrategy
+
+        if function:
+            strategy_object = TradingStrategy(
+                decorated=function,
+                time_unit=time_unit,
+                interval=interval,
+                market_data_sources=market_data_sources
+            )
+            self.add_strategy(strategy_object)
+            return strategy_object
+        else:
+
+            def wrapper(f):
+                self.add_strategy(
+                    TradingStrategy(
+                        decorated=f,
+                        time_unit=time_unit,
+                        interval=interval,
+                        market_data_sources=market_data_sources,
+                        worker_id=f.__name__
+                    )
+                )
+                return f
+
+            return wrapper
+
+    def add_strategies(self, strategies, throw_exception=True) -> None:
+        """
+        Function to add strategies to the app
+        Args:
+            strategies (List(TradingStrategy)): List of trading strategies that
+                need to be registered.
+            throw_exception (boolean): Flag to specify if an exception
+                can be thrown if the strategies are not in the format or type
+                that the application expects
+
+        Returns:
+            None
+        """
+
+        if strategies is not None:
+            for strategy in strategies:
+                self.add_strategy(strategy, throw_exception=throw_exception)
+
+    def add_strategy(self, strategy, throw_exception=True) -> None:
         """
         Function to add a strategy to the app. The strategy should be an
-        instance of TradingStrategy.
+        instance of TradingStrategy or a subclass based on the TradingStrategy
+        class.
 
         Args:
             strategy: Instance of TradingStrategy
+            throw_exception: Flag to allow for throwing an exception when
+                the provided strategy is not inline with what the application
+                expects.
 
         Returns:
             None
         """
 
         if inspect.isclass(strategy):
+
+            if not issubclass(strategy, TradingStrategy):
+                raise OperationalException(
+                    "The strategy must be a subclass of TradingStrategy"
+                )
+
             strategy = strategy()
 
         if not isinstance(strategy, TradingStrategy):
+
+            if throw_exception:
+                raise OperationalException(
+                    "Strategy should be an instance of TradingStrategy"
+                )
+            else:
+                return
+
+        has_duplicates = False
+
+        for i in range(len(self._strategies)):
+            for j in range(i + 1, len(self._strategies)):
+                if self._strategies[i].worker_id == strategy.worker_id:
+                    has_duplicates = True
+                    break
+
+        if has_duplicates:
             raise OperationalException(
-                "Strategy should be an instance of TradingStrategy"
+                "Can't add strategy, there already exists a strategy "
+                "with the same id in the algorithm"
             )
 
-        if self.algorithm is None:
-            self.algorithm = Algorithm(name=self._name)
+        if strategy.market_data_sources is not None:
+            self.add_data_sources(strategy.market_data_sources)
 
-        self.algorithm.add_strategy(strategy)
+        self._strategies.append(strategy)
 
     def add_state_handler(self, state_handler):
         """
@@ -1314,8 +1454,7 @@ class App:
 
             logger.info("Portfolio configurations complete")
             logger.info("Syncing portfolios")
-            portfolio_provider_lookup = \
-                self.container.portfolio_provider_lookup()
+
             portfolio_service = self.container.portfolio_service()
             portfolio_sync_service = self.container.portfolio_sync_service()
 
@@ -1354,4 +1493,49 @@ class App:
         order_executor_lookup = self.container.order_executor_lookup()
         order_executor_lookup.add_order_executor(
             CCXTOrderExecutor(priority=2)
+        )
+
+    def get_run_history(self):
+        """
+        Function to get the run history of the app. This function will
+        return the history of the run schedule of all the strategies,
+        and tasks that have been registered in the app.
+
+        Returns:
+            dict: The run history of the app
+        """
+        return self._run_history
+
+    def has_run(self, worker_id) -> bool:
+        """
+        Function to check if a worker has run in the app. This function
+        will check if the worker_id is present in the run history of the app.
+
+        Args:
+            worker_id:
+
+        Returns:
+            Boolean: True if the worker has run, False otherwise
+        """
+        if self._run_history is None:
+            return False
+
+        return worker_id in self._run_history
+
+    def get_algorithm(self):
+        """
+        Function to get the algorithm that is currently running in the app.
+        This function will return the algorithm that is currently running
+        in the app.
+
+        Returns:
+            Algorithm: The algorithm that is currently running in the app
+        """
+        algorithm_factory = self.container.algorithm_factory()
+        return algorithm_factory.create_algorithm(
+            name=self._name,
+            strategies=self._strategies,
+            tasks=self._tasks,
+            data_sources=self._market_data_sources,
+            on_strategy_run_hooks=self._on_strategy_run_hooks,
         )

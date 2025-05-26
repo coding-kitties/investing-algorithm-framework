@@ -10,7 +10,8 @@ from investing_algorithm_framework import create_app, Algorithm, App, \
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
     ENVIRONMENT, Environment
 from tests.resources.stubs import MarketServiceStub, \
-    PortfolioSyncServiceStub, OrderExecutorTest, PortfolioProviderTest
+    PortfolioSyncServiceStub, OrderExecutorTest, PortfolioProviderTest, \
+    MarketDataSourceServiceStub
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,15 @@ class TestBase(TestCase):
         if self.market_data_source_service is not None:
             self.app.container.market_data_source_service\
                 .override(self.market_data_source_service)
+        else:
+            market_data_service_stub = MarketDataSourceServiceStub(
+                self.app.container.market_service(),
+                self.app.container.market_credential_service(),
+                self.app.container.configuration_service(),
+                None
+            )
+            self.app.container.market_data_source_service\
+                .override(market_data_service_stub)
 
         if len(self.portfolio_configurations) > 0:
             for portfolio_configuration in self.portfolio_configurations:

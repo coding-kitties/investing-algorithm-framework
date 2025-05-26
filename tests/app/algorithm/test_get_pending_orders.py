@@ -65,7 +65,6 @@ class TestPortfolioService(TestBase):
             },
         ),
     ]
-    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_get_pending_orders(self):
         """

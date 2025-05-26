@@ -18,8 +18,19 @@ class RandomPriceMarketDataSourceServiceStub(MarketDataSourceService):
 
 class MarketDataSourceServiceStub(MarketDataSourceService):
 
-    def __init__(self):
-        pass
+    def __init__(
+        self,
+        market_service,
+        market_credential_service,
+        configuration_service,
+        market_data_sources
+    ):
+        super().__init__(
+            market_service,
+            market_credential_service,
+            configuration_service,
+            market_data_sources
+        )
 
     def initialize_market_data_sources(self):
         pass

@@ -20,7 +20,6 @@ class Test(TestBase):
     external_balances = {
         "EUR": 1000
     }
-    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_create_limit_sell_order(self):
         self.app.run(number_of_iterations=1)

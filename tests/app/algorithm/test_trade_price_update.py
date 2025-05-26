@@ -49,7 +49,6 @@ class Test(TestCase):
                 for name in dirs:
                     os.rmdir(os.path.join(root, name))
 
-
     def test_trade_recent_price_update(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         app.add_portfolio_provider(PortfolioProviderTest)
@@ -102,6 +101,8 @@ class Test(TestCase):
         )
         app.initialize_config()
         app.initialize()
+        algorithm = app.get_algorithm()
+        app.initialize_data_sources(algorithm)
         app.context.create_limit_order(
             target_symbol="btc",
             amount=1,
@@ -111,9 +112,7 @@ class Test(TestCase):
         order_service = app.container.order_service()
         order_service.check_pending_orders()
         app.run(number_of_iterations=1)
-        strategy_orchestration_service = app.algorithm\
-            .strategy_orchestrator_service
-        self.assertTrue(strategy_orchestration_service.has_run("StrategyOne"))
+        self.assertTrue(app.has_run("StrategyOne"))
 
         # Check that the last reported price is updated
         trade = app.context.get_trades()[0]

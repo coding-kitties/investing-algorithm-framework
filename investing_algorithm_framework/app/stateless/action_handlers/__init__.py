@@ -54,8 +54,10 @@ class ActionHandler:
         action_handler.set_strategy(payload)
         return action_handler
 
-    def handle(self, payload, algorithm):
-        return self.strategy.handle_event(payload=payload, algorithm=algorithm)
+    def handle(self, payload, context, strategy_orchestrator_service):
+        return self.strategy.handle_event(
+            payload, context, strategy_orchestrator_service
+        )
 
     def set_strategy(self, payload):
         action = ActionHandler.get_action_type(payload)

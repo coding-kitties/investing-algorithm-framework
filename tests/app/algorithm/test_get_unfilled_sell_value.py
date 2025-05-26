@@ -114,7 +114,6 @@ class Test(TestBase):
     external_balances = {
         "EUR": 1000
     }
-    market_data_source_service = MarketDataSourceServiceStub()
 
     def test_get_unfilled_sell_value(self):
         """
