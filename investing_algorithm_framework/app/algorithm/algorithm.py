@@ -1,12 +1,12 @@
+import inspect
 import logging
 import re
 from typing import List
-import inspect
 
-from investing_algorithm_framework.domain import OperationalException, \
-    random_string, MarketDataSource
-from investing_algorithm_framework.app.strategy import TradingStrategy
 from investing_algorithm_framework.app.app_hook import AppHook
+from investing_algorithm_framework.app.strategy import TradingStrategy
+from investing_algorithm_framework.domain import OperationalException, \
+    MarketDataSource
 
 logger = logging.getLogger("investing_algorithm_framework")
 

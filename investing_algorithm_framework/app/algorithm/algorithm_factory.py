@@ -103,6 +103,6 @@ class AlgorithmFactory:
         if algorithm.name is None:
             algorithm.name = AlgorithmFactory.create_algorithm_name(algorithm)
 
-         # Validate the algorithm name
+        # Validate the algorithm name
         validate_algorithm_name(algorithm.name)
         return algorithm
