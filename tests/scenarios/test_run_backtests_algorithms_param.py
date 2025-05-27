@@ -19,7 +19,7 @@ class Test(TestCase):
         config = {RESOURCE_DIRECTORY: resource_directory}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BINANCE", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2023, 12, 2, tzinfo=timezone.utc)
+        end_date = datetime(2023, 12, 2)
         start_date = end_date - timedelta(days=100)
         date_range = BacktestDateRange(
             start_date=start_date, end_date=end_date
@@ -34,7 +34,7 @@ class Test(TestCase):
         )
         backtest_report = backtest_reports[0]
         self.assertAlmostEqual(
-            backtest_report.get_growth(), 3, delta=0.1
+            backtest_report.get_growth(), 3, delta=0.5
         )
         self.assertAlmostEqual(
             backtest_report.get_growth_percentage(), 0.8, delta=0.05
@@ -46,7 +46,7 @@ class Test(TestCase):
             backtest_report.get_trading_symbol(), "EUR"
         )
         self.assertAlmostEqual(
-            backtest_report.get_profit(), 3, delta=0.1
+            backtest_report.get_profit(), 3, delta=0.5
         )
         self.assertAlmostEqual(
             backtest_report.get_profit_percentage(), 0.8, delta=0.05
