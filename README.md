@@ -72,9 +72,8 @@ The following example connects to Binance and buys BTC every 2 hours.
 import logging.config
 from dotenv import load_dotenv
 
-from investing_algorithm_framework import create_app, TimeUnit, \
-    CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, \
-    DEFAULT_LOGGING_CONFIG, Algorithm, Context
+from investing_algorithm_framework import create_app, TimeUnit, Context, \
+    CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, DEFAULT_LOGGING_CONFIG
 
 load_dotenv()
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
@@ -97,10 +96,9 @@ bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
 app = create_app()
 # Registered bitvavo market, credentials are read from .env file by default
 app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=100)
-algorithm = Algorithm(name="test_algorithm")
 
 # Define a strategy for the algorithm that will run every 10 seconds
-@algorithm.strategy(
+@app.strategy(
     time_unit=TimeUnit.SECOND,
     interval=10,
     market_data_sources=[bitvavo_btc_eur_ticker, bitvavo_btc_eur_ohlcv_2h]
@@ -114,8 +112,6 @@ def perform_strategy(context: Context, market_data: dict):
     trades = context.get_trades()
     open_trades = context.get_open_trades()
     closed_trades = context.get_closed_trades()
-
-app.add_algorithm(algorithm)
 
 if __name__ == "__main__":
     app.run()
