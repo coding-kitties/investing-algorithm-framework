@@ -13,7 +13,8 @@ from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLOrderMetadataRepository
 from .services import PerformanceService, CCXTMarketService, \
     AzureBlobStorageStateHandler
-from .data_providers import CCXTDataProvider, get_default_data_providers
+from .data_providers import CCXTDataProvider, get_default_data_providers, \
+    get_default_ohlcv_data_providers
 from .order_executors import CCXTOrderExecutor
 from .portfolio_providers import CCXTPortfolioProvider
 
@@ -53,4 +54,5 @@ __all__ = [
     "CCXTOrderExecutor",
     "CCXTPortfolioProvider",
     "get_default_data_providers",
+    "get_default_ohlcv_data_providers",
 ]

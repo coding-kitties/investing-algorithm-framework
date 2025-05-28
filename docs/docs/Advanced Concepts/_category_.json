@@ -1,0 +1,8 @@
+{
+  "label": "Advanced concepts",
+  "position": 1,
+  "link": {
+    "type": "generated-index",
+    "description": "Advanced concepts and features of the framework."
+  }
+}

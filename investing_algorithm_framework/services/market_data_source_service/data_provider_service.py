@@ -1,9 +1,10 @@
 import logging
 from datetime import datetime
 from typing import List, Optional
+from collections import defaultdict
 
 from investing_algorithm_framework.domain import DataProvider, \
-    OperationalException, NetworkError
+    OperationalException, NetworkError, ImproperlyConfigured, TradingDataType
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -27,39 +28,107 @@ class DataProviderIndex:
         """
         self.data_providers.append(data_provider)
 
-    def find_data_provider(
-        self,
-        symbol: Optional[str] = None,
-        market: Optional[str] = None,
-        data_type: Optional[str] = None,
-        time_frame: Optional[str] = None,
-    ):
-        number_of_network_errors = 0
-        matching_providers = []
+class OHLCVDataProviderIndex:
+    """
+    Efficient lookup for ohlcv data providers in O(1) time.
 
-        try:
-            for provider in self.data_providers:
-                if provider.has_data(
-                    symbol=symbol,
-                    market=market,
-                    data_type=data_type,
-                    time_frame=time_frame,
-                ):
-                    matching_providers.append(provider)
-        except NetworkError:
-            number_of_network_errors += 1
-        except Exception:
-            pass
+    Attributes:
+        data_providers (List[DataProvider]): List of data providers
+        order_executor_lookup (dict): Dictionary to store the lookup
+            for order executors based on market.
+    """
+    def __init__(self, data_providers=[]):
+        self.data_providers = data_providers
+        self.data_providers_lookup = defaultdict()
 
-        if len(matching_providers) == 0 and number_of_network_errors > 0:
-            raise NetworkError(
-                "Network error occurred, make sure you have "
-                "an active internet connection"
+    def add(self, data_provider: DataProvider):
+        """
+        Add a data provider to the lookup.
+
+        Args:
+            data_provider (DataProvider): The data provider to be added.
+
+        Returns:
+            None
+        """
+        self.data_providers.append(data_provider)
+
+    def register(self, symbol, market) -> DataProvider:
+        """
+        Register an ohlcv data provider for a given market and symbol.
+
+        This method will also check if the data provider supports
+        the market. If no data provider is found for the market and symbol,
+        it will raise an ImproperlyConfigured exception.
+
+        If multiple data providers are found for the market and symbol,
+        it will sort them by priority and pick the best one.
+
+        Args:
+            market (str): The market to register the data provider for.
+            symbol (str): The symbol to register the data provider for.
+
+        Returns:
+            None
+        """
+        print("Registering data provider for ohlcv data")
+        matches = []
+
+        for data_provider in self.data_providers:
+
+            print("checking data provider", data_provider)
+            if data_provider.supports(market, symbol):
+                matches.append(data_provider)
+
+        if len(matches) == 0:
+            raise ImproperlyConfigured(
+                f"No data provider found for market "
+                f"{market} and symbol {symbol}."
+                f" Please make sure that you have registered a data provider "
+                f"provider for the market and symbol you are trying to use"
             )
 
-        # Sort by priority (lower priority number is better)
-        matching_providers.sort(key=lambda p: p.priority)
-        return matching_providers[0] if matching_providers else None
+        # Sort by priority and pick the best one
+        best_provider = sorted(matches, key=lambda x: x.priority)[0]
+        self.data_providers_lookup[(market, symbol)] = best_provider
+        return best_provider
+
+    def get(self, symbol, market: str):
+        """
+        Get the ohlcv data provider for a given market and symbol.
+        If no data provider is found for the market and symbol,
+        it will return None.
+
+        Args:
+            market (str): The market to get the order executor for.
+            symbol (str): The symbol to get the order executor for.
+
+        Returns:
+            DataProvider: The data provider for the market and symbol,
+        """
+        return self.data_providers_lookup.get((market, symbol), None)
+
+    def get_all(self) -> List[DataProvider]:
+        """
+        Get all order executors.
+        This method will return all order executors that are currently
+        registered in the order_executors list.
+
+        Returns:
+            List[OrderExecutor]: A list of all order executors.
+        """
+        return self.data_providers
+
+    def reset(self):
+        """
+        Function to reset the order executor lookup table
+
+        Returns:
+            None
+        """
+        self.data_providers_lookup = defaultdict()
+        self.data_providers = []
+
 
 
 class DataProviderService:
@@ -68,12 +137,14 @@ class DataProviderService:
         # Add default data providers here
     ]
     data_provider_index: DataProviderIndex = None
+    ohlcv_data_provider_index: OHLCVDataProviderIndex = None
 
     def __init__(
         self,
         configuration_service,
         market_credentials_service,
-        default_data_providers: List[DataProvider] = []
+        default_data_providers: List[DataProvider] = [],
+        default_ohlcv_data_providers: List[DataProvider] = []
     ):
         """
         Initialize the DataProviderService with a list of data providers.
@@ -86,6 +157,9 @@ class DataProviderService:
         self.data_provider_index = DataProviderIndex(default_data_providers)
         self.configuration_service = configuration_service
         self.market_credentials_service = market_credentials_service
+        self.ohlcv_data_provider_index = OHLCVDataProviderIndex(
+            data_providers=default_ohlcv_data_providers
+        )
 
     def get_data(
         self,
@@ -105,6 +179,7 @@ class DataProviderService:
         Function to get data from the data provider.
 
         Args:
+            data_type (str): The type of data to get (e.g., "ohlcv", "ticker").
             date (datetime): The date to get data for.
             symbol (str): The symbol to get data for.
             market (str): The market to get data from.
@@ -119,10 +194,9 @@ class DataProviderService:
             DataFrame: The data for the given symbol and market.
         """
 
-        data_provider = self.data_provider_index.find_data_provider(
-            symbol=symbol
+        data_provider = self.find_data_provider(
+            symbol=symbol, market=market, data_type=data_type
         )
-        data_provider.config = self.configuration_service.get_config()
 
         if data_provider is None:
             self._throw_no_data_provider_exception(
@@ -133,6 +207,9 @@ class DataProviderService:
                     "time_frame": time_frame,
                 }
             )
+
+        if self.configuration_service is not None:
+            data_provider.config = self.configuration_service.get_config()
 
         return data_provider.get_data(
             data_type=data_type,
@@ -145,6 +222,7 @@ class DataProviderService:
             storage_path=storage_path,
             window_size=window_size,
             pandas=pandas,
+            save=save
         )
 
     def get_backtest_data(
@@ -236,3 +314,40 @@ class DataProviderService:
         """
         self.data_providers.append(data_provider)
         self.data_providers.sort(key=lambda x: x.priority, reverse=True)
+
+    def find_data_provider(
+        self,
+        symbol: Optional[str] = None,
+        market: Optional[str] = None,
+        data_type: Optional[str] = None,
+        time_frame: Optional[str] = None,
+    ):
+        """
+        Function to find a data provider based on the given parameters.
+
+        Args:
+            symbol (str): The symbol to find the data provider for.
+            market (str): The market to find the data provider for.
+            data_type (str): The type of data to find the data provider for.
+            time_frame (str): The time frame to find the data provider for.
+
+        Returns:
+            DataProvider: The data provider that matches the given parameters.
+        """
+        data_provider = None
+
+        print(data_type)
+        if TradingDataType.OHLCV.equals(data_type):
+            # Check if there is already a registered data provider
+            data_provider = self.ohlcv_data_provider_index.get(
+                symbol=symbol, market=market
+            )
+
+            if data_provider is None:
+                # Try to register a new data provider if it is not
+                # already registered
+                data_provider = self.ohlcv_data_provider_index.register(
+                    symbol=symbol, market=market
+                )
+
+        return data_provider

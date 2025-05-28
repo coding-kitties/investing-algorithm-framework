@@ -148,6 +148,7 @@ class DataProvider(ABC):
         storage_path=None,
         window_size=None,
         pandas=False,
+        save: bool = True,
     ):
         """
         Fetches data for a given symbol and date range.

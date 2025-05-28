@@ -5,7 +5,7 @@ from typing import Union
 from investing_algorithm_framework.services import DataProviderService, \
     ConfigurationService, MarketCredentialService
 from investing_algorithm_framework.infrastructure import \
-    get_default_data_providers
+    get_default_data_providers, get_default_ohlcv_data_providers
 
 
 def download(
@@ -50,7 +50,8 @@ def download(
     data_provider_service = DataProviderService(
         default_data_providers=get_default_data_providers(),
         configuration_service=configuration_service,
-        market_credentials_service=market_credential_service
+        market_credentials_service=market_credential_service,
+        default_ohlcv_data_providers=get_default_ohlcv_data_providers()
     )
 
     if start_date is not None and isinstance(start_date, str):

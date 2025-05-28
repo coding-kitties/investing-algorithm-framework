@@ -1,0 +1,8 @@
+{
+  "label": "Data",
+  "position": 0,
+  "link": {
+    "type": "generated-index",
+    "description": "Learn the basic concepts of using data sources in the investing algorithm framework"
+  }
+}
