@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkinvesting_algorithm_framework_docs=self.webpackChunkinvesting_algorithm_framework_docs||[]).push([[9425],{7171:a=>{a.exports=JSON.parse('{"label":"bitvavo","permalink":"/investing-algorithm-framework/blog/tags/bitvavo","allTagsPath":"/investing-algorithm-framework/blog/tags","count":1}')}}]);

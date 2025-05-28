@@ -10,7 +10,7 @@ const config = {
   tagline: 'Creating trading bots with the investing algorithm framework',
   favicon: 'img/favicon.ico',
   url: 'https://coding-kitties.github.io', // Your GitHub Pages URL
-  baseUrl: '/investing-algorithm-framework/docs/',
+  baseUrl: '/investing-algorithm-framework/',
 //  // Set the production url of your site here
 //  url: 'https://investing-algorithm-framework.com',
 //  // Set the /<baseUrl>/ pathname under which your site is served
