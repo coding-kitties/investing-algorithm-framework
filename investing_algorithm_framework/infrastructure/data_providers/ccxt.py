@@ -315,7 +315,6 @@ class CCXTDataProvider(DataProvider):
         return end_date - timedelta(minutes=window_size * minutes)
 
 
-
 class CCXTOHLCVDataProvider(DataProvider):
     """
     CCXT OHLCV Data Provider is a data provider that uses the

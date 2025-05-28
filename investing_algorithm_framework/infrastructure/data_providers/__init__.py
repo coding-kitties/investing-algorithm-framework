@@ -12,6 +12,7 @@ def get_default_data_providers():
         CCXTDataProvider(),
     ]
 
+
 def get_default_ohlcv_data_providers():
     """
     Function to get the default OHLCV data providers.
@@ -22,6 +23,7 @@ def get_default_ohlcv_data_providers():
     return [
         CCXTOHLCVDataProvider(),
     ]
+
 
 __all__ = [
     'CCXTDataProvider',

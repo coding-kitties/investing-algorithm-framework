@@ -1,10 +1,10 @@
 import logging
+from collections import defaultdict
 from datetime import datetime
 from typing import List, Optional
-from collections import defaultdict
 
 from investing_algorithm_framework.domain import DataProvider, \
-    OperationalException, NetworkError, ImproperlyConfigured, TradingDataType
+    OperationalException, ImproperlyConfigured, TradingDataType
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -27,6 +27,7 @@ class DataProviderIndex:
             data_provider (DataProvider): The data provider to register.
         """
         self.data_providers.append(data_provider)
+
 
 class OHLCVDataProviderIndex:
     """
@@ -128,7 +129,6 @@ class OHLCVDataProviderIndex:
         """
         self.data_providers_lookup = defaultdict()
         self.data_providers = []
-
 
 
 class DataProviderService:
