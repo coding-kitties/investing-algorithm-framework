@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkinvesting_algorithm_framework_docs=self.webpackChunkinvesting_algorithm_framework_docs||[]).push([[723],{1275:a=>{a.exports=JSON.parse('{"label":"trading bot","permalink":"/docs/blog/tags/trading-bot","allTagsPath":"/docs/blog/tags","count":4}')}}]);
