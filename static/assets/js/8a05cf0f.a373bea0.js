@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkinvesting_algorithm_framework_docs=self.webpackChunkinvesting_algorithm_framework_docs||[]).push([[6361],{2100:s=>{s.exports=JSON.parse('{"label":"crypto","permalink":"/docs/blog/tags/crypto","allTagsPath":"/docs/blog/tags","count":4}')}}]);

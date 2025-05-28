@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkinvesting_algorithm_framework_docs=self.webpackChunkinvesting_algorithm_framework_docs||[]).push([[2326],{8525:a=>{a.exports=JSON.parse('{"label":"investing algorithm","permalink":"/investing-algorithm-framework/docs/blog/tags/investing-algorithm","allTagsPath":"/investing-algorithm-framework/docs/blog/tags","count":4}')}}]);
