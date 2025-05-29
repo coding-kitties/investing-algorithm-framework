@@ -1,12 +1,15 @@
-name: Build and Copy Docusaurus to /docs
+name: Build and update documentation site
 
 on:
   push:
+    paths:
+      - 'docusaurus/**'
     branches:
-      - main  # Only run on push to main branch
+      - main
 
 jobs:
   build-docusaurus:
+    if: "!startsWith(github.ref, 'refs/heads/update-docs-site-')"
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -36,10 +39,24 @@ jobs:
       - name: Copy built site to docs/
         run: cp -r build/* ../docs/
 
-      - name: Commit and push changes to docs/
+      - name: Commit changes to a new branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          BRANCH_NAME="update-docs-site-$(date +%s)"
+          git checkout -b $BRANCH_NAME
           git add ../docs
           git commit -m "Update Docusaurus site [skip ci]" || echo "No changes to commit"
-          git push
+          git push origin $BRANCH_NAME
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: Update Docusaurus site [skip ci]
+          branch: ${{ github.ref_name }}
+          title: 'Update Docusaurus site'
+          body: 'This PR updates the static documentation site.'
+          base: main
+
