@@ -43,21 +43,31 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-      
+
           BRANCH_NAME="update-docs-site-$(date +%s)"
-          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV  # Save for later steps
-      
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
+
           git checkout -b $BRANCH_NAME
           git add ../docs
-          git commit -m "Update Docusaurus site [skip ci]" || echo "No changes to commit"
-          git push origin $BRANCH_NAME
+
+          # Check for staged changes before committing
+          if git diff --cached --quiet; then
+            echo "No changes to commit. Exiting workflow."
+            echo "create_pr=false" >> $GITHUB_ENV
+            exit 0
+          else
+            git commit -m "Update Docusaurus site [skip ci]"
+            git push origin $BRANCH_NAME
+            echo "create_pr=true" >> $GITHUB_ENV
+          fi
 
       - name: Create pull request
+        if: env.create_pr == 'true'
         uses: peter-evans/create-pull-request@v5
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: Update Docusaurus site [skip ci]
-          branch: ${{ env.BRANCH_NAME }}  # Use saved branch name
+          branch: ${{ env.BRANCH_NAME }}
           title: 'Update Docusaurus site'
           body: 'This PR updates the static documentation site.'
           base: main
