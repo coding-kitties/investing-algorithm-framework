@@ -19,9 +19,9 @@ const sidebars = {
                     id: 'Getting Started/portfolio-configuration',
                 },
                 {
-                    type: 'doc',
-                    id: 'Getting Started/strategies',
-                },
+                  type: 'doc',
+                  id: 'Getting Started/strategies',
+                }
                 {
                     type: 'doc',
                     id: 'Getting Started/orders',
