@@ -80,7 +80,7 @@ download("SOL/USDT", market="binance", time_frame="1d", save=True, storage_path=
 ```
 
 ## Internals
-The function relies on:
+The function relies on the following components:
 * ConfigurationService and MarketCredentialService to determine available providers and credentials.
 * DataProviderService to abstract away direct API calls.
 * dateutil.parser for robust datetime parsing.
