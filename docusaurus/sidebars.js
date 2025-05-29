@@ -55,7 +55,7 @@ const sidebars = {
                 {
                     type: 'doc',
                     id: 'Data/download',
-                }
+                },
                 {
                     type: 'doc',
                     id: 'Data/market-data-sources',
