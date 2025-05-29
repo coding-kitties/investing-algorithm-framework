@@ -43,8 +43,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
+      
           BRANCH_NAME="update-docs-site-$(date +%s)"
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV  # Save for later steps
+      
           git checkout -b $BRANCH_NAME
           git add ../docs
           git commit -m "Update Docusaurus site [skip ci]" || echo "No changes to commit"
@@ -55,8 +57,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: Update Docusaurus site [skip ci]
-          branch: ${{ github.ref_name }}
+          branch: ${{ env.BRANCH_NAME }}  # Use saved branch name
           title: 'Update Docusaurus site'
           body: 'This PR updates the static documentation site.'
           base: main
-
