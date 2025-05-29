@@ -50,7 +50,6 @@ jobs:
           git checkout -b $BRANCH_NAME
           git add ../docs
 
-          # Check for staged changes before committing
           if git diff --cached --quiet; then
             echo "No changes to commit. Exiting workflow."
             echo "create_pr=false" >> $GITHUB_ENV
@@ -67,7 +66,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: Update Docusaurus site [skip ci]
-          branch: ${{ env.BRANCH_NAME }}
+          branch: ${{ env.BRANCH_NAME }}           # ✅ Correct branch here
           title: 'Update Docusaurus site'
           body: 'This PR updates the static documentation site.'
           base: main
