@@ -21,7 +21,7 @@ const sidebars = {
                 {
                   type: 'doc',
                   id: 'Getting Started/strategies',
-                }
+                },
                 {
                     type: 'doc',
                     id: 'Getting Started/orders',
