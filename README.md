@@ -1,8 +1,8 @@
-<div align="center"> <h1><a href="https://investing-algorithm-framework.com" target="_blank">Investing Algorithm Framework</a></h1> <p><b>Rapidly build, backtest, and deploy quantitative strategies and trading bots</b></p> <a target="_blank" href="https://investing-algorithm-framework.com">📖 View Documentation</a> | <a href="https://investing-algorithm-framework.com/Getting%20Started/installation">🚀 Getting Started</a> </div>
+<div align="center"> <h1><a href="https://coding-kitties.github.io/investing-algorithm-framework/" target="_blank">Investing Algorithm Framework</a></h1> <p><b>Rapidly build, backtest, and deploy quantitative strategies and trading bots</b></p> <a target="_blank" href="https://coding-kitties.github.io/investing-algorithm-framework/">📖 View Documentation</a> | <a href="https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/installation">🚀 Getting Started</a> </div>
 
 ---
 
-<div align="center"> <a href="https://investing-algorithm-framework.com">
+<div align="center"> <a href="https://coding-kitties.github.io/investing-algorithm-framework/">
 <a target="_blank" href="https://discord.gg/dQsRmGZP"><img src="https://img.shields.io/discord/1345358169777635410.svg?color=7289da&label=TradeBotLab%20Discord&logo=discord&style=flat"></a>
 <img src="https://img.shields.io/badge/docs-website-brightgreen"></a> <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/publish.yml"><img src="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/publish.yml/badge.svg"></a> <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml"><img src="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml/badge.svg"></a> <a href="https://pepy.tech/project/investing-algorithm-framework"><img src="https://pepy.tech/badge/investing-algorithm-framework"></a> <a href="https://pypi.org/project/investing-algorithm-framework/"><img src="https://img.shields.io/pypi/v/investing-algorithm-framework.svg"></a> <a href="https://www.reddit.com/r/InvestingBots/"><img src="https://img.shields.io/reddit/subreddit-subscribers/investingbots?style=social"></a> <a href="https://github.com/coding-kitties/investing-algorithm-framework/stargazers"><img src="https://img.shields.io/github/stars/coding-kitties/investing-algorithm-framework.svg?style=social&label=Star"></a>
  </div>
@@ -257,7 +257,7 @@ This script:
 * Deploys your bot to Azure.
 
 ## 📚 Documentation
-Comprehensive documentation is available at [investing-algorithm-framework.com](https://investing-algorithm-framework.com).
+Comprehensive documentation is available at [github pages](https://coding-kitties.github.io/investing-algorithm-framework/).
 
 ## 🛠️ Development
 
@@ -302,7 +302,7 @@ We welcome contributions! Check out the project board and issues to get started.
 ## Documentation
 
 All the documentation can be found online
-at the [documentation webstie](https://investing-algorithm-framework.com)
+at the [documentation webstie](https://coding-kitties.github.io/investing-algorithm-framework/)
 
 In most cases, you'll probably never have to change code on this repo directly
 if you are building your algorithm/bot. But if you do, check out the
