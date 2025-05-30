@@ -72,12 +72,10 @@ class OHLCVDataProviderIndex:
         Returns:
             None
         """
-        print("Registering data provider for ohlcv data")
         matches = []
 
         for data_provider in self.data_providers:
 
-            print("checking data provider", data_provider)
             if data_provider.supports(market, symbol):
                 matches.append(data_provider)
 
@@ -336,7 +334,6 @@ class DataProviderService:
         """
         data_provider = None
 
-        print(data_type)
         if TradingDataType.OHLCV.equals(data_type):
             # Check if there is already a registered data provider
             data_provider = self.ohlcv_data_provider_index.get(

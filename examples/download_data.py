@@ -9,7 +9,5 @@ if __name__ == "__main__":
         end_date="2023-12-31",
         pandas=False,
         save=True,
+        storage_path="./data"
     )
-
-    print(btceur_ohlcv.head())
-    print(type(btceur_ohlcv))

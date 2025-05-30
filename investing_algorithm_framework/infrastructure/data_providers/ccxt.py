@@ -1,3 +1,4 @@
+import os.path
 from time import sleep
 from typing import Union
 import logging
@@ -534,7 +535,13 @@ class CCXTOHLCVDataProvider(DataProvider):
                 # to the specified storage path.
                 # This is a placeholder for that logic.
                 self.save_data_to_storage(
-                    data=data, storage_path=storage_path
+                    symbol=symbol,
+                    market=market,
+                    start_date=start_date,
+                    end_date=end_date,
+                    time_frame=time_frame,
+                    data=data,
+                    storage_path=storage_path
                 )
 
             if pandas:
@@ -745,7 +752,7 @@ class CCXTOHLCVDataProvider(DataProvider):
         time_frame: str = None,
         start_date: datetime = None,
         end_date: datetime = None
-    ) -> pl.DataFrame:
+    ) -> pl.DataFrame | None:
         """
         Function to retrieve data from the storage path.
 
@@ -760,18 +767,39 @@ class CCXTOHLCVDataProvider(DataProvider):
         Returns:
             pl.DataFrame: The retrieved data in Polars DataFrame format.
         """
-        self.data = pl.read_csv(
-            storage_path,
-            schema_overrides={"Datetime": pl.Datetime},
-            low_memory=True
+
+        if not os.path.isdir(storage_path):
+            return None
+
+        file_name = self._create_filename(
+            symbol=symbol,
+            market=market,
+            time_frame=time_frame,
+            start_date=start_date,
+            end_date=end_date
         )
-        first_row = self.data.head(1)
-        last_row = self.data.tail(1)
-        self._start_date_data_source = first_row["Datetime"][0]
-        self._end_date_data_source = last_row["Datetime"][0]
+
+        file_path = os.path.join(storage_path, file_name)
+
+        if os.path.exists(file_path):
+            try:
+                data = pl.read_csv(file_path, has_header=True)
+                return data
+            except Exception as e:
+                logger.error(
+                    f"Error reading data from {file_path}: {e}"
+                )
+                return None
+
+        return None
 
     def save_data_to_storage(
         self,
+        symbol,
+        market,
+        start_date: datetime,
+        end_date: datetime,
+        time_frame: str,
         data: pl.DataFrame,
         storage_path: str,
     ):
@@ -785,7 +813,32 @@ class CCXTOHLCVDataProvider(DataProvider):
         Returns:
             None
         """
-        # Placeholder for actual implementation
+        if storage_path is None:
+            raise OperationalException(
+                "Storage path is not set. Please set the storage path "
+                "before saving data."
+            )
+
+        if not os.path.isdir(storage_path):
+            os.makedirs(storage_path)
+
+        symbol = symbol.upper().replace('/', '_')
+        filename = self._create_filename(
+            symbol=symbol,
+            market=market,
+            time_frame=time_frame,
+            start_date=start_date,
+            end_date=end_date
+        )
+        storage_path = os.path.join(storage_path, filename)
+        if os.path.exists(storage_path):
+            os.remove(storage_path)
+
+        # Create the file
+        if not os.path.exists(storage_path):
+            with open(storage_path, 'w'):
+                pass
+
         data.write_csv(storage_path)
 
     def __repr__(self):
@@ -794,3 +847,34 @@ class CCXTOHLCVDataProvider(DataProvider):
             f"symbol={self.symbol}, time_frame={self.time_frame}, "
             f"window_size={self.window_size})"
         )
+
+    @staticmethod
+    def _create_filename(
+        symbol: str,
+        market: str,
+        time_frame: str,
+        start_date: datetime,
+        end_date: datetime
+    ) -> str:
+        """
+        Creates a filename for the data file based on the parameters.
+        The date format is YYYYMMDDHH for both start and end dates.
+
+        Args:
+            symbol (str): The symbol of the data.
+            market (str): The market of the data.
+            time_frame (str): The time frame of the data.
+            start_date (datetime): The start date of the data.
+            end_date (datetime): The end date of the data.
+
+        Returns:
+            str: The generated filename.
+        """
+        symbol = symbol.upper().replace('/', '_')
+        start_date_str = start_date.strftime('%Y%m%d%H')
+        end_date_str = end_date.strftime('%Y%m%d%H')
+        filename = (
+            f"{symbol}_{market}_{time_frame}_{start_date_str}_"
+            f"{end_date_str}.csv"
+        )
+        return filename
