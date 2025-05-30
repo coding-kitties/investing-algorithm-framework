@@ -32,23 +32,28 @@ def download(
 ) -> Union[pandas.DataFrame, polars.DataFrame]
 ```
 
-| Parameter      | Type   | Description                                                                      |
-| -------------- | ------ | -------------------------------------------------------------------------------- |
-| `symbol`       | `str`  | The symbol (e.g., `"BTC/USDT"`) for which data is downloaded.                    |
-| `market`       | `str`  | (Optional) The market to download data from (e.g., `"binance"`).                 |
-| `date`         | `str`  | (Optional) Specific date to retrieve data for.                                   |
-| `time_frame`   | `str`  | The time frame for data (e.g., `"1d"`, `"1h"`).                                  |
-| `data_type`    | `str`  | Type of data to retrieve: `"ohlcv"` (default) or `"ticker"`.                     |
-| `start_date`   | `str`  | (Optional) Start of the date range to retrieve data.                             |
-| `end_date`     | `str`  | (Optional) End of the date range.                                                |
-| `window_size`  | `int`  | Number of records to retrieve (default: 200).                                    |
-| `pandas`       | `bool` | If `True`, returns a `pandas.DataFrame`; otherwise returns a `polars.DataFrame`. |
-| `save`         | `bool` | If `True`, saves the downloaded data to disk.                                    |
-| `storage_path` | `str`  | (Optional) Path to store the data when `save=True`.                              |
+| Parameter      | Type   | Description                                                                                            |
+| -------------- | ------ |--------------------------------------------------------------------------------------------------------|
+| `symbol`       | `str`  | The symbol (e.g., `"BTC/USDT"`) for which data is downloaded.                                          |
+| `market`       | `str`  | (Optional) The market to download data from (e.g., `"binance"`).                                       |
+| `date`         | `str`  | (Optional) Specific date to retrieve data for.                                                         |
+| `time_frame`   | `str`  | The time frame for data (e.g., `"1d"`, `"1h"`).                                                        |
+| `data_type`    | `str`  | Type of data to retrieve: `"ohlcv"` (default) or `"ticker"`.                                           |
+| `start_date`   | `str`  | (Optional) Start of the date range to retrieve data.                                                   |
+| `end_date`     | `str`  | (Optional) End of the date range.                                                                      |
+| `window_size`  | `int`  | Number of records to retrieve (default: 200).                                                          |
+| `pandas`       | `bool` | If `True`, returns a `pandas.DataFrame`; otherwise returns a `polars.DataFrame`.                       |
+| `save`         | `bool` | If `True`, saves the downloaded data to disk.                                                          |
+| `storage_path` | `str`  | (Optional) Path to store the data when save=True. Also used to load from disk if data already exists.  |
 
 
 ## Returns
 The function returns a DataFrame (pandas or polars) containing the requested market data, ready for analysis, visualization, or model training.
+
+## How It Works with storage_path
+When a storage_path is provided, the function first checks if the requested data already exists at the specified path. If the file is found and readable, the function loads it directly from disk, avoiding unnecessary network calls. If not, it downloads the data and saves it to the path (if save=True).
+
+This makes repeated experiments much faster and reduces API usage and rate-limiting issues.
 
 ## Why It's Useful?
 This function streamlines the process of acquiring market data by:
@@ -78,10 +83,3 @@ This enables quick preparation of time-series datasets for supervised learning t
 ```python
 download("SOL/USDT", market="binance", time_frame="1d", save=True, storage_path="./data/")
 ```
-
-## Internals
-The function relies on the following components: ogopa
-* ConfigurationService and MarketCredentialService to determine available providers and credentials.
-* DataProviderService to abstract away direct API calls.
-* dateutil.parser for robust datetime parsing.
-* Default providers registered via get_default_data_providers() and get_default_ohlcv_data_providers().
