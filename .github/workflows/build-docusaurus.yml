@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: docusaurus
+        working-directory: .  # Not docusaurus
 
     steps:
       - name: Checkout repository
@@ -41,6 +41,7 @@ jobs:
 
       - name: Commit changes to a new branch
         run: |
+          cd ../  # ← move to repo root
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
@@ -48,8 +49,9 @@ jobs:
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
           git checkout -b $BRANCH_NAME
-          git add ../docs
+          git add docs
 
+          # Check for staged changes before committing
           if git diff --cached --quiet; then
             echo "No changes to commit. Exiting workflow."
             echo "create_pr=false" >> $GITHUB_ENV
@@ -66,7 +68,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: Update Docusaurus site [skip ci]
-          branch: ${{ env.BRANCH_NAME }}           # ✅ Correct branch here
+          branch: ${{ env.BRANCH_NAME }}
           title: 'Update Docusaurus site'
           body: 'This PR updates the static documentation site.'
           base: main
