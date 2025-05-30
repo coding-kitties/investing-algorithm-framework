@@ -1,16 +1,27 @@
 ---
-
-sidebar_position: 2
-
+id: application-setup
+title: Create an app instance
+sidebar_label: application setup
 ---
 
-# Application Setup
+##  🔧 Application Setup through CLI: Command Line Interface
+The CLI tool included with the framework allows you to initialize new apps with different presets
+
+
 The best way to get started with the framework is to create an application through the init cli command.
 You can do this by running the following command in your terminal:
 
+### ⚙️ init Command
 ```bash
-investing-algorithm-framework init
+investing-algorithm-framework init --type default --path ./my-app --replace
 ```
+
+| Option      | Type   | Description                                                             |
+| ----------- | ------ | ----------------------------------------------------------------------- |
+| `--type`    | `str`  | Type of app to initialize (`default`, `default_web`, `azure_function`). |
+| `--path`    | `str`  | Directory path to create the app in.                                    |
+| `--replace` | `bool` | If `True`, existing files will be overwritten.                          |
+
 
 This will create the following directory structure:
 
@@ -65,4 +76,43 @@ app = create_app(
 # Run the app
 if __name__ == "__main__":
     app.run()
+```
+
+## 🏗️ Using the `create_app` Function
+
+### Description
+
+The `create_app` function is a factory method for creating and configuring an `App` instance. It loads environment variables, sets up the dependency container, and optionally initializes a web-based configuration.
+This function is usefull if you want to create an app programmatically or if you want to extend the app with custom configurations.
+
+### Function Signature
+
+```python
+def create_app(
+    config: dict = None,
+    state_handler=None,
+    web: bool = False,
+    name=None
+) -> App:
+```
+
+| Name            | Type     | Description                                                |
+| --------------- | -------- | ---------------------------------------------------------- |
+| `config`        | `dict`   | Optional dictionary containing app configuration.          |
+| `state_handler` | `object` | Optional custom state handler for managing internal state. |
+| `web`           | `bool`   | Whether to configure the app for web use (`AppMode.WEB`).  |
+| `name`          | `str`    | Optional name to assign to the application instance.       |
+
+### Returns
+Returns an instance of the App class, fully initialized and ready to run or extend.
+
+### Example
+```python
+from investing_algorithm_framework import create_app
+
+app = create_app(
+    config={"MY_CONFIG": "value"},
+    web=True,
+    name="my_trading_bot"
+)
 ```

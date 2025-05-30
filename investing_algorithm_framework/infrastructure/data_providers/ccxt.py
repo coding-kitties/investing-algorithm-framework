@@ -497,11 +497,29 @@ class CCXTOHLCVDataProvider(DataProvider):
                     )
 
             # Check if the data already exists in the storage
-            if storage_path is not None and save:
+            if storage_path is not None:
                 # Here you would implement the logic to check if the data
                 # exists in the storage path and return it if it does.
                 # This is a placeholder for that logic.
-                pass
+                data = self.retrieve_data_from_storage(
+                    storage_path=storage_path,
+                    symbol=symbol,
+                    market=market,
+                    time_frame=time_frame,
+                    start_date=start_date,
+                    end_date=end_date
+                )
+
+                if data is not None:
+                    return data
+                else:
+                    data = self.get_ohlcv(
+                        symbol=symbol,
+                        time_frame=time_frame,
+                        from_timestamp=start_date,
+                        market=market,
+                        to_timestamp=end_date
+                    )
             else:
                 data = self.get_ohlcv(
                     symbol=symbol,
@@ -515,7 +533,9 @@ class CCXTOHLCVDataProvider(DataProvider):
                 # Here you would implement the logic to save the data
                 # to the specified storage path.
                 # This is a placeholder for that logic.
-                pass
+                self.save_data_to_storage(
+                    data=data, storage_path=storage_path
+                )
 
             if pandas:
                 data = convert_polars_to_pandas(data)
@@ -740,8 +760,15 @@ class CCXTOHLCVDataProvider(DataProvider):
         Returns:
             pl.DataFrame: The retrieved data in Polars DataFrame format.
         """
-        # Placeholder for actual implementation
-        pass
+        self.data = pl.read_csv(
+            storage_path,
+            schema_overrides={"Datetime": pl.Datetime},
+            low_memory=True
+        )
+        first_row = self.data.head(1)
+        last_row = self.data.tail(1)
+        self._start_date_data_source = first_row["Datetime"][0]
+        self._end_date_data_source = last_row["Datetime"][0]
 
     def save_data_to_storage(
         self,
@@ -759,7 +786,7 @@ class CCXTOHLCVDataProvider(DataProvider):
             None
         """
         # Placeholder for actual implementation
-        pass
+        data.write_csv(storage_path)
 
     def __repr__(self):
         return (
