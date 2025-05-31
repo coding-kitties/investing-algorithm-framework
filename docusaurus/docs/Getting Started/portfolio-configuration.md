@@ -1,130 +1,122 @@
 ---
+id: portfolio-configuration
+title: Configure your portfolio and market credentials
+sidebar_label: Portfolio Configuration
 ---
 # Portfolio configuration
 In this section we will explain how to configure your portfolio from your broker or exchange.
-The framework has by default support for [CCXT](https://github.com/ccxt/ccxt).
-CCXT is a library that provides a unified API to interact with multiple brokers and exchanges.
 
-Please have a look at the ccxt documentation to see which brokers and exchanges are supported.
 
-## Configuration of a portfolio
-To configure a portfolio you need to create a `PortfolioConfiguration` object.
-The `PortfolioConfiguration` object is used to connect your trading bot to your broker or exchange.
+> The framework has by default support for [CCXT](https://github.com/ccxt/ccxt).
+> CCXT is a library that provides a unified API to interact with multiple brokers and exchanges.
+> Please have a look at the ccxt documentation to see which brokers and exchanges are supported.
 
-The following code snippet shows how to create a `PortfolioConfiguration` object. You must register 
-the `PortfolioConfiguration` object with the app in the `app.py` file.
+## ✅ Simplified Registration (Recommended)
+You can use the following syntax to register a portfolio and credentials (from environment variables) in one step:
+
+```python
+app.add_market(
+    market="BITVAVO",
+    trading_symbol="EUR",
+    initial_balance=100  # Optional
+)
+```
+
+This is the recommended way to register a portfolio. It automatically reads credentials from the .env file using the expected naming convention.
+
+## Basic Configuration with `PortfolioConfiguration`
+
+To configure a portfolio, you need to register a `PortfolioConfiguration` object with the app:
 
 ```python
 from investing_algorithm_framework import PortfolioConfiguration, create_app
 
 app = create_app()
 app.add_portfolio_configuration(
-     PortfolioConfiguration(market="BITVAVO", trading_symbol="EUR")
-)
-```
-
-### Market credentials
-To let your portfolio configuration connect the portfolio to the market, you need to specify a market credential of your broker or exchange.
-The market credentials holds the API key and secret of your broker or exchange.
-
-The following code snippet shows how to specify the market credentials:
-
-```python
-from investing_algorithm_framework import PortfolioConfiguration, create_app, MarketCredentials
-
-app = create_app()
-app.add_portfolio_configuration(
-     PortfolioConfiguration(
-         market="BITVAVO",
-         trading_symbol="EUR",
-     )
-)
-app.add_market_credentials(
-    MarketCredentials(
+    PortfolioConfiguration(
         market="BITVAVO",
-        api_key=<api_key>,
-        api_secret=<api_secret>
+        trading_symbol="EUR"
     )
 )
 ```
 
-You can also specify the api key and secret in a .env file. The framework will automatically load the credentials from the .env file.
-The following code snippet shows how to specify the market credentials in a .env file for the BITVAVO exchange:
+## Market Credentials
+To connect to your broker or exchange, you'll need to provide API credentials. 
+This is done by registering a MarketCredentials object:
 
-> Make sure to specify the API_KEY and SECRET_KEY with the market indentifier prefix. So for example for the BITVAVO exchange
-> the API key and secret key should be specified as <MARKET_IDENTIFIER>_API_KEY and <MARKET_IDENTIFIER>_SECRET_KEY which 
-> results in the following environment variables: BITVAVO_API_KEY and BITVAVO_SECRET_KEY.
+```python
+from investing_algorithm_framework import MarketCredentials
+
+app.add_market_credentials(
+    MarketCredentials(
+        market="BITVAVO",
+        api_key="<your_api_key>",
+        api_secret="<your_api_secret>"
+    )
+)
+```
+
+
+## Environment Variable Support
+You can also load credentials from a .env file. The framework will
+automatically detect them using this naming convention:
 
 ```shell
-BITVAVO_API_KEY=<api_key>
-BITVAVO_SECRET_KEY=<api_secret>
+<MARKET_IDENTIFIER>_API_KEY
+<MARKET_IDENTIFIER>_SECRET_KEY
 ```
 
-You can then use the following code snippet to load the credentials from the .env file:
+For example, for the BITVAVO exchange, you would set:
 
-```python
-from investing_algorithm_framework import PortfolioConfiguration, create_app, MarketCredentials
-
-app = create_app()
-app.add_portfolio_configuration(PortfolioConfiguration(market="BITVAVO", trading_symbol="EUR"))
-app.add_market_credentials(MarketCredentials(market="BITVAVO"))
+```shell
+BITVAVO_API_KEY=<your_api_key>
+BITVAVO_SECRET_KEY=<your_api_secret>
 ```
 
-### Simplified portfolio configuration registration
-
-If you want to register your portfolio configuration and market credentials in a single step, you can use the following
-notation for creating a `PortfolioConfiguration` object.
+Then, you can register the portfolio configuration without explicitly passing the credentials:
 
 ```python
+from investing_algorithm_framework import PortfolioConfiguration, MarketCredentials, create_app
 from dotenv import load_dotenv
-import os
-
-from investing_algorithm_framework import PortfolioConfiguration, create_app
-
-load_dotenv()
-
-app = create_app()
-app.add_portfolio_configuration(
-     PortfolioConfiguration(
-         market="BITVAVO",
-         trading_symbol="EUR",
-         api_key=os.getenv("BITVAVO_API_KEY"),
-         api_secret=os.getenv("BITVAVO_SECRET_KEY")
-     )
-)
-```
-
-Or if you want to use environment variables, you can use the following code snippet:
-
-```python
-from dotenv import load_dotenv
-from investing_algorithm_framework import PortfolioConfiguration, create_app
 
 load_dotenv()
 app = create_app()
+
 app.add_portfolio_configuration(
-     PortfolioConfiguration(
-         market="BITVAVO", trading_symbol="EUR",
-     )
+    PortfolioConfiguration(
+        market="BITVAVO",
+        trading_symbol="EUR"
+    )
+)
+app.add_market_credential(
+    MarketCredentials(market="BITVAVO")
 )
 ```
 
-In both cases, the framework will automatically create the `MarketCredentials` object for you.
-
-### Specify the maximum size of the portfolio (Initial balance)
-If you want to specify the maximum size of your portfolio, you can use the `initial_balance` parameter of your portfolio configuration.
-The following code snippet shows how to use the `initial_balance` parameter:
+## Initial Balance (Max Portfolio Size)
+You can optionally define the maximum unallocated size of your portfolio using the initial_balance parameter:
 
 ```python
-from datetime import datetime
 from investing_algorithm_framework import PortfolioConfiguration, create_app
 
 app = create_app()
 app.add_portfolio_configuration(
-     PortfolioConfiguration(
-         market="BITVAVO",
-         trading_symbol="EUR",
-         initial_balance=1000 # Max unallocated amount of EUR, the rest of your balance of eur at the exchange will be untouched 
-     )
+    PortfolioConfiguration(
+        market="BITVAVO",
+        trading_symbol="EUR",
+        initial_balance=1000  # Unallocated EUR to be managed by the bot
+    )
+)
+``` 
+
+or with the simplified registration (recommended):
+
+```python
+app.add_market(
+    market="BITVAVO",
+    trading_symbol="EUR",
+    initial_balance=1000  # Unallocated EUR to be managed by the bot
 )
 ```
+
+This prevents the bot from using your entire exchange balance.

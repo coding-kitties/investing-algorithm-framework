@@ -29,9 +29,14 @@ This will create the following directory structure:
 .
 ├── README.md
 ├── app.py
-├── strategies
-│   └── my_trading_strategy.py
-└── gitignore
+├── requirements.txt
+├── .env.example
+├── run_backtest.py
+├── strategies/
+│   └── strategy_v1/
+│       ├── __init__.py
+│       └── strategy.py
+└── .gitignore
 ```
 
 The `app.py` file is the main entry point for your application. Ideally, you should only use this file to register your
@@ -45,11 +50,13 @@ and bundle them with your backtest results.
 
 By default the REST API and UI are disabled. You can enable them by running the init command with the `--web` flag:
 
+### 🖥️ Enabling REST API and UI
 ```bash
 investing-algorithm-framework init --web
 ```
 
-or you can enable them later by adding the following lines to your `app.py` file:
+You can also use the `create_app` function to create a web enabled app instance programmatically. This 
+is useful if you want to create an app instance in your own code or if you want to extend the app with custom configurations.
 
 ```python
 import logging.config
@@ -76,6 +83,42 @@ app = create_app(
 # Run the app
 if __name__ == "__main__":
     app.run()
+```
+
+### Azure Function App Initialization
+
+If you want to create an Azure Function app, you can use the `--type azure_function` option:
+
+```bash
+investing-algorithm-framework init --type azure_function --path ./my-azure-function-app --replace
+```
+This will create a directory structure suitable for deploying your trading bot as an Azure Function, including necessary files like `function_app.py`, `local.settings.json`, and `function.json`.
+
+```bash
+.
+├── README.md
+├── app.py
+├── requirements.txt
+├── .env.example
+├── run_backtest.py
+├── strategies/
+├── function_app.py
+├── local.settings.json
+├── function.json
+│   └── strategy_v1/
+│       ├── __init__.py
+│       └── strategy.py
+└── .gitignore
+```
+
+In order to run the app, you need to install the required dependencies. You can do this by running the following command:
+
+```bash
+pip install -r requirements.txt
+``` 
+And the azure functools
+```bash
+pip install azure-functions
 ```
 
 ## 🏗️ Using the `create_app` Function
