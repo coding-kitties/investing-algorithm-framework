@@ -12,17 +12,17 @@ aims to support multiple data sources, exchanges and brokers. Next to that backt
 
 ## 🔧 Core Features
 
-- [**Backtesting**](/docs/Getting%20Started/backtesting): Test strategies using historical market data.
-- [**Deployment**](/docs/Getting%20Started/deployment): Deploy bots to platforms like Azure and AWS.
-- [**Order management**](/docs/Getting%20Started/orders): Use stop-loss, take-profit, and other complex order types.
-- [**Position management**](/docs/Getting%20Started/positions): Automatically handle position logic across multiple strategies.
-- [**Trades management**](/docs/Getting%20Started/positions): Automatically handle trade logic across multiple strategies.
-- [**Performance evaluation**](/docs/Getting%20Started/performance): Track, analyze, and attribute your trading performance.
-- [**Portfolio configuration**](/docs/Getting%20Started/portfolio-configuration): Manage your portfolio and market credentials.
-- [**Market data sources**](/docs/Data/market-data-sources): Integrate ticker, OHLCV, and order book from different markets and exchanges.
-- [**Custom data sources**](/docs/Data/market-data-sources): Create custom data sources for your trading strategies.
-- [**Trading strategies**](/docs/Getting%20Started/strategies): Implement and register your trading strategies.
-- [**Deployment**](/docs/Getting%20Started/deployment): Deploy your trading bot to various platforms like Azure Functions, AWS Lambda, or run it locally.
+- [**Backtesting**](/Getting%20Started/backtesting): Test strategies using historical market data.
+- [**Deployment**](/Getting%20Started/deployment): Deploy bots to platforms like Azure and AWS.
+- [**Order management**](/Getting%20Started/orders): Use stop-loss, take-profit, and other complex order types.
+- [**Position management**](/Getting%20Started/positions): Automatically handle position logic across multiple strategies.
+- [**Trades management**](/Getting%20Started/positions): Automatically handle trade logic across multiple strategies.
+- [**Performance evaluation**](/Getting%20Started/performance): Track, analyze, and attribute your trading performance.
+- [**Portfolio configuration**](/Getting%20Started/portfolio-configuration): Manage your portfolio and market credentials.
+- [**Market data sources**](/Data/market-data-sources): Integrate ticker, OHLCV, and order book from different markets and exchanges.
+- [**Custom data sources**](/Data/market-data-sources): Create custom data sources for your trading strategies.
+- [**Trading strategies**](/Getting%20Started/strategies): Implement and register your trading strategies.
+- [**Deployment**](/Getting%20Started/deployment): Deploy your trading bot to various platforms like Azure Functions, AWS Lambda, or run it locally.
 ---
 ## Getting Started
 The Investing Algorithm Framework is a Python framework for developing and backtesting investing algorithms.

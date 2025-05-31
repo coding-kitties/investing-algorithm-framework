@@ -286,7 +286,6 @@ python -m unittest discover -s tests
 
 ## ⚠️ Disclaimer
 
-
 If you use this framework for your investments, do not risk money
 which you are afraid to lose, until you have clear understanding how the framework works. We can't stress this enough:
 
@@ -315,6 +314,8 @@ and developers, [join us on Slack](https://inv-algo-framework.slack.com) or [joi
 
 The investing algorithm framework is a community driven project.
 We welcome you to participate, contribute and together help build the future trading bots developed in python.
+
+To get started, please read the [contributing guide](https://coding-kitties.github.io/investing-algorithm-framework/Contributing&20Guide/contributing).
 
 Feel like the framework is missing a feature? We welcome your pull requests!
 If you want to contribute to the project roadmap, please take a look at the [project board](https://github.com/coding-kitties/investing-algorithm-framework/projects?query=is%3Aopen).
