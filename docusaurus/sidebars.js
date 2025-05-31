@@ -67,6 +67,20 @@ const sidebars = {
             ],
         },
         {
+            type: "contributing",
+            label: "Contributing",
+            items: [
+                {
+                    type: 'doc',
+                    id: 'Contributing Guide/contributing',
+                },
+                {
+                    type: 'doc',
+                    id: 'Contributing Guide/style-guide',
+                },
+            ],
+        },
+        {
             type: 'category',
             label: 'Advanced Concepts',
             items: [

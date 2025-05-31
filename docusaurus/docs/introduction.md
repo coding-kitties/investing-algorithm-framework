@@ -10,18 +10,20 @@ The framework allows you to leverage python to build complex bots to trade.
 The framework aims to implement orders, position, trades and portfolio management. Also, the framework
 aims to support multiple data sources, exchanges and brokers. Next to that backtesting and live trading is supported.
 
-## Features
-* [Backtesting](docs/Getting%20Started/backtesting) - Backtest your trading strategies using historical market data.
-* [Deployment](docs/Getting%20Started/deployment) - Deploy to Azure or AWS.
-* **Advanced order types** - Use advanced order types such as stop loss and take profit.
-* **Position handling** - Automatically handle your positions.
-* **Performance attribution** - Get insights into the performance of your trading strategies.
-* **Market data sources** - Use different market data sources such as tickers and ohlcv data.
-* **Multiple data sources** - Use multiple data sources in your trading strategies.
-* **Multiple exchanges** - Use multiple exchanges in your trading strategies.
-* **Multiple brokers** - Use multiple brokers in your trading strategies.
-* **Multiple timeframes** - Use multiple timeframes in your trading strategies.
+## 🔧 Core Features
 
+- [**Backtesting**](/docs/Getting%20Started/backtesting): Test strategies using historical market data.
+- [**Deployment**](/docs/Getting%20Started/deployment): Deploy bots to platforms like Azure and AWS.
+- [**Order management**](/docs/Getting%20Started/orders): Use stop-loss, take-profit, and other complex order types.
+- [**Position management**](/docs/Getting%20Started/positions): Automatically handle position logic across multiple strategies.
+- [**Trades management**](/docs/Getting%20Started/positions): Automatically handle trade logic across multiple strategies.
+- [**Performance evaluation**](/docs/Getting%20Started/performance): Track, analyze, and attribute your trading performance.
+- [**Portfolio configuration**](/docs/Getting%20Started/portfolio-configuration): Manage your portfolio and market credentials.
+- [**Market data sources**](/docs/Data/market-data-sources): Integrate ticker, OHLCV, and order book from different markets and exchanges.
+- [**Custom data sources**](/docs/Data/market-data-sources): Create custom data sources for your trading strategies.
+- [**Trading strategies**](/docs/Getting%20Started/strategies): Implement and register your trading strategies.
+- [**Deployment**](/docs/Getting%20Started/deployment): Deploy your trading bot to various platforms like Azure Functions, AWS Lambda, or run it locally.
+---
 ## Getting Started
 The Investing Algorithm Framework is a Python framework for developing and backtesting investing algorithms.
 
@@ -31,7 +33,7 @@ outlines the fundamentals of creating a simple trading bot.
 After that, you can read the [basics](/docs/Getting%20Started/application-setup.md) to learn more about the framework.
 
 ## What you'll need
-- [python 3.9 or higher](https://www.python.org/downloads/)
+- [python 3.10 or higher](https://www.python.org/downloads/)
 
 ## Installation
 You can install the framework using the following command:
@@ -41,7 +43,7 @@ pip install investing-algorithm-framework
 ```
 
 ## Contributing
-If you want to contribute to the framework, please read the [contributing guide](/docs/contributing.md). 
+If you want to contribute to the framework, please read the [contributing guide](/docs/contributing/contributing). 
 
 ### Issues
 If you find a bug or have a feature request, please create an issue on [GitHub](https://github.com/coding-kitties/investing-algorithm-framework/issues).

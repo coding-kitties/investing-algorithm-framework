@@ -1,7 +1,6 @@
 const sidebars = {
     defaultSideBar: [
         "introduction",
-        "contributing",
         {
             type: 'category',
             label: 'Getting Started',
@@ -63,6 +62,20 @@ const sidebars = {
                 {
                     type: 'doc',
                     id: 'Data/multiple-market-data-sources',
+                },
+            ],
+        },
+        {
+            type: "category",
+            label: "Contributing Guide",
+            items: [
+                {
+                    type: 'doc',
+                    id: 'Contributing Guide/contributing',
+                },
+                {
+                    type: 'doc',
+                    id: 'Contributing Guide/style-guide',
                 },
             ],
         },

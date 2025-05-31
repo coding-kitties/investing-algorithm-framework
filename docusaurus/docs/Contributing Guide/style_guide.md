@@ -1,4 +1,10 @@
-# Coding agreement
+---
+id: style-guide
+title: Style Guide
+sidebar_label: Style Guide
+---
+
+# Style Guide
 
 ## Purpose of this document
 
@@ -78,7 +84,7 @@ investing-algorithm-framework/
 │   └── test_my_other_module.py
 │
 ├── docs/                      # Documentation (Sphinx, Markdown, etc.)
-│
+├── docusaurus/                # Docusaurus documentation
 ├── .gitignore                 # Ignore unnecessary files
 ├── README.md                  # Project documentation
 ├── pyproject.toml           # Build system and tool configurations
@@ -179,8 +185,11 @@ def get_info(self) -> str, int:
     Return a string and an integer
 
     Args:
-        - str: a string
-        - int: an integer
+        name (str): a string
+        name (int): an integer
+    
+    Returns
+        Tuple[str, int]: a tuple containing a string and an integer
     """
     return "hello world", 30
 ```
