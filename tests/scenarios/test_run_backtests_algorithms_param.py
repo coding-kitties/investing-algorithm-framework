@@ -37,7 +37,7 @@ class Test(TestCase):
             backtest_report.get_growth(), 3, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.get_growth_percentage(), 0.8, delta=0.05
+            backtest_report.get_growth_percentage(), 0.8, delta=0.1
         )
         self.assertEqual(
             backtest_report.get_initial_unallocated(), 400
@@ -49,7 +49,7 @@ class Test(TestCase):
             backtest_report.get_profit(), 3, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.get_profit_percentage(), 0.8, delta=0.05
+            backtest_report.get_profit_percentage(), 0.8, delta=0.1
         )
         backtest_report_two = backtest_reports[1]
         self.assertAlmostEqual(

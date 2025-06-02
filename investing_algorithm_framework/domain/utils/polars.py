@@ -11,7 +11,7 @@ def convert_polars_to_pandas(
     """
     Function to convert polars dataframe to pandas dataframe.
 
-    Parameters:
+    Args:
         data:Polars Dataframe - The original polars dataframe
         remove_duplicates: Boolean - If set to true, all duplicate
         dates will be removed from the dataframe
@@ -22,7 +22,7 @@ def convert_polars_to_pandas(
             This is only used if add_index is set to True
 
     Returns:
-        DataFrame - Pandas DataFrame that has been converted
+        DataFrame: Pandas DataFrame that has been converted
           from a Polars DataFrame
     """
 

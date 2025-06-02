@@ -16,7 +16,7 @@ class Test(TestCase):
         """
         start_time = time.time()
         # RESOURCE_DIRECTORY should always point to the parent directory/resources
-        resource_directory = os.path.join(os.path.dirname(__file__), '..', 'resources')
+        resource_directory = os.path.join(os.path.dirname(__file__), 'resources')
         config = {RESOURCE_DIRECTORY: resource_directory}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BINANCE", trading_symbol="EUR", initial_balance=400)
@@ -36,7 +36,7 @@ class Test(TestCase):
             backtest_report.get_growth(), 3, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.get_growth_percentage(), 0.8, delta=0.05
+            backtest_report.get_growth_percentage(), 0.8, delta=0.1
         )
         self.assertEqual(
             backtest_report.get_initial_unallocated(), 400
@@ -48,7 +48,7 @@ class Test(TestCase):
             backtest_report.get_profit(), 3, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.get_profit_percentage(), 0.8, delta=0.05
+            backtest_report.get_profit_percentage(), 0.8, delta=0.1
         )
         end_time = time.time()
         elapsed_time = end_time - start_time

@@ -33,8 +33,7 @@ from .utils import random_string, append_dict_as_row_to_csv, \
     csv_to_list, StoppableThread, pretty_print_backtest_reports_evaluation, \
     pretty_print_backtest, load_csv_into_dict, load_backtest_reports, \
     get_backtest_report, pretty_print_positions, pretty_print_trades, \
-    pretty_print_orders
-from .metrics import get_price_efficiency_ratio
+    pretty_print_orders, is_timezone_aware, sync_timezones, get_timezone
 from .data_provider import DataProvider
 from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
@@ -119,7 +118,6 @@ __all__ = [
     "RoundingService",
     "BacktestDateRange",
     "load_backtest_report",
-    "get_price_efficiency_ratio",
     "convert_polars_to_pandas",
     "DateRange",
     "get_backtest_report",
@@ -140,5 +138,8 @@ __all__ = [
     "DataSource",
     "OrderExecutor",
     "PortfolioProvider",
-    "random_number"
+    "random_number",
+    "is_timezone_aware",
+    "sync_timezones",
+    "get_timezone"
 ]

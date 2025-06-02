@@ -42,6 +42,7 @@ class BacktestService:
         market_data_source_service: MarketDataSourceService,
         order_service,
         portfolio_service,
+        portfolio_snapshot_service,
         position_repository,
         performance_service,
         configuration_service,
@@ -56,6 +57,7 @@ class BacktestService:
             TradingDataType.TICKER: {}
         }
         self._performance_service = performance_service
+        self._portfolio_snapshot_service = portfolio_snapshot_service
         self._position_repository = position_repository
         self._market_data_source_service: MarketDataSourceService \
             = market_data_source_service
@@ -318,7 +320,10 @@ class BacktestService:
                 backtest_date_range=backtest_date_range,
                 initial_unallocated=initial_unallocated,
                 trading_symbol=portfolio.trading_symbol,
-                created_at=datetime.now(tz=timezone.utc)
+                created_at=datetime.now(tz=timezone.utc),
+                portfolio_snapshots=self._portfolio_snapshot_service.get_all(
+                    {"portfolio_id": portfolio.id}
+                )
             )
             backtest_report.number_of_runs = number_of_runs
             backtest_report.number_of_orders = self._order_service.count({
@@ -462,7 +467,6 @@ class BacktestService:
             backtest_report.traces = traces
 
             # Calculate metrics for the backtest report
-            backtest_report.calculate_metrics()
             return backtest_report
 
     def set_backtest_market_data_sources(self, market_data_sources):

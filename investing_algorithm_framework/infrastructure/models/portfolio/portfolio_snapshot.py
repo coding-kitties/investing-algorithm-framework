@@ -10,12 +10,19 @@ from investing_algorithm_framework.infrastructure.models.model_extension \
 class SQLPortfolioSnapshot(
     PortfolioSnapshot, SQLBaseModel, SQLAlchemyModelExtension
 ):
+    """
+    SQLAlchemy model for portfolio snapshots.
+
+    Portfolio snapshots represent the state of a portfolio at a specific
+    point in time.
+    """
     __tablename__ = "portfolio_snapshots"
     id = Column(Integer, primary_key=True)
     portfolio_id = Column(String, nullable=False)
     trading_symbol = Column(String, nullable=False)
     pending_value = Column(Float, nullable=False, default=0)
     unallocated = Column(Float, nullable=False, default=0)
+    net_size = Column(Float, nullable=False, default=0)
     total_net_gain = Column(Float, nullable=False, default=0)
     total_revenue = Column(Float, nullable=False, default=0)
     total_cost = Column(Float, nullable=False, default=0)

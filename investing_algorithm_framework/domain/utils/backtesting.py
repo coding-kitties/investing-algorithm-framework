@@ -2,7 +2,7 @@ import os
 import re
 import json
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 from tabulate import tabulate
 
@@ -1122,12 +1122,16 @@ def load_backtest_reports(folder_path: str) -> List[BacktestReport]:
 
 def get_backtest_report(
     directory: str,
-    algorithm_name: str,
-    backtest_date_range: BacktestDateRange=None
-) -> BacktestReport:
+    algorithm_name: Optional[str] = None,
+    backtest_date_range: Optional[BacktestDateRange] = None
+) -> BacktestReport | None:
     """
-    Function to get a report based on the algorithm name and
-    backtest date range if it exists.
+    Function to create a backtest report from a directory.
+    This function searches for a backtest report in the given directory.
+
+    If the algorithm name and backtest date range are provided,
+    It will search for a backtest report that matches the algorithm name
+    and backtest date range.
 
     Args:
         algorithm_name (str): The name of the algorithm
@@ -1138,48 +1142,73 @@ def get_backtest_report(
         BacktestReport: The backtest report if it exists, otherwise None
     """
 
-    # Loop through all files in the output directory
+    if not os.path.exists(directory):
+        raise OperationalException(
+            f"Directory {directory} does not exist"
+        )
+
+    # Loop through all files in the directory
     for root, _, files in os.walk(directory):
         for file in files:
-            # Check if the file contains the algorithm name
-            # and backtest date range
-            if is_backtest_report(os.path.join(root, file)):
+            print(file)
+
+            # Check if the file is a directory
+            if os.path.isdir(os.path.join(root, file)):
+
+                # Check if it has a report.json file
+                if "report.json" in os.listdir(os.path.join(root, file)):
+                    report_file = os.path.join(root, file, "report.json")
+
+                    if is_backtest_report(report_file):
+                        # Read the file
+                        with open(report_file, "r") as json_file:
+                            # Parse the JSON file
+                            report = json.load(json_file)
+                            # Convert the JSON file to a
+                            # BacktestReport object
+                            report = BacktestReport.from_dict(report)
+
+                            if algorithm_name is not None and \
+                                    report.name == algorithm_name:
+
+                                if backtest_date_range is None:
+                                    return report
+
+                                if backtest_date_range.start_date == \
+                                        report.backtest_start_date and \
+                                        backtest_date_range.end_date == \
+                                        report.backtest_end_date:
+                                    return report
+
+                            if algorithm_name is None and \
+                                    backtest_date_range is None:
+                                return report
+
+            elif file.endswith(".json"):
+                print("found file")
+                print(f"Found backtest report file: {file}")
                 # Read the file
                 with open(os.path.join(root, file), "r") as json_file:
+                    # Parse the JSON file
+                    report = json.load(json_file)
+                    # Convert the JSON file to a BacktestReport object
+                    report = BacktestReport.from_dict(report)
 
-                    name = \
-                        get_algorithm_name_from_backtest_report_file(
-                            os.path.join(root, file)
-                        )
-
-                    if name == algorithm_name:
+                    if algorithm_name is not None and \
+                            report.name == algorithm_name:
 
                         if backtest_date_range is None:
-                            # Parse the JSON file
-                            report = json.load(json_file)
-                            # Convert the JSON file to a
-                            # BacktestReport object
-                            return BacktestReport.from_dict(report)
+                            return report
 
-                        backtest_start_date = \
-                            get_start_date_from_backtest_report_file(
-                                os.path.join(root, file)
-                            )
-                        backtest_end_date = \
-                            get_end_date_from_backtest_report_file(
-                                os.path.join(root, file)
-                            )
+                        if backtest_date_range.start_date == \
+                                report.backtest_start_date and \
+                                backtest_date_range.end_date == \
+                                report.backtest_end_date:
+                            return report
 
-                        if backtest_start_date == \
-                                backtest_date_range.start_date \
-                                and backtest_end_date == \
-                                backtest_date_range.end_date:
-                            # Parse the JSON file
-                            report = json.load(json_file)
-                            # Convert the JSON file to a
-                            # BacktestReport object
-                            return BacktestReport.from_dict(report)
-
+                    if algorithm_name is None and \
+                            backtest_date_range is None:
+                        return report
     return None
 
 
@@ -1258,5 +1287,19 @@ def is_backtest_report(path: str) -> bool:
             BACKTEST_REPORT_FILE_NAME_PATTERN, os.path.basename(path)
         ):
             return True
+        else:
+            # Try to load the file as a BacktestReport
+            try:
+                # Read the file
+                with open(path, "r") as json_file:
+                    # Parse the JSON file
+                    report = json.load(json_file)
+                    # Convert the JSON file to a
+                    # BacktestReport object
+                    BacktestReport.from_dict(report)
+                    return True
+            except Exception:
+                # If the file is not a valid JSON file, return False
+                return False
 
     return False

@@ -42,6 +42,7 @@ class PortfolioSnapshotService(RepositoryService):
             "trading_symbol": portfolio.trading_symbol,
             "pending_value": pending_value,
             "unallocated": portfolio.unallocated,
+            "net_size": portfolio.net_size,
             "total_net_gain": portfolio.total_net_gain,
             "total_revenue": portfolio.total_revenue,
             "total_cost": portfolio.total_cost,
@@ -61,7 +62,4 @@ class PortfolioSnapshotService(RepositoryService):
         return snapshot
 
     def get_latest_snapshot(self, portfolio_id):
-        pass
-
-    def get_snapshots(self, portfolio_id, start_date=None, end_date=None):
         pass

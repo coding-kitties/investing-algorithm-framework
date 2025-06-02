@@ -1,12 +1,12 @@
+import logging
 import os.path
+from datetime import datetime, timedelta, timezone
 from time import sleep
 from typing import Union
-import logging
-from datetime import datetime, timedelta, timezone
 
 import ccxt
-import polars as pl
 import pandas as pd
+import polars as pl
 from dateutil import parser
 
 from investing_algorithm_framework.domain import OperationalException, \
@@ -511,9 +511,7 @@ class CCXTOHLCVDataProvider(DataProvider):
                     end_date=end_date
                 )
 
-                if data is not None:
-                    return data
-                else:
+                if data is None:
                     data = self.get_ohlcv(
                         symbol=symbol,
                         time_frame=time_frame,

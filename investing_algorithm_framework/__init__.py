@@ -20,6 +20,9 @@ from investing_algorithm_framework.infrastructure import \
     CSVTickerMarketDataSource, AzureBlobStorageStateHandler
 from .create_app import create_app
 from .download_data import download
+from .app.metrics import get_profit_factor, \
+    get_cumulative_profit_factor_series, get_rolling_profit_factor_series, \
+    get_sharpe_ratio, get_price_efficiency_ratio, get_equity_curve
 
 __all__ = [
     "Algorithm",
@@ -85,4 +88,10 @@ __all__ = [
     "DataSource",
     "OrderExecutor",
     "PortfolioProvider",
+    "get_profit_factor",
+    "get_cumulative_profit_factor_series",
+    "get_rolling_profit_factor_series",
+    "get_sharpe_ratio",
+    "get_price_efficiency_ratio",
+    "get_equity_curve",
 ]

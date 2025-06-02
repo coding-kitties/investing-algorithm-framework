@@ -43,7 +43,7 @@ pip install investing-algorithm-framework
 ```
 
 ## Contributing
-If you want to contribute to the framework, please read the [contributing guide](/docs/contributing/contributing). 
+If you want to contribute to the framework, please read the [contributing guide](/contributing-guide/contributing). 
 
 ### Issues
 If you find a bug or have a feature request, please create an issue on [GitHub](https://github.com/coding-kitties/investing-algorithm-framework/issues).

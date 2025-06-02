@@ -5,6 +5,8 @@ from investing_algorithm_framework.app.task import Task
 from investing_algorithm_framework.app.web import create_flask_app
 from .algorithm import Algorithm
 from .context import Context
+from .metrics import get_cumulative_profit_factor_series, \
+    get_rolling_profit_factor_series, get_price_efficiency_ratio
 
 __all__ = [
     "Algorithm",
@@ -15,4 +17,7 @@ __all__ = [
     "Task",
     "AppHook",
     "Context",
+    "get_cumulative_profit_factor_series",
+    "get_rolling_profit_factor_series",
+    "get_price_efficiency_ratio"
 ]

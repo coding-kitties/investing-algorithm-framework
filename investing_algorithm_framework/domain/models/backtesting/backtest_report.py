@@ -5,12 +5,12 @@ from logging import getLogger
 from pandas import DataFrame
 
 from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
-from investing_algorithm_framework.domain.metrics import \
-    get_price_efficiency_ratio
 from investing_algorithm_framework.domain.models \
     .backtesting.backtest_date_range import BacktestDateRange
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.position import Position
+from investing_algorithm_framework.domain.models.portfolio\
+    .portfolio_snapshot import PortfolioSnapshot
 from investing_algorithm_framework.domain.models.trade import Trade, \
     TradeStatus
 from investing_algorithm_framework.domain.models.order import Order
@@ -60,6 +60,7 @@ class BacktestReport(BaseModel):
         orders=None,
         created_at: datetime = None,
         context=None,
+        portfolio_snapshots=None,
     ):
         self._traces = {}
         self.metrics = {}
@@ -94,7 +95,7 @@ class BacktestReport(BaseModel):
         self._interval = interval
         self._time_unit = time_unit
         self._context = context
-
+        self._portfolio_snapshots = portfolio_snapshots
         self._symbols = symbols
 
         if self._symbols is None:
@@ -123,6 +124,28 @@ class BacktestReport(BaseModel):
     @portfolio_id.setter
     def portfolio_id(self, portfolio_id):
         self._portfolio_id = portfolio_id
+
+    def set_portfolio_snapshots(self, portfolio_snapshots):
+        """
+        Set the portfolio snapshots of the backtest report.
+
+        Args:
+            portfolio_snapshots (list): The portfolio snapshots of the
+            backtest report.
+
+        Returns:
+            None
+        """
+        self._portfolio_snapshots = portfolio_snapshots
+
+    def get_snapshots(self):
+        """
+        Get the portfolio snapshots of the backtest report.
+
+        Returns:
+            list: The portfolio snapshots of the backtest report.
+        """
+        return self._portfolio_snapshots
 
     @property
     def symbols(self):
@@ -452,6 +475,10 @@ class BacktestReport(BaseModel):
                 order.to_dict(datetime_format=DATETIME_FORMAT)
                 for order in self.orders
             ],
+            "portfolio_snapshots": [
+                snapshot.to_dict(datetime_format=DATETIME_FORMAT)
+                for snapshot in self.get_snapshots()
+            ],
             "created_at": self.created_at.strftime(DATETIME_FORMAT),
         }
 
@@ -501,15 +528,23 @@ class BacktestReport(BaseModel):
                 Position.from_dict(position) for position in positions
             ]
 
-        trades = data["trades"]
+        trades = data.get("trades", None)
 
         if trades is not None:
             report.trades = [Trade.from_dict(trade) for trade in trades]
 
-        orders = data["orders"]
+        orders = data.get("orders", None)
 
         if orders is not None:
             report.orders = [Order.from_dict(order) for order in orders]
+
+        portfolio_snapshots = data.get("portfolio_snapshots", None)
+
+        if portfolio_snapshots is not None:
+            report.set_portfolio_snapshots(
+                [PortfolioSnapshot.from_dict(snapshot)
+                 for snapshot in portfolio_snapshots]
+            )
 
         return report
 
@@ -535,29 +570,6 @@ class BacktestReport(BaseModel):
 
         if symbol not in self.symbols:
             self.symbols.append(symbol)
-
-    def calculate_metrics(self):
-        """
-        Parent method to calculate all metrics.
-
-        returns:
-            None
-        """
-        if self.traces is not None:
-            self.metrics['efficiency_ratio'] = {}
-
-            for strategy_id in self.traces:
-                entries = self.traces[strategy_id]
-
-                if entries is None:
-                    continue
-
-                for symbol in entries:
-
-                    self.metrics['efficiency_ratio'][symbol] = \
-                        get_price_efficiency_ratio(
-                            self.traces[strategy_id][symbol]
-                        )
 
     @property
     def traces(self):
@@ -662,7 +674,7 @@ class BacktestReport(BaseModel):
 
         Args:
             target_symbol (str): The target_symbol
-            trade_status (str): The trade_status
+            trade_status: The trade_status
 
         Returns:
             list: The trades of the backtest report

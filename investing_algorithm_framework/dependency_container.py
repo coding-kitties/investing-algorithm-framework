@@ -155,6 +155,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         market_data_source_service=market_data_source_service,
         portfolio_configuration_service=portfolio_configuration_service,
         strategy_orchestrator_service=strategy_orchestrator_service,
+        portfolio_snapshot_service=portfolio_snapshot_service,
     )
     context = providers.Factory(
         Context,

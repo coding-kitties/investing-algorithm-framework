@@ -433,9 +433,10 @@ class TradeService(RepositoryService):
         position.cost -= cost
         self.position_repository.save(position)
 
-        # Update the net gain of the portfolio
+        # Update the net gain and net size of the portfolio
         portfolio = self.portfolio_repository.get(position.portfolio_id)
         portfolio.total_net_gain += net_gain
+        portfolio.net_size += net_gain
         self.portfolio_repository.save(portfolio)
 
     def update_trade_with_removed_sell_order(
@@ -521,6 +522,7 @@ class TradeService(RepositoryService):
         # Update the net gain of the portfolio
         portfolio = self.portfolio_repository.get(position.portfolio_id)
         portfolio.total_net_gain -= total_net_gain
+        portfolio.net_size -= total_net_gain
         self.portfolio_repository.save(portfolio)
         return trade
 

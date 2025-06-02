@@ -1,7 +1,7 @@
 import logging
-import pytz
 import os
 from datetime import timedelta, datetime, timezone
+
 import polars
 from dateutil import parser
 
@@ -9,7 +9,7 @@ from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
     BACKTEST_DATA_DIRECTORY_NAME, DATETIME_FORMAT_BACKTESTING, \
     OperationalException, DATETIME_FORMAT, OHLCVMarketDataSource, \
     BacktestMarketDataSource, OrderBookMarketDataSource, \
-    TickerMarketDataSource, TimeFrame
+    TickerMarketDataSource, TimeFrame, sync_timezones
 from investing_algorithm_framework.infrastructure.services import \
     CCXTMarketService
 
@@ -154,6 +154,10 @@ class CCXTOHLCVBacktestMarketDataSource(
     def _precompute_sliding_windows(self):
         """
         Precompute all sliding windows for fast retrieval.
+
+        A sliding window is calculated as a subset of the data. It will
+        take for each timestamp in the data a window of size `window_size`
+        and stores it in a cache with the last timestamp of the window.
         """
         self.window_cache = {}
         timestamps = self.data["Datetime"].to_list()
@@ -164,10 +168,11 @@ class CCXTOHLCVBacktestMarketDataSource(
 
             # Convert end_time datetime object to UTC
             if isinstance(end_time, str):
-                end_time = parser.parse(end_time).astimezone(pytz.UTC)
+                end_time = parser.parse(end_time)
             elif isinstance(end_time, datetime):
-                end_time = end_time.replace(tzinfo=timezone.utc)
+                end_time = end_time
 
+                # end_time = end_time.replace(tzinfo=timezone.utc)
             self.window_cache[end_time] = self.data.slice(i, self.window_size)
 
     def load_data(self):
@@ -226,10 +231,9 @@ class CCXTOHLCVBacktestMarketDataSource(
 
         closest_date = None
         for ts in reversed(sorted_timestamps):
-            date = date.astimezone(pytz.UTC)
-            ts = ts.astimezone(pytz.UTC)
+            date = sync_timezones(ts, date)
 
-            if ts < date:
+            if ts <= date:
                 closest_date = ts
                 break
 
