@@ -110,7 +110,10 @@ class PortfolioService(RepositoryService):
         )
 
     def create_portfolio_from_configuration(
-        self, portfolio_configuration, initial_amount=None
+        self,
+        portfolio_configuration,
+        initial_amount=None,
+        created_at: datetime = None
     ) -> Portfolio:
         """
         Method to create a portfolio based on a portfolio configuration.
@@ -123,6 +126,9 @@ class PortfolioService(RepositoryService):
             portfolio_configuration (PortfolioConfiguration)
                 Portfolio configuration to create the portfolio from
             initial_amount (Decimal): Initial balance for the portfolio
+            created_at (datetime): The date and time when the portfolio
+                is created. If not provided, the current date and time
+                will be used.
 
         Returns:
             Portfolio: Portfolio created from the configuration
@@ -157,6 +163,9 @@ class PortfolioService(RepositoryService):
                 portfolio_configuration
             )
             data = portfolio.to_dict()
+
+            if created_at is not None:
+                data["created_at"] = created_at
 
             if initial_amount is not None:
                 data["unallocated"] = initial_amount

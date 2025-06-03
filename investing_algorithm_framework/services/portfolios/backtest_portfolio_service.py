@@ -1,3 +1,4 @@
+from datetime import datetime
 from investing_algorithm_framework.domain import PortfolioConfiguration, \
     OperationalException
 from .portfolio_service import PortfolioService
@@ -10,8 +11,10 @@ class BacktestPortfolioService(PortfolioService):
     not check if the initial balance is present on the exchange or broker.
     """
     def create_portfolio_from_configuration(
-        self, portfolio_configuration: PortfolioConfiguration,
-        initial_amount=None
+        self,
+        portfolio_configuration: PortfolioConfiguration,
+        initial_amount=None,
+        created_at: datetime = None
     ):
         """
         Wil create a portfolio from a portfolio configuration for backtesting.
@@ -20,6 +23,9 @@ class BacktestPortfolioService(PortfolioService):
             portfolio_configuration (PortfolioConfiguration):
                 Portfolio configuration to create the portfolio from
             initial_amount (Decimal): Initial balance for the portfolio
+            created_at (datetime): The date and time when the portfolio
+                is created. If not provided, the current date and time
+                will be used.
 
         Returns:
             Portfolio: The created portfolio
@@ -41,6 +47,7 @@ class BacktestPortfolioService(PortfolioService):
             "market": portfolio_configuration.market,
             "trading_symbol": portfolio_configuration.trading_symbol,
             "unallocated": amount,
-            "initialized": True
+            "initialized": True,
+            "created_at": created_at
         }
         return self.create(data)

@@ -48,3 +48,10 @@ class Test(TestCase):
         self.assertAlmostEqual(
             backtest_report.get_profit_percentage(), 4.5, delta=0.5
         )
+        snapshots = backtest_report.get_snapshots()
+        # Check that the first two snapshots created at are the same
+        # as the start date of the backtest
+        self.assertEqual(
+            snapshots[0].created_at.replace(tzinfo=timezone.utc),
+            start_date.replace(tzinfo=timezone.utc)
+        )

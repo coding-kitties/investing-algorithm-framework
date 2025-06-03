@@ -391,7 +391,8 @@ class App:
             configuration_service.add_value(APP_MODE, AppMode.WEB.value)
             self._initialize_web()
 
-        self._initialize_portfolios()
+        if not Environment.BACKTEST.equals(config[ENVIRONMENT]):
+            self._initialize_portfolios()
 
     def run(self, payload: dict = None, number_of_iterations: int = None):
         """
@@ -710,7 +711,7 @@ class App:
         save_strategy=False,
     ) -> BacktestReport:
         """
-        Run a backtest for an algorithm. An
+        Run a backtest for an algorithm.
 
         Args:
             backtest_date_range: The date range to run the backtest for
@@ -886,7 +887,6 @@ class App:
                     )
 
                     if report is not None:
-
                         print(
                             f"{COLOR_YELLOW}Backtest already exists "
                             f"for algorithm {algorithm.name} date "

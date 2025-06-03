@@ -53,3 +53,11 @@ class Test(TestCase):
         end_time = time.time()
         elapsed_time = end_time - start_time
         print(f"Test completed in {elapsed_time:.2f} seconds")
+
+        snapshots = backtest_report.get_snapshots()
+        # Check that the first two snapshots created at are the same
+        # as the start date of the backtest
+        self.assertEqual(
+            snapshots[0].created_at.replace(tzinfo=timezone.utc),
+            start_date.replace(tzinfo=timezone.utc)
+        )

@@ -1150,7 +1150,6 @@ def get_backtest_report(
     # Loop through all files in the directory
     for root, _, files in os.walk(directory):
         for file in files:
-            print(file)
 
             # Check if the file is a directory
             if os.path.isdir(os.path.join(root, file)):
@@ -1185,8 +1184,6 @@ def get_backtest_report(
                                 return report
 
             elif file.endswith(".json"):
-                print("found file")
-                print(f"Found backtest report file: {file}")
                 # Read the file
                 with open(os.path.join(root, file), "r") as json_file:
                     # Parse the JSON file

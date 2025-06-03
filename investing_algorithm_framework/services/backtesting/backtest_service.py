@@ -123,7 +123,9 @@ class BacktestService:
 
             # Check if the portfolio configuration has an initial balance
             self._portfolio_service.create_portfolio_from_configuration(
-                portfolio_configuration, initial_amount=initial_amount
+                portfolio_configuration,
+                initial_amount=initial_amount,
+                created_at=backtest_date_range.start_date,
             )
 
         strategy_profiles = []
