@@ -18,8 +18,8 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     SQLALCHEMY_DATABASE_URI, OperationalException, StateHandler, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, BacktestReport, \
     APP_MODE, MarketCredential, AppMode, BacktestDateRange, \
-    DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT, \
-    MarketDataSource, PortfolioConfiguration, \
+    DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, \
+    MarketDataSource, PortfolioConfiguration, SnapshotInterval, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider
@@ -703,12 +703,14 @@ class App:
     def run_backtest(
         self,
         backtest_date_range: BacktestDateRange,
+        name: str = None,
         initial_amount=None,
         output_directory=None,
         algorithm=None,
         strategy=None,
         strategies: List = None,
         save_strategy=False,
+        snapshot_interval: SnapshotInterval = SnapshotInterval.TRADE_CLOSE
     ) -> BacktestReport:
         """
         Run a backtest for an algorithm.
@@ -716,6 +718,8 @@ class App:
         Args:
             backtest_date_range: The date range to run the backtest for
                 (instance of BacktestDateRange)
+            name: The name of the backtest. This is used to identify the
+                backtest report in the output directory.
             initial_amount: The initial amount to start the backtest with.
                 This will be the amount of trading currency that the backtest
                 portfolio will start with.
@@ -729,6 +733,11 @@ class App:
             save_strategy: bool - Whether to save the strategy
                 as part of the backtest report. You can only save in-memory
                 strategies when running multiple backtests. This is because
+            snapshot_interval (SnapshotInterval): The snapshot
+                interval to use for the backtest. This is used to determine
+                how often the portfolio snapshot should be taken during the
+                backtest. The default is TRADE_CLOSE, which means that the
+                portfolio snapshot will be taken at the end of each trade.
 
         Returns:
             Instance of BacktestReport
@@ -741,7 +750,8 @@ class App:
             BACKTESTING_END_DATE: backtest_date_range.end_date,
             DATABASE_NAME: "backtest-database.sqlite3",
             DATABASE_DIRECTORY_NAME: "backtest_databases",
-            BACKTESTING_INITIAL_AMOUNT: initial_amount
+            BACKTESTING_INITIAL_AMOUNT: initial_amount,
+            SNAPSHOT_INTERVAL: snapshot_interval.value,
         })
 
         self.initialize_config()
@@ -759,7 +769,7 @@ class App:
 
         algorithm_factory = self.container.algorithm_factory()
         algorithm = algorithm_factory.create_algorithm(
-            name=self.name if self.name is not None else "Backtest Algorithm",
+            name=name if name else self._name,
             strategies=(
                 self._strategies if strategies is None else strategies
             ),
@@ -775,7 +785,19 @@ class App:
             self.container.strategy_orchestrator_service()
         strategy_orchestrator_service.initialize(algorithm)
         backtest_service = self.container.backtest_service()
+
+        # Setup snapshot service as observer
+        backtest_service.clear_observers()
+        portfolio_snapshot_service = \
+            self.container.portfolio_snapshot_service()
+        backtest_service.add_observer(portfolio_snapshot_service)
         context = self.container.context()
+        order_service = self.container.order_service()
+        order_service.clear_observers()
+        order_service.add_observer(portfolio_snapshot_service)
+        portfolio_service = self.container.portfolio_service()
+        portfolio_service.clear_observers()
+        portfolio_service.add_observer(portfolio_snapshot_service)
 
         # Run the backtest with the backtest_service and collect and
         # save the report

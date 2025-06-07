@@ -2,8 +2,7 @@ from unittest import TestCase
 from datetime import datetime
 import pandas as pd
 
-from investing_algorithm_framework.app.metrics.price_efficiency import \
-    get_price_efficiency_ratio
+from investing_algorithm_framework import get_price_efficiency_ratio
 
 class TestGetPriceEfficiencyRatio(TestCase):
 

@@ -13,6 +13,7 @@ class PortfolioSnapshot(BaseModel):
         total_net_gain=None,
         total_revenue=None,
         total_cost=None,
+        total_value=None,
         cash_flow=None,
         created_at=None,
         position_snapshots=None
@@ -23,6 +24,7 @@ class PortfolioSnapshot(BaseModel):
         self.unallocated = unallocated
         self.total_net_gain = total_net_gain
         self.total_revenue = total_revenue
+        self.total_value = total_value if total_value is not None else 0.0
         self.net_size = net_size
         self.total_cost = total_cost
         self.cash_flow = cash_flow
@@ -68,6 +70,12 @@ class PortfolioSnapshot(BaseModel):
 
     def set_total_revenue(self, total_revenue):
         self.total_revenue = total_revenue
+
+    def get_total_value(self):
+        return self.total_value
+
+    def set_total_value(self, total_value):
+        self.total_value = total_value
 
     def get_total_cost(self):
         return self.total_cost
@@ -135,7 +143,8 @@ class PortfolioSnapshot(BaseModel):
 
         return {
             "net_size": self.net_size,
-            "created_at": created_at
+            "created_at": created_at,
+            "total_value": self.total_value,
         }
 
     @staticmethod
@@ -152,4 +161,5 @@ class PortfolioSnapshot(BaseModel):
         return PortfolioSnapshot(
             net_size=data.get("net_size", 0.0),
             created_at=data.get("created_at"),
+            total_value=data.get("total_value", 0.0),
         )

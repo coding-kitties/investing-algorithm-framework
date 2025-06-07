@@ -8,7 +8,7 @@ from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
     CURRENT_UTC_DATETIME, BACKTESTING_END_DATE, SYMBOLS, \
     CCXT_DATETIME_FORMAT_WITH_TIMEZONE, RESERVED_BALANCES, \
     APP_MODE, DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT, \
-    APPLICATION_DIRECTORY
+    APPLICATION_DIRECTORY, SNAPSHOT_INTERVAL
 from .data_structures import PeekableQueue
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
 from .exceptions import OperationalException, ApiException, \
@@ -20,11 +20,11 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     BacktestPosition, Trade, MarketCredential, PositionSnapshot, \
     BacktestReportsEvaluation, AppMode, BacktestDateRange, DateRange, \
     MarketDataType, TradeRiskType, TradeTakeProfit, TradeStopLoss, \
-    DataSource
+    DataSource, Event, SnapshotInterval
 from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
     OHLCVMarketDataSource, BacktestMarketDataSource, MarketDataSource, \
     MarketService, MarketCredentialService, AbstractPortfolioSyncService, \
-    RoundingService, StateHandler
+    RoundingService, StateHandler, Observable, Observer
 from .stateless_actions import StatelessActions
 from .strategy import Strategy
 from .utils import random_string, append_dict_as_row_to_csv, \
@@ -141,5 +141,10 @@ __all__ = [
     "random_number",
     "is_timezone_aware",
     "sync_timezones",
-    "get_timezone"
+    "get_timezone",
+    "Observer",
+    "Observable",
+    "Event",
+    "SNAPSHOT_INTERVAL",
+    "SnapshotInterval",
 ]

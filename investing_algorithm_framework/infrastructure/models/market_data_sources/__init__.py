@@ -1,6 +1,8 @@
 from .ccxt import CCXTOrderBookMarketDataSource, CCXTTickerMarketDataSource, \
     CCXTOHLCVMarketDataSource, CCXTOHLCVBacktestMarketDataSource
 from .csv import CSVOHLCVMarketDataSource, CSVTickerMarketDataSource
+from .pandas import PandasOHLCVBacktestMarketDataSource, \
+    PandasOHLCVMarketDataSource
 
 __all__ = [
     'CCXTOrderBookMarketDataSource',
@@ -8,5 +10,7 @@ __all__ = [
     'CCXTOHLCVMarketDataSource',
     "CCXTOHLCVBacktestMarketDataSource",
     "CSVOHLCVMarketDataSource",
-    "CSVTickerMarketDataSource"
+    "CSVTickerMarketDataSource",
+    "PandasOHLCVBacktestMarketDataSource",
+    "PandasOHLCVMarketDataSource"
 ]

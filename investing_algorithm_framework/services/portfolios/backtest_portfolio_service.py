@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from investing_algorithm_framework.domain import PortfolioConfiguration, \
     OperationalException
 from .portfolio_service import PortfolioService

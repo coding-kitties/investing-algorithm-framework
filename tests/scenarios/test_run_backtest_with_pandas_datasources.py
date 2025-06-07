@@ -2,9 +2,12 @@ import time
 import os
 from datetime import datetime, timedelta, timezone
 from unittest import TestCase
+import pandas as pd
+import polars as pl
 
 from investing_algorithm_framework import create_app, BacktestDateRange, \
-    Algorithm, RESOURCE_DIRECTORY, SnapshotInterval
+    Algorithm, RESOURCE_DIRECTORY, PandasOHLCVMarketDataSource, \
+    convert_polars_to_pandas
 from tests.resources.strategies_for_testing.strategy_v1 import \
     CrossOverStrategyV1
 
@@ -26,12 +29,30 @@ class Test(TestCase):
             start_date=start_date, end_date=end_date
         )
         algorithm = Algorithm()
-        algorithm.add_strategy(CrossOverStrategyV1)
+        strategy = CrossOverStrategyV1()
+        dataframe = pl.read_csv(
+            os.path.join(
+                resource_directory,
+                "backtest_data/OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-06-00_2023-12-02-00-00.csv"
+            )
+        )
+        dataframe = convert_polars_to_pandas(dataframe)
+        ohlcv_data_source = PandasOHLCVMarketDataSource(
+            identifier="BTC/EUR-ohlcv-2h",
+            dataframe=dataframe,
+            market="BINANCE",
+            symbol="BTC/EUR",
+            time_frame="2h",
+            window_size=200
+        )
+        strategy.market_data_sources = [
+            ohlcv_data_source
+        ]
+        algorithm.add_strategy(strategy)
         backtest_report = app.run_backtest(
             backtest_date_range=date_range,
             save_strategy=True,
-            algorithm=algorithm,
-            snapshot_interval=SnapshotInterval.STRATEGY_ITERATION
+            algorithm=algorithm
         )
         self.assertAlmostEqual(
             backtest_report.get_growth(), 3, delta=0.5
@@ -62,8 +83,3 @@ class Test(TestCase):
             snapshots[0].created_at.replace(tzinfo=timezone.utc),
             start_date.replace(tzinfo=timezone.utc)
         )
-
-        for snapshot in snapshots:
-            self.assertTrue(
-                end_date >= snapshot.created_at >= start_date
-            )

@@ -1,23 +1,22 @@
-from datetime import datetime, timedelta, timezone
-import re
-import os
 import inspect
 import json
+import logging
+import os
+import re
+import sys
+from datetime import datetime, timedelta, timezone
+
 import pandas as pd
 from dateutil import parser
 from tqdm import tqdm
-import logging
-import sys
-
 
 from investing_algorithm_framework.domain import BacktestReport, \
     BACKTESTING_INDEX_DATETIME, TimeUnit, BacktestPosition, \
     TradingDataType, OrderStatus, OperationalException, MarketDataSource, \
     OrderSide, SYMBOLS, BacktestDateRange, DATETIME_FORMAT_BACKTESTING, \
-    RESOURCE_DIRECTORY
+    RESOURCE_DIRECTORY, Observable, Event
 from investing_algorithm_framework.services.market_data_source_service import \
     MarketDataSourceService
-
 
 logger = logging.getLogger(__name__)
 BACKTEST_REPORT_FILE_NAME_PATTERN = (
@@ -32,7 +31,7 @@ BACKTEST_REPORT_DIRECTORY_PATTERN = (
 )
 
 
-class BacktestService:
+class BacktestService(Observable):
     """
     Service that facilitates backtests for algorithm objects.
     """
@@ -40,15 +39,12 @@ class BacktestService:
     def __init__(
         self,
         market_data_source_service: MarketDataSourceService,
-        order_service,
-        portfolio_service,
-        portfolio_snapshot_service,
-        position_repository,
-        performance_service,
-        configuration_service,
-        portfolio_configuration_service,
-        strategy_orchestrator_service,
+        order_service, portfolio_service, portfolio_snapshot_service,
+        position_repository, performance_service,
+        configuration_service, portfolio_configuration_service,
+        strategy_orchestrator_service
     ):
+        super().__init__()
         self._resource_directory = None
         self._order_service = order_service
         self._portfolio_service = portfolio_service
@@ -167,6 +163,9 @@ class BacktestService:
             strategy_orchestrator_service.run_backtest_strategy(
                 context=context, strategy=strategy, config=config
             )
+            self.notify_observers(Event.STRATEGY_RUN, {
+                "created_at": index_date,
+            })
 
         report = self.create_backtest_report(
             algorithm,

@@ -1,7 +1,8 @@
 from .market_data_sources import CCXTOrderBookMarketDataSource, \
     CCXTTickerMarketDataSource, CCXTOHLCVMarketDataSource, \
     CCXTOHLCVBacktestMarketDataSource, CSVOHLCVMarketDataSource, \
-    CSVTickerMarketDataSource
+    CSVTickerMarketDataSource, PandasOHLCVBacktestMarketDataSource, \
+    PandasOHLCVMarketDataSource
 from .order import SQLOrder, SQLOrderMetadata
 from .portfolio import SQLPortfolio, SQLPortfolioSnapshot
 from .position import SQLPosition, SQLPositionSnapshot
@@ -23,4 +24,6 @@ __all__ = [
     "SQLTradeStopLoss",
     "SQLTradeTakeProfit",
     "SQLOrderMetadata",
+    "PandasOHLCVBacktestMarketDataSource",
+    "PandasOHLCVMarketDataSource"
 ]

@@ -276,8 +276,8 @@ class MarketDataSourceService:
         if self.market_data_sources is not None:
 
             for market_data_source in self._market_data_sources:
-                if isinstance(market_data_source, OHLCVMarketDataSource):
 
+                if isinstance(market_data_source, OHLCVMarketDataSource):
                     if market is not None and time_frame is not None:
                         if market_data_source.market.upper() == market.upper()\
                                 and market_data_source.symbol.upper() \
@@ -287,6 +287,7 @@ class MarketDataSourceService:
                                 ):
                             return market_data_source
                     elif market is not None:
+
                         if market_data_source.market.upper() == market.upper()\
                                 and market_data_source.symbol.upper() \
                                 == symbol.upper():

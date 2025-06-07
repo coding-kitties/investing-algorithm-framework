@@ -1,9 +1,9 @@
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 
-from investing_algorithm_framework.domain import OrderSide, OrderStatus, \
-    OperationalException, MarketCredentialService, Portfolio, \
-    Environment, ENVIRONMENT
+from investing_algorithm_framework.domain import OperationalException, \
+    MarketCredentialService, Portfolio, \
+    Environment, ENVIRONMENT, Observable, Event
 from investing_algorithm_framework.services.configuration_service import \
     ConfigurationService
 from investing_algorithm_framework.services.repository_service \
@@ -12,7 +12,7 @@ from investing_algorithm_framework.services.repository_service \
 logger = logging.getLogger("investing_algorithm_framework")
 
 
-class PortfolioService(RepositoryService):
+class PortfolioService(RepositoryService, Observable):
     """
     Service to manage portfolios. This service will sync the portfolios with
     the exchange balances and orders. It will also create portfolios based on
@@ -30,7 +30,9 @@ class PortfolioService(RepositoryService):
         portfolio_repository,
         portfolio_provider_lookup
     ):
-        super(PortfolioService, self).__init__(portfolio_repository)
+        super().__init__(repository=portfolio_repository)
+        # Call the observable constructor
+        Observable.__init__(self)
         self.configuration_service = configuration_service
         self.market_credential_service = market_credential_service
         self.portfolio_configuration_service = portfolio_configuration_service
@@ -87,27 +89,14 @@ class PortfolioService(RepositoryService):
                 "cost": unallocated
             }
         )
-        self.create_snapshot(portfolio.id, created_at=portfolio.created_at)
-        return portfolio
-
-    def create_snapshot(self, portfolio_id, created_at=None):
-
-        if created_at is None:
-            created_at = datetime.now(tz=timezone.utc)
-
-        portfolio = self.get(portfolio_id)
-        pending_orders = self.order_service.get_all(
+        self.notify_observers(
+            Event.PORTFOLIO_CREATED,
             {
-                "order_side": OrderSide.BUY.value,
-                "status": OrderStatus.OPEN.value,
-                "portfolio_id": portfolio.id
+                "portfolio_id": portfolio.id,
+                "created_at": portfolio.created_at
             }
         )
-        return self.portfolio_snapshot_service.create_snapshot(
-            portfolio,
-            pending_orders=pending_orders,
-            created_at=created_at
-        )
+        return portfolio
 
     def create_portfolio_from_configuration(
         self,

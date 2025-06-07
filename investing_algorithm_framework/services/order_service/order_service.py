@@ -5,14 +5,15 @@ from typing import List
 from dateutil.tz import tzutc
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
-    OperationalException, OrderStatus, Order, OrderExecutor, random_number
+    OperationalException, OrderStatus, Order, OrderExecutor, random_number, \
+    Observable, Event
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
 logger = logging.getLogger("investing_algorithm_framework")
 
 
-class OrderService(RepositoryService):
+class OrderService(RepositoryService, Observable):
     """
     Service to manage orders. This service will use the provided
     order executors to execute the orders. The order service is
@@ -45,12 +46,14 @@ class OrderService(RepositoryService):
         portfolio_repository,
         portfolio_configuration_service,
         portfolio_snapshot_service,
-        market_credential_service,
         trade_service,
-        order_executor_lookup,
-        portfolio_provider_lookup
+        portfolio_provider_lookup=None,
+        order_executor_lookup=None,
+        market_credential_service=None
     ):
         super(OrderService, self).__init__(order_repository)
+        # Call the observable constructor
+        Observable.__init__(self)
         self.configuration_service = configuration_service
         self.order_repository = order_repository
         self.position_service = position_service
@@ -201,7 +204,6 @@ class OrderService(RepositoryService):
         order.position_id = position.id
         order = self.order_repository.save(order)
         order_id = order.id
-        created_at = order.created_at
         order_side = order.order_side
 
         if OrderSide.SELL.equals(order_side):
@@ -223,7 +225,11 @@ class OrderService(RepositoryService):
             else:
                 self._sync_portfolio_with_created_sell_order(order)
 
-        self.create_snapshot(portfolio.id, created_at=created_at)
+        self.notify_observers(
+            Event.ORDER_CREATED,
+            {"portfolio_id": portfolio.id, "created_at": order.created_at}
+        )
+        # self.create_snapshot(portfolio.id, created_at=created_at)
         order = self.get(order_id)
         return order
 
@@ -251,8 +257,6 @@ class OrderService(RepositoryService):
             Order: Order object that has been updated
         """
         previous_order = self.order_repository.get(object_id)
-        position = self.position_service.get(previous_order.position_id)
-        portfolio = self.portfolio_repository.get(position.portfolio_id)
         new_order = self.order_repository.update(object_id, data)
         filled_difference = new_order.get_filled() \
             - previous_order.get_filled()
@@ -285,12 +289,6 @@ class OrderService(RepositoryService):
                 else:
                     self._sync_with_sell_order_expired(new_order)
 
-        if "updated_at" in data:
-            created_at = data["updated_at"]
-        else:
-            created_at = datetime.now(tz=tzutc())
-
-        self.create_snapshot(portfolio.id, created_at=created_at)
         return new_order
 
     def execute_order(self, order, portfolio) -> Order:
@@ -842,32 +840,32 @@ class OrderService(RepositoryService):
 
         self.trade_service.update_trade_with_removed_sell_order(order)
 
-    def create_snapshot(self, portfolio_id, created_at=None):
-
-        if created_at is None:
-            created_at = datetime.now(tz=tzutc())
-
-        portfolio = self.portfolio_repository.get(portfolio_id)
-        pending_orders = self.get_all(
-            {
-                "order_side": OrderSide.BUY.value,
-                "status": OrderStatus.OPEN.value,
-                "portfolio_id": portfolio.id
-            }
-        )
-        created_orders = self.get_all(
-            {
-                "order_side": OrderSide.BUY.value,
-                "status": OrderStatus.CREATED.value,
-                "portfolio_id": portfolio.id
-            }
-        )
-        return self.portfolio_snapshot_service.create_snapshot(
-            portfolio,
-            pending_orders=pending_orders,
-            created_orders=created_orders,
-            created_at=created_at
-        )
+    # def create_snapshot(self, portfolio_id, created_at=None):
+    #
+    #     if created_at is None:
+    #         created_at = datetime.now(tz=tzutc())
+    #
+    #     portfolio = self.portfolio_repository.get(portfolio_id)
+    #     pending_orders = self.get_all(
+    #         {
+    #             "order_side": OrderSide.BUY.value,
+    #             "status": OrderStatus.OPEN.value,
+    #             "portfolio_id": portfolio.id
+    #         }
+    #     )
+    #     created_orders = self.get_all(
+    #         {
+    #             "order_side": OrderSide.BUY.value,
+    #             "status": OrderStatus.CREATED.value,
+    #             "portfolio_id": portfolio.id
+    #         }
+    #     )
+    #     return self.portfolio_snapshot_service.create_snapshot(
+    #         portfolio,
+    #         pending_orders=pending_orders,
+    #         created_orders=created_orders,
+    #         created_at=created_at
+    #     )
 
     def _create_order_id(self):
         """

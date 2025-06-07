@@ -419,9 +419,6 @@ class BacktestReport(BaseModel):
         Convert the backtest report to a dictionary. So it can be
         saved to a file.
 
-        Args:
-            None
-
         Returns:
             dict: The backtest report as a dictionary
         """

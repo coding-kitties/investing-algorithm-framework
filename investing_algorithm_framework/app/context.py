@@ -1334,7 +1334,6 @@ class Context:
         ticker = self.market_data_source_service.get_ticker(
             symbol=trade.symbol, market=portfolio.market
         )
-
         logger.info(f"Closing trade {trade.id} {trade.symbol}")
         self.order_service.create(
             {

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import polars as pl
@@ -89,6 +89,17 @@ class TestOrderBacktestService(TestBase):
         self.app.initialize_config()
         self.app.initialize()
 
+        # Add portfolio
+        portfolio_service = self.app.container.portfolio_service()
+        portfolio_service.create(
+            {
+                "market": "binance",
+                "trading_symbol": "EUR",
+                "unallocated": 1000,
+                "initialized": True
+            }
+        )
+
     def test_create_limit_order(self):
         order_service = self.app.container.order_service()
         configuration_service = self.app.container.configuration_service()
@@ -160,8 +171,7 @@ class TestOrderBacktestService(TestBase):
         order_service = self.app.container.order_service()
         configuration_service = self.app.container.configuration_service()
         configuration_service.add_value(
-            BACKTESTING_INDEX_DATETIME,
-            datetime.utcnow()
+            BACKTESTING_INDEX_DATETIME, datetime.now(tz=timezone.utc)
         )
         order = order_service.create(
             {

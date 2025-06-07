@@ -71,9 +71,13 @@ class DependencyContainer(containers.DeclarativeContainer):
     )
     portfolio_snapshot_service = providers.Factory(
         PortfolioSnapshotService,
+        order_repository=order_repository,
         repository=portfolio_snapshot_repository,
+        portfolio_repository=portfolio_repository,
         position_snapshot_service=position_snapshot_service,
         position_repository=position_repository,
+        datasource_service=market_data_source_service,
+        configuration_service=configuration_service
     )
     portfolio_configuration_service = providers.ThreadSafeSingleton(
         PortfolioConfigurationService,

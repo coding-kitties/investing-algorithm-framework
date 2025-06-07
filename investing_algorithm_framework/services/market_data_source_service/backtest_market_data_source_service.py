@@ -149,6 +149,45 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
         ticker_market_data_source = self.get_ticker_market_data_source(
             symbol=symbol, market=market
         )
+        ohlcv_market_data_source = self.get_ohlcv_market_data_source(
+            symbol=symbol, market=market
+        )
+        if ohlcv_market_data_source is not None and \
+                ticker_market_data_source is None:
+            data = ohlcv_market_data_source.get_data(
+                date=self._configuration_service.get_config()[
+                    BACKTESTING_INDEX_DATETIME
+                ],
+                config=self._configuration_service.get_config()
+            )
+
+            # Get last row of the OHLCV data polars dataframe
+            close = data.tail(1)["Close"][0]
+            timestamp = data.tail(1)["Datetime"][0]
+            open = data.tail(1)["Open"][0]
+            high = data.tail(1)["High"][0]
+            low = data.tail(1)["Low"][0]
+            volume = data.tail(1)["Volume"][0]
+
+            spread = close * 0.001
+            bid = close - spread
+            ask = close + spread
+
+            ticker_data = {
+                "symbol": symbol,
+                "market": market,
+                "timestamp": timestamp,
+                # or the appropriate time column
+                "open": open,
+                "high": high,
+                "low": low,
+                "close": close,
+                "last": close,
+                "volume": volume,
+                "bid": bid,
+                "ask": ask,
+            }
+            return ticker_data
 
         if ticker_market_data_source is None:
             raise OperationalException(
@@ -212,3 +251,17 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
                 return
 
         self._market_data_sources.append(market_data_source)
+
+    def has_ticker_market_data_source(self, symbol, market=None):
+        ticker_market_data_source = self.get_ticker_market_data_source(
+            symbol=symbol, market=market
+        )
+        ohlcv_market_data_source = self.get_ohlcv_market_data_source(
+            symbol=symbol, market=market
+        )
+
+        if ohlcv_market_data_source is not None or \
+                ticker_market_data_source is not None:
+            return True
+
+        return False

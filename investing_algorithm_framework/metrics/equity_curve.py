@@ -19,7 +19,7 @@ def get_equity_curve(
     series = []
     for snapshot in backtest_report.get_snapshots():
         timestamp = snapshot.created_at
-        total_size = snapshot.net_size
+        total_size = snapshot.total_value
         series.append((timestamp, total_size))
 
     return series

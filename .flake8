@@ -3,3 +3,4 @@ exclude =
     investing_algorithm_framework/domain/utils/backtesting.py
     investing_algorithm_framework/infrastructure/database/sql_alchemy.py
     examples
+    investing_algorithm_framework/metrics

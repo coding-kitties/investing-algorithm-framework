@@ -5,7 +5,8 @@ from .models import SQLPortfolio, SQLOrder, SQLPosition, \
     CCXTOHLCVBacktestMarketDataSource, CCXTOrderBookMarketDataSource, \
     CCXTTickerMarketDataSource, CCXTOHLCVMarketDataSource, \
     CSVOHLCVMarketDataSource, CSVTickerMarketDataSource, SQLTradeTakeProfit, \
-    SQLTradeStopLoss
+    SQLTradeStopLoss, PandasOHLCVBacktestMarketDataSource, \
+    PandasOHLCVMarketDataSource
 from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLPortfolioRepository, SQLTradeRepository, \
     SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository, \
@@ -55,4 +56,6 @@ __all__ = [
     "CCXTPortfolioProvider",
     "get_default_data_providers",
     "get_default_ohlcv_data_providers",
+    "PandasOHLCVBacktestMarketDataSource",
+    "PandasOHLCVMarketDataSource"
 ]

@@ -5,6 +5,8 @@ from .market_service import MarketService
 from .portfolios import AbstractPortfolioSyncService
 from .rounding_service import RoundingService
 from .state_handler import StateHandler
+from .observer import Observer
+from .observable import Observable
 
 __all__ = [
     "MarketDataSource",
@@ -16,5 +18,7 @@ __all__ = [
     "MarketCredentialService",
     "AbstractPortfolioSyncService",
     "RoundingService",
-    "StateHandler"
+    "StateHandler",
+    "Observer",
+    "Observable"
 ]

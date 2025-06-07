@@ -24,16 +24,17 @@ class OrderBacktestService(OrderService):
         configuration_service,
         market_data_source_service: BacktestMarketDataSourceService,
     ):
-        super(OrderService, self).__init__(order_repository)
-        self.trade_service = trade_service
-        self.order_repository = order_repository
-        self.position_service = position_service
-        self.portfolio_repository = portfolio_repository
-        self.portfolio_configuration_service = portfolio_configuration_service
-        self.portfolio_snapshot_service = portfolio_snapshot_service
+        super().__init__(
+            configuration_service=configuration_service,
+            order_repository=order_repository,
+            position_service=position_service,
+            portfolio_repository=portfolio_repository,
+            portfolio_configuration_service=portfolio_configuration_service,
+            portfolio_snapshot_service=portfolio_snapshot_service,
+            trade_service=trade_service,
+        )
         self.configuration_service = configuration_service
-        self._market_data_source_service: BacktestMarketDataSourceService = \
-            market_data_source_service
+        self.market_data_source_service = market_data_source_service
 
     def create(self, data, execute=True, validate=True, sync=True) -> Order:
         """
