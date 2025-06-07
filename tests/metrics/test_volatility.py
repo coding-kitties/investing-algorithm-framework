@@ -7,8 +7,8 @@ from investing_algorithm_framework import get_volatility
 
 # Mock snapshot class
 class Snapshot:
-    def __init__(self, net_size, created_at):
-        self.net_size = net_size
+    def __init__(self, total_value, created_at):
+        self.total_value = total_value
         self.created_at = created_at
 
 class TestGetVolatility(unittest.TestCase):
