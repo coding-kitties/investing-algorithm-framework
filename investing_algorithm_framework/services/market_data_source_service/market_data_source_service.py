@@ -362,3 +362,16 @@ class MarketDataSourceService:
 
     def has_ticker_market_data_source(self, symbol, market=None):
         return self.get_ticker_market_data_source(symbol, market) is not None
+
+    def get_market_data_source_identifiers(self):
+        """
+        Function to get all list of all market data source identifiers.
+
+        Returns:
+            List[str]: A list of identifiers for all market data sources.
+        """
+
+        return [
+            market_data_source.get_identifier() for market_data_source
+            in self._market_data_sources
+        ]

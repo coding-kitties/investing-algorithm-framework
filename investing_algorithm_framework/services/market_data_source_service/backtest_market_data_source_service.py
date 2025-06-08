@@ -190,9 +190,11 @@ class BacktestMarketDataSourceService(MarketDataSourceService):
             return ticker_data
 
         if ticker_market_data_source is None:
+            identifiers = self.get_market_data_source_identifiers()
             raise OperationalException(
-                f"Backtest ticker data source "
-                f"not found for {symbol} and market {market}"
+                "Backtest ticker data source "
+                f"not found for {symbol} and market {market}, the available "
+                f"data sources are: {identifiers}"
             )
 
         config = self._configuration_service.get_config()
