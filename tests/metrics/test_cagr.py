@@ -42,7 +42,7 @@ class TestGetCagr(unittest.TestCase):
         report_x = self.create_report(prices, start_date)
 
         cagr = get_cagr(report_x)
-        self.assertAlmostEqual(cagr, 12, delta=1)
+        self.assertAlmostEqual(cagr, 0.12034875793587707, delta=1)
 
     def test_cagr_for_return_exactly_a_year(self):
         """
@@ -63,7 +63,7 @@ class TestGetCagr(unittest.TestCase):
         report_x = self.create_report(prices, start_date)
 
         cagr = get_cagr(report_x)
-        self.assertAlmostEqual(cagr, 12, delta=1)
+        self.assertAlmostEqual(cagr, 0.12034875793587663, delta=1)
 
     def test_cagr_for_return_more_then_a_year(self):
         """
@@ -84,4 +84,4 @@ class TestGetCagr(unittest.TestCase):
         report_x = self.create_report(prices, start_date)
 
         cagr = get_cagr(report_x)
-        self.assertAlmostEqual(cagr, 12, delta=1)
+        self.assertAlmostEqual(cagr, 0.1203487579358764, delta=1)

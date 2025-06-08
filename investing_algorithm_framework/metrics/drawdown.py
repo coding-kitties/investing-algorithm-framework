@@ -79,7 +79,7 @@ def get_max_drawdown(backtest_report: BacktestReport) -> float:
         drawdown_pct = (equity - peak) / peak  # Will be 0 or negative
         max_drawdown_pct = min(max_drawdown_pct, drawdown_pct)
 
-    return max_drawdown_pct * 100.0  # Return as percentage (e.g., -10.0)
+    return abs(max_drawdown_pct)
 
 
 def get_max_drawdown_absolute(backtest_report: BacktestReport) -> float:
@@ -110,4 +110,4 @@ def get_max_drawdown_absolute(backtest_report: BacktestReport) -> float:
         drawdown = peak - equity  # Drop from peak
         max_drawdown = max(max_drawdown, drawdown)
 
-    return max_drawdown
+    return abs(max_drawdown)  # Return as positive number (e.g., €10,000)

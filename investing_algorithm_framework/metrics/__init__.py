@@ -16,6 +16,8 @@ from .standard_deviation import get_standard_deviation_downside_returns, \
     get_standard_deviation_returns
 from .net_profit import get_net_profit
 from .exposure import get_exposure_time, get_average_trade_duration
+from .win_rate import get_win_rate, get_win_loss_ratio
+from .calmar_ratio import get_calmar_ratio
 
 __all__ = [
     "get_volatility",
@@ -36,4 +38,7 @@ __all__ = [
     "get_net_profit",
     "get_exposure_time",
     "get_average_trade_duration",
+    "get_win_rate",
+    "get_win_loss_ratio",
+    "get_calmar_ratio",
 ]

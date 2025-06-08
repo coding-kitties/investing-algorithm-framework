@@ -45,12 +45,12 @@ def get_cagr(report: BacktestReport) -> float:
 
     # Convert snapshots to DataFrame
     data = [(s.total_value, s.created_at) for s in snapshots]
-    df = pd.DataFrame(data, columns=["net_size", "created_at"])
+    df = pd.DataFrame(data, columns=["total_value", "created_at"])
     df['created_at'] = pd.to_datetime(df['created_at'])
     df = df.sort_values('created_at')
 
-    start_value = df.iloc[0]['net_size']
-    end_value = df.iloc[-1]['net_size']
+    start_value = df.iloc[0]['total_value']
+    end_value = df.iloc[-1]['total_value']
 
     start_date = df.iloc[0]['created_at']
     end_date = df.iloc[-1]['created_at']
@@ -61,7 +61,4 @@ def get_cagr(report: BacktestReport) -> float:
         return 0.0
 
     # CAGR formula
-    cagr = (end_value / start_value) ** (365 / num_days) - 1
-    # Return as percentage
-    cagr = round(cagr * 100, 2)  # Convert to percentage and 2 decimal places
-    return cagr
+    return (end_value / start_value) ** (365 / num_days) - 1

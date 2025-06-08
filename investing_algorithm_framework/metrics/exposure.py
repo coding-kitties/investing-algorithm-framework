@@ -53,3 +53,23 @@ def get_average_trade_duration(report: BacktestReport):
 
     average_trade_duration = total_duration / len(trades)
     return average_trade_duration.total_seconds() / 3600.0  # Convert to hours
+
+
+def get_trade_frequency(report: BacktestReport):
+    """
+    Calculates the trade frequency as the number of trades per day
+    during the backtest period.
+
+    Returns:
+        A float representing the average number of trades per day.
+    """
+    trades = report.get_trades()
+
+    if not trades:
+        return 0.0
+
+    total_days = (report.backtest_end_date - report.backtest_start_date).days + 1
+    if total_days <= 0:
+        return 0.0
+
+    return len(trades) / total_days

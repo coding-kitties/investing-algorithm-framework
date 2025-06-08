@@ -49,8 +49,7 @@ class TestDrawdownFunctions(unittest.TestCase):
 
     def test_max_drawdown(self):
         max_drawdown = get_max_drawdown(self.backtest_report)
-        print(max_drawdown)
-        expected_max = ((900 - 1200) / 1200) * 100# -0.25
+        expected_max = abs((900 - 1200) / 1200) # 0.25
         self.assertAlmostEqual(max_drawdown, expected_max, places=6)
 
     def test_max_drawdown_absolute(self):
