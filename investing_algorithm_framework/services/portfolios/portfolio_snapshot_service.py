@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
 from investing_algorithm_framework.domain import Observer, Event, \
-    SNAPSHOT_INTERVAL, SnapshotInterval, OrderSide, OrderStatus, \
+    SNAPSHOT_INTERVAL, SnapshotInterval, OrderStatus, \
     PortfolioSnapshot, Environment, ENVIRONMENT, BACKTESTING_INDEX_DATETIME
 from investing_algorithm_framework.services.repository_service import \
     RepositoryService
@@ -100,14 +100,12 @@ class PortfolioSnapshotService(RepositoryService, Observer):
         pending_value = 0
         pending_orders = self.order_repository.get_all(
             {
-                "order_side": OrderSide.BUY.value,
                 "status": OrderStatus.OPEN.value,
                 "portfolio_id": portfolio.id
             }
         )
         created_orders = self.order_repository.get_all(
             {
-                "order_side": OrderSide.BUY.value,
                 "status": OrderStatus.CREATED.value,
                 "portfolio_id": portfolio.id
             }

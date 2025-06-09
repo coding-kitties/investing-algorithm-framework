@@ -31,7 +31,8 @@ from .metrics import get_volatility, get_sortino_ratio, get_profit_factor, \
     get_drawdown_series, get_max_drawdown, get_cagr, \
     get_standard_deviation_returns, get_standard_deviation_downside_returns, \
     get_max_drawdown_absolute, get_exposure_time, get_average_trade_duration, \
-    get_net_profit, get_win_rate, get_win_loss_ratio, get_calmar_ratio
+    get_net_profit, get_win_rate, get_win_loss_ratio, get_calmar_ratio, \
+    get_trade_frequency
 
 __all__ = [
     "Algorithm",
@@ -123,4 +124,5 @@ __all__ = [
     "get_win_rate",
     "get_win_loss_ratio",
     "get_calmar_ratio",
+    "get_trade_frequency",
 ]

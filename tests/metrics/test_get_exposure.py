@@ -6,7 +6,7 @@ from investing_algorithm_framework import get_exposure_time
 # Mock classes to simulate report and trades
 class MockTrade:
     def __init__(self, created_at, closed_at=None):
-        self.created_at = created_at
+        self.opened_at = created_at
         self.closed_at = closed_at
 
 class MockReport:
@@ -79,4 +79,3 @@ class TestGetExposureTime(unittest.TestCase):
         report = MockReport(trades=[trade], backtest_start_date=start, backtest_end_date=end)
 
         self.assertEqual(get_exposure_time(report), 0.0)
-

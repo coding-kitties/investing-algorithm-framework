@@ -148,6 +148,12 @@ class Trade(BaseModel):
 
     @property
     def duration(self):
+        """
+        Calculate the duration of the trade in hours.
+
+        Returns:
+            float: The duration of the trade in hours.
+        """
         if TradeStatus.CLOSED.equals(self.status):
             # Get the total hours between the closed and opened datetime
             diff = self.closed_at - self.opened_at

@@ -15,7 +15,8 @@ from .cagr import get_cagr
 from .standard_deviation import get_standard_deviation_downside_returns, \
     get_standard_deviation_returns
 from .net_profit import get_net_profit
-from .exposure import get_exposure_time, get_average_trade_duration
+from .exposure import get_exposure_time, get_average_trade_duration, \
+    get_trade_frequency
 from .win_rate import get_win_rate, get_win_loss_ratio
 from .calmar_ratio import get_calmar_ratio
 
@@ -41,4 +42,5 @@ __all__ = [
     "get_win_rate",
     "get_win_loss_ratio",
     "get_calmar_ratio",
+    "get_trade_frequency",
 ]

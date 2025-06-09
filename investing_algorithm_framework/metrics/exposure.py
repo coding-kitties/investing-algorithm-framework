@@ -1,3 +1,11 @@
+"""
+High exposure (>1) means you’re deploying capital aggressively, possibly with many simultaneous positions.
+
+Exposure around 1 means capital is nearly fully invested most of the time, but not overlapping.
+
+Low exposure (<1) means capital is mostly idle or only partially invested.
+"""
+
 from datetime import timedelta
 from investing_algorithm_framework.domain import BacktestReport
 
@@ -18,13 +26,14 @@ def get_exposure_time(report: BacktestReport):
 
     total_trade_duration = timedelta(0)
     for trade in trades:
-        entry = trade.created_at
+        entry = trade.opened_at
         exit = trade.closed_at or report.backtest_end_date  # open trades counted up to end
 
         if exit > entry:
             total_trade_duration += exit - entry
 
     backtest_duration = report.backtest_end_date - report.backtest_start_date
+
     if backtest_duration.total_seconds() == 0:
         return 0.0
 
@@ -44,7 +53,8 @@ def get_average_trade_duration(report: BacktestReport):
     if not trades:
         return 0.0
 
-    total_duration = timedelta(0)
+    total_duration = 0
+
     for trade in trades:
         trade_duration = trade.duration
 
@@ -52,7 +62,7 @@ def get_average_trade_duration(report: BacktestReport):
             total_duration += trade_duration
 
     average_trade_duration = total_duration / len(trades)
-    return average_trade_duration.total_seconds() / 3600.0  # Convert to hours
+    return average_trade_duration
 
 
 def get_trade_frequency(report: BacktestReport):

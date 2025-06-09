@@ -60,5 +60,5 @@ def get_cagr(report: BacktestReport) -> float:
     if num_days == 0 or start_value == 0:
         return 0.0
 
-    # CAGR formula
+    # Apply CAGR formula
     return (end_value / start_value) ** (365 / num_days) - 1

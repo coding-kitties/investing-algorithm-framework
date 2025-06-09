@@ -11,14 +11,21 @@ symmetrically distributed.
 | **1 to 2**        | ✅ Acceptable/Good — Reasonable performance for most portfolios       |
 | **2 to 3**        | 💪 Strong — Very good risk-adjusted returns                          |
 | **> 3**           | 🌟 Excellent — Rare, may indicate exceptional strategy or overfitting |
+
+Formula:
+Sortino Ratio = (Mean Daily Return × Periods Per Year - Risk-Free Rate) /
+               (Downside Standard Deviation of Daily Returns × sqrt(Periods Per Year))
+
 """
 
 from typing import Optional
 
+import math
+import numpy as np
 from investing_algorithm_framework.domain import BacktestReport
-from .cagr import get_cagr
+from .mean_daily_return import get_mean_daily_return
 from .risk_free_rate import get_risk_free_rate_us
-from .standard_deviation import get_standard_deviation_downside_returns
+from .standard_deviation import get_downside_std_of_daily_returns
 
 
 def get_sortino_ratio(
@@ -44,22 +51,24 @@ def get_sortino_ratio(
     Returns:
         float: The Sortino Ratio.
     """
-    annualized_return = get_cagr(report)
+    snapshots = report.get_snapshots()
 
-    # Convert annualized return to decimal
-    annualized_return = annualized_return / 100.0
-    standard_deviation_downside = \
-        get_standard_deviation_downside_returns(report)
+    if not snapshots:
+        return float('inf')
+
+    snapshots = sorted(snapshots, key=lambda s: s.created_at)
+    mean_daily_return = get_mean_daily_return(report)
+    std_downside_daily_return = get_downside_std_of_daily_returns(snapshots)
 
     if risk_free_rate is None:
         risk_free_rate = get_risk_free_rate_us()
 
-    if standard_deviation_downside == 0.0:
-        print("returning inf because standard deviation downside is 0")
-        return float("inf")
+    # Formula: Sharpe Ratio = (Mean Daily Return × Periods Per Year - Risk-Free Rate) /
+    # (Standard Deviation of Daily Returns × sqrt(Periods Per Year))
+    ratio = (mean_daily_return * 365 - risk_free_rate) / \
+              (std_downside_daily_return * math.sqrt(365))
 
-    if annualized_return == 0:
-        return 0
+    if np.float64("inf") == ratio or np.float64("-inf") == ratio:
+        return float('inf')
 
-    # Calculate sortino ratio
-    return (annualized_return - risk_free_rate) / standard_deviation_downside
+    return ratio if not np.isnan(ratio) else 0.0

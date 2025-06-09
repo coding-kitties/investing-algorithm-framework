@@ -53,6 +53,7 @@ class SQLOrderRepository(Repository):
                 query = query.filter_by(id=None)
 
         if external_id_query_param:
+            print("Filtering by external_id:", external_id_query_param)
             query = query.filter_by(external_id=external_id_query_param)
 
         if side_query_param:

@@ -9,6 +9,22 @@ Example of Non-Overlap:
 Strategy A: 90% win rate, but average win is $1, average loss is $10 → not profitable.
 
 Strategy B: 30% win rate, but average win is $300, average loss is $50 → highly profitable.
+
+| Win Rate          | Win/Loss Ratio | Comment                            |
+| ----------------- | -------------- | ---------------------------------- |
+| High (>60%)       | <1             | Can still be profitable            |
+| Moderate (40-60%) | \~1 or >1      | Ideal sweet spot                   |
+| Low (<40%)        | >1             | Possible if big wins offset losses |
+
+
+Practical Example:
+* Win rate 40% with win/loss ratio 2: Good — you win less often but your wins are twice as big.
+* Win rate 60% with win/loss ratio 0.7: Also good — you win often but your wins are smaller than losses.
+
+What’s “good”?
+* Typical win/loss ratio ranges from 0.5 to 3 depending on strategy style.
+* Many profitable traders target win/loss ratio between 1.5 and 2.5.
+* Very aggressive strategies might have a lower win rate but higher win/loss ratio.
 """
 
 from investing_algorithm_framework import BacktestReport, TradeStatus

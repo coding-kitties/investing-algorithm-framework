@@ -57,9 +57,7 @@ class TestGetSortinoRatio(unittest.TestCase):
         report.get_snapshots.return_value = snapshots
 
         ratio = get_sortino_ratio(report)
-
-        # With one downside return and std = 0, Sortino → inf
-        self.assertEqual(ratio, float('inf'))
+        self.assertEqual(ratio, 0.0)
 
     def test_constant_returns(self):
         now = datetime.now()
