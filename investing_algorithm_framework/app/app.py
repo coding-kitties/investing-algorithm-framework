@@ -426,7 +426,7 @@ class App:
         Returns:
             None
         """
-        strategy_orchestrator_service = None  # Predefine to avoid UnboundLocalError
+        strategy_orchestrator_service = None
 
         try:
             configuration_service = self.container.configuration_service()
