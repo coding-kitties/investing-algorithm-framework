@@ -426,6 +426,7 @@ class App:
         Returns:
             None
         """
+        strategy_orchestrator_service = None  # Predefine to avoid UnboundLocalError
 
         try:
             configuration_service = self.container.configuration_service()
@@ -466,6 +467,8 @@ class App:
                 data_sources=self._market_data_sources,
                 on_strategy_run_hooks=self._on_strategy_run_hooks,
             )
+            self.initialize_data_sources(algorithm)
+
             strategy_orchestrator_service = \
                 self.container.strategy_orchestrator_service()
             strategy_orchestrator_service.initialize(algorithm)
@@ -1154,6 +1157,8 @@ class App:
             None
         """
 
+        logger.info("Adding strategy")
+
         if inspect.isclass(strategy):
 
             if not issubclass(strategy, TradingStrategy):
@@ -1187,6 +1192,7 @@ class App:
             )
 
         if strategy.market_data_sources is not None:
+            logger.info("Adding market data sources from strategy")
             self.add_data_sources(strategy.market_data_sources)
 
         self._strategies.append(strategy)
