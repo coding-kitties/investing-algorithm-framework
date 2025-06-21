@@ -10,7 +10,7 @@
 > If you like what we do, consider starring, sharing and contributing!
 
 
-![Showcase](https://coding-kitties.github.io/investing-algorithm-framework/static/showcase.png)
+<img src="static/showcase.png" alt="Investing Algorithm Framework Logo"  height="750px">
 
 ## Sponsors
 
@@ -18,7 +18,7 @@
     <picture style="height: 30px;">
     <source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png">
     <source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png">
-    <img src="static/sponsors/finterion-light.svg" alt="Finterion Logo" width="200px" height="50px">
+    <img src="static/sponsors/finterion-light.png" alt="Finterion Logo" width="200px" height="50px">
     </picture>
 </a>
 
