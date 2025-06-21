@@ -40,7 +40,7 @@ class Order(BaseModel):
         order_fee=None,
         order_fee_currency=None,
         order_fee_rate=None,
-        id=None,
+        id=None
     ):
         if target_symbol is None:
             raise OperationalException("Target symbol is not specified")
@@ -77,10 +77,6 @@ class Order(BaseModel):
         self.position_id = position_id
         self.amount = amount
         self.filled = filled
-
-        if remaining is None:
-            remaining = self.get_amount() - self.get_filled()
-
         self.remaining = remaining
         self.fee = fee
         self._available_amount = self.filled
@@ -253,7 +249,6 @@ class Order(BaseModel):
             "order_fee_currency": self.order_fee_currency,
             "order_fee_rate": self.order_fee_rate,
             "order_fee": self.order_fee,
-            "position_id": self.position_id
         }
 
     @staticmethod
@@ -292,8 +287,7 @@ class Order(BaseModel):
             order_fee=data.get("order_fee", None),
             order_fee_currency=data.get("order_fee_currency", None),
             order_fee_rate=data.get("order_fee_rate", None),
-            id=data.get("id", None),
-            position_id=data.get("position_id", None),
+            id=data.get("id", None)
         )
         return order
 
@@ -356,7 +350,6 @@ class Order(BaseModel):
             remaining=self.get_remaining(),
             created_at=self.get_created_at(),
             updated_at=self.get_updated_at(),
-            position_id=self.position_id,
         )
 
     def get_size(self):
@@ -368,32 +361,3 @@ class Order(BaseModel):
         """
         return self.get_amount() * self.get_price() \
             if self.get_price() is not None else 0
-
-    @staticmethod
-    def get_column_names():
-        """
-        Get the columns of the order
-
-        Returns:
-            list: The columns of the order
-        """
-        return [
-            "id",
-            "external_id",
-            "target_symbol",
-            "trading_symbol",
-            "order_side",
-            "order_type",
-            "status",
-            "price",
-            "amount",
-            "created_at",
-            "updated_at",
-            "cost",
-            "filled",
-            "remaining",
-            "order_fee_currency",
-            "order_fee_rate",
-            "order_fee",
-            "position_id"
-        ]

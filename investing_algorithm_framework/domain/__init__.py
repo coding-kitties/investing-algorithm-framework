@@ -9,6 +9,7 @@ from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
     CCXT_DATETIME_FORMAT_WITH_TIMEZONE, RESERVED_BALANCES, \
     APP_MODE, DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT, \
     APPLICATION_DIRECTORY, SNAPSHOT_INTERVAL
+from .data_provider import DataProvider
 from .data_structures import PeekableQueue
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
 from .exceptions import OperationalException, ApiException, \
@@ -16,11 +17,13 @@ from .exceptions import OperationalException, ApiException, \
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, \
     PortfolioConfiguration, Portfolio, Position, Order, TradeStatus, \
-    BacktestReport, PortfolioSnapshot, StrategyProfile, \
+    BacktestResult, PortfolioSnapshot, StrategyProfile, \
     BacktestPosition, Trade, MarketCredential, PositionSnapshot, \
-    BacktestReportsEvaluation, AppMode, BacktestDateRange, DateRange, \
+    AppMode, BacktestDateRange, DateRange, \
     MarketDataType, TradeRiskType, TradeTakeProfit, TradeStopLoss, \
-    DataSource, Event, SnapshotInterval, TradeOrderAssociation, OrderMetadata
+    DataSource, Event, SnapshotInterval
+from .order_executor import OrderExecutor
+from .portfolio_provider import PortfolioProvider
 from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
     OHLCVMarketDataSource, BacktestMarketDataSource, MarketDataSource, \
     MarketService, MarketCredentialService, AbstractPortfolioSyncService, \
@@ -29,14 +32,9 @@ from .stateless_actions import StatelessActions
 from .strategy import Strategy
 from .utils import random_string, append_dict_as_row_to_csv, \
     add_column_headers_to_csv, get_total_amount_of_rows, \
-    load_backtest_report, convert_polars_to_pandas, random_number, \
-    csv_to_list, StoppableThread, pretty_print_backtest_reports_evaluation, \
-    pretty_print_backtest, load_csv_into_dict, load_backtest_reports, \
-    get_backtest_report, pretty_print_positions, pretty_print_trades, \
-    pretty_print_orders, is_timezone_aware, sync_timezones, get_timezone
-from .data_provider import DataProvider
-from .order_executor import OrderExecutor
-from .portfolio_provider import PortfolioProvider
+    convert_polars_to_pandas, random_number, \
+    csv_to_list, StoppableThread, load_csv_into_dict, \
+    is_timezone_aware, sync_timezones, get_timezone
 
 __all__ = [
     "OrderStatus",
@@ -78,8 +76,7 @@ __all__ = [
     "StatelessActions",
     "parse_decimal_to_string",
     "parse_string_to_decimal",
-    "BacktestReport",
-    "pretty_print_backtest",
+    "BacktestResult",
     "DATETIME_FORMAT_BACKTESTING",
     "BACKTESTING_FLAG",
     "BACKTESTING_INDEX_DATETIME",
@@ -106,10 +103,7 @@ __all__ = [
     "MarketCredentialService",
     "TradeStatus",
     "CCXT_DATETIME_FORMAT_WITH_TIMEZONE",
-    "pretty_print_backtest_reports_evaluation",
-    "BacktestReportsEvaluation",
     "load_csv_into_dict",
-    "load_backtest_reports",
     "SYMBOLS",
     "RESERVED_BALANCES",
     "AbstractPortfolioSyncService",
@@ -117,10 +111,8 @@ __all__ = [
     "AppMode",
     "RoundingService",
     "BacktestDateRange",
-    "load_backtest_report",
     "convert_polars_to_pandas",
     "DateRange",
-    "get_backtest_report",
     "DEFAULT_LOGGING_CONFIG",
     "DATABASE_DIRECTORY_NAME",
     "BACKTESTING_INITIAL_AMOUNT",
@@ -130,9 +122,6 @@ __all__ = [
     "TradeStopLoss",
     "StateHandler",
     "APPLICATION_DIRECTORY",
-    "pretty_print_positions",
-    "pretty_print_trades",
-    "pretty_print_orders",
     "DataProvider",
     "NetworkError",
     "DataSource",
@@ -147,6 +136,4 @@ __all__ = [
     "Event",
     "SNAPSHOT_INTERVAL",
     "SnapshotInterval",
-    "TradeOrderAssociation",
-    "OrderMetadata",
 ]

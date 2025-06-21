@@ -8,10 +8,20 @@ class TradeStopLoss(BaseModel):
     TradeStopLoss represents a stop loss strategy for a trade.
 
     Attributes:
-        trade_id: int - the ID of the trade this stop loss is associated with
-        trade_risk_type: TradeRiskType - the type of risk for the trade
-        percentage: float - the percentage for the stop loss
-        open_price: float - the price at which the trade was opened
+        trade: Trade - the trade that the take profit is for
+        take_profit: float - the take profit percentage
+        trade_risk_type: TradeRiskType - the type of trade risk, either
+            trailing or fixed
+        percentage: float - the stop loss percentage
+        sell_percentage: float - the percentage of the trade to sell when the
+            take profit is hit. Default is 100% of the trade. If the
+            take profit percentage is lower than 100% a check must
+            be made that the combined sell percentage of all
+            take profits is less or equal than 100%.
+        sell_amount: float - the amount to sell when the stop loss triggers
+        sold_amount: float - the amount that has been sold
+        high_water_mark: float - the highest price of the trade
+        stop_loss_price: float - the price at which the stop loss triggers
 
     if trade_risk_type is fixed, the stop loss price is calculated as follows:
         You buy a stock at $100.
@@ -42,55 +52,34 @@ class TradeStopLoss(BaseModel):
         trade_risk_type: TradeRiskType,
         percentage: float,
         open_price: float,
-        total_amount_trade: float = 0,
+        total_amount_trade: float = None,
         sell_percentage: float = 100,
         active: bool = True,
         sell_prices: str = None,
         sell_dates: str = None,
-        high_water_mark: float = None,
-        high_water_mark_date: str = None,
-        stop_loss_price: float = None,
         sell_amount: float = None,
-        sold_amount: float = 0,
-        id: int = None,
+        high_water_mark_date: str = None,
     ):
-        self.id = id
         self.trade_id = trade_id
         self.trade_risk_type = trade_risk_type
         self.percentage = percentage
         self.sell_percentage = sell_percentage
-
-        if high_water_mark is None:
-            high_water_mark = open_price
-
-        self.high_water_mark = high_water_mark
+        self.high_water_mark = open_price
         self.high_water_mark_date = high_water_mark_date
         self.open_price = open_price
+        self.stop_loss_price = self.high_water_mark * \
+            (1 - (self.percentage / 100))
 
-        if stop_loss_price is None:
-            self.stop_loss_price = self.high_water_mark * \
-                (1 - (self.percentage / 100))
-        else:
-            self.stop_loss_price = stop_loss_price
-
-        if sell_amount is None:
-            self.sell_amount = total_amount_trade * \
-                               (self.sell_percentage / 100)
-        else:
+        if sell_amount is not None:
             self.sell_amount = sell_amount
+        else:
+            self.sell_amount = total_amount_trade * \
+                (self.sell_percentage / 100)
 
-        if sold_amount is None:
-            sold_amount = 0
-
-        self.sold_amount = sold_amount
+        self.sold_amount = 0
         self.active = active
         self.sell_prices = sell_prices
         self.sell_dates = sell_dates
-
-        if total_amount_trade is None:
-            total_amount_trade = 0
-
-        self.total_amount_trade = total_amount_trade
 
     def update_with_last_reported_price(self, current_price: float, date):
         """
@@ -231,7 +220,7 @@ class TradeStopLoss(BaseModel):
     def to_dict(self, datetime_format=None):
         return {
             "trade_id": self.trade_id,
-            "trade_risk_type": self.trade_risk_type,
+            "trade_risk_type": self.trade_risk_type.value,
             "percentage": self.percentage,
             "open_price": self.open_price,
             "sell_percentage": self.sell_percentage,
@@ -242,6 +231,22 @@ class TradeStopLoss(BaseModel):
             "active": self.active,
             "sell_prices": self.sell_prices
         }
+
+    @staticmethod
+    def from_dict(data: dict):
+        return TradeStopLoss(
+            trade_id=data.get("trade_id"),
+            trade_risk_type=TradeRiskType.from_string(data.get("trade_risk_type")),
+            percentage=data.get("percentage"),
+            open_price=data.get("open_price"),
+            total_amount_trade=data.get("sell_amount", 0) / (data.get("sell_percentage", 100) / 100),
+            sell_percentage=data.get("sell_percentage", 100),
+            active=data.get("active", True),
+            sell_prices=data.get("sell_prices"),
+            sell_dates=data.get("sell_dates"),
+            sell_amount=data.get("sell_amount"),
+            high_water_mark_date=data.get("high_water_mark_date")
+        )
 
     def __repr__(self):
         return self.repr(
@@ -257,25 +262,3 @@ class TradeStopLoss(BaseModel):
             sell_prices=self.sell_prices,
             active=self.active
         )
-
-    @staticmethod
-    def get_column_names():
-        """
-        Returns the column names of the model.
-        This method should be overridden by subclasses to
-        provide specific column names.
-        """
-        return [
-            "id",
-            "trade_id",
-            "trade_risk_type",
-            "percentage",
-            "open_price",
-            "sell_percentage",
-            "high_water_mark",
-            "stop_loss_price",
-            "sell_amount",
-            "sold_amount",
-            "active",
-            "sell_prices"
-        ]

@@ -29,14 +29,3 @@ class BaseModel:
         instance = BaseModel()
         instance.update(data)
         return instance
-
-    @staticmethod
-    def get_column_names():
-        """
-        Returns the column names of the model.
-        This method should be overridden by subclasses to
-        provide specific column names.
-        """
-        raise NotImplementedError(
-            "Subclasses must implement get_column_names method."
-        )

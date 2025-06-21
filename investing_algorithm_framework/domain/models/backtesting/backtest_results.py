@@ -22,7 +22,7 @@ logger = getLogger(__name__)
 
 
 @dataclass
-class BacktestResults(BaseModel):
+class BacktestResult(BaseModel):
     """
     Class that represents a backtest result. The backtest result
     contains information about the trades, positions, portfolio and
@@ -114,8 +114,8 @@ class BacktestResults(BaseModel):
 
         self.backtest_start_date = self.backtest_date_range.start_date
         self.backtest_end_date = self.backtest_date_range.end_date
-        self.growth = self.position_snapshots[-1].total_value \
-          - self.position_snapshots[0].total_value
+        self.growth = self.portfolio_snapshots[-1].total_value \
+          - self.portfolio_snapshots[0].total_value
         self.growth_percentage = self.growth / self.initial_unallocated * 100.0
         self.number_of_orders = \
             len(self.orders) if self.orders is not None else 0
@@ -128,7 +128,7 @@ class BacktestResults(BaseModel):
         average_trade_size = 0.0
         number_of_trades_closed = 0
         number_of_trades_open = 0
-        duration = 0 # In hours
+        total_duration = 0 # In hours
         total_trade_size = 0.0
 
 
@@ -136,22 +136,20 @@ class BacktestResults(BaseModel):
             for trade in self.trades:
                 self.total_net_gain += trade.net_gain
                 self.total_cost += trade.cost
-                average_trade_duration += \
-                    (trade.opened_at - trade.closed_at).hours
-                average_trade_size += trade.get_size()
+                total_duration += \
+                    ((trade.opened_at - trade.closed_at).total_seconds() /
+                     3600) if trade.closed_at else 0
+                total_trade_size += trade.size
                 if trade.status == TradeStatus.CLOSED.value:
                     number_of_trades_closed += 1
 
                 if trade.status == TradeStatus.OPEN.value:
                     number_of_trades_open += 1
 
-                if trade.get_profit() > 0:
+                if trade.net_gain > 0:
                     number_of_positive_trades += 1
-                elif trade.get_profit() < 0:
+                elif trade.net_gain < 0:
                     number_of_negative_trades += 1
-
-                duration += trade.get_duration_in_hours()
-                total_trade_size += trade.get_size()
 
             self.total_net_gain_percentage = \
                 (self.total_net_gain / self.initial_unallocated) * 100.0
@@ -163,7 +161,7 @@ class BacktestResults(BaseModel):
             self.number_of_trades_open = number_of_trades_open
             self.number_of_trades = len(self.trades)
             self.average_trade_duration = \
-                average_trade_duration / self.number_of_trades
+                total_duration / self.number_of_trades
             self.average_trade_size = total_trade_size / self.number_of_trades
 
     def to_dict(self):
@@ -201,7 +199,7 @@ class BacktestResults(BaseModel):
             "total_value": self.total_value,
             "average_trade_duration": self.average_trade_duration,
             "average_trade_size": self.average_trade_size,
-            "positions": [position.to_dict() for position in self.positions],
+            # "positions": [position.to_dict() for position in self.positions],
             "trades": [
                 trade.to_dict(datetime_format=DATETIME_FORMAT)
                 for trade in self.trades
@@ -229,8 +227,50 @@ class BacktestResults(BaseModel):
             end_date=datetime.strptime(
                 data["backtest_end_date"], DATETIME_FORMAT)
         )
+        portfolio_snapshots_data = data.get("portfolio_snapshots", None)
 
-        report = BacktestResults(
+        if portfolio_snapshots_data is None:
+            portfolio_snapshots = []
+        else:
+            portfolio_snapshots = [
+                PortfolioSnapshot.from_dict(snapshot)
+                for snapshot in portfolio_snapshots_data
+            ]
+
+        positions_data = data["positions"]
+
+        if positions_data is not None:
+            positions = [
+                Position.from_dict(position) for position in positions_data
+            ]
+        else:
+            positions = []
+
+        position_snapshots_data = data.get("position_snapshots", None)
+
+        if position_snapshots_data is None:
+            position_snapshots = []
+        else:
+            position_snapshots = [
+                PositionSnapshot.from_dict(snapshot)
+                for snapshot in position_snapshots_data
+            ]
+
+        trades_data = data.get("trades", None)
+
+        if trades_data is not None:
+            trades = [Trade.from_dict(trade) for trade in trades_data]
+        else:
+            trades = []
+
+        orders_data = data.get("orders", None)
+
+        if orders_data is not None:
+            orders = [Order.from_dict(order) for order in orders_data]
+        else:
+            orders = []
+
+        report = BacktestResult(
             name=data["name"],
             number_of_runs=data["number_of_runs"],
             backtest_date_range=backtest_date_range,
@@ -251,32 +291,22 @@ class BacktestResults(BaseModel):
             total_value=float(data["total_value"]),
             average_trade_duration=data["average_trade_duration"],
             average_trade_size=float(data["average_trade_size"]),
+            created_at=datetime.strptime(
+                data["created_at"], DATETIME_FORMAT
+            ),
+            backtest_start_date=datetime.strptime(
+                data["backtest_start_date"], DATETIME_FORMAT
+            ),
+            backtest_end_date=datetime.strptime(
+                data["backtest_end_date"], DATETIME_FORMAT
+            ),
+            number_of_days=data["number_of_days"],
+            portfolio_snapshots=portfolio_snapshots,
+            position_snapshots=position_snapshots,
+            trades=trades,
+            orders=orders,
+            positions=positions,
         )
-
-        positions = data["positions"]
-
-        if positions is not None:
-            report.positions = [
-                Position.from_dict(position) for position in positions
-            ]
-
-        trades = data.get("trades", None)
-
-        if trades is not None:
-            report.trades = [Trade.from_dict(trade) for trade in trades]
-
-        orders = data.get("orders", None)
-
-        if orders is not None:
-            report.orders = [Order.from_dict(order) for order in orders]
-
-        portfolio_snapshots = data.get("portfolio_snapshots", None)
-
-        if portfolio_snapshots is not None:
-            report.set_portfolio_snapshots(
-                [PortfolioSnapshot.from_dict(snapshot)
-                 for snapshot in portfolio_snapshots]
-            )
 
         return report
 

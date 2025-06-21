@@ -4,6 +4,7 @@ import os
 import threading
 from time import sleep
 from typing import List, Optional, Any
+from datetime import timedelta
 
 from flask import Flask
 
@@ -16,8 +17,8 @@ from investing_algorithm_framework.app.web import create_flask_app
 from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
     SQLALCHEMY_DATABASE_URI, OperationalException, StateHandler, \
-    BACKTESTING_START_DATE, BACKTESTING_END_DATE, BacktestReport, \
-    APP_MODE, MarketCredential, AppMode, BacktestDateRange, \
+    BACKTESTING_START_DATE, BACKTESTING_END_DATE, APP_MODE, MarketCredential, \
+    AppMode, BacktestDateRange, \
     DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, \
     MarketDataSource, PortfolioConfiguration, SnapshotInterval, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured
@@ -26,6 +27,8 @@ from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
 from investing_algorithm_framework.services import OrderBacktestService, \
     BacktestMarketDataSourceService, BacktestPortfolioService
 from .app_hook import AppHook
+from .reporting import BacktestReport
+from investing_algorithm_framework.domain.models.backtesting.backtest_results import BacktestResult
 
 logger = logging.getLogger("investing_algorithm_framework")
 COLOR_RESET = '\033[0m'
@@ -1566,4 +1569,42 @@ class App:
             tasks=self._tasks,
             data_sources=self._market_data_sources,
             on_strategy_run_hooks=self._on_strategy_run_hooks,
+        )
+
+    def run_backtest(self, backtest_date_range, algorithm, snapshot_interval):
+        """
+        Run a backtest for the given date range and algorithm.
+
+        Args:
+            backtest_date_range (BacktestDateRange): The date range for the backtest.
+            algorithm (Algorithm): The algorithm to use for the backtest.
+            snapshot_interval (str): The interval for portfolio snapshots.
+
+        Returns:
+            BacktestResult: The result of the backtest.
+        """
+        current_date = backtest_date_range.start_date
+        end_date = backtest_date_range.end_date
+        last_snapshot_date = None
+
+        while current_date <= end_date:
+            # Run the algorithm for the current date
+            algorithm.run(current_date)
+
+            # Check if a snapshot should be created
+            if snapshot_interval == "daily":
+                if last_snapshot_date is None or current_date.date() > last_snapshot_date.date():
+                    self.container.portfolio_snapshot_service().create_snapshot(
+                        portfolio=self.container.portfolio_service().get_default_portfolio(),
+                        created_at=current_date
+                    )
+                    last_snapshot_date = current_date
+
+            # Increment the current date
+            current_date += timedelta(days=1)
+
+        return BacktestResult(
+            backtest_date_range=backtest_date_range,
+            algorithm=algorithm,
+            snapshot_interval=snapshot_interval
         )

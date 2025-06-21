@@ -1,8 +1,8 @@
 import numpy as np
 import pandas as pd
-from investing_algorithm_framework.domain import BacktestReport
 
-def get_standard_deviation_downside_returns(report: BacktestReport):
+
+def get_standard_deviation_downside_returns(snapshots):
     """
     Calculate the standard deviation of downside returns from the net size
     of the reports.
@@ -13,7 +13,6 @@ def get_standard_deviation_downside_returns(report: BacktestReport):
     Returns:
         float: The standard deviation of downside returns.
     """
-    snapshots = report.get_snapshots()
 
     if len(snapshots) < 2:
         return 0.0  # Not enough data
@@ -47,7 +46,7 @@ def get_standard_deviation_downside_returns(report: BacktestReport):
     return downside_std
 
 
-def get_standard_deviation_returns(report: BacktestReport):
+def get_standard_deviation_returns(snapshots):
     """
     Calculate the standard deviation of returns from the net size
     of the reports.
@@ -58,7 +57,6 @@ def get_standard_deviation_returns(report: BacktestReport):
     Returns:
         float: The standard deviation of downside returns.
     """
-    snapshots = report.get_snapshots()
 
     if len(snapshots) < 2:
         return 0.0  # Not enough data

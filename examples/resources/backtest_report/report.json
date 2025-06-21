@@ -19,7 +19,7 @@
     "number_of_trades_closed": 133,
     "number_of_trades_open": 3,
     "total_cost": 27200.0,
-    "growth_rate": 38.740190509613605,
+    "growth_percentage": 38.740190509613605,
     "growth": 387.40190509613603,
     "initial_unallocated": 1000.0,
     "trading_symbol": "EUR",

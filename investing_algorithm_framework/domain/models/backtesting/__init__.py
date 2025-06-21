@@ -1,11 +1,9 @@
 from .backtest_position import BacktestPosition
-from .backtest_report import BacktestReport
-from .backtest_reports_evaluation import BacktestReportsEvaluation
+from .backtest_results import BacktestResult
 from .backtest_date_range import BacktestDateRange
 
 __all__ = [
-    "BacktestReport",
+    "BacktestResult",
     "BacktestPosition",
-    "BacktestReportsEvaluation",
     "BacktestDateRange"
 ]

@@ -9,6 +9,9 @@
 
 > If you like what we do, consider starring, sharing and contributing!
 
+
+![Showcase](https://coding-kitties.github.io/investing-algorithm-framework/static/showcase.png)
+
 ## Sponsors
 
 <a href="https://www.finterion.com/" target="_blank">

@@ -4,6 +4,7 @@ from enum import Enum
 class SnapshotInterval(Enum):
     TRADE_CLOSE = "TRADE_CLOSE"
     STRATEGY_ITERATION = "STRATEGY_ITERATION"
+    DAILY = "DAILY"
 
     @staticmethod
     def from_string(value: str):

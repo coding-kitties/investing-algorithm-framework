@@ -1,23 +1,22 @@
 from datetime import datetime
-from investing_algorithm_framework.domain import BacktestReport
+from typing import List
+from investing_algorithm_framework.domain import PortfolioSnapshot
 
 
 def get_equity_curve(
-    backtest_report: BacktestReport
+    snapshots: List[PortfolioSnapshot]
 ) -> list[tuple[datetime, float]]:
     """
     Calculate the total size of the portfolio at each snapshot timestamp.
 
     Args:
-        backtest_report (BacktestReport): The backtest report
-            containing history of the portfolio.
-
+        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
     Returns:
         list[tuple[datetime, float]]: A list of tuples with
             timestamps and total sizes.
     """
     series = []
-    for snapshot in backtest_report.get_snapshots():
+    for snapshot in snapshots:
         timestamp = snapshot.created_at
         total_size = snapshot.total_value
         series.append((timestamp, total_size))

@@ -44,18 +44,21 @@ When do we use actual returns vs CAGR?
 
 """
 
-from typing import Optional
+from typing import Optional, List, Tuple
 
 import math
+import pandas as pd
+import numpy as np
+from datetime import datetime, timedelta
 
-from investing_algorithm_framework.domain.models import BacktestReport
+from investing_algorithm_framework.domain import PortfolioSnapshot
 from .mean_daily_return import get_mean_daily_return
 from .risk_free_rate import get_risk_free_rate_us
 from .standard_deviation import get_daily_returns_std
 
 
 def get_sharpe_ratio(
-    backtest_report: BacktestReport, risk_free_rate: Optional[float] = None,
+    snapshots: List[PortfolioSnapshot], risk_free_rate: Optional[float] = None,
 ) -> float:
     """
     Calculate the Sharpe Ratio from a backtest report using daily or
@@ -65,17 +68,15 @@ def get_sharpe_ratio(
         (Annualized Return - Risk-Free Rate) / Annualized Std Dev of Returns
 
     Args:
-        backtest_report: Object with get_trades(trade_status=...) and
-            `number_of_days` attributes.
+        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots
         risk_free_rate (float, optional): Annual risk-free rate as a
             decimal (e.g., 0.047 for 4.7%).
 
     Returns:
         float: The Sharpe Ratio.
     """
-    snapshots = backtest_report.get_snapshots()
     snapshots = sorted(snapshots, key=lambda s: s.created_at)
-    mean_daily_return = get_mean_daily_return(backtest_report)
+    mean_daily_return = get_mean_daily_return(snapshots)
     std_daily_return = get_daily_returns_std(snapshots)
 
     if risk_free_rate is None:
@@ -85,3 +86,56 @@ def get_sharpe_ratio(
     # (Standard Deviation of Daily Returns × sqrt(Periods Per Year))
     return (mean_daily_return * 365 - risk_free_rate) / \
               (std_daily_return * math.sqrt(365))
+
+
+def get_rolling_sharpe_ratio(
+    snapshots: List[PortfolioSnapshot], risk_free_rate: Optional[float] = None
+) -> List[Tuple[float, datetime]]:
+    """
+    Calculate the rolling Sharpe Ratio over a 365-day window.
+
+    Args:
+        snapshots (List[PortfolioSnapshot]): Time-sorted list of snapshots.
+        risk_free_rate (float, optional): Annualized risk-free rate (e.g., 0.03 for 3%).
+
+    Returns:
+        List[Tuple[float, datetime]]: List of (sharpe_ratio, snapshot_date).
+    """
+    if risk_free_rate is None:
+        risk_free_rate = get_risk_free_rate_us()
+
+    data = [(s.created_at, s.total_value) for s in snapshots]
+    df = pd.DataFrame(data, columns=["created_at", "total_value"])
+    df['created_at'] = pd.to_datetime(df['created_at'])
+    df = df.sort_values('created_at').drop_duplicates('created_at')\
+        .set_index('created_at')
+
+    # Resample to daily frequency using last value of the day
+    daily_df = df.resample('1D').last().dropna()
+
+    # Returns as percentage change
+    returns_s = daily_df['total_value'].pct_change().dropna()
+
+    # Rolling Annualised Sharpe
+    rolling = returns_s.rolling(window=365)
+    rolling_sharpe_s = np.sqrt(365) * (
+        rolling.mean() / rolling.std()
+    )
+
+    # Ensure chronological order
+    snapshots = sorted(snapshots, key=lambda s: s.created_at)
+
+    result = []
+    for date, sharpe in rolling_sharpe_s.items():
+
+        if pd.isna(sharpe):
+            result.append((sharpe, date))
+            continue
+
+        # Find the corresponding snapshot
+        snapshot = next((s for s in snapshots if s.created_at == date), None)
+
+        if snapshot:
+            result.append((sharpe, snapshot.created_at))
+
+    return result

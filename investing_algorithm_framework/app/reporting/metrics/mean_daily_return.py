@@ -4,7 +4,7 @@ import numpy as np
 from .cagr import get_cagr
 
 
-def get_mean_daily_return(report):
+def get_mean_daily_return(snapshots):
     """
     Calculate the mean daily return from the total value of the snapshots.
 
@@ -17,12 +17,11 @@ def get_mean_daily_return(report):
     calculate the mean daily return.
 
     Args:
-        report (BacktestReport): The report containing the equity curve.
+        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots
 
     Returns:
         float: The mean daily return.
     """
-    snapshots = report.get_snapshots()
 
     if len(snapshots) < 2:
         return 0.0  # Not enough data

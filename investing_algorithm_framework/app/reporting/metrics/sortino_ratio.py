@@ -22,14 +22,15 @@ from typing import Optional
 
 import math
 import numpy as np
-from investing_algorithm_framework.domain import BacktestReport
+from typing import List
+from investing_algorithm_framework.domain import PortfolioSnapshot
 from .mean_daily_return import get_mean_daily_return
 from .risk_free_rate import get_risk_free_rate_us
 from .standard_deviation import get_downside_std_of_daily_returns
 
 
 def get_sortino_ratio(
-    report: BacktestReport, risk_free_rate: Optional[float] = None,
+    snapshots: List[PortfolioSnapshot], risk_free_rate: Optional[float] = None,
 ) -> float:
     """
     Calculate the Sortino Ratio for a given report.
@@ -43,21 +44,21 @@ def get_sortino_ratio(
         - Downside Standard Deviation is the standard deviation of negative returns
 
     Args:
-        report (BacktestReport): The backtest report containing snapshots.
-        region (str): Region used to fetch risk-free rate (e.g. 'us').
-        risk_free_rate (float): Override for risk-free rate. If None, fetch from data source.
-        frequency (str): Frequency to calculate returns: 'daily' or 'weekly'.
+        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots
+            from the backtest report.
+        risk_free_rate (float, optional): Annual risk-free rate as a decimal
+            (e.g., 0.047 for 4.7%). If not provided, defaults to the US risk-free
+            rate.
 
     Returns:
         float: The Sortino Ratio.
     """
-    snapshots = report.get_snapshots()
+    snapshots = sorted(snapshots, key=lambda s: s.created_at)
 
     if not snapshots:
         return float('inf')
 
-    snapshots = sorted(snapshots, key=lambda s: s.created_at)
-    mean_daily_return = get_mean_daily_return(report)
+    mean_daily_return = get_mean_daily_return(snapshots)
     std_downside_daily_return = get_downside_std_of_daily_returns(snapshots)
 
     if risk_free_rate is None:
@@ -66,7 +67,7 @@ def get_sortino_ratio(
     # Formula: Sharpe Ratio = (Mean Daily Return × Periods Per Year - Risk-Free Rate) /
     # (Standard Deviation of Daily Returns × sqrt(Periods Per Year))
     ratio = (mean_daily_return * 365 - risk_free_rate) / \
-              (std_downside_daily_return * math.sqrt(365))
+        (std_downside_daily_return * math.sqrt(365))
 
     if np.float64("inf") == ratio or np.float64("-inf") == ratio:
         return float('inf')

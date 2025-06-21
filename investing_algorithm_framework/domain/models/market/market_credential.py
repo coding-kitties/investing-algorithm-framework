@@ -1,7 +1,8 @@
 import os
 import logging
 
-from investing_algorithm_framework.domain import OperationalException
+from investing_algorithm_framework.domain.exceptions import \
+    OperationalException
 
 logger = logging.getLogger("investing_algorithm_framework")
 

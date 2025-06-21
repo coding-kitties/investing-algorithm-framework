@@ -8,13 +8,11 @@ class Position(BaseModel):
 
     def __init__(
         self,
-        id=None,
         symbol=None,
         amount=0,
         cost=0,
         portfolio_id=None
     ):
-        self.id = id
         self.symbol = symbol
         self.amount = amount
         self.cost = cost
@@ -59,13 +57,3 @@ class Position(BaseModel):
             cost=self.cost,
             portfolio_id=self.portfolio_id,
         )
-
-    @staticmethod
-    def get_column_names():
-        """
-        Get the column names for the position model.
-
-        Returns:
-            List[str]: A list of column names.
-        """
-        return ["id", "symbol", "amount", "cost", "portfolio_id"]

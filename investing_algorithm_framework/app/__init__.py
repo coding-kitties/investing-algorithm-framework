@@ -5,6 +5,8 @@ from investing_algorithm_framework.app.task import Task
 from investing_algorithm_framework.app.web import create_flask_app
 from .algorithm import Algorithm
 from .context import Context
+from .reporting import generate_report, add_html_report, add_metrics, \
+    BacktestReport, pretty_print_backtest, BacktestReportsEvaluation
 
 
 __all__ = [
@@ -16,4 +18,10 @@ __all__ = [
     "Task",
     "AppHook",
     "Context",
+    "generate_report",
+    "add_html_report",
+    "add_metrics",
+    "BacktestReport",
+    "pretty_print_backtest",
+    "BacktestReportsEvaluation"
 ]

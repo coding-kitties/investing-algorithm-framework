@@ -96,7 +96,6 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         closed_at=None,
         updated_at=None,
         net_gain=0,
-        open_price=None,
         cost=0,
         last_reported_price=None,
         last_reported_price_datetime=None,
@@ -107,7 +106,7 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         take_profits=[],
     ):
         self.orders = [buy_order]
-        self.open_price = open_price
+        self.open_price = buy_order.price
         self.target_symbol = target_symbol
         self.trading_symbol = trading_symbol
         self.closed_at = closed_at

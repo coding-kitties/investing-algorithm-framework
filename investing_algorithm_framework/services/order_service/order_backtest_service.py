@@ -60,21 +60,12 @@ class OrderBacktestService(OrderService):
             .create(data, execute, validate, sync)
 
     def execute_order(self, order, portfolio):
-        # update_data = {
-        #     "status": OrderStatus.OPEN.value,
-        #     "remaining": order.get_amount(),
-        #     "filled": 0,
-        #     "updated_at": self.configuration_service.config[
-        #         BACKTESTING_INDEX_DATETIME
-        #     ]
-        # }
         order.status = OrderStatus.OPEN.value
         order.remaining = order.get_amount()
         order.filled = 0
         order.updated_at = self.configuration_service.config[
             BACKTESTING_INDEX_DATETIME
         ]
-        # order = self.repository.update(order.id, update_data)
         return order
 
     def check_pending_orders(self, market_data):

@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Aluminium Smelting Strategy Report</title>
+    <style>
+        body {{ '{' }}
+            font-family: Arial, sans-serif;
+            margin: 40px;
+        {{ '}' }}
+        h1 {{ '{' }}
+            color: #333;
+            text-align: center;
+        {{ '}' }}
+        .tab {{ '{' }}
+            overflow: hidden;
+            border-bottom: 1px solid #ccc;
+            margin-bottom: 20px;
+        {{ '}' }}
+        .tab button {{ '{' }}
+            background-color: #f1f1f1;
+            float: left;
+            border: none;
+            outline: none;
+            cursor: pointer;
+            padding: 10px 20px;
+            transition: 0.3s;
+            font-size: 17px;
+        {{ '}' }}
+        .tab button:hover {{ '{' }}
+            background-color: #ddd;
+        {{ '}' }}
+        .tab button.active {{ '{' }}
+            background-color: #ccc;
+        {{ '}' }}
+        .tabcontent {{ '{' }}
+            display: none;
+        {{ '}' }}
+        .tabcontent.active {{ '{' }}
+            display: block;
+        {{ '}' }}
+        .stats-table, .metrics-table {{ '{' }}
+            border-collapse: collapse;
+            width: 50%;
+            margin-top: 20px;
+        {{ '}' }}
+        .stats-table th, .stats-table td {{ '{' }}
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        {{ '}' }}
+        .stats-table th {{ '{' }}
+            background-color: #f2f2f2;
+        {{ '}' }}
+        .grid-container {{ '{' }}
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+            margin-top: 20px;
+        {{ '}' }}
+        .heatmap-cell {{ '{' }}
+            padding: 5px;
+            width: 60%;
+        {{ '}' }}
+        .yearly-returns-cell {{ '{' }}
+            padding: 5px;
+            width: 30%;
+        {{ '}' }}
+        .metrics-table {{ '{' }}
+            padding: 5px;
+        {{ '}' }}
+    </style>
+    <script>
+        function openTab(evt, tabName) {{ '{' }}
+            var i, tabcontent, tablinks;
+            tabcontent = document.getElementsByClassName("tabcontent");
+            for (i = 0; i < tabcontent.length; i++) {{ '{' }}
+                tabcontent[i].classList.remove("active");
+            {{ '}' }}
+            tablinks = document.getElementsByClassName("tablink");
+            for (i = 0; i < tablinks.length; i++) {{ '{' }}
+                tablinks[i].classList.remove("active");
+            {{ '}' }}
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
+        {{ '}' }}
+    </script>
+
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css"/>
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+</head>
+<body>
+    <h1>Backtest report: {{ report.name }}</h1>
+
+    <div class="tab">
+        <button class="tablink active" onclick="openTab(event, 'Overview')">Overview</button>
+        <button class="tablink" onclick="openTab(event, 'Trades')">Trades</button>
+        <button class="tablink" onclick="openTab(event, 'Positions and orders')">Positions and Orders</button>
+    </div>
+
+    <div id="Overview" class="tabcontent active">
+        <div>
+            {{ equity_with_drawdown_plot_html | safe }}
+        </div>
+        <div>
+            {{ rolling_sharpe_ratio_plot_html | safe }}
+        </div>
+        <div class="grid-container">
+            <div class="heatmap-cell">
+                {{ monthly_returns_heatmap_html | safe }}
+            </div>
+            <div class="yearly-returns-cell">
+                {{ yearly_returns_histogram_html | safe }}
+            </div>
+        </div>
+        <div class="grid-container">
+            <div class="metrics-table">
+                <h2>Performance Metrics</h2>
+                {{ key_metrics_table_html | safe }}
+                <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+                <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+                <script>
+                    $(document).ready(function() {
+                        $('.stats-table').DataTable({
+                            paging: true,
+                            pageLength: 10,
+                            searching: true, // Enable search box
+                        });
+                    });
+                </script>
+            </div>
+            <div class="metrics-table">
+                <h2>Time Metrics</h2>
+                {{ time_metrics_table_html | safe }}
+            </div>
+            <div class="metrics-table">
+                <h2>Trade Metrics</h2>
+                {{ trades_metrics_table_html | safe }}
+            </div>
+        </div>
+    </div>
+
+    <div id="Trades" class="tabcontent">
+        {{ trades_table_html | safe }}
+        {% raw %}
+        <script>
+        $(document).ready(function() {
+            $('.stats-table').DataTable({
+                paging: true,
+                pageLength: 10,
+                searching: true
+            });
+        });
+        </script>
+        {% endraw %}
+    </div>
+</body>
+</html>

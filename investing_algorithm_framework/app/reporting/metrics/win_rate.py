@@ -27,10 +27,11 @@ What’s “good”?
 * Very aggressive strategies might have a lower win rate but higher win/loss ratio.
 """
 
-from investing_algorithm_framework import BacktestReport, TradeStatus
+from typing import List
+from investing_algorithm_framework.domain import TradeStatus, Trade
 
 
-def get_win_rate(backtest_report: BacktestReport) -> float:
+def get_win_rate(trades: List[Trade]) -> float:
     """
     Calculate the win rate of the portfolio based on the backtest report.
 
@@ -43,16 +44,24 @@ def get_win_rate(backtest_report: BacktestReport) -> float:
     Example: If 60 out of 100 trades are profitable, the win rate is 60%.
 
     Args:
-        backtest_report (BacktestReport): The backtest report containing
-                                          trade history.
+        trades (List[Trade]): List of trades from the backtest report.
 
     Returns:
         float: The win rate as a percentage (e.g., 75.0 for 75% win rate).
     """
-    return backtest_report.percentage_positive_trades
+    trades = [
+        trade for trade in trades if TradeStatus.CLOSED.equals(trade.status)
+    ]
+    positive_trades = sum(1 for trade in trades if trade.net_gain > 0)
+    total_trades = len(trades)
+
+    if total_trades == 0:
+        return 0.0
+
+    return (positive_trades / total_trades) * 100.0
 
 
-def get_win_loss_ratio(backtest_report: BacktestReport) -> float:
+def get_win_loss_ratio(trades: List[Trade]) -> float:
     """
     Calculate the win/loss ratio of the portfolio based on the backtest report.
 
@@ -67,13 +76,14 @@ def get_win_loss_ratio(backtest_report: BacktestReport) -> float:
             average loss of losing trades is $100, the win/loss ratio is 2.0.
 
     Args:
-        backtest_report (BacktestReport): The backtest report containing
-                                          trade history.
+        trades (List[Trade]): List of trades from the backtest report.
 
     Returns:
         float: The win/loss ratio.
     """
-    trades = backtest_report.get_trades(trade_status=TradeStatus.CLOSED)
+    trades = [
+        trade for trade in trades if TradeStatus.CLOSED.equals(trade.status)
+    ]
 
     if not trades:
         return 0.0

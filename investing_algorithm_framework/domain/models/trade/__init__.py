@@ -3,7 +3,6 @@ from .trade_status import TradeStatus
 from .trade_stop_loss import TradeStopLoss
 from .trade_take_profit import TradeTakeProfit
 from .trade_risk_type import TradeRiskType
-from .trade_order_association import TradeOrderAssociation
 
 __all__ = [
     "Trade",
@@ -11,5 +10,4 @@ __all__ = [
     "TradeStopLoss",
     "TradeTakeProfit",
     "TradeRiskType",
-    "TradeOrderAssociation"
 ]

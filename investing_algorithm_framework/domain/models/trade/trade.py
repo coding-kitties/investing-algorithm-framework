@@ -48,19 +48,19 @@ class Trade(BaseModel):
     def __init__(
         self,
         id,
+        orders,
         target_symbol,
         trading_symbol,
+        closed_at,
         opened_at,
         open_price,
         amount,
+        available_amount,
+        cost,
+        remaining,
+        filled_amount,
         status,
-        remaining=0,
-        available_amount=0,
-        filled_amount=0,
-        closed_at=None,
         net_gain=0,
-        cost=0,  # TODO: Remove this as part of the refactor
-        orders=None, # TODO: Remove this as part of the refactor
         last_reported_price=None,
         last_reported_price_datetime=None,
         high_water_mark=None,
@@ -86,7 +86,7 @@ class Trade(BaseModel):
         self.last_reported_price_datetime = last_reported_price_datetime
         self.high_water_mark = high_water_mark
         self.high_water_mark_datetime = high_water_mark_datetime
-        self.status = TradeStatus.from_value(status).value
+        self.status = status
         self.updated_at = updated_at
         self.stop_losses = stop_losses
         self.take_profits = take_profits
@@ -113,18 +113,14 @@ class Trade(BaseModel):
 
             if self.high_water_mark is None:
                 self.high_water_mark = data["last_reported_price"]
-
-                if "last_reported_price_datetime" in data:
-                    self.high_water_mark_datetime = \
-                        data["last_reported_price_datetime"]
+                self.high_water_mark_datetime = \
+                    data["last_reported_price_datetime"]
             else:
 
                 if data["last_reported_price"] > self.high_water_mark:
                     self.high_water_mark = data["last_reported_price"]
-
-                    if "last_reported_price_datetime" in data:
-                        self.high_water_mark_datetime = \
-                            data["last_reported_price_datetime"]
+                    self.high_water_mark_datetime = \
+                        data["last_reported_price_datetime"]
 
         return super().update(data)
 
@@ -247,84 +243,6 @@ class Trade(BaseModel):
         gain += self.net_gain
         return (gain / cost) * 100
 
-    def is_stop_loss_triggered(self):
-
-        if self.stop_loss_percentage is None:
-            return False
-
-        if self.last_reported_price is None:
-            return False
-
-        if self.open_price is None:
-            return False
-
-        stop_loss_price = self.open_price * \
-            (1 - (self.stop_loss_percentage / 100))
-
-        return self.last_reported_price <= stop_loss_price
-
-    def is_trailing_stop_loss_triggered(self):
-
-        if self.trailing_stop_loss_percentage is None:
-            return False
-
-        if self.last_reported_price is None:
-            return False
-
-        if self.high_water_mark is None:
-
-            if self.open_price is not None:
-                self.high_water_mark = self.open_price
-            else:
-                return False
-
-        stop_loss_price = self.high_water_mark * \
-            (1 - (self.trailing_stop_loss_percentage / 100))
-
-        return self.last_reported_price <= stop_loss_price
-
-    def is_take_profit_triggered(self):
-
-        if self.take_profit_percentage is None:
-            return False
-
-        if self.last_reported_price is None:
-            return False
-
-        if self.open_price is None:
-            return False
-
-        take_profit_price = self.open_price * \
-            (1 + (self.take_profit_percentage / 100))
-
-        return self.last_reported_price >= take_profit_price
-
-    def is_trailing_take_profit_triggered(self):
-        """
-        Function to check if the trailing take profit is triggered.
-        The trailing take profit is triggered when the last reported price
-        is greater than or equal to the high water mark times the trailing
-        take profit percentage.
-        """
-
-        if self.trailing_take_profit_percentage is None:
-            return False
-
-        if self.last_reported_price is None:
-            return False
-
-        if self.high_water_mark is None:
-
-            if self.open_price is not None:
-                self.high_water_mark = self.open_price
-            else:
-                return False
-
-        take_profit_price = self.high_water_mark * \
-            (1 + (self.trailing_take_profit_percentage / 100))
-
-        return self.last_reported_price >= take_profit_price
-
     def to_dict(self, datetime_format=None):
 
         if datetime_format is not None:
@@ -341,16 +259,14 @@ class Trade(BaseModel):
 
         return {
             "id": self.id,
-            # "orders": [
-            #     order.to_dict(datetime_format=datetime_format)
-            #     for order in self.orders
-            # ],
+            "orders": [
+                order.to_dict(datetime_format=datetime_format)
+                for order in self.orders
+            ],
             "target_symbol": self.target_symbol,
             "trading_symbol": self.trading_symbol,
             "status": self.status,
             "amount": self.amount,
-            "available_amount": self.available_amount,
-            "filled_amount": self.filled_amount,
             "remaining": self.remaining,
             "open_price": self.open_price,
             "last_reported_price": self.last_reported_price,
@@ -359,14 +275,14 @@ class Trade(BaseModel):
             "updated_at": updated_at,
             "net_gain": self.net_gain,
             "cost": self.cost,
-            # "stop_losses": [
-            #     stop_loss.to_dict(datetime_format=datetime_format)
-            #     for stop_loss in self.stop_losses
-            # ] if self.stop_losses else None,
-            # "take_profits": [
-            #     take_profit.to_dict(datetime_format=datetime_format)
-            #     for take_profit in self.take_profits
-            # ] if self.take_profits else None,
+            "stop_losses": [
+                stop_loss.to_dict(datetime_format=datetime_format)
+                for stop_loss in self.stop_losses
+            ] if self.stop_losses else None,
+            "take_profits": [
+                take_profit.to_dict(datetime_format=datetime_format)
+                for take_profit in self.take_profits
+            ] if self.take_profits else None,
         }
 
     @staticmethod
@@ -446,21 +362,3 @@ class Trade(BaseModel):
     def __lt__(self, other):
         # Define the less-than comparison based on created_at attribute
         return self.opened_at < other.opened_at
-
-    @staticmethod
-    def get_column_names():
-        return [
-            "id",
-            "target_symbol",
-            "trading_symbol",
-            "status",
-            "amount",
-            "available_amount",
-            "filled_amount",
-            "remaining",
-            "open_price",
-            "opened_at",
-            "closed_at",
-            "net_gain",
-            "last_reported_price",
-        ]

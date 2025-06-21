@@ -7,12 +7,7 @@ from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPortfolioSnapshotRepository, SQLTradeRepository, \
     SQLPositionSnapshotRepository, PerformanceService, CCXTMarketService, \
     SQLTradeStopLossRepository, SQLTradeTakeProfitRepository, \
-    SQLOrderMetadataRepository, SQLOrderTradeAssociationRepository, \
-    PandasPortfolioRepository, PandasOrdersRepository, PandasUnitOfWork, \
-    PandasPositionRepository, PandasPositionSnapshotRepository, \
-    PandasTradeStopLossRepository, PandasTradeTakeProfitRepository, \
-    PandasOrderTradeAssociationRepository, PandasTradesRepository, \
-    PandasPortfolioSnapshotRepository, PandasOrderMetadataRepository
+    SQLOrderMetadataRepository
 from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, StrategyOrchestratorService, \
     PortfolioConfigurationService, MarketDataSourceService, BacktestService, \
@@ -40,76 +35,26 @@ class DependencyContainer(containers.DeclarativeContainer):
     market_credential_service = providers.ThreadSafeSingleton(
         MarketCredentialService
     )
-    # pandas_unit_of_work = providers.ThreadSafeSingleton(
-    #     PandasUnitOfWork
-    # )
     order_repository = providers.Factory(SQLOrderRepository)
-    # order_repository = providers.Factory(
-    #     PandasOrdersRepository,
-    #     pandas_unit_of_work=pandas_unit_of_work,
-    # )
     order_executor_lookup = providers.ThreadSafeSingleton(
         OrderExecutorLookup
     )
     order_metadata_repository = providers.Factory(SQLOrderMetadataRepository)
-    # order_metadata_repository = providers.Factory(
-    #     PandasOrderMetadataRepository,
-    #     pandas_unit_of_work=pandas_unit_of_work,
-    # )
     position_repository = providers.Factory(SQLPositionRepository)
-    # position_repository = providers.Factory(
-    #     PandasPositionRepository,
-    #     pandas_unit_of_work=pandas_unit_of_work,
-    # )
     portfolio_provider_lookup = providers.ThreadSafeSingleton(
         PortfolioProviderLookup,
     )
     portfolio_repository = providers.Factory(SQLPortfolioRepository)
-    # portfolio_repository = providers.Factory(
-    #     PandasPortfolioRepository,
-    #     pandas_unit_of_work=pandas_unit_of_work,
-    # )
     position_snapshot_repository = providers.Factory(
         SQLPositionSnapshotRepository
     )
-    # position_snapshot_repository = providers.Factory(
-    #     PandasPositionSnapshotRepository,
-    #     pandas_unit_of_work=pandas_unit_of_work,
-    # )
     portfolio_snapshot_repository = providers.Factory(
         SQLPortfolioSnapshotRepository
     )
-    # portfolio_snapshot_repository = providers.Factory(
-    #     PandasPortfolioSnapshotRepository,
-    #     pandas_unit_of_work=pandas_unit_of_work,
-    # )
-    # portfolio_snapshot_repository = providers.Factory(
-    #     PandasPortfolioSnapshotRepository,
-    #     pandas_unit_of_work=pandas_unit_of_work,
-    # )
     trade_repository = providers.Factory(SQLTradeRepository)
-    # trade_repository = providers.Factory(
-    #     PandasTradesRepository,
-    #     pandas_unit_of_work=pandas_unit_of_work,
-    # )
     trade_take_profit_repository = providers\
         .Factory(SQLTradeTakeProfitRepository)
-    # trade_take_profit_repository = providers.Factory(
-    #     PandasTradeTakeProfitRepository,
-    #     pandas_unit_of_work=pandas_unit_of_work,
-    # )
     trade_stop_loss_repository = providers.Factory(SQLTradeStopLossRepository)
-    # trade_stop_loss_repository = providers.Factory(
-    #     PandasTradeStopLossRepository,
-    #     pandas_unit_of_work=pandas_unit_of_work,
-    # )
-    order_trade_association_repository = providers.Factory(
-        SQLOrderTradeAssociationRepository
-    )
-    # order_trade_association_repository = providers.Factory(
-    #     PandasOrderTradeAssociationRepository,
-    #     pandas_unit_of_work=pandas_unit_of_work,
-    # )
     market_service = providers.Factory(
         CCXTMarketService,
         market_credential_service=market_credential_service,

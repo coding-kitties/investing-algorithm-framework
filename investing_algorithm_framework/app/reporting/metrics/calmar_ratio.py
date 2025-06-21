@@ -7,13 +7,13 @@
 | **< 1.0**        | **Poor** – high drawdowns relative to return                |
 """
 
-
-from investing_algorithm_framework.domain import BacktestReport
+from typing import List
+from investing_algorithm_framework.domain import PortfolioSnapshot
 from .cagr import get_cagr
 from .drawdown import get_max_drawdown
 
 
-def get_calmar_ratio(report: BacktestReport):
+def get_calmar_ratio(snapshots: List[PortfolioSnapshot]):
     """
     Calculate the Calmar Ratio, which is the ratio of the annualized
     return to the maximum drawdown.
@@ -25,13 +25,14 @@ def get_calmar_ratio(report: BacktestReport):
     where a higher ratio indicates a more favorable risk-return profile.
 
     Args:
-        report: An object that provides methods to get trades and equity curve.
+        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots
+            from the backtest report.
 
     Returns:
         float: The Calmar Ratio.
     """
-    cagr = get_cagr(report)
-    max_drawdown = get_max_drawdown(report)
+    cagr = get_cagr(snapshots)
+    max_drawdown = get_max_drawdown(snapshots)
 
     if max_drawdown == 0 or max_drawdown is None:
         return 0.0

@@ -10,7 +10,7 @@ import pandas as pd
 from dateutil import parser
 from tqdm import tqdm
 
-from investing_algorithm_framework.domain import BacktestReport, \
+from investing_algorithm_framework.domain import BacktestResult, \
     BACKTESTING_INDEX_DATETIME, TimeUnit, BacktestPosition, \
     TradingDataType, OrderStatus, OperationalException, MarketDataSource, \
     OrderSide, SYMBOLS, BacktestDateRange, DATETIME_FORMAT_BACKTESTING, \
@@ -77,7 +77,7 @@ class BacktestService(Observable):
         strategy_orchestrator_service,
         backtest_date_range: BacktestDateRange,
         initial_amount=None
-    ) -> BacktestReport:
+    ) -> BacktestResult:
         """
         Run a backtest for the given algorithm. This function will run
         a backtest for the given algorithm and return a backtest report.
@@ -96,7 +96,7 @@ class BacktestService(Observable):
             context (Context): The context of the object of the application
 
         Returns:
-            BacktestReport - The backtest report
+            BacktestResult - The backtest report
         """
         logging.info(
             f"Running backtest for algorithm with name {algorithm.name}"
@@ -183,7 +183,7 @@ class BacktestService(Observable):
             portfolio = self._portfolio_service.find(
                 {"identifier": portfolio_configuration.identifier}
             )
-            # self._portfolio_service.delete(portfolio.id)
+            self._portfolio_service.delete(portfolio.id)
 
         return report
 
@@ -287,7 +287,7 @@ class BacktestService(Observable):
         number_of_runs,
         backtest_date_range: BacktestDateRange,
         initial_unallocated=0
-    ) -> BacktestReport:
+    ) -> BacktestResult:
         """
         Create a backtest report for the given algorithm. This function
         will create a backtest report for the given algorithm and return
@@ -304,7 +304,7 @@ class BacktestService(Observable):
             initial_unallocated: The initial unallocated amount
 
         Returns:
-            BacktestReport: The backtest report instance of BacktestReport
+            BacktestResult: The backtest report instance of BacktestResult
         """
 
         for portfolio in self._portfolio_service.get_all():
@@ -315,7 +315,7 @@ class BacktestService(Observable):
                 # Remove None from ids
                 ids = [x for x in ids if x is not None]
 
-            backtest_report = BacktestReport(
+            backtest_report = BacktestResult(
                 name=algorithm.name,
                 strategy_identifiers=ids,
                 backtest_date_range=backtest_date_range,
@@ -516,7 +516,7 @@ class BacktestService(Observable):
         algorithm_name: str,
         backtest_date_range: BacktestDateRange,
         directory: str
-    ) -> BacktestReport:
+    ) -> BacktestResult:
         """
         Function to get a report based on the algorithm name and
         backtest date range if it exists.
@@ -527,7 +527,7 @@ class BacktestService(Observable):
             directory: str - The output directory
 
         Returns:
-            BacktestReport - The backtest report if it exists, otherwise None
+            BacktestResult - The backtest report if it exists, otherwise None
         """
 
         # Loop through all files in the output directory
@@ -561,8 +561,8 @@ class BacktestService(Observable):
                                 # Parse the JSON file
                                 report = json.load(json_file)
                                 # Convert the JSON file to a
-                                # BacktestReport object
-                                return BacktestReport.from_dict(report)
+                                # BacktestResult object
+                                return BacktestResult.from_dict(report)
 
         return None
 
@@ -654,7 +654,7 @@ class BacktestService(Observable):
     def save_report(
         self,
         algorithm,
-        report: BacktestReport,
+        report: BacktestResult,
         output_directory: str,
         save_strategy=False,
     ) -> None:
@@ -667,7 +667,7 @@ class BacktestService(Observable):
         the strategy directory to the output directory.
 
         Args:
-            report: BacktestReport - The backtest report to save
+            report: BacktestResult - The backtest report to save
             algorithm: Algorithm - The algorithm to save
             output_directory: str - The directory to save the report in
             save_strategy: bool - Flag to save the strategy files
@@ -720,13 +720,13 @@ class BacktestService(Observable):
         self.write_report_to_json(report, output_directory)
 
     def write_report_to_json(
-        self, report: BacktestReport, output_directory: str
+        self, report: BacktestResult, output_directory: str
     ) -> None:
         """
         Function to write a backtest report to a JSON file.
 
         Args:
-            report: BacktestReport
+            report: BacktestResult
                 The backtest report to write to a file.
             output_directory: str
                 The directory to store the backtest report file.
@@ -756,7 +756,7 @@ class BacktestService(Observable):
         algorithm name and creation date.
 
         Args:
-            report: BacktestReport - The backtest report to create a
+            report: BacktestResult - The backtest report to create a
                 directory for.
 
         Returns:
@@ -778,7 +778,7 @@ class BacktestService(Observable):
         The directory will be created if it does not exist.
 
         Args:
-            report: BacktestReport - The backtest report to create a
+            report: BacktestResult - The backtest report to create a
                 directory for.
             output_directory: str - The directory to store the backtest
                 report file.

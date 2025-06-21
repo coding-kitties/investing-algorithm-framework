@@ -100,7 +100,7 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
                     raise OperationalException(
                         "The initial balance of the " +
                         "portfolio configuration " +
-                        f"({float(portfolio.initial_balance)} "
+                        f"({portfolio.initial_balance} "
                         f"{portfolio.trading_symbol}) is more " +
                         "than the available balance on the exchange. " +
                         "Please make sure that the initial balance of " +

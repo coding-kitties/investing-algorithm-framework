@@ -52,37 +52,30 @@ class TradeTakeProfit(BaseModel):
         trade_risk_type: TradeRiskType,
         percentage: float,
         open_price: float,
-        total_amount_trade: float = 0,
+        total_amount_trade: float = None,
         sell_percentage: float = 100,
-        sell_amount: float = None,
-        sold_amount: float = 0,
         active: bool = True,
         sell_prices: str = None,
         sell_dates: str = None,
-        high_water_mark: float = None,
+        sell_amount: float = None,
         high_water_mark_date: str = None,
-        take_profit_price: float = None,
-        id: int = None
     ):
-        self.id = id
         self.trade_id = trade_id
         self.trade_risk_type = trade_risk_type
         self.percentage = percentage
         self.sell_percentage = sell_percentage
-        self.high_water_mark = high_water_mark
+        self.high_water_mark = None
         self.high_water_mark_date = high_water_mark_date
         self.open_price = open_price
+        self.take_profit_price = open_price * \
+            (1 + (self.percentage / 100))
 
-        if take_profit_price is None:
-            take_profit_price = open_price * (1 + (self.percentage / 100))
-
-        self.take_profit_price = take_profit_price
-
-        if sell_amount is None:
-            sell_amount = total_amount_trade * (self.sell_percentage / 100)
-
-        self.sell_amount = sell_amount
-        self.sold_amount = sold_amount
+        if sell_amount is not None:
+            self.sell_amount = sell_amount
+        else:
+            self.sell_amount = total_amount_trade * \
+                (self.sell_percentage / 100)
+        self.sold_amount = 0
         self.active = active
         self.sell_prices = sell_prices
         self.sell_dates = sell_dates
@@ -264,7 +257,7 @@ class TradeTakeProfit(BaseModel):
     def to_dict(self, datetime_format=None):
         return {
             "trade_id": self.trade_id,
-            "trade_risk_type": self.trade_risk_type,
+            "trade_risk_type": self.trade_risk_type.value,
             "percentage": self.percentage,
             "open_price": self.open_price,
             "sell_percentage": self.sell_percentage,
@@ -275,6 +268,22 @@ class TradeTakeProfit(BaseModel):
             "active": self.active,
             "sell_prices": self.sell_prices
         }
+
+    @staticmethod
+    def from_dict(data: dict):
+        return TradeTakeProfit(
+            trade_id=data.get("trade_id"),
+            trade_risk_type=TradeRiskType.from_string(data.get("trade_risk_type")),
+            percentage=data.get("percentage"),
+            open_price=data.get("open_price"),
+            total_amount_trade=data.get("total_amount_trade"),
+            sell_percentage=data.get("sell_percentage", 100),
+            active=data.get("active", True),
+            sell_prices=data.get("sell_prices"),
+            sell_dates=data.get("sell_dates"),
+            sell_amount=data.get("sell_amount"),
+            high_water_mark_date=data.get("high_water_mark_date")
+        )
 
     def __repr__(self):
         return self.repr(
@@ -290,25 +299,3 @@ class TradeTakeProfit(BaseModel):
             active=self.active,
             sell_prices=self.sell_prices
         )
-
-    @staticmethod
-    def get_column_names():
-        """
-        Returns the column names of the model.
-        This method should be overridden by subclasses to
-        provide specific column names.
-        """
-        return [
-            "id",
-            "trade_id",
-            "trade_risk_type",
-            "percentage",
-            "open_price",
-            "sell_percentage",
-            "high_water_mark",
-            "take_profit_price",
-            "sell_amount",
-            "sold_amount",
-            "active",
-            "sell_prices"
-        ]

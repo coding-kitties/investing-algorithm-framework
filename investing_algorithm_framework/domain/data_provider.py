@@ -1,7 +1,9 @@
 from typing import List
 from abc import ABC, abstractmethod
 from datetime import datetime
-from investing_algorithm_framework.domain import TradingDataType, TimeFrame
+from investing_algorithm_framework.domain.models.trading_data_types import \
+    TradingDataType
+from investing_algorithm_framework.domain.models.time_frame import TimeFrame
 
 
 class DataProvider(ABC):

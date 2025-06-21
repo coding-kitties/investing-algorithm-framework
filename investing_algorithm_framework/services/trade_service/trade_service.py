@@ -74,11 +74,8 @@ class TradeService(RepositoryService):
             "available_amount": buy_order.get_filled(),
             "filled_amount": buy_order.get_filled(),
             "remaining": buy_order.get_remaining(),
-            "open_price": buy_order.price,
             "opened_at": buy_order.created_at,
-            "cost": buy_order.get_filled() * buy_order.price,
-            "status": TradeStatus.CREATED.value if buy_order.get_filled() == 0
-            else TradeStatus.OPEN.value,
+            "cost": buy_order.get_filled() * buy_order.price
         }
 
         if buy_order.get_filled() > 0:

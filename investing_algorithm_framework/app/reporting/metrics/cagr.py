@@ -11,10 +11,11 @@ This formula is suitable whether your data spans:
 """
 
 import pandas as pd
-from investing_algorithm_framework.domain import BacktestReport
+from typing import List
+from investing_algorithm_framework.domain import PortfolioSnapshot
 
 
-def get_cagr(report: BacktestReport) -> float:
+def get_cagr(snapshots: List[PortfolioSnapshot]) -> float:
     """
     Calculate the Compound Annual Growth Rate (CAGR) of a backtest report.
     CAGR is a useful metric to evaluate the performance of an investment
@@ -30,15 +31,13 @@ def get_cagr(report: BacktestReport) -> float:
     This function assumes that the snapshots in the report are ordered by
     creation date and that the net size represents the value of the investment.
 
-
     Args:
-        report:
+        snapshots (list[Snapshot]): A list of snapshots
 
     Returns:
         Float: The CAGR as a decimal. Returns 0.0 if not enough
             data is available.
     """
-    snapshots = report.get_snapshots()
 
     if len(snapshots) < 2:
         return 0.0  # Not enough data
@@ -48,13 +47,10 @@ def get_cagr(report: BacktestReport) -> float:
     df = pd.DataFrame(data, columns=["total_value", "created_at"])
     df['created_at'] = pd.to_datetime(df['created_at'])
     df = df.sort_values('created_at')
-
     start_value = df.iloc[0]['total_value']
     end_value = df.iloc[-1]['total_value']
-
     start_date = df.iloc[0]['created_at']
     end_date = df.iloc[-1]['created_at']
-
     num_days = (end_date - start_date).days
 
     if num_days == 0 or start_value == 0:
