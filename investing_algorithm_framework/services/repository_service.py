@@ -19,6 +19,7 @@ class RepositoryService:
         return self.repository.update_all(query_params, data)
 
     def delete(self, object_id):
+        print(type(self.repository))
         return self.repository.delete(object_id)
 
     def delete_all(self, query_params):

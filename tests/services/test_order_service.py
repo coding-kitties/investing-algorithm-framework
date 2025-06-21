@@ -6,6 +6,7 @@ from tests.resources import TestBase
 
 
 class TestOrderService(TestBase):
+    storage_repo_type = "pandas"
     market_credentials = [
         MarketCredential(
             market="binance",
@@ -653,7 +654,6 @@ class TestOrderService(TestBase):
         )
         order_executor.order_amount_filled = 1000
         order_executor.order_status = OrderStatus.CLOSED.value
-
         order_service = self.app.container.order_service()
         order = order_service.create(
             {

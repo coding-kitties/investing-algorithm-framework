@@ -5,13 +5,23 @@ from unittest import TestCase
 
 from flask_testing import TestCase as FlaskTestCase
 
-from investing_algorithm_framework import create_app, Algorithm, App, \
+from investing_algorithm_framework import create_app, App, \
     TradingStrategy, TimeUnit, OrderStatus
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
     ENVIRONMENT, Environment
 from tests.resources.stubs import MarketServiceStub, \
     PortfolioSyncServiceStub, OrderExecutorTest, PortfolioProviderTest, \
     MarketDataSourceServiceStub
+from investing_algorithm_framework.infrastructure.repositories import \
+    SQLOrderRepository, SQLTradeRepository, SQLPositionRepository, \
+    SQLPortfolioRepository, SQLPortfolioSnapshotRepository, \
+    SQLPositionSnapshotRepository, SQLOrderMetadataRepository, \
+    SQLTradeTakeProfitRepository, SQLTradeStopLossRepository, \
+    PandasTradesRepository, PandasPortfolioRepository, PandasUnitOfWork, \
+    PandasPositionRepository, PandasOrdersRepository, \
+    PandasOrderTradeAssociationRepository, PandasTradeStopLossRepository, \
+    PandasTradeTakeProfitRepository, PandasPortfolioSnapshotRepository, \
+    PandasPositionSnapshotRepository
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +41,7 @@ class StrategyOne(TradingStrategy):
 
 
 class TestBase(TestCase):
+    storage_repo_type = "sql"
     portfolio_configurations = []
     config = {}
     external_balances = None
@@ -42,13 +53,75 @@ class TestBase(TestCase):
     initialize = True
     resource_directory = os.path.dirname(__file__)
 
+    def setup_storage_repo_structure(self):
+
+        if self.storage_repo_type == "sql":
+            self.remove_database()
+            self.app.container.order_repository.override(
+                SQLOrderRepository()
+            )
+            self.app.container.trade_repository.override(
+                SQLTradeRepository()
+            )
+            self.app.container.position_repository.override(
+                SQLPositionRepository()
+            )
+            self.app.container.portfolio_repository.override(
+                SQLPortfolioRepository()
+            )
+            self.app.container.portfolio_snapshot_repository.override(
+                SQLPortfolioSnapshotRepository()
+            )
+            self.app.container.position_snapshot_repository.override(
+                SQLPositionSnapshotRepository()
+            )
+            self.app.container.order_metadata_repository.override(
+                SQLOrderMetadataRepository()
+            )
+            self.app.container.trade_take_profit_repository.override(
+                SQLTradeTakeProfitRepository()
+            )
+            self.app.container.trade_stop_loss_repository.override(
+                SQLTradeStopLossRepository()
+            )
+        elif self.storage_repo_type == "pandas":
+            pandas_unit_of_work = PandasUnitOfWork()
+            self.app.container.order_repository.override(
+                PandasOrdersRepository(pandas_unit_of_work)
+            )
+            self.app.container.trade_repository.override(
+                PandasTradesRepository(pandas_unit_of_work)
+            )
+            self.app.container.position_repository.override(
+                PandasPositionRepository(pandas_unit_of_work)
+            )
+            self.app.container.portfolio_repository.override(
+                PandasPortfolioRepository(pandas_unit_of_work)
+            )
+            self.app.container.portfolio_snapshot_repository.override(
+                PandasPortfolioSnapshotRepository(pandas_unit_of_work)
+            )
+            self.app.container.position_snapshot_repository.override(
+                PandasPositionSnapshotRepository(pandas_unit_of_work)
+            )
+            self.app.container.order_trade_association_repository\
+                .override(PandasOrderTradeAssociationRepository(
+                    pandas_unit_of_work
+                ))
+            self.app.container.trade_take_profit_repository.override(
+                PandasTradeTakeProfitRepository(pandas_unit_of_work)
+            )
+            self.app.container.trade_stop_loss_repository.override(
+                PandasTradeStopLossRepository(pandas_unit_of_work)
+            )
+
     def setUp(self) -> None:
-        self.remove_database()
         self.resource_directory = os.path.dirname(__file__)
         config = self.config
         config[RESOURCE_DIRECTORY] = self.resource_directory
         config[ENVIRONMENT] = Environment.TEST.value
         self.app: App = create_app(config=config)
+        self.setup_storage_repo_structure()
         self.market_service.balances = self.external_balances
         self.market_service.orders = self.external_orders
         self.app.container.market_service.override(self.market_service)

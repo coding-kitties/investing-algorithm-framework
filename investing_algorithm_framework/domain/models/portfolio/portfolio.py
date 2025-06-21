@@ -38,9 +38,10 @@ class Portfolio(BaseModel):
         self,
         identifier,
         trading_symbol,
-        net_size,
-        unallocated,
         market,
+        id=None,
+        net_size=0,
+        unallocated=0,
         realized=0,
         total_revenue=0,
         total_cost=0,
@@ -49,8 +50,9 @@ class Portfolio(BaseModel):
         created_at=None,
         updated_at=None,
         initialized=False,
-        initial_balance=None
+        initial_balance=None,
     ):
+        self.id = id
         self.identifier = identifier
         self.updated_at = None
         self.trading_symbol = trading_symbol.upper()
@@ -154,3 +156,28 @@ class Portfolio(BaseModel):
             "initialized": self.initialized,
             "initial_balance": self.initial_balance,
         }
+
+    @staticmethod
+    def get_column_names():
+        """
+        Returns the column names of the portfolio model.
+
+        This is used for serialization and database operations.
+        """
+        return [
+            "id",
+            "identifier",
+            "trading_symbol",
+            "net_size",
+            "unallocated",
+            "realized",
+            "total_revenue",
+            "total_cost",
+            "total_net_gain",
+            "total_trade_volume",
+            "market",
+            "created_at",
+            "updated_at",
+            "initialized",
+            "initial_balance"
+        ]

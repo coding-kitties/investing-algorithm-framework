@@ -183,7 +183,7 @@ class BacktestService(Observable):
             portfolio = self._portfolio_service.find(
                 {"identifier": portfolio_configuration.identifier}
             )
-            self._portfolio_service.delete(portfolio.id)
+            # self._portfolio_service.delete(portfolio.id)
 
         return report
 

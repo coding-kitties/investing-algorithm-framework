@@ -14,6 +14,7 @@ from tests.resources import TestBase
 
 
 class TestOrderBacktestService(TestBase):
+    storage_repo_type = "pandas"
     market_credentials = [
         MarketCredential(
             market="binance",
@@ -93,6 +94,7 @@ class TestOrderBacktestService(TestBase):
         portfolio_service = self.app.container.portfolio_service()
         portfolio_service.create(
             {
+                "identifier": "test_portfolio",
                 "market": "binance",
                 "trading_symbol": "EUR",
                 "unallocated": 1000,

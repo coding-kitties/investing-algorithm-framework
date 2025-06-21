@@ -201,8 +201,14 @@ class OrderService(RepositoryService, Observable):
             order = self.execute_order(order, portfolio)
 
         position = self._create_position_if_not_exists(symbol, portfolio)
+
+        # order = self.repository.update(
+        #     order.id,
+        #     {
+        #         "position_id": position.id
+        #     }
+        # )
         order.position_id = position.id
-        order = self.order_repository.save(order)
         order_id = order.id
         order_side = order.order_side
 
@@ -318,6 +324,17 @@ class OrderService(RepositoryService, Observable):
             portfolio, order, market_credential
         )
         logger.info(f"Executed order: {external_order.to_dict()}")
+
+        # update_data = {
+        #     "external_id": external_order.get_external_id(),
+        #     "status": external_order.get_status(),
+        #     "filled": external_order.get_filled(),
+        #     "remaining": external_order.get_remaining(),
+        #     "updated_at": datetime.now(tz=tzutc()),
+        #     "amount": external_order.get_amount(),
+        # }
+
+        # self.repository.update(order.id, update_data)
         order.set_external_id(external_order.get_external_id())
         order.set_status(external_order.get_status())
         order.set_filled(external_order.get_filled())
@@ -362,7 +379,7 @@ class OrderService(RepositoryService, Observable):
         if position.get_amount() < order_data["amount"]:
             raise OperationalException(
                 f"Order amount {order_data['amount']} is larger " +
-                f"then amount of open position {position.get_amount()}"
+                f"then amount of open position {float(position.get_amount())}"
             )
 
         if not order_data["trading_symbol"] == portfolio.trading_symbol:

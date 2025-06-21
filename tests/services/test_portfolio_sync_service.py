@@ -4,6 +4,7 @@ from tests.resources import TestBase
 
 
 class Test(TestBase):
+    storage_repo_type = "pandas"
     initialize = False
 
     def test_sync_unallocated(self):

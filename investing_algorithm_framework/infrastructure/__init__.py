@@ -8,10 +8,15 @@ from .models import SQLPortfolio, SQLOrder, SQLPosition, \
     SQLTradeStopLoss, PandasOHLCVBacktestMarketDataSource, \
     PandasOHLCVMarketDataSource
 from .repositories import SQLOrderRepository, SQLPositionRepository, \
-    SQLPortfolioRepository, SQLTradeRepository, \
+    SQLPortfolioRepository, SQLTradeRepository, PandasTradesRepository,\
     SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository, \
     SQLTradeTakeProfitRepository, SQLTradeStopLossRepository, \
-    SQLOrderMetadataRepository
+    SQLOrderMetadataRepository, PandasPortfolioRepository, PandasUnitOfWork, \
+    PandasPositionRepository, PandasOrdersRepository, \
+    PandasOrderTradeAssociationRepository, PandasTradeStopLossRepository, \
+    PandasTradeTakeProfitRepository, PandasPortfolioSnapshotRepository, \
+    PandasPositionSnapshotRepository, SQLOrderTradeAssociationRepository, \
+    PandasOrderMetadataRepository
 from .services import PerformanceService, CCXTMarketService, \
     AzureBlobStorageStateHandler
 from .data_providers import CCXTDataProvider, get_default_data_providers, \
@@ -57,5 +62,17 @@ __all__ = [
     "get_default_data_providers",
     "get_default_ohlcv_data_providers",
     "PandasOHLCVBacktestMarketDataSource",
-    "PandasOHLCVMarketDataSource"
+    "PandasOHLCVMarketDataSource",
+    "PandasPortfolioRepository",
+    "PandasUnitOfWork",
+    "PandasPositionRepository",
+    "PandasOrdersRepository",
+    "PandasTradesRepository",
+    "PandasOrderTradeAssociationRepository",
+    "PandasTradeStopLossRepository",
+    "PandasTradeTakeProfitRepository",
+    "PandasPortfolioSnapshotRepository",
+    "PandasPositionSnapshotRepository",
+    "SQLOrderTradeAssociationRepository",
+    "PandasOrderMetadataRepository"
 ]

@@ -20,7 +20,7 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     BacktestPosition, Trade, MarketCredential, PositionSnapshot, \
     BacktestReportsEvaluation, AppMode, BacktestDateRange, DateRange, \
     MarketDataType, TradeRiskType, TradeTakeProfit, TradeStopLoss, \
-    DataSource, Event, SnapshotInterval
+    DataSource, Event, SnapshotInterval, TradeOrderAssociation, OrderMetadata
 from .services import TickerMarketDataSource, OrderBookMarketDataSource, \
     OHLCVMarketDataSource, BacktestMarketDataSource, MarketDataSource, \
     MarketService, MarketCredentialService, AbstractPortfolioSyncService, \
@@ -147,4 +147,6 @@ __all__ = [
     "Event",
     "SNAPSHOT_INTERVAL",
     "SnapshotInterval",
+    "TradeOrderAssociation",
+    "OrderMetadata",
 ]

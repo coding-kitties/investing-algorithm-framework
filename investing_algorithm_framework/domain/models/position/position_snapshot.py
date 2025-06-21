@@ -5,11 +5,13 @@ class PositionSnapshot(BaseModel):
 
     def __init__(
         self,
+        id=None,
         symbol=None,
         amount=0,
         cost=0,
         portfolio_snapshot_id=None
     ):
+        self.id = id
         self.symbol = symbol
         self.amount = amount
         self.cost = cost
@@ -45,3 +47,22 @@ class PositionSnapshot(BaseModel):
             amount=self.amount,
             portfolio_snapshot_id=self.portfolio_snapshot_id,
         )
+
+    @staticmethod
+    def get_column_names():
+        return [
+            "id",
+            "symbol",
+            "amount",
+            "cost",
+            "portfolio_snapshot_id",
+        ]
+    
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "symbol": self.symbol,
+            "amount": self.amount,
+            "cost": self.cost,
+            "portfolio_snapshot_id": self.portfolio_snapshot_id,
+        }

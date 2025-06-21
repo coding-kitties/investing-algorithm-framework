@@ -33,6 +33,10 @@ class Test(TestCase):
             algorithm=algorithm,
             snapshot_interval=SnapshotInterval.STRATEGY_ITERATION
         )
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Test completed in {elapsed_time:.2f} seconds")
+
         self.assertAlmostEqual(
             backtest_report.get_growth(), 3, delta=0.5
         )
@@ -51,9 +55,6 @@ class Test(TestCase):
         self.assertAlmostEqual(
             backtest_report.get_profit_percentage(), 0.8, delta=0.1
         )
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f"Test completed in {elapsed_time:.2f} seconds")
 
         snapshots = backtest_report.get_snapshots()
         # Check that the first two snapshots created at are the same

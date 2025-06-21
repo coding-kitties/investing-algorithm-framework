@@ -5,6 +5,7 @@ from tests.resources import TestBase
 
 
 class TestTradeService(TestBase):
+    storage_repo_type = "pandas"
     market_credentials = [
         MarketCredential(
             market="binance",
@@ -583,12 +584,17 @@ class TestTradeService(TestBase):
             }
         )
         order_two_id = buy_order.id
-
         orders = order_service.get_all({
             "target_symbol": "ADA",
             "trading_symbol": "EUR",
             "portfolio_id": portfolio.id
         })
+
+        # There should be two trades for the two buy orders
+        trade_service = self.app.container.trade_service()
+        self.assertEqual(2, len(trade_service.get_all()))
+        self.assertEqual(1, len(trade_service.get_all({"order_id": order_one_id})))
+        self.assertEqual(1, len(trade_service.get_all({"order_id": order_two_id})))
 
         # Update the buy order to closed
         order_service = self.app.container.order_service()
@@ -603,6 +609,15 @@ class TestTradeService(TestBase):
                 }
             )
 
+        self.assertEqual(2, len(trade_service.get_all()))
+        self.assertEqual(1, len(trade_service.get_all(
+            {"order_id": order_one_id})))
+        self.assertEqual(1, len(trade_service.get_all(
+            {"order_id": order_two_id})))
+
+        for trade in trade_service.get_all():
+            print(trade.orders)
+
         # Check that the trade was updated
         trade_service = self.app.container.trade_service()
         self.assertEqual(2, len(trade_service.get_all()))
@@ -610,7 +625,9 @@ class TestTradeService(TestBase):
             {"target_symbol": "ADA", "trading_symbol": "EUR"}
         )
 
+
         for t in trades:
+            print(t.orders)
             self.assertNotEqual(0, t.amount)
             self.assertEqual(t.amount, t.filled_amount)
             self.assertEqual(t.available_amount, t.amount)

@@ -1,3 +1,4 @@
+from datetime import datetime
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 
 
@@ -16,8 +17,10 @@ class PortfolioSnapshot(BaseModel):
         total_value=None,
         cash_flow=None,
         created_at=None,
-        position_snapshots=None
+        position_snapshots=None,
+        id=None,
     ):
+        self.id = id
         self.portfolio_id = portfolio_id
         self.trading_symbol = trading_symbol
         self.pending_value = pending_value
@@ -34,6 +37,24 @@ class PortfolioSnapshot(BaseModel):
             position_snapshots = []
 
         self.position_snapshots = position_snapshots
+
+    @property
+    def created_at(self):
+
+        if isinstance(self._created_at, str):
+            # Convert string to datetime if necessary
+            self._created_at = datetime.strptime(
+                self._created_at, "%Y-%m-%d %H:%M:%S"
+            )
+        return self._created_at
+
+    @created_at.setter
+    def created_at(self, value):
+        if isinstance(value, str):
+            # Convert string to datetime
+            self._created_at = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+        else:
+            self._created_at = value
 
     def get_portfolio_id(self):
         return self.portfolio_id
@@ -108,13 +129,23 @@ class PortfolioSnapshot(BaseModel):
         self.portfolio_snapshot_id = portfolio_snapshot_id
 
     def __repr__(self):
+        created_at = None
+
+        if self.created_at is not None:
+
+            if isinstance(self.created_at, str):
+                created_at = self.created_at
+            else:
+                created_at = self.created_at.strftime("%Y-%m-%d %H:%M:%S")
+
         return self.repr(
             portfolio_id=self.portfolio_id,
-            created_at=self.created_at.strftime("%Y-%m-%d %H:%M:%S"),
+            created_at=created_at,
             trading_symbol=self.trading_symbol,
             net_size=self.net_size,
             unallocated=self.unallocated,
             pending_value=self.pending_value,
+            total_value=self.total_value,
             total_net_gain=self.total_net_gain,
             total_revenue=self.total_revenue,
             total_cost=self.total_cost,
@@ -163,3 +194,26 @@ class PortfolioSnapshot(BaseModel):
             created_at=data.get("created_at"),
             total_value=data.get("total_value", 0.0),
         )
+
+    @staticmethod
+    def get_column_names():
+        """
+        Get the column names for the portfolio snapshot.
+
+        Returns:
+            list: A list of column names.
+        """
+        return [
+            "id",
+            "portfolio_id",
+            "trading_symbol",
+            "pending_value",
+            "unallocated",
+            "net_size",
+            "total_net_gain",
+            "total_revenue",
+            "total_cost",
+            "total_value",
+            "cash_flow",
+            "created_at"
+        ]

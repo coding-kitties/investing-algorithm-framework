@@ -6,6 +6,7 @@ from tests.resources import TestBase
 
 
 class TestMarketDataSourceService(TestBase):
+    storage_repo_type = "pandas"
     portfolio_configurations = [
         PortfolioConfiguration(
             market="binance",

@@ -52,24 +52,37 @@ class TradeTakeProfit(BaseModel):
         trade_risk_type: TradeRiskType,
         percentage: float,
         open_price: float,
-        total_amount_trade: float,
+        total_amount_trade: float = 0,
         sell_percentage: float = 100,
+        sell_amount: float = None,
+        sold_amount: float = 0,
         active: bool = True,
         sell_prices: str = None,
         sell_dates: str = None,
+        high_water_mark: float = None,
         high_water_mark_date: str = None,
+        take_profit_price: float = None,
+        id: int = None
     ):
+        self.id = id
         self.trade_id = trade_id
         self.trade_risk_type = trade_risk_type
         self.percentage = percentage
         self.sell_percentage = sell_percentage
-        self.high_water_mark = None
+        self.high_water_mark = high_water_mark
         self.high_water_mark_date = high_water_mark_date
         self.open_price = open_price
-        self.take_profit_price = open_price * \
-            (1 + (self.percentage / 100))
-        self.sell_amount = total_amount_trade * (self.sell_percentage / 100)
-        self.sold_amount = 0
+
+        if take_profit_price is None:
+            take_profit_price = open_price * (1 + (self.percentage / 100))
+
+        self.take_profit_price = take_profit_price
+
+        if sell_amount is None:
+            sell_amount = total_amount_trade * (self.sell_percentage / 100)
+
+        self.sell_amount = sell_amount
+        self.sold_amount = sold_amount
         self.active = active
         self.sell_prices = sell_prices
         self.sell_dates = sell_dates
@@ -277,3 +290,25 @@ class TradeTakeProfit(BaseModel):
             active=self.active,
             sell_prices=self.sell_prices
         )
+
+    @staticmethod
+    def get_column_names():
+        """
+        Returns the column names of the model.
+        This method should be overridden by subclasses to
+        provide specific column names.
+        """
+        return [
+            "id",
+            "trade_id",
+            "trade_risk_type",
+            "percentage",
+            "open_price",
+            "sell_percentage",
+            "high_water_mark",
+            "take_profit_price",
+            "sell_amount",
+            "sold_amount",
+            "active",
+            "sell_prices"
+        ]
