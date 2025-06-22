@@ -9,8 +9,9 @@
 
 > If you like what we do, consider starring, sharing and contributing!
 
-
-<img src="static/showcase.svg" alt="Investing Algorithm Framework Logo"  height="750px">
+<div align="center">
+<img src="static/showcase.svg" alt="Investing Algorithm Framework Logo" style="height: 50vh; max-height: 750px;">
+</div>
 
 The investing algorithm framework is a Python framework designed to help you build, backtest, and deploy quantitative trading strategies. It comes with a event-based backtesting engine, ensuring an accurate and realistic evaluation of your strategies. The framework supports live trading with multiple exchanges and has various deployment options including Azure Functions and AWS Lambda.
 The framework is designed to be extensible, allowing you to add custom strategies, data providers, and order executors. It also supports multiple data sources, including OHLCV, ticker, and custom data, with integration for both Polars and Pandas.
