@@ -6,7 +6,8 @@ from investing_algorithm_framework.app.web import create_flask_app
 from .algorithm import Algorithm
 from .context import Context
 from .reporting import generate_report, add_html_report, add_metrics, \
-    BacktestReport, pretty_print_backtest, BacktestReportsEvaluation
+    BacktestReport, pretty_print_backtest, BacktestReportsEvaluation, \
+    pretty_print_trades, pretty_print_positions, pretty_print_orders
 
 
 __all__ = [
@@ -23,5 +24,8 @@ __all__ = [
     "add_metrics",
     "BacktestReport",
     "pretty_print_backtest",
-    "BacktestReportsEvaluation"
+    "BacktestReportsEvaluation",
+    "pretty_print_trades",
+    "pretty_print_positions",
+    "pretty_print_orders"
 ]

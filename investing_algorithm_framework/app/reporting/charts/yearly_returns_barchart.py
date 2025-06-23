@@ -34,7 +34,7 @@ def get_yearly_returns_bar_chart(yearly_returns_series):
     # Update layout for padding and formatting
     fig.update_layout(
         xaxis=dict(title="Time", tickmode="linear"),
-        yaxis=dict(title=None, tickformat="", range=[-10, 30]),  # Remove y-axis title
+        yaxis=dict(title=None, tickformat="", range=[-10, 30]),
         showlegend=False,
         coloraxis_showscale=False,  # Disable the color scale legend
         height=350,

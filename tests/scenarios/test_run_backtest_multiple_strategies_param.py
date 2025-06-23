@@ -31,24 +31,24 @@ class Test(TestCase):
             strategies=[CrossOverStrategyV1, CrossOverStrategyV2]
         )
         self.assertAlmostEqual(
-            backtest_report.get_growth(), 18.1, delta=0.5
+            backtest_report.results.growth, 18.1, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.get_growth_percentage(), 4.5, delta=0.5
+            backtest_report.results.growth_percentage, 4.5, delta=0.5
         )
         self.assertEqual(
-            backtest_report.get_initial_unallocated(), 400
+            backtest_report.results.initial_unallocated, 400
         )
         self.assertEqual(
-            backtest_report.get_trading_symbol(), "EUR"
+            backtest_report.results.trading_symbol, "EUR"
         )
         self.assertAlmostEqual(
-            backtest_report.get_profit(), 18.1, delta=0.5
+            backtest_report.results.total_net_gain, 18.1, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.get_profit_percentage(), 4.5, delta=0.5
+            backtest_report.results.total_net_gain_percentage, 4.5, delta=0.5
         )
-        snapshots = backtest_report.get_snapshots()
+        snapshots = backtest_report.results.get_portfolio_snapshots()
         # Check that the first two snapshots created at are the same
         # as the start date of the backtest
         self.assertEqual(

@@ -1,7 +1,8 @@
 from investing_algorithm_framework.app import App, Algorithm, \
     TradingStrategy, StatelessAction, Task, AppHook, Context, \
     add_html_report, add_metrics, generate_report, BacktestReport, \
-    BacktestReportsEvaluation
+    BacktestReportsEvaluation, pretty_print_trades, pretty_print_positions, \
+    pretty_print_orders, pretty_print_backtest
 from investing_algorithm_framework.domain import ApiException, \
     TradingDataType, TradingTimeFrame, OrderType, OperationalException, \
     OrderStatus, OrderSide, TimeUnit, TimeInterval, Order, Portfolio, \
@@ -59,9 +60,7 @@ __all__ = [
     "MarketCredential",
     "MarketService",
     "OperationalException",
-    "pretty_print_backtest_reports_evaluation",
     "BacktestReportsEvaluation",
-    "load_backtest_reports",
     "SYMBOLS",
     "RESERVED_BALANCES",
     "APP_MODE",
@@ -71,7 +70,6 @@ __all__ = [
     "BacktestDateRange",
     "convert_polars_to_pandas",
     "DateRange",
-    "get_backtest_report",
     "AzureBlobStorageStateHandler",
     "DEFAULT_LOGGING_CONFIG",
     "BacktestReport",

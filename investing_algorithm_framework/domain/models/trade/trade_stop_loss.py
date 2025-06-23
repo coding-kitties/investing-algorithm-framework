@@ -61,7 +61,7 @@ class TradeStopLoss(BaseModel):
         high_water_mark_date: str = None,
     ):
         self.trade_id = trade_id
-        self.trade_risk_type = trade_risk_type
+        self.trade_risk_type = TradeRiskType.from_value(trade_risk_type).value
         self.percentage = percentage
         self.sell_percentage = sell_percentage
         self.high_water_mark = open_price
@@ -220,7 +220,7 @@ class TradeStopLoss(BaseModel):
     def to_dict(self, datetime_format=None):
         return {
             "trade_id": self.trade_id,
-            "trade_risk_type": self.trade_risk_type.value,
+            "trade_risk_type": self.trade_risk_type,
             "percentage": self.percentage,
             "open_price": self.open_price,
             "sell_percentage": self.sell_percentage,
@@ -236,10 +236,13 @@ class TradeStopLoss(BaseModel):
     def from_dict(data: dict):
         return TradeStopLoss(
             trade_id=data.get("trade_id"),
-            trade_risk_type=TradeRiskType.from_string(data.get("trade_risk_type")),
+            trade_risk_type=TradeRiskType.from_string(
+                data.get("trade_risk_type")
+            ),
             percentage=data.get("percentage"),
             open_price=data.get("open_price"),
-            total_amount_trade=data.get("sell_amount", 0) / (data.get("sell_percentage", 100) / 100),
+            total_amount_trade=data.get("sell_amount", 0) /
+                               (data.get("sell_percentage", 100) / 100),
             sell_percentage=data.get("sell_percentage", 100),
             active=data.get("active", True),
             sell_prices=data.get("sell_prices"),

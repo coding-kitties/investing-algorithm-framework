@@ -153,6 +153,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         BacktestService,
         configuration_service=configuration_service,
         order_service=order_service,
+        trade_service=trade_service,
         portfolio_service=portfolio_service,
         performance_service=performance_service,
         position_repository=position_repository,

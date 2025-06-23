@@ -4,7 +4,7 @@ from unittest import TestCase
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm, \
-    BacktestDateRange
+    BacktestDateRange, BacktestReport
 from investing_algorithm_framework.services import BacktestService
 
 
@@ -69,8 +69,6 @@ class Test(TestCase):
             start_date=datetime.utcnow() - timedelta(days=1),
             end_date=datetime.utcnow()
         )
-
-        print(algorithm)
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
@@ -83,40 +81,85 @@ class Test(TestCase):
         # Check if the backtest report exists
         self.assertTrue(os.path.isdir(path))
 
-    def test_report_json_creation_with_multiple_strategies_with_id(self):
-        """
-        Test if the backtest report is created as a CSV file
-        when there are multiple strategies with identifiers
-        """
-        app = create_app(
-            config={RESOURCE_DIRECTORY: self.resource_dir}
+    def test_get_orders(self):
+        path = os.path.join(
+            self.resource_dir,
+            "backtest_reports_for_testing/test_algorithm_backtest_created-at_2025-04-21-21-21"
         )
-        algorithm = Algorithm()
-
-        @app.strategy()
-        def run_strategy(context, market_data):
-            pass
-
-        algorithm.add_strategy(TestStrategy)
-        app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="bitvavo",
-                trading_symbol="EUR",
-                initial_balance=1000
-            )
+        backtest_report = BacktestReport.open(path)
+        report = backtest_report.results
+        self.assertEqual(
+            len(report.get_orders()),
+            331
         )
-        self.assertEqual(1, len(algorithm.strategies))
-        backtest_range = BacktestDateRange(
-            start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow()
+        self.assertEqual(
+            len(report.get_orders(order_status="OPEN")),
+            0
         )
-        report = app.run_backtest(
-            algorithm=algorithm,
-            backtest_date_range=backtest_range,
+        self.assertEqual(
+            len(report.get_orders(order_status="CLOSED")),
+            331
         )
-        dir_name = BacktestService.create_report_directory_name(report)
+        self.assertEqual(
+            len(report.get_orders(target_symbol="BTC")),
+            58
+        )
+        self.assertEqual(
+            len(report.get_orders(target_symbol="SOL")),
+            98
+        )
+        self.assertEqual(
+            len(report.get_orders(target_symbol="ETH")),
+            59
+        )
+        self.assertEqual(
+            len(report.get_orders(target_symbol="DOT")),
+            116
+        )
+        self.assertEqual(
+            len(report.get_orders(order_status="CLOSED", target_symbol="BTC")),
+            58
+        )
 
-        path = os.path.join(self.resource_dir, "backtest_reports", dir_name)
+    def test_get_trades(self):
+        path = os.path.join(
+            self.resource_dir,
+            "backtest_reports_for_testing/test_algorithm_backtest_created-at_2025-04-21-21-21"
+        )
+        backtest_report = BacktestReport.open(path)
+        report = backtest_report.results
+        self.assertEqual(
+            len(report.get_trades(trade_status="OPEN")),
+            3
+        )
+        self.assertEqual(
+            len(report.get_trades(trade_status="CLOSED")),
+            133
+        )
+        self.assertEqual(
+            len(report.get_trades(target_symbol="BTC")),
+            25
+        )
+        self.assertEqual(
+            len(report.get_trades(target_symbol="SOL")),
+            40
+        )
+        self.assertEqual(
+            len(report.get_trades(target_symbol="ETH")),
+            23
+        )
+        self.assertEqual(
+            len(report.get_trades(target_symbol="DOT")),
+            48
+        )
 
-        # Check if the backtest report exists
-        self.assertTrue(os.path.isdir(path))
+    def test_get_symbols(self):
+        path = os.path.join(
+            self.resource_dir,
+            "backtest_reports_for_testing/test_algorithm_backtest_created-at_2025-04-21-21-21"
+        )
+        backtest_report = BacktestReport.open(path)
+        report = backtest_report.results
+        self.assertEqual(
+            set(report.symbols), {'SOL', 'ETH', 'DOT', 'BTC'}
+        )

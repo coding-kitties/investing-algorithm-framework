@@ -25,9 +25,9 @@ def highlight_sharpe_and_sortino(row):
         elif 1 <= value < 2:
             styles['Value'] = 'color: #FFD700; font-weight: bold;'  # gold
         elif 2 <= value < 3:
-            styles['Value'] = 'color: #32CD32; font-weight: bold;'  # lime green
+            styles['Value'] = 'color: #32CD32; font-weight: bold;' # lime green
         elif value >= 3:
-            styles['Value'] = 'color: #228B22; font-weight: bold;'  # dark green
+            styles['Value'] = 'color: #228B22; font-weight: bold;' # dark green
     return styles
 
 

@@ -29,24 +29,24 @@ class Test(TestCase):
             save_strategy=True,
         )
         self.assertAlmostEqual(
-            backtest_report.get_growth(), 3, delta=0.5
+            backtest_report.results.growth, 3, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.get_growth_percentage(), 0.8, delta=0.1
+            backtest_report.results.growth_percentage, 0.8, delta=0.1
         )
         self.assertEqual(
-            backtest_report.get_initial_unallocated(), 400
+            backtest_report.results.initial_unallocated, 400
         )
         self.assertEqual(
-            backtest_report.get_trading_symbol(), "EUR"
+            backtest_report.results.trading_symbol, "EUR"
         )
         self.assertAlmostEqual(
-            backtest_report.get_profit(), 3, delta=0.5
+            backtest_report.results.total_net_gain, 3, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.get_profit_percentage(), 0.8, delta=0.1
+            backtest_report.results.total_net_gain_percentage, 0.8, delta=0.1
         )
-        snapshots = backtest_report.get_snapshots()
+        snapshots = backtest_report.results.get_portfolio_snapshots()
         # Check that the first two snapshots created at are the same
         # as the start date of the backtest
         self.assertEqual(

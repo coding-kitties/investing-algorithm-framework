@@ -1,8 +1,8 @@
 import os
 from unittest import TestCase
 
-from investing_algorithm_framework.domain import BacktestReportsEvaluation, \
-    pretty_print_backtest_reports_evaluation, load_backtest_reports
+from investing_algorithm_framework.app import pretty_print_positions, \
+    BacktestReport
 
 
 class Test(TestCase):
@@ -25,7 +25,9 @@ class Test(TestCase):
         )
 
     def test_pretty_print(self):
-        path = os.path.join(self.resource_dir, "backtest_reports_for_testing")
-        reports = load_backtest_reports(path)
-        evaluation = BacktestReportsEvaluation(reports)
-        pretty_print_backtest_reports_evaluation(evaluation)
+        path = os.path.join(
+            self.resource_dir,
+            "backtest_reports_for_testing/test_algorithm_backtest_created-at_2025-04-21-21-21"
+        )
+        report = BacktestReport.open(path)
+        pretty_print_positions(report)

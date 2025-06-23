@@ -13,7 +13,7 @@ class TestTradeStopLoss(TestCase):
             total_amount_trade=100
         )
         self.assertEqual(stop_loss.trade_id, 1)
-        self.assertEqual(stop_loss.trade_risk_type, "fixed")
+        self.assertEqual(stop_loss.trade_risk_type, "FIXED")
         self.assertEqual(stop_loss.percentage, 10)
         self.assertEqual(stop_loss.sell_percentage, 50)
         self.assertEqual(stop_loss.high_water_mark, 20)

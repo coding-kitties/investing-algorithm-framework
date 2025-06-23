@@ -33,7 +33,9 @@ def get_rolling_sharp_ratio_chart(rolling_sharpe_ratio_series):
         )
     )
 
-    last_nan_row = rolling_sharpe_ratio_df[rolling_sharpe_ratio_df['sharpe_ratio'].isna()]
+    last_nan_row = rolling_sharpe_ratio_df[
+        rolling_sharpe_ratio_df['sharpe_ratio'].isna()
+    ]
     if not last_nan_row.empty:
         last_nan_date = last_nan_row['timestamp'].max()
         fig.add_vline(

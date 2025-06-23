@@ -1,7 +1,6 @@
-import os
 import json
+import os
 from dataclasses import dataclass
-
 
 from investing_algorithm_framework.domain import OperationalException, \
     BacktestResult
@@ -13,7 +12,7 @@ class BacktestReport:
     metrics = None
     results: BacktestResult = None
 
-    def show_html_report(self):
+    def show(self):
         """
         Display the HTML report in a Jupyter notebook cell.
         """
@@ -21,9 +20,7 @@ class BacktestReport:
             from IPython.display import display, HTML
             display(HTML(self.html_report))
         else:
-            print(
-                "No HTML report available. Please generate the report first."
-            )
+            raise OperationalException("No HTML report available to display.")
 
     @staticmethod
     def open(file_path) -> "BacktestReport":
@@ -37,7 +34,6 @@ class BacktestReport:
         Returns:
             BacktestReport: An instance of BacktestReport loaded from the file.
         """
-
         if not os.path.exists(file_path):
             raise OperationalException(
                 "Backtest report file or folder does not exist"
@@ -104,42 +100,3 @@ class BacktestReport:
 
             with open(os.path.join(path, "report.json"), 'w') as json_file:
                 json.dump(data, json_file, indent=4)
-
-
-    @staticmethod
-    def is_backtest_report(path: str) -> bool:
-        """
-        Function to check if a file is a backtest report file.
-
-        Args:
-            path (str): The path to the file
-
-        Returns:
-            bool: True if the file is a backtest report file, otherwise False
-        """
-
-        # # Check if the file is a JSON file
-        # if path.endswith(".json"):
-        #
-        #     # # Check if the file name matches the backtest
-        #     # # report file name pattern
-        #     # if re.match(
-        #     #         BACKTEST_REPORT_FILE_NAME_PATTERN, os.path.basename(path)
-        #     # ):
-        #         return True
-        #     else:
-        #         # Try to load the file as a BacktestReport
-        #         try:
-        #             # Read the file
-        #             with open(path, "r") as json_file:
-        #                 # Parse the JSON file
-        #                 report = json.load(json_file)
-        #                 # Convert the JSON file to a
-        #                 # BacktestReport object
-        #                 BacktestReport.from_dict(report)
-        #                 return True
-        #         except Exception:
-        #             # If the file is not a valid JSON file, return False
-        #             return False
-
-        return False

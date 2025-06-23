@@ -18,13 +18,16 @@ Strategy B: 30% win rate, but average win is $300, average loss is $50 → highl
 
 
 Practical Example:
-* Win rate 40% with win/loss ratio 2: Good — you win less often but your wins are twice as big.
-* Win rate 60% with win/loss ratio 0.7: Also good — you win often but your wins are smaller than losses.
+* Win rate 40% with win/loss ratio 2: Good — you win less often but your
+wins are twice as big.
+* Win rate 60% with win/loss ratio 0.7: Also good — you win often
+but your wins are smaller than losses.
 
 What’s “good”?
 * Typical win/loss ratio ranges from 0.5 to 3 depending on strategy style.
 * Many profitable traders target win/loss ratio between 1.5 and 2.5.
-* Very aggressive strategies might have a lower win rate but higher win/loss ratio.
+* Very aggressive strategies might have a lower win rate but
+higher win/loss ratio.
 """
 
 from typing import List

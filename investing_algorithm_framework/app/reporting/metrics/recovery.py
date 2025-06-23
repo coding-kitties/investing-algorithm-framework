@@ -36,14 +36,14 @@ max drawdown happened early and was never tested again.
 | **> 5.0**           | 🏆 *Excellent* – Exceptional recovery vs. risk taken | Often seen in highly optimized or low-volatility strategies      |
 | **∞ (Infinity)**    | 💡 *No drawdown* – Unrealistic or incomplete data    | Can happen if drawdown is zero — investigate carefully           |
 """
+from typing import List
 
-
-from investing_algorithm_framework.domain import BacktestReport
+from investing_algorithm_framework.domain import PortfolioSnapshot
 from .drawdown import get_max_drawdown_absolute
-from .net_profit import get_net_profit
+from .returns import get_total_net_gain
 
 
-def get_recovery_factor(backtest_report: BacktestReport) -> float:
+def get_recovery_factor(snapshots: List[PortfolioSnapshot]) -> float:
     """
     Calculate the recovery factor of a backtest report.
 
@@ -55,20 +55,19 @@ def get_recovery_factor(backtest_report: BacktestReport) -> float:
     risk-adjusted performance.
 
     Args:
-        backtest_report (BacktestReport): The backtest report containing
-            history of the portfolio.
+        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots
+            from the backtest report.
 
     Returns:
         float: The recovery factor. Returns 0.0 if max drawdown is
             zero or undefined.
     """
-    snapshots = backtest_report.get_snapshots()
 
     if not snapshots:
         return 0.0
 
-    max_drawdown_absolute = get_max_drawdown_absolute(backtest_report)
-    net_profit = get_net_profit(backtest_report)
+    max_drawdown_absolute = get_max_drawdown_absolute(snapshots)
+    net_profit = get_total_net_gain(snapshots)
 
     if max_drawdown_absolute == 0:
         return float('inf') if net_profit > 0 else 0.0
@@ -76,7 +75,7 @@ def get_recovery_factor(backtest_report: BacktestReport) -> float:
     return net_profit / max_drawdown_absolute
 
 
-def get_recovery_time(backtest_report: BacktestReport) -> float:
+def get_recovery_time(snapshots: List[PortfolioSnapshot]) -> float:
     """
     Calculate the recovery time of a backtest report.
 
@@ -84,19 +83,18 @@ def get_recovery_time(backtest_report: BacktestReport) -> float:
     from the maximum drawdown.
 
     Args:
-        backtest_report (BacktestReport): The backtest report containing
-            history of the portfolio.
+        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots
+            from the backtest report.
 
     Returns:
         float: The recovery time in days. Returns 0.0 if no drawdown
             occurred.
     """
-    snapshots = backtest_report.get_snapshots()
 
     if not snapshots:
         return 0.0
 
-    max_drawdown_absolute = get_max_drawdown_absolute(backtest_report)
+    max_drawdown_absolute = get_max_drawdown_absolute(snapshots)
 
     if max_drawdown_absolute == 0:
         return 0.0

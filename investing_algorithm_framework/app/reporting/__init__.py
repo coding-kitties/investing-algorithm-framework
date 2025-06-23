@@ -1,6 +1,7 @@
 from .generate import add_html_report, add_metrics, generate_report
 from .backtest_report import BacktestReport
-from .ascii import pretty_print_backtest
+from .ascii import pretty_print_backtest, pretty_print_positions, \
+    pretty_print_trades, pretty_print_orders
 from .evaluation import BacktestReportsEvaluation
 
 __all__ = [
@@ -9,5 +10,8 @@ __all__ = [
     "generate_report",
     "BacktestReport",
     "pretty_print_backtest",
-    "BacktestReportsEvaluation"
+    "BacktestReportsEvaluation",
+    "pretty_print_positions",
+    "pretty_print_trades",
+    "pretty_print_orders"
 ]

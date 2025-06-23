@@ -11,9 +11,9 @@ from dateutil import parser
 from tqdm import tqdm
 
 from investing_algorithm_framework.domain import BacktestResult, \
-    BACKTESTING_INDEX_DATETIME, TimeUnit, BacktestPosition, \
-    TradingDataType, OrderStatus, OperationalException, MarketDataSource, \
-    OrderSide, SYMBOLS, BacktestDateRange, DATETIME_FORMAT_BACKTESTING, \
+    BACKTESTING_INDEX_DATETIME, TimeUnit, TradingDataType, \
+    OperationalException, MarketDataSource, \
+    SYMBOLS, BacktestDateRange, DATETIME_FORMAT_BACKTESTING, \
     RESOURCE_DIRECTORY, Observable, Event
 from investing_algorithm_framework.services.market_data_source_service import \
     MarketDataSourceService
@@ -39,14 +39,20 @@ class BacktestService(Observable):
     def __init__(
         self,
         market_data_source_service: MarketDataSourceService,
-        order_service, portfolio_service, portfolio_snapshot_service,
-        position_repository, performance_service,
-        configuration_service, portfolio_configuration_service,
+        order_service,
+        portfolio_service,
+        portfolio_snapshot_service,
+        position_repository,
+        trade_service,
+        performance_service,
+        configuration_service,
+        portfolio_configuration_service,
         strategy_orchestrator_service
     ):
         super().__init__()
         self._resource_directory = None
         self._order_service = order_service
+        self._trade_service = trade_service
         self._portfolio_service = portfolio_service
         self._data_index = {
             TradingDataType.OHLCV: {},
@@ -315,49 +321,7 @@ class BacktestService(Observable):
                 # Remove None from ids
                 ids = [x for x in ids if x is not None]
 
-            backtest_report = BacktestResult(
-                name=algorithm.name,
-                strategy_identifiers=ids,
-                backtest_date_range=backtest_date_range,
-                initial_unallocated=initial_unallocated,
-                trading_symbol=portfolio.trading_symbol,
-                created_at=datetime.now(tz=timezone.utc),
-                portfolio_snapshots=self._portfolio_snapshot_service.get_all(
-                    {"portfolio_id": portfolio.id}
-                )
-            )
-            backtest_report.number_of_runs = number_of_runs
-            backtest_report.number_of_orders = self._order_service.count({
-                "portfolio": portfolio.id
-            })
-            backtest_report.number_of_positions = \
-                self._position_repository.count({
-                    "portfolio": portfolio.id,
-                    "amount_gt": 0
-                })
-            backtest_report.percentage_negative_trades = \
-                self._performance_service \
-                    .get_percentage_negative_trades(portfolio.id)
-            backtest_report.percentage_positive_trades = \
-                self._performance_service \
-                    .get_percentage_positive_trades(portfolio.id)
-            backtest_report.number_of_trades_closed = \
-                self._performance_service \
-                    .get_number_of_trades_closed(portfolio.id)
-            backtest_report.number_of_trades_open = \
-                self._performance_service \
-                    .get_number_of_trades_open(portfolio.id)
-            backtest_report.total_cost = portfolio.total_cost
-            backtest_report.total_net_gain = portfolio.total_net_gain
-            backtest_report.total_net_gain_percentage = \
-                self._performance_service \
-                    .get_total_net_gain_percentage_of_backtest(
-                        portfolio.id, backtest_report
-                    )
             positions = self._position_repository.get_all({
-                "portfolio": portfolio.id
-            })
-            orders = self._order_service.get_all({
                 "portfolio": portfolio.id
             })
             tickers = {}
@@ -387,85 +351,36 @@ class BacktestService(Observable):
                             market=portfolio.market
                         )
 
-            backtest_report.growth_rate = self._performance_service \
-                .get_growth_rate_of_backtest(
-                    portfolio.id, tickers, backtest_report
-                )
-            backtest_report.growth = self._performance_service \
-                .get_growth_of_backtest(
-                    portfolio.id, tickers, backtest_report
-                )
-            backtest_report.total_value = self._performance_service \
-                .get_total_value(portfolio.id, tickers, backtest_report)
-            backtest_report.average_trade_duration = \
-                self._performance_service \
-                    .get_average_trade_duration(portfolio.id)
-            backtest_report.average_trade_size = \
-                self._performance_service.get_average_trade_size(portfolio.id)
             positions = self._position_repository.get_all({
                 "portfolio": portfolio.id
             })
-            backtest_positions = []
 
-            for position in positions:
+            # Create the last snapshot of the portfolio
+            self._portfolio_snapshot_service.create_snapshot(
+                portfolio=portfolio,
+                created_at=backtest_date_range.end_date
+            )
 
-                if position.symbol == portfolio.trading_symbol:
-                    backtest_position = BacktestPosition(
-                        position,
-                        trading_symbol=True,
-                        total_value_portfolio=backtest_report.total_value
-                    )
-                    backtest_position.price = 1
-                else:
-                    pending_buy_orders = self._order_service.get_all({
-                        "portfolio": portfolio.id,
-                        "target_symbol": position.symbol,
-                        "status": OrderStatus.OPEN.value,
-                        "order_side": OrderSide.BUY.value
-                    })
-                    amount_in_pending_buy_orders = 0
-
-                    for order in pending_buy_orders:
-                        amount_in_pending_buy_orders += order.amount
-
-                    pending_sell_orders = self._order_service.get_all({
-                        "portfolio": portfolio.id,
-                        "target_symbol": position.symbol,
-                        "status": OrderStatus.OPEN.value,
-                        "order_side": OrderSide.SELL.value
-                    })
-                    amount_in_pending_sell_orders = 0
-
-                    for order in pending_sell_orders:
-                        amount_in_pending_sell_orders += order.amount
-
-                    backtest_position = BacktestPosition(
-                        position,
-                        amount_pending_buy=amount_in_pending_buy_orders,
-                        amount_pending_sell=amount_in_pending_sell_orders,
-                        total_value_portfolio=backtest_report.total_value
-                    )
-
-                    # Probably not needed
-                    ticker = self._market_data_source_service \
-                        .get_ticker(
-                            symbol=f"{position.symbol}"
-                                   f"/{portfolio.trading_symbol}",
-                            market=portfolio.market
-                        )
-                    backtest_position.price = ticker["bid"]
-                backtest_positions.append(backtest_position)
-            backtest_report.positions = backtest_positions
-            backtest_report.trades = context.get_trades()
-            backtest_report.orders = orders
-            traces = {}
-
-            # Add traces to the backtest report
-            for strategy in algorithm.strategies:
-                strategy_traces = strategy.get_traces()
-                traces[strategy.strategy_id] = strategy_traces
-
-            backtest_report.traces = traces
+            backtest_report = BacktestResult(
+                name=algorithm.name,
+                backtest_date_range=backtest_date_range,
+                initial_unallocated=initial_unallocated,
+                trading_symbol=portfolio.trading_symbol,
+                created_at=datetime.now(tz=timezone.utc),
+                portfolio_snapshots=self._portfolio_snapshot_service.get_all(
+                    {"portfolio_id": portfolio.id}
+                ),
+                number_of_runs=number_of_runs,
+                trades=self._trade_service.get_all(
+                    {"portfolio": portfolio.id}
+                ),
+                orders=self._order_service.get_all(
+                    {"portfolio": portfolio.id}
+                ),
+                positions=self._position_repository.get_all(
+                    {"portfolio": portfolio.id}
+                ),
+            )
 
             # Calculate metrics for the backtest report
             return backtest_report
@@ -673,6 +588,7 @@ class BacktestService(Observable):
             save_strategy: bool - Flag to save the strategy files
                 (default: False)
             algorithm: Algorithm - The algorithm to save the report for
+
         Returns:
             None
         """
@@ -740,7 +656,7 @@ class BacktestService(Observable):
 
         json_file_path = os.path.join(output_directory, "report.json")
 
-        report_dict = report.to_dict()
+        report_dict = report.results.to_dict()
         # Convert dictionary to JSON
         json_data = json.dumps(report_dict, indent=4)
 
@@ -763,8 +679,10 @@ class BacktestService(Observable):
             directory_name: str The directory name for the
                 backtest report file.
         """
-        created_at = report.created_at.strftime(DATETIME_FORMAT_BACKTESTING)
-        directory_name = f"{report.name}_backtest_created-at_{created_at}"
+        created_at = report.results\
+            .created_at.strftime(DATETIME_FORMAT_BACKTESTING)
+        name = report.results.name
+        directory_name = f"{name}_backtest_created-at_{created_at}"
         return directory_name
 
     @staticmethod

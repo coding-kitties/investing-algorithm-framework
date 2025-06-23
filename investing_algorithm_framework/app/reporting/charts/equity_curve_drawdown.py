@@ -2,12 +2,18 @@ import pandas as pd
 from plotly.subplots import make_subplots
 from plotly import graph_objects as go
 
+
 def get_equity_curve_with_drawdown_chart(equity_curve_series, drawdown_series):
-    equity_curve_df = pd.DataFrame(equity_curve_series, columns=["datetime", "value"])
-    drawdown_df = pd.DataFrame(drawdown_series, columns=["datetime", "value"])
+    equity_curve_df = pd.DataFrame(
+        equity_curve_series, columns=["datetime", "value"]
+    )
+    drawdown_df = pd.DataFrame(
+        drawdown_series, columns=["datetime", "value"]
+    )
 
     # Normalize equity to start at 1
-    equity_curve_df["value"] = equity_curve_df["value"] / equity_curve_df["value"].iloc[0]
+    equity_curve_df["value"] = (equity_curve_df["value"] /
+                                equity_curve_df["value"].iloc[0])
 
     # Split into above and below 1
     above_1 = equity_curve_df[equity_curve_df["value"] >= 1]
@@ -77,7 +83,7 @@ def get_equity_curve_with_drawdown_chart(equity_curve_series, drawdown_series):
         height=600,
         showlegend=False,
         hovermode="x unified",  # Enables vertical hover line
-        margin=dict(l=0, r=0, t=0, b=0),  # No margin = full width + no space at bottom
+        margin=dict(l=0, r=0, t=0, b=0),
     )
 
     return fig

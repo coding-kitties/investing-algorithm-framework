@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from logging import getLogger
-from typing import List, Set, Optional
+from typing import List, Optional
 
 from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
 from investing_algorithm_framework.domain.models \
@@ -13,8 +13,6 @@ from investing_algorithm_framework.domain.models.order import OrderSide, \
 from investing_algorithm_framework.domain.models.portfolio \
     .portfolio_snapshot import PortfolioSnapshot
 from investing_algorithm_framework.domain.models.position import Position
-from investing_algorithm_framework.domain.models.position import \
-    PositionSnapshot
 from investing_algorithm_framework.domain.models.trade import Trade, \
     TradeStatus
 
@@ -39,8 +37,6 @@ class BacktestResult(BaseModel):
         number_of_runs (int): The number of strategy runs of the backtest.
         portfolio_snapshots (List[PortfolioSnapshot]): The portfolio
             snapshots of the backtest.
-        position_snapshots (List[PositionSnapshot]): The position snapshots
-            of the backtest.
         trades (List[Trade]): All trades of the backtest.
         orders (List[Order]): All orders of the backtest.
         positions (List[Position]): All positions of the backtest.
@@ -76,16 +72,15 @@ class BacktestResult(BaseModel):
     trading_symbol: str
     name: str
     initial_unallocated: float
-    symbols: List[str]
     number_of_runs: int
     portfolio_snapshots: List[PortfolioSnapshot]
-    position_snapshots: List[PositionSnapshot]
+    trades: List[Trade]
+    orders: List[Order]
+    positions: List[Position]
     created_at: Optional[datetime] = field(default=None)
     backtest_start_date: Optional[datetime] = field(default=None)
     backtest_end_date: Optional[datetime] = field(default=None)
-    trades: List[Trade] = field(default_factory=list)
-    orders: List[Order] = field(default_factory=list)
-    positions: List[Position] = field(default_factory=list)
+    symbols: List[str] = field(default_factory=list)
     number_of_days: int = 0
     number_of_trades: int = 0
     number_of_trades_closed: int = 0
@@ -107,37 +102,37 @@ class BacktestResult(BaseModel):
         if self.created_at is None:
             self.created_at = datetime.now(tz=timezone.utc)
 
-        if self.number_of_days is None:
-            self.number_of_days = \
-                (self.backtest_date_range.end_date
-                 - self.backtest_date_range.start_date).days
-
+        self.number_of_days = (
+            self.backtest_date_range.end_date
+            - self.backtest_date_range.start_date
+        ).days
         self.backtest_start_date = self.backtest_date_range.start_date
         self.backtest_end_date = self.backtest_date_range.end_date
         self.growth = self.portfolio_snapshots[-1].total_value \
-          - self.portfolio_snapshots[0].total_value
+            - self.portfolio_snapshots[0].total_value
         self.growth_percentage = self.growth / self.initial_unallocated * 100.0
         self.number_of_orders = \
             len(self.orders) if self.orders is not None else 0
         self.number_of_positions = \
             len(self.positions) if self.positions is not None else 0
+        last_portfolio_snapshot = \
+            self.portfolio_snapshots[-1] if self.portfolio_snapshots else None
+        self.total_value = last_portfolio_snapshot.total_value \
+            if last_portfolio_snapshot is not None else 0.0
 
         number_of_negative_trades = 0.0
         number_of_positive_trades = 0.0
-        average_trade_duration = 0.0
-        average_trade_size = 0.0
         number_of_trades_closed = 0
         number_of_trades_open = 0
-        total_duration = 0 # In hours
+        total_duration = 0
         total_trade_size = 0.0
-
 
         if self.trades is not None:
             for trade in self.trades:
                 self.total_net_gain += trade.net_gain
                 self.total_cost += trade.cost
                 total_duration += \
-                    ((trade.opened_at - trade.closed_at).total_seconds() /
+                    ((trade.closed_at - trade.opened_at).total_seconds() /
                      3600) if trade.closed_at else 0
                 total_trade_size += trade.size
                 if trade.status == TradeStatus.CLOSED.value:
@@ -152,17 +147,31 @@ class BacktestResult(BaseModel):
                     number_of_negative_trades += 1
 
             self.total_net_gain_percentage = \
-                (self.total_net_gain / self.initial_unallocated) * 100.0
+                (self.total_net_gain / self.initial_unallocated) * 100.0 \
+                if self.initial_unallocated > 0 else 0.0
             self.percentage_positive_trades = \
-                (number_of_positive_trades / len(self.trades)) * 100.0
+                (number_of_positive_trades / len(self.trades)) * 100.0 \
+                if len(self.trades) > 0 else 0.0
             self.percentage_negative_trades = \
-                (number_of_negative_trades / len(self.trades)) * 100.0
+                (number_of_negative_trades / len(self.trades)) * 100.0 \
+                if len(self.trades) > 0 else 0.0
             self.number_of_trades_closed = number_of_trades_closed
             self.number_of_trades_open = number_of_trades_open
             self.number_of_trades = len(self.trades)
             self.average_trade_duration = \
-                total_duration / self.number_of_trades
-            self.average_trade_size = total_trade_size / self.number_of_trades
+                total_duration / self.number_of_trades \
+                if self.number_of_trades > 0 else 0.0
+            self.average_trade_size = \
+                total_trade_size / self.number_of_trades \
+                if self.number_of_trades > 0 else 0.0
+
+        # Determine all the symbols that are being traded in the backtest
+        if self.symbols is None:
+            self.symbols = []
+
+            for order in self.orders:
+                if order.target_symbol not in self.symbols:
+                    self.symbols.append(order.target_symbol)
 
     def to_dict(self):
         """
@@ -237,7 +246,7 @@ class BacktestResult(BaseModel):
                 for snapshot in portfolio_snapshots_data
             ]
 
-        positions_data = data["positions"]
+        positions_data = data.get("positions", None)
 
         if positions_data is not None:
             positions = [
@@ -245,16 +254,6 @@ class BacktestResult(BaseModel):
             ]
         else:
             positions = []
-
-        position_snapshots_data = data.get("position_snapshots", None)
-
-        if position_snapshots_data is None:
-            position_snapshots = []
-        else:
-            position_snapshots = [
-                PositionSnapshot.from_dict(snapshot)
-                for snapshot in position_snapshots_data
-            ]
 
         trades_data = data.get("trades", None)
 
@@ -302,7 +301,7 @@ class BacktestResult(BaseModel):
             ),
             number_of_days=data["number_of_days"],
             portfolio_snapshots=portfolio_snapshots,
-            position_snapshots=position_snapshots,
+            # position_snapshots=position_snapshots,
             trades=trades,
             orders=orders,
             positions=positions,
@@ -387,26 +386,6 @@ class BacktestResult(BaseModel):
 
         return selection
 
-    def get_symbols(self) -> Set[str]:
-        """
-        Get all the unique symbols of the backtest. The unique
-        symbols are all the assets that are being traded in
-        the backtest.
-
-        Args:
-            None
-
-        Returns:
-            set: The unique symbols of the backtest
-        """
-        unique_symbols = set()
-
-        for order in self.orders:
-            if order.target_symbol not in self.symbols:
-                unique_symbols.add(order.target_symbol)
-
-        return unique_symbols
-
     def get_positions(self, symbol=None) -> List[Position]:
         """
         Get the positions of the backtest report
@@ -418,12 +397,44 @@ class BacktestResult(BaseModel):
             list: The positions of the backtest report
         """
 
-        selection = self.positions
+        # Get the last portfolio snapshot
+        last_portfolio_snapshot = \
+            self.portfolio_snapshots[-1] if self.portfolio_snapshots else None
+        selection = []
 
-        if symbol is not None:
+        if last_portfolio_snapshot is not None:
+            positions = last_portfolio_snapshot.position_snapshots
+
+            if symbol is not None:
+                selection = [
+                    position for position in positions
+                    if position.symbol == symbol
+                ]
+
+            return selection
+
+        return selection
+
+    def get_portfolio_snapshots(
+        self,
+        created_at_lt: Optional[datetime] = None
+    ) -> List[PortfolioSnapshot]:
+        """
+        Get the portfolio snapshots of the backtest report
+
+        Args:
+            created_at_lt (datetime): The created_at date to filter
+                the snapshots
+
+        Returns:
+            list: The portfolio snapshots of the backtest report
+        """
+        selection = self.portfolio_snapshots
+
+        if created_at_lt is not None:
             selection = [
-                position for position in selection
-                if position.symbol == symbol
+                snapshot for snapshot in selection
+                if snapshot.created_at < created_at_lt
             ]
 
         return selection

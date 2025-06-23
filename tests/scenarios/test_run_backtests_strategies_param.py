@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 
 from investing_algorithm_framework import create_app, BacktestDateRange, \
-    RESOURCE_DIRECTORY
+    RESOURCE_DIRECTORY, pretty_print_backtest
 from tests.resources.strategies_for_testing.strategy_v1 import \
     CrossOverStrategyV1
 from tests.resources.strategies_for_testing.strategy_v3 import \
@@ -34,39 +34,39 @@ class Test(TestCase):
         )
         backtest_report = backtest_reports[0]
         self.assertAlmostEqual(
-            backtest_report.get_growth(), 3, delta=0.5
+            backtest_report.results.growth, 3, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.get_growth_percentage(), 0.8, delta=0.1
+            backtest_report.results.growth_percentage, 0.8, delta=0.1
         )
         self.assertEqual(
-            backtest_report.get_initial_unallocated(), 400
+            backtest_report.results.initial_unallocated, 400
         )
         self.assertEqual(
-            backtest_report.get_trading_symbol(), "EUR"
+            backtest_report.results.trading_symbol, "EUR"
         )
         self.assertAlmostEqual(
-            backtest_report.get_profit(), 3, delta=0.5
+            backtest_report.results.total_net_gain, 3, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.get_profit_percentage(), 0.8, delta=0.1
+            backtest_report.results.total_net_gain_percentage, 0.8, delta=0.1
         )
         backtest_report_two = backtest_reports[1]
         self.assertAlmostEqual(
-            backtest_report_two.get_growth(), 18.16, delta=0.6
+            backtest_report_two.results.growth, 18.16, delta=0.6
         )
         self.assertAlmostEqual(
-            backtest_report_two.get_growth_percentage(), 4.5, delta=0.2
+            backtest_report_two.results.growth_percentage, 4.5, delta=0.2
         )
         self.assertEqual(
-            backtest_report_two.get_initial_unallocated(), 400
+            backtest_report_two.results.initial_unallocated, 400
         )
         self.assertEqual(
-            backtest_report_two.get_trading_symbol(), "EUR"
+            backtest_report_two.results.trading_symbol, "EUR"
         )
         self.assertAlmostEqual(
-            backtest_report_two.get_profit(), 18.16, delta=0.6
+            backtest_report_two.results.total_net_gain, 18.16, delta=0.6
         )
         self.assertAlmostEqual(
-            backtest_report_two.get_profit_percentage(), 4.5, delta=0.2
+            backtest_report_two.results.total_net_gain_percentage, 4.5, delta=0.2
         )

@@ -43,13 +43,14 @@ def generate_report(backtest_results, risk_free_rate=None) -> BacktestReport:
     add_html_report(report.results)
     return report.results
 
+
 def add_metrics(report: BacktestReport, risk_free_rate=None) -> None:
     """
     Add metrics to the report.results.
 
     Args:
-        report.results (Backtestreport.results): The backtest report.results to which the metrics
-            will be added.
+        report (BacktestReport): The backtest report.results to
+            which the metrics will be added.
         risk_free_rate (float, optional): The risk-free rate to be used in
             the report.results calculations. Defaults to None. If none, the
             risk-free rate will be retrieved from the US Treasury (10-year
@@ -67,25 +68,44 @@ def add_metrics(report: BacktestReport, risk_free_rate=None) -> None:
         "Sortino Ratio": get_sortino_ratio(report.results.portfolio_snapshots),
         "Profit Factor": get_profit_factor(report.results.get_trades()),
         "Calmar Ratio": get_calmar_ratio(report.results.portfolio_snapshots),
-        "Annual Volatility": get_annual_volatility(report.results.portfolio_snapshots),
-        "Monthly Returns": get_monthly_returns(report.results.portfolio_snapshots),
-        "Yearly Returns": get_yearly_returns(report.results.portfolio_snapshots),
-        "Drawdown series": get_drawdown_series(report.results.portfolio_snapshots),
-        "Max Drawdown": get_max_drawdown(report.results.portfolio_snapshots),
+        "Annual Volatility": get_annual_volatility(
+            report.results.portfolio_snapshots
+        ),
+        "Monthly Returns": get_monthly_returns(
+            report.results.portfolio_snapshots
+        ),
+        "Yearly Returns": get_yearly_returns(
+            report.results.portfolio_snapshots
+        ),
+        "Drawdown series": get_drawdown_series(
+            report.results.portfolio_snapshots
+        ),
+        "Max Drawdown": get_max_drawdown(
+            report.results.portfolio_snapshots
+        ),
         "Max Drawdown Absolute": get_max_drawdown_absolute(
             report.results.portfolio_snapshots),
-        "Max Daily Drawdown": get_max_daily_drawdown(report.results.portfolio_snapshots),
+        "Max Daily Drawdown": get_max_daily_drawdown(
+            report.results.portfolio_snapshots
+        ),
         "Max Drawdown Duration": get_max_drawdown_duration(
-            report.results.portfolio_snapshots),
-        "Trades per Year": get_trades_per_year(report.results.get_trades(),
-                                               report.results.backtest_start_date,
-                                               report.results.backtest_end_date),
-        "Trade per day": get_trade_frequency(report.results.get_trades(),
-                                             report.results.backtest_start_date,
-                                             report.results.backtest_end_date),
-        "Exposure": get_exposure(report.results.get_trades(),
-                                 report.results.backtest_start_date,
-                                 report.results.backtest_end_date),
+            report.results.portfolio_snapshots
+        ),
+        "Trades per Year": get_trades_per_year(
+            report.results.get_trades(),
+            report.results.backtest_start_date,
+            report.results.backtest_end_date
+        ),
+        "Trade per day": get_trade_frequency(
+            report.results.get_trades(),
+            report.results.backtest_start_date,
+            report.results.backtest_end_date
+        ),
+        "Exposure": get_exposure(
+            report.results.get_trades(),
+            report.results.backtest_start_date,
+            report.results.backtest_end_date
+        ),
         "Trades winning percentage": get_win_rate(report.results.get_trades()),
         "Trades average gain": get_average_gain(report.results.get_trades()),
         "Trades average loss": get_average_loss(report.results.get_trades()),
@@ -105,9 +125,13 @@ def add_metrics(report: BacktestReport, risk_free_rate=None) -> None:
         "Average Monthly Return": get_average_monthly_return(
             report.results.portfolio_snapshots),
         "Average Monthly Return (Losing Months)":
-            get_average_monthly_return_losing_months(report.results.portfolio_snapshots),
+            get_average_monthly_return_losing_months(
+                report.results.portfolio_snapshots
+            ),
         "Average Monthly Return (Winning Months)":
-            get_average_monthly_return_winning_months(report.results.portfolio_snapshots),
+            get_average_monthly_return_winning_months(
+                report.results.portfolio_snapshots
+            ),
         "Best Month": get_best_month(report.results.portfolio_snapshots),
         "Best Year": get_best_year(report.results.portfolio_snapshots),
         "Worst Month": get_worst_month(report.results.portfolio_snapshots),
