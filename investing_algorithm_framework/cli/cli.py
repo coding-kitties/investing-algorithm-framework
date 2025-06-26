@@ -172,11 +172,17 @@ def deploy_azure_function(
     help='The path to the project directory containing '
          'the Lambda function code.'
 )
+@click.option(
+    '--ignore_dirs',
+    default=None,
+    help='List of directories to ignore when deploying.'
+)
 def deploy_aws_lambda(
     lambda_function_name,
     region,
     lambda_handler,
     project_dir=None,
+    ignore_dirs=None
 ):
     """
     Command-line tool for deploying a trading bot to AWS lambda
@@ -191,6 +197,7 @@ def deploy_aws_lambda(
         project_dir (str): The path to the project directory containing the
             Lambda function code. If not provided, it defaults to
             the current directory.
+        ignore_dirs (list): List of directories to ignore when deploying.
 
     Returns:
         None
@@ -199,7 +206,8 @@ def deploy_aws_lambda(
         lambda_function_name=lambda_function_name,
         region=region,
         lambda_handler=lambda_handler,
-        project_dir=project_dir
+        project_dir=project_dir,
+        ignore_dirs=ignore_dirs
     )
 
 

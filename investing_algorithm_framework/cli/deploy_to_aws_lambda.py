@@ -39,7 +39,7 @@ def sanitize_bucket_name(name: str) -> str:
     return name  # Enforce length limit
 
 
-def zip_code(source_dir, zip_file):
+def zip_code(source_dir, zip_file, ignore_dirs=None):
     """
     Recursively zips the contents of source_dir into zip_file,
     preserving directory structure — suitable for AWS Lambda deployment.
@@ -47,6 +47,7 @@ def zip_code(source_dir, zip_file):
     Args:
         source_dir: str, the directory containing the Lambda function code.
         zip_file: str, the path where the zip file will be created.
+        ignore_dirs: list, directories to ignore when zipping the code.
 
     Returns:
         None
@@ -56,6 +57,16 @@ def zip_code(source_dir, zip_file):
     # Function should recursively zip all files and directories
     with zipfile.ZipFile(zip_file, 'w', zipfile.ZIP_DEFLATED) as zf:
         for root, _, files in os.walk(source_dir):
+
+            # Skip ignored directories
+            if ignore_dirs is not None:
+                relative_root = os.path.relpath(root, source_dir)
+                if any(
+                    relative_root.startswith(ignore) for ignore in ignore_dirs
+                ):
+                    click.echo(f"Ignoring directory: {relative_root}")
+                    continue
+
             for file in files:
                 click.echo(f"Adding {file} to zip")
                 file_path = os.path.join(root, file)
@@ -347,6 +358,7 @@ def command(
     region,
     lambda_handler,
     project_dir=None,
+    ignore_dirs=None
 ):
     """
     Command-line tool for deploying a trading bot to AWS Lambda.
@@ -358,6 +370,7 @@ def command(
             If None, it defaults to the current directory.
         lambda_handler: str, the name of the handler function in the code
             (default is "aws_function.lambda_handler").
+        ignore_dirs: list, directories to ignore when zipping the code.
 
     Returns:
         None
