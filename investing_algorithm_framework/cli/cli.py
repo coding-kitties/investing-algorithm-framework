@@ -24,7 +24,7 @@ def cli():
     '--type',
     default="default",
     help="Type of app to create. "
-    "Options are: 'default', 'default_web', 'azure_function'."
+    "Options are: 'default', 'default_web', 'azure_function', 'aws_lambda'."
 )
 @click.option(
     '--path', default=None, help="Path to directory to initialize the app in"
