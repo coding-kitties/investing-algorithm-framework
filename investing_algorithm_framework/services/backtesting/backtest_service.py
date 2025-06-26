@@ -583,9 +583,9 @@ class BacktestService(Observable):
         backtest_start_date = report.results.backtest_date_range.start_date
         backtest_end_date = report.results.backtest_date_range.end_date
         name = report.results.name
+
+        start_date = backtest_start_date.strftime(DATETIME_FORMAT_BACKTESTING)
+        end_date = backtest_end_date.strftime(DATETIME_FORMAT_BACKTESTING)
         directory_name = f"report_{name}_backtest-start-date_" \
-            f"{backtest_start_date.strftime(DATETIME_FORMAT_BACKTESTING)}_" \
-            f"backtest-end-date_{
-                backtest_end_date.strftime(DATETIME_FORMAT_BACKTESTING)
-            }_{created_at}"
+            f"{start_date}_backtest-end-date_{end_date}_{created_at}"
         return directory_name
