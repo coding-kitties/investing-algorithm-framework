@@ -369,6 +369,118 @@ class TestAppInitialize(TestCase):
             )
         )
 
+    def test_initialize_command_aws_lambda(self):
+        command(
+            path=self.output_dir, app_type="aws_lambda"
+        )
+
+        # Check if aws_function.py file exists
+        app_file_path = os.path.join(self.output_dir, "aws_function.py")
+        self.assertTrue(os.path.exists(app_file_path))
+
+        # Check if the app.py is the same as the template
+        self.assertTrue(
+            self.is_same_file_content(
+                app_file_path,
+                os.path.join(
+                    self.template_dir, "app_aws_lambda_function.py.template"
+                )
+            )
+        )
+
+        # Check if requirements.txt file exists
+        requirements_file_path = os.path.join(
+            self.output_dir, "requirements.txt"
+        )
+        self.assertTrue(os.path.exists(requirements_file_path))
+
+        # Check if the requirements.txt is the same as the template
+        self.assertTrue(
+            self.is_same_file_content(
+                requirements_file_path,
+                os.path.join(self.template_dir, "requirements.txt.template")
+            )
+        )
+
+        # Check if strategy dir exists
+        strategy_dir_path = os.path.join(self.output_dir, "strategies")
+        self.assertTrue(os.path.exists(strategy_dir_path))
+        self.assertTrue(os.path.isdir(strategy_dir_path))
+
+        # Check if strategy.py file exists
+        strategy_file_path = os.path.join(
+            strategy_dir_path, "strategy.py"
+        )
+        self.assertTrue(os.path.exists(strategy_file_path))
+        # Check if the strategy.py is the same as the template
+        self.assertTrue(
+            self.is_same_file_content(
+                strategy_file_path,
+                os.path.join(self.template_dir, "strategy.py.template")
+            )
+        )
+
+        # Check if market_data_providers.py file exists
+        market_data_providers_file_path = os.path.join(
+            strategy_dir_path, "data_providers.py"
+        )
+        self.assertTrue(os.path.exists(market_data_providers_file_path))
+
+        # Check if the market_data_providers.py is the same as the template
+        self.assertTrue(
+            self.is_same_file_content(
+                market_data_providers_file_path,
+                os.path.join(self.template_dir, "data_providers.py.template")
+            )
+        )
+
+        # Check if __init__.py file exists
+        init_file_path = os.path.join(strategy_dir_path, "__init__.py")
+        self.assertTrue(os.path.exists(init_file_path))
+
+        # Check if __init__.py is in the root directory
+        root_init_file_path = os.path.join(self.output_dir, "__init__.py")
+        self.assertTrue(os.path.exists(root_init_file_path))
+
+        # Check if run_backtest.py file exists
+        run_backtest_file_path = os.path.join(self.output_dir, "run_backtest.py")
+        self.assertTrue(os.path.exists(run_backtest_file_path))
+
+        # Check if the run_backtest.py is the same as the template
+        self.assertTrue(
+            self.is_same_file_content(
+                run_backtest_file_path,
+                os.path.join(self.template_dir, "run_backtest.py.template")
+            )
+        )
+
+        # Check if readme.md file exists
+        readme_file_path = os.path.join(self.output_dir, "README.md")
+
+        self.assertTrue(os.path.exists(readme_file_path))
+
+        # Check if the readme.md is the same as the template
+        self.assertTrue(
+            self.is_same_file_content(
+                readme_file_path,
+                os.path.join(self.template_dir, "readme.md.template")
+            )
+        )
+
+        # Check if there is a .env.example file
+        env_example_file_path = os.path.join(self.output_dir, ".env")
+        self.assertTrue(os.path.exists(env_example_file_path))
+        # Check if the .env.example is the same as the template
+        self.assertTrue(
+            self.is_same_file_content(
+                env_example_file_path,
+                os.path.join(
+                    self.template_dir, "env.example.template"
+                )
+            )
+        )
+
+
     def is_same_file_content(self, file1, file2):
         with open(file1, 'r') as f1, open(file2, 'r') as f2:
             content1 = f1.read()

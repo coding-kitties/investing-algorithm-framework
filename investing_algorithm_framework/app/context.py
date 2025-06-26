@@ -261,6 +261,154 @@ class Context:
             order_data, execute=execute, validate=validate, sync=sync
         )
 
+    def create_limit_sell_order(
+        self,
+        target_symbol,
+        price,
+        amount=None,
+        percentage_of_position=None,
+        market=None,
+        portfolio_id=None
+    ) -> Order:
+        """
+        Function to create a limit sell order. This function will create
+        a limit sell order. If the amount parameter is specified, the
+        order will be created with the specified amount. If the
+        percentage_of_position parameter is specified, the order will be
+        created with the percentage of the position specified. If neither
+        the amount nor the percentage_of_position parameter is specified,
+        an OperationalException will be raised.
+
+        Args:
+            target_symbol (str): The symbol of the asset to sell
+            price (float): The price at which to sell the asset
+            amount (float, optional): The amount of the asset to sell
+            percentage_of_position (float, optional): The percentage of the
+                position to sell.
+            market (str, optional): the portfolio corresponding to the market
+                to sell the asset
+            portfolio_id: (str, optional): The ID of the portfolio to sell
+                the asset from.
+
+        Returns:
+            Order: The order created
+        """
+        if amount is None and percentage_of_position is None:
+            raise OperationalException(
+                "Either amount or percentage_of_position must be specified "
+                "to create a limit sell order."
+            )
+
+        if portfolio_id is not None:
+            portfolio = self.portfolio_service.get(portfolio_id)
+        elif market is not None:
+            portfolio = self.portfolio_service.find({"market": market})
+        else:
+            portfolio = self.portfolio_service.get_all()[0]
+
+        if percentage_of_position is not None:
+            position = self.position_service.find(
+                {
+                    "symbol": target_symbol,
+                    "portfolio": portfolio.id
+                }
+            )
+            amount = position.get_amount() * (percentage_of_position / 100)
+
+        logger.info(
+            f"Creating limit order: {target_symbol} "
+            f"SELL {amount} @ {price}"
+        )
+        order_data = {
+            "target_symbol": target_symbol,
+            "price": price,
+            "amount": amount,
+            "order_type": OrderType.LIMIT.value,
+            "order_side": OrderSide.SELL.value,
+            "portfolio_id": portfolio.id,
+            "status": OrderStatus.CREATED.value,
+            "trading_symbol": portfolio.trading_symbol,
+        }
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            order_data["created_at"] = \
+                self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+
+        return self.order_service.create(order_data)
+
+    def create_limit_buy_order(
+        self,
+        target_symbol,
+        price,
+        amount=None,
+        percentage_of_portfolio=None,
+        market=None,
+        portfolio_id=None
+    ) -> Order:
+        """
+        Function to create a limit buy order. This function will create
+        a limit buy order. If the amount parameter is specified, the
+        order will be created with the specified amount. If the
+        percentage_of_portfolio parameter is specified, the order will be
+        created with the percentage of the portfolio specified. If neither
+        the amount nor the percentage_of_portfolio parameter is specified,
+        an OperationalException will be raised.
+
+        Args:
+            target_symbol (str): The symbol of the asset to buy
+            price (float): The price at which to buy the asset
+            amount (float, optional): The amount of the asset to buy
+            percentage_of_portfolio (float, optional): The percentage of the
+                portfolio to buy.
+            market (str, optional): the portfolio corresponding to the market
+                to buy the asset
+            portfolio_id (str, optional): The ID of the portfolio to buy
+                the asset from.
+
+        Returns:
+            Order: The order created
+        """
+
+        if amount is None and percentage_of_portfolio is None:
+            raise OperationalException(
+                "Either amount or percentage_of_portfolio must be specified "
+                "to create a limit buy order."
+            )
+
+        if portfolio_id is not None:
+            portfolio = self.portfolio_service.get(portfolio_id)
+        elif market is not None:
+            portfolio = self.portfolio_service.find({"market": market})
+        else:
+            portfolio = self.portfolio_service.get_all()[0]
+
+        if percentage_of_portfolio is not None:
+            net_size = portfolio.get_net_size()
+            size = net_size * (percentage_of_portfolio / 100)
+            amount = size / price
+        logger.info(
+            f"Creating limit order: {target_symbol} "
+            f"BUY {amount} @ {price}"
+        )
+        order_data = {
+            "target_symbol": target_symbol,
+            "price": price,
+            "amount": amount,
+            "order_type": OrderType.LIMIT.value,
+            "order_side": OrderSide.BUY.value,
+            "portfolio_id": portfolio.id,
+            "status": OrderStatus.CREATED.value,
+            "trading_symbol": portfolio.trading_symbol,
+        }
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            order_data["created_at"] = \
+                self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+        return self.order_service.create(
+            order_data, execute=True, validate=True, sync=True
+        )
+
     def get_portfolio(self, market=None) -> Portfolio:
         """
         Function to get the portfolio of the algorithm. This function

@@ -13,8 +13,16 @@ def get_yearly_returns_bar_chart(yearly_returns_series):
     Returns:
         A Plotly Figure object representing the yearly returns bar chart.
     """
+    # Convert the series to a DataFrame
     df = pd.DataFrame(yearly_returns_series, columns=["Return", "Year"])
+
+    # Ensure the 'Year' column is datetime-like
+    df["Year"] = pd.to_datetime(df["Year"], errors="coerce")
+
+    # Extract the year from the datetime
     df["Year"] = df["Year"].dt.year
+
+    # Convert returns to percentage
     df["Return"] = df["Return"] * 100  # Convert to percentage
 
     # Ensure that there are no floating point numbers in the Return column
@@ -44,3 +52,4 @@ def get_yearly_returns_bar_chart(yearly_returns_series):
     # Format bar text
     fig.update_traces(texttemplate="%{text}", textposition="outside")
     return fig
+

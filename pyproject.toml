@@ -32,6 +32,7 @@ python-dotenv = "^1.0.1"
 pyarrow = ">=19.0.1"
 yfinance = "^0.2.61"
 plotly = "^6.1.2"
+boto3 = "^1.38.41"
 
 [tool.poetry.group.test.dependencies]
 coverage= "7.4.2"

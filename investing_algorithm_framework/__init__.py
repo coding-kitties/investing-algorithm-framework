@@ -1,6 +1,6 @@
 from investing_algorithm_framework.app import App, Algorithm, \
     TradingStrategy, StatelessAction, Task, AppHook, Context, \
-    add_html_report, add_metrics, generate_report, BacktestReport, \
+    add_html_report, add_metrics, BacktestReport, \
     BacktestReportsEvaluation, pretty_print_trades, pretty_print_positions, \
     pretty_print_orders, pretty_print_backtest
 from investing_algorithm_framework.domain import ApiException, \
@@ -15,12 +15,13 @@ from investing_algorithm_framework.domain import ApiException, \
     DateRange, DEFAULT_LOGGING_CONFIG, \
     BacktestResult, TradeStatus, MarketDataType, TradeRiskType, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
-    SnapshotInterval
+    SnapshotInterval, AWS_S3_STATE_BUCKET_NAME
 from investing_algorithm_framework.infrastructure import \
     CCXTOrderBookMarketDataSource, CCXTOHLCVMarketDataSource, \
     CCXTTickerMarketDataSource, CSVOHLCVMarketDataSource, \
     CSVTickerMarketDataSource, AzureBlobStorageStateHandler, \
-    PandasOHLCVBacktestMarketDataSource, PandasOHLCVMarketDataSource
+    PandasOHLCVBacktestMarketDataSource, PandasOHLCVMarketDataSource, \
+    AWSS3StorageStateHandler
 from .create_app import create_app
 from .download_data import download
 
@@ -89,6 +90,7 @@ __all__ = [
     "PandasOHLCVMarketDataSource",
     "SnapshotInterval",
     "add_metrics",
-    "generate_report",
-    "add_html_report"
+    "add_html_report",
+    "AWSS3StorageStateHandler",
+    "AWS_S3_STATE_BUCKET_NAME"
 ]

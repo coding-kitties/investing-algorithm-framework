@@ -13,7 +13,7 @@ from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLTradeTakeProfitRepository, SQLTradeStopLossRepository, \
     SQLOrderMetadataRepository
 from .services import PerformanceService, CCXTMarketService, \
-    AzureBlobStorageStateHandler
+    AzureBlobStorageStateHandler, AWSS3StorageStateHandler
 from .data_providers import CCXTDataProvider, get_default_data_providers, \
     get_default_ohlcv_data_providers
 from .order_executors import CCXTOrderExecutor
@@ -57,5 +57,6 @@ __all__ = [
     "get_default_data_providers",
     "get_default_ohlcv_data_providers",
     "PandasOHLCVBacktestMarketDataSource",
-    "PandasOHLCVMarketDataSource"
+    "PandasOHLCVMarketDataSource",
+    "AWSS3StorageStateHandler"
 ]

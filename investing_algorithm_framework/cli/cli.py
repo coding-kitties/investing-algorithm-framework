@@ -1,8 +1,9 @@
 import click
-from investing_algorithm_framework.cli.initialize_app import \
-    command as initialize_app_command
-from investing_algorithm_framework.cli.deploy_to_azure_function import \
-    command as deploy_to_azure_function_command
+
+from .deploy_to_aws_lambda import command as deploy_to_aws_lambda_command
+from .deploy_to_azure_function import command as \
+    deploy_to_azure_function_command
+from .initialize_app import command as initialize_app_command
 
 """
 CLI for Investing Algorithm Framework
@@ -144,6 +145,61 @@ def deploy_azure_function(
         region=region,
         create_resource_group_if_not_exists=crg,
         skip_login=skip_login
+    )
+
+
+@click.command()
+@click.option(
+    '--lambda_function_name',
+    required=True,
+    help='The name of the AWS Lambda function to deploy.'
+)
+@click.option(
+    '--region',
+    required=True,
+    help='The AWS region where the Lambda function will be deployed.'
+)
+@click.option(
+    '--lambda_handler',
+    required=True,
+    help='The Lambda handler function in the '
+         'format "module_name.function_name".',
+    default="aws_function.lambda_handler"
+)
+@click.option(
+    '--project_dir',
+    default=None,
+    help='The path to the project directory containing '
+         'the Lambda function code.'
+)
+def deploy_aws_lambda(
+    lambda_function_name,
+    region,
+    lambda_handler,
+    project_dir=None,
+):
+    """
+    Command-line tool for deploying a trading bot to AWS lambda
+
+    Args:
+        lambda_function_name (str): The name of the AWS Lambda function
+            to deploy.
+        region (str): The AWS region where the Lambda function will
+            be deployed.
+        lambda_handler (str): The Lambda handler function in the format
+            "module_name.function_name".
+        project_dir (str): The path to the project directory containing the
+            Lambda function code. If not provided, it defaults to
+            the current directory.
+
+    Returns:
+        None
+    """
+    deploy_to_aws_lambda_command(
+        lambda_function_name=lambda_function_name,
+        region=region,
+        lambda_handler=lambda_handler,
+        project_dir=project_dir
     )
 
 

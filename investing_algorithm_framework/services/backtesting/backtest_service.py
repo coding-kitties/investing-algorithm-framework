@@ -1,9 +1,7 @@
-import inspect
 import json
 import logging
 import os
 import re
-import sys
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
@@ -12,9 +10,8 @@ from tqdm import tqdm
 
 from investing_algorithm_framework.domain import BacktestResult, \
     BACKTESTING_INDEX_DATETIME, TimeUnit, TradingDataType, \
-    OperationalException, MarketDataSource, \
-    SYMBOLS, BacktestDateRange, DATETIME_FORMAT_BACKTESTING, \
-    RESOURCE_DIRECTORY, Observable, Event
+    OperationalException, MarketDataSource, Observable, Event, \
+    SYMBOLS, BacktestDateRange, DATETIME_FORMAT_BACKTESTING
 from investing_algorithm_framework.services.market_data_source_service import \
     MarketDataSourceService
 
@@ -566,104 +563,6 @@ class BacktestService(Observable):
 
         return False
 
-    def save_report(
-        self,
-        algorithm,
-        report: BacktestResult,
-        output_directory: str,
-        save_strategy=False,
-    ) -> None:
-        """
-        Function to save the backtest report to a file. If the
-        `save_in_memory_strategies` flag is set to True, the function
-        tries to get the strategy class defintion that are loaded in
-        memory and save them to the output directory(this is usefull
-        when experimenting in notebooks). Otherwise, it copies
-        the strategy directory to the output directory.
-
-        Args:
-            report: BacktestResult - The backtest report to save
-            algorithm: Algorithm - The algorithm to save
-            output_directory: str - The directory to save the report in
-            save_strategy: bool - Flag to save the strategy files
-                (default: False)
-            algorithm: Algorithm - The algorithm to save the report for
-
-        Returns:
-            None
-        """
-
-        if output_directory is None:
-            output_directory = os.path.join(
-                self._configuration_service.config[RESOURCE_DIRECTORY],
-                "backtest_reports"
-            )
-
-        output_directory = self.create_report_directory(
-            report, output_directory, algorithm.name
-        )
-
-        if save_strategy:
-            strategies = algorithm.get_strategies()
-
-            for strategy in strategies:
-                mod = sys.modules[strategy.__module__]
-                strategy_directory_path = os.path.dirname(mod.__file__)
-
-                strategy_directory_name = os.path.basename(
-                    strategy_directory_path
-                )
-                strategy_files = os.listdir(strategy_directory_path)
-                output_strategy_directory = os.path.join(
-                    output_directory, strategy_directory_name
-                )
-
-                if not os.path.exists(output_strategy_directory):
-                    os.makedirs(output_strategy_directory)
-
-                for file in strategy_files:
-                    source_file = os.path.join(strategy_directory_path, file)
-                    destination_file = os.path.join(
-                        output_strategy_directory, file
-                    )
-
-                    if os.path.isfile(source_file):
-                        # Copy the file to the output directory
-                        with open(source_file, "rb") as src:
-                            with open(destination_file, "wb") as dst:
-                                dst.write(src.read())
-
-        self.write_report_to_json(report, output_directory)
-
-    def write_report_to_json(
-        self, report: BacktestResult, output_directory: str
-    ) -> None:
-        """
-        Function to write a backtest report to a JSON file.
-
-        Args:
-            report: BacktestResult
-                The backtest report to write to a file.
-            output_directory: str
-                The directory to store the backtest report file.
-
-        Returns:
-            None
-        """
-
-        if not os.path.exists(output_directory):
-            os.makedirs(output_directory)
-
-        json_file_path = os.path.join(output_directory, "report.json")
-
-        report_dict = report.results.to_dict()
-        # Convert dictionary to JSON
-        json_data = json.dumps(report_dict, indent=4)
-
-        # Write JSON data to a .json file
-        with open(json_file_path, "w") as json_file:
-            json_file.write(json_data)
-
     @staticmethod
     def create_report_directory_name(report) -> str:
         """
@@ -681,118 +580,12 @@ class BacktestService(Observable):
         """
         created_at = report.results\
             .created_at.strftime(DATETIME_FORMAT_BACKTESTING)
+        backtest_start_date = report.results.backtest_date_range.start_date
+        backtest_end_date = report.results.backtest_date_range.end_date
         name = report.results.name
-        directory_name = f"{name}_backtest_created-at_{created_at}"
+
+        start_date = backtest_start_date.strftime(DATETIME_FORMAT_BACKTESTING)
+        end_date = backtest_end_date.strftime(DATETIME_FORMAT_BACKTESTING)
+        directory_name = f"report_{name}_backtest-start-date_" \
+            f"{start_date}_backtest-end-date_{end_date}_{created_at}"
         return directory_name
-
-    @staticmethod
-    def create_report_directory(
-        report, output_directory, algorithm_name
-    ) -> str:
-        """
-        Function to create a directory for a backtest report.
-        The directory name will be automatically generated based on the
-        backtest start date, end date, and creation date.
-        The directory will be created if it does not exist.
-
-        Args:
-            report: BacktestResult - The backtest report to create a
-                directory for.
-            output_directory: str - The directory to store the backtest
-                report file.
-            algorithm_name: str - The name of the algorithm to
-                create a directory for.
-
-        Returns:
-            directory_path: str The directory path for the
-                backtest report file.
-        """
-
-        directory_name = BacktestService.create_report_directory_name(report)
-        directory_path = os.path.join(output_directory, directory_name)
-
-        if not os.path.exists(directory_path):
-            os.makedirs(directory_path)
-
-        return directory_path
-
-    def _save_strategy_class(self, strategy, output_directory):
-        """
-        Save the strategy class to a file in the specified output directory.
-
-        Args:
-            strategy: The strategy instance to save.
-            output_directory: The directory to save the
-                strategy class file.
-
-        Returns:
-            None
-        """
-        collected_imports = set()
-        class_definitions = []
-        collected_imports = []
-        class_definitions = []
-
-        cls = strategy.__class__
-        file_path = inspect.getfile(cls)
-
-        if os.path.exists(file_path):
-
-            with open(file_path, "r") as f:
-                lines = f.readlines()
-
-            class_started = False
-            class_code = []
-            current_import = []
-
-            for line in lines:
-                stripped_line = line.strip()
-
-                # Start collecting an import line
-                if stripped_line.startswith(("import ", "from ")):
-                    current_import.append(line.rstrip())
-
-                    # Handle single-line import directly
-                    if not stripped_line.endswith(("\\", "(")):
-                        collected_imports.append(" ".join(current_import))
-                        current_import = []
-
-                # Continue collecting multi-line imports
-                elif current_import:
-                    current_import.append(line.rstrip())
-
-                    # Stop when the multi-line import finishes
-                    if not stripped_line.endswith(("\\", ",")):
-                        collected_imports.append(" ".join(current_import))
-                        current_import = []
-
-                # Catch any unfinished import (just in case)
-                if current_import:
-                    collected_imports.append(" ".join(current_import))
-
-                # Capture class definitions and functions
-                if stripped_line.startswith("class ") \
-                        or stripped_line.startswith("def "):
-                    class_started = True
-
-                if class_started:
-                    class_code.append(line)
-
-            if class_code:
-                class_definitions.append("".join(class_code))
-
-        class_name = strategy.__class__.__name__
-        class_file_name = f"{class_name}.py"
-        filename = os.path.join(output_directory, class_file_name)
-
-        # Save everything to a single file
-        with open(filename, "w") as f:
-            # Write unique imports at the top
-            for imp in collected_imports:
-                f.write(imp)
-
-            f.write("\n\n")
-
-            # Write class and function definitions
-            for class_def in class_definitions:
-                f.write(class_def + "\n\n")
