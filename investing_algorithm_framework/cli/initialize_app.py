@@ -6,6 +6,7 @@ class AppType(Enum):
     DEFAULT = "DEFAULT"
     DEFAULT_WEB = "DEFAULT_WEB"
     AZURE_FUNCTION = "AZURE_FUNCTION"
+    AWS_LAMBDA = "AWS_LAMBDA"
 
     @staticmethod
     def from_string(value: str):
@@ -106,7 +107,7 @@ def command(path=None, app_type="default", replace=False):
     Args:
         path (str): Path to directory to initialize the app in.
         app_type (str): Type of app to create. Options are: 'default',
-            'default-web', 'azure-function'.
+            'default-web', 'azure-function', 'aws-lambda'.
         replace (bool): If True, existing files will be replaced.
             If False, existing files will not be replaced.
             Default is False.
@@ -123,131 +124,167 @@ def command(path=None, app_type="default", replace=False):
             print(f"Directory {path} does not exist.")
             return
 
+    if AppType.DEFAULT.equals(app_type):
+        create_default_app(path=path, replace=replace)
+    elif AppType.DEFAULT_WEB.equals(app_type):
+        create_default_web_app(path=path, replace=replace)
+    elif AppType.AZURE_FUNCTION.equals(app_type):
+        create_azure_function_app(path=path, replace=replace)
+    elif AppType.AWS_LAMBDA.equals(app_type):
+        create_aws_lambda_app(path=path, replace=replace)
+    else:
+        raise ValueError(
+            f"Unknown app type: {app_type}. "
+            "Supported types are: 'default', 'default-web', "
+            "'azure-function', 'aws-lambda'."
+        )
+
+
+def create_default_app(path=None, replace=False):
+    """
+    Function to create a default app skeleton.
+
+    Args:
+        path (str): Path to directory to initialize the app in.
+        replace (bool): If True, existing files will be replaced.
+            If False, existing files will not be replaced.
+            Default is False.
+
+    Returns:
+        None
+    """
     # Get the path of this script (command.py)
     current_script_path = os.path.abspath(__file__)
 
-    if AppType.DEFAULT.equals(app_type):
-        # Construct the path to the template file
-        template_app_file_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "app.py.template"
-        )
-        requirements_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "requirements.txt.template"
-        )
-        run_backtest_template_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "run_backtest.py.template"
-        )
-        env_template_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "env.example.template"
-        )
-        create_file_from_template(
-            env_template_path,
-            os.path.join(path, ".env.example"),
-            replace=replace
-        )
-    elif AppType.DEFAULT_WEB.equals(app_type):
-        # Construct the path to the template file
-        template_app_file_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "app_web.py.template"
-        )
-        requirements_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "requirements.txt.template"
-        )
-        run_backtest_template_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "run_backtest.py.template"
-        )
-        env_template_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "env.example.template"
-        )
-        create_file_from_template(
-            env_template_path,
-            os.path.join(path, ".env.example"),
-            replace=replace
-        )
-    elif AppType.AZURE_FUNCTION.equals(app_type):
-        # Construct the path to the template file
-        template_app_file_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "app_azure_function.py.template"
-        )
-        requirements_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "requirements_azure_function.txt.template"
-        )
-        azure_function_template_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "azure_function_function_app.py.template"
-        )
-        run_backtest_template_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "run_backtest.py.template"
-        )
+    # Construct the path to the template file
+    template_app_file_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "app.py.template"
+    )
+    requirements_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "requirements.txt.template"
+    )
+    run_backtest_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "run_backtest.py.template"
+    )
+    env_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "env.example.template"
+    )
+    create_file_from_template(
+        env_template_path,
+        os.path.join(path, ".env.example"),
+        replace=replace
+    )
+    strategy_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "strategy.py.template"
+    )
+    data_providers_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "data_providers.py.template"
+    )
+    create_file(os.path.join(path, "__init__.py"))
+    create_file_from_template(
+        template_app_file_path,
+        os.path.join(path, "app.py"),
+        replace=replace
+    )
+    create_file_from_template(
+        requirements_path,
+        os.path.join(path, "requirements.txt"),
+        replace=replace
+    )
+    create_file_from_template(
+        run_backtest_template_path,
+        os.path.join(path, "run_backtest.py"),
+        replace=replace
+    )
+    # Create the main directory
+    create_directory(os.path.join(path, "strategies"))
+    strategies_path = os.path.join(path, "strategies")
+    create_file(os.path.join(strategies_path, "__init__.py"))
+    create_file_from_template(
+        strategy_template_path,
+        os.path.join(strategies_path, "strategy.py")
+    )
+    create_file_from_template(
+        data_providers_template_path,
+        os.path.join(strategies_path, "data_providers.py"),
+        replace=replace
+    )
+    gitignore_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        ".gitignore.template"
+    )
+    create_file_from_template(
+        gitignore_template_path,
+        os.path.join(path, ".gitignore"),
+        replace=replace
+    )
+    readme_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "readme.md.template"
+    )
+    create_file_from_template(
+        readme_template_path,
+        os.path.join(path, "README.md"),
+        replace=replace
+    )
 
-        # Create the framework app file as app_entry.py
-        create_file_from_template(
-            azure_function_template_path,
-            os.path.join(path, "function_app.py"),
-            replace=replace
-        )
 
-        # Create the host.json file
-        host_json_template_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "azure_function_host.json.template"
-        )
-        create_file_from_template(
-            host_json_template_path,
-            os.path.join(path, "host.json"),
-            replace=replace
-        )
-        # Create the local.settings.json file
-        local_settings_json_template_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "azure_function_local.settings.json.template"
-        )
-        create_file_from_template(
-            local_settings_json_template_path,
-            os.path.join(path, "local.settings.json"),
-            replace=replace
-        )
-        env_template_path = os.path.join(
-            os.path.dirname(current_script_path),
-            "templates",
-            "env_azure_function.example.template"
-        )
-        create_file_from_template(
-            env_template_path,
-            os.path.join(path, ".env.example"),
-            replace=replace
-        )
-    else:
-        raise ValueError(
-            f"Invalid app type: {app_type}. "
-            "Valid options are: 'default', 'default_web', 'azure_function'."
-        )
+def create_default_web_app(path=None, replace=False):
+    """
+    Function to create a default web app skeleton.
 
+    Args:
+        path (str): Path to directory to initialize the app in.
+        replace (bool): If True, existing files will be replaced.
+            If False, existing files will not be replaced.
+            Default is False.
+
+    Returns:
+        None
+    """
+    # Get the path of this script (command.py)
+    current_script_path = os.path.abspath(__file__)
+
+    # Construct the path to the template file
+    template_app_file_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "app_web.py.template"
+    )
+    requirements_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "requirements.txt.template"
+    )
+    run_backtest_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "run_backtest.py.template"
+    )
+    env_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "env.example.template"
+    )
+    create_file_from_template(
+        env_template_path,
+        os.path.join(path, ".env.example"),
+        replace=replace
+    )
     strategy_template_path = os.path.join(
         os.path.dirname(current_script_path),
         "templates",
@@ -259,7 +296,243 @@ def command(path=None, app_type="default", replace=False):
         "templates",
         "data_providers.py.template"
     )
+    create_file(os.path.join(path, "__init__.py"))
+    create_file_from_template(
+        template_app_file_path,
+        os.path.join(path, "app.py"),
+        replace=replace
+    )
+    create_file_from_template(
+        requirements_path,
+        os.path.join(path, "requirements.txt"),
+        replace=replace
+    )
+    create_file_from_template(
+        run_backtest_template_path,
+        os.path.join(path, "run_backtest.py"),
+        replace=replace
+    )
+    # Create the main directory
+    create_directory(os.path.join(path, "strategies"))
+    strategies_path = os.path.join(path, "strategies")
+    create_file(os.path.join(strategies_path, "__init__.py"))
+    create_file_from_template(
+        strategy_template_path,
+        os.path.join(strategies_path, "strategy.py")
+    )
+    create_file_from_template(
+        data_providers_template_path,
+        os.path.join(strategies_path, "data_providers.py"),
+        replace=replace
+    )
+    gitignore_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        ".gitignore.template"
+    )
+    create_file_from_template(
+        gitignore_template_path,
+        os.path.join(path, ".gitignore"),
+        replace=replace
+    )
+    readme_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "readme.md.template"
+    )
+    create_file_from_template(
+        readme_template_path,
+        os.path.join(path, "README.md"),
+        replace=replace
+    )
 
+
+def create_aws_lambda_app(path=None, replace=False):
+    """
+    Function to create an AWS Lambda app skeleton.
+
+    Args:
+        path (str): Path to directory to initialize the app in.
+        replace (bool): If True, existing files will be replaced.
+            If False, existing files will not be replaced.
+            Default is False.
+
+    Returns:
+        None
+    """
+    # Get the path of this script (command.py)
+    current_script_path = os.path.abspath(__file__)
+    requirements_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "requirements.txt.template"
+    )
+    aws_lambda_handler_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "app_aws_lambda_function.py.template"
+    )
+    run_backtest_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "run_backtest.py.template"
+    )
+    env_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "env.example.template"
+    )
+    create_file_from_template(
+        env_template_path,
+        os.path.join(path, ".env"),
+        replace=replace
+    )
+    strategy_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "strategy.py.template"
+    )
+    data_providers_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "data_providers.py.template"
+    )
+    create_file(os.path.join(path, "__init__.py"))
+    create_file_from_template(
+        requirements_path,
+        os.path.join(path, "requirements.txt"),
+        replace=replace
+    )
+    create_file_from_template(
+        run_backtest_template_path,
+        os.path.join(path, "run_backtest.py"),
+        replace=replace
+    )
+    # Create the main directory
+    create_directory(os.path.join(path, "strategies"))
+    strategies_path = os.path.join(path, "strategies")
+    create_file(os.path.join(strategies_path, "__init__.py"))
+    create_file_from_template(
+        strategy_template_path,
+        os.path.join(strategies_path, "strategy.py")
+    )
+    create_file_from_template(
+        data_providers_template_path,
+        os.path.join(strategies_path, "data_providers.py"),
+        replace=replace
+    )
+    gitignore_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        ".gitignore.template"
+    )
+    create_file_from_template(
+        gitignore_template_path,
+        os.path.join(path, ".gitignore"),
+        replace=replace
+    )
+    readme_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "readme.md.template"
+    )
+    create_file_from_template(
+        readme_template_path,
+        os.path.join(path, "README.md"),
+        replace=replace
+    )
+    create_file_from_template(
+        aws_lambda_handler_template_path,
+        os.path.join(path, "aws_function.py"),
+        replace=replace
+    )
+
+
+def create_azure_function_app(path=None, replace=False):
+    """
+    Function to create an Azure Function app skeleton.
+
+    Args:
+        path (str): Path to directory to initialize the app in.
+        replace (bool): If True, existing files will be replaced.
+            If False, existing files will not be replaced.
+            Default is False.
+
+    Returns:
+        None
+    """
+    # Get the path of this script (command.py)
+    current_script_path = os.path.abspath(__file__)
+
+    # Construct the path to the template file
+    template_app_file_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "app_azure_function.py.template"
+    )
+    requirements_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "azure_function_requirements.txt.template"
+    )
+    azure_function_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "azure_function_function_app.py.template"
+    )
+    run_backtest_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "run_backtest.py.template"
+    )
+    # Create the framework app file as app_entry.py
+    create_file_from_template(
+        azure_function_template_path,
+        os.path.join(path, "app_web.py"),
+        replace=replace
+    )
+    # Create the host.json file
+    host_json_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "azure_function_host.json.template"
+    )
+    create_file_from_template(
+        host_json_template_path,
+        os.path.join(path, "host.json"),
+        replace=replace
+    )
+    # Create the local.settings.json file
+    local_settings_json_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "azure_function_local.settings.json.template"
+    )
+    create_file_from_template(
+        local_settings_json_template_path,
+        os.path.join(path, "local.settings.json"),
+        replace=replace
+    )
+    env_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "env_azure_function.example.template"
+    )
+    create_file_from_template(
+        env_template_path,
+        os.path.join(path, ".env.example"),
+        replace=replace
+    )
+    strategy_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "strategy.py.template"
+    )
+    data_providers_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "data_providers.py.template"
+    )
     create_file(os.path.join(path, "__init__.py"))
     create_file_from_template(
         template_app_file_path,

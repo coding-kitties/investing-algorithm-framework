@@ -64,6 +64,9 @@ def get_sortino_ratio(
     if risk_free_rate is None:
         risk_free_rate = get_risk_free_rate_us()
 
+    if std_downside_daily_return == 0:
+        return float('nan')  # or 0.0, depending on preference
+
     # Formula: Sharpe Ratio = (Mean Daily Return × Periods Per Year - Risk-Free Rate) /
     # (Standard Deviation of Daily Returns × sqrt(Periods Per Year))
     ratio = (mean_daily_return * 365 - risk_free_rate) / \

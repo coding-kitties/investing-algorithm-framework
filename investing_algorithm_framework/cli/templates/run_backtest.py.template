@@ -1,13 +1,20 @@
 from datetime import datetime
-from investing_algorithm_framework import BacktestDateRange, \
-    pretty_print_backtest
 
-from app import app
+from investing_algorithm_framework import BacktestDateRange
+from investing_algorithm_framework import create_app
+from strategies.strategy import MyTradingStrategy
+
+app = create_app()
+app.add_strategy(MyTradingStrategy)
+app.add_market(market="BITVAVO", trading_symbol="EUR")
+
 
 if __name__ == "__main__":
     backtest_date_range = BacktestDateRange(
         start_date=datetime(2023, 1, 1),
         end_date=datetime(2023, 12, 31),
     )
-    report = app.run_backtest(backtest_date_range=backtest_date_range)
-    pretty_print_backtest(report)
+    report = app.run_backtest(
+        backtest_date_range=backtest_date_range, initial_amount=1000
+    )
+    report.show()

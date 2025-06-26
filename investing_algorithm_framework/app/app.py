@@ -17,14 +17,15 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
     SQLALCHEMY_DATABASE_URI, OperationalException, StateHandler, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, APP_MODE, MarketCredential, \
-    AppMode, BacktestDateRange, \
-    DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, \
+    AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, \
+    BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, \
     MarketDataSource, PortfolioConfiguration, SnapshotInterval, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider
 from investing_algorithm_framework.services import OrderBacktestService, \
-    BacktestMarketDataSourceService, BacktestPortfolioService
+    BacktestMarketDataSourceService, BacktestPortfolioService, \
+    BacktestService
 from .app_hook import AppHook
 from .reporting import BacktestReport
 
@@ -713,8 +714,10 @@ class App:
         algorithm=None,
         strategy=None,
         strategies: List = None,
-        save_strategy=False,
-        snapshot_interval: SnapshotInterval = SnapshotInterval.TRADE_CLOSE
+        save_strategy=True,
+        snapshot_interval: SnapshotInterval = SnapshotInterval.TRADE_CLOSE,
+        strategy_directory_path: Optional[str] = None,
+        report_name: Optional[str] = None
     ) -> BacktestReport:
         """
         Run a backtest for an algorithm.
@@ -742,6 +745,15 @@ class App:
                 how often the portfolio snapshot should be taken during the
                 backtest. The default is TRADE_CLOSE, which means that the
                 portfolio snapshot will be taken at the end of each trade.
+            strategy_directory_path (Optional[str]): The directory path
+                where the strategy is located. This is used to save the
+                strategy if save_strategy is True. If not provided,
+                the framework tries to determine the path via the
+                algorithm or strategy object.
+            report_name (Optional[str]): The name of the report. If not
+                provided, the framework will generate a name based on the
+                algorithm name and the backtest date range and the current
+                date and time.
 
         Returns:
             Instance of BacktestReport
@@ -784,7 +796,6 @@ class App:
             on_strategy_run_hooks=self._on_strategy_run_hooks,
         )
         self.initialize_data_sources(algorithm)
-
         strategy_orchestrator_service = \
             self.container.strategy_orchestrator_service()
         strategy_orchestrator_service.initialize(algorithm)
@@ -813,12 +824,29 @@ class App:
             backtest_date_range=backtest_date_range
         )
         report = BacktestReport(results=results)
-        backtest_service.save_report(
-            report=report,
+
+        if output_directory is None:
+            output_directory = os.path.join(
+                config[RESOURCE_DIRECTORY], "backtest_reports"
+            )
+
+        if report_name is None:
+            report_name = BacktestService.create_report_directory_name(report)
+
+        output_directory = os.path.join(output_directory, report_name)
+        report.save(
+            path=output_directory,
             algorithm=algorithm,
-            output_directory=output_directory,
-            save_strategy=save_strategy,
+            strategy_directory_path=strategy_directory_path,
+            save_strategy=save_strategy
         )
+        # print(report.html_report)
+        # backtest_service.save_report(
+        #     report=report,
+        #     algorithm=algorithm,
+        #     output_directory=output_directory,
+        #     save_strategy=save_strategy,
+        # )
         return report
 
     def run_backtests(

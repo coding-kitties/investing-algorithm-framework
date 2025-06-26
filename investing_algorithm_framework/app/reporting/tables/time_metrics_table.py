@@ -1,15 +1,10 @@
 import pandas as pd
 
+from .utils import safe_format, safe_format_percentage, safe_format_date
+
 
 def create_html_time_metrics_table(results, report):
     copy_results = results.copy()
-
-    # Ensure all values are numeric before formatting
-    def safe_format(value, format_str):
-        if isinstance(value, (int, float)):
-            return format_str.format(value)
-        return value  # Return the original value if it's not numeric
-
     copy_results['Percentage Winning Months'] = safe_format(copy_results['Percentage Winning Months'], "{:.2f}")
     copy_results['Percentage Winning Years'] = safe_format(copy_results['Percentage Winning Years'], "{:.2f}")
     copy_results['Average Monthly Return'] = safe_format(copy_results['Average Monthly Return'], "{:.2f}")
@@ -17,13 +12,26 @@ def create_html_time_metrics_table(results, report):
     copy_results['Average Monthly Return (Winning Months)'] = safe_format(copy_results['Average Monthly Return (Winning Months)'], "{:.2f}%")
 
     if isinstance(copy_results['Best Month'], tuple):
-        copy_results['Best Month'] = f"{(copy_results['Best Month'][0] * 100):.2f}% {copy_results['Best Month'][1].strftime('%b %Y')}"
+        copy_results['Best Month'] = (
+            safe_format_percentage(copy_results['Best Month'][0], "{:.2f}%"),
+            safe_format_date(copy_results['Best Month'][1], "%b %Y")
+        )
+
     if isinstance(copy_results['Worst Month'], tuple):
-        copy_results['Worst Month'] = f"{(copy_results['Worst Month'][0] * 100):.2f}% {copy_results['Worst Month'][1].strftime('%b %Y')}"
+        copy_results['Worst Month'] = (
+            safe_format_percentage(copy_results['Worst Month'][0], "{:.2f}%"),
+            safe_format_date(copy_results['Worst Month'][1], "%b %Y")
+        )
     if isinstance(copy_results['Best Year'], tuple):
-        copy_results['Best Year'] = f"{(copy_results['Best Year'][0] * 100):.2f}% {copy_results['Best Year'][1].strftime('%Y')}"
+        copy_results['Best Year'] = (
+            safe_format_percentage(copy_results['Best Year'][0], "{:.2f}%"),
+            safe_format_date(copy_results['Best Year'][1], "%Y")
+        )
     if isinstance(copy_results['Worst Year'], tuple):
-        copy_results['Worst Year'] = f"{(copy_results['Worst Year'][0] * 100):.2f}% {copy_results['Worst Year'][1].strftime('%Y')}"
+        copy_results['Worst Year'] = (
+            safe_format_percentage(copy_results['Worst Year'][0], "{:.2f}%"),
+            safe_format_date(copy_results['Worst Year'][1], "%Y")
+        )
 
     stats = {
         "Metric": [

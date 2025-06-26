@@ -1,6 +1,6 @@
 import os
 from jinja2 import Environment, FileSystemLoader
-from .backtest_report import BacktestReport
+
 from .tables import create_html_time_metrics_table, \
     create_html_trade_metrics_table, create_html_key_metrics_table, \
     create_html_trades_table
@@ -23,28 +23,7 @@ from .metrics import get_equity_curve, get_total_return, get_cagr, \
     get_best_year, get_worst_month, get_worst_year, get_trades_per_year
 
 
-def generate_report(backtest_results, risk_free_rate=None) -> BacktestReport:
-    """
-    Generate a report.results based on the specified type and data.
-
-    Args:
-        backtest_results (BacktestResults): The backtest results containing
-            the data to be included in the report.results.
-        risk_free_rate (float, optional): The risk-free rate to be used in
-            the report.results calculations. Defaults to None. If none, the
-            risk-free rate will be retrieved from the US Treasury (10-year
-            yield) using the `get_risk_free_rate` function.
-
-    Returns:
-        str: The generated report.results as a string.
-    """
-    report = BacktestReport.results = backtest_results
-    add_metrics(report.results, risk_free_rate)
-    add_html_report(report.results)
-    return report.results
-
-
-def add_metrics(report: BacktestReport, risk_free_rate=None) -> None:
+def add_metrics(report, risk_free_rate=None) -> "BacktestReport":
     """
     Add metrics to the report.results.
 
@@ -64,8 +43,11 @@ def add_metrics(report: BacktestReport, risk_free_rate=None) -> None:
         "CAGR": get_cagr(report.results.portfolio_snapshots),
         "Sharpe Ratio": get_sharpe_ratio(report.results.portfolio_snapshots),
         "Rolling Sharpe Ratio": get_rolling_sharpe_ratio(
-            report.results.portfolio_snapshots),
-        "Sortino Ratio": get_sortino_ratio(report.results.portfolio_snapshots),
+            report.results.portfolio_snapshots, risk_free_rate=risk_free_rate
+        ),
+        "Sortino Ratio": get_sortino_ratio(
+            report.results.portfolio_snapshots, risk_free_rate=risk_free_rate
+        ),
         "Profit Factor": get_profit_factor(report.results.get_trades()),
         "Calmar Ratio": get_calmar_ratio(report.results.portfolio_snapshots),
         "Annual Volatility": get_annual_volatility(
@@ -140,7 +122,7 @@ def add_metrics(report: BacktestReport, risk_free_rate=None) -> None:
     report.metrics = results
     return report
 
-def add_html_report(report: BacktestReport) -> BacktestReport:
+def add_html_report(report) -> "BacktestReport":
     """
     Add HTML content to the report.results.
 

@@ -4,6 +4,7 @@ import plotly.graph_objects as go
 
 def get_monthly_returns_heatmap_chart(monthly_return_series):
     df = pd.DataFrame(monthly_return_series, columns=["Return", "Timestamp"])
+    df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors='coerce')
     df["Year"] = df["Timestamp"].dt.year
     df["Month"] = df["Timestamp"].dt.strftime("%b")
 

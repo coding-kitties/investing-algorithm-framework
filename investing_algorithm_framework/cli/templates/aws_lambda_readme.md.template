@@ -1,0 +1,110 @@
+# README created by investing_algorithm_framework
+
+You can find the documentation for the investing_algorithm_framework
+[here](https://coding-kitties.github.io/investing-algorithm-framework).
+
+
+## Getting Started
+
+This project was created using the investing_algorithm_framework CLI. It provides a template for building a trading algorithm using the investing_algorithm_framework.
+
+This repository contains a simple trading algorithm that uses the
+`investing_algorithm_framework` to fetch data from [bitvavo](https://www.bitvavo.com/en/) and execute trades on the [bitvavo exchange](https://www.bitvavo.com/en/).
+
+The trading strategy is a simple moving average crossover strategy that uses the 50 and 100 day moving averages and the 200 day moving average as a trend filter. The strategy is implemented in the `strategy.py` file. The data provider is implemented in the `data_providers.py` file.
+
+All indicators are implemented with the [pyindicators](https://github.com/coding-kitties/PyIndicators) library.
+
+
+#### 1. Install the requirements
+
+You can install the requirements using the following command:
+```bash
+pip install -r requirements.txt
+```
+
+This will install the `investing_algorithm_framework`, `pyindicators`, and
+`python-dotenv` libraries. If you use the azure functions type option, it will also install the `azure-functions` library.
+
+
+#### 2. Create a `.env` file
+You need to create a `.env` file in the root of the project.
+You can use the `.env.example` file as a template. The `.env` file should
+contain the following environment variables:
+
+```bash
+<MARKET>_API_KEY=your_api_key
+<MARKET>_API_SECRET=your_api_secret
+```
+
+##### 2.1 Changing the exchange
+You can change the exchange in the `aws_function.py` file. The default is set to `bitvavo`,
+but you can change it to any exchange you want. You can find the list of supported exchanges [here](https://investing-algorithm-framework.com/Getting%20Started/markets).
+
+##### 2.2 AWS Lambda state handler
+Given that this project is created with the `aws_lambda` type option,
+it will use the AWS S3 state handler by default. This state handler
+will store the state of the trading bot in an AWS S3 bucket. When deploying
+the trading bot this bucket will be created automatically and configured
+with your Lambda function.
+
+#### 3. Deployment
+You can deploy your trading bot to aws lambda using the following command:
+
+This will deploy your trading bot to aws. You can find the
+deployment instructions [here](https://investing-algorithm-framework.com/Getting%20Started/deployment).
+
+> !Important: Make sure you have installed all your dependencies
+> from the `requirements.txt` file in a local virtual environment
+> before deploying. This is required for AWS Lambda to work correctly. The best
+> way to do this is to create a virtual environment name .venv in the
+> root of the project and install the requirements.txt file.
+
+```bash
+investing-algorithm-framework deploy_aws_lambda
+```
+
+#### 4. Backtesting
+You can run the backtest using the following command:
+
+```bash
+python run_backtest.py
+```
+
+## Project Structure
+
+> We highly recommend to keep the file structure as is, as it is
+> designed to work with the investing_algorithm_framework CLI.
+> You can add your own files and folders as needed, however, we
+> recommend to keep the `strategies` folder for your strategies
+> and the `app.py` file for your app entry point.
+
+```yaml
+.
+├── .venv
+├── aws_function.py
+├── run_backtest.py
+├── requirements.txt
+├── strategies
+│   ├── data_providers.py
+│   └── strategy.py
+├── .gitignore
+├── .env
+└── README.md
+```
+
+## Requirements
+
+The project requires Python 3.10 or higher. You can create a virtual
+environment and install the requirements using the following commands:
+
+```bash
+virtualenv venv
+source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+pip install -r requirements.txt
+```
+
+By default pyindicators is installed as its
+specified in the requirements.txt file. This is a requirement for the
+example strategy in the `strategy.py` file. You can always remove it from
+the requirements.txt file if you don't need it.

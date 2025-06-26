@@ -1,0 +1,36 @@
+import os
+from investing_algorithm_framework import create_app, \
+    AWSS3StorageStateHandler, AWS_S3_STATE_BUCKET_NAME
+
+from .strategies.strategy import MyTradingStrategy
+app = create_app()
+
+# Get the s3 state bucket name from environment variables for database
+# state storage, this is set during the deployment
+# to AWS Lambda with the `deploy_aws_lambda` cli command.
+app.add_state_handler(
+    AWSS3StorageStateHandler(bucket_name=os.getenv(AWS_S3_STATE_BUCKET_NAME))
+)
+app.add_strategy(MyTradingStrategy)
+app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=1000)
+
+
+def lambda_handler(event, context):
+    """
+    AWS Lambda handler function for executing a trading strategy.
+
+    Args:
+        event: dict, the event data passed to the Lambda function.
+        context: object, the context object provided by AWS Lambda.
+
+    Returns:
+        dict: The result of the trading strategy execution.
+    """
+    try:
+        app.run(number_of_iterations=1)
+        return {
+            "statusCode": 200,
+            "body": "Trading strategy executed successfully."
+        }
+    except Exception as e:
+        return {"statusCode": 500, "body": str(e)}

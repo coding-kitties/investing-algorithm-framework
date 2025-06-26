@@ -1,5 +1,7 @@
 import pandas as pd
 
+from .utils import safe_format, safe_format_date, safe_format_percentage
+
 
 def highlight_sharpe_and_sortino(row):
     """
@@ -149,18 +151,30 @@ def highlight_max_drawdown(row):
 
 def create_html_key_metrics_table(results, report):
     copy_results = results.copy()
-    # Format some values to percentages
-    copy_results['Total Return'] = f"{copy_results['Total Return']:.2f}%"
-    copy_results['CAGR'] = f"{copy_results['CAGR'] * 100:.2f}%"
-    copy_results['Sharpe Ratio'] = f"{copy_results['Sharpe Ratio']:.2f}"
-    copy_results['Sortino Ratio'] = f"{copy_results['Sortino Ratio']:.2f}"
-    copy_results['Profit Factor'] = f"{copy_results['Profit Factor']:.2f}"
-    copy_results['Calmar Ratio'] = f"{copy_results['Calmar Ratio']:.2f}"
-    copy_results['Annual Volatility'] = f"{copy_results['Annual Volatility'] * 100:.2f}%"
-    copy_results['Max Drawdown'] = f"{copy_results['Max Drawdown'] * 100:.2f}%"
-    copy_results['Max Drawdown Absolute'] = f"{copy_results['Max Drawdown Absolute']:.2f} {report.trading_symbol}"
-    copy_results['Max Daily Drawdown'] = f"{copy_results['Max Daily Drawdown'] * 100:.2f}%"
+    # Format some values to percentages and floats
+    copy_results['Total Return'] = safe_format_percentage(copy_results['Total Return'], "{:.2f}%")
+    copy_results['CAGR'] = safe_format_percentage(copy_results['CAGR'], "{:.2f}%")
+    copy_results['Sharpe Ratio'] = safe_format(copy_results['Sharpe Ratio'], "{:.2f}")
+    copy_results['Sortino Ratio'] = safe_format(copy_results['Sortino Ratio'], "{:.2f}")
+    copy_results['Profit Factor'] = safe_format(copy_results['Profit Factor'], "{:.2f}")
+    copy_results['Calmar Ratio'] = safe_format(copy_results['Calmar Ratio'], "{:.2f}")
+    copy_results['Annual Volatility'] = safe_format_percentage(copy_results['Annual Volatility'], "{:.2f}%")
+    copy_results['Max Drawdown'] = safe_format_percentage(copy_results['Max Drawdown'], "{:.2f}%")
+    copy_results['Max Drawdown Absolute'] = safe_format(copy_results['Max Drawdown Absolute'], "{:.2f} " + report.trading_symbol)
+    copy_results['Max Daily Drawdown'] = safe_format_percentage(copy_results['Max Daily Drawdown'], "{:.2f}%")
     copy_results['Max Drawdown Duration'] = f"{copy_results['Max Drawdown Duration']} hours - {copy_results['Max Drawdown Duration'] // 24} days"
+
+    # copy_results['Total Return'] = f"{copy_results['Total Return']:.2f}%"
+    # copy_results['CAGR'] = f"{copy_results['CAGR'] * 100:.2f}%"
+    # copy_results['Sharpe Ratio'] = f"{copy_results['Sharpe Ratio']:.2f}"
+    # copy_results['Sortino Ratio'] = f"{copy_results['Sortino Ratio']:.2f}"
+    # copy_results['Profit Factor'] = f"{copy_results['Profit Factor']:.2f}"
+    # copy_results['Calmar Ratio'] = f"{copy_results['Calmar Ratio']:.2f}"
+    # copy_results['Annual Volatility'] = f"{copy_results['Annual Volatility'] * 100:.2f}%"
+    # copy_results['Max Drawdown'] = f"{copy_results['Max Drawdown'] * 100:.2f}%"
+    # copy_results['Max Drawdown Absolute'] = f"{copy_results['Max Drawdown Absolute']:.2f} {report.trading_symbol}"
+    # copy_results['Max Daily Drawdown'] = f"{copy_results['Max Daily Drawdown'] * 100:.2f}%"
+    # copy_results['Max Drawdown Duration'] = f"{copy_results['Max Drawdown Duration']} hours - {copy_results['Max Drawdown Duration'] // 24} days"
 
     stats = {
         "Metric": [

@@ -706,7 +706,6 @@ def command(
     print("Checking functools...")
     # Ensure azure functions core tools are installed
     ensure_azure_functools()
-
     create_storage_and_function(
         resource_group_name=resource_group,
         storage_account_name=storage_account_name,
