@@ -205,3 +205,4 @@ def deploy_aws_lambda(
 
 cli.add_command(init)
 cli.add_command(deploy_azure_function)
+cli.add_command(deploy_aws_lambda)
