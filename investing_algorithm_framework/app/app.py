@@ -721,8 +721,7 @@ class App:
         Run a backtest for an algorithm.
 
         Args:
-            backtest_date_range: The date range to run the backtest for
-                (instance of BacktestDateRange)
+            backtest_date_range (BacktestDateRange): The date range to run the backtest for
             name: The name of the backtest. This is used to identify the
                 backtest report in the output directory.
             initial_amount: The initial amount to start the backtest with.
@@ -732,9 +731,13 @@ class App:
                 that needs to be backtested.
             strategies (List[TradingStrategy) (Optional): List of strategy
                 objects that need to be backtested
-            algorithm:
-            output_directory: str - The directory to
-              write the backtest report to
+            algorithm (Algorithm) (Optional): The algorithm object that
+                needs to be backtested. If this is provided, then the
+                strategies and tasks of the algorithm will be used for the
+                backtest. If this is not provided, then the strategies
+                and tasks provided in the strategies parameter will be used.
+            output_directory: str - The directory to write the
+                backtest report to
             save_strategy: bool - Whether to save the strategy
                 as part of the backtest report. You can only save in-memory
                 strategies when running multiple backtests. This is because
@@ -756,7 +759,6 @@ class App:
         Returns:
             Instance of BacktestReport
         """
-
         # Add backtest configuration to the config
         self.set_config_with_dict({
             ENVIRONMENT: Environment.BACKTEST.value,
@@ -765,7 +767,9 @@ class App:
             DATABASE_NAME: "backtest-database.sqlite3",
             DATABASE_DIRECTORY_NAME: "backtest_databases",
             BACKTESTING_INITIAL_AMOUNT: initial_amount,
-            SNAPSHOT_INTERVAL: snapshot_interval.value,
+            SNAPSHOT_INTERVAL: SnapshotInterval.from_value(
+                snapshot_interval
+            ).value
         })
 
         self.initialize_config()
