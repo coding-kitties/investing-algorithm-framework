@@ -177,12 +177,17 @@ def deploy_azure_function(
     default=None,
     help='List of directories to ignore when deploying.'
 )
+@click.option(
+    '--memory_size',
+    default=3000,
+    type=int,
+    help='The memory size for the Lambda function in MB. Default is 3000 MB.'
+)
 def deploy_aws_lambda(
     lambda_function_name,
     region,
-    lambda_handler,
     project_dir=None,
-    ignore_dirs=None
+    memory_size=3000
 ):
     """
     Command-line tool for deploying a trading bot to AWS lambda
@@ -192,12 +197,11 @@ def deploy_aws_lambda(
             to deploy.
         region (str): The AWS region where the Lambda function will
             be deployed.
-        lambda_handler (str): The Lambda handler function in the format
-            "module_name.function_name".
         project_dir (str): The path to the project directory containing the
             Lambda function code. If not provided, it defaults to
             the current directory.
-        ignore_dirs (list): List of directories to ignore when deploying.
+        memory_size (int): The memory size for the Lambda function in MB.
+            Default is 3000 MB.
 
     Returns:
         None
@@ -205,9 +209,8 @@ def deploy_aws_lambda(
     deploy_to_aws_lambda_command(
         lambda_function_name=lambda_function_name,
         region=region,
-        lambda_handler=lambda_handler,
         project_dir=project_dir,
-        ignore_dirs=ignore_dirs
+        memory_size=memory_size
     )
 
 

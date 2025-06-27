@@ -1,8 +1,8 @@
 import json
 import os
 import re
+import subprocess
 import time
-import uuid
 import zipfile
 
 import boto3
@@ -126,9 +126,9 @@ def create_iam_role(role_name):
 def deploy_lambda(
     function_name,
     region,
-    zip_file_path,
-    handler_name,
+    image_uri,
     role_arn,
+    memory_size,
     runtime="python3.10",
     env_vars=None,
 ):
@@ -138,24 +138,21 @@ def deploy_lambda(
     Args:
         function_name: str, the name of the Lambda function to
             create or update.
-        zip_file_path: str, the path to the zip file containing
-            the Lambda function code.
         region: str, the AWS region where the Lambda
             function will be deployed.
-        handler_name: str, the name of the handler function
-            in the code (e.g., "main.lambda_handler").
+        image_uri: str, the URI of the Docker image in ECR.
         role_arn:  str, the ARN of the IAM role that Lambda will assume.
         runtime: str, the runtime environment for the
             Lambda function (default is "python3.10").
         env_vars: dict, optional environment variables
             to set for the Lambda function.
+        memory_size: int, the amount of memory allocated
+            to the Lambda function.
+
     Returns:
         None
     """
     lambda_client = boto3.client('lambda', region_name=region)
-
-    with open(zip_file_path, 'rb') as f:
-        zipped_code = f.read()
 
     try:
         lambda_client.get_function(FunctionName=function_name)
@@ -163,7 +160,7 @@ def deploy_lambda(
 
         lambda_client.update_function_code(
             FunctionName=function_name,
-            ZipFile=zipped_code
+            ImageUri=image_uri
         )
         wait_for_lambda_update(lambda_client, function_name, timeout=120)
         lambda_client.update_function_configuration(
@@ -174,15 +171,18 @@ def deploy_lambda(
         click.echo(f"Creating new function: {function_name}")
 
         try:
+            click.echo(
+                "Creating new container-based "
+                f"Lambda function: {function_name}"
+            )
             lambda_client.create_function(
                 FunctionName=function_name,
-                Runtime=runtime,
                 Role=role_arn,
-                Handler=handler_name,
-                Code={'ZipFile': zipped_code},
+                PackageType="Image",
+                Code={"ImageUri": image_uri},
                 Timeout=900,
-                MemorySize=256,
-                Environment={'Variables': env_vars or {}}
+                MemorySize=memory_size,
+                Environment={"Variables": env_vars or {}}
             )
         except Exception as e:
             raise click.ClickException(
@@ -211,6 +211,82 @@ def s3_bucket_exists(bucket_name, region):
         if e.response['Error']['Code'] == '404':
             return False
         raise
+
+
+def create_ecr_repository(repository_name, region):
+    """
+    Function to create an ECR repository for storing Docker images.
+    It checks if the repository already exists and creates it if not.
+
+    Args:
+        repository_name: str, the name of the ECR repository to create.
+        region: str, the AWS region where the repository will be created.
+
+    Returns:
+        None
+    """
+
+    ecr = boto3.client('ecr', region_name=region)
+    try:
+        response = ecr.create_repository(repositoryName=repository_name)
+        click.echo(
+            "Created ECR repository: "
+            f"{response['repository']['repositoryUri']}"
+        )
+    except ecr.exceptions.RepositoryAlreadyExistsException:
+        click.echo(f"ECR repository {repository_name} already exists.")
+
+
+def build_and_push_docker_image(
+    repository_name, region, dockerfile_path='Dockerfile', tag='latest'
+):
+    """
+    Function to build a Docker image and push it to an ECR repository.
+
+    Args:
+        repository_name: str, the name of the ECR repository.
+        region: str, the AWS region where the repository is located.
+        dockerfile_path: str, path to the Dockerfile (default is 'Dockerfile').
+        tag: str, the tag for the Docker image (default is 'latest').
+
+    Returns:
+        None
+    """
+
+    # Retrieve the ECR repository URI
+    ecr = boto3.client('ecr', region_name=region)
+    try:
+        response = ecr.describe_repositories(repositoryNames=[repository_name])
+        repository_uri = response['repositories'][0]['repositoryUri']
+    except ecr.exceptions.RepositoryNotFoundException:
+        raise click.ClickException(
+            f"ECR repository {repository_name} does "
+            f"not exist in region {region}."
+        )
+
+    # Authenticate Docker to the ECR registry
+    auth = ecr.get_authorization_token()
+    proxy = auth['authorizationData'][0]['proxyEndpoint']
+
+    click.echo(f"Authenticating Docker to ECR repository {repository_name}...")
+    subprocess.run(
+        f"aws ecr get-login-password --region {region} | "
+        f"docker login --username AWS --password-stdin {proxy}",
+        shell=True, check=True
+    )
+
+    click.echo(f"Building Docker image {repository_name}:{tag}...")
+    # Build and push Docker image with the docker file path
+    image_full_uri = f"{repository_uri}:{tag}"
+    subprocess.run([
+        "docker", "build",
+        "--platform=linux/amd64",
+        "-t", image_full_uri,
+        "-f", dockerfile_path,
+        "."
+    ], check=True)
+    subprocess.run(f"docker push {image_full_uri}", shell=True, check=True)
+    return image_full_uri
 
 
 def create_s3_bucket(bucket_name, region):
@@ -273,7 +349,8 @@ def check_lambda_permissions(required_actions=None):
             "lambda:GetFunction",
             "lambda:UpdateFunctionCode",
             "lambda:UpdateFunctionConfiguration",
-            "lambda:CreateFunction"
+            "lambda:CreateFunction",
+            "ecr:CreateRepository"
         ]
 
     sts = boto3.client("sts")
@@ -356,9 +433,8 @@ def wait_for_lambda_update(lambda_client, function_name, timeout=60):
 def command(
     lambda_function_name,
     region,
-    lambda_handler,
     project_dir=None,
-    ignore_dirs=None
+    memory_size=3000
 ):
     """
     Command-line tool for deploying a trading bot to AWS Lambda.
@@ -368,9 +444,8 @@ def command(
         region: str, the AWS region where the Lambda function will be deployed.
         project_dir: str, the directory containing the Lambda function code.
             If None, it defaults to the current directory.
-        lambda_handler: str, the name of the handler function in the code
-            (default is "aws_function.lambda_handler").
-        ignore_dirs: list, directories to ignore when zipping the code.
+        memory_size: int, the amount of memory allocated
+            to the Lambda function
 
     Returns:
         None
@@ -381,12 +456,11 @@ def command(
 
     check_lambda_permissions()
 
-    click.echo(f"Deploying to AWS Lambda "
-               f"function: {lambda_function_name} in region: {region}")
+    click.echo(
+        "Deploying to AWS Lambda "
+        f"function: {lambda_function_name} in region: {region}"
+    )
     click.echo(f"Project directory: {project_dir}")
-    zip_file_path = f"/tmp/deploy-{uuid.uuid4().hex}.zip"
-    zip_code(project_dir, zip_file_path)
-    click.echo(f"Zipped code to {zip_file_path}")
 
     # Create s3 bucket for state handler
     bucket_name = f"{lambda_function_name}-state-handler-{region}"
@@ -405,13 +479,21 @@ def command(
     click.echo("Adding S3 bucket name to environment variables")
     env_vars[AWS_S3_STATE_BUCKET_NAME] = bucket_name
 
+    click.echo("Building and pushing Docker image to ECR")
+    create_ecr_repository(lambda_function_name, region)
+    image_uri = build_and_push_docker_image(
+        lambda_function_name,
+        region,
+        dockerfile_path=os.path.join(project_dir, "Dockerfile"),
+        tag="latest"
+    )
     click.echo("Creating IAM role for Lambda execution")
     role_arn = create_iam_role("lambda-execution-role")
     deploy_lambda(
         lambda_function_name,
-        zip_file_path=zip_file_path,
-        handler_name=lambda_handler,
+        image_uri=image_uri,
         role_arn=role_arn,
         env_vars=env_vars,
-        region=region
+        region=region,
+        memory_size=memory_size
     )

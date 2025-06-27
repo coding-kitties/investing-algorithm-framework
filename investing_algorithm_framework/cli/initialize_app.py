@@ -372,6 +372,16 @@ def create_aws_lambda_app(path=None, replace=False):
         "templates",
         "app_aws_lambda_function.py.template"
     )
+    aws_dockerfile_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "aws_lambda_dockerfile.template"
+    )
+    aws_dockerignore_template_path = os.path.join(
+        os.path.dirname(current_script_path),
+        "templates",
+        "aws_lambda_dockerignore.template"
+    )
     run_backtest_template_path = os.path.join(
         os.path.dirname(current_script_path),
         "templates",
@@ -444,6 +454,16 @@ def create_aws_lambda_app(path=None, replace=False):
     create_file_from_template(
         aws_lambda_handler_template_path,
         os.path.join(path, "aws_function.py"),
+        replace=replace
+    )
+    create_file_from_template(
+        aws_dockerfile_template_path,
+        os.path.join(path, "Dockerfile"),
+        replace=replace
+    )
+    create_file_from_template(
+        aws_dockerignore_template_path,
+        os.path.join(path, ".dockerignore"),
         replace=replace
     )
 

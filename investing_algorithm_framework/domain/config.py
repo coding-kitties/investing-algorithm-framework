@@ -82,3 +82,30 @@ DEFAULT_LOGGING_CONFIG = {
         'handlers': ['console', 'file'],
     },
 }
+
+AWS_LAMBDA_LOGGING_CONFIG = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {
+            'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'default',
+        },
+    },
+    'loggers': {  # Make sure to add a 'loggers' section
+        'investing_algorithm_framework': {  # Define your logger here
+            'level': 'INFO',  # Set the desired level
+            'handlers': ['console'],  # Use these handlers
+            'propagate': False,
+        },
+    },
+    'root': {  # Optional: Root logger configuration
+        'level': 'WARNING',  # Root logger defaults to WARNING
+        'handlers': ['console'],
+    },
+}

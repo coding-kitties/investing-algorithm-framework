@@ -1,0 +1,22 @@
+FROM public.ecr.aws/lambda/python:3.10
+
+# Install build tools (add this block)
+RUN yum install -y \
+    gcc \
+    gcc-c++ \
+    make \
+    cmake \
+    && yum clean all
+
+# Set the working directory
+WORKDIR /var/task
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the function code
+COPY . .
+
+CMD ["aws_function.lambda_handler"]

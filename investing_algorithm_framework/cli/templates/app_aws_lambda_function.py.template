@@ -1,9 +1,20 @@
+import logging.config
 import os
-from investing_algorithm_framework import create_app, \
-    AWSS3StorageStateHandler, AWS_S3_STATE_BUCKET_NAME
+from logging import getLogger
 
-from .strategies.strategy import MyTradingStrategy
-app = create_app()
+from dotenv import load_dotenv
+from finterion_investing_algorithm_framework import FinterionOrderExecutor, \
+    FinterionPingAction, FinterionPortfolioProvider
+from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
+    AWSS3StorageStateHandler, AWS_S3_STATE_BUCKET_NAME, AWS_LAMBDA_LOGGING_CONFIG
+
+from strategies.strategy import MyTradingStrategy
+
+
+# Make sure to set the resource directory to /tmp because this dir is writable
+app = create_app(config={RESOURCE_DIRECTORY: os.path.join("/tmp", "resources")})
+logging.config.dictConfig(AWS_LAMBDA_LOGGING_CONFIG)
+logger = logging.getLogger(__name__)
 
 # Get the s3 state bucket name from environment variables for database
 # state storage, this is set during the deployment
@@ -12,7 +23,7 @@ app.add_state_handler(
     AWSS3StorageStateHandler(bucket_name=os.getenv(AWS_S3_STATE_BUCKET_NAME))
 )
 app.add_strategy(MyTradingStrategy)
-app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=1000)
+app.add_market(market="BITVAVO", trading_symbol="EUR")
 
 
 def lambda_handler(event, context):
@@ -27,10 +38,11 @@ def lambda_handler(event, context):
         dict: The result of the trading strategy execution.
     """
     try:
-        app.run(number_of_iterations=1)
+        app.run(payload={"ACTION": "RUN_STRATEGY"})
         return {
             "statusCode": 200,
             "body": "Trading strategy executed successfully."
         }
     except Exception as e:
+        logger.exception(e)
         return {"statusCode": 500, "body": str(e)}

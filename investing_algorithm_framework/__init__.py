@@ -7,7 +7,7 @@ from investing_algorithm_framework.domain import ApiException, \
     TradingDataType, TradingTimeFrame, OrderType, OperationalException, \
     OrderStatus, OrderSide, TimeUnit, TimeInterval, Order, Portfolio, \
     Position, TimeFrame, BACKTESTING_INDEX_DATETIME, MarketCredential, \
-    PortfolioConfiguration, RESOURCE_DIRECTORY, \
+    PortfolioConfiguration, RESOURCE_DIRECTORY, AWS_LAMBDA_LOGGING_CONFIG, \
     Trade, OHLCVMarketDataSource, OrderBookMarketDataSource, SYMBOLS, \
     TickerMarketDataSource, MarketService, \
     RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT, \
@@ -92,5 +92,6 @@ __all__ = [
     "add_metrics",
     "add_html_report",
     "AWSS3StorageStateHandler",
-    "AWS_S3_STATE_BUCKET_NAME"
+    "AWS_S3_STATE_BUCKET_NAME",
+    "AWS_LAMBDA_LOGGING_CONFIG"
 ]

@@ -287,7 +287,7 @@ class TestAppInitialize(TestCase):
         self.assertTrue(
             self.is_same_file_content(
                 requirements_file_path,
-                os.path.join(self.template_dir, "requirements_azure_function.txt.template")
+                os.path.join(self.template_dir, "azure_function_requirements.txt.template")
             )
         )
 
@@ -480,6 +480,25 @@ class TestAppInitialize(TestCase):
             )
         )
 
+        # check if the dockerfile exists
+        dockerfile_path = os.path.join(self.output_dir, "Dockerfile")
+        self.assertTrue(os.path.exists(dockerfile_path))
+        self.assertTrue(
+            self.is_same_file_content(
+                dockerfile_path,
+                os.path.join(self.template_dir, "aws_lambda_dockerfile.template")
+            )
+        )
+
+        # Check if the .dockerignore file exists
+        dockerignore_file_path = os.path.join(self.output_dir, ".dockerignore")
+        self.assertTrue(os.path.exists(dockerignore_file_path))
+        self.assertTrue(
+            self.is_same_file_content(
+                dockerignore_file_path,
+                os.path.join(self.template_dir, "aws_lambda_dockerignore.template")
+            )
+        )
 
     def is_same_file_content(self, file1, file2):
         with open(file1, 'r') as f1, open(file2, 'r') as f2:
