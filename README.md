@@ -82,8 +82,6 @@ the 20, 50 and 100 period exponential moving averages (EMA) and the
 > This dependency is not part of the framework, but is used to perform technical analysis on the dataframes.
 > You can install it using pip: pip install pyindicators.
 
-```bash
-
 ```python
 import logging.config
 from dotenv import load_dotenv
