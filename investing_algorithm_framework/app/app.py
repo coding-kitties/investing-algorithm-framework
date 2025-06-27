@@ -503,7 +503,6 @@ class App:
             try:
                 while strategy_orchestrator_service.running:
                     if number_of_iterations_since_last_orders_check == 30:
-                        logger.info("Checking pending orders")
                         number_of_iterations_since_last_orders_check = 1
 
                     strategy_orchestrator_service.run_pending_jobs()
