@@ -42,9 +42,7 @@ class App:
 
     Attributes:
         container: The dependency container for the app. This is used
-            to store all the services and repositories for the app.
-        algorithm: The algorithm to run. This is used to run the
-            trading bot.
+            to store all the services and repositories for the app
         _flask_app: The flask app instance. This is used to run the
             web app.
         _state_handler: The state handler for the app. This is used
@@ -517,7 +515,8 @@ class App:
             logger.error(e)
             raise e
         finally:
-            self._run_history = strategy_orchestrator_service.history
+            if strategy_orchestrator_service is not None:
+                self._run_history = strategy_orchestrator_service.history
 
             try:
                 strategy_orchestrator_service.stop()
