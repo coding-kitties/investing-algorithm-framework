@@ -160,22 +160,10 @@ def deploy_azure_function(
     help='The AWS region where the Lambda function will be deployed.'
 )
 @click.option(
-    '--lambda_handler',
-    required=True,
-    help='The Lambda handler function in the '
-         'format "module_name.function_name".',
-    default="aws_function.lambda_handler"
-)
-@click.option(
     '--project_dir',
     default=None,
     help='The path to the project directory containing '
          'the Lambda function code.'
-)
-@click.option(
-    '--ignore_dirs',
-    default=None,
-    help='List of directories to ignore when deploying.'
 )
 @click.option(
     '--memory_size',
