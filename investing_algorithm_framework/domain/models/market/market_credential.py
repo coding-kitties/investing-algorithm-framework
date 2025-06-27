@@ -52,6 +52,12 @@ class MarketCredential:
             environment_variable = f"{self.market.upper()}_SECRET_KEY"
             self._secret_key = os.getenv(environment_variable)
 
+        if self.api_key is not None:
+            self._api_key = self.api_key.strip()
+
+        if self.secret_key is not None:
+            self._secret_key = self.secret_key.strip()
+
     def get_api_key(self):
         return self.api_key
 
