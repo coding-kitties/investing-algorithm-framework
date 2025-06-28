@@ -13,7 +13,10 @@ class DataProviderIndex:
     """
     Class to index data providers. Given a list of data providers, each data
     provider will be indexed given that it has support for the given query
-    params
+    params. The goal of this service is to provide an efficient way to
+    find data providers based on the given query params, such as symbol,
+    market, and data type. This will allow for O(1) lookup time for data
+    providers based on the given query params.
     """
 
     def __init__(self, data_providers: List[DataProvider] = []):
@@ -35,7 +38,7 @@ class OHLCVDataProviderIndex:
 
     Attributes:
         data_providers (List[DataProvider]): List of data providers
-        order_executor_lookup (dict): Dictionary to store the lookup
+        data_providers_lookup (dict): Dictionary to store the lookup
             for order executors based on market.
     """
     def __init__(self, data_providers=[]):

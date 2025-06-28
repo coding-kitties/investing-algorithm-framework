@@ -20,7 +20,7 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     PortfolioConfiguration, Portfolio, Position, Order, TradeStatus, \
     BacktestResult, PortfolioSnapshot, StrategyProfile, \
     BacktestPosition, Trade, MarketCredential, PositionSnapshot, \
-    AppMode, BacktestDateRange, DateRange, \
+    AppMode, BacktestDateRange, DataType, DataSource, \
     MarketDataType, TradeRiskType, TradeTakeProfit, TradeStopLoss, \
     DataSource, Event, SnapshotInterval
 from .order_executor import OrderExecutor
@@ -113,7 +113,6 @@ __all__ = [
     "RoundingService",
     "BacktestDateRange",
     "convert_polars_to_pandas",
-    "DateRange",
     "DEFAULT_LOGGING_CONFIG",
     "DATABASE_DIRECTORY_NAME",
     "BACKTESTING_INITIAL_AMOUNT",
@@ -138,5 +137,7 @@ __all__ = [
     "SNAPSHOT_INTERVAL",
     "SnapshotInterval",
     "AWS_S3_STATE_BUCKET_NAME",
-    "AWS_LAMBDA_LOGGING_CONFIG"
+    "AWS_LAMBDA_LOGGING_CONFIG",
+    "DataType",
+    "DataSource",
 ]

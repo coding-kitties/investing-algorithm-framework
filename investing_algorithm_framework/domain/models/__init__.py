@@ -13,11 +13,10 @@ from .trade import Trade, TradeStatus, TradeStopLoss, TradeTakeProfit, \
     TradeRiskType
 from .trading_data_types import TradingDataType
 from .trading_time_frame import TradingTimeFrame
-from .date_range import DateRange
 from .market_data_type import MarketDataType
-from .data_source import DataSource
 from .snapshot_interval import SnapshotInterval
 from .event import Event
+from .data import DataSource, DataType
 
 __all__ = [
     "OrderStatus",
@@ -40,10 +39,10 @@ __all__ = [
     "Trade",
     "MarketCredential",
     "TradeStatus",
-    "BacktestReportsEvaluation",
+    "DataType",
     "AppMode",
     "BacktestDateRange",
-    "DateRange",
+    "DataSource",
     "MarketDataType",
     "TradeStopLoss",
     "TradeTakeProfit",
