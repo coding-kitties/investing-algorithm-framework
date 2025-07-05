@@ -72,7 +72,6 @@ class Test(TestCase):
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
-            save_strategy=True
         )
         dir_name = BacktestService.create_report_directory_name(report)
 

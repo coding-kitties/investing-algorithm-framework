@@ -30,7 +30,6 @@ class Test(TestCase):
                 CrossOverStrategyV1,
                 CrossOverStrategyV3,
             ],
-            save_strategy=True,
         )
         backtest_report = backtest_reports[0]
         self.assertAlmostEqual(

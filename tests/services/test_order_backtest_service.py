@@ -327,7 +327,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24262,
                 "Close": 0.24262,
                 "Volume": 0.24262,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             }
         ]
         ohlcv_df = pl.DataFrame(ohclv)
@@ -342,7 +342,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             }
         ]
         ohlcv_df = pl.DataFrame(ohclv)
@@ -357,7 +357,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24362,
                 "Close": 0.24362,
                 "Volume": 0.24362,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             }
         ]
         ohlcv_df = pl.DataFrame(ohclv)
@@ -372,7 +372,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24462,
                 "Close": 0.24462,
                 "Volume": 0.24462,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             },
             {
                 "Open": 0.24300,
@@ -380,7 +380,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24300,
                 "Close": 0.24300,
                 "Volume": 0.24300,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             }
         ]
         ohlcv_df = pl.DataFrame(ohclv)
@@ -395,7 +395,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             },
             {
                 "Open": 0.24200,
@@ -403,7 +403,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24200,
                 "Close": 0.24200,
                 "Volume": 0.24200,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             },
             {
                 "Open": 0.24300,
@@ -411,7 +411,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24300,
                 "Close": 0.24300,
                 "Volume": 0.24300,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             }
         ]
         ohlcv_df = pl.DataFrame(ohclv)
@@ -422,7 +422,7 @@ class TestOrderBacktestService(TestBase):
         configuration_service = self.app.container.configuration_service()
         configuration_service.add_value(
             BACKTESTING_INDEX_DATETIME,
-            datetime.utcnow()
+            datetime.now(tz=timezone.utc)
         )
 
         # Create the buy order
@@ -482,7 +482,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24262,
                 "Close": 0.24262,
                 "Volume": 0.24262,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             }
         ]
         ohlcv_df = pl.DataFrame(ohclv)
@@ -497,7 +497,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24362,
                 "Close": 0.24362,
                 "Volume": 0.24362,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             }
         ]
         ohlcv_df = pl.DataFrame(ohclv)
@@ -512,7 +512,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             }
         ]
         ohlcv_df = pl.DataFrame(ohclv)
@@ -527,7 +527,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             },
             {
                 "Open": 0.24000,
@@ -535,7 +535,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24000,
                 "Close": 0.24000,
                 "Volume": 0.24000,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             }
         ]
         ohlcv_df = pl.DataFrame(ohclv)
@@ -550,7 +550,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24300,
                 "Close": 0.24300,
                 "Volume": 0.24300,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             },
             {
                 "Open": 0.24162,
@@ -558,7 +558,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24162,
                 "Close": 0.24162,
                 "Volume": 0.24162,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             },
             {
                 "Open": 0.24000,
@@ -566,7 +566,7 @@ class TestOrderBacktestService(TestBase):
                 "Low": 0.24000,
                 "Close": 0.24000,
                 "Volume": 0.24000,
-                "Datetime": datetime.now()
+                "Datetime": datetime.now(tz=timezone.utc)
             }
         ]
         ohlcv_df = pl.DataFrame(ohclv)

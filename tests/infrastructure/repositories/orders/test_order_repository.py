@@ -1,6 +1,7 @@
 from investing_algorithm_framework.domain import OrderSide, OrderType, OrderStatus
 from investing_algorithm_framework.domain import PortfolioConfiguration, MarketCredential
 from tests.resources import TestBase
+from datetime import timezone
 
 
 class TestSQLOrderRepositoryIntegration(TestBase):
@@ -55,6 +56,25 @@ class TestSQLOrderRepositoryIntegration(TestBase):
             )
 
         return order
+
+    def test_create(self):
+        data = {
+            "target_symbol": "BTC",
+            "amount": 1,
+            "trading_symbol": "EUR",
+            "price": 10,
+            "order_side": OrderSide.BUY.value,
+            "order_type": OrderType.LIMIT.value,
+            "status": OrderStatus.OPEN.value,
+        }
+        order = self.repository.create(data)
+        self.assertIsNotNone(order.id)
+
+        # Check that created at and updated at are set and are timezone utc
+        self.assertIsNotNone(order.created_at)
+        self.assertIsNotNone(order.updated_at)
+        self.assertEqual(order.created_at.tzinfo, timezone.utc)
+        self.assertEqual(order.updated_at.tzinfo, timezone.utc)
 
     def test_filter_by_id(self):
         order = self._create_order()

@@ -8,6 +8,7 @@ from .context import Context
 from .reporting import add_html_report, add_metrics, \
     BacktestReport, pretty_print_backtest, BacktestReportsEvaluation, \
     pretty_print_trades, pretty_print_positions, pretty_print_orders
+from .analysis import select_backtest_date_ranges
 
 
 __all__ = [
@@ -26,5 +27,6 @@ __all__ = [
     "BacktestReportsEvaluation",
     "pretty_print_trades",
     "pretty_print_positions",
-    "pretty_print_orders"
+    "pretty_print_orders",
+    "select_backtest_date_ranges"
 ]

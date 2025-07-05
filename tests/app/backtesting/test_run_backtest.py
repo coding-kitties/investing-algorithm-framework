@@ -74,7 +74,6 @@ class Test(TestCase):
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
-            save_strategy=True
         )
         dir_name = BacktestService.create_report_directory_name(report)
 
@@ -109,7 +108,6 @@ class Test(TestCase):
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
-            save_strategy=True
         )
         dir_name = BacktestService.create_report_directory_name(report)
         path = os.path.join(self.resource_dir, "backtest_reports", dir_name)
@@ -148,7 +146,6 @@ class Test(TestCase):
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
-            save_strategy=True
         )
         dir_name = BacktestService.create_report_directory_name(report)
         path = os.path.join(self.resource_dir, "backtest_reports", dir_name)

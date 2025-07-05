@@ -383,12 +383,21 @@ class TradeService(RepositoryService):
         Args:
             sell_order: Order object representing the sell order that has
                 been created
+            trades: List of Trade objects representing the trades that
+                are associated with the sell order. Default is None.
+            stop_losses: List of StopLoss objects representing the stop
+                losses that are associated with the sell order. Default
+                is None.
+            take_profits: List of TakeProfit objects representing the take
+                profits that are associated with the sell order. Default
+                is None.
 
         Returns:
             None
         """
         sell_order_id = sell_order.id
         sell_price = sell_order.price
+        sell_amount = sell_order.amount
 
         if (trades is None or len(trades) == 0) \
                 and (stop_losses is None or len(stop_losses) == 0) \
@@ -433,10 +442,11 @@ class TradeService(RepositoryService):
         position.cost -= cost
         self.position_repository.save(position)
 
-        # Update the net gain and net size of the portfolio
+        # Update the net gain, net size of the portfolio
         portfolio = self.portfolio_repository.get(position.portfolio_id)
         portfolio.total_net_gain += net_gain
         portfolio.net_size += net_gain
+        portfolio.total_revenue += sell_price * sell_amount
         self.portfolio_repository.save(portfolio)
 
     def update_trade_with_removed_sell_order(

@@ -20,7 +20,7 @@ class Test(TestCase):
         config = {RESOURCE_DIRECTORY: resource_directory}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BINANCE", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2023, 12, 2)
+        end_date = datetime(2023, 12, 2, tzinfo=timezone.utc)
         start_date = end_date - timedelta(days=100)
         date_range = BacktestDateRange(
             start_date=start_date, end_date=end_date
@@ -29,7 +29,6 @@ class Test(TestCase):
         algorithm.add_strategy(CrossOverStrategyV1)
         backtest_report = app.run_backtest(
             backtest_date_range=date_range,
-            save_strategy=True,
             algorithm=algorithm,
             snapshot_interval=SnapshotInterval.STRATEGY_ITERATION
         )

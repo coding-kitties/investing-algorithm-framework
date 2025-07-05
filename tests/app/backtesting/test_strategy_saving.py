@@ -80,10 +80,9 @@ class Test(TestCase):
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
-            save_strategy=True,
         )
         report_directory = BacktestService.create_report_directory_name(report)
-        report_name = "report.json"
+        report_name = "results.json"
         backtest_report_root_dir = os.path.join(
             self.resource_dir, "backtest_reports"
         )
@@ -100,6 +99,10 @@ class Test(TestCase):
         report_file_path = os.path.join(
             backtest_report_dir, report_name
         )
+
+        for root, dirs, files in os.walk(backtest_report_dir):
+            for name in files:
+                print(name)
         # check if the report json file exists
         self.assertTrue(os.path.isfile(report_file_path))
 
@@ -131,7 +134,7 @@ class Test(TestCase):
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
-            save_strategy=True,
+            risk_free_rate=2.4
         )
         report_directory = BacktestService.create_report_directory_name(report)
         backtest_report_root_dir = os.path.join(
@@ -148,7 +151,7 @@ class Test(TestCase):
         self.assertTrue(os.path.isdir(backtest_report_dir))
         # Check if the strategy file exists
         strategy_one_directory = os.path.join(
-            backtest_report_dir, "strategy_v1"
+            backtest_report_dir, "strategies"
         )
         strategy_one_file_path = os.path.join(
             strategy_one_directory, "strategy_v1.py"

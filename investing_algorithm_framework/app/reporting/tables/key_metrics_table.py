@@ -138,7 +138,6 @@ def highlight_max_drawdown(row):
         if value < 5:
             styles['Value'] = 'color: #006400; font-weight: bold;'  # dark green
         elif 10 >= value > 5:
-            print("10 >= value > 5")
             styles['Value'] = 'color: #32CD32; font-weight: bold;'  # lime green
         elif 20 >= value > 10:
             styles['Value'] = 'color: #FFD700; font-weight: bold;'  # gold
@@ -164,28 +163,32 @@ def create_html_key_metrics_table(results, report):
     copy_results['Max Daily Drawdown'] = safe_format_percentage(copy_results['Max Daily Drawdown'], "{:.2f}%")
     copy_results['Max Drawdown Duration'] = f"{copy_results['Max Drawdown Duration']} hours - {copy_results['Max Drawdown Duration'] // 24} days"
 
-    # copy_results['Total Return'] = f"{copy_results['Total Return']:.2f}%"
-    # copy_results['CAGR'] = f"{copy_results['CAGR'] * 100:.2f}%"
-    # copy_results['Sharpe Ratio'] = f"{copy_results['Sharpe Ratio']:.2f}"
-    # copy_results['Sortino Ratio'] = f"{copy_results['Sortino Ratio']:.2f}"
-    # copy_results['Profit Factor'] = f"{copy_results['Profit Factor']:.2f}"
-    # copy_results['Calmar Ratio'] = f"{copy_results['Calmar Ratio']:.2f}"
-    # copy_results['Annual Volatility'] = f"{copy_results['Annual Volatility'] * 100:.2f}%"
-    # copy_results['Max Drawdown'] = f"{copy_results['Max Drawdown'] * 100:.2f}%"
-    # copy_results['Max Drawdown Absolute'] = f"{copy_results['Max Drawdown Absolute']:.2f} {report.trading_symbol}"
-    # copy_results['Max Daily Drawdown'] = f"{copy_results['Max Daily Drawdown'] * 100:.2f}%"
-    # copy_results['Max Drawdown Duration'] = f"{copy_results['Max Drawdown Duration']} hours - {copy_results['Max Drawdown Duration'] // 24} days"
-
     stats = {
         "Metric": [
-            "Total Return", "CAGR", "Sharpe Ratio", "Sortino Ratio",
-            "Profit Factor", "Calmar Ratio", "Annual Volatility", "Max Drawdown", "Max Drawdown Absolute", "Max Daily Drawdown", "Max Drawdown Duration"
+            "Total Return",
+            "CAGR",
+            "Sharpe Ratio",
+            "Sortino Ratio",
+            "Profit Factor",
+            "Calmar Ratio",
+            "Annual Volatility",
+            "Max Drawdown",
+            "Max Drawdown Absolute",
+            "Max Daily Drawdown",
+            "Max Drawdown Duration"
         ],
         "Value": [
-            copy_results['Total Return'], copy_results['CAGR'], copy_results['Sharpe Ratio'],
-            copy_results['Sortino Ratio'], copy_results['Profit Factor'], copy_results['Calmar Ratio'],
-            copy_results['Annual Volatility'], copy_results['Max Drawdown'], copy_results['Max Drawdown Absolute'],
-            copy_results['Max Daily Drawdown'], copy_results['Max Drawdown Duration']
+            copy_results['Total Return'],
+            copy_results['CAGR'],
+            copy_results['Sharpe Ratio'],
+            copy_results['Sortino Ratio'],
+            copy_results['Profit Factor'],
+            copy_results['Calmar Ratio'],
+            copy_results['Annual Volatility'],
+            copy_results['Max Drawdown'],
+            copy_results['Max Drawdown Absolute'],
+            copy_results['Max Daily Drawdown'],
+            copy_results['Max Drawdown Duration']
         ]
     }
 

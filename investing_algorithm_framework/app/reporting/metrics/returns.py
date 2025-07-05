@@ -96,7 +96,7 @@ def get_average_loss(trades: List[Trade]) -> Tuple[float, float]:
         return 0.0, 0.0
 
     average_loss = sum(losses) / len(losses)
-    percentage = (average_loss / cost) * 100 if cost > 0 else 0.0
+    percentage = (average_loss / cost) if cost > 0 else 0.0
     return average_loss, percentage
 
 
@@ -121,7 +121,7 @@ def get_average_gain(trades: List[Trade]) -> Tuple[float, float]:
         return 0.0, 0.0
 
     average_gain = sum(gains) / len(gains)
-    percentage = (average_gain / cost) * 100 if cost > 0 else 0.0
+    percentage = (average_gain / cost) if cost > 0 else 0.0
     return average_gain, percentage
 
 
@@ -216,7 +216,7 @@ def get_percentage_winning_months(snapshots: List[PortfolioSnapshot]) -> float:
     if not monthly_returns:
         return 0.0
 
-    return (winning_months / len(monthly_returns)) * 100
+    return (winning_months / len(monthly_returns))
 
 
 def get_best_month(snapshots: List[PortfolioSnapshot]) -> Tuple[float, datetime]:
@@ -271,12 +271,14 @@ def get_best_year(
     yearly_returns = get_yearly_returns(snapshots)
 
     if not yearly_returns:
-        return 0.0, None
+        return None, None
 
     return max(yearly_returns, key=lambda x: x[0])
 
 
-def get_worst_year(snapshots: List[PortfolioSnapshot]) -> Tuple[float, datetime]:
+def get_worst_year(
+    snapshots: List[PortfolioSnapshot]
+) -> Tuple[float, datetime]:
     """
     Get the worst year in terms of return from portfolio snapshots.
 
@@ -290,7 +292,7 @@ def get_worst_year(snapshots: List[PortfolioSnapshot]) -> Tuple[float, datetime]
     yearly_returns = get_yearly_returns(snapshots)
 
     if not yearly_returns:
-        return 0.0, None
+        return None, None
 
     return min(yearly_returns, key=lambda x: x[0])
 
@@ -313,7 +315,7 @@ def get_average_monthly_return(snapshots: List[PortfolioSnapshot]) -> float:
     if not monthly_returns:
         return 0.0
 
-    return sum(r for r, _ in monthly_returns) / len(monthly_returns) * 100  # Convert to percentage
+    return sum(r for r, _ in monthly_returns) / len(monthly_returns)
 
 def get_average_monthly_return_winning_months(snapshots: List[PortfolioSnapshot]) -> float:
     """
@@ -335,7 +337,7 @@ def get_average_monthly_return_winning_months(snapshots: List[PortfolioSnapshot]
     if not winning_months:
         return 0.0
 
-    return sum(winning_months) / len(winning_months) * 100  # Convert to percentage
+    return sum(winning_months) / len(winning_months)
 
 def get_average_monthly_return_losing_months(snapshots: List[PortfolioSnapshot]) -> float:
     """
@@ -357,7 +359,7 @@ def get_average_monthly_return_losing_months(snapshots: List[PortfolioSnapshot])
     if not losing_months:
         return 0.0
 
-    return sum(losing_months) / len(losing_months) * 100  # Convert to percentage
+    return sum(losing_months) / len(losing_months)
 
 
 def get_average_yearly_return(snapshots: List[PortfolioSnapshot]) -> float:
@@ -378,7 +380,7 @@ def get_average_yearly_return(snapshots: List[PortfolioSnapshot]) -> float:
     if not yearly_returns:
         return 0.0
 
-    return sum(r for r, _ in yearly_returns) / len(yearly_returns) * 100  # Convert to percentage
+    return sum(r for r, _ in yearly_returns) / len(yearly_returns)
 
 
 def get_total_return(snapshots: List[PortfolioSnapshot]) -> float:
@@ -395,7 +397,7 @@ def get_total_return(snapshots: List[PortfolioSnapshot]) -> float:
         float: The total return as a percentage.
     """
 
-    if not snapshots:
+    if not snapshots or len(snapshots) < 2:
         return 0.0
 
     initial_value = snapshots[0].total_value
@@ -404,7 +406,7 @@ def get_total_return(snapshots: List[PortfolioSnapshot]) -> float:
     if initial_value == 0:
         return 0.0
 
-    return ((final_value - initial_value) / initial_value) * 100
+    return ((final_value - initial_value) / initial_value)
 
 
 def get_percentage_winning_years(snapshots: List[PortfolioSnapshot]) -> float:
@@ -427,7 +429,7 @@ def get_percentage_winning_years(snapshots: List[PortfolioSnapshot]) -> float:
     if not yearly_returns:
         return 0.0
 
-    return (winning_years / len(yearly_returns)) * 100
+    return (winning_years / len(yearly_returns))
 
 
 def get_total_net_gain(snapshots: List[PortfolioSnapshot]) -> float:

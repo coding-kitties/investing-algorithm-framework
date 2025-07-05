@@ -29,7 +29,11 @@ class PortfolioSnapshot(BaseModel):
         self.net_size = net_size
         self.total_cost = total_cost
         self.cash_flow = cash_flow
-        self.created_at = created_at
+
+        if created_at is not None and isinstance(created_at, str):
+            self.created_at = parser.parse(created_at)
+        else:
+            self.created_at = created_at
 
         if position_snapshots is None:
             position_snapshots = []

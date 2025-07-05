@@ -27,7 +27,6 @@ class Test(TestCase):
         )
         backtest_report = app.run_backtest(
             backtest_date_range=date_range,
-            save_strategy=True,
             strategies=[CrossOverStrategyV1, CrossOverStrategyV2]
         )
         self.assertAlmostEqual(

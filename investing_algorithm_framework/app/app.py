@@ -42,7 +42,9 @@ class App:
 
     Attributes:
         container: The dependency container for the app. This is used
-            to store all the services and repositories for the app
+            to store all the services and repositories for the app.
+        algorithm: The algorithm to run. This is used to run the
+            trading bot.
         _flask_app: The flask app instance. This is used to run the
             web app.
         _state_handler: The state handler for the app. This is used
@@ -503,6 +505,7 @@ class App:
             try:
                 while strategy_orchestrator_service.running:
                     if number_of_iterations_since_last_orders_check == 30:
+                        logger.info("Checking pending orders")
                         number_of_iterations_since_last_orders_check = 1
 
                     strategy_orchestrator_service.run_pending_jobs()
@@ -514,8 +517,7 @@ class App:
             logger.error(e)
             raise e
         finally:
-            if strategy_orchestrator_service is not None:
-                self._run_history = strategy_orchestrator_service.history
+            self._run_history = strategy_orchestrator_service.history
 
             try:
                 strategy_orchestrator_service.stop()
@@ -628,9 +630,11 @@ class App:
     def _create_resources_if_not_exists(self):
         """
         Function to create the resources required by the app if they
-          do not exist. This function will check if the resource directory
-          exists and check if the database directory exists. If they do
-          not exist, it will create them.
+        do not exist. This function will check if the resource directory
+        exists and check if the database directory exists. If they do
+        not exist, it will create them. Also it will make sure that
+        the resource directory is read and write accessible by the
+        application.
 
         Returns:
             None
@@ -650,6 +654,9 @@ class App:
         if not os.path.isdir(resource_dir):
             try:
                 os.makedirs(resource_dir)
+
+                # Make sure the resource directory is readable and writable
+                os.chmod(resource_dir, 0o755)
             except OSError as e:
                 logger.error(e)
                 raise OperationalException(
@@ -712,16 +719,18 @@ class App:
         algorithm=None,
         strategy=None,
         strategies: List = None,
-        save_strategy=True,
+        save=True,
         snapshot_interval: SnapshotInterval = SnapshotInterval.TRADE_CLOSE,
         strategy_directory_path: Optional[str] = None,
-        report_name: Optional[str] = None
+        report_name: Optional[str] = None,
+        risk_free_rate: Optional[float] = None
     ) -> BacktestReport:
         """
         Run a backtest for an algorithm.
 
         Args:
-            backtest_date_range (BacktestDateRange): The date range to run the backtest for
+            backtest_date_range: The date range to run the backtest for
+                (instance of BacktestDateRange)
             name: The name of the backtest. This is used to identify the
                 backtest report in the output directory.
             initial_amount: The initial amount to start the backtest with.
@@ -731,13 +740,9 @@ class App:
                 that needs to be backtested.
             strategies (List[TradingStrategy) (Optional): List of strategy
                 objects that need to be backtested
-            algorithm (Algorithm) (Optional): The algorithm object that
-                needs to be backtested. If this is provided, then the
-                strategies and tasks of the algorithm will be used for the
-                backtest. If this is not provided, then the strategies
-                and tasks provided in the strategies parameter will be used.
-            output_directory: str - The directory to write the
-                backtest report to
+            algorithm:
+            output_directory: str - The directory to
+              write the backtest report to
             save_strategy: bool - Whether to save the strategy
                 as part of the backtest report. You can only save in-memory
                 strategies when running multiple backtests. This is because
@@ -759,6 +764,7 @@ class App:
         Returns:
             Instance of BacktestReport
         """
+
         # Add backtest configuration to the config
         self.set_config_with_dict({
             ENVIRONMENT: Environment.BACKTEST.value,
@@ -769,7 +775,7 @@ class App:
             BACKTESTING_INITIAL_AMOUNT: initial_amount,
             SNAPSHOT_INTERVAL: SnapshotInterval.from_value(
                 snapshot_interval
-            ).value
+            ).value,
         })
 
         self.initialize_config()
@@ -825,7 +831,15 @@ class App:
             initial_amount=initial_amount,
             backtest_date_range=backtest_date_range
         )
-        report = BacktestReport(results=results)
+        market_data_source_service = \
+            self.container.market_data_source_service()
+        report = BacktestReport.create(
+            results=results,
+            risk_free_rate=risk_free_rate,
+            data_files=market_data_source_service.get_data_files(),
+            algorithm=algorithm,
+            strategy_directory_path=strategy_directory_path
+        )
 
         if output_directory is None:
             output_directory = os.path.join(
@@ -836,19 +850,9 @@ class App:
             report_name = BacktestService.create_report_directory_name(report)
 
         output_directory = os.path.join(output_directory, report_name)
-        report.save(
-            path=output_directory,
-            algorithm=algorithm,
-            strategy_directory_path=strategy_directory_path,
-            save_strategy=save_strategy
-        )
-        # print(report.html_report)
-        # backtest_service.save_report(
-        #     report=report,
-        #     algorithm=algorithm,
-        #     output_directory=output_directory,
-        #     save_strategy=save_strategy,
-        # )
+
+        if save:
+            report.save(path=output_directory)
         return report
 
     def run_backtests(
@@ -960,7 +964,6 @@ class App:
                     initial_amount=initial_amount,
                     output_directory=output_directory,
                     algorithm=algorithm,
-                    save_strategy=save_strategy
                 )
                 reports.append(report)
 

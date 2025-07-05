@@ -781,7 +781,13 @@ class CCXTOHLCVDataProvider(DataProvider):
 
         if os.path.exists(file_path):
             try:
-                data = pl.read_csv(file_path, has_header=True)
+                data = pl.read_csv(file_path).with_columns(
+                    pl.col("Datetime").str.strptime(
+                        pl.Datetime("us", "UTC"),
+                        # microsecond precision, with UTC tz
+                        fmt="%+"
+                    )
+                )
                 return data
             except Exception as e:
                 logger.error(

@@ -111,13 +111,16 @@ class PortfolioSnapshotService(RepositoryService, Observer):
             }
         )
 
+        pending_symbols = set()
         if created_orders is not None:
             for order in created_orders:
                 pending_value += order.get_price() * order.get_amount()
+                pending_symbols.add(order.get_symbol())
 
         if pending_orders is not None:
             for order in pending_orders:
                 pending_value += order.get_price() * order.get_remaining()
+                pending_symbols.add(order.get_symbol())
 
         if created_at is None:
             config = self.configuration_service.get_config()
@@ -128,6 +131,7 @@ class PortfolioSnapshotService(RepositoryService, Observer):
                 created_at = datetime.now(tz=timezone.utc)
 
         total_value = portfolio.get_unallocated() + pending_value
+        allocated = 0
 
         for position in \
                 self.position_repository.get_all({"portfolio": portfolio.id}):
@@ -136,9 +140,9 @@ class PortfolioSnapshotService(RepositoryService, Observer):
 
             if position.get_symbol() != portfolio.get_trading_symbol():
                 ticker = self.datasource_service.get_ticker(symbol)
-
                 # Calculate the position worth
                 position_worth = position.get_amount() * ticker["bid"]
+                allocated += position_worth
                 total_value += position_worth
 
         data = {

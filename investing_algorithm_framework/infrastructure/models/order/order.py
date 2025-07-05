@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float
 from sqlalchemy.orm import relationship
@@ -13,6 +13,10 @@ from investing_algorithm_framework.infrastructure.models.\
     order_trade_association import order_trade_association
 
 logger = logging.getLogger("investing_algorithm_framework")
+
+
+def utcnow():
+    return datetime.now(tz=timezone.utc)
 
 
 class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
@@ -37,8 +41,10 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     status = Column(String, default=OrderStatus.CREATED.value)
     position_id = Column(Integer, ForeignKey('positions.id'))
     position = relationship("SQLPosition", back_populates="orders")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=utcnow)
+    updated_at = Column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow
+    )
     order_fee = Column(Float, default=None)
     order_fee_currency = Column(String, default=None)
     order_fee_rate = Column(Float, default=None)

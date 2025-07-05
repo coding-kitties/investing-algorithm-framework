@@ -53,7 +53,7 @@ def create_html_trades_table(report):
     # Create a DataFrame from the trades, with the attributes id, net_gain, net_gain_percentage, entry_time, exit_time, duration, and symbol
     selection = {
         'Trade': [f"{trade.id} {trade.target_symbol}/{trade.trading_symbol}" for trade in trades],
-        'Net Gain': [f"{trade.net_gain:.2f} {report.trading_symbol} ({trade.net_gain_percentage:.2f}%)" for trade in trades],
+        'Net Gain': [f"{trade.change:.2f} {report.trading_symbol} ({trade.percentage_change:.2f}%)" for trade in trades],
         'Entry (Price, Date)': [f"{trade.open_price} {trade.opened_at.strftime('%Y-%m-%d %H:%M:%S')}" for trade in trades],
         'Exit (Price, Date)': [get_exit(trade) for trade in trades],
         'Duration': [f"{trade.duration:.2f} hours" for trade in trades],

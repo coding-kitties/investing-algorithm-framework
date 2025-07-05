@@ -2,7 +2,7 @@ from investing_algorithm_framework.app import App, Algorithm, \
     TradingStrategy, StatelessAction, Task, AppHook, Context, \
     add_html_report, add_metrics, BacktestReport, \
     BacktestReportsEvaluation, pretty_print_trades, pretty_print_positions, \
-    pretty_print_orders, pretty_print_backtest
+    pretty_print_orders, pretty_print_backtest, select_backtest_date_ranges
 from investing_algorithm_framework.domain import ApiException, \
     TradingDataType, TradingTimeFrame, OrderType, OperationalException, \
     OrderStatus, OrderSide, TimeUnit, TimeInterval, Order, Portfolio, \
@@ -93,5 +93,6 @@ __all__ = [
     "add_html_report",
     "AWSS3StorageStateHandler",
     "AWS_S3_STATE_BUCKET_NAME",
-    "AWS_LAMBDA_LOGGING_CONFIG"
+    "AWS_LAMBDA_LOGGING_CONFIG",
+    'select_backtest_date_ranges'
 ]

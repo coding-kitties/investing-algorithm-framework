@@ -4,7 +4,7 @@ import os
 import re
 from datetime import datetime, timedelta, timezone
 
-import pandas as pd
+import polars as pl
 from dateutil import parser
 from tqdm import tqdm
 
@@ -148,8 +148,8 @@ class BacktestService(Observable):
 
         logger.info(f"Prepared backtests for {len(schedule)} strategies")
 
-        for index, row in tqdm(
-            schedule.iterrows(),
+        for row in tqdm(
+            schedule.to_dicts(),
             total=len(schedule),
             desc=f"Running backtest for algorithm with name {algorithm.name}",
             colour="GREEN"
@@ -157,7 +157,7 @@ class BacktestService(Observable):
             strategy_profile = self.get_strategy_from_strategy_profiles(
                 strategy_profiles, row['id']
             )
-            index_date = parser.parse(str(index))
+            index_date = row["run_time"]
             self._configuration_service.add_value(
                 BACKTESTING_INDEX_DATETIME, index_date
             )
@@ -222,57 +222,51 @@ class BacktestService(Observable):
 
     def generate_schedule(
         self, strategies, start_date, end_date
-    ) -> pd.DataFrame:
+    ) -> pl.DataFrame:
         """
-        Generate a schedule for the given strategies. This function will
-        calculate when the strategies should run based on the given start
-        and end date. The schedule will be stored in a pandas DataFrame.
+        Generate a schedule using Polars.
 
         Args:
             strategies: The strategies to generate the schedule for
-            start_date: The start date of the schedule
-            end_date: The end date of the schedule
+            start_date: The start datetime
+            end_date: The end datetime
 
         Returns:
-            pd.DataFrame: The schedule DataFrame
+            pl.DataFrame: The schedule
         """
-        data = []
+        rows = []
 
         for strategy in strategies:
-            id = strategy.strategy_profile.strategy_id
+            strategy_id = strategy.strategy_profile.strategy_id
             time_unit = strategy.strategy_profile.time_unit
             interval = strategy.strategy_profile.interval
             current_time = start_date
 
+            delta = None
+            if TimeUnit.SECOND.equals(time_unit):
+                delta = timedelta(seconds=interval)
+            elif TimeUnit.MINUTE.equals(time_unit):
+                delta = timedelta(minutes=interval)
+            elif TimeUnit.HOUR.equals(time_unit):
+                delta = timedelta(hours=interval)
+            elif TimeUnit.DAY.equals(time_unit):
+                delta = timedelta(days=interval)
+            else:
+                raise ValueError(f"Unsupported time unit: {time_unit}")
+
             while current_time <= end_date:
-                data.append({
-                    "id": id,
-                    'run_time': current_time,
-                })
+                rows.append((strategy_id, current_time))
+                current_time += delta
 
-                if TimeUnit.SECOND.equals(time_unit):
-                    current_time += timedelta(seconds=interval)
-                elif TimeUnit.MINUTE.equals(time_unit):
-                    current_time += timedelta(minutes=interval)
-                elif TimeUnit.HOUR.equals(time_unit):
-                    current_time += timedelta(hours=interval)
-                elif TimeUnit.DAY.equals(time_unit):
-                    current_time += timedelta(days=interval)
-                else:
-                    raise ValueError(f"Unsupported time unit: {time_unit}")
-
-        schedule_df = pd.DataFrame(data)
-
-        if schedule_df.empty:
+        if not rows:
             raise OperationalException(
-                "Could not generate schedule "
-                "for backtest, do you have a strategy "
-                "registered for your algorithm?"
+                "Could not generate schedule for backtest. "
+                "Do you have a strategy registered?"
             )
 
-        schedule_df.sort_values(by='run_time', inplace=True)
-        schedule_df.set_index('run_time', inplace=True)
-        return schedule_df
+        df = pl.DataFrame(rows, schema=["id", "run_time"], orient="row")
+
+        return df.sort("run_time")
 
     def get_strategy_from_strategy_profiles(self, strategy_profiles, id):
 

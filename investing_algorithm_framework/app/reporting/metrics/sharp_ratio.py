@@ -49,7 +49,7 @@ from typing import Optional, List, Tuple
 import math
 import pandas as pd
 import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from investing_algorithm_framework.domain import PortfolioSnapshot
 from .mean_daily_return import get_mean_daily_return

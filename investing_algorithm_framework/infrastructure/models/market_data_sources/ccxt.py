@@ -2,7 +2,7 @@ import logging
 import os
 from datetime import timedelta, datetime, timezone
 
-import polars
+import polars as pl
 from dateutil import parser
 
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
@@ -60,6 +60,7 @@ class CCXTOHLCVBacktestMarketDataSource(
         self.backtest_end_index = self.window_size
         self.backtest_start_index = 0
         self.window_cache = {}
+        self.file_path = None
 
     def prepare_data(
         self,
@@ -81,9 +82,6 @@ class CCXTOHLCVBacktestMarketDataSource(
             config (dict): the configuration of the data source
             backtest_start_date (datetime): the start date of the backtest
             backtest_end_date (datetime): the end date of the backtest
-            time_frame (string): the time frame of the data
-            window_size (int): the total amount of candle sticks that need to
-            be returned
 
         Returns:
             None
@@ -113,17 +111,17 @@ class CCXTOHLCVBacktestMarketDataSource(
         if not os.path.isdir(self.backtest_data_directory):
             os.mkdir(self.backtest_data_directory)
 
-        file_path = self._create_file_path()
+        self.file_path = self._create_file_path()
 
-        if not self._data_source_exists(file_path):
-            if not os.path.isfile(file_path):
+        if not self._data_source_exists(self.file_path):
+            if not os.path.isfile(self.file_path):
                 try:
-                    with open(file_path, 'w') as _:
+                    with open(self.file_path, 'w') as _:
                         pass
                 except Exception as e:
                     logger.error(e)
                     raise OperationalException(
-                        f"Could not create backtest data file {file_path}"
+                        f"Could not create backtest data file {self.file_path}"
                     )
 
             # Get the OHLCV data from the ccxt market service
@@ -146,7 +144,7 @@ class CCXTOHLCVBacktestMarketDataSource(
                     f"to {backtest_end_date}. Please make sure that " +
                     "the market has data for this date range."
                 )
-            self.write_data_to_file_path(file_path, ohlcv)
+            self.write_data_to_file_path(self.file_path, ohlcv)
 
         self.load_data()
         self._precompute_sliding_windows()  # Precompute sliding windows!
@@ -176,12 +174,14 @@ class CCXTOHLCVBacktestMarketDataSource(
             self.window_cache[end_time] = self.data.slice(i, self.window_size)
 
     def load_data(self):
-        file_path = self._create_file_path()
-        self.data = polars.read_csv(
-            file_path,
-            schema_overrides={"Datetime": polars.Datetime},
+        self.file_path = self._create_file_path()
+        self.data = pl.read_csv(
+            self.file_path,
+            schema_overrides={"Datetime": pl.Datetime},
             low_memory=True
-        )  # Faster parsing
+        ).with_columns(
+            pl.col("Datetime").dt.convert_time_zone("UTC")
+        )
         first_row = self.data.head(1)
         last_row = self.data.tail(1)
 
@@ -250,7 +250,7 @@ class CCXTOHLCVBacktestMarketDataSource(
     def file_name(self):
         return self._create_file_path().split("/")[-1]
 
-    def write_data_to_file_path(self, data_file, data: polars.DataFrame):
+    def write_data_to_file_path(self, data_file, data: pl.DataFrame):
         data.write_csv(data_file)
 
 
@@ -412,7 +412,7 @@ class CCXTTickerBacktestMarketDataSource(
         file_path = self._create_file_path()
 
         # Filter the data based on the backtest index date and the end date
-        df = polars.read_csv(file_path)
+        df = pl.read_csv(file_path)
         filtered_df = df.filter(
             (df['Datetime'] >= date.strftime(DATETIME_FORMAT))
         )
@@ -436,7 +436,7 @@ class CCXTTickerBacktestMarketDataSource(
             "datetime": first_row_datetime,
         }
 
-    def write_data_to_file_path(self, data_file, data: polars.DataFrame):
+    def write_data_to_file_path(self, data_file, data: pl.DataFrame):
         data.write_csv(data_file)
 
 
@@ -613,13 +613,13 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
                     and file_name_time_frame == time_frame \
                     and file_name_start_date >= from_timestamp \
                     and file_name_end_date <= to_timestamp:
-                return polars.read_csv(path)
+                return pl.read_csv(path)
 
         return None
 
     def write_data_to_storage(
         self,
-        data: polars.DataFrame,
+        data: pl.DataFrame,
         storage_path,
         symbol,
         time_frame,
@@ -649,7 +649,7 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
         if not os.path.isdir(storage_path):
             os.mkdir(storage_path)
 
-        file_path = self.create_storage_file_path(
+        self.file_path = self.create_storage_file_path(
             storage_path=storage_path,
             symbol=symbol,
             time_frame=time_frame,
@@ -659,20 +659,20 @@ class CCXTOHLCVMarketDataSource(OHLCVMarketDataSource):
             data_type=data_type
         )
 
-        if os.path.isfile(file_path):
+        if os.path.isfile(self.file_path):
             return
 
         else:
             try:
-                with open(file_path, 'w') as _:
+                with open(self.file_path, 'w') as _:
                     pass
             except Exception as e:
                 logger.error(e)
                 raise OperationalException(
-                    f"Could not create data file {file_path}"
+                    f"Could not create data file {self.file_path}"
                 )
 
-            data.write_csv(file_path)
+            data.write_csv(self.file_path)
 
 
 class CCXTOrderBookMarketDataSource(OrderBookMarketDataSource):

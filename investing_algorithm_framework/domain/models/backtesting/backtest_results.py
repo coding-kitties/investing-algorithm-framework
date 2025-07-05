@@ -15,6 +15,8 @@ from investing_algorithm_framework.domain.models.portfolio \
 from investing_algorithm_framework.domain.models.position import Position
 from investing_algorithm_framework.domain.models.trade import Trade, \
     TradeStatus
+from investing_algorithm_framework.domain.exceptions import \
+    OperationalException
 
 logger = getLogger(__name__)
 
@@ -99,6 +101,7 @@ class BacktestResult(BaseModel):
     average_trade_size: float = 0.0
 
     def __post_init__(self):
+
         if self.created_at is None:
             self.created_at = datetime.now(tz=timezone.utc)
 
@@ -108,6 +111,13 @@ class BacktestResult(BaseModel):
         ).days
         self.backtest_start_date = self.backtest_date_range.start_date
         self.backtest_end_date = self.backtest_date_range.end_date
+
+        if len(self.portfolio_snapshots) < 2:
+            raise OperationalException(
+                "Backtest result must have at least 2 portfolio snapshots " +
+                "One for the initial state and one for the final state."
+            )
+
         self.growth = self.portfolio_snapshots[-1].total_value \
             - self.portfolio_snapshots[0].total_value
         self.growth_percentage = self.growth / self.initial_unallocated * 100.0

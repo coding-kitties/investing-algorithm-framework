@@ -16,6 +16,7 @@ def safe_format_percentage(value, format_str, default_value='N/A'):
 
     if isinstance(value, (int, float)):
         return format_str.format(value * 100)
+
     return value
 
 

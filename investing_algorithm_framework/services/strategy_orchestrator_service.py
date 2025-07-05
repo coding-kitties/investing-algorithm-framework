@@ -117,10 +117,7 @@ class StrategyOrchestratorService:
 
     def run_backtest_strategy(self, strategy, context, config):
         data = self.market_data_source_service.get_data_for_strategy(strategy)
-        strategy.run_strategy(
-            market_data=data,
-            context=context,
-        )
+        strategy.run_strategy(market_data=data, context=context)
 
     def run_task(self, task, context, sync=False):
         self.cleanup_threads()

@@ -25,6 +25,39 @@ class TimeInterval(Enum):
                 f"Could not convert {value} to TimeInterval"
             )
 
+    @staticmethod
+    def from_ohlcv_data_file(file_path: str):
+        """
+        Extracts the time interval from the file name of an OHLCV data file.
+        The file name should contain the time interval in the format
+        'symbol_timeinterval.csv'.
+
+        Args:
+            file_path (str): The file path of the OHLCV data file.
+
+        Returns:
+            TimeInterval: The extracted time interval.
+        """
+        if not isinstance(file_path, str):
+            raise ValueError("File path must be a string.")
+
+        parts = file_path.split('_')
+        if len(parts) < 2:
+            raise ValueError(
+                "File name does not contain a valid time interval."
+            )
+
+        time_interval_str = parts[-1].split('.')[0].upper()
+        try:
+            return TimeInterval.from_string(time_interval_str)
+        except ValueError:
+            raise ValueError(
+                "Could not extract time interval from "
+                f"file name: {file_path}. "
+                "Expected format 'symbol_timeinterval.csv', "
+                f"got '{time_interval_str}'."
+            )
+
     def equals(self, other):
 
         if isinstance(other, Enum):

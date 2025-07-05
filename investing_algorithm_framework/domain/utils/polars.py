@@ -1,4 +1,4 @@
-from pandas import to_datetime
+import pandas as pd
 from polars import DataFrame as PolarsDataFrame
 
 
@@ -10,6 +10,11 @@ def convert_polars_to_pandas(
 ):
     """
     Function to convert polars dataframe to pandas dataframe.
+
+    The function will set the index to the datetime column. The reason
+    for this is that You can filter with clean, readable code in a faster way
+    then with filtering on a column that is not the index.
+
 
     Args:
         data:Polars Dataframe - The original polars dataframe
@@ -29,22 +34,15 @@ def convert_polars_to_pandas(
     if not isinstance(data, PolarsDataFrame):
         raise ValueError("Data must be a Polars DataFrame")
 
-    data = data.to_pandas().copy()
+    df = data.to_pandas().copy()
 
-    if add_index:
-        # Convert 'Datetime' column to datetime format if it's not already
-        data[datetime_column_name] = to_datetime(data[datetime_column_name])
-
-        # Set 'Datetime' column as the index
-        data.set_index(datetime_column_name, inplace=True)
+    # Ensure datetime column is datetime type
+    df[datetime_column_name] = pd.to_datetime(df[datetime_column_name])
 
     if remove_duplicates:
+        df = df.drop_duplicates(subset=datetime_column_name, keep="first")
 
-        # Remove duplicate dates
-        data = data[~data.index.duplicated(keep='first')]
+    if add_index:
+        df.set_index(datetime_column_name, inplace=True)
 
-    # Make sure that the datetime column is still in the dataframe
-    if datetime_column_name not in data.columns:
-        data[datetime_column_name] = data.index
-
-    return data
+    return df

@@ -18,25 +18,32 @@ class Test(TestCase):
         """
         """
         start_time = time.time()
-        # RESOURCE_DIRECTORY should always point to the parent directory/resources
-        resource_directory = os.path.join(os.path.dirname(__file__), 'resources')
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        # RESOURCE_DIRECTORY should point to three directories up from this file
+        # to the resources directory
+        # Get the parent directory of the current file
+
+        cur_path = os.path.dirname(os.path.realpath(__file__))
+        par_dir_path = os.path.abspath(os.path.join(cur_path, '..'))
+        resource_dir_path = os.path.join(
+            par_dir_path, 'resources'
+        )
+        csv_file_path = f"{resource_dir_path}/market_data_sources_for_testing" \
+                        "/OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+
+        config = {RESOURCE_DIRECTORY: resource_dir_path}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BINANCE", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2023, 12, 2)
-        start_date = end_date - timedelta(days=100)
+        end_date = datetime(2023, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=99)
         date_range = BacktestDateRange(
             start_date=start_date, end_date=end_date
         )
         algorithm = Algorithm()
         strategy = CrossOverStrategyV1()
-        dataframe = pl.read_csv(
-            os.path.join(
-                resource_directory,
-                "backtest_data/OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-06-00_2023-12-02-00-00.csv"
-            )
-        )
-        dataframe = convert_polars_to_pandas(dataframe)
+
+        # Join the path to the CSV file
+        dataframe = pl.read_csv(csv_file_path)
+        dataframe = convert_polars_to_pandas(dataframe, add_index=False)
         ohlcv_data_source = PandasOHLCVMarketDataSource(
             identifier="BTC/EUR-ohlcv-2h",
             dataframe=dataframe,
@@ -50,9 +57,7 @@ class Test(TestCase):
         ]
         algorithm.add_strategy(strategy)
         backtest_report = app.run_backtest(
-            backtest_date_range=date_range,
-            save_strategy=True,
-            algorithm=algorithm
+            backtest_date_range=date_range, algorithm=algorithm
         )
         self.assertAlmostEqual(
             backtest_report.results.growth, 3, delta=0.5

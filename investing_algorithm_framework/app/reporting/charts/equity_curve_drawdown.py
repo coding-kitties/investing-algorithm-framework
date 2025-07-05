@@ -12,12 +12,9 @@ def get_equity_curve_with_drawdown_chart(equity_curve_series, drawdown_series):
     )
 
     # Normalize equity to start at 1
-    equity_curve_df["value"] = (equity_curve_df["value"] /
-                                equity_curve_df["value"].iloc[0])
-
-    # Split into above and below 1
-    above_1 = equity_curve_df[equity_curve_df["value"] >= 1]
-    below_1 = equity_curve_df[equity_curve_df["value"] < 1]
+    equity_curve_df["value"] = (
+        equity_curve_df["value"] / equity_curve_df["value"].iloc[0]
+    )
 
     fig = make_subplots(
         rows=2,
@@ -28,27 +25,15 @@ def get_equity_curve_with_drawdown_chart(equity_curve_series, drawdown_series):
         subplot_titles=["", ""]
     )
 
-    # Equity curve - gains (green)
+    # Draw equity curve
     fig.add_trace(
         go.Scatter(
-            x=above_1["datetime"],
-            y=above_1["value"],
+            x=equity_curve_df["datetime"],
+            y=equity_curve_df["value"],
             mode="lines",
-            line=dict(color="rgba(34, 139, 34, 0.9)", width=1.5),
-            name="Cumulative Equity (Gains)"
-        ),
-        row=1,
-        col=1
-    )
-
-    # Equity curve - losses (red)
-    fig.add_trace(
-        go.Scatter(
-            x=below_1["datetime"],
-            y=below_1["value"],
-            mode="lines",
-            line=dict(color="rgba(220, 20, 60, 0.9)", width=1.5),
-            name="Cumulative Equity (Loss)"
+            line=dict(color="rgba(0, 128, 0, 0.8)", width=1),
+            name="Equity Curve",
+            hovertemplate="<b>Equity</b><br>%{x}<br>Value: %{y:.2f}<extra></extra>"
         ),
         row=1,
         col=1

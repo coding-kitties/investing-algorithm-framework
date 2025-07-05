@@ -1,4 +1,6 @@
 import os
+import logging
+import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 
 from .tables import create_html_time_metrics_table, \
@@ -6,7 +8,7 @@ from .tables import create_html_time_metrics_table, \
     create_html_trades_table
 from .charts import get_equity_curve_with_drawdown_chart, \
     get_rolling_sharp_ratio_chart, get_monthly_returns_heatmap_chart, \
-    get_yearly_returns_bar_chart
+    get_yearly_returns_bar_chart, get_ohlcv_data_completeness_chart
 from .metrics import get_equity_curve, get_total_return, get_cagr, \
     get_sharpe_ratio, get_rolling_sharpe_ratio, get_sortino_ratio, \
     get_profit_factor, get_calmar_ratio, get_annual_volatility, \
@@ -21,6 +23,68 @@ from .metrics import get_equity_curve, get_total_return, get_cagr, \
     get_average_monthly_return_losing_months, get_win_loss_ratio, \
     get_average_monthly_return_winning_months, get_best_month, \
     get_best_year, get_worst_month, get_worst_year, get_trades_per_year
+from investing_algorithm_framework.domain import TimeFrame
+
+
+logger = logging.getLogger("investing_algorithm_framework")
+
+
+def get_symbol_from_file_name(file_name: str) -> str:
+    """
+    Extract the symbol from the file name.
+
+    Args:
+        file_name (str): The file name from which to extract the symbol.
+
+    Returns:
+        str: The extracted symbol.
+    """
+    # Assuming the file name format is "symbol_timeframe.csv"
+    return file_name.split('_')[0].upper()
+
+def get_market_from_file_name(file_name: str) -> str:
+    """
+    Extract the market from the file name.
+
+    Args:
+        file_name (str): The file name from which to extract the market.
+
+    Returns:
+        str: The extracted market.
+    """
+    # Assuming the file name format is "symbol_market_timeframe.csv"
+    parts = file_name.split('_')
+    if len(parts) < 2:
+        raise ValueError("File name does not contain a valid market.")
+    return parts[1].upper()
+
+
+def get_time_frame_from_file_name(file_name: str) -> TimeFrame:
+    """
+    Extract the time frame from the file name.
+
+    Args:
+        file_name (str): The file name from which to extract the time frame.
+
+    Returns:
+        TimeFrame: The extracted time frame.
+    """
+    parts = file_name.split('_')
+
+    if len(parts) < 3:
+        raise ValueError(
+            "File name does not contain a valid time frame."
+        )
+    time_frame_str = parts[3]
+
+    try:
+        return TimeFrame.from_string(time_frame_str)
+    except ValueError:
+        raise ValueError(
+            f"Could not extract time frame from file name: {file_path}. "
+            f"Expected format 'OHLCV_<SYMBOL>_<MARKET>_<TIME_FRAME>_<START_DATE>_<END_DATE>.csv', "
+            f"got '{time_frame_str}'."
+        )
 
 
 def add_metrics(report, risk_free_rate=None) -> "BacktestReport":
@@ -41,7 +105,9 @@ def add_metrics(report, risk_free_rate=None) -> "BacktestReport":
         "Equity Curve": get_equity_curve(report.results.portfolio_snapshots),
         "Total Return": get_total_return(report.results.portfolio_snapshots),
         "CAGR": get_cagr(report.results.portfolio_snapshots),
-        "Sharpe Ratio": get_sharpe_ratio(report.results.portfolio_snapshots),
+        "Sharpe Ratio": get_sharpe_ratio(
+            report.results.portfolio_snapshots, risk_free_rate=risk_free_rate
+        ),
         "Rolling Sharpe Ratio": get_rolling_sharpe_ratio(
             report.results.portfolio_snapshots, risk_free_rate=risk_free_rate
         ),
@@ -122,6 +188,7 @@ def add_metrics(report, risk_free_rate=None) -> "BacktestReport":
     report.metrics = results
     return report
 
+
 def add_html_report(report) -> "BacktestReport":
     """
     Add HTML content to the report.results.
@@ -131,7 +198,7 @@ def add_html_report(report) -> "BacktestReport":
             content will be added.
 
     Returns:
-        Backtestreport.results: The updated report.results with HTML content.
+        Backtestreport: The updated report with HTML content.
     """
     metrics = report.metrics
     # Create plots
@@ -164,6 +231,40 @@ def add_html_report(report) -> "BacktestReport":
         config={'responsive': True}
     )
 
+    # Create OHLCV data completeness charts
+    data_files = report.data_files
+    ohlcv_data_completeness_charts_html = ""
+
+    for file in data_files:
+        try:
+            if file.endswith('.csv'):
+                df = pd.read_csv(file, parse_dates=['Datetime'])
+                file_name = os.path.basename(file)
+                symbol = get_symbol_from_file_name(file_name)
+                market = get_market_from_file_name(file_name)
+                time_frame = get_time_frame_from_file_name(file_name)
+                title = f"OHLCV Data Completeness for {market} - {symbol} - {time_frame.value}"
+                ohlcv_data_completeness_chart_html = \
+                    get_ohlcv_data_completeness_chart(
+                        df,
+                        timeframe=time_frame.value,
+                        windowsize=200,
+                        title=title
+                    )
+
+                ohlcv_data_completeness_charts_html += (
+                    '<div class="ohlcv-data-completeness-chart">'
+                    f'{ohlcv_data_completeness_chart_html}'
+                    '</div>'
+                )
+
+        except Exception as e:
+            logger.warning(
+                "Error creating OHLCV data completeness " +
+                f"chart for {file}: {e}"
+            )
+            continue
+
     # Create HTML tables
     key_metrics_table_html = create_html_key_metrics_table(
         metrics, report.results
@@ -194,6 +295,7 @@ def add_html_report(report) -> "BacktestReport":
         trades_metrics_table_html=trades_metrics_table_html,
         time_metrics_table_html=time_metrics_table_html,
         trades_table_html=trades_table_html,
+        data_completeness_charts_html=ohlcv_data_completeness_charts_html
     )
     report.html_report = html_rendered
     return report

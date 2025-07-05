@@ -28,6 +28,7 @@ class BacktestMarketDataSource(ABC):
         self._symbol = symbol
         self._backtest_data_start_date = backtest_data_start_date
         self._backtest_data_index_date = backtest_data_index_date
+        self._file_path = None
 
     @property
     def config(self):
