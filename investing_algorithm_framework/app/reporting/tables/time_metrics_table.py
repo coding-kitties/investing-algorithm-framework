@@ -7,14 +7,15 @@ def create_html_time_metrics_table(results, report):
     copy_results = results.to_dict().copy()
     start_date = report.backtest_date_range.start_date
     end_date = report.backtest_date_range.end_date
+    string_format = "{:.2f}"
     # Format dates
     copy_results['Start Date'] = safe_format_date(start_date, "%Y-%m-%d %H:%M")
     copy_results['End Date'] = safe_format_date(end_date, "%Y-%m-%d %H:%M")
-    copy_results['Percentage Winning Months'] = safe_format_percentage(copy_results['percentage_winning_months'], "{:.2f}%")
-    copy_results['Percentage Winning Years'] = safe_format_percentage(copy_results['percentage_winning_years'], "{:.2f}%")
-    copy_results['Average Monthly Return'] = safe_format_percentage(copy_results['average_monthly_return'], "{:.2f}%")
-    copy_results['Average Monthly Return (Losing Months)'] = safe_format_percentage(copy_results['average_monthly_return_losing_months'], "{:.2f}%")
-    copy_results['Average Monthly Return (Winning Months)'] = safe_format_percentage(copy_results['average_monthly_return_winning_months'], "{:.2f}%")
+    copy_results['Percentage Winning Months'] = f"{safe_format_percentage(copy_results['percentage_winning_months'], string_format)}%"
+    copy_results['Percentage Winning Years'] = f"{safe_format_percentage(copy_results['percentage_winning_years'], string_format)}%"
+    copy_results['Average Monthly Return'] = f"{safe_format_percentage(copy_results['average_monthly_return'], string_format)}%"
+    copy_results['Average Monthly Return (Losing Months)'] = f"{safe_format_percentage(copy_results['average_monthly_return_losing_months'], string_format)}%"
+    copy_results['Average Monthly Return (Winning Months)'] = f"{safe_format_percentage(copy_results['average_monthly_return_winning_months'], string_format)}%"
 
     if isinstance(copy_results['best_month'], tuple):
         percentage = copy_results['best_month'][0]
@@ -34,13 +35,13 @@ def create_html_time_metrics_table(results, report):
         percentage = copy_results['best_year'][0]
         date = copy_results['best_year'][1]
         copy_results['Best Year'] = f"{safe_format_percentage(
-            percentage, '{:.2f}'
+            percentage, string_format
         )}% {safe_format_date(date, '%b %Y')}"
     if isinstance(copy_results['worst_year'], tuple):
         percentage = copy_results['worst_year'][0]
         date = copy_results['worst_year'][1]
         copy_results['Worst Year'] = f"{safe_format_percentage(
-            percentage, '{:.2f}'
+            percentage, string_format
         )}% {safe_format_date(date, '%b %Y')}"
 
     stats = {
