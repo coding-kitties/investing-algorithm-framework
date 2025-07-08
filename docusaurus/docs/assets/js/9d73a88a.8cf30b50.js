@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkinvesting_algorithm_framework_docs=self.webpackChunkinvesting_algorithm_framework_docs||[]).push([[9674],{1988:a=>{a.exports=JSON.parse('{"label":"aws lambda","permalink":"/investing-algorithm-framework/blog/tags/aws-lambda","allTagsPath":"/investing-algorithm-framework/blog/tags","count":2}')}}]);
