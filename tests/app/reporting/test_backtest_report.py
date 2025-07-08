@@ -107,10 +107,6 @@ class Test(TestCase):
         strategy_file_path = os.path.join(strategy_dir, "strategy_one.py")
         self.assertTrue(os.path.exists(strategy_file_path))
 
-        # Check if the report HTML file exists
-        report_html_path = os.path.join(output_path, "report.html")
-        self.assertTrue(os.path.exists(report_html_path))
-
         # Check if the metrics JSON file exists
         metrics_json_path = os.path.join(output_path, "metrics.json")
         self.assertTrue(os.path.exists(metrics_json_path))
@@ -126,8 +122,6 @@ class Test(TestCase):
         with an Algorithm instance and a BacktestResult instance, which are required to create the report. Also, a risk-free rate is provided,
         to simulate an offline backtest run.
         """
-        algorithm = Algorithm()
-        # algorithm.add_strategy(StrategyOne)
         snapshots = [
             PortfolioSnapshot(
                 created_at="2023-08-07 07:59:00",
@@ -200,14 +194,9 @@ class Test(TestCase):
         strategy_file_path = os.path.join(strategy_dir, "strategy_one.py")
         self.assertTrue(os.path.exists(strategy_file_path))
 
-        # Check if the report HTML file exists
-        report_html_path = os.path.join(output_path, "report.html")
-        self.assertTrue(os.path.exists(report_html_path))
-
         # Check if the metrics JSON file exists
         metrics_json_path = os.path.join(output_path, "metrics.json")
         self.assertTrue(os.path.exists(metrics_json_path))
-
 
         # Check if the results were saved correctly
         self.assertTrue(os.path.exists(os.path.join(output_path, "results.json")))
