@@ -20,9 +20,7 @@ def create_html_time_metrics_table(results, report):
     if isinstance(copy_results['best_month'], tuple):
         percentage = copy_results['best_month'][0]
         date = copy_results['best_month'][1]
-        copy_results['Best Month'] = f"{safe_format_percentage(
-            percentage, '{:.2f}'
-        )}% {safe_format_date(date, '%b %Y')}"
+        copy_results['Best Month'] = f"{safe_format_percentage(percentage, string_format)}% {safe_format_date(date, '%b %Y')}"
 
     if isinstance(copy_results['worst_month'], tuple):
         percentage = copy_results['worst_month'][0]
