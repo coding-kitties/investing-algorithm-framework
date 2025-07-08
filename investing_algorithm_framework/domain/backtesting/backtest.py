@@ -224,7 +224,7 @@ class Backtest:
                     logger.error(f"Error copying data file {file}: {e}")
 
         # Save metadata if available
-        if self.meta_data:
+        if self.metadata:
             meta_file = os.path.join(directory_path, "metadata.json")
             with open(meta_file, 'w') as f:
                 json.dump(self.metadata, f, indent=4)
