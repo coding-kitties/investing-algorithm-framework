@@ -32,6 +32,8 @@ class Test(TestCase):
         Test the save method of the BacktestReport class, as part of a backtest run. This means that the backtest report will be created
         with an Algorithm instance and a BacktestResult instance, which are required to create the report. Also, a risk-free rate is provided,
         to simulate an offline backtest run.
+
+        If algorithm is provided, that strategy files will be automatically saved in the strategies directory.
         """
         algorithm = Algorithm()
         algorithm.add_strategy(StrategyOne)
