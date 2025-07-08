@@ -25,22 +25,16 @@ def create_html_time_metrics_table(results, report):
     if isinstance(copy_results['worst_month'], tuple):
         percentage = copy_results['worst_month'][0]
         date = copy_results['worst_month'][1]
-        copy_results['Worst Month'] = f"{safe_format_percentage(
-            percentage, '{:.2f}'
-        )}% {safe_format_date(date, '%b %Y')}"
+        copy_results['Worst Month'] = f"{safe_format_percentage(percentage, string_format)}% {safe_format_date(date, '%b %Y')}"
 
     if isinstance(copy_results['best_year'], tuple):
         percentage = copy_results['best_year'][0]
         date = copy_results['best_year'][1]
-        copy_results['Best Year'] = f"{safe_format_percentage(
-            percentage, string_format
-        )}% {safe_format_date(date, '%b %Y')}"
+        copy_results['Best Year'] = f"{safe_format_percentage(percentage, string_format)}% {safe_format_date(date, '%b %Y')}"
     if isinstance(copy_results['worst_year'], tuple):
         percentage = copy_results['worst_year'][0]
         date = copy_results['worst_year'][1]
-        copy_results['Worst Year'] = f"{safe_format_percentage(
-            percentage, string_format
-        )}% {safe_format_date(date, '%b %Y')}"
+        copy_results['Worst Year'] = f"{safe_format_percentage(percentage, string_format)}% {safe_format_date(date, '%b %Y')}"
 
     stats = {
         "Metric": [
