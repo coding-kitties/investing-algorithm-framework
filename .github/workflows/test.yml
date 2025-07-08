@@ -8,6 +8,7 @@ on:
       - '**'        # matches every branch
     paths:
       - 'investing_algorithm_framework/**'
+      - 'tests/**'
 
 jobs:
   linting:
