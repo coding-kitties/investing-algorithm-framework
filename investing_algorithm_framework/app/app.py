@@ -3,7 +3,7 @@ import logging
 import os
 import threading
 from time import sleep
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 
 from flask import Flask
 
@@ -723,7 +723,8 @@ class App:
         snapshot_interval: SnapshotInterval = SnapshotInterval.TRADE_CLOSE,
         strategy_directory_path: Optional[str] = None,
         backtest_directory_name: Optional[str] = None,
-        risk_free_rate: Optional[float] = None
+        risk_free_rate: Optional[float] = None,
+        metadata: Optional[Dict[str, str]] = None
     ) -> Backtest:
         """
         Run a backtest for an algorithm.
@@ -829,6 +830,7 @@ class App:
             risk_free_rate=risk_free_rate,
             strategy_directory_path=strategy_directory_path
         )
+        backtest.metadata = metadata if metadata is not None else {}
 
         if output_directory is None:
             output_directory = os.path.join(
@@ -856,7 +858,7 @@ class App:
         backtest_date_ranges: List[BacktestDateRange] = None,
         output_directory=None,
         checkpoint=False,
-        save_strategy=False,
+
     ) -> List[BacktestReport]:
         """
         Run a backtest for a set algorithm. This method should be called when

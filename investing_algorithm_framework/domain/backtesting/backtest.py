@@ -39,7 +39,7 @@ class Backtest:
     backtest_results: BacktestResult = field(default=None)
     strategy_related_paths: list[str] = field(default_factory=list)
     data_file_paths: list[str] = field(default_factory=list)
-    meta_data: Dict[str, str] = field(default_factory=dict)
+    metadata: Dict[str, str] = field(default_factory=dict)
     risk_free_rate: float = None
 
     def to_dict(self) -> dict:
@@ -120,10 +120,10 @@ class Backtest:
             ]
 
         # Load metadata if available
-        meta_file = os.path.join(directory_path, "meta.json")
+        meta_file = os.path.join(directory_path, "metadata.json")
         if os.path.isfile(meta_file):
             with open(meta_file, 'r') as f:
-                meta_data = json.load(f)
+                metadata = json.load(f)
 
         # Load risk-free rate if available
         risk_free_rate_file = os.path.join(
@@ -144,7 +144,7 @@ class Backtest:
             backtest_results=backtest_results,
             strategy_related_paths=strategy_related_paths,
             data_file_paths=data_file_paths,
-            meta_data=meta_data,
+            metadata=metadata,
             risk_free_rate=risk_free_rate
         )
 
@@ -225,9 +225,9 @@ class Backtest:
 
         # Save metadata if available
         if self.meta_data:
-            meta_file = os.path.join(directory_path, "meta.json")
+            meta_file = os.path.join(directory_path, "metadata.json")
             with open(meta_file, 'w') as f:
-                json.dump(self.meta_data, f, indent=4)
+                json.dump(self.metadata, f, indent=4)
 
         # Save risk-free rate if available
         if self.risk_free_rate is not None:
