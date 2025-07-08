@@ -3,6 +3,7 @@ from unittest import TestCase
 
 from investing_algorithm_framework.app import pretty_print_positions, \
     BacktestReport
+from investing_algorithm_framework.domain import Backtest
 
 
 class Test(TestCase):
@@ -29,5 +30,5 @@ class Test(TestCase):
             self.resource_dir,
             "backtest_reports_for_testing/test_algorithm_backtest_created-at_2025-04-21-21-21"
         )
-        report = BacktestReport.open(path)
+        report = Backtest.open(path)
         pretty_print_positions(report)

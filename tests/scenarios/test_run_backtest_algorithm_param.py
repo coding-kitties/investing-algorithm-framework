@@ -37,24 +37,24 @@ class Test(TestCase):
         print(f"Test completed in {elapsed_time:.2f} seconds")
 
         self.assertAlmostEqual(
-            backtest_report.results.growth, 3, delta=0.5
+            backtest_report.backtest_results.growth, 3, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.results.growth_percentage, 0.8, delta=0.1
+            backtest_report.backtest_results.growth_percentage, 0.8, delta=0.1
         )
         self.assertEqual(
-            backtest_report.results.initial_unallocated, 400
+            backtest_report.backtest_results.initial_unallocated, 400
         )
         self.assertEqual(
-            backtest_report.results.trading_symbol, "EUR"
+            backtest_report.backtest_results.trading_symbol, "EUR"
         )
         self.assertAlmostEqual(
-            backtest_report.results.total_net_gain, 3, delta=0.5
+            backtest_report.backtest_results.total_net_gain, 3, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.results.total_net_gain_percentage, 0.8, delta=0.1
+            backtest_report.backtest_results.total_net_gain_percentage, 0.8, delta=0.1
         )
-        snapshots = backtest_report.results.get_portfolio_snapshots()
+        snapshots = backtest_report.backtest_results.get_portfolio_snapshots()
         # Check that the first two snapshots created at are the same
         # as the start date of the backtest
         self.assertEqual(

@@ -17,7 +17,7 @@ from investing_algorithm_framework.domain import PortfolioSnapshot
 from .equity_curve import get_equity_curve
 
 
-def get_drawdown_series(snapshots: List[PortfolioSnapshot]) -> List[Tuple[datetime, float]]:
+def get_drawdown_series(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, datetime]]:
     """
     Calculate the drawdown series of a backtest report.
 
@@ -39,12 +39,12 @@ def get_drawdown_series(snapshots: List[PortfolioSnapshot]) -> List[Tuple[dateti
     drawdown_series = []
     max_value = None
 
-    for timestamp, value in equity_curve:
+    for value, timestamp in equity_curve:
         if max_value is None:
             max_value = value
         max_value = max(max_value, value)
         drawdown = (value - max_value) / max_value  # This will be <= 0
-        drawdown_series.append((timestamp, drawdown))
+        drawdown_series.append((drawdown, timestamp))
 
     return drawdown_series
 
@@ -69,10 +69,10 @@ def get_max_drawdown(snapshots: List[PortfolioSnapshot]) -> float:
     if not equity_curve:
         return 0.0
 
-    peak = equity_curve[0][1]
+    peak = equity_curve[0][0]
     max_drawdown_pct = 0.0
 
-    for _, equity in equity_curve:
+    for equity, _  in equity_curve:
         if equity > peak:
             peak = equity
 
@@ -134,11 +134,11 @@ def get_max_drawdown_duration(snapshots: List[PortfolioSnapshot]) -> int:
     if not equity_curve:
         return 0
 
-    peak = equity_curve[0][1]
+    peak = equity_curve[0][0]
     max_duration = 0
     current_duration = 0
 
-    for _, equity in equity_curve:
+    for equity, _ in equity_curve:
         if equity < peak:
             current_duration += 1
         else:
@@ -168,10 +168,10 @@ def get_max_drawdown_absolute(snapshots: List[PortfolioSnapshot]) -> float:
     if not equity_curve:
         return 0.0
 
-    peak = equity_curve[0][1]
+    peak = equity_curve[0][0]
     max_drawdown = 0.0
 
-    for _, equity in equity_curve:
+    for equity, _ in equity_curve:
         if equity > peak:
             peak = equity
 

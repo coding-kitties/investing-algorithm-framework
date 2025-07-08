@@ -1,12 +1,13 @@
+import json
+import os
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from logging import getLogger
 from typing import List, Optional
 
 from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
-from investing_algorithm_framework.domain.models \
-    .backtesting.backtest_date_range import BacktestDateRange
-from investing_algorithm_framework.domain.models.base_model import BaseModel
+from investing_algorithm_framework.domain.exceptions import \
+    OperationalException
 from investing_algorithm_framework.domain.models.order import Order
 from investing_algorithm_framework.domain.models.order import OrderSide, \
     OrderStatus
@@ -15,14 +16,13 @@ from investing_algorithm_framework.domain.models.portfolio \
 from investing_algorithm_framework.domain.models.position import Position
 from investing_algorithm_framework.domain.models.trade import Trade, \
     TradeStatus
-from investing_algorithm_framework.domain.exceptions import \
-    OperationalException
+from .backtest_date_range import BacktestDateRange
 
 logger = getLogger(__name__)
 
 
 @dataclass
-class BacktestResult(BaseModel):
+class BacktestResult:
     """
     Class that represents a backtest result. The backtest result
     contains information about the trades, positions, portfolio and
@@ -448,3 +448,55 @@ class BacktestResult(BaseModel):
             ]
 
         return selection
+
+    def save(self, directory_path: str):
+        """
+        Save the backtest results to a file. When saving the backtest results,
+        it will save the following files and directories:
+
+        - results.json: The backtest results in JSON format.
+        - metrics.json: The metrics of the backtest report in JSON format.
+        - strategy_directory: A directory containing the strategy files
+            used in the backtest report.
+        - data_files: A directory containing the data files used in the
+            backtest report.
+        Args:
+            path (str): The path to save the backtest report to.
+        """
+
+        path = f"{directory_path}/results.json"
+        with open(path, 'w') as f:
+            json.dump(self.to_dict(), f, indent=4, default=str)
+            logger.info(f"Backtest results saved to {path}")
+
+    @staticmethod
+    def open(file_path: str) -> 'BacktestResult':
+        """
+        Open a backtest result from a file.
+
+        Args:
+            file_path (str): The path to the file to open.
+
+        Raises:
+            OperationalException: If the file does not exist or is not a valid
+                backtest result file.
+
+        Returns:
+            BacktestResult: The backtest result.
+        """
+
+        if not file_path.endswith('.json'):
+            raise OperationalException(
+                f"File {file_path} is not a valid backtest result file. "
+                "It must be a JSON file."
+            )
+
+        # Check if the file exists
+        if not os.path.isfile(file_path):
+            raise OperationalException(
+                f"The file {file_path} does not exist."
+            )
+
+        with open(file_path, 'r') as f:
+            data = json.load(f)
+            return BacktestResult.from_dict(data)

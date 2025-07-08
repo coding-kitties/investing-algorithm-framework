@@ -64,34 +64,34 @@ def highlight_win_loss_ratio(row):
 
 
 def create_html_trade_metrics_table(results, report):
-    copy_results = results.copy()
-    copy_results['Trades per Year'] = safe_format(copy_results['Trades per Year'], "{:.2f}")
-    copy_results['Trades per Day'] =  safe_format(copy_results['Trade per day'], "{:.2f}")
-    copy_results['Exposure Factor'] =  safe_format(copy_results['Exposure'], "{:.2f}")
-    best_trade = copy_results['Best Trade']
+    copy_results = results.to_dict().copy()
+    copy_results['Trades per Year'] = safe_format(copy_results['trades_per_year'], "{:.2f}")
+    copy_results['Trades per Day'] =  safe_format(copy_results['trade_per_day'], "{:.2f}")
+    copy_results['Exposure Factor'] =  safe_format(copy_results['exposure_factor'], "{:.2f}")
+    best_trade = copy_results['best_trade']
 
     if best_trade is None:
         copy_results["Best Trade"] = "N/A"
         copy_results['Best Trade Date'] = "N/A"
     else:
-        copy_results['Best Trade'] = f"{copy_results['Best Trade'].net_gain:.2f} {report.trading_symbol} ({copy_results['Best Trade'].net_gain_percentage:.2f})%"
-        copy_results['Best Trade Date'] = copy_results['Best Trade Date'].strftime('%Y-%m-%d')
+        copy_results['Best Trade'] = f"{copy_results['best_trade'].net_gain:.2f} {report.trading_symbol} ({copy_results['best_trade'].net_gain_percentage:.2f})%"
+        copy_results['Best Trade Date'] = copy_results['best_trade_date'].strftime('%Y-%m-%d')
 
-    worst_trade = copy_results['Worst Trade']
+    worst_trade = copy_results['worst_trade']
 
     if worst_trade is None:
         copy_results["Worst Trade"] = "N/A"
         copy_results['Worst Trade Date'] = "N/A"
     else:
-        copy_results['Worst Trade'] = f"{copy_results['Worst Trade'].net_gain:.2f} {report.trading_symbol} ({copy_results['Worst Trade'].net_gain_percentage:.2f})%"
-        copy_results['Worst Trade Date'] = copy_results['Worst Trade Date'].strftime('%Y-%m-%d')
+        copy_results['Worst Trade'] = f"{copy_results['worst_trade'].net_gain:.2f} {report.trading_symbol} ({copy_results['worst_trade'].net_gain_percentage:.2f})%"
+        copy_results['Worst Trade Date'] = copy_results['worst_trade_date'].strftime('%Y-%m-%d')
 
-    copy_results['Trades Average Gain'] = f"{copy_results['Trades average gain'][0]:.2f} {report.trading_symbol} {copy_results['Trades average gain'][1]:.2f}%"
-    copy_results['Trades Average Loss'] = f"{safe_format(copy_results['Trades average loss'][1], ":.2f")} {report.trading_symbol} {copy_results['Trades average loss'][1]:.2f}%"
-    copy_results['Average Trade Duration'] = f"{copy_results['Average Trade Duration']:.2f} hours"
-    copy_results['Number of Trades'] = f"{copy_results['Number of Trades']}"
-    copy_results['Win Rate'] = f"{copy_results['Win Rate']:.2f}%"
-    copy_results['Win/Loss Ratio'] = f"{copy_results['Win/Loss Ratio']:.2f}"
+    copy_results['Trades Average Gain'] = f"{safe_format(copy_results['trades_average_gain'][0], "{:.2f}")} {report.trading_symbol} {copy_results['trades_average_gain'][1]:.2f}%"
+    copy_results['Trades Average Loss'] = f"{safe_format(copy_results['trades_average_loss'][0], "{:.2f}")} {report.trading_symbol} {copy_results['trades_average_loss'][1]:.2f}%"
+    copy_results['Average Trade Duration'] = f"{copy_results['average_trade_duration']:.2f} hours"
+    copy_results['Number of Trades'] = f"{copy_results['number_of_trades']}"
+    copy_results['Win Rate'] = f"{copy_results['win_rate']:.2f}%"
+    copy_results['Win/Loss Ratio'] = f"{copy_results['win_loss_ratio']:.2f}"
 
     stats = {
         "Metric": [

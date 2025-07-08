@@ -5,10 +5,9 @@ from typing import List
 from tabulate import tabulate
 
 from investing_algorithm_framework.domain import DATETIME_FORMAT, \
-    BacktestDateRange, TradeStatus, OrderSide, TradeRiskType
+    BacktestDateRange, TradeStatus, OrderSide, TradeRiskType, Backtest
 from investing_algorithm_framework.domain.constants import \
     DATETIME_FORMAT_BACKTESTING
-from .evaluation import BacktestReportsEvaluation
 
 COLOR_RED = '\033[91m'
 COLOR_PURPLE = '\033[95m'
@@ -106,7 +105,7 @@ def pretty_print_growth_evaluation(
     )
 
 def pretty_print_stop_losses(
-    backtest_report,
+    backtest,
     triggered_only=False,
     amount_precision=4,
     price_precision=2,
@@ -115,7 +114,7 @@ def pretty_print_stop_losses(
 ):
     print(f"{COLOR_YELLOW}Stop losses overview{COLOR_RESET}")
     stop_loss_table = {}
-    results = backtest_report.results
+    results = backtest.backtest_results
     trades = results.trades
     selection = []
 
@@ -256,7 +255,7 @@ def pretty_print_stop_losses(
 
 
 def pretty_print_take_profits(
-    backtest_report,
+    backtest: Backtest,
     triggered_only=False,
     amount_precision=4,
     price_precision=2,
@@ -265,7 +264,7 @@ def pretty_print_take_profits(
 ):
     print(f"{COLOR_YELLOW}Take profits overview{COLOR_RESET}")
     take_profit_table = {}
-    results = backtest_report.results
+    results = backtest.backtest_results
     trades = results.trades
     selection = []
 
@@ -410,54 +409,6 @@ def pretty_print_take_profits(
     print(tabulate(take_profit_table, headers="keys", tablefmt="rounded_grid"))
 
 
-def pretty_print_percentage_positive_trades_evaluation(
-    evaluation: BacktestReportsEvaluation,
-    backtest_date_range: BacktestDateRange,
-    precision=0,
-    number_of_reports=3
-):
-    order = evaluation.get_percentage_positive_trades_order(backtest_date_range=backtest_date_range)
-    print(f"{COLOR_YELLOW}Trades:{COLOR_RESET} {COLOR_GREEN}Top {number_of_reports}{COLOR_RESET}")
-    profit_table = {}
-    profit_table["Algorithm name"] = [
-        report.name for report in order[:number_of_reports]
-    ]
-    profit_table["Percentage positive trades"] = [
-        f"{float(report.percentage_positive_trades):.{precision}f}%"
-        for report in order[:number_of_reports]
-    ]
-    profit_table["Total amount of trades"] = [
-        f"{report.number_of_trades_closed}" for report in order[:number_of_reports]
-    ]
-    print(
-        tabulate(profit_table, headers="keys", tablefmt="rounded_grid")
-    )
-
-    least = order[-number_of_reports:]
-    table = {}
-    table["Algorithm name"] = [
-        report.name for report in least
-    ]
-    table["Percentage positive trades"] = [
-        f"{float(report.percentage_positive_trades):.{precision}f}%"
-        for report in least
-    ]
-    table["Total amount of trades"] = [
-        f"{report.number_of_trades_closed}" for report in
-        least
-    ]
-
-    print(
-        f"{COLOR_RED}Worst trades:{COLOR_RESET} {COLOR_GREEN}"
-        f"Top {number_of_reports}{COLOR_RESET}"
-    )
-    print(
-        tabulate(
-            table, headers="keys", tablefmt="rounded_grid"
-        )
-    )
-
-
 def pretty_print_date_ranges(date_ranges: List[BacktestDateRange]) -> None:
     """
     Pretty print the date ranges to the console.
@@ -501,9 +452,6 @@ def pretty_print_price_efficiency(reports, precision=4):
                 row["Efficiency ratio / Noise"] = f"{float(price_efficiency[symbol]):.{precision}f}"
                 row["Date"] = f"{report.backtest_start_date} - {report.backtest_end_date}"
 
-
-
-
                 if report.backtest_date_range.name is not None:
                     row["Date"] = f"{report.backtest_date_range.name} " \
                                   f"{report.backtest_date_range.start_date}" \
@@ -542,38 +490,8 @@ def pretty_print_price_efficiency(reports, precision=4):
     )
 
 
-def pretty_print_most_profitable(
-    evaluation: BacktestReportsEvaluation,
-    backtest_date_range: BacktestDateRange,
-    precision=4,
-):
-    profits = evaluation.get_profit_order(backtest_date_range=backtest_date_range)
-    profit = profits[0]
-    print(f"{COLOR_YELLOW}Most profitable:{COLOR_RESET} {COLOR_GREEN}Algorithm {profit.name} {float(profit.total_net_gain):.{precision}f} {profit.trading_symbol} {float(profit.total_net_gain_percentage):.{precision}f}%{COLOR_RESET}")
-
-
-def pretty_print_most_growth(
-    evaluation: BacktestReportsEvaluation,
-    backtest_date_range: BacktestDateRange,
-    precision=4,
-):
-    profits = evaluation.get_growth_order(backtest_date_range=backtest_date_range)
-    profit = profits[0]
-    print(f"{COLOR_YELLOW}Most growth:{COLOR_RESET} {COLOR_GREEN}Algorithm {profit.name} {float(profit.growth):.{precision}f} {profit.trading_symbol} {float(profit.growth_percentage):.{precision}f}%{COLOR_RESET}")
-
-
-def pretty_print_percentage_positive_trades(
-    evaluation: BacktestReportsEvaluation,
-    backtest_date_range: BacktestDateRange,
-    precision=0
-):
-    percentages = evaluation.get_percentage_positive_trades_order(backtest_date_range=backtest_date_range)
-    percentages = percentages[0]
-    print(f"{COLOR_YELLOW}Most positive trades:{COLOR_RESET} {COLOR_GREEN}Algorithm {percentages.name} {float(percentages.percentage_positive_trades):.{precision}f}%{COLOR_RESET}")
-
-
 def pretty_print_orders(
-    backtest_report,
+    backtest: Backtest,
     target_symbol = None,
     order_status = None,
     amount_precesion=4,
@@ -597,7 +515,7 @@ def pretty_print_orders(
         None
     """
 
-    selection = backtest_report.get_orders(
+    selection = backtest.backtest_results.get_orders(
         target_symbol=target_symbol,
         order_status=order_status
     )
@@ -637,7 +555,7 @@ def pretty_print_orders(
 
 
 def pretty_print_positions(
-    backtest_report,
+    backtest,
     symbol = None,
     amount_precision=4,
     price_precision=2,
@@ -648,7 +566,7 @@ def pretty_print_positions(
     Pretty print the positions of the backtest report to the console.
 
     Args:
-        backtest_report: The backtest report
+        backtest: The backtest report
         target_symbol: The target symbol of the orders
         order_status: The status of the orders
         amount_precision: The precision of the amount
@@ -659,7 +577,7 @@ def pretty_print_positions(
     Returns:
         None
     """
-    results = backtest_report.results
+    results = backtest.backtest_results
     selection = results.get_positions(symbol=symbol)
 
     print(f"{COLOR_YELLOW}Positions overview{COLOR_RESET}")
@@ -705,7 +623,7 @@ def pretty_print_positions(
 
 
 def pretty_print_trades(
-    backtest_report,
+    backtest: Backtest,
     target_symbol = None,
     status = None,
     amount_precision=4,
@@ -717,10 +635,10 @@ def pretty_print_trades(
     Pretty print the trades of the backtest report to the console.
 
     Args:
-        backtest_report: The backtest report
+        backtest: The backtest report
         target_symbol: The target symbol of the trades
         status: The status of the trades
-        amount_precesion: The precision of the amount
+        amount_precision: The precision of the amount
         price_precision: The precision of the price
         time_precision: The precision of the time
         percentage_precision: The precision of the percentage
@@ -728,7 +646,7 @@ def pretty_print_trades(
     Returns:
         None
     """
-    results = backtest_report.results
+    results = backtest.backtest_results
     selection = results.get_trades(
         target_symbol=target_symbol,
         trade_status=status
@@ -839,77 +757,6 @@ def pretty_print_trades(
     print(tabulate(trades_table, headers="keys", tablefmt="rounded_grid"))
 
 
-def pretty_print_backtest_reports_evaluation(
-    backtest_reports_evaluation: BacktestReportsEvaluation,
-    amount_precision=4,
-    price_precision=2,
-    time_precision=1,
-    percentage_precision=2,
-    backtest_date_range: BacktestDateRange = None
-) -> None:
-    """
-    Pretty print the backtest reports evaluation to the console.
-    """
-    if backtest_date_range is not None:
-        reports = backtest_reports_evaluation.get_reports(backtest_date_range=backtest_date_range)
-
-        if len(reports) == 0:
-            print(f"No reports available for date range {backtest_date_range}")
-            return
-    else:
-        reports = backtest_reports_evaluation.backtest_reports
-
-    number_of_backtest_reports = len(reports)
-    most_profitable = backtest_reports_evaluation.get_profit_order(backtest_date_range)[0]
-    most_growth = backtest_reports_evaluation.get_growth_order(backtest_date_range)[0]
-
-    ascii_art = f"""
-              :%%%#+-          .=*#%%%      {COLOR_GREEN}Backtest reports evaluation{COLOR_RESET}
-              *%%%%%%%+------=*%%%%%%%-     {COLOR_GREEN}---------------------------{COLOR_RESET}
-              *%%%%%%%%%%%%%%%%%%%%%%%-     {COLOR_YELLOW}Number of reports:{COLOR_RESET} {COLOR_GREEN}{number_of_backtest_reports} backtest reports{COLOR_RESET}
-              .%%%%%%%%%%%%%%%%%%%%%%#      {COLOR_YELLOW}Largest overall profit:{COLOR_RESET}{COLOR_GREEN}{COLOR_RESET}{COLOR_GREEN} (Algorithm {most_profitable.name}) {float(most_profitable.total_net_gain):.{price_precision}f} {most_profitable.trading_symbol} {float(most_profitable.total_net_gain_percentage):.{percentage_precision}f}% ({most_profitable.backtest_date_range.name} {most_profitable.backtest_date_range.start_date} - {most_profitable.backtest_date_range.end_date}){COLOR_RESET}
-               #%%%####%%%%%%%%**#%%%+      {COLOR_YELLOW}Largest overall growth:{COLOR_RESET}{COLOR_GREEN} (Algorithm {most_profitable.name}) {float(most_growth.growth):.{price_precision}f} {most_growth.trading_symbol} {float(most_growth.growth_percentage):.{percentage_precision}f}% ({most_growth.backtest_date_range.name} {most_growth.backtest_date_range.start_date} - {most_growth.backtest_date_range.end_date}){COLOR_RESET}
-         .:-+*%%%%- {COLOR_PURPLE}-+..#{COLOR_RESET}%%%+.{COLOR_PURPLE}+-  +{COLOR_RESET}%%%#*=-:
-          .:-=*%%%%. {COLOR_PURPLE}+={COLOR_RESET} .%%#  {COLOR_PURPLE}-+.-{COLOR_RESET}%%%%=-:..
-          .:=+#%%%%%*###%%%%#*+#%%%%%%*+-:
-                +%%%%%%%%%%%%%%%%%%%=
-            :++  .=#%%%%%%%%%%%%%*-
-           :++:      :+%%%%%%#-.
-          :++:        .%%%%%#=
-         :++:        .#%%%%%#*=
-        :++-        :%%%%%%%%%+=
-       .++-        -%%%%%%%%%%%+=
-      .++-        .%%%%%%%%%%%%%+=
-     .++-         *%%%%%%%%%%%%%*+:
-    .++-          %%%%%%%%%%%%%%#+=
-    =++........:::%%%%%%%%%%%%%%*+-
-    .=++++++++++**#%%%%%%%%%%%%%++.
-    """
-
-    if len(backtest_reports_evaluation.backtest_reports) == 0:
-        print("No backtest reports available in your evaluation")
-        return
-
-    print(ascii_art)
-    if backtest_date_range is None:
-        pretty_print_date_ranges(backtest_reports_evaluation.get_date_ranges())
-        print("")
-
-    pretty_print_price_efficiency(reports, precision=price_precision)
-    print(f"{COLOR_YELLOW}All profits ordered{COLOR_RESET}")
-    pretty_print_profit_evaluation(
-        backtest_reports_evaluation.get_profit_order(backtest_date_range),
-        price_precision=price_precision,
-        percentage_precision=percentage_precision
-    )
-    print(f"{COLOR_YELLOW}All growths ordered{COLOR_RESET}")
-    pretty_print_growth_evaluation(
-        backtest_reports_evaluation.get_growth_order(backtest_date_range),
-        percentage_precision=percentage_precision,
-        price_precision=price_precision
-    )
-
-
 def print_number_of_runs(report):
 
     if report.number_of_runs == 1:
@@ -920,7 +767,7 @@ def print_number_of_runs(report):
 
 
 def pretty_print_backtest(
-    backtest_report,
+    backtest: Backtest,
     show_positions=True,
     show_trades=True,
     show_stop_losses=True,
@@ -936,14 +783,14 @@ def pretty_print_backtest(
     Pretty print the backtest report to the console.
 
     Args:
-        backtest_report: BacktestReport - the backtest report
+        backtest: Backtest - the backtest report
         show_positions: bool - show the positions
         show_trades: bool - show the trades
         show_stop_losses: bool - show the stop losses
         show_triggered_stop_losses_only: bool - show only the triggered stop losses
         show_take_profits: bool - show the take profits
         show_triggered_take_profits_only: bool - show only the triggered take profits
-        amount_precesion: int - the amount precision
+        amount_precision: int - the amount precision
         price_precision: int - the price precision
         time_precision: int - the time precision
         percentage_precision: int - the percentage precision
@@ -951,7 +798,7 @@ def pretty_print_backtest(
     Returns:
         None
     """
-    backtest_results = backtest_report.results
+    backtest_results = backtest.backtest_results
     ascii_art = f"""
                   :%%%#+-          .=*#%%%        {COLOR_GREEN}Backtest report{COLOR_RESET}
                   *%%%%%%%+------=*%%%%%%%-       {COLOR_GREEN}---------------------------{COLOR_RESET}
@@ -980,11 +827,11 @@ def pretty_print_backtest(
 
     if show_positions:
         print(f"{COLOR_YELLOW}Positions overview{COLOR_RESET}")
-        pretty_print_positions(backtest_report)
+        pretty_print_positions(backtest)
 
     if show_trades:
         pretty_print_trades(
-            backtest_report=backtest_report,
+            backtest=backtest,
             amount_precision=amount_precision,
             price_precision=price_precision,
             time_precision=time_precision,
@@ -993,7 +840,7 @@ def pretty_print_backtest(
 
     if show_stop_losses:
         pretty_print_stop_losses(
-            backtest_report=backtest_report,
+            backtest=backtest,
             triggered_only=show_triggered_stop_losses_only,
             amount_precision=amount_precision,
             price_precision=price_precision,
@@ -1003,7 +850,7 @@ def pretty_print_backtest(
 
     if show_take_profits:
         pretty_print_take_profits(
-            backtest_report=backtest_report,
+            backtest=backtest,
             triggered_only=show_triggered_take_profits_only,
             amount_precision=amount_precision,
             price_precision=price_precision,

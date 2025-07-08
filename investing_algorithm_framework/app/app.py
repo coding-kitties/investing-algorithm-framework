@@ -18,7 +18,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     SQLALCHEMY_DATABASE_URI, OperationalException, StateHandler, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, APP_MODE, MarketCredential, \
     AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, \
-    BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, \
+    BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, Backtest, \
     MarketDataSource, PortfolioConfiguration, SnapshotInterval, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
@@ -722,9 +722,9 @@ class App:
         save=True,
         snapshot_interval: SnapshotInterval = SnapshotInterval.TRADE_CLOSE,
         strategy_directory_path: Optional[str] = None,
-        report_name: Optional[str] = None,
+        backtest_directory_name: Optional[str] = None,
         risk_free_rate: Optional[float] = None
-    ) -> BacktestReport:
+    ) -> Backtest:
         """
         Run a backtest for an algorithm.
 
@@ -738,14 +738,13 @@ class App:
                 portfolio will start with.
             strategy (TradingStrategy) (Optional): The strategy object
                 that needs to be backtested.
-            strategies (List[TradingStrategy) (Optional): List of strategy
+            strategies (List[TradingStrategy]) (Optional): List of strategy
                 objects that need to be backtested
-            algorithm:
-            output_directory: str - The directory to
-              write the backtest report to
-            save_strategy: bool - Whether to save the strategy
-                as part of the backtest report. You can only save in-memory
-                strategies when running multiple backtests. This is because
+            algorithm (Algorithm) (Optional): The algorithm object that needs
+                to be backtested. If this is provided, then the strategies
+                and tasks of the algorithm will be used for the backtest.
+            output_directory (str) (Optional): The directory to write
+                the backtest report to
             snapshot_interval (SnapshotInterval): The snapshot
                 interval to use for the backtest. This is used to determine
                 how often the portfolio snapshot should be taken during the
@@ -756,7 +755,7 @@ class App:
                 strategy if save_strategy is True. If not provided,
                 the framework tries to determine the path via the
                 algorithm or strategy object.
-            report_name (Optional[str]): The name of the report. If not
+            backtest_directory_name (Optional[str]): If not
                 provided, the framework will generate a name based on the
                 algorithm name and the backtest date range and the current
                 date and time.
@@ -821,23 +820,13 @@ class App:
         portfolio_service = self.container.portfolio_service()
         portfolio_service.clear_observers()
         portfolio_service.add_observer(portfolio_snapshot_service)
-
-        # Run the backtest with the backtest_service and collect and
-        # save the report
-        results = backtest_service.run_backtest(
+        backtest = backtest_service.run_backtest(
             algorithm=algorithm,
             context=context,
             strategy_orchestrator_service=strategy_orchestrator_service,
             initial_amount=initial_amount,
-            backtest_date_range=backtest_date_range
-        )
-        market_data_source_service = \
-            self.container.market_data_source_service()
-        report = BacktestReport.create(
-            results=results,
+            backtest_date_range=backtest_date_range,
             risk_free_rate=risk_free_rate,
-            data_files=market_data_source_service.get_data_files(),
-            algorithm=algorithm,
             strategy_directory_path=strategy_directory_path
         )
 
@@ -846,14 +835,18 @@ class App:
                 config[RESOURCE_DIRECTORY], "backtest_reports"
             )
 
-        if report_name is None:
-            report_name = BacktestService.create_report_directory_name(report)
+        if backtest_directory_name is None:
+            backtest_directory_name = BacktestService\
+                .create_report_directory_name(backtest)
 
-        output_directory = os.path.join(output_directory, report_name)
+        output_directory = os.path.join(
+            output_directory, backtest_directory_name
+        )
 
         if save:
-            report.save(path=output_directory)
-        return report
+            backtest.save(directory_path=output_directory)
+
+        return backtest
 
     def run_backtests(
         self,

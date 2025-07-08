@@ -18,9 +18,8 @@ from .exceptions import OperationalException, ApiException, \
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, \
     PortfolioConfiguration, Portfolio, Position, Order, TradeStatus, \
-    BacktestResult, PortfolioSnapshot, StrategyProfile, \
-    BacktestPosition, Trade, MarketCredential, PositionSnapshot, \
-    AppMode, BacktestDateRange, DateRange, \
+    PortfolioSnapshot, StrategyProfile, \
+    Trade, MarketCredential, PositionSnapshot, AppMode, \
     MarketDataType, TradeRiskType, TradeTakeProfit, TradeStopLoss, \
     DataSource, Event, SnapshotInterval
 from .order_executor import OrderExecutor
@@ -36,6 +35,8 @@ from .utils import random_string, append_dict_as_row_to_csv, \
     convert_polars_to_pandas, random_number, \
     csv_to_list, StoppableThread, load_csv_into_dict, \
     is_timezone_aware, sync_timezones, get_timezone
+from .backtesting import BacktestResult, BacktestPosition, \
+    BacktestDateRange, Backtest, BacktestMetrics
 
 __all__ = [
     "OrderStatus",
@@ -113,7 +114,6 @@ __all__ = [
     "RoundingService",
     "BacktestDateRange",
     "convert_polars_to_pandas",
-    "DateRange",
     "DEFAULT_LOGGING_CONFIG",
     "DATABASE_DIRECTORY_NAME",
     "BACKTESTING_INITIAL_AMOUNT",
@@ -138,5 +138,9 @@ __all__ = [
     "SNAPSHOT_INTERVAL",
     "SnapshotInterval",
     "AWS_S3_STATE_BUCKET_NAME",
-    "AWS_LAMBDA_LOGGING_CONFIG"
+    "AWS_LAMBDA_LOGGING_CONFIG",
+    "Backtest",
+    "BacktestMetrics",
+    "BacktestResult",
+    "BacktestPosition"
 ]

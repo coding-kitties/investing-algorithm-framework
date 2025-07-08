@@ -291,7 +291,7 @@ class CCXTTickerBacktestMarketDataSource(
         )
 
         if time_frame is not None:
-            self.time_frame = time_frame
+            self.time_frame = TimeFrame.from_value(time_frame).value
 
         if self.time_frame is None:
             raise OperationalException(

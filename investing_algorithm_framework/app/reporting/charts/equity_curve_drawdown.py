@@ -5,10 +5,10 @@ from plotly import graph_objects as go
 
 def get_equity_curve_with_drawdown_chart(equity_curve_series, drawdown_series):
     equity_curve_df = pd.DataFrame(
-        equity_curve_series, columns=["datetime", "value"]
+        equity_curve_series, columns=["value", "datetime"]
     )
     drawdown_df = pd.DataFrame(
-        drawdown_series, columns=["datetime", "value"]
+        drawdown_series, columns=["value", "datetime"]
     )
 
     # Normalize equity to start at 1

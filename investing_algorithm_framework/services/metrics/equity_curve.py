@@ -5,7 +5,7 @@ from investing_algorithm_framework.domain import PortfolioSnapshot
 
 def get_equity_curve(
     snapshots: List[PortfolioSnapshot]
-) -> list[tuple[datetime, float]]:
+) -> list[tuple[float, datetime]]:
     """
     Calculate the total size of the portfolio at each snapshot timestamp.
 
@@ -19,6 +19,6 @@ def get_equity_curve(
     for snapshot in snapshots:
         timestamp = snapshot.created_at
         total_size = snapshot.total_value
-        series.append((timestamp, total_size))
+        series.append((total_size, timestamp))
 
     return series

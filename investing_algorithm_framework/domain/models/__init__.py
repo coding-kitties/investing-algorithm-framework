@@ -1,6 +1,4 @@
 from .app_mode import AppMode
-from .backtesting import BacktestResult, BacktestPosition, \
-    BacktestDateRange
 from .market import MarketCredential
 from .order import OrderStatus, OrderSide, OrderType, Order
 from .portfolio import PortfolioConfiguration, Portfolio, PortfolioSnapshot
@@ -13,7 +11,6 @@ from .trade import Trade, TradeStatus, TradeStopLoss, TradeTakeProfit, \
     TradeRiskType
 from .trading_data_types import TradingDataType
 from .trading_time_frame import TradingTimeFrame
-from .date_range import DateRange
 from .market_data_type import MarketDataType
 from .data_source import DataSource
 from .snapshot_interval import SnapshotInterval
@@ -32,18 +29,13 @@ __all__ = [
     "PortfolioConfiguration",
     "Position",
     "Portfolio",
-    "BacktestResult",
     "PositionSnapshot",
     "PortfolioSnapshot",
     "StrategyProfile",
-    "BacktestPosition",
     "Trade",
     "MarketCredential",
     "TradeStatus",
-    "BacktestReportsEvaluation",
     "AppMode",
-    "BacktestDateRange",
-    "DateRange",
     "MarketDataType",
     "TradeStopLoss",
     "TradeTakeProfit",

@@ -61,6 +61,7 @@ class Test(TestCase):
                 market="BINANCE",
                 symbol="BTC/EUR",
                 window_size=200,
+                time_frame="2h",
                 csv_file_path=os.path.join(
                     self.resource_dir,
                     "market_data_sources",

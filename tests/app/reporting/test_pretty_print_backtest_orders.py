@@ -1,8 +1,8 @@
 import os
 from unittest import TestCase
 
-from investing_algorithm_framework.app import pretty_print_orders, \
-    BacktestReport
+from investing_algorithm_framework.app import pretty_print_orders
+from investing_algorithm_framework.domain import Backtest
 
 
 class Test(TestCase):
@@ -29,5 +29,5 @@ class Test(TestCase):
             self.resource_dir,
             "backtest_reports_for_testing/test_algorithm_backtest_created-at_2025-04-21-21-21"
         )
-        report = BacktestReport.open(path)
-        pretty_print_orders(report.results)
+        backtest = Backtest.open(path)
+        pretty_print_orders(backtest)

@@ -24,8 +24,9 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
     def __init__(
         self,
         csv_file_path,
-        market=None,
-        symbol=None,
+        time_frame,
+        market,
+        symbol,
         identifier=None,
         window_size=None,
     ):
@@ -33,7 +34,7 @@ class CSVOHLCVMarketDataSource(OHLCVMarketDataSource):
             identifier=identifier,
             market=market,
             symbol=symbol,
-            time_frame=None,
+            time_frame=time_frame,
             window_size=window_size,
         )
         self._csv_file_path = csv_file_path

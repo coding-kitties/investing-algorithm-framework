@@ -1,19 +1,19 @@
-import json
 import logging
 import os
-import re
+import sys
 from datetime import datetime, timedelta, timezone
 
 import polars as pl
-from dateutil import parser
 from tqdm import tqdm
 
 from investing_algorithm_framework.domain import BacktestResult, \
     BACKTESTING_INDEX_DATETIME, TimeUnit, TradingDataType, \
     OperationalException, MarketDataSource, Observable, Event, \
-    SYMBOLS, BacktestDateRange, DATETIME_FORMAT_BACKTESTING
+    BacktestDateRange, DATETIME_FORMAT_BACKTESTING, Backtest
 from investing_algorithm_framework.services.market_data_source_service import \
     MarketDataSourceService
+from investing_algorithm_framework.services.metrics import \
+    create_backtest_metrics
 
 logger = logging.getLogger(__name__)
 BACKTEST_REPORT_FILE_NAME_PATTERN = (
@@ -47,7 +47,6 @@ class BacktestService(Observable):
         strategy_orchestrator_service
     ):
         super().__init__()
-        self._resource_directory = None
         self._order_service = order_service
         self._trade_service = trade_service
         self._portfolio_service = portfolio_service
@@ -60,18 +59,9 @@ class BacktestService(Observable):
         self._position_repository = position_repository
         self._market_data_source_service: MarketDataSourceService \
             = market_data_source_service
-        self._backtest_market_data_sources = []
         self._configuration_service = configuration_service
         self._portfolio_configuration_service = portfolio_configuration_service
         self._strategy_orchestrator_service = strategy_orchestrator_service
-
-    @property
-    def resource_directory(self):
-        return self._resource_directory
-
-    @resource_directory.setter
-    def resource_directory(self, resource_directory):
-        self._resource_directory = resource_directory
 
     def run_backtest(
         self,
@@ -79,8 +69,10 @@ class BacktestService(Observable):
         context,
         strategy_orchestrator_service,
         backtest_date_range: BacktestDateRange,
-        initial_amount=None
-    ) -> BacktestResult:
+        risk_free_rate,
+        initial_amount=None,
+        strategy_directory_path=None
+    ) -> Backtest:
         """
         Run a backtest for the given algorithm. This function will run
         a backtest for the given algorithm and return a backtest report.
@@ -97,9 +89,14 @@ class BacktestService(Observable):
             initial_amount: The initial amount of the backtest portfolio
             strategy_orchestrator_service: The strategy orchestrator service
             context (Context): The context of the object of the application
+            risk_free_rate (float): The risk-free rate to use in the metrics
+                calculations
+            strategy_directory_path (optional, str): The path to the
+                strategy directory. If not provided, the strategies will be
+                loaded from the algorithm object.
 
         Returns:
-            BacktestResult - The backtest report
+            Backtest: The backtest
         """
         logging.info(
             f"Running backtest for algorithm with name {algorithm.name}"
@@ -137,9 +134,6 @@ class BacktestService(Observable):
         for strategy in algorithm.strategies:
             strategy_profiles.append(strategy.strategy_profile)
 
-        # Check if required market data sources are registered
-        self._check_if_required_market_data_sources_are_registered()
-
         schedule = self.generate_schedule(
             strategies=algorithm.strategies,
             start_date=backtest_date_range.start_date,
@@ -170,12 +164,13 @@ class BacktestService(Observable):
                 "created_at": index_date,
             })
 
-        report = self.create_backtest_report(
+        report = self.create_backtest(
             algorithm,
-            context,
-            len(schedule),
-            backtest_date_range,
-            initial_unallocated
+            number_of_runs=len(schedule),
+            backtest_date_range=backtest_date_range,
+            initial_unallocated=initial_unallocated,
+            risk_free_rate=risk_free_rate,
+            strategy_directory_path=strategy_directory_path
         )
 
         # Cleanup backtest portfolio
@@ -277,31 +272,34 @@ class BacktestService(Observable):
 
         raise ValueError(f"Strategy profile with id {id} not found.")
 
-    def create_backtest_report(
+    def create_backtest(
         self,
         algorithm,
-        context,
         number_of_runs,
         backtest_date_range: BacktestDateRange,
-        initial_unallocated=0
-    ) -> BacktestResult:
+        risk_free_rate,
+        initial_unallocated=0,
+        strategy_directory_path=None
+    ) -> Backtest:
         """
-        Create a backtest report for the given algorithm. This function
-        will create a backtest report for the given algorithm and return
-        the backtest report instance.
+        Create a backtest for the given algorithm.
 
-        It will calculate various performance metrics for the backtest.
-        Also, it will add all traces to the backtest report. The traces
-        are collected from each strategy that was run during the backtest.
+        It will store all results and metrics in a Backtest object through
+        the BacktestResults and BacktestMetrics objects. Optionally,
+        it will also store the strategy related paths and backtest
+        data file paths.
 
         Args:
             algorithm: The algorithm to create the backtest report for
             number_of_runs: The number of runs
             backtest_date_range: The backtest date range of the backtest
             initial_unallocated: The initial unallocated amount
+            risk_free_rate: The risk-free rate to use in the calculations
+            strategy_directory_path (optional, str): The path to the
+                strategy directory
 
         Returns:
-            BacktestResult: The backtest report instance of BacktestResult
+            Backtest: The backtest containing the results and metrics.
         """
 
         for portfolio in self._portfolio_service.get_all():
@@ -336,15 +334,11 @@ class BacktestService(Observable):
                             f"backtest mode. Otherwise, the backtest "
                             f"report cannot be generated."
                         )
+                    symbol = f"{position.symbol}/{portfolio.trading_symbol}"
                     tickers[ticker_symbol] = \
                         self._market_data_source_service.get_ticker(
-                            f"{position.symbol}/{portfolio.trading_symbol}",
-                            market=portfolio.market
+                            symbol=symbol, market=portfolio.market
                         )
-
-            positions = self._position_repository.get_all({
-                "portfolio": portfolio.id
-            })
 
             # Create the last snapshot of the portfolio
             self._portfolio_snapshot_service.create_snapshot(
@@ -352,232 +346,88 @@ class BacktestService(Observable):
                 created_at=backtest_date_range.end_date
             )
 
-            backtest_report = BacktestResult(
-                name=algorithm.name,
-                backtest_date_range=backtest_date_range,
-                initial_unallocated=initial_unallocated,
-                trading_symbol=portfolio.trading_symbol,
-                created_at=datetime.now(tz=timezone.utc),
-                portfolio_snapshots=self._portfolio_snapshot_service.get_all(
-                    {"portfolio_id": portfolio.id}
-                ),
-                number_of_runs=number_of_runs,
-                trades=self._trade_service.get_all(
-                    {"portfolio": portfolio.id}
-                ),
-                orders=self._order_service.get_all(
-                    {"portfolio": portfolio.id}
-                ),
-                positions=self._position_repository.get_all(
-                    {"portfolio": portfolio.id}
-                ),
-            )
+        # Get the first portfolio
+        portfolio = self._portfolio_service.get_all()[0]
 
-            # Calculate metrics for the backtest report
-            return backtest_report
+        # List all strategy related files in the strategy directory
+        strategy_related_paths = []
 
-    def set_backtest_market_data_sources(self, market_data_sources):
-        self._backtest_market_data_sources = market_data_sources
+        if strategy_directory_path is not None:
+            if not os.path.exists(strategy_directory_path) or \
+                    not os.path.isdir(strategy_directory_path):
+                raise OperationalException(
+                    "Strategy directory does not exist"
+                )
 
-    def get_backtest_market_data_sources(self):
-        return self._backtest_market_data_sources
+            strategy_files = os.listdir(strategy_directory_path)
+            for file in strategy_files:
+                source_file = os.path.join(strategy_directory_path, file)
+                if os.path.isfile(source_file):
+                    strategy_related_paths.append(source_file)
+        else:
+            if algorithm is not None and hasattr(algorithm, 'strategies'):
+                for strategy in algorithm.strategies:
+                    mod = sys.modules[strategy.__module__]
+                    strategy_directory_path = os.path.dirname(mod.__file__)
+                    strategy_files = os.listdir(strategy_directory_path)
+                    for file in strategy_files:
+                        source_file = os.path.join(
+                            strategy_directory_path, file
+                        )
+                        if os.path.isfile(source_file):
+                            strategy_related_paths.append(source_file)
 
-    def get_backtest_market_data_source(self, symbol, market):
-
-        for market_data_source in self._backtest_market_data_sources:
-            if market_data_source.symbol == symbol \
-                    and market_data_source.market == market:
-                return market_data_source
-        raise OperationalException(
-            f"Market data source for "
-            f"symbol {symbol} and market {market} not found"
+        backtest_result = BacktestResult(
+            name=algorithm.name,
+            backtest_date_range=backtest_date_range,
+            initial_unallocated=initial_unallocated,
+            trading_symbol=portfolio.trading_symbol,
+            created_at=datetime.now(tz=timezone.utc),
+            portfolio_snapshots=self._portfolio_snapshot_service.get_all(
+                {"portfolio_id": portfolio.id}
+            ),
+            number_of_runs=number_of_runs,
+            trades=self._trade_service.get_all(
+                {"portfolio": portfolio.id}
+            ),
+            orders=self._order_service.get_all(
+                {"portfolio": portfolio.id}
+            ),
+            positions=self._position_repository.get_all(
+                {"portfolio": portfolio.id}
+            ),
+        )
+        backtest_metrics = create_backtest_metrics(
+            backtest_result, risk_free_rate=risk_free_rate
+        )
+        return Backtest(
+            backtest_results=backtest_result,
+            backtest_metrics=backtest_metrics,
+            strategy_related_paths=strategy_related_paths,
+            data_file_paths=self._market_data_source_service.get_data_files(),
         )
 
-    def _check_if_required_market_data_sources_are_registered(self):
-        """
-        Check if the required market data sources are registered.
-
-        It will iterate over all registered symbols and markets and check
-        if a ticker market data source is registered for the symbol and market.
-        """
-        symbols = self._configuration_service.config[SYMBOLS]
-
-        if symbols is not None:
-
-            for symbol in symbols:
-                if not self._market_data_source_service\
-                        .has_ticker_market_data_source(
-                            symbol=symbol
-                        ):
-                    raise OperationalException(
-                        f"Ticker market data source for symbol {symbol} not "
-                        f"found, please make sure you register a ticker "
-                        f"market data source for this symbol in backtest "
-                        f"mode. Otherwise, the backtest report "
-                        f"cannot be generated."
-                    )
-
-    def get_report(
-        self,
-        algorithm_name: str,
-        backtest_date_range: BacktestDateRange,
-        directory: str
-    ) -> BacktestResult:
-        """
-        Function to get a report based on the algorithm name and
-        backtest date range if it exists.
-
-        Args:
-            algorithm_name: str - The name of the algorithm
-            backtest_date_range: BacktestDateRange - The backtest date range
-            directory: str - The output directory
-
-        Returns:
-            BacktestResult - The backtest report if it exists, otherwise None
-        """
-
-        # Loop through all files in the output directory
-        for root, _, files in os.walk(directory):
-            for file in files:
-                # Check if the file contains the algorithm name
-                # and backtest date range
-                if self._is_backtest_report(os.path.join(root, file)):
-                    # Read the file
-                    with open(os.path.join(root, file), "r") as json_file:
-
-                        name = \
-                            self._get_algorithm_name_from_backtest_report_file(
-                                os.path.join(root, file)
-                            )
-
-                        if name == algorithm_name:
-                            backtest_start_date = \
-                                self._get_start_date_from_backtest_report_file(
-                                    os.path.join(root, file)
-                                )
-                            backtest_end_date = \
-                                self._get_end_date_from_backtest_report_file(
-                                    os.path.join(root, file)
-                                )
-
-                            if backtest_start_date == \
-                                    backtest_date_range.start_date \
-                                    and backtest_end_date == \
-                                    backtest_date_range.end_date:
-                                # Parse the JSON file
-                                report = json.load(json_file)
-                                # Convert the JSON file to a
-                                # BacktestResult object
-                                return BacktestResult.from_dict(report)
-
-        return None
-
-    def _get_start_date_from_backtest_report_file(self, path: str) -> datetime:
-        """
-        Function to get the backtest start date from a backtest report file.
-
-        Args:
-            path: str - The path to the backtest report file
-
-        Returns:
-            datetime - The backtest start date
-        """
-
-        # Get the backtest start date from the file name
-        backtest_start_date = os.path.basename(path).split("_")[3]
-
-        try:
-            # Parse the backtest start date
-            return datetime.strptime(
-                backtest_start_date, DATETIME_FORMAT_BACKTESTING
-            )
-        except ValueError:
-            # Try to parse the backtest start date with a different format
-            return parser.parse(backtest_start_date)
-
-    def _get_end_date_from_backtest_report_file(self, path: str) -> datetime:
-        """
-        Function to get the backtest end date from a backtest report file.
-
-        Args:
-            path: str - The path to the backtest report file
-
-        Returns:
-            datetime - The backtest end date
-        """
-
-        # Get the backtest end date from the file name
-        backtest_end_date = os.path.basename(path).split("_")[5]
-
-        try:
-            # Parse the backtest end date
-            return datetime.strptime(
-                backtest_end_date, DATETIME_FORMAT_BACKTESTING
-            )
-        except ValueError:
-            # Try to parse the backtest end date with a different format
-            return parser.parse(backtest_end_date)
-
-    def _get_algorithm_name_from_backtest_report_file(self, path: str) -> str:
-        """
-        Function to get the algorithm name from a backtest report file.
-
-        Args:
-            path: str - The path to the backtest report file
-
-        Returns:
-            str - The algorithm name
-        """
-        # Get the word between "report_" and "_backtest_start_date"
-        # it can contain _
-        # Get the algorithm name from the file name
-        algorithm_name = os.path.basename(path).split("_")[1]
-        return algorithm_name
-
-    def _is_backtest_report(self, path: str) -> bool:
-        """
-        Function to check if a file is a backtest report file.
-
-        Args:
-            path: str - The path to the file
-
-        Returns:
-            bool - True if the file is a backtest report file, otherwise False
-        """
-
-        # Check if the file is a JSON file
-        if path.endswith(".json"):
-
-            # Check if the file name matches the backtest
-            # report file name pattern
-            if re.match(
-                BACKTEST_REPORT_FILE_NAME_PATTERN, os.path.basename(path)
-            ):
-                return True
-
-        return False
-
     @staticmethod
-    def create_report_directory_name(report) -> str:
+    def create_report_directory_name(backtest: Backtest) -> str:
         """
         Function to create a directory name for a backtest report.
         The directory name will be automatically generated based on the
         algorithm name and creation date.
 
         Args:
-            report: BacktestResult - The backtest report to create a
-                directory for.
+            backtest (Backtest): The backtest object containing the results
+                and metrics.
 
         Returns:
             directory_name: str The directory name for the
                 backtest report file.
         """
-        created_at = report.results\
+        created_at = backtest.backtest_results\
             .created_at.strftime(DATETIME_FORMAT_BACKTESTING)
-        backtest_start_date = report.results.backtest_date_range.start_date
-        backtest_end_date = report.results.backtest_date_range.end_date
-        name = report.results.name
-
+        date_range = backtest.backtest_results.backtest_date_range
+        backtest_start_date = date_range.start_date
+        backtest_end_date = date_range.end_date
+        name = backtest.backtest_results.name
         start_date = backtest_start_date.strftime(DATETIME_FORMAT_BACKTESTING)
         end_date = backtest_end_date.strftime(DATETIME_FORMAT_BACKTESTING)
         directory_name = f"report_{name}_backtest-start-date_" \

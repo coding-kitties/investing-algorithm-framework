@@ -149,19 +149,19 @@ def highlight_max_drawdown(row):
 
 
 def create_html_key_metrics_table(results, report):
-    copy_results = results.copy()
+    copy_results = results.to_dict().copy()
     # Format some values to percentages and floats
-    copy_results['Total Return'] = safe_format_percentage(copy_results['Total Return'], "{:.2f}%")
-    copy_results['CAGR'] = safe_format_percentage(copy_results['CAGR'], "{:.2f}%")
-    copy_results['Sharpe Ratio'] = safe_format(copy_results['Sharpe Ratio'], "{:.2f}")
-    copy_results['Sortino Ratio'] = safe_format(copy_results['Sortino Ratio'], "{:.2f}")
-    copy_results['Profit Factor'] = safe_format(copy_results['Profit Factor'], "{:.2f}")
-    copy_results['Calmar Ratio'] = safe_format(copy_results['Calmar Ratio'], "{:.2f}")
-    copy_results['Annual Volatility'] = safe_format_percentage(copy_results['Annual Volatility'], "{:.2f}%")
-    copy_results['Max Drawdown'] = safe_format_percentage(copy_results['Max Drawdown'], "{:.2f}%")
-    copy_results['Max Drawdown Absolute'] = safe_format(copy_results['Max Drawdown Absolute'], "{:.2f} " + report.trading_symbol)
-    copy_results['Max Daily Drawdown'] = safe_format_percentage(copy_results['Max Daily Drawdown'], "{:.2f}%")
-    copy_results['Max Drawdown Duration'] = f"{copy_results['Max Drawdown Duration']} hours - {copy_results['Max Drawdown Duration'] // 24} days"
+    copy_results['Total Return'] = safe_format_percentage(copy_results['total_return'], "{:.2f}%")
+    copy_results['CAGR'] = safe_format_percentage(copy_results['cagr'], "{:.2f}%")
+    copy_results['Sharpe Ratio'] = safe_format(copy_results['sharpe_ratio'], "{:.2f}")
+    copy_results['Sortino Ratio'] = safe_format(copy_results['sortino_ratio'], "{:.2f}")
+    copy_results['Profit Factor'] = safe_format(copy_results['profit_factor'], "{:.2f}")
+    copy_results['Calmar Ratio'] = safe_format(copy_results['calmar_ratio'], "{:.2f}")
+    copy_results['Annual Volatility'] = safe_format_percentage(copy_results['annual_volatility'], "{:.2f}%")
+    copy_results['Max Drawdown'] = safe_format_percentage(copy_results['max_drawdown'], "{:.2f}%")
+    copy_results['Max Drawdown Absolute'] = safe_format(copy_results['max_drawdown_absolute'], "{:.2f} " + report.trading_symbol)
+    copy_results['Max Daily Drawdown'] = safe_format_percentage(copy_results['max_daily_drawdown'], "{:.2f}%")
+    copy_results['Max Drawdown Duration'] = f"{copy_results['max_drawdown_duration']} hours - {copy_results['max_drawdown_duration'] // 24} days"
 
     stats = {
         "Metric": [

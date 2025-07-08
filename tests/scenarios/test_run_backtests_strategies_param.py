@@ -33,39 +33,39 @@ class Test(TestCase):
         )
         backtest_report = backtest_reports[0]
         self.assertAlmostEqual(
-            backtest_report.results.growth, 3, delta=0.5
+            backtest_report.backtest_results.growth, 3, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.results.growth_percentage, 0.8, delta=0.1
+            backtest_report.backtest_results.growth_percentage, 0.8, delta=0.1
         )
         self.assertEqual(
-            backtest_report.results.initial_unallocated, 400
+            backtest_report.backtest_results.initial_unallocated, 400
         )
         self.assertEqual(
-            backtest_report.results.trading_symbol, "EUR"
+            backtest_report.backtest_results.trading_symbol, "EUR"
         )
         self.assertAlmostEqual(
-            backtest_report.results.total_net_gain, 3, delta=0.5
+            backtest_report.backtest_results.total_net_gain, 3, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.results.total_net_gain_percentage, 0.8, delta=0.1
+            backtest_report.backtest_results.total_net_gain_percentage, 0.8, delta=0.1
         )
         backtest_report_two = backtest_reports[1]
         self.assertAlmostEqual(
-            backtest_report_two.results.growth, 18.16, delta=0.6
+            backtest_report_two.backtest_results.growth, 18.16, delta=0.6
         )
         self.assertAlmostEqual(
-            backtest_report_two.results.growth_percentage, 4.5, delta=0.2
+            backtest_report_two.backtest_results.growth_percentage, 4.5, delta=0.2
         )
         self.assertEqual(
-            backtest_report_two.results.initial_unallocated, 400
+            backtest_report_two.backtest_results.initial_unallocated, 400
         )
         self.assertEqual(
-            backtest_report_two.results.trading_symbol, "EUR"
+            backtest_report_two.backtest_results.trading_symbol, "EUR"
         )
         self.assertAlmostEqual(
-            backtest_report_two.results.total_net_gain, 18.16, delta=0.6
+            backtest_report_two.backtest_results.total_net_gain, 18.16, delta=0.6
         )
         self.assertAlmostEqual(
-            backtest_report_two.results.total_net_gain_percentage, 4.5, delta=0.2
+            backtest_report_two.backtest_results.total_net_gain_percentage, 4.5, delta=0.2
         )

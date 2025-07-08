@@ -33,6 +33,34 @@ class CrossOverStrategyV1(TradingStrategy):
     take_profit_percentage = 8
     take_profit_sell_size = 50
 
+    def __init__(
+        self,
+        time_unit: TimeUnit = TimeUnit.HOUR,
+        interval: int = 2,
+        symbol_pairs: list[str] = None,
+        market_data_sources=None,
+        fast: int = 50,
+        slow: int = 100,
+        trend: int = 200,
+        stop_loss_percentage: float = 2.0,
+        stop_loss_sell_size: float = 50.0,
+        take_profit_percentage: float = 8.0,
+        take_profit_sell_size: float = 50.0
+    ):
+        super().__init__(
+            time_unit=time_unit,
+            interval=interval,
+            market_data_sources=market_data_sources or self.market_data_sources
+        )
+        self.symbol_pairs = symbol_pairs or self.symbol_pairs
+        self.fast = fast
+        self.slow = slow
+        self.trend = trend
+        self.stop_loss_percentage = stop_loss_percentage
+        self.stop_loss_sell_size = stop_loss_sell_size
+        self.take_profit_percentage = take_profit_percentage
+        self.take_profit_sell_size = take_profit_sell_size
+
     def apply_strategy(self, context: Context, market_data):
 
         for pair in self.symbol_pairs:

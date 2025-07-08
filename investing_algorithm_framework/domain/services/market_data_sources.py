@@ -425,8 +425,13 @@ class OHLCVMarketDataSource(MarketDataSource, ABC):
             symbol=symbol,
             storage_path=storage_path
         )
+
+        if identifier is None:
+            self._identifier = \
+                f"{self.market}_{self.symbol}_{time_frame}_ohlcv"
+
         self._window_size = window_size
-        self._time_frame = time_frame
+        self._time_frame = TimeFrame.from_value(time_frame).value
 
     @property
     def time_frame(self):

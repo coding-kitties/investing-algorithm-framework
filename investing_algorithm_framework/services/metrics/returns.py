@@ -51,7 +51,7 @@ def get_yearly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, 
         snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
 
     Returns:
-        List[Tuple[float, datetime]]: A list of tuples containing the yearly return
+        List[Tuple[float, date]]: A list of tuples containing the yearly return
             and the corresponding year.
     """
 
@@ -61,6 +61,10 @@ def get_yearly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, 
     df['created_at'] = pd.to_datetime(df['created_at'])
     df = df.sort_values('created_at').drop_duplicates('created_at')\
         .set_index('created_at')
+
+    # Remove timezone information if present to avoid warning
+    if df.index.tz is not None:
+        df.index = df.index.tz_localize(None)
 
     # Resample to yearly frequency using last value of the year
     yearly_df = df.resample('YE').last().dropna()
@@ -124,7 +128,6 @@ def get_average_gain(trades: List[Trade]) -> Tuple[float, float]:
     percentage = (average_gain / cost) if cost > 0 else 0.0
     return average_gain, percentage
 
-
 def get_best_trade(trades: List[Trade]) -> Trade:
     """
     Get the trade with the highest net gain.
@@ -140,43 +143,6 @@ def get_best_trade(trades: List[Trade]) -> Trade:
         return None
 
     return max(trades, key=lambda t: t.net_gain)
-
-def get_best_trade_date(trades: List[Trade]) -> Tuple[float, datetime]:
-    """
-    Get the date of the trade with the highest net gain.
-
-    Args:
-        trades (List[Trade]): List of trades.
-
-    Returns:
-        Tuple[float, datetime]: The highest net gain and the corresponding trade date.
-    """
-
-    best_trade = get_best_trade(trades)
-
-    if best_trade is None:
-        return 0.0, None
-
-    return best_trade.closed_at
-
-
-def get_worst_trade_date(trades: List[Trade]) -> Tuple[float, datetime]:
-    """
-    Get the date of the trade with the lowest net gain (worst trade).
-
-    Args:
-        trades (List[Trade]): List of trades.
-
-    Returns:
-        Tuple[float, datetime]: The lowest net gain and the corresponding trade date.
-    """
-
-    worst_trade = get_worst_trade(trades)
-
-    if worst_trade is None:
-        return 0.0, None
-
-    return worst_trade.closed_at
 
 
 def get_worst_trade(trades: List[Trade]) -> Trade:
@@ -278,7 +244,7 @@ def get_best_year(
 
 def get_worst_year(
     snapshots: List[PortfolioSnapshot]
-) -> Tuple[float, datetime]:
+) -> Tuple[float, date]:
     """
     Get the worst year in terms of return from portfolio snapshots.
 

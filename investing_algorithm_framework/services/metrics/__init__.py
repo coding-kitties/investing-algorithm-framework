@@ -3,10 +3,9 @@ from .sortino_ratio import get_sortino_ratio
 from .drawdown import get_drawdown_series, get_max_drawdown
 from .equity_curve import get_equity_curve
 from .price_efficiency import get_price_efficiency_ratio
-from .sharp_ratio import get_sharpe_ratio
 from .profit_factor import get_profit_factor, \
     get_cumulative_profit_factor_series, get_rolling_profit_factor_series
-from .sharp_ratio import get_sharpe_ratio, get_rolling_sharpe_ratio
+from .sharpe_ratio import get_sharpe_ratio, get_rolling_sharpe_ratio
 from .price_efficiency import get_price_efficiency_ratio
 from .equity_curve import get_equity_curve
 from .drawdown import get_drawdown_series, get_max_drawdown, \
@@ -20,13 +19,13 @@ from .returns import get_yearly_returns, get_monthly_returns, \
     get_worst_trade, get_total_return, get_average_yearly_return, \
     get_average_gain, get_average_loss, get_average_monthly_return, \
     get_percentage_winning_months, get_average_monthly_return_losing_months, \
-    get_average_monthly_return_winning_months, get_best_trade_date, \
-    get_worst_trade_date, get_percentage_winning_years, \
-    get_worst_year
+    get_average_monthly_return_winning_months, \
+    get_percentage_winning_years, get_worst_year
 from .exposure import get_exposure, get_average_trade_duration, \
     get_trade_frequency, get_trades_per_day, get_trades_per_year
 from .win_rate import get_win_rate, get_win_loss_ratio
 from .calmar_ratio import get_calmar_ratio
+from .generate import create_backtest_metrics
 
 __all__ = [
     "get_annual_volatility",
@@ -76,8 +75,7 @@ __all__ = [
     "get_trades_per_year",
     "get_average_monthly_return_losing_months",
     "get_average_monthly_return_winning_months",
-    "get_best_trade_date",
-    "get_worst_trade_date",
     "get_percentage_winning_years",
     "get_rolling_sharpe_ratio",
+    "create_backtest_metrics",
 ]

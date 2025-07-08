@@ -5,9 +5,9 @@ from investing_algorithm_framework.app.task import Task
 from investing_algorithm_framework.app.web import create_flask_app
 from .algorithm import Algorithm
 from .context import Context
-from .reporting import add_html_report, add_metrics, \
-    BacktestReport, pretty_print_backtest, BacktestReportsEvaluation, \
-    pretty_print_trades, pretty_print_positions, pretty_print_orders
+from .reporting import add_html_report, \
+    BacktestReport, pretty_print_backtest, pretty_print_trades, \
+    pretty_print_positions, pretty_print_orders
 from .analysis import select_backtest_date_ranges
 
 
@@ -21,10 +21,8 @@ __all__ = [
     "AppHook",
     "Context",
     "add_html_report",
-    "add_metrics",
     "BacktestReport",
     "pretty_print_backtest",
-    "BacktestReportsEvaluation",
     "pretty_print_trades",
     "pretty_print_positions",
     "pretty_print_orders",

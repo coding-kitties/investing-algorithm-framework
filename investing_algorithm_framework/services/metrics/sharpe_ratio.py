@@ -82,6 +82,9 @@ def get_sharpe_ratio(
     if risk_free_rate is None:
         risk_free_rate = get_risk_free_rate_us()
 
+    if std_daily_return == 0:
+        return float('nan')  # Avoid division by zero
+
     # Formula: Sharpe Ratio = (Mean Daily Return × Periods Per Year - Risk-Free Rate) /
     # (Standard Deviation of Daily Returns × sqrt(Periods Per Year))
     return (mean_daily_return * 365 - risk_free_rate) / \

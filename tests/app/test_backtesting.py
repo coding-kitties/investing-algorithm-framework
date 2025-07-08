@@ -4,6 +4,7 @@ from unittest import TestCase
 from investing_algorithm_framework import TradingStrategy, Algorithm, \
     create_app, RESOURCE_DIRECTORY, PortfolioConfiguration, \
     BacktestDateRange, BacktestReport, Context
+from investing_algorithm_framework.domain import Backtest
 from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI
 
 
@@ -45,19 +46,19 @@ class Test(TestCase):
         algorithm = Algorithm()
         algorithm.add_strategy(SimpleTradingStrategy)
         app.add_algorithm(algorithm)
-        report: BacktestReport = app.run_backtest(
+        report = app.run_backtest(
             backtest_date_range=date_range,
             initial_amount=1000
         )
         portfolios = app.context.get_portfolios()
-        self.assertEqual(report.results.initial_unallocated, 1000)
+        self.assertEqual(report.backtest_results.initial_unallocated, 1000)
         self.assertEqual(len(portfolios), 0)
-        self.assertEqual(report.results.growth, 0)
-        self.assertEqual(report.results.growth_percentage, 0)
-        self.assertEqual(report.results.total_net_gain, 0)
-        self.assertEqual(report.results.total_net_gain_percentage, 0)
-        self.assertAlmostEqual(report.results.number_of_runs, 373, places=1)
-        self.assertEqual(report.results.trading_symbol, "USDT")
+        self.assertEqual(report.backtest_results.growth, 0)
+        self.assertEqual(report.backtest_results.growth_percentage, 0)
+        self.assertEqual(report.backtest_results.total_net_gain, 0)
+        self.assertEqual(report.backtest_results.total_net_gain_percentage, 0)
+        self.assertAlmostEqual(report.backtest_results.number_of_runs, 373, places=1)
+        self.assertEqual(report.backtest_results.trading_symbol, "USDT")
         database_uri = app.config[SQLALCHEMY_DATABASE_URI]
         self.assertIsNotNone(database_uri)
         self.assertTrue(database_uri.endswith("backtest-database.sqlite3"))
@@ -78,18 +79,18 @@ class Test(TestCase):
         algorithm = Algorithm()
         algorithm.add_strategy(SimpleTradingStrategy)
         app.add_algorithm(algorithm)
-        report: BacktestReport = app.run_backtest(
+        report = app.run_backtest(
             backtest_date_range=date_range,
         )
         portfolios = app.context.get_portfolios()
         self.assertEqual(len(portfolios), 0)
-        self.assertEqual(report.results.initial_unallocated, 500)
-        self.assertEqual(report.results.growth, 0)
-        self.assertEqual(report.results.growth_percentage, 0)
-        self.assertEqual(report.results.total_net_gain, 0)
-        self.assertEqual(report.results.total_net_gain_percentage, 0)
-        self.assertAlmostEqual(report.results.number_of_runs, 373, places=1)
-        self.assertEqual(report.results.trading_symbol, "USDT")
+        self.assertEqual(report.backtest_results.initial_unallocated, 500)
+        self.assertEqual(report.backtest_results.growth, 0)
+        self.assertEqual(report.backtest_results.growth_percentage, 0)
+        self.assertEqual(report.backtest_results.total_net_gain, 0)
+        self.assertEqual(report.backtest_results.total_net_gain_percentage, 0)
+        self.assertAlmostEqual(report.backtest_results.number_of_runs, 373, places=1)
+        self.assertEqual(report.backtest_results.trading_symbol, "USDT")
         database_uri = app.config[SQLALCHEMY_DATABASE_URI]
         self.assertIsNotNone(database_uri)
         self.assertTrue(database_uri.endswith("backtest-database.sqlite3"))
