@@ -82,7 +82,7 @@ class Backtest:
         backtest_results = None
         data_file_paths = []
         strategy_related_paths = []
-        meta_data = {}
+        metadata = {}
         risk_free_rate = None
 
         if not os.path.exists(directory_path):
