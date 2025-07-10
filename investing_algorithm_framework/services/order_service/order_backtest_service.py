@@ -127,7 +127,7 @@ class OrderBacktestService(OrderService):
                     }
                 )
 
-    def has_executed(self, order, ohlcv_data_frame):
+    def has_executed(self, order, ohlcv_data_frame: pl.DataFrame):
         """
         Check if the order has executed based on the OHLCV data.
 
@@ -135,7 +135,7 @@ class OrderBacktestService(OrderService):
         order price. Example: If the order price is 1000 and the low price
         drops below or equals 1000, the order is executed. This simulates the
         situation where a buyer is willing to pay a higher price than the
-        the lowest price in the ohlcv data.
+        lowest price in the ohlcv data.
 
         A sell order is executed if the high price goes above or equals the
         order price. Example: If the order price is 1000 and the high price
@@ -143,27 +143,22 @@ class OrderBacktestService(OrderService):
         situation where a seller is willing to accept a higher price for its
         sell order.
 
-        :param order: Order object
-        :param ohlcv_data_frame: OHLCV data frame
-        :return: True if the order has executed, False otherwise
+        Args:
+            order: Order object
+            ohlcv_data_frame: OHLCV data frame
+            True if the order has executed, False otherwise
+
+        Returns:
+            bool: True if the order has executed, False otherwise
         """
 
         # Extract attributes from the order object
         created_at = order.get_created_at()
         order_side = order.get_order_side()
         order_price = order.get_price()
-        column_type = ohlcv_data_frame['Datetime'].dtype
-
-        if isinstance(column_type, pl.Datetime):
-            ohlcv_data_after_order = ohlcv_data_frame.filter(
-                pl.col('Datetime') >= created_at
-            )
-        else:
-            ohlcv_data_after_order = ohlcv_data_frame.filter(
-                pl.col('Datetime') >= created_at.strftime(
-                    self.configuration_service.config["DATETIME_FORMAT"]
-                )
-            )
+        ohlcv_data_after_order = ohlcv_data_frame.filter(
+            pl.col('Datetime') >= created_at
+        )
 
         # Check if the order execution conditions are met
         if OrderSide.BUY.equals(order_side):

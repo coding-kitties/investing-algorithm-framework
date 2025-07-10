@@ -49,7 +49,14 @@ class ImproperlyConfigured(Exception):
 class OperationalException(Exception):
     """
     Class OperationalException: Exception class indicating a problem occurred
-    during running of the investing_algorithm_framework
+    during running of the investing_algorithm_framework.
+
+    This exception is used to indicate that an error occurred during the
+    operation of the investing_algorithm_framework, such as during a backtest,
+    strategy execution, or any other operational aspect of the framework.
+
+    Attributes:
+        message (str): The error message to be returned in the response.
     """
     def __init__(self, message) -> None:
         super(OperationalException, self).__init__(message)

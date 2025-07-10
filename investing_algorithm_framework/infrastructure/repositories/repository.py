@@ -20,7 +20,6 @@ class Repository(ABC):
 
     def create(self, data, save=True):
         created_object = self.base_class(**data)
-
         if save:
             with Session() as db:
                 try:

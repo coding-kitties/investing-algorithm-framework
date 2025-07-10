@@ -90,7 +90,7 @@ from pyindicators import ema, rsi
 
 from investing_algorithm_framework import create_app, TimeUnit, Context, BacktestDateRange, \
     CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, DEFAULT_LOGGING_CONFIG, \
-    TradingStrategy, SnapshotInterval, convert_polars_to_pandas
+    TradingStrategy, SnapshotInterval, convert_polars_to_pandas, BacktestReport
 
 load_dotenv()
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
@@ -169,9 +169,10 @@ app.add_strategy(MyStrategy)
 
 if __name__ == "__main__":
     # Run the backtest with a daily snapshot interval for end-of-day granular reporting
-    backtest_report = app.run_backtest(
+    backtest = app.run_backtest(
         backtest_date_range=date_range, initial_amount=100, snapshot_interval=SnapshotInterval.STRATEGY_ITERATION
     )
+    backtest_report = BacktestReport(backtests=[backtest])
     backtest_report.show()
 ```
 

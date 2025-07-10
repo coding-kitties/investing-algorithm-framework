@@ -375,3 +375,19 @@ class MarketDataSourceService:
             market_data_source.get_identifier() for market_data_source
             in self._market_data_sources
         ]
+
+    def get_data_files(self):
+        """
+        Function to get the data files for the market data sources.
+
+        Returns:
+            List[str]: A list of file paths for the data files.
+        """
+        data_files = []
+
+        for market_data_source in self._market_data_sources:
+            if hasattr(market_data_source, 'file_path') and \
+                    market_data_source.file_path is not None:
+                data_files.append(market_data_source.file_path)
+
+        return data_files

@@ -828,7 +828,12 @@ class Context:
         return (position.cost / net_size) * 100
 
     def close_position(
-        self, position=None, symbol=None, portfolio=None, precision=None
+        self,
+        position=None,
+        symbol=None,
+        portfolio=None,
+        precision=None,
+        price=None
     ) -> Order:
         """
         Function to close a position. This function will close a position
@@ -841,6 +846,8 @@ class Context:
             symbol (Optional): The symbol of the asset
             portfolio (Optional): The portfolio where the position is located
             precision (Optional): The precision of the amount
+            price (Optional[Float]): The price with which the position needs
+                to be closed.
 
         Returns:
             Order: The order created to close the position
@@ -887,19 +894,23 @@ class Context:
 
         target_symbol = position.get_symbol()
         symbol = f"{target_symbol.upper()}/{portfolio.trading_symbol.upper()}"
-        ticker = self.market_data_source_service.get_ticker(
-            symbol=symbol, market=portfolio.market
-        )
+
+        if price is None:
+            ticker = self.market_data_source_service.get_ticker(
+                symbol=symbol, market=portfolio.market
+            )
+            price = ticker["bid"]
+
         logger.info(
             f"Closing position {position.symbol} "
             f"with amount {position.get_amount()} "
-            f"at price {ticker['bid']}"
+            f"at price {price}"
         )
         return self.create_limit_order(
             target_symbol=position.symbol,
             amount=position.get_amount(),
             order_side=OrderSide.SELL.value,
-            price=ticker["bid"],
+            price=price,
             precision=precision,
         )
 

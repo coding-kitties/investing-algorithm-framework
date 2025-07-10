@@ -174,16 +174,25 @@ class Trade(BaseModel):
 
     @property
     def change(self):
+        """
+        Property to calculate the change in value of the trade.
+
+        This is the difference between the current value of the trade
+        and the cost of the trade.
+        """
         if TradeStatus.CLOSED.equals(self.status):
-            cost = self.amount * self.open_price
-            return self.net_gain - cost
+            return self.net_gain
 
         if self.last_reported_price is None:
             return 0
 
-        cost = self.remaining * self.open_price
-        gain = (self.remaining * self.last_reported_price) - cost
-        gain += self.net_gain
+        if self.remaining is None or self.remaining == 0:
+            amount = self.amount
+        else:
+            amount = self.amount - self.remaining
+
+        cost = amount * self.open_price
+        gain = (amount * self.last_reported_price) - cost
         return gain
 
     @property
@@ -231,15 +240,15 @@ class Trade(BaseModel):
     def percentage_change(self):
 
         if TradeStatus.CLOSED.equals(self.status):
-            cost = self.amount * self.open_price
-            gain = self.net_gain - cost
-            return (gain / cost) * 100
+
+            if self.cost != 0:
+                return (self.net_gain / self.cost) * 100
 
         if self.last_reported_price is None:
             return 0
 
-        cost = self.remaining * self.open_price
-        gain = (self.remaining * self.last_reported_price) - cost
+        cost = self.available_amount * self.open_price
+        gain = (self.available_amount * self.last_reported_price) - cost
         gain += self.net_gain
         return (gain / cost) * 100
 

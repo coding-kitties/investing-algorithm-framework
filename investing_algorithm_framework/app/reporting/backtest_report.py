@@ -1,14 +1,85 @@
-import json
+import logging
 import os
-import sys
+from pathlib import Path
 import webbrowser
 from dataclasses import dataclass
-from IPython.display import display, HTML
+from dataclasses import field
+from typing import List, Union
+
+import pandas as pd
 from IPython import get_ipython
+from IPython.display import display, HTML
+from jinja2 import Environment, FileSystemLoader
 
 from investing_algorithm_framework.domain import OperationalException, \
     BacktestResult
-from .generate import add_html_report, add_metrics
+from investing_algorithm_framework.domain import TimeFrame, Backtest
+from .charts import get_equity_curve_with_drawdown_chart, \
+    get_rolling_sharp_ratio_chart, get_monthly_returns_heatmap_chart, \
+    get_yearly_returns_bar_chart, get_ohlcv_data_completeness_chart
+from .tables import create_html_time_metrics_table, \
+    create_html_trade_metrics_table, create_html_key_metrics_table, \
+    create_html_trades_table
+
+logger = logging.getLogger("investing_algorithm_framework")
+
+
+def get_symbol_from_file_name(file_name: str) -> str:
+    """
+    Extract the symbol from the file name.
+
+    Args:
+        file_name (str): The file name from which to extract the symbol.
+
+    Returns:
+        str: The extracted symbol.
+    """
+    # Assuming the file name format is "symbol_timeframe.csv"
+    return file_name.split('_')[0].upper()
+
+def get_market_from_file_name(file_name: str) -> str:
+    """
+    Extract the market from the file name.
+
+    Args:
+        file_name (str): The file name from which to extract the market.
+
+    Returns:
+        str: The extracted market.
+    """
+    # Assuming the file name format is "symbol_market_timeframe.csv"
+    parts = file_name.split('_')
+    if len(parts) < 2:
+        raise ValueError("File name does not contain a valid market.")
+    return parts[1].upper()
+
+
+def get_time_frame_from_file_name(file_name: str) -> TimeFrame:
+    """
+    Extract the time frame from the file name.
+
+    Args:
+        file_name (str): The file name from which to extract the time frame.
+
+    Returns:
+        TimeFrame: The extracted time frame.
+    """
+    parts = file_name.split('_')
+
+    if len(parts) < 3:
+        raise ValueError(
+            "File name does not contain a valid time frame."
+        )
+    time_frame_str = parts[3]
+
+    try:
+        return TimeFrame.from_string(time_frame_str)
+    except ValueError:
+        raise ValueError(
+            f"Could not extract time frame from file name: {file_path}. "
+            f"Expected format 'OHLCV_<SYMBOL>_<MARKET>_<TIME_FRAME>_<START_DATE>_<END_DATE>.csv', "
+            f"got '{time_frame_str}'."
+        )
 
 
 @dataclass
@@ -29,207 +100,248 @@ class BacktestReport:
         strategy_path (str): The path to the strategy directory used in the
             backtest.
     """
+    backtests: List[Backtest] = field(default_factory=list)
     html_report: str = None
     html_report_path: str = None
-    metrics = None
-    results: BacktestResult = None
-    risk_free_rate: float = None
 
-    def __post_init__(self):
-        """
-        Post-initialization method to create the metrics and HTML report
-        """
-        if self.metrics is None:
-            add_metrics(self, self.risk_free_rate)
 
-        if self.html_report is None:
-            add_html_report(self)
-
-    def show(self):
+    def show(self, browser: bool = False):
         """
         Display the HTML report in a Jupyter notebook cell.
         """
-        if self.html_report:
 
-            def in_jupyter_notebook():
-                try:
-                    shell = get_ipython().__class__.__name__
-                    return shell == 'ZMQInteractiveShell'
-                except (NameError, ImportError):
-                    return False
+        if not self.html_report:
+            # If the HTML report is not created, create it
+            self._create_html_report()
 
-            if in_jupyter_notebook():
-                display(HTML(self.html_report))
-            else:
-                webbrowser.open(f"file://{self.html_report_path}")
+        # Save the html report to a tmp location
+        path = "/tmp/backtest_report.html"
+        with open(path, "w") as html_file:
+            html_file.write(self.html_report)
+
+        if browser:
+            webbrowser.open(f"file://{path}")
+
+        def in_jupyter_notebook():
+            try:
+                shell = get_ipython().__class__.__name__
+                return shell == 'ZMQInteractiveShell'
+            except (NameError, ImportError):
+                return False
+
+        if in_jupyter_notebook():
+            display(HTML(self.html_report))
         else:
-            raise OperationalException("No HTML report available to display.")
+            webbrowser.open(f"file://{path}")
 
-    @staticmethod
-    def open(file_path) -> "BacktestReport":
+    def _create_html_report(self):
         """
-        Open the backtest report from a file.
+        Create an HTML report from the backtest metrics and results.
 
-        Args:
-            file_path (str): The file path from which the report will
-                be loaded.
+        This method generates various charts and tables from the backtest
+        metrics and results, and renders them into an HTML template using
+        Jinja2.
 
-        Returns:
-            BacktestReport: An instance of BacktestReport loaded from the file.
-        """
-        if not os.path.exists(file_path):
-            raise OperationalException(
-                "Backtest report file or folder does not exist"
-            )
-
-        if os.path.isdir(file_path):
-            report_file_path = os.path.join(file_path, "report.json")
-            results = None
-            html_report = None
-
-            # Open the results file
-            if os.path.isfile(report_file_path):
-                with open(report_file_path, 'r') as json_file:
-                    data = json.load(json_file)
-
-                results = BacktestResult.from_dict(data)
-
-            # Open the html file
-            html_file_path = os.path.join(file_path, "report.html")
-            if os.path.isfile(html_file_path):
-                with open(html_file_path, 'r') as html_file:
-                    html_content = html_file.read()
-                html_report = html_content
-
-            if not results and not html_report:
-                raise OperationalException(
-                    "No report.json or report.html found in the directory"
-                )
-
-            return BacktestReport(
-                html_report=html_report,
-                results=results,
-                html_report_path=html_file_path
-            )
-        else:
-            return BacktestReport.open(file_path)
-
-    def save(
-        self,
-        path,
-        save_strategy=True,
-        algorithm=None,
-        strategy_directory_path=None
-    ):
-        """
-        Save the backtest report. When saving the report, the metrics
-        will be saved as a JSON, the backtest results will be saved as a
-        JSON, and the HTML report will be saved as an HTML file.
-
-        Args:
-            path (str): The file path where the report will be saved.
-            save_strategy (bool): If True, the strategy code will be copied
-                to the report directory. Defaults to True.
-            algorithm (Algorithm, optional): The algorithm used for the
-                backtest. If provided, the strategy code will be copied to
-                the report directory.
-            strategy_directory_path (str, optional): The path to the
-                strategy directory. If provided, the strategy code will be
-                copied to the report directory.
+        Raises:
+            OperationalException: If no backtests are available to
+                create a report.
 
         Returns:
             None
         """
+        # Get the first backtest
+        if not self.backtests:
+            raise OperationalException(
+                "No backtests available to create a report."
+            )
 
-        if not os.path.exists(path):
-            os.makedirs(path)
+        backtest = self.backtests[0]
+        metrics = backtest.backtest_metrics
+        results = backtest.backtest_results
+        # Create plots
+        equity_with_drawdown_fig = get_equity_curve_with_drawdown_chart(
+            metrics.equity_curve, metrics.drawdown_series
+        )
+        equity_with_drawdown_plot_html = equity_with_drawdown_fig.to_html(
+            full_html=False, include_plotlyjs='cdn',
+            config={'responsive': True}, default_width="90%"
+        )
+        rolling_sharpe_ratio_fig = get_rolling_sharp_ratio_chart(
+            metrics.rolling_sharpe_ratio
+        )
+        rolling_sharpe_ratio_plot_html = rolling_sharpe_ratio_fig.to_html(
+            full_html=False, include_plotlyjs='cdn',
+            config={'responsive': True}, default_width="90%"
+        )
+        monthly_returns_heatmap_fig = get_monthly_returns_heatmap_chart(
+            metrics.monthly_returns
+        )
+        monthly_returns_heatmap_html = monthly_returns_heatmap_fig.to_html(
+            full_html=False, include_plotlyjs='cdn',
+            config={'responsive': True}
+        )
+        yearly_returns_histogram_fig = get_yearly_returns_bar_chart(
+            metrics.yearly_returns
+        )
+        yearly_returns_histogram_html = yearly_returns_histogram_fig.to_html(
+            full_html=False, include_plotlyjs='cdn',
+            config={'responsive': True}
+        )
 
-        print("Saving backtest report to", path)
-        print(f"save_strategy: {save_strategy}")
-        if save_strategy:
-            # If strategy_directory_path is set, copy the strategy code to
-            # the report directory
-            if strategy_directory_path is not None:
-                print("Saving strategy code from directory")
-                # check if the strategy directory exists
-                if not os.path.exists(strategy_directory_path) and \
-                        not os.path.isdir(strategy_directory_path):
-                    raise OperationalException(
-                        "Strategy directory does not exist"
+        # Create OHLCV data completeness charts
+        data_files = backtest.data_file_paths
+        ohlcv_data_completeness_charts_html = ""
+
+        for file in data_files:
+            try:
+                if file.endswith('.csv'):
+                    df = pd.read_csv(file, parse_dates=['Datetime'])
+                    file_name = os.path.basename(file)
+                    symbol = get_symbol_from_file_name(file_name)
+                    market = get_market_from_file_name(file_name)
+                    time_frame = get_time_frame_from_file_name(file_name)
+                    title = f"OHLCV Data Completeness for {market} - {symbol} - {time_frame.value}"
+                    ohlcv_data_completeness_chart_html = \
+                        get_ohlcv_data_completeness_chart(
+                            df,
+                            timeframe=time_frame.value,
+                            windowsize=200,
+                            title=title
+                        )
+
+                    ohlcv_data_completeness_charts_html += (
+                        '<div class="ohlcv-data-completeness-chart">'
+                        f'{ohlcv_data_completeness_chart_html}'
+                        '</div>'
                     )
 
-                # Copy the strategy directory to the report directory
-                strategy_directory_name = os.path.basename(
-                    strategy_directory_path
+            except Exception as e:
+                logger.warning(
+                    "Error creating OHLCV data completeness " +
+                    f"chart for {file}: {e}"
                 )
-                output_strategy_directory = os.path.join(
-                    path, strategy_directory_name
+                continue
+
+        # Create HTML tables
+        key_metrics_table_html = create_html_key_metrics_table(
+            metrics, results
+        )
+        trades_metrics_table_html = create_html_trade_metrics_table(
+            metrics, results
+        )
+        time_metrics_table_html = create_html_time_metrics_table(
+            metrics, results
+        )
+        trades_table_html = create_html_trades_table(results)
+
+        # Jinja2 environment setup
+        template_dir = os.path.join(os.path.dirname(__file__), 'templates')
+        env = Environment(loader=FileSystemLoader(template_dir))
+        template = env.get_template('report_template.html.j2')
+
+        # Render template with variables
+        html_rendered = template.render(
+            report=results,
+            equity_with_drawdown_plot_html=equity_with_drawdown_plot_html,
+            rolling_sharpe_ratio_plot_html=rolling_sharpe_ratio_plot_html,
+            monthly_returns_heatmap_html=monthly_returns_heatmap_html,
+            yearly_returns_histogram_html=yearly_returns_histogram_html,
+            key_metrics_table_html=key_metrics_table_html,
+            trades_metrics_table_html=trades_metrics_table_html,
+            time_metrics_table_html=time_metrics_table_html,
+            trades_table_html=trades_table_html,
+            data_completeness_charts_html=ohlcv_data_completeness_charts_html
+        )
+        self.html_report = html_rendered
+
+    @staticmethod
+    def _load_backtest(backtest_path: str) -> Backtest:
+        """
+        Load the backtest from a give path
+        and return an instance of Backtest.
+
+        Args:
+            backtest_path (str): The path to the backtest directory.
+
+        Returns:
+            Backtest: An instance of Backtest loaded from the
+                backtest directory.
+        """
+        return Backtest.open(backtest_path)
+
+    @staticmethod
+    def _is_backtest(backtest_path: Union[str, Path]) -> bool:
+        """
+        Check if the given path is a valid backtest report directory.
+
+        Args:
+            backtest_path (Union[str, Path]): The path to check.
+
+        Returns:
+            bool: True if the path is a valid backtest report directory,
+                False otherwise.
+        """
+        return (
+            os.path.exists(backtest_path) and
+            os.path.isdir(backtest_path) and
+            os.path.isfile(os.path.join(backtest_path, "results.json"))
+            and os.path.isfile(os.path.join(backtest_path, "metrics.json"))
+        )
+
+    @staticmethod
+    def open(
+        backtests: List[Backtest] = [],
+        directory_path=None
+    ) -> "BacktestReport":
+        """
+        Open the backtest report from a file.
+
+        Args:
+            backtests (List[Backtest], optional): A list of Backtest instances
+                to include in the report. If provided, it will use these
+                backtests as part of the report.
+            directory_path (str, optional): The directory path from
+                which the reports will be loaded.
+
+        Returns:
+            BacktestReport: An instance of BacktestReport loaded from the file.
+
+        Raises:
+            OperationalException: If the backtest path is not a valid backtest
+                report directory.
+        """
+        loaded_backtests = []
+
+        if directory_path is not None:
+            # Check if the directory is a valid backtest report directory
+            if BacktestReport._is_backtest(directory_path):
+                backtests.append(
+                    Backtest.open(directory_path)
                 )
-                if not os.path.exists(output_strategy_directory):
-                    os.makedirs(output_strategy_directory)
-
-                strategy_files = os.listdir(strategy_directory_path)
-                for file in strategy_files:
-                    source_file = os.path.join(strategy_directory_path, file)
-                    destination_file = os.path.join(
-                        output_strategy_directory, file
-                    )
-
-                    if os.path.isfile(source_file):
-                        # Copy the file to the output directory
-                        with open(source_file, "rb") as src:
-                            with open(destination_file, "wb") as dst:
-                                dst.write(src.read())
-
-            elif algorithm is not None:
-                print("saving strategy code from algorithm")
-                strategy = algorithm.strategies[0]
-                mod = sys.modules[strategy.__module__]
-                strategy_directory_path = os.path.dirname(mod.__file__)
-                strategy_directory_name = os.path.basename(
-                    strategy_directory_path
-                )
-                strategy_files = os.listdir(strategy_directory_path)
-                output_strategy_directory = os.path.join(
-                    path, strategy_directory_name
-                )
-
-                if not os.path.exists(output_strategy_directory):
-                    os.makedirs(output_strategy_directory)
-
-                for file in strategy_files:
-                    source_file = os.path.join(strategy_directory_path, file)
-                    destination_file = os.path.join(
-                        output_strategy_directory, file
-                    )
-
-                    if os.path.isfile(source_file):
-                        # Copy the file to the output directory
-                        with open(source_file, "rb") as src:
-                            with open(destination_file, "wb") as dst:
-                                dst.write(src.read())
-
             else:
-                raise OperationalException(
-                    "No strategy directory or algorithm provided to save the "
-                    "strategy code."
-                )
+                # Loop over all subdirectories
+                for root, dirs, _ in os.walk(directory_path):
+                    for dir_name in dirs:
+                        subdir_path = os.path.join(root, dir_name)
+                        if BacktestReport._is_backtest(subdir_path):
+                            loaded_backtests.append(
+                                Backtest.open(directory_path=subdir_path)
+                            )
 
-        # Save the results as a JSON file
-        if self.results is not None:
-            results_file_path = os.path.join(path, "report.json")
-            with open(results_file_path, 'w') as json_file:
-                json.dump(self.results.to_dict(), json_file, indent=4)
+        if len(backtests) > 0:
 
-        # Save the HTML report
-        if self.html_report is not None:
-            html_file_path = os.path.join(path, "report.html")
-            with open(html_file_path, 'w') as html_file:
-                html_file.write(self.html_report)
-            self.html_report_path = html_file_path
+            for backtest in backtests:
+                if not isinstance(backtest, Backtest):
+                    raise OperationalException(
+                        "The provided backtest is not a valid Backtest instance."
+                    )
 
-        if self.results is not None:
-            data = self.results.to_dict()
+            # Add the backtests to the backtests list
+            loaded_backtests.extend(backtests)
 
-            with open(os.path.join(path, "report.json"), 'w') as json_file:
-                json.dump(data, json_file, indent=4)
+        if len(loaded_backtests) == 0:
+            raise OperationalException(
+                f"The directory {directory_path} is not a valid backtest report."
+            )
+
+        return BacktestReport(backtests=loaded_backtests)

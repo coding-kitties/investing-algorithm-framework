@@ -24,6 +24,36 @@ class TimeUnit(Enum):
             f"TimeUnit. Its current type is {type(value)}"
         )
 
+    @staticmethod
+    def from_ohlcv_data_file(file_path: str):
+        """
+        Extracts the time unit from the file name of an OHLCV data file.
+        The file name should contain the time unit in the
+        format 'symbol_timeunit.csv'.
+
+        Args:
+            file_path (str): The file path of the OHLCV data file.
+
+        Returns:
+            TimeUnit: The extracted time unit.
+        """
+        if not isinstance(file_path, str):
+            raise ValueError("File path must be a string.")
+
+        parts = file_path.split('_')
+        if len(parts) < 2:
+            raise ValueError("File name does not contain a valid time unit.")
+
+        time_unit_str = parts[-1].split('.')[0].upper()
+        try:
+            return TimeUnit.from_string(time_unit_str)
+        except ValueError:
+            raise ValueError(
+                f"Could not extract time unit from file name: {file_path}. "
+                "Expected format 'symbol_timeunit.csv', "
+                f"got '{time_unit_str}'."
+            )
+
     def equals(self, other):
 
         if isinstance(other, Enum):

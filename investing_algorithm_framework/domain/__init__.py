@@ -21,6 +21,8 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     BacktestResult, PortfolioSnapshot, StrategyProfile, \
     BacktestPosition, Trade, MarketCredential, PositionSnapshot, \
     AppMode, BacktestDateRange, DataType, DataSource, \
+    PortfolioSnapshot, StrategyProfile, \
+    Trade, MarketCredential, PositionSnapshot, AppMode, \
     MarketDataType, TradeRiskType, TradeTakeProfit, TradeStopLoss, \
     DataSource, Event, SnapshotInterval
 from .order_executor import OrderExecutor
@@ -36,6 +38,8 @@ from .utils import random_string, append_dict_as_row_to_csv, \
     convert_polars_to_pandas, random_number, \
     csv_to_list, StoppableThread, load_csv_into_dict, \
     is_timezone_aware, sync_timezones, get_timezone
+from .backtesting import BacktestResult, BacktestPosition, \
+    BacktestDateRange, Backtest, BacktestMetrics
 
 __all__ = [
     "OrderStatus",
@@ -140,4 +144,8 @@ __all__ = [
     "AWS_LAMBDA_LOGGING_CONFIG",
     "DataType",
     "DataSource",
+    "Backtest",
+    "BacktestMetrics",
+    "BacktestResult",
+    "BacktestPosition"
 ]

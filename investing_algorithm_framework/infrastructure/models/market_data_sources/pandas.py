@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
 from dateutil import parser
-from pandas import DataFrame
+import pandas as pd
 import polars as pl
 
 from investing_algorithm_framework.domain import OHLCVMarketDataSource, \
@@ -19,7 +19,7 @@ class PandasOHLCVBacktestMarketDataSource(
     backtest_data_directory = None
     backtest_data_end_date = None
     total_minutes_time_frame = None
-    column_names = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
+    column_names = ["Open", "High", "Low", "Close", "Volume", "Datetime"]
 
     def __init__(
         self,
@@ -87,39 +87,48 @@ class PandasOHLCVBacktestMarketDataSource(
         self.backtest_data_start_date = backtest_data_start_date \
             .replace(microsecond=0)
         self.backtest_data_end_date = backtest_end_date.replace(microsecond=0)
-
-        if not isinstance(self.dataframe, DataFrame):
-            raise OperationalException(
-                "Provided dataframe is not a pandas dataframe"
-            )
+        #
+        # if not isinstance(self.dataframe, pl,=):
+        #     raise OperationalException(
+        #         "Provided dataframe is not a pandas dataframe"
+        #     )
 
         if not set(self.column_names).issubset(self.dataframe.columns):
             raise OperationalException(
                 "Provided dataframe does not have all required columns. "
                 "Your pandas dataframe should have the following columns: "
-                "Datetime, Open, High, Low, Close, Volume"
+                "Open, High, Low, Close, Volume"
             )
 
-        # Get first and last row and check if backtest start and end dates
-        # are within the dataframe
-        first_row = self.dataframe.head(1)
-        last_row = self.dataframe.tail(1)
+        # # Make sure that the index is a datetime index
+        # if not isinstance(self.dataframe.index, DatetimeIndex):
+        #     raise OperationalException(
+        #         "Provided dataframe does not have a datetime index. "
+        #         "Your pandas dataframe should have a datetime index."
+        #     )
 
-        if backtest_end_date > last_row["Datetime"].iloc[0]:
+        print(type(self.dataframe))
+        print(f"Columns are {self.dataframe.columns}")
+
+        # Get first and last row are within the backtest date range
+        first_timestamp = self.dataframe["Datetime"][0]
+        last_timestamp = self.dataframe["Datetime"][-1]
+
+        if backtest_end_date > last_timestamp:
             raise OperationalException(
                 f"Backtest end date {backtest_end_date} is "
                 f"after the end date of the data source "
-                f"{last_row['Datetime'].iloc[0]}"
+                f"{last_timestamp}"
             )
 
-        if backtest_data_start_date < first_row["Datetime"].iloc[0]:
+        if backtest_data_start_date < first_timestamp:
             raise OperationalException(
                 f"Backtest start date {backtest_data_start_date} is "
                 f"before the start date of the data source "
-                f"{first_row['Datetime'][0]}"
+                f"{first_timestamp}"
             )
-
-        self._precompute_sliding_windows()  # Precompute sliding windows!
+        # Precompute sliding windows
+        self._precompute_sliding_windows()
 
     def _precompute_sliding_windows(self):
         """
@@ -142,8 +151,9 @@ class PandasOHLCVBacktestMarketDataSource(
             elif isinstance(end_time, datetime):
                 end_time = end_time
 
+            # Store a polars DataFrame slice in the cache
             self.window_cache[end_time] = \
-                self.dataframe.iloc[i:i + self.window_size]
+                self.dataframe.slice(i, self.window_size)
 
     def get_data(
         self,
@@ -159,7 +169,6 @@ class PandasOHLCVBacktestMarketDataSource(
         data = self.window_cache.get(date)
 
         if data is not None:
-            data = pl.from_pandas(data)
             return data
 
         # Find closest previous timestamp
@@ -174,10 +183,6 @@ class PandasOHLCVBacktestMarketDataSource(
                 break
 
         data = self.window_cache.get(closest_date) if closest_date else None
-
-        if data is not None:
-            data = pl.from_pandas(data)
-
         return data
 
     def to_backtest_market_data_source(self) -> BacktestMarketDataSource:
@@ -206,13 +211,13 @@ class PandasOHLCVMarketDataSource(OHLCVMarketDataSource):
     column_names = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
 
     def __init__(
-            self,
-            identifier,
-            market,
-            symbol,
-            time_frame,
-            dataframe=None,
-            window_size=None,
+        self,
+        identifier,
+        market,
+        symbol,
+        time_frame,
+        dataframe: pd.DataFrame = None,
+        window_size=None,
     ):
         super().__init__(
             identifier=identifier,
@@ -221,7 +226,7 @@ class PandasOHLCVMarketDataSource(OHLCVMarketDataSource):
             time_frame=time_frame,
             window_size=window_size,
         )
-        self.dataframe = dataframe
+        self.dataframe = pl.from_pandas(dataframe)
         self._start_date_data_source = None
         self._end_date_data_source = None
         self.backtest_end_index = self.window_size

@@ -98,6 +98,8 @@
         <button class="tablink active" onclick="openTab(event, 'Overview')">Overview</button>
         <button class="tablink" onclick="openTab(event, 'Trades')">Trades</button>
         <button class="tablink" onclick="openTab(event, 'Positions and orders')">Positions and Orders</button>
+        <button class="tablink" onclick="openTab(event, 'DataAnalysis')">Data Analysis</button>
+
     </div>
 
     <div id="Overview" class="tabcontent active">
@@ -117,23 +119,12 @@
         </div>
         <div class="grid-container">
             <div class="metrics-table">
-                <h2>Performance Metrics</h2>
-                {{ key_metrics_table_html | safe }}
-                <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
-                <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-                <script>
-                    $(document).ready(function() {
-                        $('.stats-table').DataTable({
-                            paging: true,
-                            pageLength: 10,
-                            searching: true, // Enable search box
-                        });
-                    });
-                </script>
-            </div>
-            <div class="metrics-table">
                 <h2>Time Metrics</h2>
                 {{ time_metrics_table_html | safe }}
+            </div>
+            <div class="metrics-table">
+                <h2>Performance Metrics</h2>
+                {{ key_metrics_table_html | safe }}
             </div>
             <div class="metrics-table">
                 <h2>Trade Metrics</h2>
@@ -141,7 +132,6 @@
             </div>
         </div>
     </div>
-
     <div id="Trades" class="tabcontent">
         {{ trades_table_html | safe }}
         {% raw %}
@@ -155,6 +145,10 @@
         });
         </script>
         {% endraw %}
+    </div>
+    <div id="DataAnalysis" class="tabcontent">
+    <h2>OHLCV Data Completeness Charts</h2>
+        {{ data_completeness_charts_html | safe }}
     </div>
 </body>
 </html>

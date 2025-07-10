@@ -72,7 +72,6 @@ class Test(TestCase):
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
-            save_strategy=True
         )
         dir_name = BacktestService.create_report_directory_name(report)
 
@@ -86,8 +85,8 @@ class Test(TestCase):
             self.resource_dir,
             "backtest_reports_for_testing/test_algorithm_backtest_created-at_2025-04-21-21-21"
         )
-        backtest_report = BacktestReport.open(path)
-        report = backtest_report.results
+        backtest_report = BacktestReport.open(directory_path=path)
+        report = backtest_report.backtests[0].backtest_results
         self.assertEqual(
             len(report.get_orders()),
             331
@@ -126,8 +125,8 @@ class Test(TestCase):
             self.resource_dir,
             "backtest_reports_for_testing/test_algorithm_backtest_created-at_2025-04-21-21-21"
         )
-        backtest_report = BacktestReport.open(path)
-        report = backtest_report.results
+        backtest_report = BacktestReport.open(directory_path=path)
+        report = backtest_report.backtests[0].backtest_results
         self.assertEqual(
             len(report.get_trades(trade_status="OPEN")),
             3
@@ -158,8 +157,8 @@ class Test(TestCase):
             self.resource_dir,
             "backtest_reports_for_testing/test_algorithm_backtest_created-at_2025-04-21-21-21"
         )
-        backtest_report = BacktestReport.open(path)
-        report = backtest_report.results
+        backtest_report = BacktestReport.open(directory_path=path)
+        report = backtest_report.backtests[0].backtest_results
         self.assertEqual(
             set(report.symbols), {'SOL', 'ETH', 'DOT', 'BTC'}
         )

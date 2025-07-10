@@ -3,7 +3,7 @@ import logging
 import os
 import threading
 from time import sleep
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 
 from flask import Flask
 
@@ -18,7 +18,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     SQLALCHEMY_DATABASE_URI, OperationalException, StateHandler, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, APP_MODE, MarketCredential, \
     AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, \
-    BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, \
+    BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, Backtest, \
     MarketDataSource, PortfolioConfiguration, SnapshotInterval, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
@@ -27,7 +27,6 @@ from investing_algorithm_framework.services import OrderBacktestService, \
     BacktestMarketDataSourceService, BacktestPortfolioService, \
     BacktestService
 from .app_hook import AppHook
-from .reporting import BacktestReport
 
 logger = logging.getLogger("investing_algorithm_framework")
 COLOR_RESET = '\033[0m'
@@ -42,7 +41,9 @@ class App:
 
     Attributes:
         container: The dependency container for the app. This is used
-            to store all the services and repositories for the app
+            to store all the services and repositories for the app.
+        algorithm: The algorithm to run. This is used to run the
+            trading bot.
         _flask_app: The flask app instance. This is used to run the
             web app.
         _state_handler: The state handler for the app. This is used
@@ -503,6 +504,7 @@ class App:
             try:
                 while strategy_orchestrator_service.running:
                     if number_of_iterations_since_last_orders_check == 30:
+                        logger.info("Checking pending orders")
                         number_of_iterations_since_last_orders_check = 1
 
                     strategy_orchestrator_service.run_pending_jobs()
@@ -514,8 +516,7 @@ class App:
             logger.error(e)
             raise e
         finally:
-            if strategy_orchestrator_service is not None:
-                self._run_history = strategy_orchestrator_service.history
+            self._run_history = strategy_orchestrator_service.history
 
             try:
                 strategy_orchestrator_service.stop()
@@ -628,9 +629,11 @@ class App:
     def _create_resources_if_not_exists(self):
         """
         Function to create the resources required by the app if they
-          do not exist. This function will check if the resource directory
-          exists and check if the database directory exists. If they do
-          not exist, it will create them.
+        do not exist. This function will check if the resource directory
+        exists and check if the database directory exists. If they do
+        not exist, it will create them. Also it will make sure that
+        the resource directory is read and write accessible by the
+        application.
 
         Returns:
             None
@@ -650,6 +653,9 @@ class App:
         if not os.path.isdir(resource_dir):
             try:
                 os.makedirs(resource_dir)
+
+                # Make sure the resource directory is readable and writable
+                os.chmod(resource_dir, 0o755)
             except OSError as e:
                 logger.error(e)
                 raise OperationalException(
@@ -712,16 +718,19 @@ class App:
         algorithm=None,
         strategy=None,
         strategies: List = None,
-        save_strategy=True,
+        save=True,
         snapshot_interval: SnapshotInterval = SnapshotInterval.TRADE_CLOSE,
         strategy_directory_path: Optional[str] = None,
-        report_name: Optional[str] = None
-    ) -> BacktestReport:
+        backtest_directory_name: Optional[str] = None,
+        risk_free_rate: Optional[float] = None,
+        metadata: Optional[Dict[str, str]] = None
+    ) -> Backtest:
         """
         Run a backtest for an algorithm.
 
         Args:
-            backtest_date_range (BacktestDateRange): The date range to run the backtest for
+            backtest_date_range: The date range to run the backtest for
+                (instance of BacktestDateRange)
             name: The name of the backtest. This is used to identify the
                 backtest report in the output directory.
             initial_amount: The initial amount to start the backtest with.
@@ -729,18 +738,13 @@ class App:
                 portfolio will start with.
             strategy (TradingStrategy) (Optional): The strategy object
                 that needs to be backtested.
-            strategies (List[TradingStrategy) (Optional): List of strategy
+            strategies (List[TradingStrategy]) (Optional): List of strategy
                 objects that need to be backtested
-            algorithm (Algorithm) (Optional): The algorithm object that
-                needs to be backtested. If this is provided, then the
-                strategies and tasks of the algorithm will be used for the
-                backtest. If this is not provided, then the strategies
-                and tasks provided in the strategies parameter will be used.
-            output_directory: str - The directory to write the
-                backtest report to
-            save_strategy: bool - Whether to save the strategy
-                as part of the backtest report. You can only save in-memory
-                strategies when running multiple backtests. This is because
+            algorithm (Algorithm) (Optional): The algorithm object that needs
+                to be backtested. If this is provided, then the strategies
+                and tasks of the algorithm will be used for the backtest.
+            output_directory (str) (Optional): The directory to write
+                the backtest report to
             snapshot_interval (SnapshotInterval): The snapshot
                 interval to use for the backtest. This is used to determine
                 how often the portfolio snapshot should be taken during the
@@ -751,14 +755,15 @@ class App:
                 strategy if save_strategy is True. If not provided,
                 the framework tries to determine the path via the
                 algorithm or strategy object.
-            report_name (Optional[str]): The name of the report. If not
+            backtest_directory_name (Optional[str]): If not
                 provided, the framework will generate a name based on the
                 algorithm name and the backtest date range and the current
                 date and time.
 
         Returns:
-            Instance of BacktestReport
+            Backtest: Instance of Backtest
         """
+
         # Add backtest configuration to the config
         self.set_config_with_dict({
             ENVIRONMENT: Environment.BACKTEST.value,
@@ -769,7 +774,7 @@ class App:
             BACKTESTING_INITIAL_AMOUNT: initial_amount,
             SNAPSHOT_INTERVAL: SnapshotInterval.from_value(
                 snapshot_interval
-            ).value
+            ).value,
         })
 
         self.initialize_config()
@@ -815,55 +820,50 @@ class App:
         portfolio_service = self.container.portfolio_service()
         portfolio_service.clear_observers()
         portfolio_service.add_observer(portfolio_snapshot_service)
-
-        # Run the backtest with the backtest_service and collect and
-        # save the report
-        results = backtest_service.run_backtest(
+        backtest = backtest_service.run_backtest(
             algorithm=algorithm,
             context=context,
             strategy_orchestrator_service=strategy_orchestrator_service,
             initial_amount=initial_amount,
-            backtest_date_range=backtest_date_range
+            backtest_date_range=backtest_date_range,
+            risk_free_rate=risk_free_rate,
+            strategy_directory_path=strategy_directory_path
         )
-        report = BacktestReport(results=results)
+        backtest.metadata = metadata if metadata is not None else {}
 
         if output_directory is None:
             output_directory = os.path.join(
                 config[RESOURCE_DIRECTORY], "backtest_reports"
             )
 
-        if report_name is None:
-            report_name = BacktestService.create_report_directory_name(report)
+        if backtest_directory_name is None:
+            backtest_directory_name = BacktestService\
+                .create_report_directory_name(backtest)
 
-        output_directory = os.path.join(output_directory, report_name)
-        report.save(
-            path=output_directory,
-            algorithm=algorithm,
-            strategy_directory_path=strategy_directory_path,
-            save_strategy=save_strategy
+        output_directory = os.path.join(
+            output_directory, backtest_directory_name
         )
-        # print(report.html_report)
-        # backtest_service.save_report(
-        #     report=report,
-        #     algorithm=algorithm,
-        #     output_directory=output_directory,
-        #     save_strategy=save_strategy,
-        # )
-        return report
+
+        if save:
+            backtest.save(directory_path=output_directory)
+
+        return backtest
 
     def run_backtests(
         self,
         algorithms=None,
-        strategies=None,
+        strategies: List[TradingStrategy] = None,
         initial_amount=None,
         backtest_date_ranges: List[BacktestDateRange] = None,
+        snapshot_interval: SnapshotInterval = SnapshotInterval.TRADE_CLOSE,
+        risk_free_rate: Optional[float] = None,
+        save=True,
         output_directory=None,
         checkpoint=False,
-        save_strategy=False,
-    ) -> List[BacktestReport]:
+    ) -> List[Backtest]:
         """
-        Run a backtest for a set algorithm. This method should be called when
-        running a backtest.
+        Run a set of backtests for the provided algorithms or strategies
+        with the given date ranges.
 
         Args:
             algorithms (List[Algorithm]) (Optional): The algorithms to run
@@ -886,14 +886,15 @@ class App:
                 when running backtests for a large number of algorithms
                 and date ranges where some of the backtests may fail
                 and you want to re-run only the failed backtests.
-            save_strategy: bool - Whether to save the strategy as part
-                of the backtest report. You can only save in-memory strategies
-                when running multiple backtests. This is because we can't
-                differentiate between which folders belong to a specific
-                strategy.
+            save (bool): Whether to save the backtest report
+                to the output directory. If True, then the backtest report
+                will be saved to the output directory.
+            snapshot_interval (SnapshotInterval): The snapshot interval to
+                use for the backtest. This is used to determine how often
+                the portfolio snapshot should be taken during the backtest.
 
         Returns
-            List of BacktestReport instances
+            List[Backtest]: List of Backtest instances
         """
         logger.info("Initializing backtests")
         reports = []
@@ -960,7 +961,9 @@ class App:
                     initial_amount=initial_amount,
                     output_directory=output_directory,
                     algorithm=algorithm,
-                    save_strategy=save_strategy
+                    save=save,
+                    snapshot_interval=snapshot_interval,
+                    risk_free_rate=risk_free_rate
                 )
                 reports.append(report)
 

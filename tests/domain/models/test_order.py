@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest import TestCase
 
 from investing_algorithm_framework.domain import Order
@@ -38,5 +38,11 @@ class Test(TestCase):
         self.assertEqual(order.get_remaining(), 0)
         self.assertEqual(order.get_status(), "OPEN")
         self.assertEqual(
-            order.get_created_at(), datetime(2017, 8, 17, 12, 42, 48)
+            order.get_created_at(),
+            datetime(2017, 8, 17, 12, 42, 48, tzinfo=timezone.utc)
         )
+
+        # Check that created_at is a datetime object and has timezone info utc
+        self.assertIsInstance(order.get_created_at(), datetime)
+        self.assertIsNotNone(order.get_created_at().tzinfo)
+        self.assertEqual(order.get_created_at().tzinfo, timezone.utc)

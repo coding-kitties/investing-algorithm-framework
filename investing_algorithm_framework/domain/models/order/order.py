@@ -311,6 +311,13 @@ class Order(BaseModel):
             order_fee_currency = ccxt_fee.get("currency", None)
             order_fee_rate = ccxt_fee.get("rate", None)
 
+        created_at = ccxt_order.get("datetime", None)
+        created_at = parse(created_at) if created_at else None
+
+        # Make sure that the created_at is a utc datetime object
+        if created_at and created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+
         return Order(
             external_id=ccxt_order.get("id", None),
             target_symbol=target_symbol,
@@ -326,7 +333,7 @@ class Order(BaseModel):
             order_fee=order_fee,
             order_fee_currency=order_fee_currency,
             order_fee_rate=order_fee_rate,
-            created_at=parse(ccxt_order.get("datetime", None))
+            created_at=created_at
         )
 
     def __repr__(self):
