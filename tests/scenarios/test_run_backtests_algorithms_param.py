@@ -30,7 +30,7 @@ class Test(TestCase):
                 Algorithm(strategies=[CrossOverStrategyV1]),
                 Algorithm(strategies=[CrossOverStrategyV3]),
             ],
-            save_strategy=True,
+            save=True,
         )
         backtest_report = backtest_reports[0]
         self.assertAlmostEqual(

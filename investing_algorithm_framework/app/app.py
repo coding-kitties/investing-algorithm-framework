@@ -27,7 +27,6 @@ from investing_algorithm_framework.services import OrderBacktestService, \
     BacktestMarketDataSourceService, BacktestPortfolioService, \
     BacktestService
 from .app_hook import AppHook
-from .reporting import BacktestReport
 
 logger = logging.getLogger("investing_algorithm_framework")
 COLOR_RESET = '\033[0m'
@@ -762,7 +761,7 @@ class App:
                 date and time.
 
         Returns:
-            Instance of BacktestReport
+            Backtest: Instance of Backtest
         """
 
         # Add backtest configuration to the config
@@ -853,16 +852,18 @@ class App:
     def run_backtests(
         self,
         algorithms=None,
-        strategies=None,
+        strategies: List[TradingStrategy] = None,
         initial_amount=None,
         backtest_date_ranges: List[BacktestDateRange] = None,
+        snapshot_interval: SnapshotInterval = SnapshotInterval.TRADE_CLOSE,
+        risk_free_rate: Optional[float] = None,
+        save=True,
         output_directory=None,
         checkpoint=False,
-
-    ) -> List[BacktestReport]:
+    ) -> List[Backtest]:
         """
-        Run a backtest for a set algorithm. This method should be called when
-        running a backtest.
+        Run a set of backtests for the provided algorithms or strategies
+        with the given date ranges.
 
         Args:
             algorithms (List[Algorithm]) (Optional): The algorithms to run
@@ -885,14 +886,15 @@ class App:
                 when running backtests for a large number of algorithms
                 and date ranges where some of the backtests may fail
                 and you want to re-run only the failed backtests.
-            save_strategy: bool - Whether to save the strategy as part
-                of the backtest report. You can only save in-memory strategies
-                when running multiple backtests. This is because we can't
-                differentiate between which folders belong to a specific
-                strategy.
+            save (bool): Whether to save the backtest report
+                to the output directory. If True, then the backtest report
+                will be saved to the output directory.
+            snapshot_interval (SnapshotInterval): The snapshot interval to
+                use for the backtest. This is used to determine how often
+                the portfolio snapshot should be taken during the backtest.
 
         Returns
-            List of BacktestReport instances
+            List[Backtest]: List of Backtest instances
         """
         logger.info("Initializing backtests")
         reports = []
@@ -959,6 +961,9 @@ class App:
                     initial_amount=initial_amount,
                     output_directory=output_directory,
                     algorithm=algorithm,
+                    save=save,
+                    snapshot_interval=snapshot_interval,
+                    risk_free_rate=risk_free_rate
                 )
                 reports.append(report)
 
