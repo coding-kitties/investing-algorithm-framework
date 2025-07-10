@@ -18,9 +18,9 @@ from .exceptions import OperationalException, ApiException, \
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, TradingTimeFrame, TradingDataType, \
     PortfolioConfiguration, Portfolio, Position, Order, TradeStatus, \
-    BacktestResult, PortfolioSnapshot, StrategyProfile, \
-    BacktestPosition, Trade, MarketCredential, PositionSnapshot, \
-    AppMode, BacktestDateRange, DataType, DataSource, \
+    PortfolioSnapshot, StrategyProfile, \
+    Trade, MarketCredential, PositionSnapshot, \
+    AppMode, DataType, DataSource, \
     PortfolioSnapshot, StrategyProfile, \
     Trade, MarketCredential, PositionSnapshot, AppMode, \
     MarketDataType, TradeRiskType, TradeTakeProfit, TradeStopLoss, \

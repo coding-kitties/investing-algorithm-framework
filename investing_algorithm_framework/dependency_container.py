@@ -13,7 +13,7 @@ from investing_algorithm_framework.services import OrderService, \
     PortfolioConfigurationService, MarketDataSourceService, BacktestService, \
     ConfigurationService, PortfolioSnapshotService, PositionSnapshotService, \
     MarketCredentialService, TradeService, PortfolioSyncService, \
-    OrderExecutorLookup, PortfolioProviderLookup
+    OrderExecutorLookup, PortfolioProviderLookup, DataProviderService
 
 
 def setup_dependency_container(app, modules=None, packages=None):
@@ -161,6 +161,11 @@ class DependencyContainer(containers.DeclarativeContainer):
         portfolio_configuration_service=portfolio_configuration_service,
         strategy_orchestrator_service=strategy_orchestrator_service,
         portfolio_snapshot_service=portfolio_snapshot_service,
+    )
+    data_provider_service = providers.ThreadSafeSingleton(
+        DataProviderService,
+        configuration_service=configuration_service,
+        market_credentials_service=market_credential_service
     )
     context = providers.Factory(
         Context,

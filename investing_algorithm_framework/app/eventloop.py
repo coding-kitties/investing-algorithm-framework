@@ -1,4 +1,5 @@
 from typing import List
+from time import sleep
 from datetime import  datetime, timedelta, timezone
 from investing_algorithm_framework.domain import TimeUnit, ENVIRONMENT, \
     Environment, BACKTESTING_INDEX_DATETIME
@@ -54,12 +55,12 @@ class EventLoopService:
         """
         self.tasks = []
         self._algorithm = None
-        self._strategies = []
+        self.strategies = []
         self._order_service = order_service
         self._portfolio_service = portfolio_service
         self._configuration_service = configuration_service
         self._data_provider_service = data_provider_service
-        self._data_configurations = []
+        self.data_sources = set()
         self.next_run_times = {}
 
     def _get_due_strategies(self):
@@ -89,7 +90,7 @@ class EventLoopService:
 
         return due
 
-    def initialize(self, algorithm):
+    def initialize(self):
         """
         Initializes the event loop service by calculating the schedule for
         running strategies and tasks based on their defined intervals and time
@@ -104,21 +105,18 @@ class EventLoopService:
         Returns:
             None
         """
-        
-        self._algorithm = algorithm
-        self._strategies = algorithm.strategies
         self.next_run_times = {
-            strategy.identifier: {
-                "next_run": datetime.now(timezone.utc)
-                "data_configurations": strategy.data_configurations
+            strategy.strategy_id: {
+                "next_run": datetime.now(timezone.utc),
+                "data_sources": strategy.data_sources
             }
-            for strategy in self._strategies
+            for strategy in self.strategies
         }
 
-        # Collect all data configurations
-        for strategy in self._strategies:
-            self._data_configurations.append(
-                strategy.data_configurations
+        # Collect all data sources
+        for strategy in self.strategies:
+            self.data_sources = self.data_sources.union(
+                set(strategy.data_sources)
             )
 
     def start(self, number_of_iterations=None):
@@ -129,7 +127,14 @@ class EventLoopService:
             number_of_iterations: Optional; the number of iterations to run.
                 If None, runs indefinitely.
         """
-        pass
+
+        # if number_of_iterations is None:
+        try:
+            self._run_iteration()
+            number_of_iterations_since_last_orders_check += 1
+            sleep(1)
+        except KeyboardInterrupt:
+            exit(0)
 
     def _run_iteration_backtest(self):
         """

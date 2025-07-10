@@ -23,16 +23,17 @@ class TradingStrategy:
         worker_id (optional): str - the id of the worker
         strategy_id (optional): str - the id of the strategy
         decorated (optional): function - the decorated function
-        market_data_sources (optional): list - the list of market data
-            sources to use for the strategy. This will be passed to the
-            run_strategy function.
+        data_sources (List[DataSource] optional):the list of data
+            sources to use for the strategy. The data sources will be used
+            to indetify data providers that will be called to gather data
+            and pass to the strategy before its run.
     """
     time_unit: str = None
     interval: int = None
     worker_id: str = None
     strategy_id: str = None
     decorated = None
-    market_data_sources = None
+    data_sources = None
     traces = None
     context: Context = None
 
@@ -41,7 +42,7 @@ class TradingStrategy:
         strategy_id=None,
         time_unit=None,
         interval=None,
-        market_data_sources=None,
+        data_sources=None,
         worker_id=None,
         decorated=None
     ):
@@ -55,8 +56,8 @@ class TradingStrategy:
         if time_unit is not None:
             self.time_unit = TimeUnit.from_value(time_unit)
 
-        if market_data_sources is not None:
-            self.market_data_sources = market_data_sources
+        if data_sources is not None:
+            self.data_sources = data_sources
 
         if decorated is not None:
             self.decorated = decorated
@@ -146,7 +147,7 @@ class TradingStrategy:
             strategy_id=self.worker_id,
             interval=self.interval,
             time_unit=self.time_unit,
-            market_data_sources=self.market_data_sources
+            data_sources=self.data_sources
         )
 
     def _update_trades_and_orders(self, market_data):
