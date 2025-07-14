@@ -89,27 +89,12 @@ from dotenv import load_dotenv
 from pyindicators import ema, rsi
 
 from investing_algorithm_framework import create_app, TimeUnit, Context, BacktestDateRange, \
-    CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, DEFAULT_LOGGING_CONFIG, \
-    TradingStrategy, SnapshotInterval, convert_polars_to_pandas, BacktestReport
+    DEFAULT_LOGGING_CONFIG, TradingStrategy, SnapshotInterval, convert_polars_to_pandas, BacktestReport, \
+    DataSource
 
 load_dotenv()
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
-
-# OHLCV data for candles
-bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
-    identifier="BTC-ohlcv",
-    market="BITVAVO",
-    symbol="BTC/EUR",
-    time_frame="2h",
-    window_size=200
-)
-# Ticker data for orders, trades and positions
-bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
-    identifier="BTC-ticker",
-    market="BITVAVO",
-    symbol="BTC/EUR",
-)
 
 app = create_app()
 # Registered bitvavo market, credentials are read from .env file by default
@@ -118,15 +103,15 @@ app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=100)
 class MyStrategy(TradingStrategy):
     interval = 2
     time_unit = TimeUnit.HOUR
-    data_sources = [bitvavo_btc_eur_ohlcv_2h, bitvavo_btc_eur_ticker]
+    data_sources = [
+        DataSource(data_type="OHLCV", market="bitvavo", symbol="BTC/EUR", window_size=200, time_frame="2h", identifier="BTC-ohlcv"),
+    ]
 
     def run_strategy(self, context: Context, market_data):
 
         if context.has_open_orders(target_symbol="BTC"):
             logger.info("There are open orders, skipping strategy iteration.")
             return
-
-        print(market_data)
 
         data = convert_polars_to_pandas(market_data["BTC-ohlcv"])
         data = ema(data, source_column="Close", period=20, result_column="ema_20")
