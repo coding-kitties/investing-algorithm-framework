@@ -31,10 +31,13 @@ The framework is designed to be extensible, allowing you to add custom strategie
 
 - [x] Python 3.10+: Cross-platform support for Windows, macOS, and Linux.
 - [x] Backtesting: Simulate strategies with detailed performance reports.
+- [x] Event-Driven Backtest Engine: Accurate and realistic backtesting with event-driven architecture.
+- [x] Backtest Reporting: Generate detailed reports to analyse and compare backtests.
 - [x] Live Trading: Execute trades in real-time with support for multiple exchanges via ccxt.
 - [x] Portfolio Management: Manage portfolios, trades, and positions with persistence via SQLite.
 - [x] Market Data Sources: Fetch OHLCV, ticker, and custom data with support for Polars and Pandas.
-- [x] Azure Functions Support: Deploy stateless trading bots to Azure.
+- [x] Azure Functions Support: Deploy trading bots to Azure.
+- [x] AWS Lambda Support: Deploy trading bots to AWS Lambda.
 - [x] Web API: Interact with your bot via REST API.
 - [x] PyIndicators Integration: Perform technical analysis directly on your dataframes.
 - [x] Extensibility: Add custom strategies, data providers, order executors so you can connect your trading bot to your favorite exchange or broker.
@@ -89,8 +92,7 @@ from dotenv import load_dotenv
 from pyindicators import ema, rsi
 
 from investing_algorithm_framework import create_app, TimeUnit, Context, BacktestDateRange, \
-    DEFAULT_LOGGING_CONFIG, TradingStrategy, SnapshotInterval, convert_polars_to_pandas, BacktestReport, \
-    DataSource
+    DEFAULT_LOGGING_CONFIG, TradingStrategy, SnapshotInterval, BacktestReport, DataSource
 
 load_dotenv()
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
@@ -104,7 +106,7 @@ class MyStrategy(TradingStrategy):
     interval = 2
     time_unit = TimeUnit.HOUR
     data_sources = [
-        DataSource(data_type="OHLCV", market="bitvavo", symbol="BTC/EUR", window_size=200, time_frame="2h", identifier="BTC-ohlcv"),
+        DataSource(data_type="OHLCV", market="bitvavo", symbol="BTC/EUR", window_size=200, time_frame="2h", identifier="BTC-ohlcv", pandas=True),
     ]
 
     def run_strategy(self, context: Context, market_data):
@@ -113,7 +115,7 @@ class MyStrategy(TradingStrategy):
             logger.info("There are open orders, skipping strategy iteration.")
             return
 
-        data = convert_polars_to_pandas(market_data["BTC-ohlcv"])
+        data = market_data["BTC-ohlcv"]
         data = ema(data, source_column="Close", period=20, result_column="ema_20")
         data = ema(data, source_column="Close", period=50, result_column="ema_50")
         data = ema(data, source_column="Close", period=100, result_column="ema_100")
