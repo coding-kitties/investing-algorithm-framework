@@ -21,7 +21,7 @@ from investing_algorithm_framework.infrastructure import \
     CCXTTickerMarketDataSource, CSVOHLCVMarketDataSource, \
     CSVTickerMarketDataSource, AzureBlobStorageStateHandler, \
     PandasOHLCVBacktestMarketDataSource, PandasOHLCVMarketDataSource, \
-    AWSS3StorageStateHandler
+    AWSS3StorageStateHandler, CSVOHLCVDataProvider, CCXTOHLCVDataProvider
 from .create_app import create_app
 from .download_data import download
 
@@ -92,5 +92,7 @@ __all__ = [
     "AWS_S3_STATE_BUCKET_NAME",
     "AWS_LAMBDA_LOGGING_CONFIG",
     'select_backtest_date_ranges',
-    'DataType'
+    'DataType',
+    'CSVOHLCVDataProvider',
+    "CCXTOHLCVDataProvider"
 ]

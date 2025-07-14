@@ -1,4 +1,5 @@
-from .ccxt import CCXTDataProvider, CCXTOHLCVDataProvider
+from .ccxt import CCXTOHLCVDataProvider
+from .csv import CSVOHLCVDataProvider
 
 
 def get_default_data_providers():
@@ -9,7 +10,7 @@ def get_default_data_providers():
         list: List of default data providers.
     """
     return [
-        CCXTDataProvider(),
+        CCXTOHLCVDataProvider(),
     ]
 
 
@@ -26,7 +27,7 @@ def get_default_ohlcv_data_providers():
 
 
 __all__ = [
-    'CCXTDataProvider',
+    'CSVOHLCVDataProvider',
     'CCXTOHLCVDataProvider',
     'get_default_data_providers',
     'get_default_ohlcv_data_providers'

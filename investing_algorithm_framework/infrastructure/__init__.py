@@ -14,8 +14,8 @@ from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLOrderMetadataRepository
 from .services import PerformanceService, CCXTMarketService, \
     AzureBlobStorageStateHandler, AWSS3StorageStateHandler
-from .data_providers import CCXTDataProvider, get_default_data_providers, \
-    get_default_ohlcv_data_providers
+from .data_providers import CSVOHLCVDataProvider, get_default_data_providers, \
+    get_default_ohlcv_data_providers, CCXTOHLCVDataProvider
 from .order_executors import CCXTOrderExecutor
 from .portfolio_providers import CCXTPortfolioProvider
 
@@ -51,12 +51,13 @@ __all__ = [
     "SQLTradeTakeProfitRepository",
     "SQLTradeStopLossRepository",
     "SQLOrderMetadataRepository",
-    "CCXTDataProvider",
+    "CSVOHLCVDataProvider",
     "CCXTOrderExecutor",
     "CCXTPortfolioProvider",
     "get_default_data_providers",
     "get_default_ohlcv_data_providers",
     "PandasOHLCVBacktestMarketDataSource",
     "PandasOHLCVMarketDataSource",
-    "AWSS3StorageStateHandler"
+    "AWSS3StorageStateHandler",
+    "CCXTOHLCVDataProvider"
 ]

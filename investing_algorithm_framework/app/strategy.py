@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from investing_algorithm_framework.domain import OperationalException, Position
 from investing_algorithm_framework.domain import \
     TimeUnit, StrategyProfile, Trade, ENVIRONMENT, Environment, \
-    BACKTESTING_INDEX_DATETIME
+    BACKTESTING_INDEX_DATETIME, DataSource
 from .context import Context
 
 
@@ -23,9 +23,9 @@ class TradingStrategy:
         worker_id (optional): str - the id of the worker
         strategy_id (optional): str - the id of the strategy
         decorated (optional): function - the decorated function
-        data_sources (List[DataSource] optional):the list of data
+        data_sources (List[DataSource] optional): the list of data
             sources to use for the strategy. The data sources will be used
-            to indetify data providers that will be called to gather data
+            to indentify data providers that will be called to gather data
             and pass to the strategy before its run.
     """
     time_unit: str = None
@@ -33,7 +33,7 @@ class TradingStrategy:
     worker_id: str = None
     strategy_id: str = None
     decorated = None
-    data_sources = None
+    data_sources: List[DataSource] = None
     traces = None
     context: Context = None
 
