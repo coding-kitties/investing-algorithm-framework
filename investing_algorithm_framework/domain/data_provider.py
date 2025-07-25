@@ -24,14 +24,10 @@ class DataProvider(ABC):
             data provider can provide data for. The framework will use this
             list when searching for a data provider for a specific symbol.
             Example: ["AAPL/USD", "GOOGL/USD", "MSFT/USD"]
-        markets (Optional[List[str]]): A list supported markets that the
-            data provider can provide data for. The framework will use this
-            list when searching for a data provider for a specific market.
-            Example: ["BINANCE", "COINBASE", "KRAKEN"]
         priority (int): The priority of the data provider. The lower the
             number, the higher the priority. The framework will use this
             priority when searching for a data provider for a specific symbol.
-            Example: 0 is the highest priority, 1 is the second highest
+            Example: 0 is the highest priority, 1 is the second-highest
             priority, etc. This is useful when multiple data providers
             support the same symbol or market. The framework will use the
             data provider with the highest priority.
@@ -54,11 +50,11 @@ class DataProvider(ABC):
         data_type: str = None,
         symbol: str = None,
         market: str = None,
-        markets: list = None,
         priority: int = 0,
         time_frame=None,
         window_size=None,
         storage_path=None,
+        config=None,
     ):
         """
         Initializes the DataProvider. The data provider should be defined
@@ -79,13 +75,11 @@ class DataProvider(ABC):
             market (str): The market to fetch data for.
                 This is optional and can be set later.
                 Example: "BINANCE", "COINBASE"
-            markets (list): A list of markets that the data provider supports.
-                This is optional and can be set later. Example: ["BINANCE", "COINBASE"]
             priority (int): The priority of the data provider. The lower the
                 number, the higher the priority. This is useful when multiple
                 data providers support the same symbol or market. The framework
                 will use the data provider with the highest priority.
-                Example: 0 is the highest priority, 1 is the second highest
+                Example: 0 is the highest priority, 1 is the second-highest
                 priority, etc.
             time_frame (str): The time frame for the data. This is optional and
                 can be set later. This is useful for data providers that support
@@ -111,8 +105,8 @@ class DataProvider(ABC):
 
         self.symbol = symbol
         self.market = market
-        self.markets = markets
         self.priority = priority
+        self._config = config
         self.window_size = window_size
         self.storage_path = storage_path
         self._market_credentials = None
@@ -189,18 +183,19 @@ class DataProvider(ABC):
     @abstractmethod
     def get_data(
         self,
-        data_source: DataSource,
+        date: datetime = None,
         start_date: datetime = None,
         end_date: datetime = None,
+        save: bool = False,
     ):
         """
         Fetches data for a given symbol and date range.
 
         Args:
-            data_source (DataSource): The data source specification that
-                matches a data provider.
             start_date (datetime): The start date for the data.
             end_date (datetime): The end date for the data.
+            date (datetime): The specific date for which to fetch data.
+            save (bool): Whether to save the data to the storage path.
 
         Returns:
             DataFrame: The data for the given symbol and market.
@@ -210,7 +205,6 @@ class DataProvider(ABC):
     @abstractmethod
     def prepare_backtest_data(
         self,
-        data_source: DataSource,
         backtest_start_date,
         backtest_end_date,
     ) -> None:
@@ -218,8 +212,6 @@ class DataProvider(ABC):
         Prepares backtest data for a given symbol and date range.
 
         Args:
-            data_source (DataSource): The data source specification that
-                matches a data provider.
             backtest_start_date (datetime): The start date for the
                 backtest data.
             backtest_end_date (datetime): The end date for the
@@ -233,7 +225,6 @@ class DataProvider(ABC):
     @abstractmethod
     def get_backtest_data(
         self,
-        data_source: DataSource,
         backtest_index_date: datetime,
         backtest_start_date: datetime = None,
         backtest_end_date: datetime = None,
@@ -242,8 +233,6 @@ class DataProvider(ABC):
         Fetches backtest data for a given datasource
 
         Args:
-            data_source (DataSource): The data source specification that
-                matches a data provider.
             backtest_index_date (datetime): The date for which to fetch
                 backtest data.
             backtest_start_date (datetime): The start date for the
@@ -253,5 +242,24 @@ class DataProvider(ABC):
 
         Returns:
             pl.DataFrame: The backtest data for the given datasource.
+        """
+        raise NotImplementedError("Subclasses should implement this method.")
+
+    @abstractmethod
+    def copy(self, data_source: DataSource) -> "DataProvider":
+        """
+        Returns a copy of the data provider instance based on a
+        given data source. The data source is previously matched
+        with the 'has_data' method. Then a new instance of the data
+        provider must be registered in the framework so that each
+        data source has its own instance of the data provider.
+
+        Args:
+            data_source (DataSource): The data source specification that
+                matches a data provider.
+
+        Returns:
+            DataProvider: A new instance of the data provider with the same
+                configuration.
         """
         raise NotImplementedError("Subclasses should implement this method.")

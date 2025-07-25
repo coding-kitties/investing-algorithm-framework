@@ -29,14 +29,12 @@ class TradeService(RepositoryService):
         trade_take_profit_repository,
         position_repository,
         portfolio_repository,
-        market_data_source_service,
         configuration_service,
         order_metadata_repository
     ):
         super(TradeService, self).__init__(trade_repository)
         self.order_repository = order_repository
         self.portfolio_repository = portfolio_repository
-        self.market_data_source_service = market_data_source_service
         self.position_repository = position_repository
         self.configuration_service = configuration_service
         self.trade_stop_loss_repository = trade_stop_loss_repository
@@ -864,7 +862,6 @@ class TradeService(RepositoryService):
         Returns:
             List of trade ids
         """
-        triggered_stop_losses = {}
         sell_orders_data = []
         query = {"status": TradeStatus.OPEN.value}
         open_trades = self.get_all(query)
@@ -964,9 +961,7 @@ class TradeService(RepositoryService):
 
         Returns:
             List of trade objects. A trade object is a dictionary
-
         """
-        triggered_take_profits = {}
         sell_orders_data = []
         query = {"status": TradeStatus.OPEN.value}
         open_trades = self.get_all(query)

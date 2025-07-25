@@ -62,35 +62,8 @@ class OrderService(RepositoryService, Observable):
         self.portfolio_snapshot_service = portfolio_snapshot_service
         self.market_credential_service = market_credential_service
         self.trade_service = trade_service
-        self._order_executors = None
         self._order_executor_lookup = order_executor_lookup
         self._portfolio_provider_lookup = portfolio_provider_lookup
-
-    @property
-    def order_executors(self) -> List[OrderExecutor]:
-        """
-        Returns the order executors for the order service.
-        """
-        return self._order_executors
-
-    @order_executors.setter
-    def order_executors(self, value) -> None:
-        """
-        Sets the order executors for the order service.
-        """
-        self._order_executors = value
-
-    def get_order_executor(self, market) -> OrderExecutor:
-        """
-        Returns the order executor for the given market.
-
-        Args:
-            market (str): The market for which to get the order executor.
-
-        Returns:
-            OrderExecutor: The order executor for the given market.
-        """
-        return self._order_executor_lookup.get_order_executor(market)
 
     def create(self, data, execute=True, validate=True, sync=True) -> Order:
         """
@@ -310,7 +283,8 @@ class OrderService(RepositoryService, Observable):
             f"and price {order.get_price()}"
         )
 
-        order_executor = self.get_order_executor(portfolio.market)
+        order_executor = self._order_executor_lookup\
+            .get_order_executor(portfolio.market)
         market_credential = self.market_credential_service.get(
             portfolio.market
         )
@@ -544,7 +518,8 @@ class OrderService(RepositoryService, Observable):
                 market_credential = self.market_credential_service.get(
                     portfolio.market
                 )
-                order_executor = self.get_order_executor(portfolio.market)
+                order_executor = self._order_executor_lookup\
+                    .get_order_executor(portfolio.market)
                 order = order_executor\
                     .cancel_order(portfolio, order, market_credential)
                 self.update(order.id, order.to_dict())

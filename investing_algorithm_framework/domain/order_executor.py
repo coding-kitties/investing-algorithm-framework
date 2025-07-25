@@ -13,10 +13,12 @@ class OrderExecutor(ABC):
             other order executors. The lower the number, the higher the
             priority. The framework will use this priority when searching
             for an order executor for a specific market.
+        _config (dict): Reference to the application configuration.
     """
 
     def __init__(self, priority=1):
         self._priority = priority
+        self._config = None
 
     @property
     def priority(self):
@@ -24,6 +26,23 @@ class OrderExecutor(ABC):
         Returns the priority of the order executor.
         """
         return self._priority
+
+    @property
+    def config(self):
+        """
+        Returns the configuration of the order executor.
+        This can be used to store any configuration that is needed
+        for the order executor.
+        """
+        return self._config
+
+    @config.setter
+    def config(self, config):
+        """
+        Setter for the app config. This will be used to set a reference
+        to the config of the Application when the app is started.
+        """
+        self._config = config
 
     @abstractmethod
     def execute_order(self, portfolio, order, market_credential) -> Order:

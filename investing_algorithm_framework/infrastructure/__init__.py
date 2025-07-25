@@ -16,7 +16,7 @@ from .services import PerformanceService, CCXTMarketService, \
     AzureBlobStorageStateHandler, AWSS3StorageStateHandler
 from .data_providers import CSVOHLCVDataProvider, get_default_data_providers, \
     get_default_ohlcv_data_providers, CCXTOHLCVDataProvider
-from .order_executors import CCXTOrderExecutor
+from .order_executors import CCXTOrderExecutor, BacktestOrderExecutor
 from .portfolio_providers import CCXTPortfolioProvider
 
 __all__ = [
@@ -59,5 +59,6 @@ __all__ = [
     "PandasOHLCVBacktestMarketDataSource",
     "PandasOHLCVMarketDataSource",
     "AWSS3StorageStateHandler",
-    "CCXTOHLCVDataProvider"
+    "CCXTOHLCVDataProvider",
+    "BacktestOrderExecutor"
 ]

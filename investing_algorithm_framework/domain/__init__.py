@@ -9,7 +9,8 @@ from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
     CURRENT_UTC_DATETIME, BACKTESTING_END_DATE, SYMBOLS, \
     CCXT_DATETIME_FORMAT_WITH_TIMEZONE, RESERVED_BALANCES, \
     APP_MODE, DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT, \
-    APPLICATION_DIRECTORY, SNAPSHOT_INTERVAL, AWS_S3_STATE_BUCKET_NAME
+    APPLICATION_DIRECTORY, SNAPSHOT_INTERVAL, AWS_S3_STATE_BUCKET_NAME, \
+    BACKTESTING_LAST_SNAPSHOT_DATETIME, DATA_DIRECTORY, INDEX_DATETIME
 from .data_provider import DataProvider
 from .data_structures import PeekableQueue
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
@@ -147,5 +148,8 @@ __all__ = [
     "Backtest",
     "BacktestMetrics",
     "BacktestResult",
-    "BacktestPosition"
+    "BacktestPosition",
+    "BACKTESTING_LAST_SNAPSHOT_DATETIME",
+    "DATA_DIRECTORY",
+    "INDEX_DATETIME",
 ]

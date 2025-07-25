@@ -2,7 +2,6 @@ import inspect
 import logging
 import os
 import threading
-from time import sleep
 from typing import List, Optional, Any, Dict
 
 from flask import Flask
@@ -20,13 +19,17 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, \
     BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, Backtest, \
     MarketDataSource, PortfolioConfiguration, SnapshotInterval, \
-    PortfolioProvider, OrderExecutor, ImproperlyConfigured
+    PortfolioProvider, OrderExecutor, ImproperlyConfigured, \
+    BACKTESTING_INDEX_DATETIME, DataProvider, INDEX_DATETIME, \
+    BACKTESTING_LAST_SNAPSHOT_DATETIME
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
-    create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider
+    create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
+    BacktestOrderExecutor, CCXTOHLCVDataProvider
 from investing_algorithm_framework.services import OrderBacktestService, \
-    BacktestMarketDataSourceService, BacktestPortfolioService, \
-    BacktestService
+    BacktestPortfolioService, BacktestTradeOrderEvaluator, \
+    DefaultTradeOrderEvaluator
 from .app_hook import AppHook
+from .eventloop import EventLoopService
 
 logger = logging.getLogger("investing_algorithm_framework")
 COLOR_RESET = '\033[0m'
@@ -54,9 +57,6 @@ class App:
             started or not.
         _tasks (List[Task]): List of task that need to be run by the
             application.
-        _algorithm (Algorithm): The algorithm instance. An algorithm is a
-            bundle of tasks and strategies. The algorithm is only
-            initialized when the application in started.
     """
 
     def __init__(self, state_handler=None, name=None):
@@ -65,18 +65,68 @@ class App:
         self._started = False
         self._tasks = []
         self._strategies = []
-        self._market_data_sources = []
+        self._data_providers = []
         self._on_initialize_hooks = []
         self._on_strategy_run_hooks = []
         self._on_after_initialize_hooks = []
+        self._trade_order_evaluator = None
         self._state_handler = state_handler
-        self._strategy_orchestrator_service = None
         self._run_history = None
         self._name = name
 
     @property
     def context(self):
         return self.container.context()
+
+    @property
+    def resource_directory_path(self):
+        """
+        Returns the resource directory path from the configuration.
+        This directory is used to store resources such as market data,
+        database files, and other resources required by the app.
+        """
+        config = self.config
+        resource_directory_path = config.get(RESOURCE_DIRECTORY, None)
+
+        # Check if the resource directory is set
+        if resource_directory_path is None:
+            logger.info(
+                "Resource directory not set, setting" +
+                " to current working directory"
+            )
+            resource_directory_path = os.path.join(os.getcwd(), "resources")
+            configuration_service = self.container.configuration_service()
+            configuration_service.add_value(
+                RESOURCE_DIRECTORY, resource_directory_path
+            )
+
+        return resource_directory_path
+
+    @property
+    def database_directory_path(self):
+        """
+        Returns the database directory path from the configuration.
+        This directory is used to store database files required by the app.
+        """
+        config = self.config
+        database_directory_path = config.get(DATABASE_DIRECTORY_PATH, None)
+
+        # Check if the database directory is set
+        if database_directory_path is None:
+            logger.info(
+                "Database directory not set, setting" +
+                " to current working directory"
+            )
+            resource_directory_path = self.resource_directory_path
+            database_directory_path = os.path.join(
+                resource_directory_path, "databases"
+            )
+            configuration_service = self.container.configuration_service()
+            configuration_service.add_value(
+                DATABASE_DIRECTORY_PATH, database_directory_path
+            )
+
+        return database_directory_path
 
     @property
     def name(self):
@@ -133,6 +183,20 @@ class App:
         self.add_data_sources(algorithm.data_sources)
         self.add_tasks(algorithm.tasks)
 
+    def add_trade_order_evaluator(self, trade_order_evaluator):
+        """
+        Function to add a trade order evaluator to the app. This is used
+        to evaluate trades and orders based on OHLCV data.
+
+        Args:
+            trade_order_evaluator: The trade order evaluator to add to the app.
+                This should be an instance of TradeOrderEvaluator.
+
+        Returns:
+            None
+        """
+        self._trade_order_evaluator = trade_order_evaluator
+
     def set_config(self, key: str, value: Any) -> None:
         """
         Function to add a key-value pair to the app's configuration.
@@ -147,108 +211,19 @@ class App:
         configuration_service = self.container.configuration_service()
         configuration_service.add_value(key, value)
 
-    def set_config_with_dict(self, dictionary) -> None:
+    def set_config_with_dict(self, config: dict) -> None:
         """
-        Function to add a dictionary to the app's configuration.
-        This method is useful for adding multiple configuration values
+        Function to set the configuration for the app with a dictionary.
+        This is useful for setting multiple configuration values at once.
 
         Args:
-            dictionary (Dict): A dictionary containing key-value pairs
-                to add to the configuration
+            config (dict): A dictionary containing the configuration
 
         Returns:
             None
         """
         configuration_service = self.container.configuration_service()
-        configuration_service.add_dict(dictionary)
-
-    def initialize_services(self) -> None:
-        """
-        Method to initialize the services for the app. This method should
-        be called before running the application. This method initializes
-        all services so that they are ready to be used.
-
-        Returns:
-            None
-        """
-        self._initialize_default_order_executors()
-        self._initialize_default_portfolio_providers()
-
-        # Initialize all market credentials
-        market_credential_service = self.container.market_credential_service()
-        market_credential_service.initialize()
-
-    def initialize_services_backtest(self) -> None:
-        """
-        Method to initialize the services for the app in backtest mode.
-        This method should be called before running the application.
-        This method initializes all services so that they are ready to
-        be used.
-
-        The method overrides the portfolio service, market data source
-        service and order service with the backtest equivalents.
-
-        App hooks are not added when running in backtest mode.
-
-        Returns:
-            None
-        """
-        configuration_service = self.container.configuration_service()
-        self._initialize_default_order_executors()
-        self._initialize_default_portfolio_providers()
-        portfolio_conf_service = self.container \
-            .portfolio_configuration_service()
-        portfolio_snap_service = self.container \
-            .portfolio_snapshot_service()
-        market_cred_service = self.container.market_credential_service()
-        portfolio_provider_lookup = \
-            self.container.portfolio_provider_lookup()
-        # Override the portfolio service with the backtest portfolio service
-        self.container.portfolio_service.override(
-            BacktestPortfolioService(
-                configuration_service=configuration_service,
-                market_credential_service=market_cred_service,
-                position_service=self.container.position_service(),
-                order_service=self.container.order_service(),
-                portfolio_repository=self.container.portfolio_repository(),
-                portfolio_configuration_service=portfolio_conf_service,
-                portfolio_snapshot_service=portfolio_snap_service,
-                portfolio_provider_lookup=portfolio_provider_lookup
-            )
-        )
-
-        # Override the market data source service with the backtest market
-        # data source service
-        self.container.market_data_source_service.override(
-            BacktestMarketDataSourceService(
-                market_service=self.container.market_service(),
-                market_credential_service=self.container
-                .market_credential_service(),
-                configuration_service=self.container
-                .configuration_service(),
-            )
-        )
-
-        portfolio_conf_service = self.container. \
-            portfolio_configuration_service()
-        portfolio_snap_service = self.container. \
-            portfolio_snapshot_service()
-        configuration_service = self.container.configuration_service()
-        market_data_source_service = self.container. \
-            market_data_source_service()
-        # Override the order service with the backtest order service
-        self.container.order_service.override(
-            OrderBacktestService(
-                trade_service=self.container.trade_service(),
-                order_repository=self.container.order_repository(),
-                position_service=self.container.position_service(),
-                portfolio_repository=self.container.portfolio_repository(),
-                portfolio_configuration_service=portfolio_conf_service,
-                portfolio_snapshot_service=portfolio_snap_service,
-                configuration_service=configuration_service,
-                market_data_source_service=market_data_source_service
-            )
-        )
+        configuration_service.initialize_from_dict(config)
 
     def initialize_config(self):
         """
@@ -278,30 +253,22 @@ class App:
             )
 
         # Set the database directory name
-        if Environment.BACKTEST.equals(config[ENVIRONMENT]):
+        configuration_service.add_value(
+            DATABASE_DIRECTORY_NAME, "databases"
+        )
+
+        if Environment.TEST.equals(config[ENVIRONMENT]):
             configuration_service.add_value(
-                DATABASE_DIRECTORY_NAME, "backtest_databases"
+                DATABASE_NAME, "test-database.sqlite3"
             )
+        elif Environment.PROD.equals(config[ENVIRONMENT]):
             configuration_service.add_value(
-                DATABASE_NAME, "backtest-database.sqlite3"
+                DATABASE_NAME, "prod-database.sqlite3"
             )
         else:
             configuration_service.add_value(
-                DATABASE_DIRECTORY_NAME, "databases"
+                DATABASE_NAME, "dev-database.sqlite3"
             )
-
-            if Environment.TEST.equals(config[ENVIRONMENT]):
-                configuration_service.add_value(
-                    DATABASE_NAME, "test-database.sqlite3"
-                )
-            elif Environment.PROD.equals(config[ENVIRONMENT]):
-                configuration_service.add_value(
-                    DATABASE_NAME, "prod-database.sqlite3"
-                )
-            else:
-                configuration_service.add_value(
-                    DATABASE_NAME, "dev-database.sqlite3"
-                )
 
         config = configuration_service.get_config()
         resource_dir = config[RESOURCE_DIRECTORY]
@@ -325,28 +292,213 @@ class App:
         if APP_MODE not in config:
             configuration_service.add_value(APP_MODE, AppMode.DEFAULT.value)
 
+    def initialize_backtest_config(
+        self,
+        backtest_date_range: BacktestDateRange,
+        initial_amount=None,
+        snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY
+    ):
+        """
+        Function to initialize the configuration for the app in backtest mode.
+        This method should be called before running the algorithm in backtest
+        mode. It sets the environment to BACKTEST and initializes the
+        configuration accordingly.
+
+        Args:
+            backtest_date_range (BacktestDateRange): The date range for the
+                backtest. This should be an instance of BacktestDateRange.
+            initial_amount (float): The initial amount to start the backtest
+                with. This will be the amount of trading currency that the
+                backtest portfolio will start with.
+            snapshot_interval (SnapshotInterval): The snapshot interval to
+                use for the backtest. This is used to determine how often the
+                portfolio snapshot should be taken during the backtest.
+
+        Returns:
+            None
+        """
+        logger.info("Initializing backtest configuration")
+        data = {
+            ENVIRONMENT: Environment.BACKTEST.value,
+            BACKTESTING_START_DATE: backtest_date_range.start_date,
+            BACKTESTING_END_DATE: backtest_date_range.end_date,
+            DATABASE_NAME: "backtest-database.sqlite3",
+            DATABASE_DIRECTORY_NAME: "backtest_databases",
+            BACKTESTING_INITIAL_AMOUNT: initial_amount,
+            SNAPSHOT_INTERVAL: SnapshotInterval.from_value(
+                snapshot_interval
+            ).value,
+            INDEX_DATETIME: backtest_date_range.start_date,
+            BACKTESTING_INDEX_DATETIME: backtest_date_range.start_date,
+            BACKTESTING_LAST_SNAPSHOT_DATETIME: None
+        }
+        configuration_service = self.container.configuration_service()
+        configuration_service.initialize_from_dict(data)
+
+    def initialize_storage(self, remove_database_if_exists: bool = False):
+        """
+        Function to initialize the storage for the app. The given
+        resource directory will be created if it does not exist.
+        The database directory will also be created if it does not
+        exist.
+        """
+        resource_directory_path = self.resource_directory_path
+
+        if not os.path.exists(resource_directory_path):
+            os.makedirs(resource_directory_path)
+            logger.info(
+                f"Resource directory created at {resource_directory_path}"
+            )
+
+        database_directory_path = self.database_directory_path
+
+        if not os.path.exists(database_directory_path):
+            os.makedirs(database_directory_path)
+            logger.info(
+                f"Database directory created at {database_directory_path}"
+            )
+
+        database_path = os.path.join(
+            database_directory_path, self.config[DATABASE_NAME]
+        )
+
+        if remove_database_if_exists:
+
+            if os.path.exists(database_path):
+                logger.info(
+                    f"Removing existing database at {database_path}"
+                )
+                os.remove(database_path)
+
+        # Create the sqlalchemy database uri
+        path = f"sqlite:///{database_path}"
+        self.set_config(SQLALCHEMY_DATABASE_URI, path)
+
+        # Setup sql if needed
+        setup_sqlalchemy(self)
+        create_all_tables()
+
     def initialize_data_sources(self, algorithm):
         """
         Function to initialize the data sources for the app. This method
         should be called before running the algorithm. This method
         initializes all data sources so that they are ready to be used.
 
+        Args:
+            algorithm (Algorithm): The algorithm to initialize the data
+                sources for. This should be an instance of Algorithm.
+
         Returns:
             None
         """
         logger.info("Initializing data sources")
-        market_data_source_service = self.container \
-            .market_data_source_service()
-        market_data_source_service.clear_market_data_sources()
+        data_provider_service = self.container.data_provider_service()
+        data_provider_service.reset()
 
-        # Add all market data sources of the strategies to the market
-        # data source service
-        market_data_source_service.market_data_sources = algorithm.data_sources
+        for data_provider in self._data_providers:
+            data_provider_service.add_data_provider(data_provider)
 
-        # Initialize the market data source service
-        market_data_source_service.initialize_market_data_sources()
+        # Add the default data providers
+        data_provider_service.add_data_provider(CCXTOHLCVDataProvider())
 
-    def initialize(self):
+        # Initialize all data sources
+        data_provider_service.index_data_providers(algorithm.data_sources)
+
+    def initialize_data_sources_backtest(
+        self,
+        algorithm,
+        backtest_date_range: BacktestDateRange
+    ):
+        """
+        Function to initialize the data sources for the app in backtest mode.
+        This method should be called before running the algorithm in backtest
+        mode. It initializes all data sources so that they are
+        ready to be used.
+
+        Args:
+            algorithm (Algorithm): The algorithm to initialize the data
+                sources for. This should be an instance of Algorithm.
+            backtest_date_range (BacktestDateRange): The date range for the
+                backtest. This should be an instance of BacktestDateRange.
+
+        Returns:
+            None
+        """
+        logger.info("Initializing data sources for backtest")
+        data_provider_service = self.container.data_provider_service()
+        data_provider_service.reset()
+
+        for data_provider in self._data_providers:
+            data_provider_service.add_data_provider(data_provider)
+
+        # Add the default data providers
+        data_provider_service.add_data_provider(CCXTOHLCVDataProvider())
+
+        # Initialize all data sources
+        data_provider_service.index_backtest_data_providers(
+            algorithm.data_sources, backtest_date_range
+        )
+
+        # Prepare the backtest data for each data provider
+        for data_source, data_provider in \
+                data_provider_service.data_provider_index.get_all():
+            data_provider.prepare_backtest_data(
+                backtest_date_range.start_date,
+                backtest_date_range.end_date
+            )
+
+    def initialize_backtest_services(self):
+        """
+        Function to initialize the backtest services for the app. This method
+        should be called before running the algorithm in backtest mode.
+        It initializes the backtest services so that they are ready to be used.
+
+        Returns:
+            None
+        """
+        configuration_service = self.container.configuration_service()
+        self.initialize_order_executors()
+        self.initialize_portfolio_providers()
+        portfolio_conf_service = self.container \
+            .portfolio_configuration_service()
+        portfolio_snap_service = self.container \
+            .portfolio_snapshot_service()
+        market_cred_service = self.container.market_credential_service()
+        portfolio_provider_lookup = \
+            self.container.portfolio_provider_lookup()
+        # Override the portfolio service with the backtest portfolio service
+        self.container.portfolio_service.override(
+            BacktestPortfolioService(
+                configuration_service=configuration_service,
+                market_credential_service=market_cred_service,
+                position_service=self.container.position_service(),
+                order_service=self.container.order_service(),
+                portfolio_repository=self.container.portfolio_repository(),
+                portfolio_configuration_service=portfolio_conf_service,
+                portfolio_snapshot_service=portfolio_snap_service,
+                portfolio_provider_lookup=portfolio_provider_lookup
+            )
+        )
+
+        portfolio_conf_service = self.container. \
+            portfolio_configuration_service()
+        portfolio_snap_service = self.container. \
+            portfolio_snapshot_service()
+        configuration_service = self.container.configuration_service()
+        # Override the order service with the backtest order service
+        self.container.order_service.override(
+            OrderBacktestService(
+                trade_service=self.container.trade_service(),
+                order_repository=self.container.order_repository(),
+                position_service=self.container.position_service(),
+                portfolio_repository=self.container.portfolio_repository(),
+                portfolio_configuration_service=portfolio_conf_service,
+                portfolio_snapshot_service=portfolio_snap_service,
+                configuration_service=configuration_service,
+            )
+        )
+
+    def initialize_services(self):
         """
         Method to initialize the app. This method should be called before
         running the algorithm. It initializes the services and the algorithm
@@ -358,42 +510,25 @@ class App:
             None
         """
         logger.info("Initializing app")
+        self.initialize_order_executors()
+        self.initialize_portfolio_providers()
 
-        # Ensure that all resource directories exist
-        self._create_resources_if_not_exists()
-
-        # Set up the database
-        setup_sqlalchemy(self)
-        create_all_tables()
-
-        # Check if environment is in backtest mode
-        config = self.container.configuration_service().get_config()
-
-        # Initialize services in backtest
-        if Environment.BACKTEST.equals(config[ENVIRONMENT]):
-            self.initialize_services_backtest()
-        else:
-            self.initialize_services()
-
+        # Initialize all market credentials
+        market_credential_service = self.container.market_credential_service()
+        market_credential_service.initialize()
         portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
-
-        # Re-init the market service because the portfolio configuration
-        # service is a singleton
-        portfolio_configuration_service.market_service \
-            = self.container.market_service()
 
         if portfolio_configuration_service.count() == 0:
             raise OperationalException("No portfolios configured")
 
         configuration_service = self.container.configuration_service()
+        config = configuration_service.get_config()
 
-        if config[APP_MODE] == AppMode.WEB.value:
+        if AppMode.WEB.equals(config[APP_MODE]):
             configuration_service.add_value(APP_MODE, AppMode.WEB.value)
             self._initialize_web()
 
-        if not Environment.BACKTEST.equals(config[ENVIRONMENT]):
-            self._initialize_portfolios()
 
     def run(self, payload: dict = None, number_of_iterations: int = None):
         """
@@ -427,7 +562,6 @@ class App:
         Returns:
             None
         """
-        strategy_orchestrator_service = None
 
         try:
             configuration_service = self.container.configuration_service()
@@ -465,14 +599,9 @@ class App:
                 name=self._name,
                 strategies=self._strategies,
                 tasks=self._tasks,
-                data_sources=self._market_data_sources,
                 on_strategy_run_hooks=self._on_strategy_run_hooks,
             )
             self.initialize_data_sources(algorithm)
-
-            strategy_orchestrator_service = \
-                self.container.strategy_orchestrator_service()
-            strategy_orchestrator_service.initialize(algorithm)
 
             # Run in payload mode if payload is provided
             if payload is not None:
@@ -482,7 +611,6 @@ class App:
                 response = action_handler.handle(
                     payload=payload,
                     context=context,
-                    strategy_orchestrator_service=strategy_orchestrator_service
                 )
                 return response
 
@@ -496,31 +624,30 @@ class App:
                 flask_thread.daemon = True
                 flask_thread.start()
 
-            number_of_iterations_since_last_orders_check = 1
-            strategy_orchestrator_service.start(
-                context=self.context, number_of_iterations=number_of_iterations
+            event_loop_service = EventLoopService(
+                configuration_service=self.container.configuration_service(),
+                portfolio_snapshot_service=self.container
+                .portfolio_snapshot_service(),
+                context=self.context,
+                order_service=self.container.order_service(),
+                portfolio_service=self.container.portfolio_service(),
+                data_provider_service=self.container.data_provider_service(),
+                trade_service=self.container.trade_service(),
+                trade_order_evaluator=self._trade_order_evaluator
             )
 
             try:
-                while strategy_orchestrator_service.running:
-                    if number_of_iterations_since_last_orders_check == 30:
-                        logger.info("Checking pending orders")
-                        number_of_iterations_since_last_orders_check = 1
-
-                    strategy_orchestrator_service.run_pending_jobs()
-                    number_of_iterations_since_last_orders_check += 1
-                    sleep(1)
+                event_loop_service.start(
+                    number_of_iterations=number_of_iterations
+                )
             except KeyboardInterrupt:
                 exit(0)
         except Exception as e:
             logger.error(e)
             raise e
         finally:
-            self._run_history = strategy_orchestrator_service.history
 
             try:
-                strategy_orchestrator_service.stop()
-
                 # Upload state if state handler is provided
                 if self._state_handler is not None:
                     logger.info("Detected state handler, saving state")
@@ -626,51 +753,6 @@ class App:
         configuration_service = self.container.configuration_service()
         self._flask_app = create_flask_app(configuration_service)
 
-    def _create_resources_if_not_exists(self):
-        """
-        Function to create the resources required by the app if they
-        do not exist. This function will check if the resource directory
-        exists and check if the database directory exists. If they do
-        not exist, it will create them. Also it will make sure that
-        the resource directory is read and write accessible by the
-        application.
-
-        Returns:
-            None
-        """
-        configuration_service = self.container.configuration_service()
-        config = configuration_service.get_config()
-        resource_dir = config[RESOURCE_DIRECTORY]
-        database_dir = config[DATABASE_DIRECTORY_PATH]
-
-        if resource_dir is None:
-            raise OperationalException(
-                "Resource directory is not specified in the config, please "
-                "specify the resource directory in the config with the key "
-                "RESOURCE_DIRECTORY"
-            )
-
-        if not os.path.isdir(resource_dir):
-            try:
-                os.makedirs(resource_dir)
-
-                # Make sure the resource directory is readable and writable
-                os.chmod(resource_dir, 0o755)
-            except OSError as e:
-                logger.error(e)
-                raise OperationalException(
-                    "Could not create resource directory"
-                )
-
-        if not os.path.isdir(database_dir):
-            try:
-                os.makedirs(database_dir)
-            except OSError as e:
-                logger.error(e)
-                raise OperationalException(
-                    "Could not create database directory"
-                )
-
     def get_portfolio_configurations(self):
         portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
@@ -719,7 +801,7 @@ class App:
         strategy=None,
         strategies: List = None,
         save=True,
-        snapshot_interval: SnapshotInterval = SnapshotInterval.TRADE_CLOSE,
+        snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         strategy_directory_path: Optional[str] = None,
         backtest_directory_name: Optional[str] = None,
         risk_free_rate: Optional[float] = None,
@@ -759,39 +841,32 @@ class App:
                 provided, the framework will generate a name based on the
                 algorithm name and the backtest date range and the current
                 date and time.
+            risk_free_rate (Optional[float]): The risk-free rate to use for
+                the backtest. This is used to calculate the Sharpe ratio
+                and other performance metrics. If not provided, the default
+                risk-free rate will be tried to be fetched from the
+                US Treasury website.
+            save (bool): Whether to save the backtest report to the output
+                directory. If True, then the backtest report will be saved
+                to the output directory.
+            metadata (Optional[Dict[str, str]]): Metadata to attach to the
+                backtest report. This can be used to store additional
+                information about the backtest, such as the author, version,
+                parameters or any other relevant information.
 
         Returns:
             Backtest: Instance of Backtest
         """
-
-        # Add backtest configuration to the config
-        self.set_config_with_dict({
-            ENVIRONMENT: Environment.BACKTEST.value,
-            BACKTESTING_START_DATE: backtest_date_range.start_date,
-            BACKTESTING_END_DATE: backtest_date_range.end_date,
-            DATABASE_NAME: "backtest-database.sqlite3",
-            DATABASE_DIRECTORY_NAME: "backtest_databases",
-            BACKTESTING_INITIAL_AMOUNT: initial_amount,
-            SNAPSHOT_INTERVAL: SnapshotInterval.from_value(
-                snapshot_interval
-            ).value,
-        })
-
-        self.initialize_config()
-        configuration_service = self.container.configuration_service()
-        config = configuration_service.get_config()
-        path = os.path.join(
-            config[DATABASE_DIRECTORY_PATH], config[DATABASE_NAME]
+        self.initialize_backtest_config(
+            backtest_date_range=backtest_date_range,
+            snapshot_interval=snapshot_interval,
+            initial_amount=initial_amount
         )
+        self.initialize_storage(remove_database_if_exists=True)
+        self.initialize_backtest_services()
+        self.initialize_backtest_portfolios()
 
-        # Remove the previous backtest db if it exists
-        if os.path.exists(path):
-            os.remove(path)
-
-        self.initialize()
-
-        algorithm_factory = self.container.algorithm_factory()
-        algorithm = algorithm_factory.create_algorithm(
+        algorithm = self.container.algorithm_factory().create_algorithm(
             name=name if name else self._name,
             strategies=(
                 self._strategies if strategies is None else strategies
@@ -799,55 +874,97 @@ class App:
             algorithm=algorithm,
             strategy=strategy,
             tasks=self._tasks,
-            data_sources=self._market_data_sources,
             on_strategy_run_hooks=self._on_strategy_run_hooks,
         )
-        self.initialize_data_sources(algorithm)
-        strategy_orchestrator_service = \
-            self.container.strategy_orchestrator_service()
-        strategy_orchestrator_service.initialize(algorithm)
+        self.initialize_data_sources_backtest(algorithm, backtest_date_range)
         backtest_service = self.container.backtest_service()
 
-        # Setup snapshot service as observer
-        backtest_service.clear_observers()
-        portfolio_snapshot_service = \
-            self.container.portfolio_snapshot_service()
-        backtest_service.add_observer(portfolio_snapshot_service)
-        context = self.container.context()
-        order_service = self.container.order_service()
-        order_service.clear_observers()
-        order_service.add_observer(portfolio_snapshot_service)
-        portfolio_service = self.container.portfolio_service()
-        portfolio_service.clear_observers()
-        portfolio_service.add_observer(portfolio_snapshot_service)
-        backtest = backtest_service.run_backtest(
+        # Create backtest schedule
+        schedule = backtest_service.generate_schedule(
+            algorithm.strategies,
+            algorithm.tasks,
+            backtest_date_range.start_date,
+            backtest_date_range.end_date
+        )
+
+        # Initialize event loop
+        event_loop_service = EventLoopService(
+            configuration_service=self.container.configuration_service(),
+            portfolio_snapshot_service=self.container
+            .portfolio_snapshot_service(),
+            context=self.context,
+            order_service=self.container.order_service(),
+            portfolio_service=self.container.portfolio_service(),
+            data_provider_service=self.container.data_provider_service(),
+            trade_service=self.container.trade_service(),
+            trade_order_evaluator=self._trade_order_evaluator
+        )
+        trade_order_evaluator = BacktestTradeOrderEvaluator(
+            trade_service=self.container.trade_service(),
+            order_service=self.container.order_service()
+        )
+        event_loop_service.initialize(
             algorithm=algorithm,
-            context=context,
-            strategy_orchestrator_service=strategy_orchestrator_service,
-            initial_amount=initial_amount,
+            trade_order_evaluator=trade_order_evaluator
+        )
+        event_loop_service.start(schedule=schedule, show_progress=True)
+
+        # Convert the current run to a backtest and save it if needed
+        backtest = backtest_service.create_backtest(
+            algorithm=algorithm,
+            number_of_runs=event_loop_service.total_number_of_runs,
             backtest_date_range=backtest_date_range,
             risk_free_rate=risk_free_rate,
-            strategy_directory_path=strategy_directory_path
         )
         backtest.metadata = metadata if metadata is not None else {}
-
-        if output_directory is None:
-            output_directory = os.path.join(
-                config[RESOURCE_DIRECTORY], "backtest_reports"
-            )
-
-        if backtest_directory_name is None:
-            backtest_directory_name = BacktestService\
-                .create_report_directory_name(backtest)
-
-        output_directory = os.path.join(
-            output_directory, backtest_directory_name
-        )
-
-        if save:
-            backtest.save(directory_path=output_directory)
-
+        # backtest_service.save_backtest(backtest)
         return backtest
+
+            # strategy_orchestrator_service = \
+        #     self.container.strategy_orchestrator_service()
+        # strategy_orchestrator_service.initialize(algorithm)
+        # backtest_service = self.container.backtest_service()
+        #
+        # # Setup snapshot service as observer
+        # backtest_service.clear_observers()
+        # portfolio_snapshot_service = \
+        #     self.container.portfolio_snapshot_service()
+        # backtest_service.add_observer(portfolio_snapshot_service)
+        # context = self.container.context()
+        # order_service = self.container.order_service()
+        # order_service.clear_observers()
+        # order_service.add_observer(portfolio_snapshot_service)
+        # portfolio_service = self.container.portfolio_service()
+        # portfolio_service.clear_observers()
+        # portfolio_service.add_observer(portfolio_snapshot_service)
+        # backtest = backtest_service.run_backtest(
+        #     algorithm=algorithm,
+        #     context=context,
+        #     strategy_orchestrator_service=strategy_orchestrator_service,
+        #     initial_amount=initial_amount,
+        #     backtest_date_range=backtest_date_range,
+        #     risk_free_rate=risk_free_rate,
+        #     strategy_directory_path=strategy_directory_path
+        # )
+        # backtest.metadata = metadata if metadata is not None else {}
+        #
+        # if output_directory is None:
+        #     output_directory = os.path.join(
+        #         config[RESOURCE_DIRECTORY], "backtest_reports"
+        #     )
+        #
+        # if backtest_directory_name is None:
+        #     backtest_directory_name = BacktestService\
+        #         .create_report_directory_name(backtest)
+        #
+        # output_directory = os.path.join(
+        #     output_directory, backtest_directory_name
+        # )
+        #
+        # if save:
+        #     backtest.save(directory_path=output_directory)
+        #
+        # return backtest
 
     def run_backtests(
         self,
@@ -855,7 +972,7 @@ class App:
         strategies: List[TradingStrategy] = None,
         initial_amount=None,
         backtest_date_ranges: List[BacktestDateRange] = None,
-        snapshot_interval: SnapshotInterval = SnapshotInterval.TRADE_CLOSE,
+        snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         risk_free_rate: Optional[float] = None,
         save=True,
         output_directory=None,
@@ -969,46 +1086,39 @@ class App:
 
         return reports
 
-    def add_data_source(self, data_source) -> None:
+    def add_data_provider(self, data_provider) -> None:
         """
-        Function to add a data source to the app. The data source should
-        be an instance of DataSource.
+        Function to add a data provider to the app. The data provider should
+        be an instance of DataProvider or a DataProviderClass.
 
         Args:
-            data_source: Instance of DataSource
+            data_provider: Instance or class of DataProvider
 
         Returns:
             None
         """
-        if inspect.isclass(data_source):
-            if not issubclass(data_source, MarketDataSource):
+        if inspect.isclass(data_provider):
+            if not issubclass(data_provider, DataProvider):
                 raise OperationalException(
-                    "Data source should be an instance of MarketDataSource"
+                    "Data provider should be an instance of DataProvider"
                 )
 
-            data_source = data_source()
+            data_provider = data_provider()
 
-        # Check if data source is already registered
-        # for market_data_source in self._market_data_sources:
-        #     if market_data_source.get_identifier() == \
-        #             data_source.get_identifier():
-        #         return
+        self._data_providers.append(data_provider)
 
-        self._market_data_sources.append(data_source)
-
-    def add_data_sources(self, data_sources) -> None:
+    def add_data_providers(self, data_providers: List) -> None:
         """
-        Function to add a list of data sources to the app. The data sources
-        should be instances of DataSource.
+        Function to add a list of data providers to the app.
 
         Args:
-            data_sources: List of DataSource
+            data_providers: List of DataProvider instances or classes
 
         Returns:
             None
         """
-        for data_source in data_sources:
-            self.add_data_source(data_source)
+        for data_provider in data_providers:
+            self.add_data_provider(data_provider)
 
     def add_market_data_source(self, market_data_source):
         """
@@ -1365,7 +1475,36 @@ class App:
         portfolio_provider_lookup = self.container.portfolio_provider_lookup()
         return portfolio_provider_lookup.get_all()
 
-    def _initialize_portfolios(self):
+    def initialize_order_executors(self):
+        """
+        Function to initialize the order executors. This function will
+        first check if the app is running in backtest mode or not. If it is
+        running in backtest mode, all order executors will be removed and
+        a single BacktestOrderExecutor will be added to the order executors.
+
+        If it is not running in backtest mode, it will add the default
+        CCXTOrderExecutor with a priority 3.
+        """
+        logger.info("Adding order executors")
+        order_executor_lookup = self.container.order_executor_lookup()
+        environment = self.config[ENVIRONMENT]
+
+        if Environment.BACKTEST.equals(environment):
+            # If the app is running in backtest mode, remove all order executors
+            # and add a single BacktestOrderExecutor
+            order_executor_lookup.reset()
+            order_executor_lookup.add_order_executor(
+                BacktestOrderExecutor(priority=1)
+            )
+        else:
+            order_executor_lookup.add_order_executor(
+                CCXTOrderExecutor(priority=3)
+            )
+
+        for order_executor in order_executor_lookup.get_all():
+            order_executor.config = self.config
+
+    def initialize_portfolios(self):
         """
         Function to initialize the portfolios. This function will
         first check if the app is running in backtest mode or not. If it is
@@ -1385,148 +1524,164 @@ class App:
         if portfolio_configuration_service.count() == 0:
             raise OperationalException("No portfolios configured")
 
-        if Environment.BACKTEST.equals(config[ENVIRONMENT]):
-            logger.info("Setting up backtest portfolios")
-            initial_backtest_amount = config.get(
-                BACKTESTING_INITIAL_AMOUNT, None
-            )
+        # Check if there are already existing portfolios
+        portfolios = portfolio_service.get_all()
+        portfolio_configurations = portfolio_configuration_service\
+            .get_all()
 
-            for portfolio_configuration \
-                    in portfolio_configuration_service.get_all():
+        if len(portfolios) > 0:
 
-                if not portfolio_service.exists(
-                    {"identifier": portfolio_configuration.identifier}
-                ):
-                    portfolio = (
-                        portfolio_service.create_portfolio_from_configuration(
-                            portfolio_configuration,
-                            initial_amount=initial_backtest_amount,
-                        )
+            # Check if there are matching portfolio configurations
+            for portfolio in portfolios:
+                logger.info(
+                    f"Checking if there is an matching portfolio "
+                    "configuration "
+                    f"for portfolio {portfolio.identifier}"
+                )
+                portfolio_configuration = \
+                    portfolio_configuration_service.get(
+                        portfolio.market
                     )
-        else:
-            # Check if there are already existing portfolios
-            portfolios = portfolio_service.get_all()
-            portfolio_configurations = portfolio_configuration_service\
-                .get_all()
 
-            if len(portfolios) > 0:
-
-                # Check if there are matching portfolio configurations
-                for portfolio in portfolios:
-                    logger.info(
-                        f"Checking if there is an matching portfolio "
-                        "configuration "
-                        f"for portfolio {portfolio.identifier}"
+                if portfolio_configuration is None:
+                    raise ImproperlyConfigured(
+                        f"No matching portfolio configuration found for "
+                        f"existing portfolio {portfolio.market}, "
+                        f"please make sure that you have configured your "
+                        f"app with the right portfolio configurations "
+                        f"for the existing portfolios."
+                        f"If you want to create a new portfolio, please "
+                        f"remove the existing database (WARNING!!: this "
+                        f"will remove all existing history of your "
+                        f"trading bot.)"
                     )
-                    portfolio_configuration = \
-                        portfolio_configuration_service.get(
-                            portfolio.market
-                        )
 
-                    if portfolio_configuration is None:
+                # Check if the portfolio configuration is still inline
+                # with the initial balance
+
+                if portfolio_configuration.initial_balance != \
+                        portfolio.initial_balance:
+                    logger.warning(
+                        "The initial balance of the portfolio "
+                        "configuration is different from the existing "
+                        "portfolio. Checking if the existing portfolio "
+                        "can be updated..."
+                    )
+
+                    portfolio_provider_lookup = \
+                        self.container.portfolio_provider_lookup()
+                    # Register a portfolio provider for the portfolio
+                    portfolio_provider_lookup \
+                        .register_portfolio_provider_for_market(
+                            portfolio_configuration.market
+                        )
+                    initial_balance = portfolio_configuration\
+                        .initial_balance
+
+                    if initial_balance != portfolio.initial_balance:
                         raise ImproperlyConfigured(
-                            f"No matching portfolio configuration found for "
-                            f"existing portfolio {portfolio.market}, "
-                            f"please make sure that you have configured your "
-                            f"app with the right portfolio configurations "
-                            f"for the existing portfolios."
-                            f"If you want to create a new portfolio, please "
-                            f"remove the existing database (WARNING!!: this "
-                            f"will remove all existing history of your "
-                            f"trading bot.)"
-                        )
-
-                    # Check if the portfolio configuration is still inline
-                    # with the initial balance
-
-                    if portfolio_configuration.initial_balance != \
-                            portfolio.initial_balance:
-                        logger.warning(
                             "The initial balance of the portfolio "
-                            "configuration is different from the existing "
-                            "portfolio. Checking if the existing portfolio "
-                            "can be updated..."
+                            "configuration is different then that of "
+                            "the existing portfolio. Please make sure "
+                            "that the initial balance of the portfolio "
+                            "configuration is the same as that of the "
+                            "existing portfolio. "
+                            f"Existing portfolio initial balance: "
+                            f"{portfolio.initial_balance}, "
+                            f"Portfolio configuration initial balance: "
+                            f"{portfolio_configuration.initial_balance}"
+                            "If this is intentional, please remove "
+                            "the database and re-run the app. "
+                            "WARNING!!: this will remove all existing "
+                            "history of your trading bot."
                         )
 
-                        portfolio_provider_lookup = \
-                            self.container.portfolio_provider_lookup()
-                        # Register a portfolio provider for the portfolio
-                        portfolio_provider_lookup \
-                            .register_portfolio_provider_for_market(
-                                portfolio_configuration.market
-                            )
-                        initial_balance = portfolio_configuration\
-                            .initial_balance
+        portfolio_provider_lookup = \
+            self.container.portfolio_provider_lookup()
+        order_executor_lookup = self.container.order_executor_lookup()
+        market_credential_service = \
+            self.container.market_credential_service()
+        # Register portfolio providers and order executors
+        for portfolio_configuration in portfolio_configurations:
 
-                        if initial_balance != portfolio.initial_balance:
-                            raise ImproperlyConfigured(
-                                "The initial balance of the portfolio "
-                                "configuration is different then that of "
-                                "the existing portfolio. Please make sure "
-                                "that the initial balance of the portfolio "
-                                "configuration is the same as that of the "
-                                "existing portfolio. "
-                                f"Existing portfolio initial balance: "
-                                f"{portfolio.initial_balance}, "
-                                f"Portfolio configuration initial balance: "
-                                f"{portfolio_configuration.initial_balance}"
-                                "If this is intentional, please remove "
-                                "the database and re-run the app. "
-                                "WARNING!!: this will remove all existing "
-                                "history of your trading bot."
-                            )
-
-            portfolio_provider_lookup = \
-                self.container.portfolio_provider_lookup()
-            order_executor_lookup = self.container.order_executor_lookup()
-            market_credential_service = \
-                self.container.market_credential_service()
-            # Register portfolio providers and order executors
-            for portfolio_configuration in portfolio_configurations:
-
-                # Register a portfolio provider for the portfolio
-                portfolio_provider_lookup\
-                    .register_portfolio_provider_for_market(
-                        portfolio_configuration.market
-                    )
-
-                # Register an order executor for the portfolio
-                order_executor_lookup.register_order_executor_for_market(
+            # Register a portfolio provider for the portfolio
+            portfolio_provider_lookup\
+                .register_portfolio_provider_for_market(
                     portfolio_configuration.market
                 )
 
-                market_credential = \
-                    market_credential_service.get(
-                        portfolio_configuration.market
-                    )
+            # Register an order executor for the portfolio
+            order_executor_lookup.register_order_executor_for_market(
+                portfolio_configuration.market
+            )
 
-                if market_credential is None:
-                    raise ImproperlyConfigured(
-                        f"No market credential found for existing "
-                        f"portfolio {portfolio_configuration.market} "
-                        "with market "
-                        "Cannot initialize portfolio configuration."
-                    )
+            market_credential = \
+                market_credential_service.get(
+                    portfolio_configuration.market
+                )
 
-                if not portfolio_service.exists(
-                    {"identifier": portfolio_configuration.identifier}
-                ):
-                    portfolio_service.create_portfolio_from_configuration(
-                        portfolio_configuration
-                    )
+            if market_credential is None:
+                raise ImproperlyConfigured(
+                    f"No market credential found for existing "
+                    f"portfolio {portfolio_configuration.market} "
+                    "with market "
+                    "Cannot initialize portfolio configuration."
+                )
 
-            logger.info("Portfolio configurations complete")
-            logger.info("Syncing portfolios")
+            if not portfolio_service.exists(
+                {"identifier": portfolio_configuration.identifier}
+            ):
+                portfolio_service.create_portfolio_from_configuration(
+                    portfolio_configuration
+                )
 
-            portfolio_service = self.container.portfolio_service()
-            portfolio_sync_service = self.container.portfolio_sync_service()
+        logger.info("Portfolio configurations complete")
+        logger.info("Syncing portfolios")
+        portfolio_service = self.container.portfolio_service()
+        portfolio_sync_service = self.container.portfolio_sync_service()
 
-            for portfolio in portfolio_service.get_all():
-                logger.info(f"Syncing portfolio {portfolio.identifier}")
-                portfolio_sync_service.sync_unallocated(portfolio)
-                portfolio_sync_service.sync_orders(portfolio)
+        for portfolio in portfolio_service.get_all():
+            logger.info(f"Syncing portfolio {portfolio.identifier}")
+            portfolio_sync_service.sync_unallocated(portfolio)
+            portfolio_sync_service.sync_orders(portfolio)
 
-    def _initialize_default_portfolio_providers(self):
+    def initialize_backtest_portfolios(self):
+        """
+        Function to initialize the backtest portfolios. This function will
+        create a default portfolio provider for each market that is configured
+        in the app. The default portfolio provider will be used to create
+        portfolios for the app.
+
+        Returns:
+            None
+        """
+        logger.info("Initializing backtest portfolios")
+        config = self.config
+        portfolio_configuration_service = self.container \
+            .portfolio_configuration_service()
+        portfolio_service = self.container.portfolio_service()
+
+        # Throw an error if no portfolios are configured
+        if portfolio_configuration_service.count() == 0:
+            raise OperationalException("No portfolios configured")
+
+        logger.info("Setting up backtest portfolios")
+        initial_backtest_amount = config.get(
+            BACKTESTING_INITIAL_AMOUNT, None
+        )
+
+        for portfolio_configuration \
+                in portfolio_configuration_service.get_all():
+
+            if not portfolio_service.exists(
+                {"identifier": portfolio_configuration.identifier}
+            ):
+                portfolio_service.create_portfolio_from_configuration(
+                    portfolio_configuration,
+                    initial_amount=initial_backtest_amount,
+                )
+
+    def initialize_portfolio_providers(self):
         """
         Function to initialize the default portfolio providers.
         This function will create a default portfolio provider for
@@ -1536,27 +1691,21 @@ class App:
         Returns:
             None
         """
-        logger.info("Adding default portfolio providers")
+        logger.info("Adding portfolio providers")
         portfolio_provider_lookup = self.container.portfolio_provider_lookup()
-        portfolio_provider_lookup.add_portfolio_provider(
-            CCXTPortfolioProvider(priority=2)
-        )
+        environment = self.config[ENVIRONMENT]
 
-    def _initialize_default_order_executors(self):
-        """
-        Function to initialize the default order executors.
-        This function will create a default order executor for
-        each market that is configured in the app. The default order
-        executor will be used to create orders for the app.
+        if Environment.BACKTEST.equals(environment):
+            # If the app is running in backtest mode, remove all order executors
+            # and add a single BacktestOrderExecutor
+            portfolio_provider_lookup.reset()
+        else:
+            portfolio_provider_lookup.add_portfolio_provider(
+                CCXTPortfolioProvider(priority=3)
+            )
 
-        Returns:
-            None
-        """
-        logger.info("Adding default order executors")
-        order_executor_lookup = self.container.order_executor_lookup()
-        order_executor_lookup.add_order_executor(
-            CCXTOrderExecutor(priority=2)
-        )
+        for portfolio_provider in portfolio_provider_lookup.get_all():
+            portfolio_provider.config = self.config
 
     def get_run_history(self):
         """

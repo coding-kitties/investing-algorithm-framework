@@ -6,7 +6,7 @@ from typing import List
 from investing_algorithm_framework.app.app_hook import AppHook
 from investing_algorithm_framework.app.strategy import TradingStrategy
 from investing_algorithm_framework.domain import OperationalException, \
-    MarketDataSource
+    DataSource
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -32,7 +32,7 @@ class Algorithm:
         strategy=None,
         strategies=None,
         tasks: List = None,
-        data_sources: List[MarketDataSource] = None,
+        data_sources: List[DataSource] = None,
         on_strategy_run_hooks=None
     ):
         self._name = name
@@ -210,9 +210,6 @@ class Algorithm:
                 "with the same id in the algorithm"
             )
 
-        if strategy.market_data_sources is not None:
-            self.add_data_sources(strategy.market_data_sources)
-
         self._strategies.append(strategy)
 
     def add_task(self, task):
@@ -220,41 +217,6 @@ class Algorithm:
             task = task()
 
         self._tasks.append(task)
-
-    def add_data_source(self, data_source) -> None:
-        """
-        Function to add a data source to the app. The data source should
-        be an instance of DataSource.
-
-        Args:
-            data_source: Instance of DataSource
-
-        Returns:
-            None
-        """
-        if inspect.isclass(data_source):
-            if not issubclass(data_source, MarketDataSource):
-                raise OperationalException(
-                    "Data source should be an instance of MarketDataSource"
-                )
-
-            data_source = data_source()
-
-        self.data_sources.append(data_source)
-
-    def add_data_sources(self, data_sources) -> None:
-        """
-        Function to add a list of data sources to the app. The data sources
-        should be instances of DataSource.
-
-        Args:
-            data_sources: List of DataSource
-
-        Returns:
-            None
-        """
-        for data_source in data_sources:
-            self.add_data_source(data_source)
 
     def add_on_strategy_run_hook(self, app_hook):
         """

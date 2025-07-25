@@ -2,13 +2,12 @@ import logging
 from typing import List
 
 from investing_algorithm_framework.services import ConfigurationService, \
-    MarketCredentialService, MarketDataSourceService, \
-    OrderService, PortfolioConfigurationService, PortfolioService, \
-    PositionService, TradeService
+    MarketCredentialService, OrderService, PortfolioConfigurationService, \
+    PortfolioService, PositionService, TradeService, DataProviderService
 from investing_algorithm_framework.domain import OrderStatus, OrderType, \
     OrderSide, OperationalException, Portfolio, RoundingService, \
     BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, TradeRiskType, Order, \
-    Position, Trade, TradeStatus, MarketService, MarketCredential
+    Position, Trade, TradeStatus, DataSource, MarketCredential, INDEX_DATETIME
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -28,9 +27,8 @@ class Context:
         position_service: PositionService,
         order_service: OrderService,
         market_credential_service: MarketCredentialService,
-        market_data_source_service: MarketDataSourceService,
-        market_service: MarketService,
         trade_service: TradeService,
+        data_provider_service: DataProviderService
     ):
         self.configuration_service: ConfigurationService = \
             configuration_service
@@ -41,9 +39,7 @@ class Context:
         self.order_service: OrderService = order_service
         self.market_credential_service: MarketCredentialService = \
             market_credential_service
-        self.market_data_source_service: MarketDataSourceService = \
-            market_data_source_service
-        self.market_service: MarketService = market_service
+        self.data_provider_service: DataProviderService = data_provider_service
         self.trade_service: TradeService = trade_service
 
     @property
@@ -761,41 +757,6 @@ class Context:
         query_params["symbol"] = symbol
         return self.position_service.exists(query_params)
 
-    def get_position_percentage_of_portfolio(
-        self, symbol, market=None, identifier=None
-    ) -> float:
-        """
-        Returns the percentage of the current total value of the portfolio
-        that is allocated to a position. This is calculated by dividing
-        the current value of the position by the total current value
-        of the portfolio.
-        """
-
-        query_params = {}
-
-        if market is not None:
-            query_params["market"] = market
-
-        if identifier is not None:
-            query_params["identifier"] = identifier
-
-        portfolios = self.portfolio_service.get_all(query_params)
-
-        if not portfolios:
-            raise OperationalException("No portfolio found.")
-
-        portfolio = portfolios[0]
-        position = self.position_service.find(
-            {"portfolio": portfolio.id, "symbol": symbol}
-        )
-        full_symbol = f"{position.symbol.upper()}/" \
-                      f"{portfolio.trading_symbol.upper()}"
-        ticker = self.market_data_source_service.get_ticker(
-            symbol=full_symbol, market=market
-        )
-        total = self.get_unallocated() + self.get_allocated()
-        return (position.amount * ticker["bid"] / total) * 100
-
     def get_position_percentage_of_portfolio_by_net_size(
         self, symbol, market=None, identifier=None
     ) -> float:
@@ -896,8 +857,10 @@ class Context:
         symbol = f"{target_symbol.upper()}/{portfolio.trading_symbol.upper()}"
 
         if price is None:
-            ticker = self.market_data_source_service.get_ticker(
-                symbol=symbol, market=portfolio.market
+            ticker = self.data_provider_service.get_ticker_data(
+                symbol=symbol,
+                market=portfolio.market,
+                date=self.config[INDEX_DATETIME]
             )
             price = ticker["bid"]
 
@@ -962,8 +925,8 @@ class Context:
 
                 symbol = f"{position.symbol.upper()}/" \
                          f"{portfolio.trading_symbol.upper()}"
-                ticker = self.market_data_source_service.get_ticker(
-                    symbol=symbol, market=market,
+                ticker = self.data_provider_service.get_data(
+                    DataSource(symbol=symbol, market=portfolio.market)
                 )
                 allocated = allocated + \
                     (position.get_amount() * ticker["bid"])
@@ -1462,7 +1425,6 @@ class Context:
         Returns:
             None
         """
-
         trade = self.trade_service.get(trade.id)
 
         if TradeStatus.CLOSED.equals(trade.status):
@@ -1490,8 +1452,10 @@ class Context:
             )
             amount = position.get_amount()
 
-        ticker = self.market_data_source_service.get_ticker(
-            symbol=trade.symbol, market=portfolio.market
+        ticker = self.data_provider_service.get_ticker_data(
+            symbol=trade.symbol,
+            market=portfolio.market,
+            date=self.config[INDEX_DATETIME]
         )
         logger.info(f"Closing trade {trade.id} {trade.symbol}")
         self.order_service.create(

@@ -31,9 +31,11 @@ class Task:
         else:
             self.worker_id = self.__class__.__name__
 
-    def run(self, algorithm):
+    def run(self, context):
 
         if self.decorated:
-            self.decorated(algorithm=algorithm)
+            self.decorated(context=context)
         else:
-            raise NotImplementedError("Apply strategy is not implemented")
+            raise NotImplementedError(
+                "run method must be implemented in the subclass"
+            )

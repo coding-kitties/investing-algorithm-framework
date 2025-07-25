@@ -12,7 +12,7 @@ from investing_algorithm_framework.domain import ApiException, \
     TickerMarketDataSource, MarketService, \
     RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT, \
     BacktestDateRange, convert_polars_to_pandas, \
-    DEFAULT_LOGGING_CONFIG, DataType, \
+    DEFAULT_LOGGING_CONFIG, DataType, DataProvider,\
     BacktestResult, TradeStatus, MarketDataType, TradeRiskType, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME
@@ -94,5 +94,6 @@ __all__ = [
     'select_backtest_date_ranges',
     'DataType',
     'CSVOHLCVDataProvider',
-    "CCXTOHLCVDataProvider"
+    "CCXTOHLCVDataProvider",
+    "DataProvider",
 ]

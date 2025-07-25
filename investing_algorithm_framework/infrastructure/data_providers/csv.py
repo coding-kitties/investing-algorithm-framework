@@ -85,44 +85,70 @@ class CSVOHLCVDataProvider(DataProvider):
             bool: True if the data provider has data for the given data source,
                 False otherwise.
         """
-        return DataType.OHLCV.equals(data_source.data_type) and \
+
+        if start_date is None and end_date is None:
+            return False
+
+        if DataType.OHLCV.equals(data_source.data_type) and \
             data_source.symbol == self.symbol and \
             data_source.time_frame.equals(self.time_frame) and \
-            data_source.market == self.market
+            data_source.market == self.market:
+
+            if end_date > self._end_date_data_source:
+                return False
+
+            if data_source.window_size is not None:
+                required_start_date = end_date - timedelta(
+                    minutes=TimeFrame.from_value(data_source.time_frame)
+                            .amount_of_minutes * data_source.window_size
+                )
+
+                if required_start_date < self._start_date_data_source:
+                    return False
+            else:
+                required_start_date = start_date
+                if required_start_date < self._start_date_data_source:
+                    return False
+
+            return True
+
+        return False
 
     def get_data(
         self,
-        data_source: DataSource,
+        date: datetime = None,
         start_date: datetime = None,
         end_date: datetime = None,
+        save: bool = False,
     ):
         """
         Fetches OHLCV data for a given symbol and date range.
         If no date range is provided, it returns the entire dataset.
 
         Args:
-            data_source (DataSource): The data source specification that
-                matches a data provider.
+            date (datetime, optional): A specific date to fetch data for.
+                Defaults to None.
             start_date (datetime, optional): The start date for the data.
                 Defaults to None.
             end_date (datetime, optional): The end date for the data.
                 Defaults to None.
+            save (bool, optional): Whether to save the data to a file.
 
         Returns:
             polars.DataFrame: A DataFrame containing the OHLCV data for the
                 specified symbol and date range.
         """
-        windows_size = data_source.window_size
+        windows_size = self.window_size
 
         if start_date is None and end_date is None:
-            end_date = datetime.now(tz=timezone)
-            time_frame = TimeFrame.from_value(data_source.time_frame)
+            end_date = datetime.now(tz=timezone.utc)
+            time_frame = TimeFrame.from_value(self.time_frame)
             start_date = end_date - timedelta(
                 minutes=time_frame.amount_of_minutes() * windows_size
             )
         elif start_date is None and end_date is not None:
             start_date = end_date - timedelta(
-                minutes=TimeFrame.from_value(data_source.time_frame)
+                minutes=TimeFrame.from_value(self.time_frame)
                         .amount_of_minutes * windows_size
             )
             df = self.data
@@ -133,7 +159,7 @@ class CSVOHLCVDataProvider(DataProvider):
 
         if start_date is not None:
             end_date = start_date + timedelta(
-                minutes=TimeFrame.from_value(data_source.time_frame)
+                minutes=TimeFrame.from_value(self.time_frame)
                 .amount_of_minutes * windows_size
             )
 
@@ -151,7 +177,7 @@ class CSVOHLCVDataProvider(DataProvider):
 
         if end_date is not None:
             start_data = end_date - timedelta(
-                minutes=TimeFrame.from_value(data_source.time_frame)
+                minutes=TimeFrame.from_value(self.time_frame)
                         .amount_of_minutes * windows_size
             )
 
@@ -171,7 +197,6 @@ class CSVOHLCVDataProvider(DataProvider):
 
     def prepare_backtest_data(
         self,
-        data_source: DataSource,
         backtest_start_date,
         backtest_end_date
     ) -> None:
@@ -211,20 +236,20 @@ class CSVOHLCVDataProvider(DataProvider):
         # data available to create a sliding window.
         required_start_date = backtest_start_date - \
             timedelta(
-                minutes=TimeFrame.from_value(data_source.time_frame)
-                .amount_of_minutes * data_source.window_size
+                minutes=TimeFrame.from_value(self.time_frame)
+                .amount_of_minutes * self.window_size
             )
 
         if required_start_date < self._start_date_data_source:
             raise OperationalException(
-                f"Not enough data available for data source {data_source} "
+                f"Not enough data available for backtest. "
                 f"Data earlier then {required_start_date} is required, but only "
                 f"{self._start_date_data_source} is available."
             )
 
         # Create cache with sliding windows
         self._precompute_sliding_windows(
-            window_size=data_source.window_size,
+            window_size=self.window_size,
             start_date=backtest_start_date,
             end_date=backtest_end_date
         )
@@ -336,3 +361,23 @@ class CSVOHLCVDataProvider(DataProvider):
                     minutes=self.time_frame.amount_of_minutes * window_size
                 ))
             )
+
+    def copy(self, data_source: DataSource) -> "DataProvider":
+        """
+        Create a copy of the data provider with the given data source.
+
+        Args:
+            data_source (DataSource): The data source to copy.
+
+        Returns:
+            DataProvider: A new instance of the data provider with the
+                specified data source.
+        """
+        return CSVOHLCVDataProvider(
+            file_path=data_source.storage_path,
+            symbol=data_source.symbol,
+            time_frame=data_source.time_frame,
+            market=data_source.market,
+            window_size=data_source.window_size,
+            data_provider_identifier=self.data_provider_identifier
+        )

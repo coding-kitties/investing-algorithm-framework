@@ -87,11 +87,6 @@ class PandasOHLCVBacktestMarketDataSource(
         self.backtest_data_start_date = backtest_data_start_date \
             .replace(microsecond=0)
         self.backtest_data_end_date = backtest_end_date.replace(microsecond=0)
-        #
-        # if not isinstance(self.dataframe, pl,=):
-        #     raise OperationalException(
-        #         "Provided dataframe is not a pandas dataframe"
-        #     )
 
         if not set(self.column_names).issubset(self.dataframe.columns):
             raise OperationalException(
@@ -99,16 +94,6 @@ class PandasOHLCVBacktestMarketDataSource(
                 "Your pandas dataframe should have the following columns: "
                 "Open, High, Low, Close, Volume"
             )
-
-        # # Make sure that the index is a datetime index
-        # if not isinstance(self.dataframe.index, DatetimeIndex):
-        #     raise OperationalException(
-        #         "Provided dataframe does not have a datetime index. "
-        #         "Your pandas dataframe should have a datetime index."
-        #     )
-
-        print(type(self.dataframe))
-        print(f"Columns are {self.dataframe.columns}")
 
         # Get first and last row are within the backtest date range
         first_timestamp = self.dataframe["Datetime"][0]

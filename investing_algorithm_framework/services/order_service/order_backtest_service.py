@@ -4,8 +4,6 @@ import polars as pl
 
 from investing_algorithm_framework.domain import BACKTESTING_INDEX_DATETIME, \
     OrderStatus, OrderSide, Order, MarketDataType
-from investing_algorithm_framework.services.market_data_source_service \
-    import BacktestMarketDataSourceService
 from .order_service import OrderService
 
 logger = logging.getLogger("investing_algorithm_framework")
@@ -22,7 +20,6 @@ class OrderBacktestService(OrderService):
         portfolio_configuration_service,
         portfolio_snapshot_service,
         configuration_service,
-        market_data_source_service: BacktestMarketDataSourceService,
     ):
         super().__init__(
             configuration_service=configuration_service,
@@ -34,7 +31,6 @@ class OrderBacktestService(OrderService):
             trade_service=trade_service,
         )
         self.configuration_service = configuration_service
-        self.market_data_source_service = market_data_source_service
 
     def create(self, data, execute=True, validate=True, sync=True) -> Order:
         """
@@ -51,7 +47,6 @@ class OrderBacktestService(OrderService):
             Order: Created order object
         """
         config = self.configuration_service.get_config()
-
         # Make sure the created_at is set to the current backtest time
         data["created_at"] = config[BACKTESTING_INDEX_DATETIME]
         data["updated_at"] = config[BACKTESTING_INDEX_DATETIME]

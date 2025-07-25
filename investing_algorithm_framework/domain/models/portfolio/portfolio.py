@@ -40,16 +40,17 @@ class Portfolio(BaseModel):
         trading_symbol,
         net_size,
         unallocated,
+        initial_balance,
         market,
         realized=0,
         total_revenue=0,
         total_cost=0,
         total_net_gain=0,
+
         total_trade_volume=0,
         created_at=None,
         updated_at=None,
         initialized=False,
-        initial_balance=None
     ):
         self.identifier = identifier
         self.updated_at = None

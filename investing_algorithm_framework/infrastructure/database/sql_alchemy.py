@@ -79,3 +79,13 @@ def attach_utc_timezone_on_load(target, context):
         dt = getattr(target, "updated_at")
         if dt and dt.tzinfo is None:
             target.updated_at = dt.replace(tzinfo=timezone.utc)
+
+    if hasattr(target, "closed_at"):
+        dt = getattr(target, "closed_at")
+        if dt and dt.tzinfo is None:
+            target.closed_at = dt.replace(tzinfo=timezone.utc)
+
+    if hasattr(target, "opened_at"):
+        dt = getattr(target, "opened_at")
+        if dt and dt.tzinfo is None:
+            target.opened_at = dt.replace(tzinfo=timezone.utc)

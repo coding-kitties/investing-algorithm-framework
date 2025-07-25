@@ -1,6 +1,6 @@
 import os
 from investing_algorithm_framework.domain import Environment, \
-    RESOURCE_DIRECTORY
+    RESOURCE_DIRECTORY, DATA_DIRECTORY, INDEX_DATETIME
 
 DEFAULT_CONFIGURATION = {
     "ENVIRONMENT": Environment.PROD.value,
@@ -16,7 +16,9 @@ DEFAULT_CONFIGURATION = {
     "SYMBOLS": None,
     "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
     "DATABASE_DIRECTORY_PATH": None,
-    "DATABASE_DIRECTORY_NAME": "databases"
+    "DATABASE_DIRECTORY_NAME": "databases",
+    DATA_DIRECTORY: "data",
+    "INDEX_DATETIME": None,
 }
 
 DEFAULT_FLASK_CONFIGURATION = {

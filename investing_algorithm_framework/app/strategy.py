@@ -49,12 +49,18 @@ class TradingStrategy:
 
         if time_unit is not None:
             self.time_unit = TimeUnit.from_value(time_unit)
+        else:
+            # Check if time_unit is None
+            if self.time_unit is None:
+                raise OperationalException(
+                    f"Time unit attribute not set for "
+                    f"strategy instance {self.strategy_id}"
+                )
+
+            self.time_unit = TimeUnit.from_value(self.time_unit)
 
         if interval is not None:
             self.interval = interval
-
-        if time_unit is not None:
-            self.time_unit = TimeUnit.from_value(time_unit)
 
         if data_sources is not None:
             self.data_sources = data_sources
@@ -74,13 +80,6 @@ class TradingStrategy:
         else:
             self.strategy_id = self.worker_id
 
-        # Check if time_unit is None
-        if self.time_unit is None:
-            raise OperationalException(
-                f"Time unit attribute not set for "
-                f"strategy instance {self.strategy_id}"
-            )
-
         # Check if interval is None
         if self.interval is None:
             raise OperationalException(
@@ -90,6 +89,36 @@ class TradingStrategy:
         # context initialization
         self._context = None
         self._last_run = None
+
+    def is_buy_signal_vectorized(self, data: pd.DataFrame) -> bool:
+        """
+        Check if the data contains a buy signal.
+        This method should be implemented by the user.
+
+        Args:
+            data (pd.DataFrame): The data to check for a buy signal.
+
+        Returns:
+            bool: True if there is a buy signal, False otherwise.
+        """
+        raise NotImplementedError(
+            "is_buy_signal_vectorized method not implemented"
+        )
+
+    def is_sell_signal_vectorized(self, data: pd.DataFrame) -> bool:
+        """
+        Check if the data contains a sell signal.
+        This method should be implemented by the user.
+
+        Args:
+            data (pd.DataFrame): The data to check for a sell signal.
+
+        Returns:
+            bool: True if there is a sell signal, False otherwise.
+        """
+        raise NotImplementedError(
+            "is_sell_signal_vectorized method not implemented"
+        )
 
     def run_strategy(self, context: Context, market_data: Dict[str, Any]):
         """
@@ -119,21 +148,21 @@ class TradingStrategy:
         self.context = context
         config = self.context.get_config()
 
-        if config[ENVIRONMENT] == Environment.BACKTEST.value:
-            self._update_trades_and_orders_for_backtest(market_data)
-        else:
-            self._update_trades_and_orders(market_data)
+        # if config[ENVIRONMENT] == Environment.BACKTEST.value:
+        #     self._update_trades_and_orders_for_backtest(market_data)
+        # else:
+        #     self._update_trades_and_orders(market_data)
 
-        self._check_stop_losses()
-        self._check_take_profits()
+        # self._check_stop_losses()
+        # self._check_take_profits()
 
         # Run user defined strategy
         self.apply_strategy(context=context, market_data=market_data)
 
-        if config[ENVIRONMENT] == Environment.BACKTEST.value:
-            self._last_run = config[BACKTESTING_INDEX_DATETIME]
-        else:
-            self._last_run = datetime.now(tz=timezone.utc)
+        # if config[ENVIRONMENT] == Environment.BACKTEST.value:
+        #     self._last_run = config[BACKTESTING_INDEX_DATETIME]
+        # else:
+        #     self._last_run = datetime.now(tz=timezone.utc)
 
     def apply_strategy(self, context, market_data):
         if self.decorated:

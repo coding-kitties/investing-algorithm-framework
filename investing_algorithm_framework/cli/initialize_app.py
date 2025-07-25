@@ -121,7 +121,6 @@ def command(path=None, app_type="default", replace=False):
     else:
         # check if directory exists
         if not os.path.exists(path) or not os.path.isdir(path):
-            print(f"Directory {path} does not exist.")
             return
 
     if AppType.DEFAULT.equals(app_type):

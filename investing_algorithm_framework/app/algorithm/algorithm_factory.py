@@ -56,7 +56,6 @@ class AlgorithmFactory:
         strategies=None,
         tasks=None,
         on_strategy_run_hooks=None,
-        data_sources=None
     ) -> Algorithm:
         """
         Create an instance of the specified algorithm type.
@@ -69,7 +68,6 @@ class AlgorithmFactory:
             tasks (list): List of Task instances.
             on_strategy_run_hooks (list): List of hooks to be called
                 when a strategy is run.
-            data_sources (list): List of MarketDataSource instances.
 
         Returns:
             Algorithm: Instance of Algorithm.
@@ -78,17 +76,21 @@ class AlgorithmFactory:
         strategies = strategies or []
         tasks = tasks or []
         on_strategy_run_hooks = on_strategy_run_hooks or []
-        data_sources = data_sources or []
+        data_sources = []
 
-        if algorithm is not None:
+        if algorithm is not None and isinstance(algorithm, Algorithm):
+            if name is None:
+                name = algorithm.name
 
-            for task in tasks:
-                algorithm.add_task(task)
+            strategies.extend(algorithm.strategies)
+            tasks.extend(algorithm.tasks)
+            on_strategy_run_hooks.extend(algorithm.on_strategy_run_hooks)
+            if hasattr(algorithm, 'data_sources'):
+                data_sources.extend(algorithm.data_sources)
 
-            for app_hook in on_strategy_run_hooks:
-                algorithm.add_on_strategy_run_hook(app_hook)
-
-            return algorithm
+        for strategy in strategies:
+            if hasattr(strategy, 'data_sources'):
+                data_sources.extend(strategy.data_sources)
 
         algorithm = Algorithm(
             name=name,

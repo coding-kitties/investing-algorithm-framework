@@ -31,7 +31,7 @@ class OrderStatus(Enum):
         elif isinstance(value, str):
             return OrderStatus.from_string(value)
 
-        raise ValueError("Could not convert value to OrderStatus")
+        raise ValueError(f"Could not convert value: {value} to OrderStatus")
 
     def equals(self, other):
         return OrderStatus.from_value(other) == self

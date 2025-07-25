@@ -1,17 +1,16 @@
 import logging
 import os
 import sys
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-
-import polars as pl
-from tqdm import tqdm
+from typing import Dict, List
 
 from investing_algorithm_framework.domain import BacktestResult, \
-    BACKTESTING_INDEX_DATETIME, TimeUnit, TradingDataType, \
-    OperationalException, MarketDataSource, Observable, Event, \
-    BacktestDateRange, DATETIME_FORMAT_BACKTESTING, Backtest
-from investing_algorithm_framework.services.market_data_source_service import \
-    MarketDataSourceService
+    TimeUnit, TradingDataType, \
+    OperationalException, Observable, BacktestDateRange, \
+    DATETIME_FORMAT_BACKTESTING, Backtest
+from investing_algorithm_framework.services.data_providers import \
+    DataProviderService
 from investing_algorithm_framework.services.metrics import \
     create_backtest_metrics
 
@@ -35,7 +34,7 @@ class BacktestService(Observable):
 
     def __init__(
         self,
-        market_data_source_service: MarketDataSourceService,
+        data_provider_service: DataProviderService,
         order_service,
         portfolio_service,
         portfolio_snapshot_service,
@@ -44,7 +43,6 @@ class BacktestService(Observable):
         performance_service,
         configuration_service,
         portfolio_configuration_service,
-        strategy_orchestrator_service
     ):
         super().__init__()
         self._order_service = order_service
@@ -57,211 +55,64 @@ class BacktestService(Observable):
         self._performance_service = performance_service
         self._portfolio_snapshot_service = portfolio_snapshot_service
         self._position_repository = position_repository
-        self._market_data_source_service: MarketDataSourceService \
-            = market_data_source_service
         self._configuration_service = configuration_service
         self._portfolio_configuration_service = portfolio_configuration_service
-        self._strategy_orchestrator_service = strategy_orchestrator_service
-
-    def run_backtest(
-        self,
-        algorithm,
-        context,
-        strategy_orchestrator_service,
-        backtest_date_range: BacktestDateRange,
-        risk_free_rate,
-        initial_amount=None,
-        strategy_directory_path=None
-    ) -> Backtest:
-        """
-        Run a backtest for the given algorithm. This function will run
-        a backtest for the given algorithm and return a backtest report.
-
-        A schedule is generated for the given algorithm and the strategies
-        are run for each date in the schedule.
-
-        Also, all backtest data is downloaded (if not already downloaded) and
-        the backtest is run for each date in the schedule.
-
-        Args:
-            algorithm: The algorithm to run the backtest for
-            backtest_date_range: The backtest date range
-            initial_amount: The initial amount of the backtest portfolio
-            strategy_orchestrator_service: The strategy orchestrator service
-            context (Context): The context of the object of the application
-            risk_free_rate (float): The risk-free rate to use in the metrics
-                calculations
-            strategy_directory_path (optional, str): The path to the
-                strategy directory. If not provided, the strategies will be
-                loaded from the algorithm object.
-
-        Returns:
-            Backtest: The backtest
-        """
-        logging.info(
-            f"Running backtest for algorithm with name {algorithm.name}"
-        )
-
-        # Create backtest portfolio
-        portfolio_configurations = \
-            self._portfolio_configuration_service.get_all()
-
-        for portfolio_configuration in portfolio_configurations:
-
-            if self._portfolio_service.exists(
-                {"identifier": portfolio_configuration.identifier}
-            ):
-                # Delete existing portfolio
-                portfolio = self._portfolio_service.find(
-                    {"identifier": portfolio_configuration.identifier}
-                )
-                self._portfolio_service.delete(portfolio.id)
-
-            # Check if the portfolio configuration has an initial balance
-            self._portfolio_service.create_portfolio_from_configuration(
-                portfolio_configuration,
-                initial_amount=initial_amount,
-                created_at=backtest_date_range.start_date,
-            )
-
-        strategy_profiles = []
-        portfolios = self._portfolio_service.get_all()
-        initial_unallocated = 0
-
-        for portfolio in portfolios:
-            initial_unallocated += portfolio.unallocated
-
-        for strategy in algorithm.strategies:
-            strategy_profiles.append(strategy.strategy_profile)
-
-        schedule = self.generate_schedule(
-            strategies=algorithm.strategies,
-            start_date=backtest_date_range.start_date,
-            end_date=backtest_date_range.end_date
-        )
-
-        logger.info(f"Prepared backtests for {len(schedule)} strategies")
-
-        for row in tqdm(
-            schedule.to_dicts(),
-            total=len(schedule),
-            desc=f"Running backtest for algorithm with name {algorithm.name}",
-            colour="GREEN"
-        ):
-            strategy_profile = self.get_strategy_from_strategy_profiles(
-                strategy_profiles, row['id']
-            )
-            index_date = row["run_time"]
-            self._configuration_service.add_value(
-                BACKTESTING_INDEX_DATETIME, index_date
-            )
-            config = self._configuration_service.get_config()
-            strategy = algorithm.get_strategy(strategy_profile.strategy_id)
-            strategy_orchestrator_service.run_backtest_strategy(
-                context=context, strategy=strategy, config=config
-            )
-            self.notify_observers(Event.STRATEGY_RUN, {
-                "created_at": index_date,
-            })
-
-        report = self.create_backtest(
-            algorithm,
-            number_of_runs=len(schedule),
-            backtest_date_range=backtest_date_range,
-            initial_unallocated=initial_unallocated,
-            risk_free_rate=risk_free_rate,
-            strategy_directory_path=strategy_directory_path
-        )
-
-        # Cleanup backtest portfolio
-        portfolio_configurations = \
-            self._portfolio_configuration_service.get_all()
-
-        for portfolio_configuration in portfolio_configurations:
-            portfolio = self._portfolio_service.find(
-                {"identifier": portfolio_configuration.identifier}
-            )
-            self._portfolio_service.delete(portfolio.id)
-
-        return report
-
-    def run_backtest_for_profile(
-        self, context, algorithm, strategy, index_date
-    ):
-        self._configuration_service.add_value(
-            BACKTESTING_INDEX_DATETIME, index_date
-        )
-        algorithm.config[BACKTESTING_INDEX_DATETIME] = index_date
-        market_data = {}
-
-        if strategy.strategy_profile.market_data_sources is not None:
-
-            for data_id in strategy.strategy_profile.market_data_sources:
-
-                if isinstance(data_id, MarketDataSource):
-                    market_data[data_id.get_identifier()] = \
-                        self._market_data_source_service.get_data(
-                            data_id.get_identifier()
-                        )
-                else:
-                    market_data[data_id] = \
-                        self._market_data_source_service.get_data(data_id)
-
-        strategy.run_strategy(context=context, market_data=market_data)
-
-    def run_backtest_v2(self, strategy, context):
-        config = self._configuration_service.get_config()
-        self._strategy_orchestrator_service.run_backtest_strategy(
-            context=context, strategy=strategy, config=config
-        )
+        self._data_provider_service = data_provider_service
 
     def generate_schedule(
-        self, strategies, start_date, end_date
-    ) -> pl.DataFrame:
+        self,
+        strategies,
+        tasks,
+        start_date,
+        end_date
+    ) -> Dict[datetime, Dict[str, List[str]]]:
         """
-        Generate a schedule using Polars.
+        Generates a dict-based schedule: datetime => {strategy_ids, task_ids}
 
         Args:
-            strategies: The strategies to generate the schedule for
-            start_date: The start datetime
-            end_date: The end datetime
+            strategies (list): Strategies with intervals and time units.
+            tasks (list): List of task IDs (run for every timestamp).
+            start_date (datetime): Start of the simulation.
+            end_date (datetime): End of the simulation.
 
         Returns:
-            pl.DataFrame: The schedule
+            dict: schedule[datetime] =
+                {"strategy_ids": [...], "task_ids": [...]}
         """
-        rows = []
+        schedule = defaultdict(
+            lambda: {"strategy_ids": set(), "task_ids": set(tasks)}
+        )
 
         for strategy in strategies:
             strategy_id = strategy.strategy_profile.strategy_id
-            time_unit = strategy.strategy_profile.time_unit
             interval = strategy.strategy_profile.interval
-            current_time = start_date
+            time_unit = strategy.strategy_profile.time_unit
 
-            delta = None
-            if TimeUnit.SECOND.equals(time_unit):
-                delta = timedelta(seconds=interval)
-            elif TimeUnit.MINUTE.equals(time_unit):
-                delta = timedelta(minutes=interval)
-            elif TimeUnit.HOUR.equals(time_unit):
-                delta = timedelta(hours=interval)
-            elif TimeUnit.DAY.equals(time_unit):
-                delta = timedelta(days=interval)
+            # Convert interval to seconds
+            if time_unit == TimeUnit.SECOND:
+                step = timedelta(seconds=interval)
+            elif time_unit == TimeUnit.MINUTE:
+                step = timedelta(minutes=interval)
+            elif time_unit == TimeUnit.HOUR:
+                step = timedelta(hours=interval)
+            elif time_unit == TimeUnit.DAY:
+                step = timedelta(days=interval)
             else:
                 raise ValueError(f"Unsupported time unit: {time_unit}")
 
-            while current_time <= end_date:
-                rows.append((strategy_id, current_time))
-                current_time += delta
+            t = start_date
+            while t <= end_date:
+                schedule[t]["strategy_ids"].add(strategy_id)
+                t += step
 
-        if not rows:
-            raise OperationalException(
-                "Could not generate schedule for backtest. "
-                "Do you have a strategy registered?"
-            )
-
-        df = pl.DataFrame(rows, schema=["id", "run_time"], orient="row")
-
-        return df.sort("run_time")
+            # Convert sets to sorted lists (optional, for deterministic iteration)
+            return {
+                ts: {
+                    "strategy_ids": sorted(data["strategy_ids"]),
+                    "task_ids": sorted(data["task_ids"])
+                }
+                for ts, data in schedule.items()
+            }
 
     def get_strategy_from_strategy_profiles(self, strategy_profiles, id):
 
@@ -272,13 +123,33 @@ class BacktestService(Observable):
 
         raise ValueError(f"Strategy profile with id {id} not found.")
 
+    def _get_initial_unallocated(
+        self
+    ) -> float:
+        """
+        Get the initial unallocated amount for the backtest.
+
+        Args:
+            algorithm: The algorithm to create the backtest report for
+            backtest_date_range: The backtest date range of the backtest
+
+        Returns:
+            float: The initial unallocated amount.
+        """
+        portfolios = self._portfolio_service.get_all()
+        initial_unallocated = 0.0
+
+        for portfolio in portfolios:
+            initial_unallocated += portfolio.initial_balance
+
+        return initial_unallocated
+
     def create_backtest(
         self,
         algorithm,
         number_of_runs,
         backtest_date_range: BacktestDateRange,
         risk_free_rate,
-        initial_unallocated=0,
         strategy_directory_path=None
     ) -> Backtest:
         """
@@ -293,7 +164,6 @@ class BacktestService(Observable):
             algorithm: The algorithm to create the backtest report for
             number_of_runs: The number of runs
             backtest_date_range: The backtest date range of the backtest
-            initial_unallocated: The initial unallocated amount
             risk_free_rate: The risk-free rate to use in the calculations
             strategy_directory_path (optional, str): The path to the
                 strategy directory
@@ -301,50 +171,6 @@ class BacktestService(Observable):
         Returns:
             Backtest: The backtest containing the results and metrics.
         """
-
-        for portfolio in self._portfolio_service.get_all():
-            ids = [strategy.strategy_id for strategy in algorithm.strategies]
-
-            # Check if strategy_id is None
-            if None in ids:
-                # Remove None from ids
-                ids = [x for x in ids if x is not None]
-
-            positions = self._position_repository.get_all({
-                "portfolio": portfolio.id
-            })
-            tickers = {}
-
-            for position in positions:
-
-                if position.symbol != portfolio.trading_symbol:
-                    ticker_symbol = \
-                        f"{position.symbol}/{portfolio.trading_symbol}"
-
-                    if not self._market_data_source_service\
-                            .has_ticker_market_data_source(
-                                symbol=ticker_symbol, market=portfolio.market
-                            ):
-                        raise OperationalException(
-                            f"Ticker market data source for "
-                            f"symbol {ticker_symbol} and market "
-                            f"{portfolio.market} not found, please make "
-                            f"sure you register a ticker market data "
-                            f"source for this symbol and market in "
-                            f"backtest mode. Otherwise, the backtest "
-                            f"report cannot be generated."
-                        )
-                    symbol = f"{position.symbol}/{portfolio.trading_symbol}"
-                    tickers[ticker_symbol] = \
-                        self._market_data_source_service.get_ticker(
-                            symbol=symbol, market=portfolio.market
-                        )
-
-            # Create the last snapshot of the portfolio
-            self._portfolio_snapshot_service.create_snapshot(
-                portfolio=portfolio,
-                created_at=backtest_date_range.end_date
-            )
 
         # Get the first portfolio
         portfolio = self._portfolio_service.get_all()[0]
@@ -380,7 +206,7 @@ class BacktestService(Observable):
         backtest_result = BacktestResult(
             name=algorithm.name,
             backtest_date_range=backtest_date_range,
-            initial_unallocated=initial_unallocated,
+            initial_unallocated=self._get_initial_unallocated(),
             trading_symbol=portfolio.trading_symbol,
             created_at=datetime.now(tz=timezone.utc),
             portfolio_snapshots=self._portfolio_snapshot_service.get_all(
@@ -404,7 +230,7 @@ class BacktestService(Observable):
             backtest_results=backtest_result,
             backtest_metrics=backtest_metrics,
             strategy_related_paths=strategy_related_paths,
-            data_file_paths=self._market_data_source_service.get_data_files(),
+            data_file_paths=self._data_provider_service.get_data_files(),
         )
 
     @staticmethod

@@ -37,8 +37,6 @@ def create_app(
         ["investing_algorithm_framework"],
         ["investing_algorithm_framework"]
     )
-    # After the container is setup, initialize the services
-    app.initialize_services()
     app.name = name
 
     if config is not None:
