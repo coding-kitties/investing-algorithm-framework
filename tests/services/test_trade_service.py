@@ -615,9 +615,6 @@ class TestTradeService(TestBase):
         self.assertEqual(1, len(trade_service.get_all(
             {"order_id": order_two_id})))
 
-        for trade in trade_service.get_all():
-            print(trade.orders)
-
         # Check that the trade was updated
         trade_service = self.app.container.trade_service()
         self.assertEqual(2, len(trade_service.get_all()))
@@ -627,7 +624,6 @@ class TestTradeService(TestBase):
 
 
         for t in trades:
-            print(t.orders)
             self.assertNotEqual(0, t.amount)
             self.assertEqual(t.amount, t.filled_amount)
             self.assertEqual(t.available_amount, t.amount)

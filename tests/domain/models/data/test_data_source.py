@@ -64,7 +64,7 @@ class TestDataSource(TestCase):
                 data_source = DataSource(data_type=data_type)
                 self.assertEqual(data_source.data_type, data_type)
 
-    def test_data_source_equality(self):
+    def test_data_source_equality_ohlcv(self):
         """Test DataSource equality comparison"""
         data_source1 = DataSource(
             data_provider_identifier="test",
@@ -85,6 +85,23 @@ class TestDataSource(TestCase):
         )
 
         self.assertEqual(data_source1, data_source2)
+
+        data_source3 = DataSource(
+            data_type=DataType.OHLCV,
+            symbol="BTC/EUR",
+            market="binance"
+        )
+
+        data_source4 = DataSource(
+            data_provider_identifier="test",
+            data_type=DataType.OHLCV,
+            symbol="BTC/EUR",
+            window_size=50,
+            time_frame="4h",
+            market="binance"
+        )
+
+        self.assertEqual(data_source4, data_source3)
 
     def test_data_source_inequality(self):
         """Test DataSource inequality comparison"""
@@ -328,3 +345,22 @@ class TestDataSource(TestCase):
             with self.subTest(field=field.name):
                 # All fields should have None as default
                 self.assertIsNone(field.default)
+
+    def test_comparison_between_ohlcv_data_sources(self):
+        # Compare that a datasource with OHLCV data type, symbol BTC/EUR,
+        # window size 100, and time frame 1h, market binance is equal to
+        # a datasource with OHLCV data type, symbol BTC/EUR, market binance,
+        data_source_one = DataSource(
+            data_type=DataType.OHLCV,
+            symbol="BTC/EUR",
+            window_size=100,
+            time_frame="1h",
+            market="binance"
+        )
+
+        data_source_two = DataSource(
+            data_type=DataType.OHLCV,
+            symbol="BTC/EUR",
+        )
+
+        self.assertEqual(data_source_one, data_source_two)

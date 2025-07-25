@@ -100,9 +100,6 @@ class Test(TestCase):
             backtest_report_dir, report_name
         )
 
-        for root, dirs, files in os.walk(backtest_report_dir):
-            for name in files:
-                print(name)
         # check if the report json file exists
         self.assertTrue(os.path.isfile(report_file_path))
 

@@ -89,7 +89,56 @@ class Test(TestCase):
             symbol="BTC/EUR",
             time_frame="2h"
         )
-        self.assertTrue(data_provider.has_data(data_source))
+        self.assertTrue(
+            data_provider.has_data(
+                data_source,
+                start_date=datetime(
+                    2023, 8, 8, 7, 59, tzinfo=timezone.utc
+                ),
+                end_date=datetime(
+                    2023, 12, 2, 0, 0, tzinfo=timezone.utc
+                )
+            )
+        )
+
+    def test_has_data_backtest_mode(self):
+        start_date = datetime(
+            2023, 8, 7, 8, 0, tzinfo=timezone.utc
+        )
+        end_date = datetime(
+            2023, 12, 2, 0, 0, tzinfo=timezone.utc
+        )
+        data_source = DataSource(
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h",
+            data_type="OHLCV",
+            start_date=start_date,
+            end_date=end_date
+        )
+        file_name = "OHLCV_BTC-EUR_BINANCE" \
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        data_provider = CSVOHLCVDataProvider(
+            file_path=f"{self.resource_dir}/market_data_sources/"
+                          f"{file_name}",
+            window_size=10,
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h"
+        )
+        self.assertFalse(data_provider.has_data(data_source))
+
+        start_date = datetime(
+            2023, 9, 7, 7, 59, tzinfo=timezone.utc
+        )
+        self.assertTrue(
+            data_provider.has_data(
+                data_source,
+                start_date=start_date,
+                end_date=end_date
+            )
+        )
+
 
     def test_correct_data_source_start_date_and_end_date(self):
         pass
