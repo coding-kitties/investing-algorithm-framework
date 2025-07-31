@@ -1,15 +1,17 @@
-from typing import List, Set
-from tqdm import tqdm
-import polars as pl
-from time import sleep
 from datetime import datetime, timedelta, timezone
+from time import sleep
+from typing import List, Set, Dict
+
+import polars as pl
+from tqdm import tqdm
+
 from investing_algorithm_framework.domain import Environment, ENVIRONMENT, \
-    OrderStatus, BACKTESTING_INDEX_DATETIME, DataSource, DataType, \
+    OrderStatus, DataSource, DataType, \
     TradeStatus, SNAPSHOT_INTERVAL, SnapshotInterval, OperationalException, \
-    BACKTESTING_START_DATE, BACKTESTING_LAST_SNAPSHOT_DATETIME, INDEX_DATETIME
+    LAST_SNAPSHOT_DATETIME, INDEX_DATETIME
 from investing_algorithm_framework.services import TradeOrderEvaluator
-from .strategy import TradingStrategy
 from .algorithm import Algorithm
+from .strategy import TradingStrategy
 
 
 class EventLoopService:
@@ -49,7 +51,6 @@ class EventLoopService:
         trade_service,
         portfolio_service,
         configuration_service,
-        trade_order_evaluator,
         data_provider_service,
         portfolio_snapshot_service
     ):
@@ -73,7 +74,7 @@ class EventLoopService:
         self._portfolio_service = portfolio_service
         self._configuration_service = configuration_service
         self._data_provider_service = data_provider_service
-        self._trade_order_evaluator = trade_order_evaluator
+        self._trade_order_evaluator = None
         self._portfolio_snapshot_service = portfolio_snapshot_service
         self.data_sources = set()
         self.next_run_times = {}
@@ -81,37 +82,61 @@ class EventLoopService:
 
     @staticmethod
     def _get_data_sources_for_iteration(
-        strategy_data_sources, pending_order, open_trades
+        strategy_data_sources
     ) -> Set[DataSource]:
         """
         Return a list of data sources that need to be fetched for the
-        current iteration based on the strategies, pending orders,
-        and open trades.
+        current iteration based on the strategies.
 
         Args:
             strategy_data_sources: List of data sources defined in the strategies.
+        Returns:
+            Set[DataSource]: A set of data sources that need to be fetched.
+        """
+        data_sources = set(strategy_data_sources)
+        return data_sources
+
+    def _get_pending_orders_and_trades_data_for_iteration(
+        self, pending_order, open_trades, date
+    ) -> Dict:
+        """
+        Returns a set of data sources that need to be fetched for the
+        current iteration based on the pending orders and open trades.
+
+        Args:
             pending_order: List of pending orders.
             open_trades: List of open trades.
+            date: The current date for which the data is being fetched.
 
         Returns:
             Set[DataSource]: A set of data sources that need to be fetched.
         """
-        symbol_set = {ds.symbol for ds in strategy_data_sources}
-        data_sources = set(strategy_data_sources)
+        symbol_set = set()
+        data_sources = set()
+        data = {}
 
         for order in pending_order:
             if order.symbol not in symbol_set:
                 data_sources.add(
-                    DataSource(symbol=order.symbol, data_type=DataType.OHLCV))
+                    DataSource(
+                        symbol=order.symbol,
+                        data_type=DataType.TICKER
+                    )
+                )
                 symbol_set.add(order.symbol)
 
         for trade in open_trades:
+
             if trade.symbol not in symbol_set:
                 data_sources.add(
-                    DataSource(symbol=trade.symbol, data_type=DataType.OHLCV))
+                    DataSource(symbol=trade.symbol, data_type=DataType.TICKER))
                 symbol_set.add(trade.symbol)
 
-        return data_sources
+        for symbol in symbol_set:
+            data[symbol] = self._data_provider_service.get_ohlcv_data(
+                symbol=symbol, date=date
+            )
+        return data
 
     def _get_strategies(self, strategy_ids: List[str]) -> List[TradingStrategy]:
         """
@@ -121,8 +146,10 @@ class EventLoopService:
             strategy_ids: A list of strategy IDs to retrieve.
 
         Returns:
-            List[TradingStrategy]: A list of strategies matching the provided IDs.
+            List[TradingStrategy]: A list of strategies matching the
+                provided IDs.
         """
+
         if not strategy_ids:
             return self.strategies
 
@@ -185,9 +212,9 @@ class EventLoopService:
             open_orders: List of open orders.
             created_orders: List of created orders.
         """
-        snapshot_interval = self._configuration_service.config[SNAPSHOT_INTERVAL]
+        snapshot_interval = self._configuration_service\
+            .config[SNAPSHOT_INTERVAL]
         portfolio = self._portfolio_service.get_all()[0]
-
         if SnapshotInterval.STRATEGY_ITERATION.equals(snapshot_interval):
             snapshot = self._portfolio_snapshot_service.create_snapshot(
                 created_at=current_datetime,
@@ -198,11 +225,11 @@ class EventLoopService:
             )
             self._snapshots.append(snapshot)
             self._configuration_service.add_value(
-                BACKTESTING_LAST_SNAPSHOT_DATETIME, current_datetime
+                LAST_SNAPSHOT_DATETIME, current_datetime
             )
         elif SnapshotInterval.DAILY.equals(snapshot_interval):
             last_snapshot_datetime = self._configuration_service.config[
-                BACKTESTING_LAST_SNAPSHOT_DATETIME
+                LAST_SNAPSHOT_DATETIME
             ]
 
             # Check if the time difference is greater than 24 hours
@@ -218,7 +245,7 @@ class EventLoopService:
                 )
                 self._snapshots.append(snapshot)
                 self._configuration_service.add_value(
-                    BACKTESTING_LAST_SNAPSHOT_DATETIME, current_datetime
+                    LAST_SNAPSHOT_DATETIME, current_datetime
                 )
 
     def initialize(
@@ -245,15 +272,17 @@ class EventLoopService:
         Returns:
             None
         """
-        config = self._configuration_service.config[ENVIRONMENT]
         self._algorithm = algorithm
         self.strategies = algorithm.strategies
-        self._trade_order_evaluator = trade_order_evaluator
 
-        if Environment.BACKTEST.equals(config):
-            start_date = self._configuration_service.config[BACKTESTING_START_DATE]
-        else:
-            start_date = datetime.now(timezone.utc)
+        if len(self.strategies) == 0:
+            raise OperationalException(
+                "No strategies are defined in the algorithm. "
+                "Please add at least one strategy to the algorithm."
+            )
+
+        self._trade_order_evaluator = trade_order_evaluator
+        start_date = self._configuration_service.config[INDEX_DATETIME]
 
         self.next_run_times = {
             strategy.strategy_id: {
@@ -265,13 +294,15 @@ class EventLoopService:
 
         # Collect all data sources and initialize history
         for strategy in self.strategies:
-            self.data_sources = self.data_sources.union(
-                set(strategy.data_sources)
-            )
-            self.history[strategy.strategy_id] = {
-                "runs": [],
-            }
-            self._strategies_lookup[strategy.strategy_id] = strategy
+
+            if strategy.data_sources is not None:
+                self.data_sources = self.data_sources.union(
+                    set(strategy.data_sources)
+                )
+
+            self.history[strategy.strategy_id] = {"runs": []}
+            self._strategies_lookup[strategy.strategy_profile.strategy_id] \
+                = strategy
 
         if self._trade_order_evaluator is None:
             raise OperationalException(
@@ -317,9 +348,6 @@ class EventLoopService:
                     colour="GREEN"
                 ):
                     self._configuration_service.add_value(
-                        BACKTESTING_INDEX_DATETIME, current_time
-                    )
-                    self._configuration_service.add_value(
                         INDEX_DATETIME, current_time
                     )
                     strategy_ids = schedule[current_time]["strategy_ids"]
@@ -329,15 +357,24 @@ class EventLoopService:
 
             else:
                 for current_time in sorted_times:
+                    self._configuration_service.add_value(
+                        INDEX_DATETIME, current_time
+                    )
                     strategy_ids = schedule[current_time]["strategy_ids"]
                     task_ids = schedule[current_time]["task_ids"]
-                    # Your simulation logic here
-                    # print(strategy_ids)
-                    # print(task_ids)
+                    strategies = self._get_strategies(strategy_ids)
+                    self._run_iteration(strategies=strategies, tasks=[])
         else:
             if number_of_iterations is None:
                 try:
-                    self._run_iteration()
+                    config = self._configuration_service.config
+                    current_time = config[INDEX_DATETIME]
+                    strategies = self._get_due_strategies(current_time)
+                    self._run_iteration(strategies)
+                    current_time = datetime.now(timezone.utc)
+                    self._configuration_service.add_value(
+                        INDEX_DATETIME, current_time
+                    )
                     sleep(1)
                 except KeyboardInterrupt:
                     exit(0)
@@ -349,14 +386,28 @@ class EventLoopService:
                         colour="GREEN"
                     ):
                         try:
-                            self._run_iteration()
+                            config = self._configuration_service.config
+                            current_time = config[INDEX_DATETIME]
+                            strategies = self._get_due_strategies(current_time)
+                            self._run_iteration(strategies)
+                            current_time = datetime.now(timezone.utc)
+                            self._configuration_service.add_value(
+                                INDEX_DATETIME, current_time
+                            )
                             sleep(1)
                         except KeyboardInterrupt:
                             exit(0)
 
                 for _ in range(number_of_iterations):
                     try:
-                        self._run_iteration()
+                        config = self._configuration_service.config
+                        current_time = config[INDEX_DATETIME]
+                        strategies = self._get_due_strategies(current_time)
+                        self._run_iteration(strategies)
+                        current_time = datetime.now(timezone.utc)
+                        self._configuration_service.add_value(
+                            INDEX_DATETIME, current_time
+                        )
                         sleep(1)
                     except KeyboardInterrupt:
                         exit(0)
@@ -387,11 +438,7 @@ class EventLoopService:
         """
         config = self._configuration_service.get_config()
         environment = config[ENVIRONMENT]
-
-        if Environment.BACKTEST.equals(environment):
-            current_datetime = config[BACKTESTING_INDEX_DATETIME]
-        else:
-            current_datetime = datetime.now(tz=timezone.utc)
+        current_datetime = config[INDEX_DATETIME]
 
         # Step 1: Collect all data for the strategies and for the
         # pending orders
@@ -408,14 +455,22 @@ class EventLoopService:
         data_sources = []
 
         for strategy in strategies:
+
+            if strategy.data_sources is None:
+                continue
+
             data_sources.extend(strategy.data_sources)
 
         data_sources = self._get_data_sources_for_iteration(
             strategy_data_sources=data_sources,
-            pending_order=open_orders,
-            open_trades=open_trades
         )
         data_object = {}
+        orders_trades_update_ohlcv_data = \
+            self._get_pending_orders_and_trades_data_for_iteration(
+                pending_order=open_orders,
+                open_trades=open_trades,
+                date=current_datetime,
+            )
 
         if Environment.BACKTEST.equals(environment):
 
@@ -439,18 +494,11 @@ class EventLoopService:
                         end_date=data_source.end_date,
                     )
 
-        # Step 2: Update prices of trades
-        ohlcv_data = {
-            data_source.symbol: data_object[data_source.get_identifier()]
-            for data_source in data_sources
-            if DataType.OHLCV.equals(data_source.data_type)
-        }
-
         # Step 3: Check pending orders, stop losses, take profits
         self._trade_order_evaluator.evaluate(
             open_trades=open_trades,
             open_orders=open_orders,
-            ohlcv_data=ohlcv_data
+            ohlcv_data=orders_trades_update_ohlcv_data
         )
 
         # Step 4: Run all tasks
@@ -462,12 +510,18 @@ class EventLoopService:
             return
 
         for strategy in strategies:
+
+            if strategy.data_sources is not None:
+                data = {
+                    data_source.get_identifier(): data_object[
+                        data_source.get_identifier()]
+                    for data_source in strategy.data_sources
+                }
+            else:
+                data = {}
+
             # Select data for the strategy
-            data = {
-                data_source.get_identifier(): data_object[data_source.get_identifier()]
-                for data_source in strategy.data_sources
-            }
-            strategy.run_strategy(context=self.context, market_data=data)
+            strategy.run_strategy(context=self.context, data=data)
 
         # # Step 6: Run all on_strategy_run hooks
         # for strategy in due_strategies:

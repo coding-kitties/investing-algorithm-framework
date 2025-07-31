@@ -28,12 +28,11 @@ class TestDrawdownFunctions(unittest.TestCase):
             self.snapshots.append(snapshot)
 
         # Create a mocked BacktestReport
-        self.backtest_report = MagicMock()
-        self.backtest_report.get_snapshots.return_value = self.snapshots
+        self.backtest_result = MagicMock()
+        self.backtest_result.portfolio_snapshots = self.snapshots
 
     def test_drawdown_series(self):
-        drawdown_series = get_drawdown_series(self.backtest_report)
-
+        drawdown_series = get_drawdown_series(self.backtest_result.portfolio_snapshots)
         expected_drawdowns = [
             0.0,                                # baseline
             0.0,                                # new high
@@ -44,14 +43,14 @@ class TestDrawdownFunctions(unittest.TestCase):
 
         self.assertEqual(len(drawdown_series), len(expected_drawdowns))
 
-        for i, (_, drawdown) in enumerate(drawdown_series):
+        for i, (drawdown, _) in enumerate(drawdown_series):
             self.assertAlmostEqual(drawdown, expected_drawdowns[i], places=6)
 
     def test_max_drawdown(self):
-        max_drawdown = get_max_drawdown(self.backtest_report)
+        max_drawdown = get_max_drawdown(self.backtest_result.portfolio_snapshots)
         expected_max = abs((900 - 1200) / 1200) # 0.25
         self.assertAlmostEqual(max_drawdown, expected_max, places=6)
 
     def test_max_drawdown_absolute(self):
-        max_drawdown = get_max_drawdown_absolute(self.backtest_report)
+        max_drawdown = get_max_drawdown_absolute(self.backtest_result.portfolio_snapshots)
         self.assertEqual(max_drawdown, 300)  # 1200 - 900 = 300

@@ -1,8 +1,6 @@
-from typing import List
+from typing import List, Any
 from abc import ABC, abstractmethod
 from datetime import datetime
-from investing_algorithm_framework.domain.models.trading_data_types import \
-    TradingDataType
 from investing_algorithm_framework.domain.exceptions import \
     ImproperlyConfigured
 from investing_algorithm_framework.domain.models.time_frame import TimeFrame
@@ -54,6 +52,7 @@ class DataProvider(ABC):
         time_frame=None,
         window_size=None,
         storage_path=None,
+        storage_directory=None,
         config=None,
     ):
         """
@@ -95,7 +94,7 @@ class DataProvider(ABC):
         self._time_frame = None
 
         if data_type is not None:
-            self.data_type = TradingDataType.from_value(data_type)
+            self.data_type = DataType.from_value(data_type)
 
         if time_frame is not None:
             self.time_frame = TimeFrame.from_value(time_frame)
@@ -104,11 +103,20 @@ class DataProvider(ABC):
             self.data_provider_identifier = data_provider_identifier
 
         self.symbol = symbol
+
+        if self.symbol is not None:
+            self.symbol = self.symbol.upper()
+
         self.market = market
+
+        if self.market is not None:
+            self.market = self.market.upper()
+
         self.priority = priority
         self._config = config
         self.window_size = window_size
         self.storage_path = storage_path
+        self.storage_directory = storage_directory
         self._market_credentials = None
 
         # Check if the data provider is properly configured
@@ -187,7 +195,7 @@ class DataProvider(ABC):
         start_date: datetime = None,
         end_date: datetime = None,
         save: bool = False,
-    ):
+    ) -> Any:
         """
         Fetches data for a given symbol and date range.
 
@@ -198,7 +206,9 @@ class DataProvider(ABC):
             save (bool): Whether to save the data to the storage path.
 
         Returns:
-            DataFrame: The data for the given symbol and market.
+            Any: The data for the given symbol and date range.
+            This can be a DataFrame, a list, or any other data structure
+            depending on the implementation.
         """
         raise NotImplementedError("Subclasses should implement this method.")
 
@@ -228,7 +238,7 @@ class DataProvider(ABC):
         backtest_index_date: datetime,
         backtest_start_date: datetime = None,
         backtest_end_date: datetime = None,
-    ) -> None:
+    ) -> Any:
         """
         Fetches backtest data for a given datasource
 
@@ -241,7 +251,9 @@ class DataProvider(ABC):
                 backtest data.
 
         Returns:
-            pl.DataFrame: The backtest data for the given datasource.
+            Any: The data for the given symbol and date range.
+            This can be a DataFrame, a list, or any other data structure
+            depending on the implementation.
         """
         raise NotImplementedError("Subclasses should implement this method.")
 

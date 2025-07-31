@@ -2,8 +2,6 @@ from pyindicators import ema, is_crossover, is_above, is_below, is_crossunder
 from investing_algorithm_framework import TradingStrategy, TimeUnit, Context, \
     OrderSide, DataSource
 
-from .data_sources import bitvavo_btc_eur_ohlcv_2h, bitvavo_btc_eur_ticker
-
 
 class CrossOverStrategyV1(TradingStrategy):
     """
@@ -40,7 +38,7 @@ class CrossOverStrategyV1(TradingStrategy):
     take_profit_percentage = 8
     take_profit_sell_size = 50
 
-    def apply_strategy(self, context: Context, market_data):
+    def apply_strategy(self, context: Context, data):
 
         for pair in self.symbol_pairs:
             symbol = pair.split('/')[0]
@@ -51,7 +49,7 @@ class CrossOverStrategyV1(TradingStrategy):
             if context.has_open_orders(symbol):
                 continue
 
-            ohlcv_data = market_data[f"{pair}-ohlcv-2h"]
+            ohlcv_data = data[f"{pair}-ohlcv-2h"]
 
             if ohlcv_data is None:
                 return

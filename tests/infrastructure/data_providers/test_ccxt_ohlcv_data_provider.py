@@ -51,7 +51,7 @@ class TestCCXTOHLCVDataProvider(TestCase):
         date = datetime(
             2023, 8, 7, 8, 0, tzinfo=timezone.utc
         )
-        df = data_provider.get_data(data_source, start_date=date)
+        df = data_provider.get_data(start_date=date)
         self.assertEqual(
             ["Datetime", "Open", "High", "Low", "Close", "Volume"],
             df.columns
@@ -127,7 +127,6 @@ class TestCCXTOHLCVDataProvider(TestCase):
             time_frame="2h"
         )
         data = ccxt_ohlcv_market_data_source.get_data(
-            data_source=data_source,
             start_date=start_date
         )
         self.assertAlmostEqual(200, len(data), delta=1)
@@ -167,7 +166,6 @@ class TestCCXTOHLCVDataProvider(TestCase):
             time_frame="2h"
         )
         data = csv_ohlcv_market_data_source.get_data(
-            data_source=data_source,
             end_date=end_date
         )
         self.assertAlmostEqual(200, len(data), delta=1)
@@ -204,7 +202,7 @@ class TestCCXTOHLCVDataProvider(TestCase):
             window_size=10,
             time_frame="2h",
         )
-        self.assertEqual("test", data_provider.market)
+        self.assertEqual("TEST", data_provider.market)
 
     def test_get_symbol(self):
         data_provider = CCXTOHLCVDataProvider(
@@ -237,7 +235,6 @@ class TestCCXTOHLCVDataProvider(TestCase):
         )
 
         data_provider.prepare_backtest_data(
-            datasource,
             backtest_date_range.start_date,
             backtest_date_range.end_date,
         )
@@ -283,13 +280,13 @@ class TestCCXTOHLCVDataProvider(TestCase):
             market="binance",
             symbol="BTC/EUR",
             time_frame="2h",
+            window_size=200
         )
         backtest_date_range = BacktestDateRange(
             start_date=datetime(2023, 8, 28, 8, 0, tzinfo=timezone.utc),
             end_date=datetime(2023, 12, 2, 0, 0, tzinfo=timezone.utc)
         )
         data_provider.prepare_backtest_data(
-            datasource,
             backtest_date_range.start_date,
             backtest_date_range.end_date,
         )
@@ -297,7 +294,6 @@ class TestCCXTOHLCVDataProvider(TestCase):
 
         while index_date <= backtest_date_range.end_date:
             data = data_provider.get_backtest_data(
-                datasource,
                 index_date
             )
             self.assertAlmostEqual(

@@ -1,6 +1,7 @@
 from investing_algorithm_framework import PortfolioConfiguration, \
     OrderStatus, MarketCredential
-from tests.resources import TestBase, MarketDataSourceServiceStub
+from tests.resources import TestBase
+from tests.resources.strategies_for_testing import StrategyOne
 
 
 class Test(TestBase):
@@ -22,6 +23,7 @@ class Test(TestBase):
     }
 
     def test_create_limit_sell_order(self):
+        self.app.add_strategy(StrategyOne)
         self.app.run(number_of_iterations=1)
         self.app.context.create_limit_order(
             target_symbol="BTC",
@@ -54,6 +56,7 @@ class Test(TestBase):
         self.assertEqual(20, order.get_amount())
 
     def test_create_limit_sell_order_with_percentage_position(self):
+        self.app.add_strategy(StrategyOne)
         self.app.run(number_of_iterations=1)
         self.app.context.create_limit_order(
             target_symbol="BTC",

@@ -1,8 +1,7 @@
 from pyindicators import ema, is_crossover, is_above, is_below, is_crossunder
 from investing_algorithm_framework import TradingStrategy, TimeUnit, Context, \
-    OrderSide
+    OrderSide, DataSource
 
-from .data_sources import bitvavo_btc_eur_ohlcv_2h, bitvavo_btc_eur_ticker
 
 
 class CrossOverStrategyV2(TradingStrategy):
@@ -24,7 +23,15 @@ class CrossOverStrategyV2(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 2
     symbol_pairs = ["BTC/EUR"]
-    market_data_sources = [bitvavo_btc_eur_ohlcv_2h, bitvavo_btc_eur_ticker]
+    data_sources = [
+        DataSource(
+            market="BITVAVO",
+            symbol="BTC/EUR",
+            data_type="ohlcv",
+            time_frame="2h",
+            window_size=200,
+        )
+    ]
     fast = 75
     slow = 100
     trend = 200

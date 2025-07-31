@@ -1,8 +1,10 @@
 from decimal import Decimal
+from unittest.mock import patch
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential
-from tests.resources import TestBase, MarketDataSourceServiceStub
+from tests.resources import TestBase
+from tests.resources.strategies_for_testing import StrategyOne
 
 
 class Test(TestBase):
@@ -28,27 +30,38 @@ class Test(TestBase):
         trading_symbol_position = self.app.context.get_position("EUR")
         self.assertEqual(1, self.app.context.get_number_of_positions())
         self.assertEqual(Decimal(1000), trading_symbol_position.get_amount())
-        self.app.context.create_limit_order(
-            target_symbol="BTC",
-            amount=1,
-            price=10,
-            order_side="BUY",
-        )
-        order_service = self.app.container.order_service()
-        order_service.check_pending_orders()
-        self.assertEqual(2, self.app.context.get_number_of_positions())
-        self.app.context.create_limit_order(
-            target_symbol="DOT",
-            amount=1,
-            price=10,
-            order_side="BUY",
-        )
-        order_service.check_pending_orders()
-        self.assertEqual(3, self.app.context.get_number_of_positions())
-        self.app.context.create_limit_order(
-            target_symbol="ADA",
-            amount=1,
-            price=10,
-            order_side="BUY",
-        )
-        self.assertEqual(3, self.app.context.get_number_of_positions())
+
+        with patch.object(
+                self.app.container.data_provider_service(),
+                "get_ticker_data",
+                return_value={
+                    "bid": 10,
+                    "ask": 10,
+                    "last": 10
+
+                }
+        ):
+            self.app.context.create_limit_order(
+                target_symbol="BTC",
+                amount=1,
+                price=10,
+                order_side="BUY",
+            )
+            order_service = self.app.container.order_service()
+            order_service.check_pending_orders()
+            self.assertEqual(2, self.app.context.get_number_of_positions())
+            self.app.context.create_limit_order(
+                target_symbol="DOT",
+                amount=1,
+                price=10,
+                order_side="BUY",
+            )
+            order_service.check_pending_orders()
+            self.assertEqual(3, self.app.context.get_number_of_positions())
+            self.app.context.create_limit_order(
+                target_symbol="ADA",
+                amount=1,
+                price=10,
+                order_side="BUY",
+            )
+            self.assertEqual(3, self.app.context.get_number_of_positions())

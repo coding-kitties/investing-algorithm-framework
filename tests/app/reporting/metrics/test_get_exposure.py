@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime, timedelta
 
-from investing_algorithm_framework import get_exposure_time
+from investing_algorithm_framework import get_exposure
 
 # Mock classes to simulate report and trades
 class MockTrade:
@@ -25,14 +25,14 @@ class TestGetExposureTime(unittest.TestCase):
         report = MockReport(trades=[],
                             backtest_start_date=datetime(2023,1,1),
                             backtest_end_date=datetime(2023,1,10))
-        self.assertEqual(get_exposure_time(report), 0.0)
+        self.assertEqual(get_exposure(report.get_trades(), report.backtest_start_date, report.backtest_end_date), 0.0)
 
     def test_no_backtest_duration(self):
         # start and end date are the same
         report = MockReport(trades=[MockTrade(datetime(2023,1,1))],
                             backtest_start_date=datetime(2023,1,1),
                             backtest_end_date=datetime(2023,1,1))
-        self.assertEqual(get_exposure_time(report), 0.0)
+        self.assertEqual(get_exposure(report.get_trades(), report.backtest_start_date, report.backtest_end_date), 0.0)
 
     def test_single_trade_within_backtest(self):
         start = datetime(2023,1,1)
@@ -43,7 +43,7 @@ class TestGetExposureTime(unittest.TestCase):
         report = MockReport(trades=[trade], backtest_start_date=start, backtest_end_date=end)
 
         expected = (trade_end - trade_start).total_seconds() / (end - start).total_seconds()
-        self.assertAlmostEqual(get_exposure_time(report), expected)
+        self.assertAlmostEqual(get_exposure(report.get_trades(), start, end), expected)
 
     def test_multiple_trades(self):
         start = datetime(2023,1,1)
@@ -57,7 +57,7 @@ class TestGetExposureTime(unittest.TestCase):
 
         total_duration = timedelta(days=1) + timedelta(days=2) + timedelta(days=1)
         expected = total_duration.total_seconds() / (end - start).total_seconds()
-        self.assertAlmostEqual(get_exposure_time(report), expected)
+        self.assertAlmostEqual(get_exposure(report.get_trades(), start, end), expected)
 
     def test_open_trade_counts_to_backtest_end(self):
         start = datetime(2023,1,1)
@@ -67,7 +67,7 @@ class TestGetExposureTime(unittest.TestCase):
         report = MockReport(trades=[trade], backtest_start_date=start, backtest_end_date=end)
 
         expected = (end - trade_start).total_seconds() / (end - start).total_seconds()
-        self.assertAlmostEqual(get_exposure_time(report), expected)
+        self.assertAlmostEqual(get_exposure(report.get_trades(), start, end), expected)
 
     def test_trade_exit_before_entry_ignored(self):
         # Trade closed before it started (bad data), should ignore this trade duration
@@ -77,5 +77,4 @@ class TestGetExposureTime(unittest.TestCase):
         trade_end = datetime(2023,1,4)  # closed before created
         trade = MockTrade(created_at=trade_start, closed_at=trade_end)
         report = MockReport(trades=[trade], backtest_start_date=start, backtest_end_date=end)
-
-        self.assertEqual(get_exposure_time(report), 0.0)
+        self.assertEqual(get_exposure(report.get_trades(), start, end), 0.0)

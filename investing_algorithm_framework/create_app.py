@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 from .app import App
 from .dependency_container import setup_dependency_container
-from .domain import AppMode, APPLICATION_DIRECTORY
+from .domain import AppMode, APPLICATION_DIRECTORY, APP_MODE
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -43,12 +43,12 @@ def create_app(
         app.set_config_with_dict(config)
 
     if web:
-        app.set_config("APP_MODE", AppMode.WEB.value)
+        app.set_config(APP_MODE, AppMode.WEB.value)
 
     # Add the application directory to the config
     caller_frame = inspect.stack()[1]
     caller_path = os.path.abspath(caller_frame.filename)
     app.set_config(APPLICATION_DIRECTORY, caller_path)
 
-    logger.info("Investing algoritm framework app created")
+    logger.info("Investing algorithm framework app created")
     return app

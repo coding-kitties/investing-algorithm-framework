@@ -5,7 +5,8 @@ from datetime import datetime, timezone
 from logging import getLogger
 from typing import List, Optional
 
-from investing_algorithm_framework.domain.constants import DATETIME_FORMAT
+from investing_algorithm_framework.domain.constants import \
+    DEFAULT_DATETIME_FORMAT
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
 from investing_algorithm_framework.domain.models.order import Order
@@ -183,7 +184,7 @@ class BacktestResult:
                 if order.target_symbol not in self.symbols:
                     self.symbols.append(order.target_symbol)
 
-    def to_dict(self):
+    def to_dict(self, datetime_format=DEFAULT_DATETIME_FORMAT):
         """
         Convert the backtest report to a dictionary. So it can be
         saved to a file.
@@ -196,9 +197,9 @@ class BacktestResult:
             "name": self.name,
             "backtest_date_range_identifier": self.backtest_date_range.name,
             "backtest_start_date": self.backtest_date_range.start_date
-            .strftime(DATETIME_FORMAT),
+            .strftime(datetime_format),
             "backtest_end_date": self.backtest_date_range.end_date
-            .strftime(DATETIME_FORMAT),
+            .strftime(datetime_format),
             "number_of_runs": self.number_of_runs,
             "symbols": self.symbols,
             "number_of_days": self.number_of_days,
@@ -220,31 +221,32 @@ class BacktestResult:
             "average_trade_size": self.average_trade_size,
             # "positions": [position.to_dict() for position in self.positions],
             "trades": [
-                trade.to_dict(datetime_format=DATETIME_FORMAT)
+                trade.to_dict(datetime_format=datetime_format)
                 for trade in self.trades
             ],
             "orders": [
-                order.to_dict(datetime_format=DATETIME_FORMAT)
+                order.to_dict(datetime_format=datetime_format)
                 for order in self.orders
             ],
             "portfolio_snapshots": [
-                snapshot.to_dict(datetime_format=DATETIME_FORMAT)
+                snapshot.to_dict(datetime_format=datetime_format)
                 for snapshot in self.portfolio_snapshots
             ],
-            "created_at": self.created_at.strftime(DATETIME_FORMAT),
+            "created_at": self.created_at.strftime(datetime_format),
         }
 
     @staticmethod
-    def from_dict(data):
+    def from_dict(data, datetime_format=DEFAULT_DATETIME_FORMAT):
         """
         Factory method to create a backtest report from a dictionary.
         """
-
         backtest_date_range = BacktestDateRange(
             start_date=datetime.strptime(
-                data["backtest_start_date"], DATETIME_FORMAT),
+                data["backtest_start_date"], datetime_format
+            ),
             end_date=datetime.strptime(
-                data["backtest_end_date"], DATETIME_FORMAT)
+                data["backtest_end_date"], datetime_format
+            )
         )
         portfolio_snapshots_data = data.get("portfolio_snapshots", None)
 
@@ -301,13 +303,13 @@ class BacktestResult:
             average_trade_duration=data["average_trade_duration"],
             average_trade_size=float(data["average_trade_size"]),
             created_at=datetime.strptime(
-                data["created_at"], DATETIME_FORMAT
+                data["created_at"], datetime_format
             ),
             backtest_start_date=datetime.strptime(
-                data["backtest_start_date"], DATETIME_FORMAT
+                data["backtest_start_date"], datetime_format
             ),
             backtest_end_date=datetime.strptime(
-                data["backtest_end_date"], DATETIME_FORMAT
+                data["backtest_end_date"], datetime_format
             ),
             number_of_days=data["number_of_days"],
             portfolio_snapshots=portfolio_snapshots,

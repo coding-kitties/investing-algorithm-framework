@@ -1,9 +1,11 @@
 import os
 from decimal import Decimal
+from unittest.mock import patch
 
 from investing_algorithm_framework import PortfolioConfiguration, \
-    CSVTickerMarketDataSource, MarketCredential
+    CSVOHLCVDataProvider, MarketCredential
 from tests.resources import TestBase
+from tests.resources.strategies_for_testing import StrategyOne
 
 
 class Test(TestBase):
@@ -26,18 +28,20 @@ class Test(TestBase):
 
     def setUp(self) -> None:
         super(Test, self).setUp()
-        self.app.add_market_data_source(CSVTickerMarketDataSource(
-            identifier="BTC/EUR-ticker",
+        self.app.add_data_provider(CSVOHLCVDataProvider(
+            data_provider_identifier="BTC/EUR-ticker",
             market="BITVAVO",
             symbol="BTC/EUR",
-            csv_file_path=os.path.join(
+            storage_path=os.path.join(
                 self.resource_directory,
                 "market_data_sources",
-                "TICKER_BTC-EUR_BINANCE_2023-08-23-22-00_2023-12-02-00-00.csv"
-            )
-        ))
+                "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+            ),
+            time_frame="1h",
+        ), priority=1)
 
     def test_close_position(self):
+        self.app.add_strategy(StrategyOne)
         trading_symbol_position = self.app.context.get_position("EUR")
         self.assertEqual(1000, trading_symbol_position.get_amount())
         self.app.context.create_limit_order(
@@ -46,16 +50,31 @@ class Test(TestBase):
             price=10,
             order_side="BUY",
         )
-        btc_position = self.app.context.get_position("BTC")
-        self.assertIsNotNone(btc_position)
-        self.assertEqual(0, btc_position.get_amount())
-        order_service = self.app.container.order_service()
-        order_service.check_pending_orders()
-        btc_position = self.app.context.get_position("BTC")
-        self.assertIsNotNone(btc_position.get_amount())
-        self.assertEqual(Decimal(1), btc_position.get_amount())
-        self.assertNotEqual(Decimal(990), trading_symbol_position.get_amount())
-        self.app.context.close_position(btc_position)
-        self.app.run(number_of_iterations=1)
-        btc_position = self.app.context.get_position("BTC")
-        self.assertEqual(Decimal(0), btc_position.get_amount())
+
+        with patch.object(
+            self.app.container.data_provider_service(),
+            "get_ticker_data",
+            return_value={
+                "bid": 990,
+                "ask": 1000,
+                "last": 995
+
+            }
+        ):
+            btc_position = self.app.context.get_position("BTC")
+            self.assertIsNotNone(btc_position)
+            self.assertEqual(0, btc_position.get_amount())
+
+            order_service = self.app.container.order_service()
+            order_service.check_pending_orders()
+
+            btc_position = self.app.context.get_position("BTC")
+            self.assertIsNotNone(btc_position.get_amount())
+            self.assertEqual(Decimal(1), btc_position.get_amount())
+            self.assertNotEqual(Decimal(990), trading_symbol_position.get_amount())
+
+            self.app.context.close_position(btc_position)
+            self.app.run(number_of_iterations=1)
+
+            btc_position = self.app.context.get_position("BTC")
+            self.assertEqual(Decimal(0), btc_position.get_amount())

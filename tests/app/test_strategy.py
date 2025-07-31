@@ -20,7 +20,7 @@ class StrategyForTesting(TradingStrategy):
     time_unit = "hour"
     interval = 2
 
-    def run_strategy(self, context, market_data):
+    def run_strategy(self, context, data):
         pass
 
 

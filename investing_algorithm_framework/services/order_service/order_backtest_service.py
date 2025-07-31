@@ -2,8 +2,8 @@ import logging
 
 import polars as pl
 
-from investing_algorithm_framework.domain import BACKTESTING_INDEX_DATETIME, \
-    OrderStatus, OrderSide, Order, MarketDataType
+from investing_algorithm_framework.domain import INDEX_DATETIME, \
+    OrderStatus, OrderSide, Order, DataType
 from .order_service import OrderService
 
 logger = logging.getLogger("investing_algorithm_framework")
@@ -48,8 +48,8 @@ class OrderBacktestService(OrderService):
         """
         config = self.configuration_service.get_config()
         # Make sure the created_at is set to the current backtest time
-        data["created_at"] = config[BACKTESTING_INDEX_DATETIME]
-        data["updated_at"] = config[BACKTESTING_INDEX_DATETIME]
+        data["created_at"] = config[INDEX_DATETIME]
+        data["updated_at"] = config[INDEX_DATETIME]
         # Call super to have standard behavior
         return super(OrderBacktestService, self)\
             .create(data, execute, validate, sync)
@@ -59,7 +59,7 @@ class OrderBacktestService(OrderService):
         order.remaining = order.get_amount()
         order.filled = 0
         order.updated_at = self.configuration_service.config[
-            BACKTESTING_INDEX_DATETIME
+            INDEX_DATETIME
         ]
         return order
 
@@ -80,7 +80,7 @@ class OrderBacktestService(OrderService):
         meta_data = market_data["metadata"]
 
         for order in pending_orders:
-            ohlcv_meta_data = meta_data[MarketDataType.OHLCV]
+            ohlcv_meta_data = meta_data[DataType.OHLCV]
 
             if order.get_symbol() not in ohlcv_meta_data:
                 continue
@@ -101,7 +101,7 @@ class OrderBacktestService(OrderService):
                         "filled": order.get_amount(),
                         "remaining": 0,
                         "updated_at": self.configuration_service
-                        .config[BACKTESTING_INDEX_DATETIME]
+                        .config[INDEX_DATETIME]
                     }
                 )
 
@@ -118,7 +118,7 @@ class OrderBacktestService(OrderService):
                         "status": OrderStatus.CANCELED.value,
                         "remaining": 0,
                         "updated_at": self.configuration_service
-                        .config[BACKTESTING_INDEX_DATETIME]
+                        .config[INDEX_DATETIME]
                     }
                 )
 
@@ -172,7 +172,7 @@ class OrderBacktestService(OrderService):
 
         if created_at is None:
             created_at = self.configuration_service \
-                .config[BACKTESTING_INDEX_DATETIME]
+                .config[INDEX_DATETIME]
 
         super(OrderBacktestService, self)\
             .create_snapshot(portfolio_id, created_at=created_at)

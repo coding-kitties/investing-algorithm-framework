@@ -3,12 +3,15 @@ import os
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List
+from typing import Dict, List, Optional
+
+import numpy as np
+import pandas as pd
 
 from investing_algorithm_framework.domain import BacktestResult, \
-    TimeUnit, TradingDataType, \
-    OperationalException, Observable, BacktestDateRange, \
-    DATETIME_FORMAT_BACKTESTING, Backtest
+    TimeUnit, Trade, OperationalException, Observable, BacktestDateRange, \
+    DATETIME_FORMAT_BACKTESTING, Backtest, TradeStatus, PortfolioSnapshot, \
+    convert_polars_to_pandas, DataType
 from investing_algorithm_framework.services.data_providers import \
     DataProviderService
 from investing_algorithm_framework.services.metrics import \
@@ -48,16 +51,196 @@ class BacktestService(Observable):
         self._order_service = order_service
         self._trade_service = trade_service
         self._portfolio_service = portfolio_service
-        self._data_index = {
-            TradingDataType.OHLCV: {},
-            TradingDataType.TICKER: {}
-        }
         self._performance_service = performance_service
         self._portfolio_snapshot_service = portfolio_snapshot_service
         self._position_repository = position_repository
         self._configuration_service = configuration_service
         self._portfolio_configuration_service = portfolio_configuration_service
         self._data_provider_service = data_provider_service
+
+    def validate_strategy_for_vector_backtest(self, strategy):
+        """
+        Validate if the strategy is suitable for backtesting.
+
+        Args:
+            strategy: The strategy to validate.
+
+        Raises:
+            OperationalException: If the strategy does not have the required
+                buy/sell signal functions.
+        """
+        if not hasattr(strategy, 'buy_signal_vectorized'):
+            raise OperationalException(
+                "Strategy must define a vectorized buy signal function "
+                "(buy_signal_vectorized)."
+            )
+        if not hasattr(strategy, 'sell_signal_vectorized'):
+            raise OperationalException(
+                "Strategy must define a vectorized sell signal function "
+                "(sell_signal_vectorized)."
+            )
+
+    def create_vector_backtest(
+        self,
+        strategy,
+        backtest_date_range: BacktestDateRange,
+        initial_amount,
+        position_size: float = 1.0,
+        risk_free_rate: float = 0.027
+    ):
+        """
+        Vectorized backtest using a strategy's buy/sell signals.
+
+        Args:
+            strategy: The strategy to use for the backtest.
+            backtest_date_range: The date range for the backtest.
+            initial_amount: The initial capital.
+            position_size: Amount per trade.
+            risk_free_rate: Annualized risk-free rate.
+
+        Returns:
+            Backtest: backtest result with trades and performance.
+        """
+        # Load all data sources
+        data_sources = strategy.data_sources
+        data_bundle = {}
+        for data_source in data_sources:
+            data = self._data_provider_service.get_backtest_data(
+                data_source=data_source,
+                start_date=backtest_date_range.start_date,
+                end_date=backtest_date_range.end_date
+            )
+            if not isinstance(data, pd.DataFrame):
+                data = convert_polars_to_pandas(data, add_index=True)
+            data_bundle[data_source] = data
+
+        # Verify signal functions
+        buy_fn = getattr(strategy, 'buy_signal_vectorized', None)
+        sell_fn = getattr(strategy, 'sell_signal_vectorized', None)
+        if not buy_fn or not sell_fn:
+            raise OperationalException(
+                "Strategy must define vectorized buy/sell signal functions.")
+
+        # Select main OHLCV source (most granular)
+        ohlcv_sources = [ds for ds in data_sources if
+                         DataType.OHLCV.equals(ds.data_type)]
+        if not ohlcv_sources:
+            raise OperationalException("No OHLCV data sources found.")
+
+        most_granular_ds = min(ohlcv_sources, key=lambda ds: ds.time_frame)
+        main_df = data_bundle[most_granular_ds]
+
+        close = main_df['Close']
+        index = main_df.index
+
+        # === Signal computation ===
+        buy_signal = buy_fn(data_bundle)
+        sell_signal = sell_fn(data_bundle)
+
+        # Reindex to match main_df (avoid alignment issues)
+        buy_signal = buy_signal.reindex(index, fill_value=False)
+        sell_signal = sell_signal.reindex(index, fill_value=False)
+
+        signal = pd.Series(0, index=index)
+        signal[buy_signal] = 1
+        signal[sell_signal] = -1
+        signal = signal.replace(0, np.nan).ffill().shift(1).fillna(0)
+
+        # === Portfolio computation ===
+        returns = close.pct_change().fillna(0)
+        position = signal
+        strategy_returns = position * returns
+
+        holdings = (strategy_returns + 1).cumprod() * initial_amount
+        total_value = holdings
+        net_gain = total_value - initial_amount
+
+        portfolio = pd.DataFrame({
+            'position': position,
+            'returns': strategy_returns,
+            'holdings': holdings,
+            'cash': initial_amount,
+            'total': total_value
+        }, index=index)
+
+        # === Trade generation (semi-vectorized) ===
+        trades = []
+        position_state = 0
+        trade_open_price = None
+        trade_open_date = None
+
+        for i in range(len(index)):
+            current_signal = signal.iloc[i]
+            current_price = close.iloc[i]
+            current_date = index[i]
+
+            if position_state == 0 and current_signal != 0:
+                position_state = current_signal
+                trade_open_price = current_price
+                trade_open_date = current_date
+            elif position_state != 0 and current_signal == -position_state:
+                net_gain_val = (
+                                           current_price - trade_open_price) * position_state * position_size
+                trades.append(Trade(
+                    id=len(trades) + 1,
+                    orders=[],
+                    target_symbol="BTC",
+                    trading_symbol="EUR",
+                    available_amount=0,
+                    remaining=0,
+                    filled_amount=position_size,
+                    opened_at=trade_open_date,
+                    closed_at=current_date,
+                    open_price=trade_open_price,
+                    amount=position_size,
+                    net_gain=net_gain_val,
+                    status=TradeStatus.CLOSED,
+                    cost=position_size * trade_open_price
+                ))
+                trade_open_price = None
+                trade_open_date = None
+                position_state = 0
+
+        # === Snapshots ===
+        snapshots = [
+            PortfolioSnapshot(
+                created_at=pd.Timestamp(ts),
+                unallocated=0.0,
+                total_value=total_value.loc[ts],
+                total_net_gain=net_gain.loc[ts]
+            )
+            for ts in index
+        ]
+
+        backtest_start = pd.Timestamp(index[0]).to_pydatetime() if len(
+            index) > 0 else None
+        backtest_end = pd.Timestamp(index[-1]).to_pydatetime() if len(
+            index) > 0 else None
+
+        backtest_result = BacktestResult(
+            trading_symbol="EUR",
+            name="vector_backtest",
+            initial_unallocated=initial_amount,
+            number_of_runs=1,
+            portfolio_snapshots=snapshots,
+            trades=trades,
+            orders=[],
+            positions=[],
+            created_at=datetime.now(timezone.utc),
+            backtest_date_range=backtest_date_range,
+            backtest_start_date=backtest_start,
+            backtest_end_date=backtest_end,
+            symbols=[]
+        )
+
+        backtest_metrics = create_backtest_metrics(
+            backtest_result, risk_free_rate=risk_free_rate
+        )
+
+        return Backtest(
+            backtest_metrics=backtest_metrics,
+            backtest_results=backtest_result
+        )
 
     def generate_schedule(
         self,
@@ -232,6 +415,48 @@ class BacktestService(Observable):
             strategy_related_paths=strategy_related_paths,
             data_file_paths=self._data_provider_service.get_data_files(),
         )
+
+    def get_backtest(
+        self,
+        algorithm,
+        backtest_date_range: BacktestDateRange,
+        directory
+    ) -> Optional[Backtest]:
+        """
+        Get a backtest for the given algorithm and date range.
+
+        Args:
+            algorithm: The algorithm to get the backtest for
+            backtest_date_range: The date range of the backtest
+            directory: The directory where the backtest report will be saved
+
+        Returns:
+            Optional[Backtest]: The backtest containing the
+                results and metrics.
+        """
+
+        if not os.path.exists(directory):
+            return None
+
+        for entry in os.listdir(directory):
+            path = os.path.join(directory, entry)
+
+            if not os.path.isdir(path):
+                continue
+
+            try:
+                # Load the backtest report
+                backtest = Backtest.open(path)
+
+                # Check if the algorithm name and date range match
+                if (backtest.backtest_results.name == algorithm.name and
+                        backtest.backtest_results.backtest_date_range \
+                        == backtest_date_range):
+                    return backtest
+            except Exception:
+                continue
+
+        return None
 
     @staticmethod
     def create_report_directory_name(backtest: Backtest) -> str:

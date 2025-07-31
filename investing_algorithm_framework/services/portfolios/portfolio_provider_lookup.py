@@ -54,9 +54,7 @@ class PortfolioProviderLookup:
             None
         """
         matches = []
-
         for portfolio_provider in self.portfolio_providers:
-
             if portfolio_provider.supports_market(market):
                 matches.append(portfolio_provider)
 

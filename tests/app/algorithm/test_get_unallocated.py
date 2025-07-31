@@ -2,7 +2,7 @@ from decimal import Decimal
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential
-from tests.resources import TestBase, MarketDataSourceServiceStub
+from tests.resources import TestBase
 
 
 class Test(TestBase):

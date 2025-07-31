@@ -17,14 +17,14 @@ class TestStandardDeviationDownside(unittest.TestCase):
     def test_empty_snapshots(self):
         report = MagicMock()
         report.get_snapshots.return_value = []
-        self.assertEqual(get_standard_deviation_downside_returns(report), 0.0)
+        self.assertEqual(get_standard_deviation_downside_returns(report.get_snapshots()), 0.0)
 
     def test_single_snapshot(self):
         now = datetime.now()
         snapshots = [Snapshot(100, now)]
         report = MagicMock()
         report.get_snapshots.return_value = snapshots
-        self.assertEqual(get_standard_deviation_downside_returns(report), 0.0)
+        self.assertEqual(get_standard_deviation_downside_returns(report.get_snapshots()), 0.0)
 
     def test_all_positive_returns(self):
         now = datetime.now()
@@ -35,7 +35,7 @@ class TestStandardDeviationDownside(unittest.TestCase):
         ]
         report = MagicMock()
         report.get_snapshots.return_value = snapshots
-        self.assertEqual(get_standard_deviation_downside_returns(report), 0.0)
+        self.assertEqual(get_standard_deviation_downside_returns(report.get_snapshots()), 0.0)
 
     def test_all_negative_returns(self):
         now = datetime.now()
@@ -48,7 +48,7 @@ class TestStandardDeviationDownside(unittest.TestCase):
         report.get_snapshots.return_value = snapshots
         # Returns: -10%, -10%
         expected_std = np.std([-0.1, -0.1], ddof=1)
-        self.assertAlmostEqual(get_standard_deviation_downside_returns(report), expected_std, places=6)
+        self.assertAlmostEqual(get_standard_deviation_downside_returns(report.get_snapshots()), expected_std, places=6)
 
     def test_mixed_returns(self):
         now = datetime.now()
@@ -62,7 +62,7 @@ class TestStandardDeviationDownside(unittest.TestCase):
         # Downside returns: [-0.1]
         expected_std = np.std([-0.1], ddof=1)
         self.assertTrue(np.isnan(expected_std) or expected_std == 0.0)
-        self.assertEqual(get_standard_deviation_downside_returns(report), 0.0)
+        self.assertEqual(get_standard_deviation_downside_returns(report.get_snapshots()), 0.0)
 
     def test_nan_handling(self):
         now = datetime.now()
@@ -73,4 +73,4 @@ class TestStandardDeviationDownside(unittest.TestCase):
         ]
         report = MagicMock()
         report.get_snapshots.return_value = snapshots
-        self.assertEqual(get_standard_deviation_downside_returns(report), 0.0)
+        self.assertEqual(get_standard_deviation_downside_returns(report.get_snapshots()), 0.0)

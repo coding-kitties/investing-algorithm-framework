@@ -13,7 +13,7 @@ class TestStrategy(TradingStrategy):
     time_unit = TimeUnit.MINUTE
     interval = 1
 
-    def run_strategy(self, context, market_data):
+    def run_strategy(self, context, data):
         pass
 
 
@@ -65,17 +65,20 @@ class Test(TestCase):
                 initial_balance=1000
             )
         )
+        start_date = datetime(2023, 12, 2, tzinfo=None)
+        end_date = start_date + timedelta(days=1)
         backtest_date_range = BacktestDateRange(
-            start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow()
+            start_date=start_date,
+            end_date=end_date
         )
-        report = app.run_backtest(
+        backtest = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
         )
-        dir_name = BacktestService.create_report_directory_name(report)
-
-        path = os.path.join(self.resource_dir, "backtest_reports", dir_name)
+        path = os.path.join(
+            self.resource_dir, "backtest_reports_for_testing/test_algorithm_backtest"
+        )
+        backtest.save(directory_path=path)
 
         # Check if the backtest report exists
         self.assertTrue(os.path.isdir(path))

@@ -94,6 +94,7 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
         Returns:
             None
         """
+
         if ohlcv_df.is_empty():
             return
 

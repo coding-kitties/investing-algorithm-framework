@@ -1,7 +1,9 @@
 import logging
 
 from sqlalchemy import create_engine, StaticPool
+from sqlalchemy import inspect
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import clear_mappers
 
 from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI, \
     OperationalException
@@ -38,6 +40,7 @@ def setup_sqlalchemy(app, throw_exception_if_not_set=True):
     return app
 
 
+
 class SQLBaseModel(DeclarativeBase):
     pass
 
@@ -49,6 +52,33 @@ def create_all_tables():
 from sqlalchemy import event
 from sqlalchemy.orm import mapper
 from datetime import timezone
+
+def clear_db(db_uri):
+    """
+    Clear the database by dropping all tables.
+    This is useful for testing purposes.
+
+    Args:
+        db_uri (str): The database URI to connect to.
+
+    Returns:
+        None
+    """
+    # Drop all tables before deleting file
+    try:
+        engine = create_engine(db_uri)
+        inspector = inspect(engine)
+        if inspector.get_table_names():
+            logger.info("Dropping all tables in backtest database")
+            SQLBaseModel.metadata.drop_all(bind=engine)
+    except Exception as e:
+        logger.error(f"Error dropping tables: {e}")
+
+    # # Clear mappers (if using classical mappings)
+    # try:
+    #     clear_mappers()
+    # except Exception:
+    #     pass  # ignore if not needed
 
 
 @event.listens_for(mapper, "load")

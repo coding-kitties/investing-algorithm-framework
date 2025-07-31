@@ -1,18 +1,14 @@
 from .database import setup_sqlalchemy, Session, \
-    create_all_tables
+    create_all_tables, clear_db
 from .models import SQLPortfolio, SQLOrder, SQLPosition, \
     SQLPortfolioSnapshot, SQLPositionSnapshot, SQLTrade, \
-    CCXTOHLCVBacktestMarketDataSource, CCXTOrderBookMarketDataSource, \
-    CCXTTickerMarketDataSource, CCXTOHLCVMarketDataSource, \
-    CSVOHLCVMarketDataSource, CSVTickerMarketDataSource, SQLTradeTakeProfit, \
-    SQLTradeStopLoss, PandasOHLCVBacktestMarketDataSource, \
-    PandasOHLCVMarketDataSource
+    SQLTradeTakeProfit, SQLTradeStopLoss
 from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLPortfolioRepository, SQLTradeRepository, \
     SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository, \
     SQLTradeTakeProfitRepository, SQLTradeStopLossRepository, \
     SQLOrderMetadataRepository
-from .services import PerformanceService, CCXTMarketService, \
+from .services import PerformanceService, \
     AzureBlobStorageStateHandler, AWSS3StorageStateHandler
 from .data_providers import CSVOHLCVDataProvider, get_default_data_providers, \
     get_default_ohlcv_data_providers, CCXTOHLCVDataProvider
@@ -20,6 +16,7 @@ from .order_executors import CCXTOrderExecutor, BacktestOrderExecutor
 from .portfolio_providers import CCXTPortfolioProvider
 
 __all__ = [
+    "clear_db",
     "create_all_tables",
     "SQLPositionRepository",
     "SQLPortfolioRepository",
@@ -35,15 +32,6 @@ __all__ = [
     "PerformanceService",
     "SQLPortfolioSnapshot",
     "SQLPositionSnapshot",
-    "CCXTOHLCVMarketDataSource",
-    "CCXTOrderBookMarketDataSource",
-    "CCXTTickerMarketDataSource",
-    "CCXTOHLCVMarketDataSource",
-    "CCXTMarketService",
-    "CSVOHLCVMarketDataSource",
-    "CSVTickerMarketDataSource",
-    "CCXTOHLCVBacktestMarketDataSource",
-    "CCXTOrderBookMarketDataSource",
     "AzureBlobStorageStateHandler",
     "SQLTradeRepository",
     "SQLTradeTakeProfit",
@@ -56,8 +44,6 @@ __all__ = [
     "CCXTPortfolioProvider",
     "get_default_data_providers",
     "get_default_ohlcv_data_providers",
-    "PandasOHLCVBacktestMarketDataSource",
-    "PandasOHLCVMarketDataSource",
     "AWSS3StorageStateHandler",
     "CCXTOHLCVDataProvider",
     "BacktestOrderExecutor"

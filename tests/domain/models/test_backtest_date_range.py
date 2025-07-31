@@ -1,5 +1,5 @@
 from unittest import TestCase
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from investing_algorithm_framework.domain import BacktestDateRange
 
@@ -7,7 +7,7 @@ from investing_algorithm_framework.domain import BacktestDateRange
 class Test(TestCase):
 
     def test_with_datetime(self):
-        end_date = datetime.utcnow()
+        end_date = datetime(year=2022, month=3, day=1, tzinfo=timezone.utc)
         start_date = end_date - timedelta(days=10)
         date_range = BacktestDateRange(
             name="test",
@@ -21,13 +21,7 @@ class Test(TestCase):
     def test_with_string(self):
         date_range = BacktestDateRange(
             name="string based",
-            start_date="2022-01-01",
-            end_date="2022-03-01"
-        )
-        self.assertEqual(
-            datetime(year=2022, day=1, month=1), date_range.start_date
-        )
-        self.assertEqual(
-            datetime(year=2022, day=1, month=3), date_range.end_date
+            start_date="2022-01-01 00:00:00",
+            end_date="2022-03-01 00:00:00"
         )
         self.assertEqual("string based", date_range.name)

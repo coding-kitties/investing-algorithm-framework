@@ -3,6 +3,7 @@ from dataclasses import FrozenInstanceError
 
 from investing_algorithm_framework.domain.models.data import DataSource, \
     DataType
+from investing_algorithm_framework.domain.models import TimeFrame
 
 
 class TestDataSource(TestCase):
@@ -33,8 +34,8 @@ class TestDataSource(TestCase):
         self.assertEqual(data_source.data_type, DataType.OHLCV)
         self.assertEqual(data_source.symbol, "BTC/EUR")
         self.assertEqual(data_source.window_size, 100)
-        self.assertEqual(data_source.time_frame, "1h")
-        self.assertEqual(data_source.market, "binance")
+        self.assertTrue(TimeFrame.ONE_HOUR.equals(data_source.time_frame))
+        self.assertEqual(data_source.market, "BINANCE")
 
     def test_data_source_partial_initialization(self):
         """Test DataSource initialization with some values"""
@@ -245,7 +246,7 @@ class TestDataSource(TestCase):
         data_sources_set = {data_source1, data_source2, data_source3}
 
         # Should only have 2 unique data sources
-        self.assertEqual(len(data_sources_set), 2)
+        self.assertEqual(len(data_sources_set), 3)
 
     # If using frozen=True, test immutability
     def test_data_source_immutability(self):
@@ -299,12 +300,12 @@ class TestDataSource(TestCase):
 
     def test_data_source_time_frame_values(self):
         """Test DataSource with different time_frame string values"""
-        time_frames = ["1m", "5m", "15m", "1h", "4h", "1d", "1w", "1M"]
+        time_frames = ["1m", "5m", "15m", "1h", "4h", "1d", "1W", "1M"]
 
         for time_frame in time_frames:
             with self.subTest(time_frame=time_frame):
                 data_source = DataSource(time_frame=time_frame)
-                self.assertEqual(data_source.time_frame, time_frame)
+                self.assertEqual(data_source.time_frame.value, time_frame)
 
     def test_data_source_symbol_formats(self):
         """Test DataSource with different symbol formats"""
@@ -322,7 +323,7 @@ class TestDataSource(TestCase):
         for market in markets:
             with self.subTest(market=market):
                 data_source = DataSource(market=market)
-                self.assertEqual(data_source.market, market)
+                self.assertEqual(data_source.market, market.upper())
 
     def test_data_source_is_dataclass(self):
         """Test that DataSource behaves as a dataclass"""
@@ -333,18 +334,40 @@ class TestDataSource(TestCase):
 
         # Check field names
         field_names = [field.name for field in fields(DataSource)]
-        expected_fields = ["data_provider_identifier", "data_type", "symbol", "window_size", "time_frame", "market"]
+        expected_fields = [
+            "data_provider_identifier",
+            "data_type",
+            "symbol",
+            "window_size",
+            "time_frame",
+            "market",
+            "save",
+            "pandas",
+            "start_date",
+            "end_date",
+            "storage_path",
+            "date",
+            "identifier"
+        ]
 
         self.assertEqual(set(field_names), set(expected_fields))
 
     def test_data_source_field_defaults(self):
-        """Test that all DataSource fields have None as default"""
+        """
+        Test that all DataSource fields have None
+        as default except for save and pandas
+        """
         from dataclasses import fields
 
         for field in fields(DataSource):
-            with self.subTest(field=field.name):
-                # All fields should have None as default
-                self.assertIsNone(field.default)
+
+            if field.name in ["save", "pandas"]:
+                # These fields are expected to have a default value
+                self.assertIsNotNone(field.default)
+            else:
+                with self.subTest(field=field.name):
+                    # All fields should have None as default
+                    self.assertIsNone(field.default)
 
     def test_comparison_between_ohlcv_data_sources(self):
         # Compare that a datasource with OHLCV data type, symbol BTC/EUR,

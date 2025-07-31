@@ -66,6 +66,12 @@ class DataSource:
                     end_date.replace(tzinfo=timezone.utc)
                 )
 
+        if self.market is not None:
+            object.__setattr__(self, 'market', self.market.upper())
+
+        if self.symbol is not None:
+            object.__setattr__(self, 'symbol', self.symbol.upper())
+
     def get_identifier(self):
         """
         Returns the identifier or creates a unique identifier for the

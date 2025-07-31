@@ -2,17 +2,17 @@ import os
 from unittest import TestCase
 
 from investing_algorithm_framework import create_app, TradingStrategy, \
-    TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, \
-    Algorithm, MarketCredential
-from tests.resources import random_string, MarketServiceStub, \
-    MarketDataSourceServiceStub, OrderExecutorTest, PortfolioProviderTest
+    TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, Algorithm, \
+    MarketCredential
+from tests.resources import random_string, OrderExecutorTest, \
+    PortfolioProviderTest
 
 
 class StrategyOne(TradingStrategy):
     time_unit = TimeUnit.SECOND
     interval = 2
 
-    def apply_strategy(self, context, market_data):
+    def apply_strategy(self, context, data):
         pass
 
 
@@ -20,7 +20,7 @@ class StrategyTwo(TradingStrategy):
     time_unit = TimeUnit.SECOND
     interval = 2
 
-    def apply_strategy(self, context, market_data):
+    def apply_strategy(self, context, data):
         pass
 
 
@@ -76,7 +76,6 @@ class Test(TestCase):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         app.add_portfolio_provider(PortfolioProviderTest)
         app.add_order_executor(OrderExecutorTest)
-        app.container.market_service.override(MarketServiceStub(None))
         app.container.portfolio_configuration_service().clear()
         app.add_portfolio_configuration(
             PortfolioConfiguration(
@@ -95,7 +94,7 @@ class Test(TestCase):
         algorithm.add_strategy(StrategyOne)
         algorithm.add_strategy(StrategyTwo)
         app.add_algorithm(algorithm)
-        app.run(number_of_iterations=2)
+        app.run(number_of_iterations=1)
         self.assertTrue(app.has_run("StrategyOne"))
         self.assertTrue(app.has_run("StrategyTwo"))
 
@@ -103,7 +102,6 @@ class Test(TestCase):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         app.add_portfolio_provider(PortfolioProviderTest)
         app.add_order_executor(OrderExecutorTest)
-        app.container.market_service.override(MarketServiceStub(None))
         app.container.portfolio_configuration_service().clear()
         app.add_portfolio_configuration(
             PortfolioConfiguration(
@@ -121,7 +119,7 @@ class Test(TestCase):
         algorithm = Algorithm()
 
         @app.strategy(time_unit=TimeUnit.SECOND, interval=1)
-        def run_strategy(context, market_data):
+        def run_strategy(context, data):
             pass
 
         app.add_algorithm(algorithm)
@@ -132,7 +130,6 @@ class Test(TestCase):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         app.add_portfolio_provider(PortfolioProviderTest)
         app.add_order_executor(OrderExecutorTest)
-        app.container.market_service.override(MarketServiceStub(None))
         app.container.portfolio_configuration_service().clear()
         app.add_portfolio_configuration(
             PortfolioConfiguration(
@@ -151,8 +148,6 @@ class Test(TestCase):
         algorithm.add_strategy(StrategyOne)
         algorithm.add_strategy(StrategyTwo)
         app.add_algorithm(algorithm)
-        app.run(
-            number_of_iterations=2, payload={"ACTION": "RUN_STRATEGY"},
-        )
+        app.run(number_of_iterations=1)
         self.assertTrue(app.has_run("StrategyOne"))
         self.assertTrue(app.has_run("StrategyTwo"))

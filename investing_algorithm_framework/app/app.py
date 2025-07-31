@@ -2,13 +2,12 @@ import inspect
 import logging
 import os
 import threading
-from typing import List, Optional, Any, Dict
+from datetime import datetime, timezone
+from typing import List, Optional, Any, Dict, Tuple
 
 from flask import Flask
 
-from investing_algorithm_framework.app.algorithm import Algorithm, \
-    AlgorithmFactory
-from investing_algorithm_framework.app.stateless import ActionHandler
+from investing_algorithm_framework.app.algorithm import Algorithm
 from investing_algorithm_framework.app.strategy import TradingStrategy
 from investing_algorithm_framework.app.task import Task
 from investing_algorithm_framework.app.web import create_flask_app
@@ -16,15 +15,15 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     DATABASE_DIRECTORY_PATH, RESOURCE_DIRECTORY, ENVIRONMENT, Environment, \
     SQLALCHEMY_DATABASE_URI, OperationalException, StateHandler, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, APP_MODE, MarketCredential, \
-    AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, \
+    AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, DataSource, \
     BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, Backtest, \
-    MarketDataSource, PortfolioConfiguration, SnapshotInterval, \
+    PortfolioConfiguration, SnapshotInterval, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured, \
-    BACKTESTING_INDEX_DATETIME, DataProvider, INDEX_DATETIME, \
-    BACKTESTING_LAST_SNAPSHOT_DATETIME
+    DataProvider, INDEX_DATETIME, \
+    LAST_SNAPSHOT_DATETIME
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
-    BacktestOrderExecutor, CCXTOHLCVDataProvider
+    BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db
 from investing_algorithm_framework.services import OrderBacktestService, \
     BacktestPortfolioService, BacktestTradeOrderEvaluator, \
     DefaultTradeOrderEvaluator
@@ -45,8 +44,6 @@ class App:
     Attributes:
         container: The dependency container for the app. This is used
             to store all the services and repositories for the app.
-        algorithm: The algorithm to run. This is used to run the
-            trading bot.
         _flask_app: The flask app instance. This is used to run the
             web app.
         _state_handler: The state handler for the app. This is used
@@ -65,7 +62,7 @@ class App:
         self._started = False
         self._tasks = []
         self._strategies = []
-        self._data_providers = []
+        self._data_providers: List[Tuple[DataProvider, int]] = []
         self._on_initialize_hooks = []
         self._on_strategy_run_hooks = []
         self._on_after_initialize_hooks = []
@@ -180,7 +177,6 @@ class App:
             None
         """
         self.add_strategies(algorithm.strategies)
-        self.add_data_sources(algorithm.data_sources)
         self.add_tasks(algorithm.tasks)
 
     def add_trade_order_evaluator(self, trade_order_evaluator):
@@ -229,33 +225,23 @@ class App:
         """
         Function to initialize the configuration for the app. This method
         should be called before running the algorithm.
+
+        Returns:
+            None
         """
-        logger.info("Initializing configuration")
+        data = {
+            ENVIRONMENT: self.config.get(ENVIRONMENT, Environment.PROD.value),
+            DATABASE_DIRECTORY_NAME: "databases",
+            LAST_SNAPSHOT_DATETIME: None
+        }
         configuration_service = self.container.configuration_service()
+        configuration_service.initialize_from_dict(data)
         config = configuration_service.get_config()
 
-        # Check if the resource directory is set
-        if RESOURCE_DIRECTORY not in config \
-                or config[RESOURCE_DIRECTORY] is None:
-            logger.info(
-                "Resource directory not set, setting" +
-                " to current working directory"
-            )
-            path = os.path.join(os.getcwd(), "resources")
-            configuration_service.add_value(RESOURCE_DIRECTORY, path)
-
-        config = configuration_service.get_config()
-        logger.info(f"Resource directory set to {config[RESOURCE_DIRECTORY]}")
-
-        if DATABASE_NAME not in config or config[DATABASE_NAME] is None:
+        if INDEX_DATETIME not in config or config[INDEX_DATETIME] is None:
             configuration_service.add_value(
-                DATABASE_NAME, "prod-database.sqlite3"
+                INDEX_DATETIME, datetime.now(timezone.utc)
             )
-
-        # Set the database directory name
-        configuration_service.add_value(
-            DATABASE_DIRECTORY_NAME, "databases"
-        )
 
         if Environment.TEST.equals(config[ENVIRONMENT]):
             configuration_service.add_value(
@@ -270,7 +256,6 @@ class App:
                 DATABASE_NAME, "dev-database.sqlite3"
             )
 
-        config = configuration_service.get_config()
         resource_dir = config[RESOURCE_DIRECTORY]
         database_dir_name = config.get(DATABASE_DIRECTORY_NAME)
         configuration_service.add_value(
@@ -287,16 +272,11 @@ class App:
             )
             configuration_service.add_value(SQLALCHEMY_DATABASE_URI, path)
 
-        config = configuration_service.get_config()
-
-        if APP_MODE not in config:
-            configuration_service.add_value(APP_MODE, AppMode.DEFAULT.value)
-
     def initialize_backtest_config(
         self,
         backtest_date_range: BacktestDateRange,
         initial_amount=None,
-        snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY
+        snapshot_interval: SnapshotInterval = None
     ):
         """
         Function to initialize the configuration for the app in backtest mode.
@@ -324,16 +304,22 @@ class App:
             BACKTESTING_END_DATE: backtest_date_range.end_date,
             DATABASE_NAME: "backtest-database.sqlite3",
             DATABASE_DIRECTORY_NAME: "backtest_databases",
+            DATABASE_DIRECTORY_PATH: os.path.join(
+                self.resource_directory_path,
+                "backtest_databases"
+            ),
             BACKTESTING_INITIAL_AMOUNT: initial_amount,
-            SNAPSHOT_INTERVAL: SnapshotInterval.from_value(
-                snapshot_interval
-            ).value,
             INDEX_DATETIME: backtest_date_range.start_date,
-            BACKTESTING_INDEX_DATETIME: backtest_date_range.start_date,
-            BACKTESTING_LAST_SNAPSHOT_DATETIME: None
+            LAST_SNAPSHOT_DATETIME: None
         }
         configuration_service = self.container.configuration_service()
         configuration_service.initialize_from_dict(data)
+
+        if snapshot_interval is not None:
+            configuration_service.add_value(
+                SNAPSHOT_INTERVAL, SnapshotInterval\
+                    .from_value(snapshot_interval).value
+            )
 
     def initialize_storage(self, remove_database_if_exists: bool = False):
         """
@@ -378,15 +364,18 @@ class App:
         setup_sqlalchemy(self)
         create_all_tables()
 
-    def initialize_data_sources(self, algorithm):
+    def initialize_data_sources(
+        self,
+        data_sources: List[DataSource],
+    ):
         """
         Function to initialize the data sources for the app. This method
         should be called before running the algorithm. This method
         initializes all data sources so that they are ready to be used.
 
         Args:
-            algorithm (Algorithm): The algorithm to initialize the data
-                sources for. This should be an instance of Algorithm.
+            data_sources (List[DataSource]): The data sources to initialize.
+                This should be a list of DataSource instances.
 
         Returns:
             None
@@ -395,18 +384,20 @@ class App:
         data_provider_service = self.container.data_provider_service()
         data_provider_service.reset()
 
-        for data_provider in self._data_providers:
-            data_provider_service.add_data_provider(data_provider)
+        for (data_provider, priority) in self._data_providers:
+            data_provider_service.add_data_provider(
+                data_provider, priority=priority
+            )
 
         # Add the default data providers
         data_provider_service.add_data_provider(CCXTOHLCVDataProvider())
 
         # Initialize all data sources
-        data_provider_service.index_data_providers(algorithm.data_sources)
+        data_provider_service.index_data_providers(data_sources)
 
     def initialize_data_sources_backtest(
         self,
-        algorithm,
+        data_sources: List[DataSource],
         backtest_date_range: BacktestDateRange
     ):
         """
@@ -416,8 +407,7 @@ class App:
         ready to be used.
 
         Args:
-            algorithm (Algorithm): The algorithm to initialize the data
-                sources for. This should be an instance of Algorithm.
+            data_sources (List[DataSource]): The data sources to initialize.
             backtest_date_range (BacktestDateRange): The date range for the
                 backtest. This should be an instance of BacktestDateRange.
 
@@ -436,7 +426,7 @@ class App:
 
         # Initialize all data sources
         data_provider_service.index_backtest_data_providers(
-            algorithm.data_sources, backtest_date_range
+            data_sources, backtest_date_range
         )
 
         # Prepare the backtest data for each data provider
@@ -529,8 +519,7 @@ class App:
             configuration_service.add_value(APP_MODE, AppMode.WEB.value)
             self._initialize_web()
 
-
-    def run(self, payload: dict = None, number_of_iterations: int = None):
+    def run(self, number_of_iterations: int = None):
         """
         Entry point to run the application. This method should be called to
         start the trading bot. This method can be called in three modes:
@@ -555,26 +544,17 @@ class App:
          initializes the algorithm with the services and the configuration.
 
         Args:
-            payload (dict): The payload to handle for the algorithm
             number_of_iterations (int): The number of iterations to run the
-            algorithm for
+                algorithm for
 
         Returns:
             None
         """
+        self.initialize_config()
+        self.initialize_storage()
+        event_loop_service = None
 
         try:
-            configuration_service = self.container.configuration_service()
-            config = configuration_service.get_config()
-
-            # Run method should never be called with environment set to
-            # backtest, if it is, then set the environment to prod
-            if config[ENVIRONMENT] == Environment.BACKTEST.value:
-                configuration_service.add_value(
-                    ENVIRONMENT, Environment.PROD.value
-                )
-
-            self.initialize_config()
 
             # Load the state if a state handler is provided
             if self._state_handler is not None:
@@ -583,38 +563,18 @@ class App:
                 config = self.container.configuration_service().get_config()
                 self._state_handler.load(config[RESOURCE_DIRECTORY])
 
-            self.initialize()
             logger.info("App initialization complete")
 
             # Run all on_initialize hooks
             for hook in self._on_initialize_hooks:
                 hook.on_run(self.context)
 
-            configuration_service = self.container.configuration_service()
-            config = configuration_service.get_config()
+            algorithm = self.get_algorithm()
+            self.initialize_data_sources(algorithm.data_sources)
+            self.initialize_services()
+            self.initialize_portfolios()
 
-            algorithm_factory: AlgorithmFactory = \
-                self.container.algorithm_factory()
-            algorithm = algorithm_factory.create_algorithm(
-                name=self._name,
-                strategies=self._strategies,
-                tasks=self._tasks,
-                on_strategy_run_hooks=self._on_strategy_run_hooks,
-            )
-            self.initialize_data_sources(algorithm)
-
-            # Run in payload mode if payload is provided
-            if payload is not None:
-                logger.info("Running with payload")
-                context = self.container.context()
-                action_handler = ActionHandler.of(payload)
-                response = action_handler.handle(
-                    payload=payload,
-                    context=context,
-                )
-                return response
-
-            if AppMode.WEB.equals(config[APP_MODE]):
+            if AppMode.WEB.equals(self.config[APP_MODE]):
                 logger.info("Running web")
                 flask_thread = threading.Thread(
                     name='Web App',
@@ -624,6 +584,10 @@ class App:
                 flask_thread.daemon = True
                 flask_thread.start()
 
+            trade_order_evaluator = DefaultTradeOrderEvaluator(
+                trade_service=self.container.trade_service(),
+                order_service=self.container.order_service()
+            )
             event_loop_service = EventLoopService(
                 configuration_service=self.container.configuration_service(),
                 portfolio_snapshot_service=self.container
@@ -633,7 +597,9 @@ class App:
                 portfolio_service=self.container.portfolio_service(),
                 data_provider_service=self.container.data_provider_service(),
                 trade_service=self.container.trade_service(),
-                trade_order_evaluator=self._trade_order_evaluator
+            )
+            event_loop_service.initialize(
+                algorithm, trade_order_evaluator=trade_order_evaluator
             )
 
             try:
@@ -646,6 +612,9 @@ class App:
             logger.error(e)
             raise e
         finally:
+
+            if event_loop_service is not None:
+                self._run_history = event_loop_service.history
 
             try:
                 # Upload state if state handler is provided
@@ -796,16 +765,14 @@ class App:
         backtest_date_range: BacktestDateRange,
         name: str = None,
         initial_amount=None,
-        output_directory=None,
         algorithm=None,
         strategy=None,
         strategies: List = None,
-        save=True,
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
-        strategy_directory_path: Optional[str] = None,
-        backtest_directory_name: Optional[str] = None,
         risk_free_rate: Optional[float] = None,
-        metadata: Optional[Dict[str, str]] = None
+        metadata: Optional[Dict[str, str]] = None,
+        save = True,
+        directory: str = None
     ) -> Backtest:
         """
         Run a backtest for an algorithm.
@@ -825,34 +792,22 @@ class App:
             algorithm (Algorithm) (Optional): The algorithm object that needs
                 to be backtested. If this is provided, then the strategies
                 and tasks of the algorithm will be used for the backtest.
-            output_directory (str) (Optional): The directory to write
-                the backtest report to
             snapshot_interval (SnapshotInterval): The snapshot
                 interval to use for the backtest. This is used to determine
                 how often the portfolio snapshot should be taken during the
                 backtest. The default is TRADE_CLOSE, which means that the
                 portfolio snapshot will be taken at the end of each trade.
-            strategy_directory_path (Optional[str]): The directory path
-                where the strategy is located. This is used to save the
-                strategy if save_strategy is True. If not provided,
-                the framework tries to determine the path via the
-                algorithm or strategy object.
-            backtest_directory_name (Optional[str]): If not
-                provided, the framework will generate a name based on the
-                algorithm name and the backtest date range and the current
-                date and time.
             risk_free_rate (Optional[float]): The risk-free rate to use for
                 the backtest. This is used to calculate the Sharpe ratio
                 and other performance metrics. If not provided, the default
                 risk-free rate will be tried to be fetched from the
                 US Treasury website.
-            save (bool): Whether to save the backtest report to the output
-                directory. If True, then the backtest report will be saved
-                to the output directory.
             metadata (Optional[Dict[str, str]]): Metadata to attach to the
                 backtest report. This can be used to store additional
                 information about the backtest, such as the author, version,
                 parameters or any other relevant information.
+            save (bool): Whether to save the backtest report to the disk.
+            directory (str): The directory to save the backtest report to.
 
         Returns:
             Backtest: Instance of Backtest
@@ -876,7 +831,9 @@ class App:
             tasks=self._tasks,
             on_strategy_run_hooks=self._on_strategy_run_hooks,
         )
-        self.initialize_data_sources_backtest(algorithm, backtest_date_range)
+        self.initialize_data_sources_backtest(
+            algorithm.data_sources, backtest_date_range
+        )
         backtest_service = self.container.backtest_service()
 
         # Create backtest schedule
@@ -897,7 +854,6 @@ class App:
             portfolio_service=self.container.portfolio_service(),
             data_provider_service=self.container.data_provider_service(),
             trade_service=self.container.trade_service(),
-            trade_order_evaluator=self._trade_order_evaluator
         )
         trade_order_evaluator = BacktestTradeOrderEvaluator(
             trade_service=self.container.trade_service(),
@@ -916,131 +872,121 @@ class App:
             backtest_date_range=backtest_date_range,
             risk_free_rate=risk_free_rate,
         )
+
         backtest.metadata = metadata if metadata is not None else {}
-        # backtest_service.save_backtest(backtest)
+        self.cleanup_backtest_resources()
+
+        if save and directory:
+            directory_name = backtest_service \
+                .create_report_directory_name(backtest)
+            backtest.save(os.path.join(directory, directory_name))
+
         return backtest
 
-            # strategy_orchestrator_service = \
-        #     self.container.strategy_orchestrator_service()
-        # strategy_orchestrator_service.initialize(algorithm)
-        # backtest_service = self.container.backtest_service()
-        #
-        # # Setup snapshot service as observer
-        # backtest_service.clear_observers()
-        # portfolio_snapshot_service = \
-        #     self.container.portfolio_snapshot_service()
-        # backtest_service.add_observer(portfolio_snapshot_service)
-        # context = self.container.context()
-        # order_service = self.container.order_service()
-        # order_service.clear_observers()
-        # order_service.add_observer(portfolio_snapshot_service)
-        # portfolio_service = self.container.portfolio_service()
-        # portfolio_service.clear_observers()
-        # portfolio_service.add_observer(portfolio_snapshot_service)
-        # backtest = backtest_service.run_backtest(
-        #     algorithm=algorithm,
-        #     context=context,
-        #     strategy_orchestrator_service=strategy_orchestrator_service,
-        #     initial_amount=initial_amount,
-        #     backtest_date_range=backtest_date_range,
-        #     risk_free_rate=risk_free_rate,
-        #     strategy_directory_path=strategy_directory_path
-        # )
-        # backtest.metadata = metadata if metadata is not None else {}
-        #
-        # if output_directory is None:
-        #     output_directory = os.path.join(
-        #         config[RESOURCE_DIRECTORY], "backtest_reports"
-        #     )
-        #
-        # if backtest_directory_name is None:
-        #     backtest_directory_name = BacktestService\
-        #         .create_report_directory_name(backtest)
-        #
-        # output_directory = os.path.join(
-        #     output_directory, backtest_directory_name
-        # )
-        #
-        # if save:
-        #     backtest.save(directory_path=output_directory)
-        #
-        # return backtest
+    def run_vector_backtest(
+        self,
+        backtest_date_range: BacktestDateRange,
+        initial_amount,
+        strategy,
+        snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
+        metadata: Optional[Dict[str, str]] = None,
+        risk_free_rate: Optional[float] = None,
+    ) -> Backtest:
+        """
+        Run a vectorized backtest for an algorithm. The provided algorithm
+        or set of strategies need to have their 'buy_signal_vectorized' and
+        'sell_signal_vectorized' methods implemented to support vectorized
+        backtesting.
+
+        Args:
+            backtest_date_range: The date range to run the backtest for
+                (instance of BacktestDateRange)
+            initial_amount: The initial amount to start the backtest with.
+                This will be the amount of trading currency that the backtest
+                portfolio will start with.
+            strategy (TradingStrategy) (Optional): The strategy object
+                that needs to be backtested.
+            snapshot_interval (SnapshotInterval): The snapshot
+                interval to use for the backtest. This is used to determine
+                how often the portfolio snapshot should be taken during the
+                backtest. The default is TRADE_CLOSE, which means that the
+                portfolio snapshot will be taken at the end of each trade.
+            risk_free_rate (Optional[float]): The risk-free rate to use for
+                the backtest. This is used to calculate the Sharpe ratio
+                and other performance metrics. If not provided, the default
+                risk-free rate will be tried to be fetched from the
+                US Treasury website.
+            metadata (Optional[Dict[str, str]]): Metadata to attach to the
+                backtest report. This can be used to store additional
+                information about the backtest, such as the author, version,
+                parameters or any other relevant information.
+
+        Returns:
+            Backtest: Instance of Backtest
+        """
+        # Initialize configuration for vectorized backtesting
+        self.initialize_backtest_config(
+            backtest_date_range=backtest_date_range,
+            snapshot_interval=snapshot_interval,
+            initial_amount=initial_amount
+        )
+        self.initialize_data_sources_backtest(
+            strategy.data_sources, backtest_date_range
+        )
+        backtest_service = self.container.backtest_service()
+        backtest_service.validate_strategy_for_vector_backtest(strategy)
+        backtest = backtest_service.create_vector_backtest(
+            strategy=strategy,
+            backtest_date_range=backtest_date_range,
+            initial_amount=initial_amount,
+            risk_free_rate=risk_free_rate
+        )
+        backtest.metadata = metadata if metadata is not None else {}
+        return backtest
 
     def run_backtests(
         self,
-        algorithms=None,
-        strategies: List[TradingStrategy] = None,
+        algorithms,
+        backtest_date_ranges,
         initial_amount=None,
-        backtest_date_ranges: List[BacktestDateRange] = None,
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         risk_free_rate: Optional[float] = None,
-        save=True,
-        output_directory=None,
-        checkpoint=False,
-    ) -> List[Backtest]:
+        save = True,
+        directory: Optional[str] = None,
+        use_checkpoints: Optional[bool] = True,
+    ):
         """
-        Run a set of backtests for the provided algorithms or strategies
-        with the given date ranges.
+        Function to run multiple backtests for a list of algorithms over
+        a list of date ranges. This function will run each algorithm
+        for each date range and return a list of backtest reports.
 
         Args:
-            algorithms (List[Algorithm]) (Optional): The algorithms to run
-                backtests for. This param is optional. Either algorithms or
-                strategies should be provided. If both are provided, then the
-                algorithms will be used.
-            strategies (List[TradingStrategy]) (Optional): The strategies to
-                run backtests for. This param is optional. Either algorithms
-                or strategies should be provided. If both are provided, then
-                the algorithms will be used.
-            backtest_date_ranges: List[BacktestDateRange] - The date ranges
-                to run the backtests for
-            initial_amount: The initial amount to start the backtest with.
-            output_directory: str - The directory to write the backtest
-              report to.
-            checkpoint: bool - Whether to checkpoint the backtest,
-              If True, then it will be checked if for a given algorithm name
-                and date range, a backtest report already exists. If it does,
-                then the backtest will not be run again. This is useful
-                when running backtests for a large number of algorithms
-                and date ranges where some of the backtests may fail
-                and you want to re-run only the failed backtests.
-            save (bool): Whether to save the backtest report
-                to the output directory. If True, then the backtest report
-                will be saved to the output directory.
-            snapshot_interval (SnapshotInterval): The snapshot interval to
-                use for the backtest. This is used to determine how often
-                the portfolio snapshot should be taken during the backtest.
+            algorithms: List of Algorithm instances to run backtests for.
+            backtest_date_ranges (List[BacktestDateRange]): List of date ranges
+            initial_amount (float): The initial amount to start the
+                backtest with. This will be the amount of trading currency
+                that the portfolio will start with.
+            snapshot_interval (SnapshotInterval): The snapshot interval to use
+                for the backtest. This is used to determine how often the
+                portfolio snapshot should be taken during the backtest.
+            risk_free_rate (Optional[float]): The risk-free rate to use for
+                calculating performance metrics. If not provided, the default
+                risk-free rate will be tried to be fetched from the
+                US Treasury website.
+            save (bool): Whether to save the backtest reports to disk.
+            directory (Optional[str]): The directory to save the backtest
+                reports to. If not provided, the reports will not be saved
+            use_checkpoints (Optional[bool]): Whether to use checkpoints
+                to skip already run backtests. If True, the function will
+                check if a backtest report already exists for the given
+                algorithm and date range. If it does, it will skip running
+                the backtest and return the existing report.
 
-        Returns
-            List[Backtest]: List of Backtest instances
+        Returns:
+            List[Backtest]: List of Backtest instances containing the results
         """
-        logger.info("Initializing backtests")
-        reports = []
-
-        if algorithms is None and strategies is None:
-            raise OperationalException(
-                "No algorithms or strategies provided for backtest"
-            )
-
-        # Create or validate all algorithms with the algorithm factory
-        algorithm_factory = self.container.algorithm_factory()
-
-        if algorithms is not None:
-            to_be_validated_algorithms = algorithms
-            algorithms = []
-
-            for algorithm in to_be_validated_algorithms:
-                algorithm = algorithm_factory.create_algorithm(
-                    algorithm=algorithm
-                )
-                algorithms.append(algorithm)
-        else:
-            algorithms = []
-
-        if strategies is not None:
-            for strategy in strategies:
-                algorithms.append(
-                    algorithm_factory.create_algorithm(strategy=strategy)
-                )
+        backtests = []
+        backtest_service = self.container.backtest_service()
 
         for date_range in backtest_date_ranges:
             print(
@@ -1053,12 +999,11 @@ class App:
 
             for algorithm in algorithms:
 
-                if checkpoint:
-                    backtest_service = self.container.backtest_service()
-                    report = backtest_service.get_report(
-                        algorithm_name=algorithm.name,
+                if use_checkpoints and directory is not None:
+                    report = backtest_service.get_backtest(
+                        algorithm=algorithm,
                         backtest_date_range=date_range,
-                        directory=output_directory
+                        directory=directory
                     )
 
                     if report is not None:
@@ -1070,29 +1015,36 @@ class App:
                             f"{date_range.start_date} - "
                             f"{date_range.end_date}"
                         )
-                        reports.append(report)
+                        backtests.append(report)
                         continue
 
-                report = self.run_backtest(
+                backtest = self.run_backtest(
                     backtest_date_range=date_range,
                     initial_amount=initial_amount,
-                    output_directory=output_directory,
                     algorithm=algorithm,
-                    save=save,
                     snapshot_interval=snapshot_interval,
                     risk_free_rate=risk_free_rate
                 )
-                reports.append(report)
 
-        return reports
+                if save and directory is not None:
+                    directory_name = backtest_service\
+                        .create_report_directory_name(backtest)
+                    backtest.save(os.path.join(directory, directory_name))
 
-    def add_data_provider(self, data_provider) -> None:
+                backtests.append(backtest)
+
+        return backtests
+
+    def add_data_provider(self, data_provider, priority=3) -> None:
         """
         Function to add a data provider to the app. The data provider should
         be an instance of DataProvider or a DataProviderClass.
 
         Args:
             data_provider: Instance or class of DataProvider
+            priority: Optional priority for the data provider. If not
+                provided, the data provider will be added with the default
+                priority (3).
 
         Returns:
             None
@@ -1105,49 +1057,7 @@ class App:
 
             data_provider = data_provider()
 
-        self._data_providers.append(data_provider)
-
-    def add_data_providers(self, data_providers: List) -> None:
-        """
-        Function to add a list of data providers to the app.
-
-        Args:
-            data_providers: List of DataProvider instances or classes
-
-        Returns:
-            None
-        """
-        for data_provider in data_providers:
-            self.add_data_provider(data_provider)
-
-    def add_market_data_source(self, market_data_source):
-        """
-        Function to add a market data source to the app. The market data
-        source should be an instance of MarketDataSource.
-
-        This is a seperate function from the market data source service. This
-        is because the market data source service can be re-initialized.
-        Therefore, we need a persistent list of market data sources in the app.
-
-        Args:
-            market_data_source: Instance of MarketDataSource
-
-        Returns:
-            None
-        """
-
-        # Check if the market data source is an instance of MarketDataSource
-        if not isinstance(market_data_source, MarketDataSource):
-            return
-
-        # Check if there is already a market data source with the same
-        # identifier
-        for existing_market_data_source in self._market_data_sources:
-            if existing_market_data_source.get_identifier() == \
-                    market_data_source.get_identifier():
-                return
-
-        self._market_data_sources.append(market_data_source)
+        self._data_providers.append((data_provider, priority))
 
     def add_market_credential(
         self, market_credential: MarketCredential
@@ -1223,7 +1133,7 @@ class App:
         function=None,
         time_unit=TimeUnit.MINUTE,
         interval=10,
-        market_data_sources=None
+        data_sources=None
     ):
         """
         Decorator for registering a strategy. This decorator can be used
@@ -1235,7 +1145,7 @@ class App:
                 a TradingStrategy
             time_unit (TimeUnit): instance of TimeUnit Enum
             interval (int): interval of the schedule ( interval - TimeUnit )
-            market_data_sources (List): List of data sources that the
+            data_sources (List): List of data sources that the
                 trading strategy function uses.
 
         Returns:
@@ -1248,7 +1158,7 @@ class App:
                 decorated=function,
                 time_unit=time_unit,
                 interval=interval,
-                market_data_sources=market_data_sources
+                data_sources=data_sources
             )
             self.add_strategy(strategy_object)
             return strategy_object
@@ -1260,7 +1170,7 @@ class App:
                         decorated=f,
                         time_unit=time_unit,
                         interval=interval,
-                        market_data_sources=market_data_sources,
+                        data_sources=data_sources,
                         worker_id=f.__name__
                     )
                 )
@@ -1335,10 +1245,6 @@ class App:
                 "Can't add strategy, there already exists a strategy "
                 "with the same id in the algorithm"
             )
-
-        if strategy.market_data_sources is not None:
-            logger.info("Adding market data sources from strategy")
-            self.add_data_sources(strategy.market_data_sources)
 
         self._strategies.append(strategy)
 
@@ -1514,8 +1420,6 @@ class App:
 
         """
         logger.info("Initializing portfolios")
-        config = self.config
-
         portfolio_configuration_service = self.container \
             .portfolio_configuration_service()
         portfolio_service = self.container.portfolio_service()
@@ -1528,6 +1432,8 @@ class App:
         portfolios = portfolio_service.get_all()
         portfolio_configurations = portfolio_configuration_service\
             .get_all()
+        portfolio_provider_lookup = \
+            self.container.portfolio_provider_lookup()
 
         if len(portfolios) > 0:
 
@@ -1568,8 +1474,6 @@ class App:
                         "can be updated..."
                     )
 
-                    portfolio_provider_lookup = \
-                        self.container.portfolio_provider_lookup()
                     # Register a portfolio provider for the portfolio
                     portfolio_provider_lookup \
                         .register_portfolio_provider_for_market(
@@ -1596,8 +1500,7 @@ class App:
                             "history of your trading bot."
                         )
 
-        portfolio_provider_lookup = \
-            self.container.portfolio_provider_lookup()
+
         order_executor_lookup = self.container.order_executor_lookup()
         market_credential_service = \
             self.container.market_credential_service()
@@ -1672,7 +1575,6 @@ class App:
 
         for portfolio_configuration \
                 in portfolio_configuration_service.get_all():
-
             if not portfolio_service.exists(
                 {"identifier": portfolio_configuration.identifier}
             ):
@@ -1748,6 +1650,17 @@ class App:
             name=self._name,
             strategies=self._strategies,
             tasks=self._tasks,
-            data_sources=self._market_data_sources,
             on_strategy_run_hooks=self._on_strategy_run_hooks,
         )
+
+    def cleanup_backtest_resources(self):
+        """
+        Clean up the backtest database and remove SQLAlchemy models/tables.
+        """
+        logger.info("Cleaning up backtest resources")
+        config = self.config
+        environment = config[ENVIRONMENT]
+
+        if Environment.BACKTEST.equals(environment):
+            db_uri = config.get(SQLALCHEMY_DATABASE_URI)
+            clear_db(db_uri)

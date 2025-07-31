@@ -1,11 +1,11 @@
 import os
-from datetime import datetime, timedelta
+import shutil
+from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm, \
     BacktestDateRange
-from investing_algorithm_framework.services import BacktestService
 
 
 class TestStrategy(TradingStrategy):
@@ -13,7 +13,7 @@ class TestStrategy(TradingStrategy):
     time_unit = TimeUnit.MINUTE
     interval = 1
 
-    def run_strategy(self, context, market_data):
+    def run_strategy(self, context, data):
         pass
 
 
@@ -22,7 +22,7 @@ class Test(TestCase):
     Collection of tests for backtest report operations
     """
     def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
+        self.resource_directory = os.path.abspath(
             os.path.join(
                 os.path.join(
                     os.path.join(
@@ -39,23 +39,21 @@ class Test(TestCase):
         )
 
     def tearDown(self) -> None:
-        database_dir = os.path.join(
-            self.resource_dir, "databases"
-        )
+        super().tearDown()
+        databases_directory = os.path.join(self.resource_directory,
+                                           "databases")
+        backtest_databases_directory = os.path.join(
+            self.resource_directory, "backtest_databases")
 
-        if os.path.exists(database_dir):
-            for root, dirs, files in os.walk(database_dir, topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
+        if os.path.exists(databases_directory):
+            shutil.rmtree(databases_directory)
+
+        if os.path.exists(backtest_databases_directory):
+            shutil.rmtree(backtest_databases_directory)
 
     def test_report_creation(self):
-        """
-        Test if the backtest report is created as a CSV file
-        """
         app = create_app(
-            config={"test": "test", RESOURCE_DIRECTORY: self.resource_dir}
+            config={"test": "test", RESOURCE_DIRECTORY: self.resource_directory}
         )
         algorithm = Algorithm()
         algorithm.add_strategy(TestStrategy())
@@ -67,28 +65,24 @@ class Test(TestCase):
                 initial_balance=1000
             )
         )
+        end_date = datetime(2023, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=1)
         backtest_date_range = BacktestDateRange(
-            start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow()
+            start_date=start_date,
+            end_date=end_date
         )
-        report = app.run_backtest(
+        backtest = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
         )
-        dir_name = BacktestService.create_report_directory_name(report)
-
-        path = os.path.join(self.resource_dir, "backtest_reports", dir_name)
-
+        path = os.path.join(self.resource_directory, "backtest_reports/test_backtest")
+        backtest.save(path)
         # Check if the backtest report exists
         self.assertTrue(os.path.isdir(path))
 
     def test_report_creation_without_strategy_identifier(self):
-        """
-        Test if the backtest report is created as a CSV file
-        when the strategy does not have an identifier
-        """
         app = create_app(
-            config={RESOURCE_DIRECTORY: self.resource_dir}
+            config={RESOURCE_DIRECTORY: self.resource_directory}
         )
         strategy = TestStrategy()
         strategy.strategy_id = None
@@ -101,32 +95,31 @@ class Test(TestCase):
                 initial_balance=1000
             )
         )
+        end_date = datetime(2023, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=1)
         backtest_date_range = BacktestDateRange(
-            start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow()
+            start_date=start_date,
+            end_date=end_date
         )
-        report = app.run_backtest(
+        backtest = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
         )
-        dir_name = BacktestService.create_report_directory_name(report)
-        path = os.path.join(self.resource_dir, "backtest_reports", dir_name)
-
+        path = os.path.join(
+            self.resource_directory, "backtest_reports/test_backtest"
+        )
+        backtest.save(path)
         # Check if the backtest report exists
         self.assertTrue(os.path.isdir(path))
 
     def test_report_creation_with_multiple_strategies_with_id(self):
-        """
-        Test if the backtest report is created as a CSV file
-        when there are multiple strategies with identifiers
-        """
         app = create_app(
-            config={RESOURCE_DIRECTORY: self.resource_dir}
+            config={RESOURCE_DIRECTORY: self.resource_directory}
         )
         algorithm = Algorithm()
 
         @app.strategy()
-        def run_strategy(context, market_data):
+        def run_strategy(context, data):
             pass
 
         algorithm.add_strategy(TestStrategy)
@@ -139,16 +132,20 @@ class Test(TestCase):
         )
 
         self.assertEqual(1, len(algorithm.strategies))
+        end_date = datetime(2023, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=1)
         backtest_date_range = BacktestDateRange(
-            start_date=datetime.utcnow() - timedelta(days=1),
-            end_date=datetime.utcnow()
+            start_date=start_date,
+            end_date=end_date
         )
-        report = app.run_backtest(
+        backtest = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
         )
-        dir_name = BacktestService.create_report_directory_name(report)
-        path = os.path.join(self.resource_dir, "backtest_reports", dir_name)
+        path = os.path.join(
+            self.resource_directory, "backtest_reports/test_backtest"
+        )
 
+        backtest.save(path)
         # Check if the backtest report exists
         self.assertTrue(os.path.isdir(path))

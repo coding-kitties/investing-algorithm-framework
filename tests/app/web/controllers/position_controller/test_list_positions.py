@@ -3,6 +3,7 @@ import json
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential
 from tests.resources import FlaskTestBase
+from tests.resources.strategies_for_testing import StrategyOne
 
 
 class Test(FlaskTestBase):
@@ -24,16 +25,11 @@ class Test(FlaskTestBase):
     }
 
     def test_list_portfolios(self):
-        self.iaf_app.context.create_limit_order(
-            amount=10,
-            target_symbol="KSM",
-            price=10,
-            order_side="BUY"
-        )
+        self.iaf_app.add_strategy(StrategyOne)
         order_repository = self.iaf_app.container.order_repository()
         self.iaf_app.run(number_of_iterations=1)
-        self.assertEqual(1, order_repository.count())
+        self.assertEqual(0, order_repository.count())
         response = self.client.get("/api/positions")
         data = json.loads(response.data.decode())
         self.assertEqual(200, response.status_code)
-        self.assertEqual(2, len(data["items"]))
+        self.assertEqual(1, len(data["items"]))

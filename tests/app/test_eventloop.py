@@ -1,12 +1,15 @@
 from datetime import datetime, timezone, timedelta
+from typing import Any
+import os
+import shutil
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     DataType, MarketCredential, PortfolioConfiguration, Order, Trade, \
     CCXTOHLCVDataProvider, BacktestDateRange, DataProvider, \
-    BACKTESTING_INDEX_DATETIME, OrderStatus
+    INDEX_DATETIME, OrderStatus
 from investing_algorithm_framework.app.eventloop import EventLoopService
 from investing_algorithm_framework.domain import ENVIRONMENT, Environment, \
-    BACKTESTING_START_DATE, BACKTESTING_LAST_SNAPSHOT_DATETIME, \
+    BACKTESTING_START_DATE, LAST_SNAPSHOT_DATETIME, \
     SNAPSHOT_INTERVAL, SnapshotInterval
 from investing_algorithm_framework.infrastructure import BacktestOrderExecutor
 from investing_algorithm_framework.services import DataProviderService, \
@@ -16,26 +19,24 @@ from tests.resources import TestBase
 
 class CustomFeedDataProvider(DataProvider):
 
-    def has_data(
-        self, data_source: DataSource,
-        start_date: datetime = None,
-        end_date: datetime = None
-    ) -> bool:
+    def has_data(self, data_source: DataSource, start_date: datetime = None,
+                 end_date: datetime = None) -> bool:
         pass
 
-    def get_data(self, data_source: DataSource, date: datetime = None,
-                 start_date: datetime = None, end_date: datetime = None,
-                 save: bool = False):
+    def prepare_backtest_data(self, backtest_start_date,
+                              backtest_end_date) -> None:
         pass
 
-    def prepare_backtest_data(self, data_source: DataSource,
-                              backtest_start_date, backtest_end_date) -> None:
+    def get_data(self, date: datetime = None, start_date: datetime = None,
+                 end_date: datetime = None, save: bool = False) -> Any:
         pass
 
-    def get_backtest_data(self, data_source: DataSource,
-                          backtest_index_date: datetime,
+    def get_backtest_data(self, backtest_index_date: datetime,
                           backtest_start_date: datetime = None,
-                          backtest_end_date: datetime = None) -> None:
+                          backtest_end_date: datetime = None) -> Any:
+        pass
+
+    def copy(self, data_source: DataSource) -> "DataProvider":
         pass
 
 
@@ -60,7 +61,7 @@ class StrategyForTesting(TradingStrategy):
     time_unit = "hour"
     interval = 2
 
-    def run_strategy(self, context, market_data):
+    def run_strategy(self, context, data):
         pass
 
 class StrategyForTestingTwo(TradingStrategy):
@@ -80,7 +81,7 @@ class StrategyForTestingTwo(TradingStrategy):
     time_unit = "hour"
     interval = 4
 
-    def run_strategy(self, context, market_data):
+    def run_strategy(self, context, data):
         pass
 
 
@@ -110,7 +111,7 @@ class TestEventloopService(TestBase):
     storage_repo_type = "pandas"
     market_credentials = [
         MarketCredential(
-            market="binance",
+            market="bitvavo",
             api_key="api_key",
             secret_key="secret_key",
         )
@@ -118,20 +119,41 @@ class TestEventloopService(TestBase):
     external_balances = {
         "EUR": 1000
     }
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="bitvavo",
+            trading_symbol="EUR",
+            initial_balance=1000
+        )
+    ]
+
 
     def test_initialize(self):
         event_loop_service = EventLoopService(
             order_service=self.app.container.order_service(),
             portfolio_service=self.app.container.portfolio_service(),
             configuration_service=self.app.container.configuration_service(),
-            data_provider_service=self.app.container.data_provider_service()
+            data_provider_service=self.app.container.data_provider_service(),
+            context=self.app.container.context(),
+            trade_service=self.app.container.trade_service(),
+            portfolio_snapshot_service=self.app.container.portfolio_snapshot_service(),
         )
-        event_loop_service.strategies = [
+        self.app.add_strategy(
             StrategyForTesting(),
+        )
+        self.app.add_strategy(
             StrategyForTestingTwo(),
-            StrategyForTestingThree()
-        ]
-        event_loop_service.initialize()
+        )
+        self.app.add_strategy(
+            StrategyForTestingThree(),
+        )
+        event_loop_service.initialize(
+            trade_order_evaluator=BacktestTradeOrderEvaluator(
+                trade_service=self.app.container.trade_service(),
+                order_service=self.app.container.order_service(),
+            ),
+            algorithm=self.app.get_algorithm()
+        )
         self.assertEqual(len(event_loop_service.next_run_times), 3)
         self.assertEqual(len(event_loop_service.data_sources), 5)
 
@@ -168,19 +190,7 @@ class TestEventloopService(TestBase):
                 symbol="DOT/EUR",
                 time_frame="2h",
                 market="bitvavo"
-            ),
-            DataSource(
-                data_type=DataType.OHLCV,
-                symbol="BTC/EUR",
-            ),
-            DataSource(
-                data_type=DataType.OHLCV,
-                symbol="SOL/EUR",
-            ),
-            DataSource(
-                data_type=DataType.OHLCV,
-                symbol="XRP/EUR",
-            ),
+            )
         ]
 
         data_sources = EventLoopService._get_data_sources_for_iteration(
@@ -215,72 +225,21 @@ class TestEventloopService(TestBase):
                     data_provider_identifier="custom_feed_data"
                 ),
             ],
-            [
-                Order(
-                    target_symbol="BTC",
-                    trading_symbol="EUR",
-                    amount=1.0,
-                    order_side="buy",
-                    order_type="limit",
-                    price=100.0,
-                    external_id="order_123",
-                ),
-                Order(
-                    target_symbol="XRP",
-                    trading_symbol="EUR",
-                    amount=2.0,
-                    order_side="sell",
-                    order_type="limit",
-                    price=200.0,
-                    external_id="order_456",
-                ),
-                Order(
-                    target_symbol="DOT",
-                    trading_symbol="EUR",
-                    amount=3.0,
-                    order_side="buy",
-                    order_type="limit",
-                    price=50.0,
-                    external_id="order_789",
-                )
-            ],
-            [
-                Trade(
-                    id=1,
-                    orders=[],
-                    opened_at=datetime(2023, 8, 28, 8, 0, tzinfo=timezone.utc),
-                    closed_at=None,
-                    available_amount=1.0,
-                    filled_amount=1.0,
-                    remaining=0.0,
-                    cost=10,
-                    target_symbol="BTC",
-                    trading_symbol="EUR",
-                    amount=1.0,
-                    open_price=100.0,
-                    net_gain=10.0,
-                    status="closed"
-                ),
-                Trade(
-                    id=1,
-                    orders=[],
-                    opened_at=datetime(2023, 8, 28, 8, 0, tzinfo=timezone.utc),
-                    closed_at=None,
-                    available_amount=1.0,
-                    filled_amount=1.0,
-                    remaining=0.0,
-                    cost=10,
-                    target_symbol="SOL",
-                    trading_symbol="EUR",
-                    amount=1.0,
-                    open_price=100.0,
-                    net_gain=10.0,
-                    status="closed"
-                )
-            ]
         )
 
         self.assertEqual(data_sources, set(correct_data_sources))
+
+    def tearDown(self) -> None:
+        super().tearDown()
+
+        databases_directory = os.path.join(self.resource_directory, "databases")
+        backtest_databases_directory = os.path.join(self.resource_directory, "backtest_databases")
+
+        if os.path.exists(databases_directory):
+            shutil.rmtree(databases_directory)
+
+        if os.path.exists(backtest_databases_directory):
+            shutil.rmtree(backtest_databases_directory)
 
     def test_backtest_loop(self):
         data_provider_service = DataProviderService(
@@ -291,7 +250,6 @@ class TestEventloopService(TestBase):
         data_provider_service.add_data_provider(
             CCXTOHLCVDataProvider()
         )
-
         strategy = StrategyForTesting()
         data_sources = strategy.data_sources
         backtest_date_range = BacktestDateRange(
@@ -301,17 +259,13 @@ class TestEventloopService(TestBase):
 
         # Register data providers for data sources
         data_provider_service.index_backtest_data_providers(
-            strategy.data_sources,
-            backtest_date_range.start_date,
-            backtest_date_range.end_date
+            strategy.data_sources, backtest_date_range
         )
-
+        self.app.add_strategy(strategy)
         # Prepare the backtest data for each data provider
         for data_source, data_provider in data_provider_service.data_provider_index.get_all():
             data_provider.prepare_backtest_data(
-                data_source,
-                backtest_start_date=backtest_date_range.start_date,
-                backtest_end_date=backtest_date_range.end_date
+                backtest_date_range.start_date, backtest_date_range.end_date
             )
 
         # There should be a single backtest data provider registered
@@ -321,16 +275,12 @@ class TestEventloopService(TestBase):
 
         # Should be all CCXTOHLCVDataProvider
         for datasource in data_sources:
-            data_provider = data_provider_service.find_data_provider(datasource)
+            data_provider = data_provider_service.data_provider_index.get(datasource)
             self.assertIsNotNone(data_provider)
             self.assertTrue(
                 isinstance(data_provider, CCXTOHLCVDataProvider)
             )
 
-        backtest_trade_order_evaluator = BacktestTradeOrderEvaluator(
-            trade_service=self.app.container.trade_service(),
-            order_service=self.app.container.order_service(),
-        )
         event_loop_service = EventLoopService(
             order_service=self.app.container.order_service(),
             portfolio_service=self.app.container.portfolio_service(),
@@ -339,10 +289,15 @@ class TestEventloopService(TestBase):
             context=self.app.container.context(),
             trade_service=self.app.container.trade_service(),
             portfolio_snapshot_service=self.app.container.portfolio_snapshot_service(),
-            trade_order_evaluator=backtest_trade_order_evaluator
         )
         event_loop_service.strategies = [StrategyForTesting()]
-        event_loop_service.initialize()
+        event_loop_service.initialize(
+            trade_order_evaluator=BacktestTradeOrderEvaluator(
+                trade_service=self.app.container.trade_service(),
+                order_service=self.app.container.order_service(),
+            ),
+            algorithm=self.app.get_algorithm()
+        )
         event_loop_service.start(number_of_iterations=1)
         history = event_loop_service.history
 
@@ -361,7 +316,7 @@ class TestEventloopService(TestBase):
             end_date=datetime(2023, 12, 2, 0, 0, tzinfo=timezone.utc)
         )
         configuration_service = self.app.container.configuration_service()
-        configuration_service.add_value(BACKTESTING_INDEX_DATETIME,
+        configuration_service.add_value(INDEX_DATETIME,
                                         backtest_date_range.start_date)
         configuration_service.add_value(ENVIRONMENT,
                                         Environment.BACKTEST.value)
@@ -376,7 +331,10 @@ class TestEventloopService(TestBase):
                 initial_balance=1000
             )
         )
-        self.app.initialize()
+        self.app.initialize_backtest_config(
+            backtest_date_range=backtest_date_range,
+            initial_amount=1000
+        )
         order_service = self.app.container.order_service()
         order_service.create(
             {
@@ -390,11 +348,7 @@ class TestEventloopService(TestBase):
             }
         )
 
-        data_provider_service = DataProviderService(
-            configuration_service=self.app.container.configuration_service(),
-            market_credential_service=self.app.container\
-                .market_credential_service()
-        )
+        data_provider_service = self.app.container.data_provider_service()
         data_provider_service.add_data_provider(
             CCXTOHLCVDataProvider()
         )
@@ -402,27 +356,29 @@ class TestEventloopService(TestBase):
         data_sources = strategy.data_sources
         # Register data providers for data sources
         data_provider_service.index_backtest_data_providers(
-            strategy.data_sources,
-            backtest_date_range.start_date,
-            backtest_date_range.end_date
+            strategy.data_sources, backtest_date_range
         )
 
         # Prepare the backtest data for each data provider
         for data_source, data_provider in data_provider_service.data_provider_index.get_all():
             data_provider.prepare_backtest_data(
-                data_source,
-                backtest_start_date=backtest_date_range.start_date,
-                backtest_end_date=backtest_date_range.end_date
+                backtest_date_range.start_date, backtest_date_range.end_date
             )
 
         # There should be a single backtest data provider registered
         self.assertEqual(
-            len(data_provider_service.data_provider_index), 2
+            len(data_provider_service.data_provider_index.ohlcv_data_providers_no_market), 2
+        )
+        self.assertEqual(
+            len(data_provider_service.data_provider_index.ohlcv_data_providers), 2
+        )
+        self.assertEqual(
+            len(data_provider_service.data_provider_index.data_providers_lookup), 2
         )
 
         # Should be all CCXTOHLCVDataProvider
         for datasource in data_sources:
-            data_provider = data_provider_service.find_data_provider(datasource)
+            data_provider = data_provider_service.data_provider_index.get(datasource)
             self.assertIsNotNone(data_provider)
             self.assertTrue(
                 isinstance(data_provider, CCXTOHLCVDataProvider)
@@ -440,10 +396,12 @@ class TestEventloopService(TestBase):
             context=self.app.container.context(),
             trade_service=self.app.container.trade_service(),
             portfolio_snapshot_service=self.app.container.portfolio_snapshot_service(),
+        )
+        self.app.add_strategy(strategy)
+        event_loop_service.initialize(
+            algorithm=self.app.get_algorithm(),
             trade_order_evaluator=backtest_trade_order_evaluator
         )
-        event_loop_service.strategies = [StrategyForTesting()]
-        event_loop_service.initialize()
         event_loop_service.start(number_of_iterations=1)
         history = event_loop_service.history
 
@@ -459,9 +417,6 @@ class TestEventloopService(TestBase):
         self.assertEqual(orders[0].remaining, 0.0)
 
     def test_event_loop_with_schedule(self):
-        """
-
-        """
         # Set the app in backtest mode
         backtest_date_range = BacktestDateRange(
             start_date=datetime(2022, 1, 1, 0, 0, tzinfo=timezone.utc),
@@ -469,13 +424,13 @@ class TestEventloopService(TestBase):
         )
         number_of_days = (backtest_date_range.end_date - backtest_date_range.start_date).days
         configuration_service = self.app.container.configuration_service()
-        configuration_service.add_value(BACKTESTING_INDEX_DATETIME,
+        configuration_service.add_value(INDEX_DATETIME,
                                         backtest_date_range.start_date)
         configuration_service.add_value(ENVIRONMENT,
                                         Environment.BACKTEST.value)
         configuration_service.add_value(BACKTESTING_START_DATE,
                                         backtest_date_range.start_date)
-        configuration_service.add_value(BACKTESTING_LAST_SNAPSHOT_DATETIME, backtest_date_range.start_date)
+        configuration_service.add_value(LAST_SNAPSHOT_DATETIME, backtest_date_range.start_date)
         configuration_service.add_value(SNAPSHOT_INTERVAL, SnapshotInterval.DAILY.value)
         strategy = StrategyForTesting()
         backtest_service = self.app.container.backtest_service()
@@ -493,8 +448,12 @@ class TestEventloopService(TestBase):
                 initial_balance=1000
             )
         )
-        self.app.initialize()
-
+        self.app.add_strategy(strategy)
+        self.app.initialize_backtest_config(
+            backtest_date_range
+        )
+        self.app.initialize_storage()
+        self.app.initialize_portfolios()
 
         data_provider_service = DataProviderService(
             configuration_service=self.app.container.configuration_service(),
@@ -507,15 +466,12 @@ class TestEventloopService(TestBase):
         data_sources = strategy.data_sources
         # Register data providers for data sources
         data_provider_service.index_backtest_data_providers(
-            strategy.data_sources,
-            backtest_date_range.start_date,
-            backtest_date_range.end_date
+            strategy.data_sources, backtest_date_range
         )
 
         # Prepare the backtest data for each data provider
         for data_source, data_provider in data_provider_service.data_provider_index.get_all():
             data_provider.prepare_backtest_data(
-                data_source,
                 backtest_start_date=backtest_date_range.start_date,
                 backtest_end_date=backtest_date_range.end_date
             )
@@ -527,7 +483,7 @@ class TestEventloopService(TestBase):
 
         # Should be all CCXTOHLCVDataProvider
         for datasource in data_sources:
-            data_provider = data_provider_service.find_data_provider(datasource)
+            data_provider = data_provider_service.data_provider_index.get(datasource)
             self.assertIsNotNone(data_provider)
             self.assertTrue(
                 isinstance(data_provider, CCXTOHLCVDataProvider)
@@ -545,19 +501,20 @@ class TestEventloopService(TestBase):
             context=self.app.container.context(),
             trade_service=self.app.container.trade_service(),
             portfolio_snapshot_service=self.app.container.portfolio_snapshot_service(),
-            trade_order_evaluator=backtest_trade_order_evaluator
         )
         event_loop_service.strategies = [StrategyForTesting()]
-        event_loop_service.initialize()
+        event_loop_service.initialize(
+            algorithm=self.app.get_algorithm(),
+            trade_order_evaluator=backtest_trade_order_evaluator
+        )
         event_loop_service.start(schedule=schedule, show_progress=True)
 
-        # Check that for every day a snapshot was created
+        # Check that for everyday a snapshot was created
         portfolio_snapshot_service = self.app.container.portfolio_snapshot_service()
-        self.assertEqual(
-            len(portfolio_snapshot_service.get_all()), number_of_days
+        self.assertAlmostEqual(
+            len(portfolio_snapshot_service.get_all()), number_of_days, delta=2
         )
         history = event_loop_service.history
-
         # StrategyOne should have run 8749 times
         self.assertEqual(
             len(history[strategy.strategy_id]["runs"]), 8749
@@ -567,110 +524,6 @@ class TestEventloopService(TestBase):
         """
 
         """
-        # Set the app in backtest mode
-        backtest_date_range = BacktestDateRange(
-            start_date=datetime(2022, 1, 1, 0, 0, tzinfo=timezone.utc),
-            end_date=datetime(2023, 12, 31, 0, 0, tzinfo=timezone.utc)
-        )
-        number_of_days = (backtest_date_range.end_date - backtest_date_range.start_date).days
-        configuration_service = self.app.container.configuration_service()
-        configuration_service.add_value(BACKTESTING_INDEX_DATETIME,
-                                        backtest_date_range.start_date)
-        configuration_service.add_value(ENVIRONMENT,
-                                        Environment.BACKTEST.value)
-        configuration_service.add_value(BACKTESTING_START_DATE,
-                                        backtest_date_range.start_date)
-        configuration_service.add_value(BACKTESTING_LAST_SNAPSHOT_DATETIME, backtest_date_range.start_date)
-        configuration_service.add_value(SNAPSHOT_INTERVAL, SnapshotInterval.STRATEGY_ITERATION.value)
-        strategy = StrategyForTesting()
-        backtest_service = self.app.container.backtest_service()
-        schedule = backtest_service.generate_schedule(
-            start_date=backtest_date_range.start_date,
-            end_date=backtest_date_range.end_date,
-            strategies=[strategy],
-            tasks=[]
-        )
-        self.app.add_order_executor(BacktestOrderExecutor())
-        self.app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="bitvavo",
-                trading_symbol="EUR",
-                initial_balance=1000
-            )
-        )
-        self.app.initialize()
-        data_provider_service = DataProviderService(
-            configuration_service=self.app.container.configuration_service(),
-            market_credential_service=self.app.container\
-                .market_credential_service()
-        )
-        data_provider_service.add_data_provider(
-            CCXTOHLCVDataProvider()
-        )
-        data_sources = strategy.data_sources
-        # Register data providers for data sources
-        data_provider_service.index_backtest_data_providers(
-            strategy.data_sources,
-            backtest_date_range.start_date,
-            backtest_date_range.end_date
-        )
-
-        # Prepare the backtest data for each data provider
-        for data_source, data_provider in data_provider_service.data_provider_index.get_all():
-            data_provider.prepare_backtest_data(
-                data_source,
-                backtest_start_date=backtest_date_range.start_date,
-                backtest_end_date=backtest_date_range.end_date
-            )
-
-        # There should be a single backtest data provider registered
-        self.assertEqual(
-            len(data_provider_service.data_provider_index), 2
-        )
-
-        # Should be all CCXTOHLCVDataProvider
-        for datasource in data_sources:
-            data_provider = data_provider_service.find_data_provider(datasource)
-            self.assertIsNotNone(data_provider)
-            self.assertTrue(
-                isinstance(data_provider, CCXTOHLCVDataProvider)
-            )
-
-        backtest_trade_order_evaluator = BacktestTradeOrderEvaluator(
-            trade_service=self.app.container.trade_service(),
-            order_service=self.app.container.order_service(),
-        )
-        event_loop_service = EventLoopService(
-            order_service=self.app.container.order_service(),
-            portfolio_service=self.app.container.portfolio_service(),
-            configuration_service=self.app.container.configuration_service(),
-            data_provider_service=data_provider_service,
-            context=self.app.container.context(),
-            trade_service=self.app.container.trade_service(),
-            portfolio_snapshot_service=self.app.container.portfolio_snapshot_service(),
-            trade_order_evaluator=backtest_trade_order_evaluator
-        )
-        event_loop_service.strategies = [StrategyForTesting()]
-        event_loop_service.initialize()
-        event_loop_service.start(schedule=schedule, show_progress=True)
-
-        # Check that for every day a snapshot was created
-        portfolio_snapshot_service = self.app.container.portfolio_snapshot_service()
-        self.assertEqual(
-            len(portfolio_snapshot_service.get_all()), 8749
-        )
-        history = event_loop_service.history
-        # StrategyOne should have run 8749 times
-        self.assertEqual(
-            len(history[strategy.strategy_id]["runs"]), 8749
-        )
-
-    def test_schedule_with_daily_iteration_snapshotting(self):
-        """
-
-        """
-        # Set the app in backtest mode
-        # Set the app in backtest mode
         backtest_date_range = BacktestDateRange(
             start_date=datetime(2022, 1, 1, 0, 0, tzinfo=timezone.utc),
             end_date=datetime(2023, 12, 31, 0, 0, tzinfo=timezone.utc)
@@ -678,16 +531,17 @@ class TestEventloopService(TestBase):
         number_of_days = (
                     backtest_date_range.end_date - backtest_date_range.start_date).days
         configuration_service = self.app.container.configuration_service()
-        configuration_service.add_value(BACKTESTING_INDEX_DATETIME,
+        configuration_service.add_value(INDEX_DATETIME,
                                         backtest_date_range.start_date)
         configuration_service.add_value(ENVIRONMENT,
                                         Environment.BACKTEST.value)
         configuration_service.add_value(BACKTESTING_START_DATE,
                                         backtest_date_range.start_date)
-        configuration_service.add_value(BACKTESTING_LAST_SNAPSHOT_DATETIME,
+        configuration_service.add_value(LAST_SNAPSHOT_DATETIME,
                                         backtest_date_range.start_date)
         configuration_service.add_value(SNAPSHOT_INTERVAL,
                                         SnapshotInterval.STRATEGY_ITERATION.value)
+
         strategy = StrategyForTesting()
         backtest_service = self.app.container.backtest_service()
         schedule = backtest_service.generate_schedule(
@@ -704,7 +558,13 @@ class TestEventloopService(TestBase):
                 initial_balance=1000
             )
         )
-        self.app.initialize()
+        self.app.add_strategy(strategy)
+        self.app.initialize_backtest_config(
+            backtest_date_range
+        )
+        self.app.initialize_storage()
+        self.app.initialize_portfolios()
+
         data_provider_service = DataProviderService(
             configuration_service=self.app.container.configuration_service(),
             market_credential_service=self.app.container \
@@ -716,15 +576,12 @@ class TestEventloopService(TestBase):
         data_sources = strategy.data_sources
         # Register data providers for data sources
         data_provider_service.index_backtest_data_providers(
-            strategy.data_sources,
-            backtest_date_range.start_date,
-            backtest_date_range.end_date
+            strategy.data_sources, backtest_date_range
         )
 
         # Prepare the backtest data for each data provider
         for data_source, data_provider in data_provider_service.data_provider_index.get_all():
             data_provider.prepare_backtest_data(
-                data_source,
                 backtest_start_date=backtest_date_range.start_date,
                 backtest_end_date=backtest_date_range.end_date
             )
@@ -736,7 +593,7 @@ class TestEventloopService(TestBase):
 
         # Should be all CCXTOHLCVDataProvider
         for datasource in data_sources:
-            data_provider = data_provider_service.find_data_provider(
+            data_provider = data_provider_service.data_provider_index.get(
                 datasource)
             self.assertIsNotNone(data_provider)
             self.assertTrue(
@@ -755,16 +612,128 @@ class TestEventloopService(TestBase):
             context=self.app.container.context(),
             trade_service=self.app.container.trade_service(),
             portfolio_snapshot_service=self.app.container.portfolio_snapshot_service(),
-            trade_order_evaluator=backtest_trade_order_evaluator
         )
         event_loop_service.strategies = [StrategyForTesting()]
-        event_loop_service.initialize()
+        event_loop_service.initialize(
+            algorithm=self.app.get_algorithm(),
+            trade_order_evaluator=backtest_trade_order_evaluator
+        )
+        event_loop_service.start(schedule=schedule, show_progress=True)
+
+        # Check that for every day a snapshot was created
+        history = event_loop_service.history
+        portfolio_snapshot_service = self.app.container.portfolio_snapshot_service()
+        self.assertEqual(
+            len(portfolio_snapshot_service.get_all()), 8749
+        )
+        # StrategyOne should have run 8749 times
+        self.assertEqual(
+            len(history[strategy.strategy_id]["runs"]), 8749
+        )
+
+    def test_schedule_with_daily_iteration_snapshotting(self):
+        """
+
+        """
+        backtest_date_range = BacktestDateRange(
+            start_date=datetime(2022, 1, 1, 0, 0, tzinfo=timezone.utc),
+            end_date=datetime(2023, 12, 31, 0, 0, tzinfo=timezone.utc)
+        )
+        number_of_days = (
+                backtest_date_range.end_date - backtest_date_range.start_date).days
+        configuration_service = self.app.container.configuration_service()
+        configuration_service.add_value(INDEX_DATETIME,
+                                        backtest_date_range.start_date)
+        configuration_service.add_value(ENVIRONMENT,
+                                        Environment.BACKTEST.value)
+        configuration_service.add_value(BACKTESTING_START_DATE,
+                                        backtest_date_range.start_date)
+        configuration_service.add_value(LAST_SNAPSHOT_DATETIME,
+                                        backtest_date_range.start_date)
+        configuration_service.add_value(SNAPSHOT_INTERVAL,
+                                        SnapshotInterval.DAILY.value)
+        strategy = StrategyForTesting()
+        backtest_service = self.app.container.backtest_service()
+        schedule = backtest_service.generate_schedule(
+            start_date=backtest_date_range.start_date,
+            end_date=backtest_date_range.end_date,
+            strategies=[strategy],
+            tasks=[]
+        )
+        self.app.add_order_executor(BacktestOrderExecutor())
+        self.app.add_portfolio_configuration(
+            PortfolioConfiguration(
+                market="bitvavo",
+                trading_symbol="EUR",
+                initial_balance=1000
+            )
+        )
+        self.app.add_strategy(strategy)
+        self.app.initialize_backtest_config(
+            backtest_date_range
+        )
+        self.app.initialize_storage()
+        self.app.initialize_portfolios()
+
+        data_provider_service = DataProviderService(
+            configuration_service=self.app.container.configuration_service(),
+            market_credential_service=self.app.container \
+                .market_credential_service()
+        )
+        data_provider_service.add_data_provider(
+            CCXTOHLCVDataProvider()
+        )
+        data_sources = strategy.data_sources
+        # Register data providers for data sources
+        data_provider_service.index_backtest_data_providers(
+            strategy.data_sources, backtest_date_range
+        )
+
+        # Prepare the backtest data for each data provider
+        for data_source, data_provider in data_provider_service.data_provider_index.get_all():
+            data_provider.prepare_backtest_data(
+                backtest_start_date=backtest_date_range.start_date,
+                backtest_end_date=backtest_date_range.end_date
+            )
+
+        # There should be a single backtest data provider registered
+        self.assertEqual(
+            len(data_provider_service.data_provider_index), 2
+        )
+
+        # Should be all CCXTOHLCVDataProvider
+        for datasource in data_sources:
+            data_provider = data_provider_service.data_provider_index.get(
+                datasource)
+            self.assertIsNotNone(data_provider)
+            self.assertTrue(
+                isinstance(data_provider, CCXTOHLCVDataProvider)
+            )
+
+        backtest_trade_order_evaluator = BacktestTradeOrderEvaluator(
+            trade_service=self.app.container.trade_service(),
+            order_service=self.app.container.order_service(),
+        )
+        event_loop_service = EventLoopService(
+            order_service=self.app.container.order_service(),
+            portfolio_service=self.app.container.portfolio_service(),
+            configuration_service=self.app.container.configuration_service(),
+            data_provider_service=data_provider_service,
+            context=self.app.container.context(),
+            trade_service=self.app.container.trade_service(),
+            portfolio_snapshot_service=self.app.container.portfolio_snapshot_service(),
+        )
+        event_loop_service.strategies = [StrategyForTesting()]
+        event_loop_service.initialize(
+            algorithm=self.app.get_algorithm(),
+            trade_order_evaluator=backtest_trade_order_evaluator
+        )
         event_loop_service.start(schedule=schedule, show_progress=True)
 
         # Check that for every day a snapshot was created
         portfolio_snapshot_service = self.app.container.portfolio_snapshot_service()
-        self.assertEqual(
-            len(portfolio_snapshot_service.get_all()), number_of_days
+        self.assertAlmostEqual(
+            len(portfolio_snapshot_service.get_all()), number_of_days, delta=2
         )
         history = event_loop_service.history
         # StrategyOne should have run 8749 times

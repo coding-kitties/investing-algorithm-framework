@@ -6,7 +6,7 @@ from investing_algorithm_framework.services import ConfigurationService, \
     PortfolioService, PositionService, TradeService, DataProviderService
 from investing_algorithm_framework.domain import OrderStatus, OrderType, \
     OrderSide, OperationalException, Portfolio, RoundingService, \
-    BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, TradeRiskType, Order, \
+    BACKTESTING_FLAG, INDEX_DATETIME, TradeRiskType, Order, \
     Position, Trade, TradeStatus, DataSource, MarketCredential, INDEX_DATETIME
 
 logger = logging.getLogger("investing_algorithm_framework")
@@ -106,7 +106,7 @@ class Context:
         if BACKTESTING_FLAG in self.configuration_service.config \
                 and self.configuration_service.config[BACKTESTING_FLAG]:
             order_data["created_at"] = \
-                self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+                self.configuration_service.config[INDEX_DATETIME]
 
         return self.order_service.create(
             order_data, execute=execute, validate=validate, sync=sync
@@ -251,7 +251,7 @@ class Context:
         if BACKTESTING_FLAG in self.configuration_service.config \
                 and self.configuration_service.config[BACKTESTING_FLAG]:
             order_data["created_at"] = \
-                self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+                self.configuration_service.config[INDEX_DATETIME]
 
         return self.order_service.create(
             order_data, execute=execute, validate=validate, sync=sync
@@ -329,7 +329,7 @@ class Context:
         if BACKTESTING_FLAG in self.configuration_service.config \
                 and self.configuration_service.config[BACKTESTING_FLAG]:
             order_data["created_at"] = \
-                self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+                self.configuration_service.config[INDEX_DATETIME]
 
         return self.order_service.create(order_data)
 
@@ -400,7 +400,7 @@ class Context:
         if BACKTESTING_FLAG in self.configuration_service.config \
                 and self.configuration_service.config[BACKTESTING_FLAG]:
             order_data["created_at"] = \
-                self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+                self.configuration_service.config[INDEX_DATETIME]
         return self.order_service.create(
             order_data, execute=True, validate=True, sync=True
         )
@@ -925,8 +925,9 @@ class Context:
 
                 symbol = f"{position.symbol.upper()}/" \
                          f"{portfolio.trading_symbol.upper()}"
-                ticker = self.data_provider_service.get_data(
-                    DataSource(symbol=symbol, market=portfolio.market)
+                current_date = self.config[INDEX_DATETIME]
+                ticker = self.data_provider_service.get_ticker_data(
+                    symbol=symbol, market=portfolio.market, date=current_date
                 )
                 allocated = allocated + \
                     (position.get_amount() * ticker["bid"])

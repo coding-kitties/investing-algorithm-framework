@@ -45,7 +45,7 @@ class TestConfig(TestBase):
     def test_config_production(self):
         self.app.set_config(ENVIRONMENT, Environment.PROD.value)
         self.app.initialize_config()
-        self.app.initialize()
+        self.app.initialize_services()
         self.assertIsNotNone(self.app.config[RESOURCE_DIRECTORY])
         self.assertIsNotNone(self.app.config[ENVIRONMENT])
         self.assertEqual(
@@ -58,41 +58,6 @@ class TestConfig(TestBase):
         self.assertIsNotNone(self.app.config[DATABASE_NAME])
         self.assertEqual(
             "prod-database.sqlite3", self.app.config[DATABASE_NAME]
-        )
-        self.assertIsNotNone(self.app.config[DATABASE_DIRECTORY_NAME])
-        database_directory_path = os.path.join(
-            self.app.config[RESOURCE_DIRECTORY],
-            self.app.config[DATABASE_DIRECTORY_NAME]
-        )
-        self.assertEqual(
-            database_directory_path, self.app.config[DATABASE_DIRECTORY_PATH]
-        )
-
-    def test_config_backtest(self):
-        date_range = BacktestDateRange(
-            start_date="2021-01-01",
-            end_date="2021-01-01 00:30:00"
-        )
-
-        @self.app.strategy(interval=1, time_unit="SECOND")
-        def test_strategy(context, market_data):
-            pass
-
-        self.app.run_backtest(
-            backtest_date_range=date_range, initial_amount=1000
-        )
-        self.assertIsNotNone(self.app.config[RESOURCE_DIRECTORY])
-        self.assertIsNotNone(self.app.config[ENVIRONMENT])
-        self.assertEqual(
-            self.app.config[ENVIRONMENT], Environment.BACKTEST.value
-        )
-        self.assertIsNotNone(self.app.config[DATABASE_DIRECTORY_NAME])
-        self.assertEqual(
-            "backtest_databases", self.app.config[DATABASE_DIRECTORY_NAME]
-        )
-        self.assertIsNotNone(self.app.config[DATABASE_NAME])
-        self.assertEqual(
-            "backtest-database.sqlite3", self.app.config[DATABASE_NAME]
         )
         self.assertIsNotNone(self.app.config[DATABASE_DIRECTORY_NAME])
         database_directory_path = os.path.join(

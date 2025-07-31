@@ -30,7 +30,7 @@ class CSVOHLCVDataProvider(DataProvider):
 
     def __init__(
         self,
-        file_path: str,
+        storage_path: str,
         symbol: str,
         time_frame: str,
         market: str,
@@ -41,7 +41,7 @@ class CSVOHLCVDataProvider(DataProvider):
         Initialize the CSV Data Provider.
 
         Args:
-            file_path (str): Path to the CSV file.
+            storage_path (str): Path to the CSV file.
             symbol (str): The symbol for which the data is provided.
             time_frame (str): The time frame for the data.
             market (str, optional): The market for the data. Defaults to None.
@@ -55,14 +55,14 @@ class CSVOHLCVDataProvider(DataProvider):
             market=market,
             time_frame=time_frame,
             window_size=window_size,
-            storage_path=file_path,
+            storage_path=storage_path,
             data_provider_identifier=data_provider_identifier
         )
         self._start_date_data_source = None
         self._end_date_data_source = None
         self._columns = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
         self.window_cache = {}
-        self._load_data(file_path)
+        self._load_data(storage_path)
 
     def has_data(
         self,

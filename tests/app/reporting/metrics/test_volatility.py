@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 from datetime import datetime, timedelta
 import numpy as np
 
-from investing_algorithm_framework import get_volatility
+from investing_algorithm_framework import get_annual_volatility
 
 # Mock snapshot class
 class Snapshot:
@@ -17,14 +17,14 @@ class TestGetVolatility(unittest.TestCase):
         report = MagicMock()
         report.get_snapshots.return_value = []
         report.number_of_days = 10
-        self.assertEqual(get_volatility(report), 0.0)
+        self.assertEqual(get_annual_volatility(report.get_snapshots()), 0.0)
 
     def test_single_snapshot(self):
         report = MagicMock()
         snapshot = Snapshot(1000, datetime.now())
         report.get_snapshots.return_value = [snapshot]
         report.number_of_days = 10
-        self.assertEqual(get_volatility(report), 0.0)
+        self.assertEqual(get_annual_volatility(report.get_snapshots()), 0.0)
 
     def test_constant_net_size(self):
         now = datetime.now()
@@ -34,7 +34,7 @@ class TestGetVolatility(unittest.TestCase):
         report = MagicMock()
         report.get_snapshots.return_value = snapshots
         report.number_of_days = 9
-        self.assertAlmostEqual(get_volatility(report), 0.0, places=6)
+        self.assertAlmostEqual(get_annual_volatility(report.get_snapshots()), 0.0, places=6)
 
     def test_increasing_net_size(self):
         now = datetime.now()
@@ -46,7 +46,7 @@ class TestGetVolatility(unittest.TestCase):
         report.get_snapshots.return_value = snapshots
         report.number_of_days = 9
 
-        vol = get_volatility(report)
+        vol = get_annual_volatility(report.get_snapshots())
         self.assertGreater(vol, 0.0)
 
     def test_zero_days_fallback(self):
@@ -59,7 +59,7 @@ class TestGetVolatility(unittest.TestCase):
         report.get_snapshots.return_value = snapshots
         report.number_of_days = 0  # Should trigger fallback to 252
 
-        vol = get_volatility(report)
+        vol = get_annual_volatility(report.get_snapshots())
         self.assertGreater(vol, 0.0)
 
     def test_known_volatility_zero(self):
@@ -74,7 +74,7 @@ class TestGetVolatility(unittest.TestCase):
         report.number_of_days = 2  # span = 2 days
 
         # Two log returns: ln(1.1), ln(1.1), std = 0
-        vol = get_volatility(report)
+        vol = get_annual_volatility(report.get_snapshots())
         self.assertAlmostEqual(vol, 0.0, places=6)
 
     def test_known_nonzero_volatility(self):
@@ -93,5 +93,5 @@ class TestGetVolatility(unittest.TestCase):
         expected_std = np.std(log_returns, ddof=1)
         expected_vol = expected_std * np.sqrt((2 / 2) * 365)  # 2 returns in 2 days
 
-        vol = get_volatility(report)
+        vol = get_annual_volatility(report.get_snapshots())
         self.assertAlmostEqual(vol, expected_vol, places=6)

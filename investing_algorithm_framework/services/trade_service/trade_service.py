@@ -5,8 +5,8 @@ from typing import Union
 
 from investing_algorithm_framework.domain import OrderStatus, TradeStatus, \
     Trade, OperationalException, TradeRiskType, OrderType, \
-    OrderSide, MarketDataType, Environment, ENVIRONMENT, PeekableQueue, \
-    BACKTESTING_INDEX_DATETIME, random_number, random_string
+    OrderSide, Environment, ENVIRONMENT, PeekableQueue, DataType, \
+    INDEX_DATETIME, random_number, random_string
 from investing_algorithm_framework.services.repository_service import \
     RepositoryService
 
@@ -247,7 +247,7 @@ class TradeService(RepositoryService):
 
                 if Environment.BACKTEST.equals(environment):
                     last_reported_price_date = \
-                        config[BACKTESTING_INDEX_DATETIME]
+                        config[INDEX_DATETIME]
                 else:
                     last_reported_price_date = \
                         datetime.now(tz=timezone.utc)
@@ -710,7 +710,7 @@ class TradeService(RepositoryService):
         meta_data = market_data["metadata"]
 
         for open_trade in open_trades:
-            ohlcv_meta_data = meta_data[MarketDataType.OHLCV]
+            ohlcv_meta_data = meta_data[DataType.OHLCV]
 
             if open_trade.symbol not in ohlcv_meta_data:
                 continue

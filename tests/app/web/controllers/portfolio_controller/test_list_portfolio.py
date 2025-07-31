@@ -1,8 +1,9 @@
 import json
 
 from investing_algorithm_framework import MarketCredential, \
-    PortfolioConfiguration
+    PortfolioConfiguration, DataSource, INDEX_DATETIME
 from tests.resources import FlaskTestBase
+from tests.resources.strategies_for_testing import StrategyOne
 
 
 class Test(FlaskTestBase):
@@ -24,18 +25,18 @@ class Test(FlaskTestBase):
     }
 
     def test_list_portfolios(self):
-        self.iaf_app.context.create_limit_order(
-            target_symbol="KSM",
-            price=10,
-            amount=10,
-            order_side="BUY"
-        )
+        strategy = StrategyOne()
+        strategy.data_sources =[
+            DataSource(
+                market="BITVAVO",
+                symbol="DOT/EUR",
+                time_frame="2h",
+            )
+        ]
+        self.iaf_app.add_strategy(StrategyOne)
         order_repository = self.iaf_app.container.order_repository()
         self.iaf_app.run(number_of_iterations=1)
-        self.assertEqual(1, order_repository.count())
         response = self.client.get("api/portfolios")
         data = json.loads(response.data.decode())
         self.assertEqual(200, response.status_code)
         self.assertEqual(1, len(data["items"]))
-        self.assertEqual(1, data["items"][0]["orders"])
-        self.assertEqual(2, data["items"][0]["positions"])

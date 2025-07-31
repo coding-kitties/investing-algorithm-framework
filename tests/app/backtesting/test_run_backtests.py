@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
@@ -12,7 +12,7 @@ class TestStrategy(TradingStrategy):
     time_unit = TimeUnit.MINUTE
     interval = 1
 
-    def run_strategy(self, context, market_data):
+    def run_strategy(self, context, data):
         pass
 
 
@@ -70,22 +70,23 @@ class Test(TestCase):
                 initial_balance=1000
             )
         )
-        start_date = datetime.utcnow() - timedelta(days=1)
-        end_date = datetime.utcnow()
+        end_date = datetime(2023, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=1)
         backtest_date_range = BacktestDateRange(
             start_date=start_date,
             end_date=end_date
         )
+        directory = os.path.join(
+            self.resource_dir, "backtest_reports", "test_backtests"
+        )
         reports = app.run_backtests(
             algorithms=[algorithm_one, algorithm_two, algorithm_three],
             backtest_date_ranges=[backtest_date_range],
+            directory=directory,
+            risk_free_rate=0.027
         )
         backtest_service = app.container.backtest_service()
 
         # Check if the backtest reports exist
         for report in reports:
-            dir_name = backtest_service.create_report_directory_name(report)
-            path = os.path.join(
-                self.resource_dir, "backtest_reports", dir_name
-            )
-            self.assertTrue(os.path.isdir(path))
+            self.assertTrue(os.path.isdir(directory))

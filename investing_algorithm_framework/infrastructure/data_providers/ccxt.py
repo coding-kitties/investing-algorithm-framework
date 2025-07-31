@@ -88,7 +88,7 @@ class CCXTOHLCVDataProvider(DataProvider):
             market=market,
             time_frame=time_frame,
             window_size=window_size,
-            storage_path=storage_directory,
+            storage_directory=storage_directory,
             data_provider_identifier=data_provider_identifier,
             config=config
         )
@@ -195,12 +195,15 @@ class CCXTOHLCVDataProvider(DataProvider):
         """
         # There must be at least backtest_start_date - window_size * time_frame
         # data available to create a sliding window.
-        required_start_date = backtest_start_date - \
-            timedelta(
-              minutes=TimeFrame.from_value(
-                  self.time_frame)
-                      .amount_of_minutes * self.window_size
-            )
+        if self.window_size is not None:
+            required_start_date = backtest_start_date - \
+                timedelta(
+                  minutes=TimeFrame.from_value(
+                      self.time_frame)
+                          .amount_of_minutes * self.window_size
+                )
+        else:
+            required_start_date = backtest_start_date
 
         storage_directory_path = self.get_storage_directory()
 
@@ -215,33 +218,42 @@ class CCXTOHLCVDataProvider(DataProvider):
         )
 
         if data is None:
+
+            # Disable pandas if it is set to True, because logic
+            # depends on polars DataFrame
+            has_pandas_flag = self.pandas
+            self.pandas = False
+
             # If the data is not available in the storage path,
             # retrieve it from the CCXT data provider
             data = self.get_data(
                 start_date=required_start_date,
                 end_date=backtest_end_date,
-                save=True
+                save=True,
             )
 
-        self.data = data
-        self._start_date_data_source = data["Datetime"].min()
-        self._end_date_data_source = data["Datetime"].max()
+            self.pandas = has_pandas_flag
 
-        # Create cache with sliding windows
-        self._precompute_sliding_windows(
-            data=data,
-            window_size=self.window_size,
-            time_frame=self.time_frame,
-            start_date=backtest_start_date,
-            end_date=backtest_end_date
-        )
+        self.data = data
+        self._start_date_data_source = self.data["Datetime"].min()
+        self._end_date_data_source = self.data["Datetime"].max()
+
+        if self.window_size is not None:
+            # Create cache with sliding windows
+            self._precompute_sliding_windows(
+                data=data,
+                window_size=self.window_size,
+                time_frame=self.time_frame,
+                start_date=backtest_start_date,
+                end_date=backtest_end_date
+            )
 
     def get_data(
         self,
         date: datetime = None,
         start_date: datetime = None,
         end_date: datetime = None,
-        save: bool = False
+        save: bool = False,
     ) -> Union[pl.DataFrame, pd.DataFrame]:
         """
         Function to retrieve data from the CCXT data provider.
@@ -255,6 +267,7 @@ class CCXTOHLCVDataProvider(DataProvider):
             start_date (datetime): The start date for the data.
             end_date (datetime): The end date for the data.
             save (bool): If True, the data will be saved to the storage path
+                if it is not already available. Defaults to False.
 
         Returns:
             DataFrame: The data for the given symbol and market.
@@ -278,39 +291,46 @@ class CCXTOHLCVDataProvider(DataProvider):
                 "before requesting ohlcv data."
             )
 
-        if (end_date is None and start_date is None
-                and self.window_size is None):
-            raise OperationalException(
-                "A start date or end date or window size is required "
-                "to retrieve ohlcv data."
-            )
-
-        if (start_date is not None and end_date is None
-                and self.window_size is None):
-            end_date = datetime.now(tz=timezone.utc)
-
-        if (end_date is not None and start_date is None
-                and self.window_size is None):
-            raise OperationalException(
-                "A window size is required when using an end date "
-                "to retrieve ohlcv data."
-            )
-
-        if start_date is not None and end_date is None:
-            end_date = self.create_end_date(
-                start_date=start_date,
-                time_frame=self.time_frame,
-                window_size=self.window_size
-            )
-
-        if end_date is not None and start_date is None \
-                and self.window_size is not None:
+        if date is not None and self.window_size is not None and self.time_frame is not None:
             start_date = self.create_start_date(
-                end_date=end_date,
+                end_date=date,
                 time_frame=self.time_frame,
                 window_size=self.window_size
             )
+            end_date = date
+        else:
+            if (end_date is None and start_date is None
+                    and self.window_size is None):
+                raise OperationalException(
+                    "A start date or end date or window size is required "
+                    "to retrieve ohlcv data."
+                )
 
+            if (start_date is not None and end_date is None
+                    and self.window_size is None):
+                end_date = datetime.now(tz=timezone.utc)
+
+            if (end_date is not None and start_date is None
+                    and self.window_size is None):
+                raise OperationalException(
+                    "A window size is required when using an end date "
+                    "to retrieve ohlcv data."
+                )
+
+            if start_date is not None and end_date is None:
+                end_date = self.create_end_date(
+                    start_date=start_date,
+                    time_frame=self.time_frame,
+                    window_size=self.window_size
+                )
+
+            if end_date is not None and start_date is None \
+                    and self.window_size is not None:
+                start_date = self.create_start_date(
+                    end_date=end_date,
+                    time_frame=self.time_frame,
+                    window_size=self.window_size
+                )
 
         if start_date is None and end_date is None:
             end_date = datetime.now(tz=timezone.utc)
@@ -340,7 +360,6 @@ class CCXTOHLCVDataProvider(DataProvider):
 
         if save:
             storage_directory = self.get_storage_directory()
-
             if storage_directory is None:
                 raise OperationalException(
                     "Storage directory is not set for "
@@ -406,27 +425,34 @@ class CCXTOHLCVDataProvider(DataProvider):
                     f"- {self._end_date_data_source}."
                 )
 
-            return self.data.filter(
+            data = self.data.filter(
                 (pl.col("Datetime") >= backtest_start_date) &
                 (pl.col("Datetime") <= backtest_end_date)
             )
-
-        try:
-            return self.window_cache[backtest_index_date]
-        except KeyError:
-
+        else:
             try:
-                # Return the key in the cache that is closest to the
-                # backtest_index_date but not after it.
-                closest_key = min(
-                    [k for k in self.window_cache.keys() if k >= backtest_index_date]
-                )
-                return self.window_cache[closest_key]
-            except ValueError:
-                raise OperationalException(
-                    f"No data available for the date: {backtest_index_date} "
-                    "within the prepared backtest data."
-                )
+                data = self.window_cache[backtest_index_date]
+            except KeyError:
+
+                try:
+                    # Return the key in the cache that is closest to the
+                    # backtest_index_date but not after it.
+                    closest_key = min(
+                        [k for k in self.window_cache.keys()
+                         if k >= backtest_index_date]
+                    )
+                    data =  self.window_cache[closest_key]
+                except ValueError:
+                    raise OperationalException(
+                        "No data available for the "
+                        f"date: {backtest_index_date} "
+                        "within the prepared backtest data."
+                    )
+
+        if self.pandas:
+            data = convert_polars_to_pandas(data)
+
+        return data
 
     def get_ohlcv(
         self, symbol, time_frame, from_timestamp, market, to_timestamp=None
@@ -861,7 +887,8 @@ class CCXTOHLCVDataProvider(DataProvider):
         """
         self.window_cache = {}
         timestamps = data["Datetime"].to_list()
-
+        print(f"Precomputing sliding windows for {len(timestamps)} timestamps")
+        print(window_size)
         # Only select the entries after the start date
         timestamps = [
             ts for ts in timestamps if start_date <= ts <= end_date
@@ -877,6 +904,11 @@ class CCXTOHLCVDataProvider(DataProvider):
                     minutes=time_frame.amount_of_minutes * window_size
                 ))
             )
+
+        # Make sure the end datetime of the backtest is included in the
+        # sliding windows cache
+        if end_date not in self.window_cache:
+            self.window_cache[end_date] = data[-window_size:]
 
     def get_storage_directory(self) -> Union[str, None]:
         """
@@ -921,4 +953,5 @@ class CCXTOHLCVDataProvider(DataProvider):
             data_provider_identifier=data_source.data_provider_identifier,
             storage_directory=self.get_storage_directory(),
             config=self.config,
+            pandas=data_source.pandas
         )

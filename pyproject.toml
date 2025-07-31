@@ -38,7 +38,7 @@ boto3 = "^1.38.41"
 coverage= "7.4.2"
 flake8 = "7.0.0"
 Flask-Testing = "^0.8.1"
-pyindicators = "0.9.2"
+pyindicators = "0.11.1"
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"

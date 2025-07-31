@@ -1,11 +1,11 @@
+from datetime import datetime
 from typing import List, Dict, Any
+
 import pandas as pd
-from datetime import datetime, timezone
 
 from investing_algorithm_framework.domain import OperationalException, Position
 from investing_algorithm_framework.domain import \
-    TimeUnit, StrategyProfile, Trade, ENVIRONMENT, Environment, \
-    BACKTESTING_INDEX_DATETIME, DataSource
+    TimeUnit, StrategyProfile, Trade, DataSource
 from .context import Context
 
 
@@ -90,37 +90,39 @@ class TradingStrategy:
         self._context = None
         self._last_run = None
 
-    def is_buy_signal_vectorized(self, data: pd.DataFrame) -> bool:
+    def buy_signal_vectorized(self,data: Dict[DataSource, Any]) -> pd.Series:
         """
         Check if the data contains a buy signal.
         This method should be implemented by the user.
 
         Args:
-            data (pd.DataFrame): The data to check for a buy signal.
+            data (Dict[DataSource, Any]): All the data that matched the
+                data sources of the strategy.
 
         Returns:
-            bool: True if there is a buy signal, False otherwise.
+            Series: A pandas Series containing the sell signals.
         """
         raise NotImplementedError(
             "is_buy_signal_vectorized method not implemented"
         )
 
-    def is_sell_signal_vectorized(self, data: pd.DataFrame) -> bool:
+    def sell_signal_vectorized(self, data: Dict[DataSource, Any]) -> pd.Series:
         """
         Check if the data contains a sell signal.
         This method should be implemented by the user.
 
         Args:
-            data (pd.DataFrame): The data to check for a sell signal.
+            data (Dict[DataSource, Any]): All the data that matched the
+                data sources of the strategy.
 
         Returns:
-            bool: True if there is a sell signal, False otherwise.
+            Series: A pandas Series containing the sell signals.
         """
         raise NotImplementedError(
             "is_sell_signal_vectorized method not implemented"
         )
 
-    def run_strategy(self, context: Context, market_data: Dict[str, Any]):
+    def run_strategy(self, context: Context, data: Dict[str, Any]):
         """
         Main function for running your strategy. This function will be called
         by the framework when the trigger of your strategy is met.
@@ -138,7 +140,7 @@ class TradingStrategy:
                 of the Context class, this class has various methods to do
                 operations with your portfolio, orders, trades, positions and
                 other components.
-            market_data (Dict[str, Any]): The data for the strategy.
+            data (Dict[str, Any]): The data for the strategy.
                 This is a dictionary containing all the data retrieved from the
                 specified data sources.
 
@@ -146,27 +148,11 @@ class TradingStrategy:
             None
         """
         self.context = context
-        config = self.context.get_config()
+        self.apply_strategy(context=context, data=data)
 
-        # if config[ENVIRONMENT] == Environment.BACKTEST.value:
-        #     self._update_trades_and_orders_for_backtest(market_data)
-        # else:
-        #     self._update_trades_and_orders(market_data)
-
-        # self._check_stop_losses()
-        # self._check_take_profits()
-
-        # Run user defined strategy
-        self.apply_strategy(context=context, market_data=market_data)
-
-        # if config[ENVIRONMENT] == Environment.BACKTEST.value:
-        #     self._last_run = config[BACKTESTING_INDEX_DATETIME]
-        # else:
-        #     self._last_run = datetime.now(tz=timezone.utc)
-
-    def apply_strategy(self, context, market_data):
+    def apply_strategy(self, context, data):
         if self.decorated:
-            self.decorated(context=context, market_data=market_data)
+            self.decorated(context=context, data=data)
         else:
             raise NotImplementedError("Apply strategy is not implemented")
 

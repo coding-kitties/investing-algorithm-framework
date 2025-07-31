@@ -85,16 +85,21 @@ class AlgorithmFactory:
             strategies.extend(algorithm.strategies)
             tasks.extend(algorithm.tasks)
             on_strategy_run_hooks.extend(algorithm.on_strategy_run_hooks)
+
             if hasattr(algorithm, 'data_sources'):
                 data_sources.extend(algorithm.data_sources)
 
-        for strategy in strategies:
-            if hasattr(strategy, 'data_sources'):
-                data_sources.extend(strategy.data_sources)
+        if strategy is not None:
+            strategies.append(strategy)
+            data_sources.extend(strategy.data_sources)
+
+        for strategy_entry in strategies:
+            if strategy_entry.data_sources is not None \
+                    and len(strategy_entry.data_sources):
+                data_sources.extend(strategy_entry.data_sources)
 
         algorithm = Algorithm(
             name=name,
-            strategy=strategy,
             strategies=strategies,
             tasks=tasks,
             on_strategy_run_hooks=on_strategy_run_hooks,

@@ -23,13 +23,13 @@ class BitvavoTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.SECOND
     interval = 10
     data_sources = [
-        DataSource(data_type="OHLCV", market="bitvavo", symbol="BTC/EUR", window_size=200, time_frame="2h", indentifier="BTC/EUR-ohlcv"),
-        DataSource(data_type="Ticker", market="bitvavo", symbol="BTC/EUR", indentifier="BTC/EUR-ticker")
+        DataSource(data_type="OHLCV", market="bitvavo", symbol="BTC/EUR", window_size=200, time_frame="2h", identifier="BTC/EUR-ohlcv"),
+        DataSource(data_type="Ticker", market="bitvavo", symbol="BTC/EUR", identifier="BTC/EUR-ticker")
     ]
 
-    def run_strategy(self, context: Context, market_data):
-        print(market_data["BTC/EUR-ohlcv"])
-        print(market_data["BTC/EUR-ticker"])
+    def run_strategy(self, context: Context, data):
+        print(data["BTC/EUR-ohlcv"])
+        print(data["BTC/EUR-ticker"])
 
 # Create an app and add the market data sources and market credentials to it
 app = create_app()
