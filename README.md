@@ -160,7 +160,7 @@ app.add_strategy(MyStrategy)
 if __name__ == "__main__":
     # Run the backtest with a daily snapshot interval for end-of-day granular reporting
     backtest = app.run_backtest(
-        backtest_date_range=date_range, initial_amount=100, snapshot_interval=SnapshotInterval.STRATEGY_ITERATION
+        backtest_date_range=date_range, initial_amount=100, snapshot_interval=SnapshotInterval.DAILY
     )
     backtest_report = BacktestReport(backtests=[backtest])
     backtest_report.show()
