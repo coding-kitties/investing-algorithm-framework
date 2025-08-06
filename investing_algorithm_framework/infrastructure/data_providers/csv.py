@@ -1,9 +1,10 @@
 from datetime import datetime, timezone, timedelta
 
-import polars
+import polars as pl
 
 from investing_algorithm_framework.domain import DataProvider, \
-    OperationalException, DataSource, DataType, TimeFrame
+    OperationalException, DataSource, DataType, TimeFrame, \
+    convert_polars_to_pandas
 
 
 class CSVOHLCVDataProvider(DataProvider):
@@ -35,7 +36,8 @@ class CSVOHLCVDataProvider(DataProvider):
         time_frame: str,
         market: str,
         window_size=None,
-        data_provider_identifier: str = None
+        data_provider_identifier: str = None,
+        pandas: bool = False,
     ):
         """
         Initialize the CSV Data Provider.
@@ -56,13 +58,15 @@ class CSVOHLCVDataProvider(DataProvider):
             time_frame=time_frame,
             window_size=window_size,
             storage_path=storage_path,
-            data_provider_identifier=data_provider_identifier
+            data_provider_identifier=data_provider_identifier,
+            data_type=DataType.OHLCV.value
         )
         self._start_date_data_source = None
         self._end_date_data_source = None
         self._columns = ["Datetime", "Open", "High", "Low", "Close", "Volume"]
         self.window_cache = {}
-        self._load_data(storage_path)
+        self._load_data(self.storage_path)
+        self.pandas = pandas
 
     def has_data(
         self,
@@ -90,17 +94,19 @@ class CSVOHLCVDataProvider(DataProvider):
             return False
 
         if DataType.OHLCV.equals(data_source.data_type) and \
-            data_source.symbol == self.symbol and \
-            data_source.time_frame.equals(self.time_frame) and \
-            data_source.market == self.market:
+                data_source.symbol == self.symbol and \
+                data_source.time_frame.equals(self.time_frame) and \
+                data_source.market == self.market:
 
             if end_date > self._end_date_data_source:
                 return False
 
             if data_source.window_size is not None:
+                minutes = TimeFrame.from_value(
+                    data_source.time_frame
+                ).amount_of_minutes * data_source.window_size
                 required_start_date = end_date - timedelta(
-                    minutes=TimeFrame.from_value(data_source.time_frame)
-                            .amount_of_minutes * data_source.window_size
+                    minutes=minutes
                 )
 
                 if required_start_date < self._start_date_data_source:
@@ -148,8 +154,9 @@ class CSVOHLCVDataProvider(DataProvider):
             )
         elif start_date is None and end_date is not None:
             start_date = end_date - timedelta(
-                minutes=TimeFrame.from_value(self.time_frame)
-                        .amount_of_minutes * windows_size
+                minutes=TimeFrame.from_value(
+                    self.time_frame
+                ).amount_of_minutes * windows_size
             )
             df = self.data
             df = df.filter(
@@ -164,10 +171,10 @@ class CSVOHLCVDataProvider(DataProvider):
             )
 
             if start_date < self._start_date_data_source:
-                return polars.DataFrame()
+                return pl.DataFrame()
 
             if start_date > self._end_date_data_source:
-                return polars.DataFrame()
+                return pl.DataFrame()
 
             df = self.data
             df = df.filter(
@@ -176,16 +183,17 @@ class CSVOHLCVDataProvider(DataProvider):
             return df
 
         if end_date is not None:
-            start_data = end_date - timedelta(
-                minutes=TimeFrame.from_value(self.time_frame)
-                        .amount_of_minutes * windows_size
+            start_date = end_date - timedelta(
+                minutes=TimeFrame.from_value(
+                    self.time_frame
+                ).amount_of_minutes * windows_size
             )
 
             if end_date < self._start_date_data_source:
-                return polars.DataFrame()
+                return pl.DataFrame()
 
             if end_date > self._end_date_data_source:
-                return polars.DataFrame()
+                return pl.DataFrame()
 
             df = self.data
             df = df.filter(
@@ -243,7 +251,8 @@ class CSVOHLCVDataProvider(DataProvider):
         if required_start_date < self._start_date_data_source:
             raise OperationalException(
                 f"Not enough data available for backtest. "
-                f"Data earlier then {required_start_date} is required, but only "
+                f"Data earlier then {required_start_date} is "
+                "required, but only "
                 f"{self._start_date_data_source} is available."
             )
 
@@ -256,15 +265,73 @@ class CSVOHLCVDataProvider(DataProvider):
 
     def get_backtest_data(
         self,
-        data_source: DataSource,
-        backtest_index_date: datetime = None,
+        backtest_index_date: datetime,
         backtest_start_date: datetime = None,
-        backtest_end_date: datetime = None,
+        backtest_end_date: datetime = None
     ) -> None:
         """
-        Fetches backtest data for a given symbol and date range.
+        Fetches backtest data for a given datasource
+
+        Args:
+           backtest_index_date (datetime): The date for which to fetch
+               backtest data.
+           backtest_start_date (datetime): The start date for the
+               backtest data.
+           backtest_end_date (datetime): The end date for the
+               backtest data.
+
+        Returns:
+           pl.DataFrame: The backtest data for the given datasource.
         """
-        return self.window_cache[backtest_index_date]
+        if backtest_start_date is not None and \
+                backtest_end_date is not None:
+
+            if backtest_start_date < self._start_date_data_source:
+                raise OperationalException(
+                    f"Request data date {backtest_start_date} "
+                    f"is before the range of "
+                    f"the available data "
+                    f"{self._start_date_data_source} "
+                    f"- {self._end_date_data_source}."
+                )
+
+            if backtest_end_date > self._end_date_data_source:
+                raise OperationalException(
+                    f"Request data date {backtest_end_date} "
+                    f"is after the range of "
+                    f"the available data "
+                    f"{self._start_date_data_source} "
+                    f"- {self._end_date_data_source}."
+                )
+
+            data = self.data.filter(
+                (pl.col("Datetime") >= backtest_start_date) &
+                (pl.col("Datetime") <= backtest_end_date)
+            )
+        else:
+            try:
+                data = self.window_cache[backtest_index_date]
+            except KeyError:
+
+                try:
+                    # Return the key in the cache that is closest to the
+                    # backtest_index_date but not after it.
+                    closest_key = min(
+                        [k for k in self.window_cache.keys()
+                         if k >= backtest_index_date]
+                    )
+                    data = self.window_cache[closest_key]
+                except ValueError:
+                    raise OperationalException(
+                        "No data available for the "
+                        f"date: {backtest_index_date} "
+                        "within the prepared backtest data."
+                    )
+
+        if self.pandas:
+            data = convert_polars_to_pandas(data)
+
+        return data
 
     def _load_data(self, storage_path):
         """
@@ -285,7 +352,7 @@ class CSVOHLCVDataProvider(DataProvider):
         Returns:
             None
         """
-        df = polars.read_csv(storage_path)
+        df = pl.read_csv(storage_path)
 
         # Check if all column names are in the csv file
         if not all(column in df.columns for column in self._columns):
@@ -298,13 +365,13 @@ class CSVOHLCVDataProvider(DataProvider):
                 f"Missing columns: {missing_columns}"
             )
 
-        self.data = polars.read_csv(
+        self.data = pl.read_csv(
             storage_path,
-            schema_overrides={"Datetime": polars.Datetime},
+            schema_overrides={"Datetime": pl.Datetime},
             low_memory=True
         ).with_columns(
-            polars.col("Datetime").cast(
-                polars.Datetime(time_unit="ms", time_zone="UTC")
+            pl.col("Datetime").cast(
+                pl.Datetime(time_unit="ms", time_zone="UTC")
             )
         )
 
@@ -373,8 +440,14 @@ class CSVOHLCVDataProvider(DataProvider):
             DataProvider: A new instance of the data provider with the
                 specified data source.
         """
+
+        storage_path = data_source.storage_path
+
+        if storage_path is None:
+            storage_path = self.storage_path
+
         return CSVOHLCVDataProvider(
-            file_path=data_source.storage_path,
+            storage_path=storage_path,
             symbol=data_source.symbol,
             time_frame=data_source.time_frame,
             market=data_source.market,

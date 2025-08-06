@@ -362,8 +362,7 @@ class Test(TestCase):
 
         while index_date <= backtest_date_range.end_date:
             data = data_provider.get_backtest_data(
-                datasource,
-                index_date
+                backtest_index_date=index_date
             )
             self.assertAlmostEqual(
                 200, len(data), delta=1

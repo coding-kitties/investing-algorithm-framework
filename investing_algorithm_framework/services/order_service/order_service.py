@@ -1,12 +1,8 @@
 import logging
-from datetime import datetime
-from typing import List
-
-from dateutil.tz import tzutc
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
-    OperationalException, OrderStatus, Order, OrderExecutor, random_number, \
-    Observable, Event, INDEX_DATETIME
+    OperationalException, OrderStatus, Order, random_number, \
+    Observable, INDEX_DATETIME
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
@@ -174,7 +170,6 @@ class OrderService(RepositoryService, Observable):
         if execute:
             order = self.execute_order(order, portfolio)
 
-        print(order.remaining)
         position = self._create_position_if_not_exists(symbol, portfolio)
         order.position_id = position.id
         order = self.order_repository.save(order)

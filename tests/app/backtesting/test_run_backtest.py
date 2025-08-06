@@ -74,6 +74,7 @@ class Test(TestCase):
         backtest = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
+            risk_free_rate=0.027
         )
         path = os.path.join(self.resource_directory, "backtest_reports/test_backtest")
         backtest.save(path)
@@ -104,6 +105,7 @@ class Test(TestCase):
         backtest = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
+            risk_free_rate=0.027
         )
         path = os.path.join(
             self.resource_directory, "backtest_reports/test_backtest"
@@ -141,6 +143,7 @@ class Test(TestCase):
         backtest = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
+            risk_free_rate=0.027
         )
         path = os.path.join(
             self.resource_directory, "backtest_reports/test_backtest"

@@ -1,14 +1,8 @@
 from datetime import datetime, timezone
-from decimal import Decimal
-
-import polars as pl
 
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential, INDEX_DATETIME, BacktestDateRange
 from investing_algorithm_framework.services import OrderBacktestService
-from investing_algorithm_framework.domain import ENVIRONMENT, \
-    DATABASE_NAME, DATABASE_DIRECTORY_NAME, Environment, \
-    BACKTESTING_START_DATE, BACKTESTING_END_DATE, BACKTESTING_INITIAL_AMOUNT
 from tests.resources import TestBase
 
 
@@ -30,7 +24,7 @@ class TestOrderBacktestService(TestBase):
     external_balances = {
         "EUR": 1000
     }
-    initialize = False
+    initialize = True
 
     def setUp(self) -> None:
         super(TestOrderBacktestService, self).setUp()
@@ -49,16 +43,7 @@ class TestOrderBacktestService(TestBase):
                 configuration_service(),
             )
         )
-        # self.app.set_config_with_dict(
-        #     {
-        #         ENVIRONMENT: Environment.BACKTEST.value,
-        #         DATABASE_NAME: "backtest-database.sqlite3",
-        #         DATABASE_DIRECTORY_NAME: "backtest_databases",
-        #         BACKTESTING_START_DATE: datetime(2023, 8, 8),
-        #         BACKTESTING_END_DATE: datetime(2023, 8, 10),
-        #         BACKTESTING_INITIAL_AMOUNT: 1000
-        #     }
-        # )
+
         backtest_date_range = BacktestDateRange(
             start_date=datetime(2023, 8, 8),
             end_date=datetime(2023, 8, 10)

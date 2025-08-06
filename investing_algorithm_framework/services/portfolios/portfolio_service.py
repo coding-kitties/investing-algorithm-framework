@@ -3,7 +3,7 @@ from datetime import datetime
 
 from investing_algorithm_framework.domain import OperationalException, \
     MarketCredentialService, Portfolio, \
-    Environment, ENVIRONMENT, Observable, Event
+    Environment, ENVIRONMENT, Observable
 from investing_algorithm_framework.services.configuration_service import \
     ConfigurationService
 from investing_algorithm_framework.services.repository_service \

@@ -1,5 +1,5 @@
 from investing_algorithm_framework.domain import OrderStatus, \
-    PortfolioSnapshot, DataSource
+    PortfolioSnapshot
 from investing_algorithm_framework.services.repository_service import \
     RepositoryService
 

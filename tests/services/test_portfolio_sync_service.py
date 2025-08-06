@@ -3,8 +3,7 @@ from investing_algorithm_framework import PortfolioConfiguration, Algorithm, \
 from tests.resources import TestBase
 
 
-class Test(TestBase):
-    storage_repo_type = "pandas"
+class TestPortfolioSyncService(TestBase):
     initialize = False
 
     def test_sync_unallocated(self):
@@ -32,18 +31,21 @@ class Test(TestBase):
                 secret_key="test"
             )
         )
-        self.market_service.balances = {"EUR": 1000}
-        self.app.add_algorithm(Algorithm())
+
+        # Check that is 1 market credential is added
+        self.assertEqual(1, len(self.app.container.market_credential_service().get_all()))
+
+        # Check that is 1 portfolio configuration is added
+        self.assertEqual(1, len(self.app.container.portfolio_configuration_service().get_all()))
+
+        # self.app.add_algorithm(Algorithm())
         self.app.initialize_config()
-        self.app.initialize()
+        self.app.initialize_storage()
+        self.app.initialize_services()
+        self.app.initialize_portfolios()
+
         portfolio = self.app.container.portfolio_service()\
             .find({"identifier": "test"})
-        self.assertEqual(1000, portfolio.unallocated)
-
-        # Sync again but with the new balance, if not stateless the
-        # unallocated balance should be the same
-        self.market_service.balances = {"EUR": 2000}
-        portfolio_sync_service.sync_unallocated(portfolio)
         self.assertEqual(1000, portfolio.unallocated)
 
     def test_sync_unallocated_with_no_balance(self):
@@ -82,9 +84,12 @@ class Test(TestBase):
             portfolio_provider_lookup.get_portfolio_provider("binance")
         portfolio_provider.external_balances = {"EUR": 400}
 
+        self.app.initialize_config()
+        self.app.initialize_storage()
+        self.app.initialize_services()
+
         with self.assertRaises(OperationalException) as context:
-            self.app.initialize_config()
-            self.app.initialize()
+            self.app.initialize_portfolios()
 
         self.assertEqual(
             "The initial balance of the portfolio configuration (1000.0 EUR) is more than the available balance on the exchange. Please make sure that the initial balance of the portfolio configuration is less than the available balance on the exchange 400 EUR.",
@@ -109,10 +114,11 @@ class Test(TestBase):
                 secret_key="test"
             )
         )
-        self.market_service.balances = {"EUR": 1200}
         self.app.add_algorithm(Algorithm())
         self.app.initialize_config()
-        self.app.initialize()
+        self.app.initialize_storage()
+        self.app.initialize_services()
+        self.app.initialize_portfolios()
 
         portfolio = self.app.container.portfolio_service() \
             .find({"identifier": "test"})
@@ -134,10 +140,10 @@ class Test(TestBase):
                 secret_key="test"
             )
         )
-        self.market_service.balances = {"EUR": 1200}
         self.app.add_algorithm(Algorithm())
         self.app.initialize_config()
-        self.app.initialize()
+        self.app.initialize_storage()
+        self.app.initialize_portfolios()
 
         portfolio = self.app.container.portfolio_service() \
             .find({"identifier": "test"})

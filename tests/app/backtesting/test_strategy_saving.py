@@ -83,7 +83,8 @@ class Test(TestCase):
         report = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
-            directory=backtest_report_root_dir
+            directory=backtest_report_root_dir,
+            risk_free_rate=0.027
         )
         report_directory = BacktestService.create_report_directory_name(report)
         report_name = "results.json"

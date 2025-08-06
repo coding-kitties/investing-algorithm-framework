@@ -3,13 +3,13 @@ from time import sleep
 from typing import List, Set, Dict
 
 import polars as pl
-from tqdm import tqdm
 
 from investing_algorithm_framework.domain import Environment, ENVIRONMENT, \
-    OrderStatus, DataSource, DataType, \
+    OrderStatus, DataSource, DataType, tqdm, \
     TradeStatus, SNAPSHOT_INTERVAL, SnapshotInterval, OperationalException, \
     LAST_SNAPSHOT_DATETIME, INDEX_DATETIME
 from investing_algorithm_framework.services import TradeOrderEvaluator
+
 from .algorithm import Algorithm
 from .strategy import TradingStrategy
 
@@ -89,9 +89,11 @@ class EventLoopService:
         current iteration based on the strategies.
 
         Args:
-            strategy_data_sources: List of data sources defined in the strategies.
+            strategy_data_sources: List of data sources defined
+                in the strategies.
         Returns:
-            Set[DataSource]: A set of data sources that need to be fetched.
+            Set[DataSource]: A set of data sources that need to
+                be fetched.
         """
         data_sources = set(strategy_data_sources)
         return data_sources
@@ -133,12 +135,15 @@ class EventLoopService:
                 symbol_set.add(trade.symbol)
 
         for symbol in symbol_set:
-            data[symbol] = self._data_provider_service.get_ohlcv_data(
-                symbol=symbol, date=date
-            )
+            data[symbol] = self._data_provider_service\
+                .get_ohlcv_data(
+                    symbol=symbol, date=date
+                )
         return data
 
-    def _get_strategies(self, strategy_ids: List[str]) -> List[TradingStrategy]:
+    def _get_strategies(
+        self, strategy_ids: List[str]
+    ) -> List[TradingStrategy]:
         """
         Returns a list of strategies based on the provided strategy IDs.
 
@@ -235,7 +240,7 @@ class EventLoopService:
             # Check if the time difference is greater than 24 hours
             if last_snapshot_datetime is None or \
                     (current_datetime - last_snapshot_datetime)\
-                            .total_seconds() >= 86400:
+                    .total_seconds() >= 86400:
                 snapshot = self._portfolio_snapshot_service.create_snapshot(
                     created_at=current_datetime,
                     portfolio=portfolio,
@@ -345,13 +350,14 @@ class EventLoopService:
                 for current_time in tqdm(
                     sorted_times,
                     total=len(sorted_times),
-                    colour="GREEN"
+                    colour="GREEN",
+                    desc="Running backtest"
                 ):
                     self._configuration_service.add_value(
                         INDEX_DATETIME, current_time
                     )
                     strategy_ids = schedule[current_time]["strategy_ids"]
-                    task_ids = schedule[current_time]["task_ids"]
+                    # task_ids = schedule[current_time]["task_ids"]
                     strategies = self._get_strategies(strategy_ids)
                     self._run_iteration(strategies=strategies, tasks=[])
 
@@ -361,7 +367,7 @@ class EventLoopService:
                         INDEX_DATETIME, current_time
                     )
                     strategy_ids = schedule[current_time]["strategy_ids"]
-                    task_ids = schedule[current_time]["task_ids"]
+                    # task_ids = schedule[current_time]["task_ids"]
                     strategies = self._get_strategies(strategy_ids)
                     self._run_iteration(strategies=strategies, tasks=[])
         else:
@@ -428,8 +434,9 @@ class EventLoopService:
         of the portfolios if needed.
 
         Args:
-            strategies: Optional; a list of strategies to run in this iteration.
-                If None, uses the strategies defined in the event loop service.
+            strategies: Optional; a list of strategies to
+                run in this iteration. If None, uses the strategies
+                defined in the event loop service.
             tasks: Optional; a list of tasks to run in this iteration.
                 If None, uses the tasks defined in the event loop service.
 

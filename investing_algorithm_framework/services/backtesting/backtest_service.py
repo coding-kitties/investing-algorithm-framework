@@ -11,7 +11,7 @@ import pandas as pd
 from investing_algorithm_framework.domain import BacktestResult, \
     TimeUnit, Trade, OperationalException, Observable, BacktestDateRange, \
     DATETIME_FORMAT_BACKTESTING, Backtest, TradeStatus, PortfolioSnapshot, \
-    convert_polars_to_pandas, DataType
+    DataType
 from investing_algorithm_framework.services.data_providers import \
     DataProviderService
 from investing_algorithm_framework.services.metrics import \
@@ -103,23 +103,19 @@ class BacktestService(Observable):
         """
         # Load all data sources
         data_sources = strategy.data_sources
-        data_bundle = {}
-        for data_source in data_sources:
-            data = self._data_provider_service.get_backtest_data(
-                data_source=data_source,
-                start_date=backtest_date_range.start_date,
-                end_date=backtest_date_range.end_date
-            )
-            if not isinstance(data, pd.DataFrame):
-                data = convert_polars_to_pandas(data, add_index=True)
-            data_bundle[data_source] = data
+        data = self._data_provider_service.get_vectorized_backtest_data(
+            data_sources=data_sources,
+            start_date=backtest_date_range.start_date,
+            end_date=backtest_date_range.end_date
+        )
 
         # Verify signal functions
         buy_fn = getattr(strategy, 'buy_signal_vectorized', None)
         sell_fn = getattr(strategy, 'sell_signal_vectorized', None)
         if not buy_fn or not sell_fn:
             raise OperationalException(
-                "Strategy must define vectorized buy/sell signal functions.")
+                "Strategy must define vectorized buy/sell signal functions."
+            )
 
         # Select main OHLCV source (most granular)
         ohlcv_sources = [ds for ds in data_sources if
@@ -128,14 +124,14 @@ class BacktestService(Observable):
             raise OperationalException("No OHLCV data sources found.")
 
         most_granular_ds = min(ohlcv_sources, key=lambda ds: ds.time_frame)
-        main_df = data_bundle[most_granular_ds]
+        main_df = data[most_granular_ds.get_identifier()]
 
         close = main_df['Close']
         index = main_df.index
 
         # === Signal computation ===
-        buy_signal = buy_fn(data_bundle)
-        sell_signal = sell_fn(data_bundle)
+        buy_signal = buy_fn(data)
+        sell_signal = sell_fn(data)
 
         # Reindex to match main_df (avoid alignment issues)
         buy_signal = buy_signal.reindex(index, fill_value=False)
@@ -155,14 +151,6 @@ class BacktestService(Observable):
         total_value = holdings
         net_gain = total_value - initial_amount
 
-        portfolio = pd.DataFrame({
-            'position': position,
-            'returns': strategy_returns,
-            'holdings': holdings,
-            'cash': initial_amount,
-            'total': total_value
-        }, index=index)
-
         # === Trade generation (semi-vectorized) ===
         trades = []
         position_state = 0
@@ -179,8 +167,8 @@ class BacktestService(Observable):
                 trade_open_price = current_price
                 trade_open_date = current_date
             elif position_state != 0 and current_signal == -position_state:
-                net_gain_val = (
-                                           current_price - trade_open_price) * position_state * position_size
+                net_gain_val = (current_price - trade_open_price) \
+                    * position_state * position_size
                 trades.append(Trade(
                     id=len(trades) + 1,
                     orders=[],
@@ -251,16 +239,6 @@ class BacktestService(Observable):
     ) -> Dict[datetime, Dict[str, List[str]]]:
         """
         Generates a dict-based schedule: datetime => {strategy_ids, task_ids}
-
-        Args:
-            strategies (list): Strategies with intervals and time units.
-            tasks (list): List of task IDs (run for every timestamp).
-            start_date (datetime): Start of the simulation.
-            end_date (datetime): End of the simulation.
-
-        Returns:
-            dict: schedule[datetime] =
-                {"strategy_ids": [...], "task_ids": [...]}
         """
         schedule = defaultdict(
             lambda: {"strategy_ids": set(), "task_ids": set(tasks)}
@@ -271,7 +249,6 @@ class BacktestService(Observable):
             interval = strategy.strategy_profile.interval
             time_unit = strategy.strategy_profile.time_unit
 
-            # Convert interval to seconds
             if time_unit == TimeUnit.SECOND:
                 step = timedelta(seconds=interval)
             elif time_unit == TimeUnit.MINUTE:
@@ -288,14 +265,13 @@ class BacktestService(Observable):
                 schedule[t]["strategy_ids"].add(strategy_id)
                 t += step
 
-            # Convert sets to sorted lists (optional, for deterministic iteration)
-            return {
-                ts: {
-                    "strategy_ids": sorted(data["strategy_ids"]),
-                    "task_ids": sorted(data["task_ids"])
-                }
-                for ts, data in schedule.items()
+        return {
+            ts: {
+                "strategy_ids": sorted(data["strategy_ids"]),
+                "task_ids": sorted(data["task_ids"])
             }
+            for ts, data in schedule.items()
+        }
 
     def get_strategy_from_strategy_profiles(self, strategy_profiles, id):
 
@@ -449,9 +425,9 @@ class BacktestService(Observable):
                 backtest = Backtest.open(path)
 
                 # Check if the algorithm name and date range match
-                if (backtest.backtest_results.name == algorithm.name and
-                        backtest.backtest_results.backtest_date_range \
-                        == backtest_date_range):
+                if backtest.backtest_results.name == algorithm.name \
+                    and backtest.backtest_results.backtest_date_range \
+                        == backtest_date_range:
                     return backtest
             except Exception:
                 continue

@@ -349,7 +349,9 @@ def get_average_yearly_return(snapshots: List[PortfolioSnapshot]) -> float:
     return sum(r for r, _ in yearly_returns) / len(yearly_returns)
 
 
-def get_total_return(snapshots: List[PortfolioSnapshot]) -> float:
+def get_total_return(
+    snapshots: List[PortfolioSnapshot]
+) -> Tuple[float, float]:
     """
     Calculate the total return from portfolio snapshots.
 
@@ -360,7 +362,8 @@ def get_total_return(snapshots: List[PortfolioSnapshot]) -> float:
         snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
 
     Returns:
-        float: The total return as a percentage.
+        Tuple[Float, Float]: First number is the absolute return and the
+            second number is the percetage total return
     """
 
     if not snapshots or len(snapshots) < 2:
@@ -372,7 +375,9 @@ def get_total_return(snapshots: List[PortfolioSnapshot]) -> float:
     if initial_value == 0:
         return 0.0
 
-    return ((final_value - initial_value) / initial_value)
+    absolute_return = final_value - initial_value
+    percentage = (absolute_return / initial_value)
+    return absolute_return, percentage
 
 
 def get_percentage_winning_years(snapshots: List[PortfolioSnapshot]) -> float:
@@ -415,7 +420,74 @@ def get_total_net_gain(snapshots: List[PortfolioSnapshot]) -> float:
     if not snapshots:
         return 0.0
 
+    return snapshots[-1].total_net_gain
+
+
+def get_final_value(snapshots: List[PortfolioSnapshot]) -> float:
+    """
+    Calculate the final portfolio value from portfolio snapshots.
+
+    Args:
+        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
+
+    Returns:
+        float: The final portfolio value.
+    """
+
+    if not snapshots:
+        return 0.0
+
+    return snapshots[-1].total_value
+
+
+def get_growth(snapshots: List[PortfolioSnapshot]) -> float:
+    """
+    Calculate the growth of the portfolio from the first to the last snapshot.
+
+    The growth is calculated as the percentage change in portfolio value
+    from the first snapshot to the last snapshot.
+
+    Args:
+        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
+
+    Returns:
+        float: The growth as a percentage.
+    """
+
+    if not snapshots or len(snapshots) < 2:
+        return 0.0
+
     initial_value = snapshots[0].total_value
     final_value = snapshots[-1].total_value
 
-    return final_value - initial_value
+    if initial_value == 0:
+        return 0.0
+
+    return (final_value - initial_value)
+
+
+def get_growth_percentage(snapshots: List[PortfolioSnapshot]) -> float:
+    """
+    Calculate the growth percentage of the portfolio from the first
+    to the last snapshot.
+
+    The growth percentage is calculated as the percentage change in
+    portfolio value from the first snapshot to the last snapshot.
+
+    Args:
+        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
+
+    Returns:
+        float: The growth percentage.
+    """
+
+    if not snapshots or len(snapshots) < 2:
+        return 0.0
+
+    initial_value = snapshots[0].total_value
+    final_value = snapshots[-1].total_value
+
+    if initial_value == 0:
+        return 0.0
+
+    return (final_value - initial_value) / initial_value

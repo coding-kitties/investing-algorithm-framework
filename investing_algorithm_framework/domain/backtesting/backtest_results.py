@@ -59,11 +59,8 @@ class BacktestResult:
             trades of the backtest.
         percentage_negative_trades (float): The percentage of negative
             trades of the backtest.
-        total_net_gain_percentage (float): The total net gain percentage
-            of the backtest.
         growth (float): The growth of the backtest.
         growth_percentage (float): The growth percentage of the backtest.
-        total_net_gain (float): The total net gain of the backtest.
         total_cost (float): The total cost of the backtest.
         total_value (float): The total value of the backtest.
         average_trade_duration (float): The average trade duration
@@ -92,10 +89,8 @@ class BacktestResult:
     number_of_positions: int = 0
     percentage_positive_trades: float = 0.0
     percentage_negative_trades: float = 0.0
-    total_net_gain_percentage: float = 0.0
     growth: float = 0.0
     growth_percentage: float = 0.0
-    total_net_gain: float = 0.0
     total_cost: float = 0.0
     total_value: float = 0.0
     average_trade_duration: float = 0.0
@@ -140,7 +135,6 @@ class BacktestResult:
 
         if self.trades is not None:
             for trade in self.trades:
-                self.total_net_gain += trade.net_gain
                 self.total_cost += trade.cost
                 total_duration += \
                     ((trade.closed_at - trade.opened_at).total_seconds() /
@@ -157,9 +151,6 @@ class BacktestResult:
                 elif trade.net_gain < 0:
                     number_of_negative_trades += 1
 
-            self.total_net_gain_percentage = \
-                (self.total_net_gain / self.initial_unallocated) * 100.0 \
-                if self.initial_unallocated > 0 else 0.0
             self.percentage_positive_trades = \
                 (number_of_positive_trades / len(self.trades)) * 100.0 \
                 if len(self.trades) > 0 else 0.0
@@ -214,8 +205,6 @@ class BacktestResult:
             "growth": self.growth,
             "initial_unallocated": self.initial_unallocated,
             "trading_symbol": self.trading_symbol,
-            "total_net_gain_percentage": self.total_net_gain_percentage,
-            "total_net_gain": self.total_net_gain,
             "total_value": self.total_value,
             "average_trade_duration": self.average_trade_duration,
             "average_trade_size": self.average_trade_size,
@@ -297,8 +286,6 @@ class BacktestResult:
             growth=float(data["growth"]),
             initial_unallocated=float(data["initial_unallocated"]),
             trading_symbol=data["trading_symbol"],
-            total_net_gain_percentage=float(data["total_net_gain_percentage"]),
-            total_net_gain=float(data["total_net_gain"]),
             total_value=float(data["total_value"]),
             average_trade_duration=data["average_trade_duration"],
             average_trade_size=float(data["average_trade_size"]),

@@ -19,7 +19,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, Backtest, \
     PortfolioConfiguration, SnapshotInterval, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured, \
-    DataProvider, INDEX_DATETIME, \
+    DataProvider, INDEX_DATETIME, tqdm, \
     LAST_SNAPSHOT_DATETIME
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
@@ -317,8 +317,8 @@ class App:
 
         if snapshot_interval is not None:
             configuration_service.add_value(
-                SNAPSHOT_INTERVAL, SnapshotInterval\
-                    .from_value(snapshot_interval).value
+                SNAPSHOT_INTERVAL,
+                SnapshotInterval.from_value(snapshot_interval).value
             )
 
     def initialize_storage(self, remove_database_if_exists: bool = False):
@@ -384,9 +384,9 @@ class App:
         data_provider_service = self.container.data_provider_service()
         data_provider_service.reset()
 
-        for (data_provider, priority) in self._data_providers:
+        for data_provider_tuple in self._data_providers:
             data_provider_service.add_data_provider(
-                data_provider, priority=priority
+                data_provider_tuple[0], priority=data_provider_tuple[1]
             )
 
         # Add the default data providers
@@ -418,8 +418,10 @@ class App:
         data_provider_service = self.container.data_provider_service()
         data_provider_service.reset()
 
-        for data_provider in self._data_providers:
-            data_provider_service.add_data_provider(data_provider)
+        for data_provider_tuple in self._data_providers:
+            data_provider_service.add_data_provider(
+                data_provider_tuple[0], priority=data_provider_tuple[1]
+            )
 
         # Add the default data providers
         data_provider_service.add_data_provider(CCXTOHLCVDataProvider())
@@ -429,9 +431,11 @@ class App:
             data_sources, backtest_date_range
         )
 
+        description = "Preparing backtest data for all data sources"
+        data_providers = data_provider_service.data_provider_index.get_all()
         # Prepare the backtest data for each data provider
-        for data_source, data_provider in \
-                data_provider_service.data_provider_index.get_all():
+        for _, data_provider in \
+                tqdm(data_providers, desc=description, colour="green"):
             data_provider.prepare_backtest_data(
                 backtest_date_range.start_date,
                 backtest_date_range.end_date
@@ -771,7 +775,7 @@ class App:
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         risk_free_rate: Optional[float] = None,
         metadata: Optional[Dict[str, str]] = None,
-        save = True,
+        save=True,
         directory: str = None
     ) -> Backtest:
         """
@@ -864,6 +868,7 @@ class App:
             trade_order_evaluator=trade_order_evaluator
         )
         event_loop_service.start(schedule=schedule, show_progress=True)
+        self._run_history = event_loop_service.history
 
         # Convert the current run to a backtest and save it if needed
         backtest = backtest_service.create_backtest(
@@ -946,15 +951,17 @@ class App:
 
     def run_backtests(
         self,
-        algorithms,
         backtest_date_ranges,
         initial_amount=None,
+        strategy: Optional[TradingStrategy] = None,
+        algorithm: Optional[Algorithm] = None,
+        algorithms: Optional[List[Algorithm]] = None,
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         risk_free_rate: Optional[float] = None,
-        save = True,
+        save=True,
         directory: Optional[str] = None,
         use_checkpoints: Optional[bool] = True,
-    ):
+    ) -> List[Backtest]:
         """
         Function to run multiple backtests for a list of algorithms over
         a list of date ranges. This function will run each algorithm
@@ -987,17 +994,25 @@ class App:
         """
         backtests = []
         backtest_service = self.container.backtest_service()
+        final_algorithms = []
 
-        for date_range in backtest_date_ranges:
-            print(
-                f"{COLOR_YELLOW}Running backtests for date "
-                f"range:{COLOR_RESET} {COLOR_GREEN}{date_range.name} "
-                f"{date_range.start_date} - "
-                f"{date_range.end_date} for a "
-                f"total of {len(algorithms)} algorithms.{COLOR_RESET}"
+        if algorithms is not None:
+            final_algorithms = algorithms
+        elif strategy is not None:
+            algorithm_factory = self.container.algorithm_factory()
+            algorithm = algorithm_factory.create_algorithm(
+                strategy=strategy
+            )
+            final_algorithms = [algorithm]
+        elif algorithm is not None:
+            final_algorithms = [algorithm]
+        else:
+            raise OperationalException(
+                "No algorithms or strategy provided for backtesting"
             )
 
-            for algorithm in algorithms:
+        for date_range in backtest_date_ranges:
+            for algorithm in final_algorithms:
 
                 if use_checkpoints and directory is not None:
                     report = backtest_service.get_backtest(
@@ -1396,7 +1411,8 @@ class App:
         environment = self.config[ENVIRONMENT]
 
         if Environment.BACKTEST.equals(environment):
-            # If the app is running in backtest mode, remove all order executors
+            # If the app is running in backtest mode,
+            # remove all order executors
             # and add a single BacktestOrderExecutor
             order_executor_lookup.reset()
             order_executor_lookup.add_order_executor(
@@ -1500,7 +1516,6 @@ class App:
                             "history of your trading bot."
                         )
 
-
         order_executor_lookup = self.container.order_executor_lookup()
         market_credential_service = \
             self.container.market_credential_service()
@@ -1594,11 +1609,13 @@ class App:
             None
         """
         logger.info("Adding portfolio providers")
-        portfolio_provider_lookup = self.container.portfolio_provider_lookup()
+        portfolio_provider_lookup = self.container\
+            .portfolio_provider_lookup()
         environment = self.config[ENVIRONMENT]
 
         if Environment.BACKTEST.equals(environment):
-            # If the app is running in backtest mode, remove all order executors
+            # If the app is running in backtest mode,
+            # remove all order executors
             # and add a single BacktestOrderExecutor
             portfolio_provider_lookup.reset()
         else:

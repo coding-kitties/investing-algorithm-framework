@@ -3,7 +3,6 @@ import logging
 from sqlalchemy import create_engine, StaticPool
 from sqlalchemy import inspect
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
-from sqlalchemy.orm import clear_mappers
 
 from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI, \
     OperationalException

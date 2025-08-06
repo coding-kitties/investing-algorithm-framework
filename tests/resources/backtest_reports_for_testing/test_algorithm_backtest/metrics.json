@@ -1,0 +1,85 @@
+{
+    "backtest_start_date": "2023-12-01T23:00:00+00:00",
+    "backtest_end_date": "2023-12-02T23:00:00+00:00",
+    "equity_curve": [
+        [
+            1000.0,
+            "2023-12-01T23:00:00+00:00"
+        ],
+        [
+            1000.0,
+            "2023-12-02T23:00:00+00:00"
+        ]
+    ],
+    "total_return": 0.0,
+    "total_return_percentage": 0.0,
+    "final_value": 1000.0,
+    "cagr": 0.0,
+    "sharpe_ratio": NaN,
+    "rolling_sharpe_ratio": [
+        [
+            NaN,
+            "2023-12-02T00:00:00+00:00"
+        ]
+    ],
+    "sortino_ratio": NaN,
+    "calmar_ratio": 0.0,
+    "profit_factor": 0.0,
+    "gross_profit": 0.0,
+    "gross_loss": 0.0,
+    "annual_volatility": NaN,
+    "monthly_returns": [],
+    "yearly_returns": [],
+    "drawdown_series": [
+        [
+            0.0,
+            "2023-12-01T23:00:00+00:00"
+        ],
+        [
+            0.0,
+            "2023-12-02T23:00:00+00:00"
+        ]
+    ],
+    "max_drawdown": 0.0,
+    "max_drawdown_absolute": 0.0,
+    "max_daily_drawdown": 0.0,
+    "max_drawdown_duration": 0,
+    "trades_per_year": 0.0,
+    "trade_per_day": 0.0,
+    "exposure_factor": 0.0,
+    "trades_average_gain": [
+        0.0,
+        0.0
+    ],
+    "trades_average_loss": [
+        0.0,
+        0.0
+    ],
+    "best_trade": null,
+    "worst_trade": null,
+    "average_trade_duration": 0.0,
+    "number_of_trades": 0,
+    "win_rate": 0.0,
+    "win_loss_ratio": 0.0,
+    "percentage_winning_months": 0.0,
+    "percentage_winning_years": 0.0,
+    "average_monthly_return": 0.0,
+    "average_monthly_return_losing_months": 0.0,
+    "average_monthly_return_winning_months": 0.0,
+    "best_month": [
+        0.0,
+        null
+    ],
+    "best_year": [
+        null,
+        null
+    ],
+    "worst_month": [
+        0.0,
+        null
+    ],
+    "worst_year": [
+        null,
+        null
+    ]
+}

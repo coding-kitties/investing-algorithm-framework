@@ -37,3 +37,15 @@ class OrderExecutorTest(OrderExecutor):
     def cancel_order(self, portfolio, order, market_credential) -> Order:
         order.status = OrderStatus.CANCELED
         return order
+
+
+    def reset(self):
+        """
+        Reset the order executor to its initial state.
+        """
+        OrderExecutorTest.order_amount = None
+        OrderExecutorTest.order_amount_filled = None
+        OrderExecutorTest.order_status = None
+        self.order_amount_filled = None
+        self.order_amount = None
+        self.order_status = None

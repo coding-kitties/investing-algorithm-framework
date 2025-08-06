@@ -1,5 +1,6 @@
 from .ccxt import CCXTOHLCVDataProvider
 from .csv import CSVOHLCVDataProvider
+from .pandas import PandasOHLCVDataProvider
 
 
 def get_default_data_providers():
@@ -30,5 +31,6 @@ __all__ = [
     'CSVOHLCVDataProvider',
     'CCXTOHLCVDataProvider',
     'get_default_data_providers',
-    'get_default_ohlcv_data_providers'
+    'get_default_ohlcv_data_providers',
+    'PandasOHLCVDataProvider',
 ]

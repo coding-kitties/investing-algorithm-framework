@@ -65,10 +65,10 @@ class DataProvider(ABC):
             data_provider_identifier (str): The unique identifier for the
                 data provider. This is used to identify the data provider
                 in the framework. It should be a unique string that identifies
-                the data provider. Example: "binance", "coinbase", "custom_feed_data
-            data_type (str): The type of data to be fetched by the data provider.
-                This should be a valid TradingDataType. Example: "OHLCV", "T
-                ICKER", "CUSTOM_DATA"
+                the data provider. Example: "binance",
+                "coinbase", "custom_feed_data"
+            data_type (str): The type of data to be fetched
+                (e.g., "OHLCV", "TICKER", "CUSTOM_DATA")
             symbol (str): The symbol to fetch data for. This is optional and
                 can be set later. Example: "AAPL/USD", "BTC/USD"
             market (str): The market to fetch data for.
@@ -81,14 +81,16 @@ class DataProvider(ABC):
                 Example: 0 is the highest priority, 1 is the second-highest
                 priority, etc.
             time_frame (str): The time frame for the data. This is optional and
-                can be set later. This is useful for data providers that support
-                multiple time frames. Example: "1m", "5m", "1h", "1d"
+                can be set later. This is useful for data providers
+                that support multiple time frames.
+                Example: "1m", "5m", "1h", "1d"
             window_size (int): The window size for the data. This is optional
                 and can be set later. This is useful for data providers that
                 support multiple window sizes. Example: 100, 200, 500
             storage_path (str): The path to the storage location for the data.
                 This is optional and can be set later. This is useful for data
-                providers that support saving data to a file. Example: "/path/to/data"
+                providers that support saving data to a file.
+                Example: "/path/to/data"
         """
         self._data_type = None
         self._time_frame = None
@@ -122,7 +124,7 @@ class DataProvider(ABC):
         # Check if the data provider is properly configured
         if self.data_type is None:
             raise ImproperlyConfigured(
-                "DataProvider must be initialized " 
+                "DataProvider must be initialized "
                 "with a data_type. Either pass it as a parameter in "
                 "the constructor or set it as a class attribute."
             )

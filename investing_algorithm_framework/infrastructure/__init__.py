@@ -11,7 +11,8 @@ from .repositories import SQLOrderRepository, SQLPositionRepository, \
 from .services import PerformanceService, \
     AzureBlobStorageStateHandler, AWSS3StorageStateHandler
 from .data_providers import CSVOHLCVDataProvider, get_default_data_providers, \
-    get_default_ohlcv_data_providers, CCXTOHLCVDataProvider
+    get_default_ohlcv_data_providers, CCXTOHLCVDataProvider, \
+    PandasOHLCVDataProvider
 from .order_executors import CCXTOrderExecutor, BacktestOrderExecutor
 from .portfolio_providers import CCXTPortfolioProvider
 
@@ -46,5 +47,6 @@ __all__ = [
     "get_default_ohlcv_data_providers",
     "AWSS3StorageStateHandler",
     "CCXTOHLCVDataProvider",
-    "BacktestOrderExecutor"
+    "BacktestOrderExecutor",
+    "PandasOHLCVDataProvider",
 ]

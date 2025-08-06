@@ -820,7 +820,8 @@ class TradeService(RepositoryService):
         Args:
             trade: Trade object representing the trade
             percentage: float representing the percentage of the open price
-                that the stop loss should be set at
+                that the stop loss should be set at. This must be a positive
+                number, e.g. 5 for 5%, or 10 for 10%.
             trade_risk_type (TradeRiskType): The type of the stop loss, fixed
                 or trailing
             sell_percentage: float representing the percentage of the trade

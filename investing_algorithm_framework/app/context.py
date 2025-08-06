@@ -7,7 +7,7 @@ from investing_algorithm_framework.services import ConfigurationService, \
 from investing_algorithm_framework.domain import OrderStatus, OrderType, \
     OrderSide, OperationalException, Portfolio, RoundingService, \
     BACKTESTING_FLAG, INDEX_DATETIME, TradeRiskType, Order, \
-    Position, Trade, TradeStatus, DataSource, MarketCredential, INDEX_DATETIME
+    Position, Trade, TradeStatus, MarketCredential
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -1326,7 +1326,7 @@ class Context:
 
     def add_stop_loss(
         self,
-        trade,
+        trade: Trade,
         percentage: float,
         trade_risk_type=TradeRiskType.FIXED,
         sell_percentage: float = 100,
@@ -1348,13 +1348,16 @@ class Context:
             * BTC price drops to $39,900 → SL level reached, trade closes.
 
         Args:
-            trade: Trade object representing the trade
-            percentage: float representing the percentage of the open price
-                that the stop loss should be set at
-            trade_risk_type: The type of the stop loss, fixed
-                or trailing
-            sell_percentage: float representing the percentage of the trade
-                that should be sold if the stop loss is triggered
+            trade (Trade): Trade object representing the trade
+            percentage (float): float representing the percentage
+                of the open price that the stop loss should
+                be set at. This must be a positive
+                number, e.g. 5 for 5%, or 10 for 10%.
+            trade_risk_type (TradeRiskType): The type of the stop
+                loss, fixed or trailing
+            sell_percentage (float): float representing the
+                percentage of the trade that should be sold if the
+                stop loss is triggered
 
         Returns:
             None
@@ -1369,7 +1372,7 @@ class Context:
 
     def add_take_profit(
         self,
-        trade,
+        trade: Trade,
         percentage: float,
         trade_risk_type=TradeRiskType.FIXED,
         sell_percentage: float = 100,
@@ -1393,13 +1396,16 @@ class Context:
             * BTC drops to $42,750 → Trade closes, securing profit.
 
         Args:
-            trade: Trade object representing the trade
-            percentage: float representing the percentage of the open price
-                that the stop loss should be set at
-            trade_risk_type: The type of the stop loss, fixed
-                or trailing
-            sell_percentage: float representing the percentage of the trade
-                that should be sold if the stop loss is triggered
+            trade (Trade): Trade object representing the trade
+            percentage (float): float representing the percentage
+                of the open price that the stop loss should
+                be set at. This must be a positive
+                number, e.g. 5 for 5%, or 10 for 10%.
+            trade_risk_type (TradeRiskType): The type of the stop
+                loss, fixed or trailing
+            sell_percentage (float): float representing the
+                percentage of the trade that should be sold if the
+                stop loss is triggered
 
         Returns:
             None

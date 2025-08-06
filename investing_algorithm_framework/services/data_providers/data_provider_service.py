@@ -1,7 +1,9 @@
 import logging
+import pandas as pd
+import polars as pl
 from collections import defaultdict
 from datetime import datetime
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Dict, Any
 
 from tqdm import tqdm
 
@@ -72,7 +74,6 @@ class DataProviderIndex:
                 f" Please make sure that you have registered a data provider "
                 f"provider for the market and symbol you are trying to use"
             )
-
         # Sort by priority and pick the best one
         best_provider = sorted(matches, key=lambda x: x.priority)[0]
         best_provider = best_provider.copy(data_source)
@@ -160,7 +161,7 @@ class DataProviderIndex:
 
             )
 
-        # Sort by priority and pick the best one
+        # Sort by priority and pick the best one (lowest priority first)
         best_provider = sorted(matches, key=lambda x: x.priority)[0]
         best_provider = best_provider.copy(data_source)
         self.data_providers_lookup[data_source] = best_provider
@@ -231,7 +232,6 @@ class DataProviderIndex:
         """
         return self.data_providers_lookup.get(data_source, None)
 
-
     def get_all(self) -> List[Tuple[DataSource, DataProvider]]:
         """
         Get all registered data providers with corresponding DataSource.
@@ -279,7 +279,6 @@ class DataProviderIndex:
             DataProvider: The OHLCV data provider for the symbol and market,
                 or None if no provider is found.
         """
-
         if market is None:
             # If no market is specified
             return self.ohlcv_data_providers_no_market.get(symbol, None)
@@ -358,6 +357,7 @@ class DataProviderService:
             date=date,
             start_date=start_date,
             end_date=end_date,
+            save=data_source.save,
         )
 
     def get_ticker_data(self, symbol, market, date):
@@ -371,22 +371,28 @@ class DataProviderService:
         )
 
         if data_provider is None:
-            data_provider = self.data_provider_index.get_ohlcv_data_provider(
-                symbol=symbol, market=market
-            )
+            ohlcv_data_provider = self.data_provider_index.\
+                get_ohlcv_data_provider(
+                    symbol=symbol, market=market
+                )
 
-            if data_provider is None:
+            if ohlcv_data_provider is None:
                 raise OperationalException(
                     "No ticker data provider found "
                     f"for symbol: {symbol} and market: {market} "
                     f"on date: {date}"
                 )
             else:
-
                 if self.backtest_mode:
-                    data = data_provider.get_backtest_data(
+                    data = ohlcv_data_provider.get_backtest_data(
                         backtest_index_date=date,
                     )
+
+                    if isinstance(data, pd.DataFrame):
+                        # Convert to Polars DataFrame for consistency
+                        data.index.name = "Datetime"
+                        data = data.reset_index()
+                        data = pl.from_pandas(data)
                     entry = data[-1]
                     return {
                         "symbol": symbol,
@@ -401,9 +407,16 @@ class DataProviderService:
                         "bid": entry["Close"][0],
                     }
                 else:
-                    data = data_provider.get_data(
+                    data = ohlcv_data_provider.get_data(
                         date=date,
                     )
+
+                    if isinstance(data, pd.DataFrame):
+                        # Convert to Polars DataFrame for consistency
+                        data.index.name = "Datetime"
+                        data = data.reset_index()
+                        data = pl.from_pandas(data)
+
                     entry = data[-1]
                     return {
                         "symbol": symbol,
@@ -426,7 +439,6 @@ class DataProviderService:
 
             else:
                 return data_provider.get_data(date=date)
-
 
     def get_ohlcv_data(
         self,
@@ -470,17 +482,25 @@ class DataProviderService:
                 )
 
         if self.backtest_mode:
-            return data_provider.get_backtest_data(
+            data = data_provider.get_backtest_data(
                 backtest_index_date=date,
                 backtest_start_date=start_date,
                 backtest_end_date=end_date,
             )
         else:
-            return data_provider.get_data(
+            data = data_provider.get_data(
                 date=date,
                 start_date=start_date,
                 end_date=end_date,
             )
+
+        if isinstance(data, pd.DataFrame):
+            # Convert to Polars DataFrame for consistency
+            data.index.name = "Datetime"
+            data = data.reset_index()
+            data = pl.from_pandas(data)
+
+        return data
 
     def get_backtest_data(
         self,
@@ -513,6 +533,35 @@ class DataProviderService:
             backtest_end_date=end_date,
         )
 
+    def get_vectorized_backtest_data(
+        self,
+        data_sources: List[DataSource],
+        start_date: datetime = None,
+        end_date: datetime = None,
+    ) -> Dict[str, Any]:
+        """
+        Function to get vectorized backtest data from the data provider.
+
+        Args:
+            data_sources (List[DataSource]): The data sources to get
+                backtest data for.
+            start_date (datetime): The start date for the backtest data.
+            end_date (datetime): The end date for the backtest data.
+
+        Returns:
+            Dict[str, Any]: The vectorized backtest data for the
+                given data sources.
+        """
+        vectorized_data = {}
+        for data_source in data_sources:
+            backtest_data = self.get_backtest_data(
+                data_source=data_source,
+                start_date=start_date,
+                end_date=end_date,
+            )
+            vectorized_data[data_source.get_identifier()] = backtest_data
+        return vectorized_data
+
     def _throw_no_data_provider_exception(self, params):
         """
         Raise an exception if no data provider is found for the given params
@@ -532,7 +581,7 @@ class DataProviderService:
         )
 
     def add_data_provider(
-        self, data_provider: DataProvider, priority: int = 0
+        self, data_provider: DataProvider, priority: int = 3
     ):
         """
         Add a data provider to the service.

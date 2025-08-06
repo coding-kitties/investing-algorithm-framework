@@ -12,7 +12,8 @@ from dateutil import parser
 from investing_algorithm_framework.domain import OperationalException, \
     DATETIME_FORMAT, DataProvider, convert_polars_to_pandas, \
     NetworkError, TimeFrame, MarketCredential, DataType, DataSource, \
-    RESOURCE_DIRECTORY, CCXT_DATETIME_FORMAT, DATA_DIRECTORY
+    RESOURCE_DIRECTORY, CCXT_DATETIME_FORMAT, DATA_DIRECTORY, \
+    DATETIME_FORMAT_FILE_NAME
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -60,7 +61,7 @@ class CCXTOHLCVDataProvider(DataProvider):
         market: str = None,
         window_size=None,
         data_provider_identifier: str = None,
-        storage_directory = None,
+        storage_directory=None,
         pandas: bool = False,
         config=None
     ):
@@ -162,10 +163,7 @@ class CCXTOHLCVDataProvider(DataProvider):
             return symbol in symbols
 
         except ccxt.NetworkError:
-            raise NetworkError(
-                "Network error occurred, make sure you have "
-                "an active internet connection"
-            )
+            pass
 
         except Exception as e:
             logger.error(e)
@@ -198,9 +196,9 @@ class CCXTOHLCVDataProvider(DataProvider):
         if self.window_size is not None:
             required_start_date = backtest_start_date - \
                 timedelta(
-                  minutes=TimeFrame.from_value(
-                      self.time_frame)
-                          .amount_of_minutes * self.window_size
+                    minutes=TimeFrame.from_value(
+                        self.time_frame
+                    ).amount_of_minutes * self.window_size
                 )
         else:
             required_start_date = backtest_start_date
@@ -291,7 +289,8 @@ class CCXTOHLCVDataProvider(DataProvider):
                 "before requesting ohlcv data."
             )
 
-        if date is not None and self.window_size is not None and self.time_frame is not None:
+        if date is not None and self.window_size is not None \
+                and self.time_frame is not None:
             start_date = self.create_start_date(
                 end_date=date,
                 time_frame=self.time_frame,
@@ -339,12 +338,11 @@ class CCXTOHLCVDataProvider(DataProvider):
                 time_frame=self.time_frame,
                 window_size=self.window_size
             )
-
         data = self._get_data_from_storage(
             symbol=self.symbol,
             market=self.market,
             time_frame=self.time_frame,
-            storage_path=self.storage_path,
+            storage_path=self.get_storage_directory(),
             start_date=start_date,
             end_date=end_date
         )
@@ -358,25 +356,26 @@ class CCXTOHLCVDataProvider(DataProvider):
                 to_timestamp=end_date
             )
 
-        if save:
-            storage_directory = self.get_storage_directory()
-            if storage_directory is None:
-                raise OperationalException(
-                    "Storage directory is not set for "
-                    "the CCXTOHLCVDataProvider. Make sure to set the "
-                    "storage directory in the configuration or "
-                    "in the constructor."
-                )
+            if save:
+                storage_directory = self.get_storage_directory()
 
-            self.save_data_to_storage(
-                symbol=self.symbol,
-                market=self.market,
-                time_frame=self.time_frame,
-                start_date=start_date,
-                end_date=end_date,
-                data=data,
-                storage_directory_path=storage_directory
-            )
+                if storage_directory is None:
+                    raise OperationalException(
+                        "Storage directory is not set for "
+                        "the CCXTOHLCVDataProvider. Make sure to set the "
+                        "storage directory in the configuration or "
+                        "in the constructor."
+                    )
+
+                self.save_data_to_storage(
+                    symbol=self.symbol,
+                    market=self.market,
+                    time_frame=self.time_frame,
+                    start_date=start_date,
+                    end_date=end_date,
+                    data=data,
+                    storage_directory_path=storage_directory
+                )
 
         if self.pandas:
             data = convert_polars_to_pandas(data)
@@ -405,7 +404,7 @@ class CCXTOHLCVDataProvider(DataProvider):
         """
 
         if backtest_start_date is not None and \
-            backtest_end_date is not None:
+                backtest_end_date is not None:
 
             if backtest_start_date < self._start_date_data_source:
                 raise OperationalException(
@@ -441,12 +440,13 @@ class CCXTOHLCVDataProvider(DataProvider):
                         [k for k in self.window_cache.keys()
                          if k >= backtest_index_date]
                     )
-                    data =  self.window_cache[closest_key]
+                    data = self.window_cache[closest_key]
                 except ValueError:
                     raise OperationalException(
-                        "No data available for the "
+                        "No OHLCV data available for the "
                         f"date: {backtest_index_date} "
-                        "within the prepared backtest data."
+                        f"within the prepared backtest data "
+                        f"for symbol {self.symbol}. "
                     )
 
         if self.pandas:
@@ -512,7 +512,8 @@ class CCXTOHLCVDataProvider(DataProvider):
 
                 if len(ohlcv) > 0:
                     from_timestamp = \
-                        ohlcv[-1][0] + exchange.parse_timeframe(time_frame) * 1000
+                        ohlcv[-1][0] + \
+                        exchange.parse_timeframe(time_frame) * 1000
                 else:
                     from_timestamp = to_timestamp
 
@@ -714,7 +715,7 @@ class CCXTOHLCVDataProvider(DataProvider):
         Returns:
             str: The generated filename.
         """
-        datetime_format = self.config[DATETIME_FORMAT]
+        datetime_format = self.config[DATETIME_FORMAT_FILE_NAME]
         symbol = symbol.upper().replace('/', '-')
         start_date_str = start_date.strftime(datetime_format)
         end_date_str = end_date.strftime(datetime_format)
@@ -765,23 +766,23 @@ class CCXTOHLCVDataProvider(DataProvider):
             if file_name.startswith("OHLCV_") and file_name.endswith(".csv"):
 
                 try:
-                    data_source_spec = self._get_data_source_specification_from_file_name(
-                        file_name
-                    )
+                    data_source_spec = self.\
+                        _get_data_source_specification_from_file_name(
+                            file_name
+                        )
 
                     if data_source_spec is None:
                         continue
 
                     if data_source_spec.symbol.upper() == symbol.upper() and \
                         data_source_spec.market.upper() == market.upper() and \
-                        data_source_spec.time_frame.equals(time_frame):
-
+                            data_source_spec.time_frame.equals(time_frame):
                         # Check if the data source specification matches
                         # the start and end date if its specified
                         if data_source_spec.start_date is not None and \
                             data_source_spec.end_date is not None and \
-                            (data_source_spec.start_date <= start_date and data_source_spec.end_date >= end_date):
-
+                                (data_source_spec.start_date <= start_date
+                                 and data_source_spec.end_date >= end_date):
                             # If the data source specification matches,
                             # read the file
                             file_path = os.path.join(storage_path, file_name)
@@ -791,8 +792,9 @@ class CCXTOHLCVDataProvider(DataProvider):
                                 low_memory=True
                             ).with_columns(
                                 pl.col("Datetime").cast(
-                                    pl.Datetime(time_unit="ms",
-                                                    time_zone="UTC")
+                                    pl.Datetime(
+                                        time_unit="ms", time_zone="UTC"
+                                    )
                                 )
                             )
                             data = data.filter(
@@ -840,10 +842,14 @@ class CCXTOHLCVDataProvider(DataProvider):
                 symbol=symbol,
                 market=market,
                 time_frame=TimeFrame.from_string(time_frame_str),
-                start_date=parser.parse(start_date_str).replace(tzinfo=timezone.utc),
-                end_date=parser.parse(end_date_str).replace(tzinfo=timezone.utc)
+                start_date=parser.parse(
+                    start_date_str
+                ).replace(tzinfo=timezone.utc),
+                end_date=parser.parse(
+                    end_date_str
+                ).replace(tzinfo=timezone.utc)
             )
-        except ValueError as e:
+        except ValueError:
             logger.info(
                 f"Could not extract data source attributes from "
                 f"file name: {file_name}. "
@@ -887,8 +893,6 @@ class CCXTOHLCVDataProvider(DataProvider):
         """
         self.window_cache = {}
         timestamps = data["Datetime"].to_list()
-        print(f"Precomputing sliding windows for {len(timestamps)} timestamps")
-        print(window_size)
         # Only select the entries after the start date
         timestamps = [
             ts for ts in timestamps if start_date <= ts <= end_date
@@ -945,13 +949,45 @@ class CCXTOHLCVDataProvider(DataProvider):
             DataProvider: A new instance of the data provider with the same
                 configuration.
         """
+        # Check that the data source has the required attributes set
+        # for usage with CCXT data providers
+
+        if data_source.market is None or data_source.market == "":
+            raise OperationalException(
+                "DataSource has not `market` attribute specified, "
+                "please specify the market attribute in the "
+                "data source specification before using the "
+                "ccxt OHLCV data provider"
+            )
+
+        if data_source.time_frame is None or data_source.time_frame == "":
+            raise OperationalException(
+                "DataSource has not `time_frame` attribute specified, "
+                "please specify the time_frame attribute in the "
+                "data source specification before using the "
+                "ccxt OHLCV data provider"
+            )
+
+        if data_source.symbol is None or data_source.symbol == "":
+            raise OperationalException(
+                "DataSource has not `symbol` attribute specified, "
+                "please specify the symbol attribute in the "
+                "data source specification before using the "
+                "ccxt OHLCV data provider"
+            )
+
+        storage_path = data_source.storage_path
+
+        if storage_path is None:
+            storage_path = self.get_storage_directory()
+
         return CCXTOHLCVDataProvider(
             symbol=data_source.symbol,
             time_frame=data_source.time_frame,
             market=data_source.market,
             window_size=data_source.window_size,
             data_provider_identifier=data_source.data_provider_identifier,
-            storage_directory=self.get_storage_directory(),
+            storage_directory=storage_path,
             config=self.config,
-            pandas=data_source.pandas
+            pandas=data_source.pandas,
         )

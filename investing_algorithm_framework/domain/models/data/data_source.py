@@ -107,7 +107,8 @@ class DataSource:
         Converts the DataSource instance to a dictionary.
         """
         non_null_attributes = {
-            key: value for key, value in self.__dict__.items() if value is not None
+            key: value for key, value in self.__dict__.items()
+            if value is not None
         }
         # Convert DataType and TimeFrame to their string representations
         if self.data_type is not None:
@@ -124,9 +125,9 @@ class DataSource:
         }
         return (
             f"DataSource("
-            f"{', '.join(f'{key}={value}' 
-                         for key, value in attributes.items())
-            })"
+            f"{', '.join(
+                f'{key}={value}' for key, value in attributes.items()
+            )}"
         )
 
     def __eq__(self, other):
@@ -135,8 +136,9 @@ class DataSource:
 
         OHLCV data sources are considered equal if they have:
         - The same data_type (OHLCV), symbol, time_frame, and market.
-        - If no market and timeframe is specified, then they are considered equal
-        for the same symbol and data_type.
+        - If no market and timeframe is specified, then
+            they are considered equal for the same symbol
+            and data_type.
         """
         if DataType.OHLCV.equals(self.data_type):
 
@@ -165,4 +167,3 @@ class DataSource:
                     self.market == other.market)
 
         return False
-

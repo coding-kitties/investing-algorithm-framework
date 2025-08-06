@@ -90,29 +90,30 @@ class TradingStrategy:
         self._context = None
         self._last_run = None
 
-    def buy_signal_vectorized(self,data: Dict[DataSource, Any]) -> pd.Series:
+    def buy_signal_vectorized(self, data: Dict[str, Any]) -> pd.Series:
         """
-        Check if the data contains a buy signal.
-        This method should be implemented by the user.
+        Function that needs to be implemented by the user.
+        This function should return a pandas Series containing the buy signals.
 
         Args:
-            data (Dict[DataSource, Any]): All the data that matched the
+            data (Dict[str, Any]): All the data that matched the
                 data sources of the strategy.
 
         Returns:
-            Series: A pandas Series containing the sell signals.
+            Series: A pandas Series containing the buy signals.
         """
         raise NotImplementedError(
             "is_buy_signal_vectorized method not implemented"
         )
 
-    def sell_signal_vectorized(self, data: Dict[DataSource, Any]) -> pd.Series:
+    def sell_signal_vectorized(self, data: Dict[str, Any]) -> pd.Series:
         """
-        Check if the data contains a sell signal.
-        This method should be implemented by the user.
+        Function that needs to be implemented by the user.
+        This function should return a pandas Series containing
+        the sell signals.
 
         Args:
-            data (Dict[DataSource, Any]): All the data that matched the
+            data (Dict[str, Any]): All the data that matched the
                 data sources of the strategy.
 
         Returns:

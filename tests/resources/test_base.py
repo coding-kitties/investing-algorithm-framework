@@ -30,7 +30,6 @@ class StrategyOne(TradingStrategy):
 
 
 class TestBase(TestCase):
-    storage_repo_type = "sql"
     portfolio_configurations = []
     config = {}
     external_balances = None
@@ -53,7 +52,10 @@ class TestBase(TestCase):
         portfolio_provider_lookup = self.app.container\
             .portfolio_provider_lookup()
         portfolio_provider_lookup.reset()
-        self.app.add_order_executor(OrderExecutorTest())
+        order_executor_test = OrderExecutorTest()
+        order_executor_lookup = self.app.container.order_executor_lookup()
+        order_executor_lookup.reset()
+        self.app.add_order_executor(order_executor_test)
         portfolio_provider = PortfolioProviderTest()
 
         if self.external_balances is not None:
@@ -76,33 +78,34 @@ class TestBase(TestCase):
             for market_credential in self.market_credentials:
                 self.app.add_market_credential(market_credential)
 
-        self.app.initialize_config()
-        self.app.initialize_storage()
-        self.app.initialize_services()
-        self.app.initialize_portfolios()
+        if self.initialize:
+            self.app.initialize_config()
+            self.app.initialize_storage()
+            self.app.initialize_services()
+            self.app.initialize_portfolios()
 
-        if self.initial_orders is not None:
-            for order in self.initial_orders:
-                created_order = self.app.context.create_order(
-                    target_symbol=order.get_target_symbol(),
-                    amount=order.get_amount(),
-                    price=order.get_price(),
-                    order_side=order.get_order_side(),
-                    order_type=order.get_order_type()
-                )
-
-                # Update the order to the correct status
-                order_service = self.app.container.order_service()
-
-                if OrderStatus.CLOSED.value == order.get_status():
-                    order_service.update(
-                        created_order.get_id(),
-                        {
-                            "status": "CLOSED",
-                            "filled": order.get_filled(),
-                            "remaining": Decimal('0'),
-                        }
+            if self.initial_orders is not None:
+                for order in self.initial_orders:
+                    created_order = self.app.context.create_order(
+                        target_symbol=order.get_target_symbol(),
+                        amount=order.get_amount(),
+                        price=order.get_price(),
+                        order_side=order.get_order_side(),
+                        order_type=order.get_order_type()
                     )
+
+                    # Update the order to the correct status
+                    order_service = self.app.container.order_service()
+
+                    if OrderStatus.CLOSED.value == order.get_status():
+                        order_service.update(
+                            created_order.get_id(),
+                            {
+                                "status": "CLOSED",
+                                "filled": order.get_filled(),
+                                "remaining": Decimal('0'),
+                            }
+                        )
 
     def tearDown(self) -> None:
         database_dir = os.path.join(
