@@ -14,6 +14,6 @@ def is_jupyter_notebook():
     except AttributeError:
         # If get_ipython() does not have 'config', it is not a Jupyter Notebook
         return False
-    except Exception as e:
+    except Exception:
         # Catch any other exceptions and return False
         return False
