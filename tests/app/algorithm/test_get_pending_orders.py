@@ -1,7 +1,7 @@
 from investing_algorithm_framework import PortfolioConfiguration, Order, \
     MarketCredential
 from investing_algorithm_framework.services import PortfolioService
-from tests.resources import TestBase, MarketDataSourceServiceStub
+from tests.resources import TestBase
 
 
 class TestPortfolioService(TestBase):

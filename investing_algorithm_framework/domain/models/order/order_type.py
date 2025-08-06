@@ -13,7 +13,7 @@ class OrderType(Enum):
                 if value.upper() == order_type.value:
                     return order_type
 
-        raise ValueError("Could not convert value to OrderType")
+        raise ValueError(f"Could not convert value: {value} to OrderType")
 
     @staticmethod
     def from_value(value):

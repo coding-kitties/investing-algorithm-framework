@@ -8,7 +8,7 @@ from .drawdown import get_drawdown_series, get_max_drawdown, \
 from .equity_curve import get_equity_curve
 from .exposure import get_exposure, get_trades_per_year, get_trades_per_day, \
     get_average_trade_duration
-from .profit_factor import get_profit_factor
+from .profit_factor import get_profit_factor, get_gross_loss, get_gross_profit
 from .returns import get_monthly_returns, get_yearly_returns, \
     get_worst_trade, get_best_trade, get_worst_year, \
     get_best_year, get_best_month, get_worst_month, get_average_gain, \
@@ -16,7 +16,8 @@ from .returns import get_monthly_returns, get_yearly_returns, \
     get_average_loss, get_average_monthly_return, \
     get_average_monthly_return_winning_months, \
     get_average_monthly_return_losing_months
-from .returns import get_total_return
+from .returns import get_total_return, get_final_value, get_growth, \
+    get_growth_percentage
 from .sharpe_ratio import get_sharpe_ratio, get_rolling_sharpe_ratio
 from .sortino_ratio import get_sortino_ratio
 from .volatility import get_annual_volatility
@@ -38,11 +39,15 @@ def create_backtest_metrics(
         BacktestMetrics: The created BacktestMetrics instance.
     """
 
+    total_return = get_total_return(backtest_results.portfolio_snapshots)
+
     return BacktestMetrics(
         backtest_start_date=backtest_results.backtest_start_date,
         backtest_end_date=backtest_results.backtest_end_date,
         equity_curve=get_equity_curve(backtest_results.portfolio_snapshots),
-        total_return=get_total_return(backtest_results.portfolio_snapshots),
+        final_value=get_final_value(backtest_results.portfolio_snapshots),
+        total_return=total_return[0],
+        total_return_percentage=total_return[1],
         cagr=get_cagr(backtest_results.portfolio_snapshots),
         sharpe_ratio=get_sharpe_ratio(
             backtest_results.portfolio_snapshots,
@@ -139,4 +144,10 @@ def create_backtest_metrics(
         worst_year=get_worst_year(
             backtest_results.portfolio_snapshots
         ),
+        gross_loss=get_gross_loss(backtest_results.trades),
+        gross_profit=get_gross_profit(backtest_results.trades),
+        growth=get_growth(backtest_results.portfolio_snapshots),
+        growth_percentage=get_growth_percentage(
+            backtest_results.portfolio_snapshots
+        )
     )

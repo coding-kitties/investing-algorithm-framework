@@ -1,11 +1,11 @@
+from datetime import datetime
 from typing import List, Dict, Any
+
 import pandas as pd
-from datetime import datetime, timezone
 
 from investing_algorithm_framework.domain import OperationalException, Position
 from investing_algorithm_framework.domain import \
-    TimeUnit, StrategyProfile, Trade, ENVIRONMENT, Environment, \
-    BACKTESTING_INDEX_DATETIME
+    TimeUnit, StrategyProfile, Trade, DataSource
 from .context import Context
 
 
@@ -23,16 +23,17 @@ class TradingStrategy:
         worker_id (optional): str - the id of the worker
         strategy_id (optional): str - the id of the strategy
         decorated (optional): function - the decorated function
-        market_data_sources (optional): list - the list of market data
-            sources to use for the strategy. This will be passed to the
-            run_strategy function.
+        data_sources (List[DataSource] optional): the list of data
+            sources to use for the strategy. The data sources will be used
+            to indentify data providers that will be called to gather data
+            and pass to the strategy before its run.
     """
     time_unit: str = None
     interval: int = None
     worker_id: str = None
     strategy_id: str = None
     decorated = None
-    market_data_sources = None
+    data_sources: List[DataSource] = None
     traces = None
     context: Context = None
 
@@ -41,22 +42,28 @@ class TradingStrategy:
         strategy_id=None,
         time_unit=None,
         interval=None,
-        market_data_sources=None,
+        data_sources=None,
         worker_id=None,
         decorated=None
     ):
 
         if time_unit is not None:
             self.time_unit = TimeUnit.from_value(time_unit)
+        else:
+            # Check if time_unit is None
+            if self.time_unit is None:
+                raise OperationalException(
+                    f"Time unit attribute not set for "
+                    f"strategy instance {self.strategy_id}"
+                )
+
+            self.time_unit = TimeUnit.from_value(self.time_unit)
 
         if interval is not None:
             self.interval = interval
 
-        if time_unit is not None:
-            self.time_unit = TimeUnit.from_value(time_unit)
-
-        if market_data_sources is not None:
-            self.market_data_sources = market_data_sources
+        if data_sources is not None:
+            self.data_sources = data_sources
 
         if decorated is not None:
             self.decorated = decorated
@@ -73,13 +80,6 @@ class TradingStrategy:
         else:
             self.strategy_id = self.worker_id
 
-        # Check if time_unit is None
-        if self.time_unit is None:
-            raise OperationalException(
-                f"Time unit attribute not set for "
-                f"strategy instance {self.strategy_id}"
-            )
-
         # Check if interval is None
         if self.interval is None:
             raise OperationalException(
@@ -90,7 +90,40 @@ class TradingStrategy:
         self._context = None
         self._last_run = None
 
-    def run_strategy(self, context: Context, market_data: Dict[str, Any]):
+    def buy_signal_vectorized(self, data: Dict[str, Any]) -> pd.Series:
+        """
+        Function that needs to be implemented by the user.
+        This function should return a pandas Series containing the buy signals.
+
+        Args:
+            data (Dict[str, Any]): All the data that matched the
+                data sources of the strategy.
+
+        Returns:
+            Series: A pandas Series containing the buy signals.
+        """
+        raise NotImplementedError(
+            "is_buy_signal_vectorized method not implemented"
+        )
+
+    def sell_signal_vectorized(self, data: Dict[str, Any]) -> pd.Series:
+        """
+        Function that needs to be implemented by the user.
+        This function should return a pandas Series containing
+        the sell signals.
+
+        Args:
+            data (Dict[str, Any]): All the data that matched the
+                data sources of the strategy.
+
+        Returns:
+            Series: A pandas Series containing the sell signals.
+        """
+        raise NotImplementedError(
+            "is_sell_signal_vectorized method not implemented"
+        )
+
+    def run_strategy(self, context: Context, data: Dict[str, Any]):
         """
         Main function for running your strategy. This function will be called
         by the framework when the trigger of your strategy is met.
@@ -108,7 +141,7 @@ class TradingStrategy:
                 of the Context class, this class has various methods to do
                 operations with your portfolio, orders, trades, positions and
                 other components.
-            market_data (Dict[str, Any]): The data for the strategy.
+            data (Dict[str, Any]): The data for the strategy.
                 This is a dictionary containing all the data retrieved from the
                 specified data sources.
 
@@ -116,27 +149,11 @@ class TradingStrategy:
             None
         """
         self.context = context
-        config = self.context.get_config()
+        self.apply_strategy(context=context, data=data)
 
-        if config[ENVIRONMENT] == Environment.BACKTEST.value:
-            self._update_trades_and_orders_for_backtest(market_data)
-        else:
-            self._update_trades_and_orders(market_data)
-
-        self._check_stop_losses()
-        self._check_take_profits()
-
-        # Run user defined strategy
-        self.apply_strategy(context=context, market_data=market_data)
-
-        if config[ENVIRONMENT] == Environment.BACKTEST.value:
-            self._last_run = config[BACKTESTING_INDEX_DATETIME]
-        else:
-            self._last_run = datetime.now(tz=timezone.utc)
-
-    def apply_strategy(self, context, market_data):
+    def apply_strategy(self, context, data):
         if self.decorated:
-            self.decorated(context=context, market_data=market_data)
+            self.decorated(context=context, data=data)
         else:
             raise NotImplementedError("Apply strategy is not implemented")
 
@@ -146,7 +163,7 @@ class TradingStrategy:
             strategy_id=self.worker_id,
             interval=self.interval,
             time_unit=self.time_unit,
-            market_data_sources=self.market_data_sources
+            data_sources=self.data_sources
         )
 
     def _update_trades_and_orders(self, market_data):

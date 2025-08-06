@@ -1,7 +1,7 @@
 import logging
 from sqlalchemy.exc import SQLAlchemyError
 
-from investing_algorithm_framework.domain import OrderStatus, ApiException
+from investing_algorithm_framework.domain import TradeStatus, ApiException
 from investing_algorithm_framework.infrastructure.models import SQLPosition, \
     SQLPortfolio, SQLTrade, SQLOrder
 from investing_algorithm_framework.infrastructure.database import Session
@@ -43,7 +43,7 @@ class SQLTradeRepository(Repository):
                 .filter(SQLPosition.portfolio_id == portfolio.id)
 
         if status_query_param:
-            status = OrderStatus.from_value(status_query_param)
+            status = TradeStatus.from_value(status_query_param)
             # Explicitly filter on SQLTrade.status
             query = query.filter(SQLTrade.status == status.value)
 

@@ -3,6 +3,7 @@ import json
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential
 from tests.resources import FlaskTestBase
+from tests.resources.strategies_for_testing import StrategyOne
 
 
 class Test(FlaskTestBase):
@@ -24,6 +25,7 @@ class Test(FlaskTestBase):
     }
 
     def test_list_portfolios(self):
+        self.iaf_app.add_strategy(StrategyOne)
         self.iaf_app.run(number_of_iterations=1)
         response = self.client.get("/api/portfolios")
         data = json.loads(response.data.decode())

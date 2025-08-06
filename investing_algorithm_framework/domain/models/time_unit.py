@@ -115,3 +115,19 @@ class TimeUnit(Enum):
 
         if TimeUnit.DAY.equals(self.value):
             return "days"
+
+    @property
+    def amount_of_minutes(self):
+        if TimeUnit.SECOND.equals(self):
+            return 1 / 60
+
+        if TimeUnit.MINUTE.equals(self):
+            return 1
+
+        if TimeUnit.HOUR.equals(self):
+            return 60
+
+        if TimeUnit.DAY.equals(self):
+            return 60 * 24
+
+        raise ValueError(f"Unsupported time unit: {self}")

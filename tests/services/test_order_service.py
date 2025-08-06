@@ -667,9 +667,9 @@ class TestOrderService(TestBase):
             }
         )
 
-        self.assertEqual(0, order.get_remaining())
-        self.assertEqual(1000, order.get_filled())
-        self.assertEqual(1000, order.get_amount())
+        self.assertEqual(0, order.remaining)
+        self.assertEqual(1000, order.filled)
+        self.assertEqual(1000, order.amount)
         self.assertEqual(OrderStatus.CLOSED.value, order.get_status())
 
         # Check position

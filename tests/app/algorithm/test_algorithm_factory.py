@@ -1,12 +1,11 @@
 from unittest import TestCase
 
-from investing_algorithm_framework import PortfolioConfiguration, \
-    OrderStatus, MarketCredential, Task, AppHook
+from investing_algorithm_framework import Task, AppHook
 from investing_algorithm_framework.app.algorithm import AlgorithmFactory, \
     Algorithm
-from tests.resources import TestBase
 from tests.resources.strategies_for_testing.strategy_v1 import \
     CrossOverStrategyV1
+
 
 class TestTask(Task):
 
@@ -42,7 +41,7 @@ class Test(TestCase):
         self.assertEqual(len(algorithm.strategies), 1)
         self.assertEqual(len(algorithm.tasks), 1)
         self.assertEqual(len(algorithm.on_strategy_run_hooks), 1)
-        self.assertEqual(len(algorithm.data_sources), 2)
+        self.assertEqual(len(algorithm.strategies[0].data_sources), 1)
 
     def test_with_strategy_param(self):
         algorithm = AlgorithmFactory.create_algorithm(
@@ -53,4 +52,4 @@ class Test(TestCase):
         self.assertEqual(len(algorithm.strategies), 1)
         self.assertEqual(len(algorithm.tasks), 0)
         self.assertEqual(len(algorithm.on_strategy_run_hooks), 0)
-        self.assertEqual(len(algorithm.data_sources), 2)
+        self.assertEqual(len(algorithm.strategies[0].data_sources), 1)

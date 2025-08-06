@@ -6,5 +6,5 @@ class StrategyOne(TradingStrategy):
     time_unit = TimeUnit.MINUTE
     interval = 1
 
-    def run_strategy(self, context, market_data):
+    def run_strategy(self, context, data):
         pass

@@ -1,10 +1,9 @@
-import os
 from decimal import Decimal
+from unittest.mock import patch
 
 from investing_algorithm_framework import PortfolioConfiguration, \
-    CSVTickerMarketDataSource, MarketCredential, OperationalException
-from tests.resources import TestBase, RandomPriceMarketDataSourceServiceStub, \
-    MarketDataSourceServiceStub
+    MarketCredential, OperationalException
+from tests.resources import TestBase
 
 
 class Test(TestBase):
@@ -25,20 +24,6 @@ class Test(TestBase):
         "EUR": 1000
     }
 
-
-    def setUp(self) -> None:
-        super().setUp()
-        self.app.add_market_data_source(CSVTickerMarketDataSource(
-            identifier="BTC/EUR-ticker",
-            market="BITVAVO",
-            symbol="BTC/EUR",
-            csv_file_path=os.path.join(
-                self.resource_directory,
-                "market_data_sources",
-                "TICKER_BTC-EUR_BINANCE_2023-08-23-22-00_2023-12-02-00-00.csv"
-            )
-        ))
-
     def test_close_trade(self):
         trading_symbol_position = self.app.context.get_position("EUR")
         self.assertEqual(1000, trading_symbol_position.get_amount())
@@ -52,21 +37,43 @@ class Test(TestBase):
         self.assertIsNotNone(btc_position)
         self.assertEqual(0, btc_position.get_amount())
         self.assertEqual(1, len(self.app.context.get_trades()))
-        order_service = self.app.container.order_service()
-        order_service.check_pending_orders()
-        self.assertEqual(1, len(self.app.context.get_trades()))
-        trades = self.app.context.get_trades()
-        trade = trades[0]
-        self.assertIsNotNone(trade.amount)
-        self.assertEqual(trade.remaining, 0)
-        self.assertEqual(trade.filled_amount, 1)
-        self.assertEqual(trade.available_amount, 1)
-        self.assertEqual(Decimal(1), trade.amount)
-        self.app.context.close_trade(trade)
-        self.assertEqual(1, len(self.app.context.get_trades()))
-        order_service.check_pending_orders()
-        self.assertEqual(1, len(self.app.context.get_trades()))
-        self.assertEqual(0, len(self.app.context.get_open_trades()))
+
+        with patch.object(
+            self.app.container.data_provider_service(),
+            "get_ticker_data",
+            return_value={
+                "bid": 990,
+                "ask": 1000,
+                "last": 995
+
+            }
+        ):
+            order_service = self.app.container.order_service()
+            order_service.check_pending_orders()
+            self.assertEqual(1, len(self.app.context.get_trades()))
+            trades = self.app.context.get_trades()
+            trade = trades[0]
+            self.assertIsNotNone(trade.amount)
+            self.assertEqual(trade.remaining, 0)
+            self.assertEqual(trade.filled_amount, 1)
+            self.assertEqual(trade.available_amount, 1)
+            self.assertEqual(Decimal(1), trade.amount)
+
+        with patch.object(
+                self.app.container.data_provider_service(),
+                "get_ticker_data",
+                return_value={
+                    "bid": 990,
+                    "ask": 1000,
+                    "last": 995
+
+                }
+        ):
+            self.app.context.close_trade(trade)
+            self.assertEqual(1, len(self.app.context.get_trades()))
+            order_service.check_pending_orders()
+            self.assertEqual(1, len(self.app.context.get_trades()))
+            self.assertEqual(0, len(self.app.context.get_open_trades()))
 
     def test_close_trade_with_already_closed_trade(self):
         trading_symbol_position = self.app.context.get_position("EUR")
@@ -81,18 +88,44 @@ class Test(TestBase):
         self.assertIsNotNone(btc_position)
         self.assertEqual(0, btc_position.get_amount())
         self.assertEqual(1, len(self.app.context.get_trades()))
-        order_service = self.app.container.order_service()
-        order_service.check_pending_orders()
-        self.assertEqual(1, len(self.app.context.get_trades()))
-        trades = self.app.context.get_trades()
-        trade = trades[0]
-        self.assertIsNotNone(trade.amount)
-        self.assertEqual(Decimal(1), trade.amount)
-        self.app.context.close_trade(trade)
-        self.assertEqual(1, len(self.app.context.get_trades()))
-        order_service.check_pending_orders()
-        self.assertEqual(1, len(self.app.context.get_trades()))
-        self.assertEqual(0, len(self.app.context.get_open_trades()))
+
+        with patch.object(
+            self.app.container.data_provider_service(),
+            "get_ticker_data",
+            return_value={
+                "bid": 990,
+                "ask": 1000,
+                "last": 995
+
+            }
+        ):
+            order_service = self.app.container.order_service()
+            order_service.check_pending_orders()
+            self.assertEqual(1, len(self.app.context.get_trades()))
+            trades = self.app.context.get_trades()
+            trade = trades[0]
+            self.assertIsNotNone(trade.amount)
+            self.assertEqual(trade.remaining, 0)
+            self.assertEqual(trade.filled_amount, 1)
+            self.assertEqual(trade.available_amount, 1)
+            self.assertEqual(Decimal(1), trade.amount)
+
+        with patch.object(
+                self.app.container.data_provider_service(),
+                "get_ticker_data",
+                return_value={
+                    "bid": 990,
+                    "ask": 1000,
+                    "last": 995
+
+                }
+        ):
+            self.app.context.close_trade(trade)
+            self.assertEqual(1, len(self.app.context.get_trades()))
+            order_service.check_pending_orders()
+            self.assertEqual(1, len(self.app.context.get_trades()))
+            self.assertEqual(0, len(self.app.context.get_open_trades()))
+
         trades = self.app.context.get_trades()
         trade = trades[0]
 

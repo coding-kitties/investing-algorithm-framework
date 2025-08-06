@@ -1,7 +1,7 @@
+from unittest.mock import patch
 from investing_algorithm_framework import TradingStrategy, TimeUnit, \
     MarketCredential, PortfolioConfiguration
-from tests.resources import TestBase, RandomPriceMarketDataSourceServiceStub, \
-    MarketDataSourceServiceStub
+from tests.resources import TestBase
 
 
 class StrategyOne(TradingStrategy):
@@ -10,11 +10,10 @@ class StrategyOne(TradingStrategy):
 
     def apply_strategy(
         self,
-        algorithm,
-        market_date=None,
-        **kwargs
+        context,
+        data=None,
     ):
-        algorithm.create_limit_order(
+        context.create_limit_order(
             target_symbol="BTC",
             amount=1,
             order_side="BUY",
@@ -42,23 +41,22 @@ class Test(TestBase):
     ]
 
     def test_get_allocated(self):
-        self.app.container.market_data_source_service.override(
-            RandomPriceMarketDataSourceServiceStub(
-                None,
-                None,
-                None
-            )
-        )
-        self.app.run(number_of_iterations=1)
-        order_service = self.app.container.order_service()
-        self.app.context.create_limit_order(
-            target_symbol="BTC",
-            amount=1,
-            price=10,
-            order_side="BUY",
-        )
-        self.assertEqual(1, order_service.count())
-        order_service.check_pending_orders()
-        self.assertNotEqual(0, self.app.context.get_allocated())
-        self.assertNotEqual(0, self.app.context.get_allocated("BITVAVO"))
-        self.assertNotEqual(0, self.app.context.get_allocated("bitvavo"))
+        self.app.add_strategy(StrategyOne)
+
+        with patch.object(
+            self.app.container.data_provider_service(),
+            "get_ticker_data",
+            return_value={
+                "bid": 10,
+                "ask": 10,
+                "last": 10
+
+            }
+        ):
+            self.app.run(number_of_iterations=1)
+            order_service = self.app.container.order_service()
+            self.assertEqual(1, order_service.count())
+            order_service.check_pending_orders()
+            self.assertNotEqual(0, self.app.context.get_allocated())
+            self.assertNotEqual(0, self.app.context.get_allocated("BITVAVO"))
+            self.assertNotEqual(0, self.app.context.get_allocated("bitvavo"))

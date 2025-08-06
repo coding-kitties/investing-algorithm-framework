@@ -2,7 +2,7 @@ import os
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     PortfolioConfiguration, MarketCredential, Algorithm
-from tests.resources import TestBase, MarketServiceStub
+from tests.resources import TestBase
 
 
 class Test(TestBase):

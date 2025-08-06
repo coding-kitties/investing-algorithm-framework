@@ -24,8 +24,14 @@ class BacktestMetrics:
         backtest_end_date (datetime): The end date of the backtest.
         equity_curve (List[Tuple[datetime, float]]): A list of
             tuples representing  the equity curve, where each tuple
-            contains a date and the corresponding portfolio value.
+            contains a date and the  corresponding portfolio value.
+        growth (float): The growth of the portfolio over the backtest period.
+        growth_percentage (float): The percentage growth of the portfolio
+            over the backtest period.
+        final_value (float): The final value of the portfolio at the end
+            of the backtest.
         total_return (float): The total return of the backtest.
+        total_return_percentage (float): The total return percentage
         cagr (float): The compound annual growth rate of the backtest.
         sharpe_ratio (float): The Sharpe ratio of the backtest, indicating
             risk-adjusted return.
@@ -62,10 +68,8 @@ class BacktestMetrics:
         trades_average_loss (float): The average loss from losing trades.
         best_trade (float): A string representation of the best trade,
             including net gain and percentage.
-        best_trade_date (datetime): The date of the best trade.
         worst_trade (float): A string representation of the worst trade,
             including net loss and percentage.
-        worst_trade_date (datetime): The date of the worst trade.
         average_trade_duration (float): The average duration of
             trades in hours.
         number_of_trades (int): The total number of trades executed
@@ -96,7 +100,11 @@ class BacktestMetrics:
     backtest_start_date: datetime
     backtest_end_date: datetime
     equity_curve: List[Tuple[float, datetime]] = field(default_factory=list)
+    growth: float = 0.0
+    growth_percentage: float = 0.0
     total_return: float = 0.0
+    total_return_percentage: float = 0.0
+    final_value: float = 0.0
     cagr: float = 0.0
     sharpe_ratio: float = 0.0
     rolling_sharpe_ratio: List[Tuple[float, datetime]] = \
@@ -104,6 +112,8 @@ class BacktestMetrics:
     sortino_ratio: float = 0.0
     calmar_ratio: float = 0.0
     profit_factor: float = 0.0
+    gross_profit: float = None
+    gross_loss: float = None
     annual_volatility: float = 0.0
     monthly_returns: List[Tuple[float, datetime]] = field(default_factory=list)
     yearly_returns: List[Tuple[float, date]] = field(default_factory=list)
@@ -131,7 +141,7 @@ class BacktestMetrics:
     best_month: Tuple[float, datetime] = None
     best_year: Tuple[float, date] = None
     worst_month: Tuple[float, datetime] = None
-    worst_year: Tuple[float, datetime] = None
+    worst_year: Tuple[float, date] = None
 
     def to_dict(self) -> dict:
         """
@@ -146,6 +156,8 @@ class BacktestMetrics:
             "equity_curve": [(value, date.isoformat())
                              for value, date in self.equity_curve],
             "total_return": self.total_return,
+            "total_return_percentage": self.total_return_percentage,
+            "final_value": self.final_value,
             "cagr": self.cagr,
             "sharpe_ratio": self.sharpe_ratio,
             "rolling_sharpe_ratio": [
@@ -155,6 +167,8 @@ class BacktestMetrics:
             "sortino_ratio": self.sortino_ratio,
             "calmar_ratio": self.calmar_ratio,
             "profit_factor": self.profit_factor,
+            "gross_profit": self.gross_profit,
+            "gross_loss": self.gross_loss,
             "annual_volatility": self.annual_volatility,
             "monthly_returns": [(value, date.isoformat())
                                 for value, date in self.monthly_returns],
@@ -211,7 +225,7 @@ class BacktestMetrics:
 
     @staticmethod
     def _parse_tuple_list_datetime(
-            data: List[List]
+        data: List[List]
     ) -> List[Tuple[float, datetime]]:
         """
             Parse a list of [value, datetime_string]

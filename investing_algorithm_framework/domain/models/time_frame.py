@@ -124,6 +124,13 @@ class TimeFrame(Enum):
         if self.equals(TimeFrame.ONE_MONTH):
             return 40320
 
+        if self.equals(TimeFrame.ONE_YEAR):
+            return 525600
+
+        raise ValueError(
+            f"Could not determine amount of minutes for {self.value}"
+        )
+
     # Add comparison methods for ordering
     def __lt__(self, other):
         if isinstance(other, TimeFrame):

@@ -4,8 +4,7 @@ from unittest import TestCase
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration, Algorithm, \
     MarketCredential
-from tests.resources import MarketServiceStub, OrderExecutorTest, \
-    PortfolioProviderTest
+from tests.resources import OrderExecutorTest, PortfolioProviderTest
 
 
 class StrategyOne(TradingStrategy):
@@ -35,8 +34,7 @@ class StrategyOne(TradingStrategy):
     def apply_strategy(
         self,
         context,
-        market_date=None,
-        **kwargs
+        data,
     ):
         StrategyOne.number_of_runs += 1
 
@@ -68,8 +66,7 @@ class StrategyTwo(TradingStrategy):
     def apply_strategy(
         self,
         context,
-        market_date=None,
-        **kwargs
+        data,
     ):
         StrategyTwo.number_of_runs += 1
 
@@ -123,7 +120,6 @@ class Test(TestCase):
                 trading_symbol="EUR"
             )
         )
-        app.container.market_service.override(MarketServiceStub(None))
         algorithm = Algorithm()
         algorithm.add_strategy(StrategyOne)
         algorithm.add_strategy(StrategyTwo)
@@ -135,11 +131,6 @@ class Test(TestCase):
                 secret_key="secret_key"
             )
         )
-        market_service_stub = MarketServiceStub(None)
-        market_service_stub.balances = {
-            "EUR": 1000
-        }
-        app.container.market_service.override(market_service_stub)
         app.run(number_of_iterations=2)
         self.assertTrue(app.has_run("StrategyOne"))
         self.assertTrue(app.has_run("StrategyTwo"))
@@ -157,7 +148,6 @@ class Test(TestCase):
                 trading_symbol="EUR"
             )
         )
-        app.container.market_service.override(MarketServiceStub(None))
         algorithm = Algorithm()
         algorithm.add_strategy(StrategyOne)
         algorithm.add_strategy(StrategyTwo)
@@ -169,11 +159,6 @@ class Test(TestCase):
                 secret_key="secret_key"
             )
         )
-        market_service_stub = MarketServiceStub(None)
-        market_service_stub.balances = {
-            "EUR": 1000
-        }
-        app.container.market_service.override(market_service_stub)
         app.run(number_of_iterations=2)
         self.assertTrue(app.has_run("StrategyOne"))
         self.assertTrue(app.has_run("StrategyTwo"))

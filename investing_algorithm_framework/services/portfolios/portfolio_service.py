@@ -3,7 +3,7 @@ from datetime import datetime
 
 from investing_algorithm_framework.domain import OperationalException, \
     MarketCredentialService, Portfolio, \
-    Environment, ENVIRONMENT, Observable, Event
+    Environment, ENVIRONMENT, Observable
 from investing_algorithm_framework.services.configuration_service import \
     ConfigurationService
 from investing_algorithm_framework.services.repository_service \
@@ -79,7 +79,7 @@ class PortfolioService(RepositoryService, Observable):
                 {"identifier": identifier}
             )
             return portfolio
-
+        data["initial_balance"] = unallocated
         portfolio = super(PortfolioService, self).create(data)
         self.position_service.create(
             {
@@ -87,13 +87,6 @@ class PortfolioService(RepositoryService, Observable):
                 "amount": unallocated,
                 "portfolio_id": portfolio.id,
                 "cost": unallocated
-            }
-        )
-        self.notify_observers(
-            Event.PORTFOLIO_CREATED,
-            {
-                "portfolio_id": portfolio.id,
-                "created_at": portfolio.created_at
             }
         )
         return portfolio

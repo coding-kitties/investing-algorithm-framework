@@ -33,6 +33,10 @@ class PortfolioConfiguration(BaseModel):
         initial_balance=None,
     ):
         self._market = market
+
+        if self._market is not None:
+            self._market = self._market.upper()
+
         self._track_from = None
         self._trading_symbol = trading_symbol.upper()
         self._identifier = identifier

@@ -2,7 +2,7 @@ import unittest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
-from investing_algorithm_framework import get_cagr
+from investing_algorithm_framework.services.metrics import get_cagr
 
 
 # Mock Snapshot class

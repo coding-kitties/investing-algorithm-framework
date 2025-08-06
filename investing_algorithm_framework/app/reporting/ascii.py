@@ -799,6 +799,7 @@ def pretty_print_backtest(
         None
     """
     backtest_results = backtest.backtest_results
+    backtest_metrics = backtest.backtest_metrics
     ascii_art = f"""
                   :%%%#+-          .=*#%%%        {COLOR_GREEN}Backtest report{COLOR_RESET}
                   *%%%%%%%+------=*%%%%%%%-       {COLOR_GREEN}---------------------------{COLOR_RESET}
@@ -808,8 +809,8 @@ def pretty_print_backtest(
              .:-+*%%%%- {COLOR_PURPLE}-+..#{COLOR_RESET}%%%+.{COLOR_PURPLE}+-  +{COLOR_RESET}%%%#*=-:   {COLOR_YELLOW}Number of runs:{COLOR_RESET}{COLOR_GREEN} {backtest_results.number_of_runs}{COLOR_RESET}
               .:-=*%%%%. {COLOR_PURPLE}+={COLOR_RESET} .%%#  {COLOR_PURPLE}-+.-{COLOR_RESET}%%%%=-:..   {COLOR_YELLOW}Number of orders:{COLOR_RESET}{COLOR_GREEN} {backtest_results.number_of_orders}{COLOR_RESET}
               .:=+#%%%%%*###%%%%#*+#%%%%%%*+-:    {COLOR_YELLOW}Initial balance:{COLOR_RESET}{COLOR_GREEN} {backtest_results.initial_unallocated}{COLOR_RESET}
-                    +%%%%%%%%%%%%%%%%%%%=         {COLOR_YELLOW}Final balance:{COLOR_RESET}{COLOR_GREEN} {float(backtest_results.total_value):.{price_precision}f}{COLOR_RESET}
-                :++  .=#%%%%%%%%%%%%%*-           {COLOR_YELLOW}Total net gain:{COLOR_RESET}{COLOR_GREEN} {float(backtest_results.total_net_gain):.{price_precision}f} {float(backtest_results.total_net_gain_percentage):.{percentage_precision}f}%{COLOR_RESET}
+                    +%%%%%%%%%%%%%%%%%%%=         {COLOR_YELLOW}Final balance:{COLOR_RESET}{COLOR_GREEN} {float(backtest_metrics.final_value):.{price_precision}f}{COLOR_RESET}
+                :++  .=#%%%%%%%%%%%%%*-           {COLOR_YELLOW}Total net gain:{COLOR_RESET}{COLOR_GREEN} {float(backtest_metrics.total_return):.{price_precision}f} {float(backtest_metrics.total_return_percentage):.{percentage_precision}f}%{COLOR_RESET}
                :++:      :+%%%%%%#-.              {COLOR_YELLOW}Growth:{COLOR_RESET}{COLOR_GREEN} {float(backtest_results.growth):.{price_precision}f} {float(backtest_results.growth_percentage):.{percentage_precision}f}%{COLOR_RESET}
               :++:        .%%%%%#=                {COLOR_YELLOW}Number of trades:{COLOR_RESET}{COLOR_GREEN} {backtest_results.number_of_trades}{COLOR_RESET}
               :++:        .%%%%%#=                {COLOR_YELLOW}Number of trades closed:{COLOR_RESET}{COLOR_GREEN} {backtest_results.number_of_trades_closed}{COLOR_RESET}

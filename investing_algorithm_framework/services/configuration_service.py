@@ -1,6 +1,11 @@
 import os
+import inspect
 from investing_algorithm_framework.domain import Environment, \
-    RESOURCE_DIRECTORY
+    SNAPSHOT_INTERVAL, DATA_DIRECTORY, INDEX_DATETIME, AppMode, \
+    SnapshotInterval, DATETIME_FORMAT_FILE_NAME
+
+caller_file = inspect.stack()[-1].filename
+caller_dir = os.path.dirname(os.path.abspath(caller_file))
 
 DEFAULT_CONFIGURATION = {
     "ENVIRONMENT": Environment.PROD.value,
@@ -9,14 +14,20 @@ DEFAULT_CONFIGURATION = {
     "PROJECT_ROOT": os.path.abspath(
         os.path.join(os.path.abspath(os.path.dirname(__file__)), os.pardir)
     ),
-    "RESOURCE_DIRECTORY": os.getenv(RESOURCE_DIRECTORY),
+    "RESOURCE_DIRECTORY": os.getenv("RESOURCE_DIRECTORY")
+    or os.path.join(caller_dir, "resources"),
+    "APP_MODE": AppMode.DEFAULT.value,
     "CHECK_PENDING_ORDERS": True,
     "SQLITE_INITIALIZED": False,
     "BACKTEST_DATA_DIRECTORY_NAME": "backtest_data",
     "SYMBOLS": None,
     "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",
     "DATABASE_DIRECTORY_PATH": None,
-    "DATABASE_DIRECTORY_NAME": "databases"
+    "DATABASE_DIRECTORY_NAME": "databases",
+    DATA_DIRECTORY: "data",
+    INDEX_DATETIME: None,
+    SNAPSHOT_INTERVAL: SnapshotInterval.DAILY.value,
+    DATETIME_FORMAT_FILE_NAME: "%Y-%m-%d-%H-%M"
 }
 
 DEFAULT_FLASK_CONFIGURATION = {

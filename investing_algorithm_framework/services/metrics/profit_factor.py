@@ -127,3 +127,39 @@ def get_profit_factor(trades: List[Trade]) -> float:
         return float('inf') if gross_profit > 0 else 0.0
 
     return gross_profit / gross_loss
+
+
+def get_gross_profit(trades: List[Trade]) -> float:
+    """
+    Function to calculate the total gross profit from a list of trades.
+
+    Args:
+        trades (List[Trade]): List of closed trades from the backtest report.
+
+    Returns:
+        float: The total gross profit from the trades.
+    """
+
+    gross_profit = 0.0
+    for trade in trades:
+        if trade.net_gain > 0:
+            gross_profit += trade.net_gain
+    return gross_profit
+
+
+def get_gross_loss(trades: List[Trade]) -> float:
+    """
+    Function to calculate the total gross loss from a list of trades.
+
+    Args:
+        trades (List[Trade]): List of closed trades from the backtest report.
+
+    Returns:
+        float: The total gross loss from the trades.
+    """
+
+    gross_loss = 0.0
+    for trade in trades:
+        if trade.net_gain < 0:
+            gross_loss += abs(trade.net_gain)
+    return gross_loss

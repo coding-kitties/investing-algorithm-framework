@@ -2,7 +2,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 
-def get_rolling_sharp_ratio_chart(rolling_sharpe_ratio_series):
+def get_rolling_sharpe_ratio_chart(rolling_sharpe_ratio_series):
     """
     Generates a Plotly figure showing the rolling Sharpe ratio series.
 

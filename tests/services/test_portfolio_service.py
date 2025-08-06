@@ -1,7 +1,6 @@
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential
 from investing_algorithm_framework.services import PortfolioService
-from tests.resources import MarketServiceStub
 from tests.resources import TestBase
 
 
@@ -29,12 +28,6 @@ class TestPortfolioService(TestBase):
         portfolio_service: PortfolioService \
             = self.app.container.portfolio_service()
 
-        market_service_stub = MarketServiceStub(None)
-        market_service_stub.balances = {
-            "EUR": 1000,
-            "BTC": 20,
-        }
-        portfolio_service.market_service = market_service_stub
         portfolio = portfolio_service.find({"market": "binance"})
         portfolio_service.create_portfolio_from_configuration(
             PortfolioConfiguration(
@@ -44,12 +37,6 @@ class TestPortfolioService(TestBase):
         )
         self.assertEqual(1000, portfolio.unallocated)
 
-        # Test when a new sync is ma de the unallocated is not updated
-        # Because it already exists
-        market_service_stub.balances = {
-            "EUR": 2000,
-            "BTC": 30,
-        }
         portfolio_service.create_portfolio_from_configuration(
             PortfolioConfiguration(
                 market="binance",

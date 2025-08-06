@@ -1,9 +1,12 @@
-from typing import List
+from typing import List, Any
 from abc import ABC, abstractmethod
 from datetime import datetime
-from investing_algorithm_framework.domain.models.trading_data_types import \
-    TradingDataType
+from investing_algorithm_framework.domain.exceptions import \
+    ImproperlyConfigured
 from investing_algorithm_framework.domain.models.time_frame import TimeFrame
+from investing_algorithm_framework.domain.models.data.data_type import DataType
+from investing_algorithm_framework.domain.models.data.data_source import \
+    DataSource
 
 
 class DataProvider(ABC):
@@ -13,20 +16,16 @@ class DataProvider(ABC):
     algorithms.
 
     Attributes:
-        data_type (str): The type of data to be
+        data_type (DataType): The type of data to be
             fetched (e.g., OHLCV, TICKER, CUSTOM_DATA).
-        symbols (Optional[List[str]]): A list supported symbols that the
+        symbol (Optional[List[str]]): A list supported symbols that the
             data provider can provide data for. The framework will use this
             list when searching for a data provider for a specific symbol.
             Example: ["AAPL/USD", "GOOGL/USD", "MSFT/USD"]
-        markets (Optional[List[str]]): A list supported markets that the
-            data provider can provide data for. The framework will use this
-            list when searching for a data provider for a specific market.
-            Example: ["BINANCE", "COINBASE", "KRAKEN"]
         priority (int): The priority of the data provider. The lower the
             number, the higher the priority. The framework will use this
             priority when searching for a data provider for a specific symbol.
-            Example: 0 is the highest priority, 1 is the second highest
+            Example: 0 is the highest priority, 1 is the second-highest
             priority, etc. This is useful when multiple data providers
             support the same symbol or market. The framework will use the
             data provider with the highest priority.
@@ -40,53 +39,102 @@ class DataProvider(ABC):
             for the data. This is useful for data providers that support
             saving data to a file
     """
+    data_type: DataType = None
+    data_provider_identifier: str = None
 
     def __init__(
         self,
-        data_type: str,
+        data_provider_identifier: str = None,
+        data_type: str = None,
         symbol: str = None,
         market: str = None,
-        markets: list = None,
         priority: int = 0,
         time_frame=None,
         window_size=None,
         storage_path=None,
+        storage_directory=None,
+        config=None,
     ):
         """
-        Initializes the DataProvider with data type, symbols, and markets.
+        Initializes the DataProvider. The data provider should be defined
+        with a data_type and a data_provider_identifier. The data_type
+        should be a valid DataType, and the data_provider_identifier
+        should be a unique identifier for the data provider.
+
+        Args:
+            data_provider_identifier (str): The unique identifier for the
+                data provider. This is used to identify the data provider
+                in the framework. It should be a unique string that identifies
+                the data provider. Example: "binance",
+                "coinbase", "custom_feed_data"
+            data_type (str): The type of data to be fetched
+                (e.g., "OHLCV", "TICKER", "CUSTOM_DATA")
+            symbol (str): The symbol to fetch data for. This is optional and
+                can be set later. Example: "AAPL/USD", "BTC/USD"
+            market (str): The market to fetch data for.
+                This is optional and can be set later.
+                Example: "BINANCE", "COINBASE"
+            priority (int): The priority of the data provider. The lower the
+                number, the higher the priority. This is useful when multiple
+                data providers support the same symbol or market. The framework
+                will use the data provider with the highest priority.
+                Example: 0 is the highest priority, 1 is the second-highest
+                priority, etc.
+            time_frame (str): The time frame for the data. This is optional and
+                can be set later. This is useful for data providers
+                that support multiple time frames.
+                Example: "1m", "5m", "1h", "1d"
+            window_size (int): The window size for the data. This is optional
+                and can be set later. This is useful for data providers that
+                support multiple window sizes. Example: 100, 200, 500
+            storage_path (str): The path to the storage location for the data.
+                This is optional and can be set later. This is useful for data
+                providers that support saving data to a file.
+                Example: "/path/to/data"
         """
         self._data_type = None
         self._time_frame = None
 
         if data_type is not None:
-            self._data_type = TradingDataType.from_value(data_type)
+            self.data_type = DataType.from_value(data_type)
 
         if time_frame is not None:
             self.time_frame = TimeFrame.from_value(time_frame)
 
+        if data_provider_identifier is not None:
+            self.data_provider_identifier = data_provider_identifier
+
         self.symbol = symbol
+
+        if self.symbol is not None:
+            self.symbol = self.symbol.upper()
+
         self.market = market
-        self.markets = markets
+
+        if self.market is not None:
+            self.market = self.market.upper()
+
         self.priority = priority
+        self._config = config
         self.window_size = window_size
         self.storage_path = storage_path
+        self.storage_directory = storage_directory
         self._market_credentials = None
 
-    @property
-    def data_type(self):
-        return self._data_type
+        # Check if the data provider is properly configured
+        if self.data_type is None:
+            raise ImproperlyConfigured(
+                "DataProvider must be initialized "
+                "with a data_type. Either pass it as a parameter in "
+                "the constructor or set it as a class attribute."
+            )
 
-    @data_type.setter
-    def data_type(self, value):
-        self._data_type = TradingDataType.from_value(value)
-
-    @property
-    def time_frame(self):
-        return self._time_frame
-
-    @time_frame.setter
-    def time_frame(self, value):
-        self._time_frame = TimeFrame.from_value(value)
+        if self.data_provider_identifier is None:
+            raise ImproperlyConfigured(
+                "DataProvider must be initialized with a "
+                "data_provider_identifier. Either pass it as a parameter "
+                "in the constructor or set it as a class attribute."
+            )
 
     @property
     def market_credentials(self):
@@ -124,67 +172,108 @@ class DataProvider(ABC):
     @abstractmethod
     def has_data(
         self,
-        data_type: str = None,
-        symbol: str = None,
-        market: str = None,
-        time_frame: str = None,
+        data_source: DataSource,
         start_date: datetime = None,
         end_date: datetime = None,
-        window_size=None,
     ) -> bool:
         """
         Checks if the data provider has data for the given parameters.
+
+        Args:
+            data_source (DataSource): The data source specification that
+                matches a data provider.
+            start_date (datetime): The start date for the data.
+            end_date (datetime): The end date for the data.
+
+        Returns:
+            bool: True if the data provider has data for the given parameters,
         """
         raise NotImplementedError("Subclasses should implement this method.")
 
     @abstractmethod
     def get_data(
         self,
-        data_type: str = None,
         date: datetime = None,
-        symbol: str = None,
-        market: str = None,
-        time_frame: str = None,
         start_date: datetime = None,
         end_date: datetime = None,
-        storage_path=None,
-        window_size=None,
-        pandas=False,
-        save: bool = True,
-    ):
+        save: bool = False,
+    ) -> Any:
         """
         Fetches data for a given symbol and date range.
+
+        Args:
+            start_date (datetime): The start date for the data.
+            end_date (datetime): The end date for the data.
+            date (datetime): The specific date for which to fetch data.
+            save (bool): Whether to save the data to the storage path.
+
+        Returns:
+            Any: The data for the given symbol and date range.
+            This can be a DataFrame, a list, or any other data structure
+            depending on the implementation.
         """
         raise NotImplementedError("Subclasses should implement this method.")
 
     @abstractmethod
-    def pre_pare_backtest_data(
+    def prepare_backtest_data(
         self,
         backtest_start_date,
         backtest_end_date,
-        symbol: str = None,
-        market: str = None,
-        time_frame: str = None,
-        window_size=None,
     ) -> None:
         """
         Prepares backtest data for a given symbol and date range.
+
+        Args:
+            backtest_start_date (datetime): The start date for the
+                backtest data.
+            backtest_end_date (datetime): The end date for the
+                backtest data.
+
+        Returns:
+            None
         """
         raise NotImplementedError("Subclasses should implement this method.")
 
     @abstractmethod
     def get_backtest_data(
         self,
-        date: datetime = None,
-        symbol: str = None,
-        market: str = None,
-        time_frame: str = None,
+        backtest_index_date: datetime,
         backtest_start_date: datetime = None,
         backtest_end_date: datetime = None,
-        window_size=None,
-        pandas=False,
-    ) -> None:
+    ) -> Any:
         """
-        Fetches backtest data for a given symbol and date range.
+        Fetches backtest data for a given datasource
+
+        Args:
+            backtest_index_date (datetime): The date for which to fetch
+                backtest data.
+            backtest_start_date (datetime): The start date for the
+                backtest data.
+            backtest_end_date (datetime): The end date for the
+                backtest data.
+
+        Returns:
+            Any: The data for the given symbol and date range.
+            This can be a DataFrame, a list, or any other data structure
+            depending on the implementation.
+        """
+        raise NotImplementedError("Subclasses should implement this method.")
+
+    @abstractmethod
+    def copy(self, data_source: DataSource) -> "DataProvider":
+        """
+        Returns a copy of the data provider instance based on a
+        given data source. The data source is previously matched
+        with the 'has_data' method. Then a new instance of the data
+        provider must be registered in the framework so that each
+        data source has its own instance of the data provider.
+
+        Args:
+            data_source (DataSource): The data source specification that
+                matches a data provider.
+
+        Returns:
+            DataProvider: A new instance of the data provider with the same
+                configuration.
         """
         raise NotImplementedError("Subclasses should implement this method.")

@@ -8,15 +8,9 @@ from flask_testing import TestCase as FlaskTestCase
 from investing_algorithm_framework import create_app, App, \
     TradingStrategy, TimeUnit, OrderStatus
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
-    ENVIRONMENT, Environment
-from tests.resources.stubs import MarketServiceStub, \
-    PortfolioSyncServiceStub, OrderExecutorTest, PortfolioProviderTest, \
-    MarketDataSourceServiceStub
-from investing_algorithm_framework.infrastructure.repositories import \
-    SQLOrderRepository, SQLTradeRepository, SQLPositionRepository, \
-    SQLPortfolioRepository, SQLPortfolioSnapshotRepository, \
-    SQLPositionSnapshotRepository, SQLOrderMetadataRepository, \
-    SQLTradeTakeProfitRepository, SQLTradeStopLossRepository
+    ENVIRONMENT, Environment, BACKTEST_DATA_DIRECTORY_NAME
+from investing_algorithm_framework.infrastructure import BacktestOrderExecutor
+from tests.resources.stubs import OrderExecutorTest, PortfolioProviderTest
 
 logger = logging.getLogger(__name__)
 
@@ -36,33 +30,32 @@ class StrategyOne(TradingStrategy):
 
 
 class TestBase(TestCase):
-    storage_repo_type = "sql"
     portfolio_configurations = []
     config = {}
     external_balances = None
     external_orders = []
     initial_orders = []
     market_credentials = []
-    market_service = MarketServiceStub(None)
     market_data_source_service = None
     initialize = True
     resource_directory = os.path.dirname(__file__)
+    data_providers = []
 
     def setUp(self) -> None:
         self.resource_directory = os.path.dirname(__file__)
         config = self.config
         config[RESOURCE_DIRECTORY] = self.resource_directory
         config[ENVIRONMENT] = Environment.TEST.value
+        config[BACKTEST_DATA_DIRECTORY_NAME] = \
+            "market_data_sources_for_testing"
         self.app: App = create_app(config=config)
-        self.market_service.balances = self.external_balances
-        self.market_service.orders = self.external_orders
-        self.app.container.market_service.override(self.market_service)
-        order_executor_lookup = self.app.container.order_executor_lookup()
-        order_executor_lookup.reset()
         portfolio_provider_lookup = self.app.container\
             .portfolio_provider_lookup()
         portfolio_provider_lookup.reset()
-        self.app.add_order_executor(OrderExecutorTest())
+        order_executor_test = OrderExecutorTest()
+        order_executor_lookup = self.app.container.order_executor_lookup()
+        order_executor_lookup.reset()
+        self.app.add_order_executor(order_executor_test)
         portfolio_provider = PortfolioProviderTest()
 
         if self.external_balances is not None:
@@ -70,18 +63,9 @@ class TestBase(TestCase):
 
         self.app.add_portfolio_provider(portfolio_provider)
 
-        if self.market_data_source_service is not None:
-            self.app.container.market_data_source_service\
-                .override(self.market_data_source_service)
-        else:
-            market_data_service_stub = MarketDataSourceServiceStub(
-                self.app.container.market_service(),
-                self.app.container.market_credential_service(),
-                self.app.container.configuration_service(),
-                None
-            )
-            self.app.container.market_data_source_service\
-                .override(market_data_service_stub)
+        if len(self.data_providers) > 0:
+            for data_provider in self.data_providers:
+                self.app.add_data_provider(data_provider)
 
         if len(self.portfolio_configurations) > 0:
             for portfolio_configuration in self.portfolio_configurations:
@@ -94,33 +78,34 @@ class TestBase(TestCase):
             for market_credential in self.market_credentials:
                 self.app.add_market_credential(market_credential)
 
-        self.app.initialize_config()
-
         if self.initialize:
-            self.app.initialize()
+            self.app.initialize_config()
+            self.app.initialize_storage()
+            self.app.initialize_services()
+            self.app.initialize_portfolios()
 
-        if self.initial_orders is not None:
-            for order in self.initial_orders:
-                created_order = self.app.context.create_order(
-                    target_symbol=order.get_target_symbol(),
-                    amount=order.get_amount(),
-                    price=order.get_price(),
-                    order_side=order.get_order_side(),
-                    order_type=order.get_order_type()
-                )
-
-                # Update the order to the correct status
-                order_service = self.app.container.order_service()
-
-                if OrderStatus.CLOSED.value == order.get_status():
-                    order_service.update(
-                        created_order.get_id(),
-                        {
-                            "status": "CLOSED",
-                            "filled": order.get_filled(),
-                            "remaining": Decimal('0'),
-                        }
+            if self.initial_orders is not None:
+                for order in self.initial_orders:
+                    created_order = self.app.context.create_order(
+                        target_symbol=order.get_target_symbol(),
+                        amount=order.get_amount(),
+                        price=order.get_price(),
+                        order_side=order.get_order_side(),
+                        order_type=order.get_order_type()
                     )
+
+                    # Update the order to the correct status
+                    order_service = self.app.container.order_service()
+
+                    if OrderStatus.CLOSED.value == order.get_status():
+                        order_service.update(
+                            created_order.get_id(),
+                            {
+                                "status": "CLOSED",
+                                "filled": order.get_filled(),
+                                "remaining": Decimal('0'),
+                            }
+                        )
 
     def tearDown(self) -> None:
         database_dir = os.path.join(
@@ -169,7 +154,6 @@ class FlaskTestBase(FlaskTestCase):
     external_balances = {}
     initial_orders = []
     external_orders = []
-    market_service = MarketServiceStub(None)
     initialize = True
     resource_directory = os.path.dirname(__file__)
 
@@ -181,9 +165,6 @@ class FlaskTestBase(FlaskTestCase):
             },
             web=True
         )
-        self.market_service.balances = self.external_balances
-        self.market_service.orders = self.external_orders
-        self.iaf_app.container.market_service.override(self.market_service)
         order_executor_lookup = self.iaf_app.container.order_executor_lookup()
         order_executor_lookup.reset()
         portfolio_provider_lookup = self.iaf_app.container\
@@ -225,9 +206,12 @@ class FlaskTestBase(FlaskTestCase):
 
         if self.initialize:
             self.iaf_app.initialize_config()
-            self.iaf_app.initialize()
+            self.iaf_app.initialize_storage()
+            self.iaf_app.initialize_services()
+            self.iaf_app.initialize_portfolios()
 
         if self.initial_orders is not None:
+            print(self.initial_orders)
             for order in self.initial_orders:
                 created_order = self.app.context.create_order(
                     target_symbol=order.get_target_symbol(),

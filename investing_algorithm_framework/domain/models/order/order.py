@@ -191,6 +191,11 @@ class Order(BaseModel):
         return (self.get_target_symbol().upper() + "/"
                 + self.get_trading_symbol().upper())
 
+    @property
+    def symbol(self):
+        return (self.get_target_symbol().upper() + "/"
+                + self.get_trading_symbol().upper())
+
     def get_available_amount(self):
 
         if self._available_amount is None:

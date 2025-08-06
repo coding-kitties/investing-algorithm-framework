@@ -20,7 +20,6 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
         position_repository: PositionRepository object
         portfolio_repository: PortfolioRepository object
         market_credential_service: MarketCredentialService object
-        market_service: MarketService object
         portfolio_configuration_service: PortfolioConfigurationService object
         portfolio_provider_lookup: PortfolioProviderLookup object
     """
@@ -34,7 +33,6 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
         portfolio_repository,
         portfolio_configuration_service,
         market_credential_service,
-        market_service,
         portfolio_provider_lookup
     ):
         self.trade_service = trade_service
@@ -43,7 +41,6 @@ class PortfolioSyncService(AbstractPortfolioSyncService):
         self.position_repository = position_repository
         self.portfolio_repository = portfolio_repository
         self.market_credential_service = market_credential_service
-        self.market_service = market_service
         self.portfolio_configuration_service = portfolio_configuration_service
         self.portfolio_provider_lookup = portfolio_provider_lookup
 

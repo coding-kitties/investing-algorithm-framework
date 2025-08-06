@@ -13,8 +13,18 @@
 <img src="static/showcase.svg" alt="Investing Algorithm Framework Logo" style="height: 50vh; max-height: 750px;">
 </div>
 
-The investing algorithm framework is a Python framework designed to help you build, backtest, and deploy quantitative trading strategies. It comes with a event-based backtesting engine, ensuring an accurate and realistic evaluation of your strategies. The framework supports live trading with multiple exchanges and has various deployment options including Azure Functions and AWS Lambda.
-The framework is designed to be extensible, allowing you to add custom strategies, data providers, and order executors. It also supports multiple data sources, including OHLCV, ticker, and custom data, with integration for both Polars and Pandas.
+The Investing Algorithm Framework is a Python-based framework built to streamline the entire lifecycle of quantitative trading strategies from signal generation and backtesting to live deployment.
+It offers a complete quantitative workflow, featuring two dedicated backtesting engines:
+
+* A vectorized backtest engine for fast signal research and prototyping
+
+* An event-based backtest engine for realistic and accurate strategy evaluation
+
+The framework supports live trading across multiple exchanges and offers flexible deployment options, including Azure Functions and AWS Lambda.
+Designed for extensibility, it allows you to integrate custom strategies, data providers, and order executors, enabling support for any exchange or broker.
+It natively supports multiple data formats, including OHLCV, ticker, and custom datasets with seamless compatibility for both Pandas and Polars DataFrames.
+
+
 
 ## Sponsors
 
@@ -30,11 +40,14 @@ The framework is designed to be extensible, allowing you to add custom strategie
 ## 🌟 Features
 
 - [x] Python 3.10+: Cross-platform support for Windows, macOS, and Linux.
-- [x] Backtesting: Simulate strategies with detailed performance reports.
+- [x] Event-Driven Backtest Engine: Accurate and realistic backtesting with event-driven architecture.
+- [x] Vectorized Backtest Engine: Fast signal research and prototyping with vectorized operations.
+- [x] Backtest Reporting: Generate detailed reports to analyse and compare backtests.
 - [x] Live Trading: Execute trades in real-time with support for multiple exchanges via ccxt.
 - [x] Portfolio Management: Manage portfolios, trades, and positions with persistence via SQLite.
 - [x] Market Data Sources: Fetch OHLCV, ticker, and custom data with support for Polars and Pandas.
-- [x] Azure Functions Support: Deploy stateless trading bots to Azure.
+- [x] Azure Functions Support: Deploy trading bots to Azure.
+- [x] AWS Lambda Support: Deploy trading bots to AWS Lambda.
 - [x] Web API: Interact with your bot via REST API.
 - [x] PyIndicators Integration: Perform technical analysis directly on your dataframes.
 - [x] Extensibility: Add custom strategies, data providers, order executors so you can connect your trading bot to your favorite exchange or broker.
@@ -86,30 +99,14 @@ the 20, 50 and 100 period exponential moving averages (EMA) and the
 import logging.config
 from dotenv import load_dotenv
 
-from pyindicators import ema, rsi
+from pyindicators import ema, rsi, crossunder, crossover, is_above
 
 from investing_algorithm_framework import create_app, TimeUnit, Context, BacktestDateRange, \
-    CCXTOHLCVMarketDataSource, CCXTTickerMarketDataSource, DEFAULT_LOGGING_CONFIG, \
-    TradingStrategy, SnapshotInterval, convert_polars_to_pandas, BacktestReport
+    DEFAULT_LOGGING_CONFIG, TradingStrategy, SnapshotInterval, BacktestReport, DataSource
 
 load_dotenv()
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
-
-# OHLCV data for candles
-bitvavo_btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
-    identifier="BTC-ohlcv",
-    market="BITVAVO",
-    symbol="BTC/EUR",
-    time_frame="2h",
-    window_size=200
-)
-# Ticker data for orders, trades and positions
-bitvavo_btc_eur_ticker = CCXTTickerMarketDataSource(
-    identifier="BTC-ticker",
-    market="BITVAVO",
-    symbol="BTC/EUR",
-)
 
 app = create_app()
 # Registered bitvavo market, credentials are read from .env file by default
@@ -118,20 +115,23 @@ app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=100)
 class MyStrategy(TradingStrategy):
     interval = 2
     time_unit = TimeUnit.HOUR
-    data_sources = [bitvavo_btc_eur_ohlcv_2h, bitvavo_btc_eur_ticker]
+    data_sources = [
+        DataSource(data_type="OHLCV", market="bitvavo", symbol="BTC/EUR", window_size=200, time_frame="2h", identifier="BTC-ohlcv", pandas=True),
+    ]
+    symbols = ["BTC/EUR"]
 
-    def run_strategy(self, context: Context, market_data):
+    def run_strategy(self, context: Context, data):
 
         if context.has_open_orders(target_symbol="BTC"):
             logger.info("There are open orders, skipping strategy iteration.")
             return
 
-        print(market_data)
-
-        data = convert_polars_to_pandas(market_data["BTC-ohlcv"])
+        data = data["BTC-ohlcv"]
         data = ema(data, source_column="Close", period=20, result_column="ema_20")
         data = ema(data, source_column="Close", period=50, result_column="ema_50")
         data = ema(data, source_column="Close", period=100, result_column="ema_100")
+        data = crossunder(data, first_column="ema_50", second_column="ema_100", result_column="crossunder_50_20")
+        data = crossover(data, first_column="ema_50", second_column="ema_100", result_column="crossover_50_20")
         data = rsi(data, source_column="Close", period=14, result_column="rsi_14")
 
         if context.has_position("BTC") and self.sell_signal(data):
@@ -146,20 +146,10 @@ class MyStrategy(TradingStrategy):
             )
             return
 
-    def buy_signal(self, data):
-        if len(data) < 100:
-            return False
-        last_row = data.iloc[-1]
-        if last_row["ema_20"] > last_row["ema_50"] and last_row["ema_50"] > last_row["ema_100"]:
-            return True
+    def buy_signal(self, data) -> bool:
         return False
 
-    def sell_signal(self, data):
-
-        if data["ema_20"].iloc[-1] < data["ema_50"].iloc[-1] and \
-           data["ema_20"].iloc[-2] >= data["ema_50"].iloc[-2]:
-            return True
-
+    def sell_signal(self, data) -> bool:
         return False
 
 date_range = BacktestDateRange(
@@ -170,7 +160,7 @@ app.add_strategy(MyStrategy)
 if __name__ == "__main__":
     # Run the backtest with a daily snapshot interval for end-of-day granular reporting
     backtest = app.run_backtest(
-        backtest_date_range=date_range, initial_amount=100, snapshot_interval=SnapshotInterval.STRATEGY_ITERATION
+        backtest_date_range=date_range, initial_amount=100, snapshot_interval=SnapshotInterval.DAILY
     )
     backtest_report = BacktestReport(backtests=[backtest])
     backtest_report.show()

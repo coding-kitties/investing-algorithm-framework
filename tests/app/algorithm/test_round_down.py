@@ -1,4 +1,3 @@
-import os
 from unittest import TestCase
 
 from investing_algorithm_framework.domain import RoundingService

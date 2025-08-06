@@ -4,8 +4,7 @@ from unittest import TestCase
 from investing_algorithm_framework import create_app, PortfolioConfiguration, \
     MarketCredential, Algorithm, AppMode, APP_MODE, RESOURCE_DIRECTORY, \
     AppHook
-from tests.resources import MarketServiceStub, PortfolioProviderTest, \
-    OrderExecutorTest
+from tests.resources import PortfolioProviderTest, OrderExecutorTest
 from tests.resources.strategies_for_testing.strategy_v2.strategy_v2 import \
     CrossOverStrategyV2
 from tests.resources.strategies_for_testing.strategy_v1.strategy_v1 import \
@@ -56,9 +55,6 @@ class TestAppInitialize(TestCase):
         )
         app.add_portfolio_provider(PortfolioProviderTest)
         app.add_order_executor(OrderExecutorTest)
-        app.container.market_service.override(
-            MarketServiceStub(app.container.market_credential_service())
-        )
         app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BITVAVO",
@@ -75,7 +71,8 @@ class TestAppInitialize(TestCase):
             )
         )
         app.initialize_config()
-        app.initialize()
+        app.initialize_storage()
+        app.initialize_services()
         self.assertIsNotNone(app.config)
         self.assertIsNone(app._flask_app)
         self.assertTrue(AppMode.DEFAULT.equals(app.config[APP_MODE]))
@@ -89,7 +86,6 @@ class TestAppInitialize(TestCase):
         )
         app.add_portfolio_provider(PortfolioProviderTest)
         app.add_order_executor(OrderExecutorTest)
-        app.container.market_service.override(MarketServiceStub(None))
         app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BITVAVO",
@@ -106,7 +102,8 @@ class TestAppInitialize(TestCase):
             )
         )
         app.initialize_config()
-        app.initialize()
+        app.initialize_storage()
+        app.initialize_services()
         self.assertIsNotNone(app.config)
         self.assertIsNotNone(app._flask_app)
         self.assertTrue(AppMode.WEB.equals(app.config[APP_MODE]))
@@ -120,7 +117,6 @@ class TestAppInitialize(TestCase):
         )
         app.add_portfolio_provider(PortfolioProviderTest)
         app.add_order_executor(OrderExecutorTest)
-        app.container.market_service.override(MarketServiceStub(None))
         app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BITVAVO",
@@ -139,7 +135,8 @@ class TestAppInitialize(TestCase):
             )
         )
         app.initialize_config()
-        app.initialize()
+        app.initialize_storage()
+        app.initialize_services()
         self.assertEqual(2, len(algorithm.strategies))
         algorithm = app.get_algorithm()
         self.assertEqual(2, len(algorithm.strategies))
@@ -151,7 +148,6 @@ class TestAppInitialize(TestCase):
         )
         app.add_portfolio_provider(PortfolioProviderTest)
         app.add_order_executor(OrderExecutorTest)
-        app.container.market_service.override(MarketServiceStub(None))
         app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BITVAVO",
@@ -171,7 +167,8 @@ class TestAppInitialize(TestCase):
             )
         )
         app.initialize_config()
-        app.initialize()
+        app.initialize_storage()
+        app.initialize_services()
         self.assertEqual(2, len(algorithm.strategies))
         algorithm = app.get_algorithm()
         self.assertEqual(2, len(algorithm.strategies))
@@ -184,7 +181,6 @@ class TestAppInitialize(TestCase):
         )
         app.add_portfolio_provider(PortfolioProviderTest)
         app.add_order_executor(OrderExecutorTest)
-        app.container.market_service.override(MarketServiceStub(None))
         app.add_portfolio_configuration(
             PortfolioConfiguration(
                 market="BITVAVO",
@@ -202,7 +198,8 @@ class TestAppInitialize(TestCase):
             )
         )
         app.initialize_config()
-        app.initialize()
+        app.initialize_storage()
+        app.initialize_services()
         algorithm = app.get_algorithm()
         self.assertEqual(2, len(algorithm.strategies))
         self.assertEqual(1, len(algorithm.on_strategy_run_hooks))

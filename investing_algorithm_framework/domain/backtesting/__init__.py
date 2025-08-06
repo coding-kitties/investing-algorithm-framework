@@ -9,5 +9,5 @@ __all__ = [
     "BacktestResult",
     "BacktestPosition",
     "BacktestDateRange",
-    "BacktestMetrics"
+    "BacktestMetrics",
 ]

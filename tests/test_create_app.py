@@ -2,10 +2,9 @@ import os
 from unittest import TestCase
 
 from investing_algorithm_framework import create_app, \
-    PortfolioConfiguration, Algorithm, MarketCredential
+    PortfolioConfiguration, MarketCredential
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY
-from tests.resources import MarketServiceStub, OrderExecutorTest, \
-    PortfolioProviderTest
+from tests.resources import OrderExecutorTest, PortfolioProviderTest
 
 
 class TestCreateApp(TestCase):
@@ -65,7 +64,8 @@ class TestCreateApp(TestCase):
         app.add_portfolio_provider(PortfolioProviderTest)
         app.add_order_executor(OrderExecutorTest)
         app.initialize_config()
-        app.initialize()
+        app.initialize_storage()
+        app.initialize_services()
         self.assertIsNotNone(app)
         self.assertIsNotNone(app._flask_app)
         self.assertIsNotNone(app.container)

@@ -1,7 +1,9 @@
 import pandas as pd
+from typing import List, Union
+
+from datetime import timezone
 from investing_algorithm_framework.domain import BacktestDateRange, \
     OperationalException
-from typing import List, Union
 
 
 def select_backtest_date_ranges(
@@ -11,6 +13,18 @@ def select_backtest_date_ranges(
     Identifies the best upturn, worst downturn, and sideways periods
     for the given window duration. This allows you to quickly select
     interesting periods for backtesting.
+
+    Args:
+        df (pd.DataFrame): DataFrame with a DateTime index
+            and 'Close' column.
+        window (Union[str, int]): Duration of the window
+            to analyze. Can be a string like '365D' or an
+            integer representing days.
+
+    Returns:
+        List[BacktestDateRange]: List of BacktestDateRange
+            objects representing the best upturn, worst
+            downturn, and most sideways periods.
     """
     df = df.copy()
     df = df.sort_index()
@@ -21,6 +35,15 @@ def select_backtest_date_ranges(
         window = pd.to_timedelta(window)
     else:
         raise OperationalException("window must be a string or integer")
+
+    # Check if the window is larger than the DataFrame
+    if len(df) == 0:
+        raise OperationalException("DataFrame is empty")
+
+    if df.index[-1] - df.index[0] < window:
+        raise OperationalException(
+            "Window duration is larger than the data duration"
+        )
 
     if len(df) < 2 or df.index[-1] - df.index[0] < window:
         raise OperationalException(
@@ -55,9 +78,11 @@ def select_backtest_date_ranges(
         ret = (end_price / start_price) - 1  # relative return
         volatility = window_df['Close'].std()
 
-        # Ensure datetime for BacktestDateRange
+        # Ensure datetime for BacktestDateRange and with timezone utc
         start_time = pd.Timestamp(start_time).to_pydatetime()
+        start_time = start_time.replace(tzinfo=timezone.utc)
         end_time = pd.Timestamp(window_df.index[-1]).to_pydatetime()
+        end_time = end_time.replace(tzinfo=timezone.utc)
 
         if ret > best_upturn["return"]:
             best_upturn.update(

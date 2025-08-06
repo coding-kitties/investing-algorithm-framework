@@ -128,7 +128,7 @@ class TradeStopLoss(BaseModel):
             return False
 
         if TradeRiskType.FIXED.equals(self.trade_risk_type):
-            # Check if the current price is less than the high water mark
+            # Check if the current price is less than the high watermark
             return current_price <= self.stop_loss_price
         else:
             # Check if the current price is less than the stop loss price

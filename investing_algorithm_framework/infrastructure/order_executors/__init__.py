@@ -1,4 +1,5 @@
 from .ccxt_order_executor import CCXTOrderExecutor
+from .backtest_oder_executor import BacktestOrderExecutor
 
 
 def get_default_order_executors():
@@ -15,5 +16,6 @@ def get_default_order_executors():
 
 __all__ = [
     'CCXTOrderExecutor',
+    'BacktestOrderExecutor',
     'get_default_order_executors',
 ]

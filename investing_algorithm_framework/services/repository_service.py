@@ -3,8 +3,8 @@ class RepositoryService:
     def __init__(self, repository):
         self.repository = repository
 
-    def create(self, data):
-        return self.repository.create(data)
+    def create(self, data, save=True):
+        return self.repository.create(data, save=save)
 
     def get(self, object_id):
         return self.repository.get(object_id)
@@ -35,3 +35,6 @@ class RepositoryService:
 
     def save(self, object):
         return self.repository.save(object)
+
+    def save_all(self, objects):
+        return self.repository.save_objects(objects)

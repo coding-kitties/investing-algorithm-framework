@@ -37,7 +37,7 @@ class Test(TestCase):
         algorithm.add_strategy(StrategyOne)
         snapshots = [
             PortfolioSnapshot(
-                created_at="2023-08-07 07:59:00",
+                created_at="2023-08-07 07:00:00",
                 total_value=1000,
                 trading_symbol="EUR",
                 unallocated=1000,
@@ -52,7 +52,7 @@ class Test(TestCase):
         results = BacktestResult(
             name="test",
             backtest_date_range=BacktestDateRange(
-                start_date="2023-08-07 07:59:00",
+                start_date="2023-08-07 07:00:00",
                 end_date="2023-12-02 00:00:00",
                 name="Test Backtest Date Range"
             ),
@@ -124,7 +124,7 @@ class Test(TestCase):
         """
         snapshots = [
             PortfolioSnapshot(
-                created_at="2023-08-07 07:59:00",
+                created_at="2023-08-07 07:00:00",
                 total_value=1000,
                 trading_symbol="EUR",
                 unallocated=1000,
@@ -139,7 +139,7 @@ class Test(TestCase):
         results = BacktestResult(
             name="test",
             backtest_date_range=BacktestDateRange(
-                start_date="2023-08-07 07:59:00",
+                start_date="2023-08-07 07:00:00",
                 end_date="2023-12-02 00:00:00",
                 name="Test Backtest Date Range"
             ),

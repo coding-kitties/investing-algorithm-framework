@@ -2,13 +2,12 @@ import logging
 from typing import List
 
 from investing_algorithm_framework.services import ConfigurationService, \
-    MarketCredentialService, MarketDataSourceService, \
-    OrderService, PortfolioConfigurationService, PortfolioService, \
-    PositionService, TradeService
+    MarketCredentialService, OrderService, PortfolioConfigurationService, \
+    PortfolioService, PositionService, TradeService, DataProviderService
 from investing_algorithm_framework.domain import OrderStatus, OrderType, \
     OrderSide, OperationalException, Portfolio, RoundingService, \
-    BACKTESTING_FLAG, BACKTESTING_INDEX_DATETIME, TradeRiskType, Order, \
-    Position, Trade, TradeStatus, MarketService, MarketCredential
+    BACKTESTING_FLAG, INDEX_DATETIME, TradeRiskType, Order, \
+    Position, Trade, TradeStatus, MarketCredential
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -28,9 +27,8 @@ class Context:
         position_service: PositionService,
         order_service: OrderService,
         market_credential_service: MarketCredentialService,
-        market_data_source_service: MarketDataSourceService,
-        market_service: MarketService,
         trade_service: TradeService,
+        data_provider_service: DataProviderService
     ):
         self.configuration_service: ConfigurationService = \
             configuration_service
@@ -41,9 +39,7 @@ class Context:
         self.order_service: OrderService = order_service
         self.market_credential_service: MarketCredentialService = \
             market_credential_service
-        self.market_data_source_service: MarketDataSourceService = \
-            market_data_source_service
-        self.market_service: MarketService = market_service
+        self.data_provider_service: DataProviderService = data_provider_service
         self.trade_service: TradeService = trade_service
 
     @property
@@ -110,7 +106,7 @@ class Context:
         if BACKTESTING_FLAG in self.configuration_service.config \
                 and self.configuration_service.config[BACKTESTING_FLAG]:
             order_data["created_at"] = \
-                self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+                self.configuration_service.config[INDEX_DATETIME]
 
         return self.order_service.create(
             order_data, execute=execute, validate=validate, sync=sync
@@ -255,7 +251,7 @@ class Context:
         if BACKTESTING_FLAG in self.configuration_service.config \
                 and self.configuration_service.config[BACKTESTING_FLAG]:
             order_data["created_at"] = \
-                self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+                self.configuration_service.config[INDEX_DATETIME]
 
         return self.order_service.create(
             order_data, execute=execute, validate=validate, sync=sync
@@ -333,7 +329,7 @@ class Context:
         if BACKTESTING_FLAG in self.configuration_service.config \
                 and self.configuration_service.config[BACKTESTING_FLAG]:
             order_data["created_at"] = \
-                self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+                self.configuration_service.config[INDEX_DATETIME]
 
         return self.order_service.create(order_data)
 
@@ -404,7 +400,7 @@ class Context:
         if BACKTESTING_FLAG in self.configuration_service.config \
                 and self.configuration_service.config[BACKTESTING_FLAG]:
             order_data["created_at"] = \
-                self.configuration_service.config[BACKTESTING_INDEX_DATETIME]
+                self.configuration_service.config[INDEX_DATETIME]
         return self.order_service.create(
             order_data, execute=True, validate=True, sync=True
         )
@@ -761,41 +757,6 @@ class Context:
         query_params["symbol"] = symbol
         return self.position_service.exists(query_params)
 
-    def get_position_percentage_of_portfolio(
-        self, symbol, market=None, identifier=None
-    ) -> float:
-        """
-        Returns the percentage of the current total value of the portfolio
-        that is allocated to a position. This is calculated by dividing
-        the current value of the position by the total current value
-        of the portfolio.
-        """
-
-        query_params = {}
-
-        if market is not None:
-            query_params["market"] = market
-
-        if identifier is not None:
-            query_params["identifier"] = identifier
-
-        portfolios = self.portfolio_service.get_all(query_params)
-
-        if not portfolios:
-            raise OperationalException("No portfolio found.")
-
-        portfolio = portfolios[0]
-        position = self.position_service.find(
-            {"portfolio": portfolio.id, "symbol": symbol}
-        )
-        full_symbol = f"{position.symbol.upper()}/" \
-                      f"{portfolio.trading_symbol.upper()}"
-        ticker = self.market_data_source_service.get_ticker(
-            symbol=full_symbol, market=market
-        )
-        total = self.get_unallocated() + self.get_allocated()
-        return (position.amount * ticker["bid"] / total) * 100
-
     def get_position_percentage_of_portfolio_by_net_size(
         self, symbol, market=None, identifier=None
     ) -> float:
@@ -896,8 +857,10 @@ class Context:
         symbol = f"{target_symbol.upper()}/{portfolio.trading_symbol.upper()}"
 
         if price is None:
-            ticker = self.market_data_source_service.get_ticker(
-                symbol=symbol, market=portfolio.market
+            ticker = self.data_provider_service.get_ticker_data(
+                symbol=symbol,
+                market=portfolio.market,
+                date=self.config[INDEX_DATETIME]
             )
             price = ticker["bid"]
 
@@ -962,8 +925,9 @@ class Context:
 
                 symbol = f"{position.symbol.upper()}/" \
                          f"{portfolio.trading_symbol.upper()}"
-                ticker = self.market_data_source_service.get_ticker(
-                    symbol=symbol, market=market,
+                current_date = self.config[INDEX_DATETIME]
+                ticker = self.data_provider_service.get_ticker_data(
+                    symbol=symbol, market=portfolio.market, date=current_date
                 )
                 allocated = allocated + \
                     (position.get_amount() * ticker["bid"])
@@ -1362,7 +1326,7 @@ class Context:
 
     def add_stop_loss(
         self,
-        trade,
+        trade: Trade,
         percentage: float,
         trade_risk_type=TradeRiskType.FIXED,
         sell_percentage: float = 100,
@@ -1384,13 +1348,16 @@ class Context:
             * BTC price drops to $39,900 → SL level reached, trade closes.
 
         Args:
-            trade: Trade object representing the trade
-            percentage: float representing the percentage of the open price
-                that the stop loss should be set at
-            trade_risk_type: The type of the stop loss, fixed
-                or trailing
-            sell_percentage: float representing the percentage of the trade
-                that should be sold if the stop loss is triggered
+            trade (Trade): Trade object representing the trade
+            percentage (float): float representing the percentage
+                of the open price that the stop loss should
+                be set at. This must be a positive
+                number, e.g. 5 for 5%, or 10 for 10%.
+            trade_risk_type (TradeRiskType): The type of the stop
+                loss, fixed or trailing
+            sell_percentage (float): float representing the
+                percentage of the trade that should be sold if the
+                stop loss is triggered
 
         Returns:
             None
@@ -1405,7 +1372,7 @@ class Context:
 
     def add_take_profit(
         self,
-        trade,
+        trade: Trade,
         percentage: float,
         trade_risk_type=TradeRiskType.FIXED,
         sell_percentage: float = 100,
@@ -1429,13 +1396,16 @@ class Context:
             * BTC drops to $42,750 → Trade closes, securing profit.
 
         Args:
-            trade: Trade object representing the trade
-            percentage: float representing the percentage of the open price
-                that the stop loss should be set at
-            trade_risk_type: The type of the stop loss, fixed
-                or trailing
-            sell_percentage: float representing the percentage of the trade
-                that should be sold if the stop loss is triggered
+            trade (Trade): Trade object representing the trade
+            percentage (float): float representing the percentage
+                of the open price that the stop loss should
+                be set at. This must be a positive
+                number, e.g. 5 for 5%, or 10 for 10%.
+            trade_risk_type (TradeRiskType): The type of the stop
+                loss, fixed or trailing
+            sell_percentage (float): float representing the
+                percentage of the trade that should be sold if the
+                stop loss is triggered
 
         Returns:
             None
@@ -1462,7 +1432,6 @@ class Context:
         Returns:
             None
         """
-
         trade = self.trade_service.get(trade.id)
 
         if TradeStatus.CLOSED.equals(trade.status):
@@ -1490,8 +1459,10 @@ class Context:
             )
             amount = position.get_amount()
 
-        ticker = self.market_data_source_service.get_ticker(
-            symbol=trade.symbol, market=portfolio.market
+        ticker = self.data_provider_service.get_ticker_data(
+            symbol=trade.symbol,
+            market=portfolio.market,
+            date=self.config[INDEX_DATETIME]
         )
         logger.info(f"Closing trade {trade.id} {trade.symbol}")
         self.order_service.create(

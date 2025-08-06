@@ -1,12 +1,8 @@
 import logging
-from datetime import datetime
-from typing import List
-
-from dateutil.tz import tzutc
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
-    OperationalException, OrderStatus, Order, OrderExecutor, random_number, \
-    Observable, Event
+    OperationalException, OrderStatus, Order, random_number, \
+    Observable, INDEX_DATETIME
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
@@ -62,35 +58,8 @@ class OrderService(RepositoryService, Observable):
         self.portfolio_snapshot_service = portfolio_snapshot_service
         self.market_credential_service = market_credential_service
         self.trade_service = trade_service
-        self._order_executors = None
         self._order_executor_lookup = order_executor_lookup
         self._portfolio_provider_lookup = portfolio_provider_lookup
-
-    @property
-    def order_executors(self) -> List[OrderExecutor]:
-        """
-        Returns the order executors for the order service.
-        """
-        return self._order_executors
-
-    @order_executors.setter
-    def order_executors(self, value) -> None:
-        """
-        Sets the order executors for the order service.
-        """
-        self._order_executors = value
-
-    def get_order_executor(self, market) -> OrderExecutor:
-        """
-        Returns the order executor for the given market.
-
-        Args:
-            market (str): The market for which to get the order executor.
-
-        Returns:
-            OrderExecutor: The order executor for the given market.
-        """
-        return self._order_executor_lookup.get_order_executor(market)
 
     def create(self, data, execute=True, validate=True, sync=True) -> Order:
         """
@@ -189,6 +158,7 @@ class OrderService(RepositoryService, Observable):
             self.validate_order(data, portfolio)
 
         del data["portfolio_id"]
+        data["target_symbol"] = data["target_symbol"].upper()
         symbol = data["target_symbol"]
         data["id"] = self._create_order_id()
 
@@ -225,11 +195,6 @@ class OrderService(RepositoryService, Observable):
             else:
                 self._sync_portfolio_with_created_sell_order(order)
 
-        self.notify_observers(
-            Event.ORDER_CREATED,
-            {"portfolio_id": portfolio.id, "created_at": order.created_at}
-        )
-        # self.create_snapshot(portfolio.id, created_at=created_at)
         order = self.get(order_id)
         return order
 
@@ -310,7 +275,8 @@ class OrderService(RepositoryService, Observable):
             f"and price {order.get_price()}"
         )
 
-        order_executor = self.get_order_executor(portfolio.market)
+        order_executor = self._order_executor_lookup\
+            .get_order_executor(portfolio.market)
         market_credential = self.market_credential_service.get(
             portfolio.market
         )
@@ -322,7 +288,8 @@ class OrderService(RepositoryService, Observable):
         order.set_status(external_order.get_status())
         order.set_filled(external_order.get_filled())
         order.set_remaining(external_order.get_remaining())
-        order.updated_at = datetime.now(tz=tzutc())
+        config = self.configuration_service.config
+        order.updated_at = config[INDEX_DATETIME]
         return order
 
     def validate_order(self, order_data, portfolio):
@@ -544,7 +511,8 @@ class OrderService(RepositoryService, Observable):
                 market_credential = self.market_credential_service.get(
                     portfolio.market
                 )
-                order_executor = self.get_order_executor(portfolio.market)
+                order_executor = self._order_executor_lookup\
+                    .get_order_executor(portfolio.market)
                 order = order_executor\
                     .cancel_order(portfolio, order, market_credential)
                 self.update(order.id, order.to_dict())

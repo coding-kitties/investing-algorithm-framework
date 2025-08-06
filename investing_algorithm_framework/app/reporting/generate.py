@@ -7,7 +7,7 @@ from .tables import create_html_time_metrics_table, \
     create_html_trade_metrics_table, create_html_key_metrics_table, \
     create_html_trades_table
 from .charts import get_equity_curve_with_drawdown_chart, \
-    get_rolling_sharp_ratio_chart, get_monthly_returns_heatmap_chart, \
+    get_rolling_sharpe_ratio_chart, get_monthly_returns_heatmap_chart, \
     get_yearly_returns_bar_chart, get_ohlcv_data_completeness_chart
 from investing_algorithm_framework.domain import TimeFrame
 
@@ -93,7 +93,7 @@ def add_html_report(report) -> "BacktestReport":
         full_html=False, include_plotlyjs='cdn',
         config={'responsive': True}, default_width="90%"
     )
-    rolling_sharpe_ratio_fig = get_rolling_sharp_ratio_chart(
+    rolling_sharpe_ratio_fig = get_rolling_sharpe_ratio_chart(
         metrics["Rolling Sharpe Ratio"]
     )
     rolling_sharpe_ratio_plot_html = rolling_sharpe_ratio_fig.to_html(
