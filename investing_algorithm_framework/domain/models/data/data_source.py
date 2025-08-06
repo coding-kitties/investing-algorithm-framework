@@ -119,15 +119,15 @@ class DataSource:
         return non_null_attributes
 
     def __repr__(self):
-        attributes = {
-            key: value for key, value in self.__dict__.items() if value is not
-            None
-        }
         return (
-            f"DataSource("
-            f"{', '.join(
-                f'{key}={value}' for key, value in attributes.items()
-            )}"
+            f"DataSource(identifier={self.identifier}, "
+            f"data_provider_identifier={self.data_provider_identifier}, "
+            f"data_type={self.data_type}, symbol={self.symbol}, "
+            f"window_size={self.window_size}, time_frame={self.time_frame}, "
+            f"market={self.market}, storage_path={self.storage_path}, "
+            f"pandas={self.pandas}, date={self.date}, "
+            f"start_date={self.start_date}, end_date={self.end_date}, "
+            f"save={self.save})"
         )
 
     def __eq__(self, other):
