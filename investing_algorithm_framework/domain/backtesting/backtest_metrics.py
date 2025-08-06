@@ -30,8 +30,8 @@ class BacktestMetrics:
             over the backtest period.
         final_value (float): The final value of the portfolio at the end
             of the backtest.
-        total_return (float): The total return of the backtest.
-        total_return_percentage (float): The total return percentage
+        total_net_gain (float): The total return of the backtest.
+        total_net_gain_percentage (float): The total return percentage
         cagr (float): The compound annual growth rate of the backtest.
         sharpe_ratio (float): The Sharpe ratio of the backtest, indicating
             risk-adjusted return.
@@ -102,8 +102,8 @@ class BacktestMetrics:
     equity_curve: List[Tuple[float, datetime]] = field(default_factory=list)
     growth: float = 0.0
     growth_percentage: float = 0.0
-    total_return: float = 0.0
-    total_return_percentage: float = 0.0
+    total_net_gain: float = 0.0
+    total_net_gain_percentage: float = 0.0
     final_value: float = 0.0
     cagr: float = 0.0
     sharpe_ratio: float = 0.0
@@ -155,8 +155,8 @@ class BacktestMetrics:
             "backtest_end_date": self.backtest_end_date.isoformat(),
             "equity_curve": [(value, date.isoformat())
                              for value, date in self.equity_curve],
-            "total_return": self.total_return,
-            "total_return_percentage": self.total_return_percentage,
+            "total_net_gain": self.total_net_gain,
+            "total_net_gain_percentage": self.total_net_gain_percentage,
             "final_value": self.final_value,
             "cagr": self.cagr,
             "sharpe_ratio": self.sharpe_ratio,

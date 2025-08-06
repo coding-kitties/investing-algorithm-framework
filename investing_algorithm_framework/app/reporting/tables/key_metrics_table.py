@@ -153,7 +153,7 @@ def create_html_key_metrics_table(results, report):
     format_str = "{:.2f}"
 
     # Format some values to percentages and floats
-    copy_results['Total Return'] = f"{safe_format_percentage(copy_results['total_return'], format_str)}%"
+    copy_results['Total Return'] = f"{safe_format(copy_results["total_net_gain"], format_str)} ({safe_format_percentage(copy_results['total_net_gain_percentage'], format_str)}%)"
     copy_results['CAGR'] = f"{safe_format_percentage(copy_results['cagr'],format_str)}%"
     copy_results['Sharpe Ratio'] = safe_format(copy_results['sharpe_ratio'], format_str)
     copy_results['Sortino Ratio'] = safe_format(copy_results['sortino_ratio'], format_str)

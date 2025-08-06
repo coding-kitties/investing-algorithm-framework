@@ -1,7 +1,7 @@
 from investing_algorithm_framework.domain import Backtest
 
 defaults_ranking_weights = {
-    "total_return": 2.0,
+    "total_net_gain": 2.0,
     "sharpe_ratio": 1.0,
     "sortino_ratio": 1.0,
     "win_rate": 1.0,
@@ -17,7 +17,7 @@ def compute_score(metrics: dict, weights: dict) -> float:
     score = 0
     for key, weight in weights.items():
 
-        # Metrics are attributeds to the backtest
+        # Metrics are attributes to the backtest
         if not hasattr(metrics, key):
             continue
 

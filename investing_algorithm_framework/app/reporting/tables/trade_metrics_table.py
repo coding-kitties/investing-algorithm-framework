@@ -1,5 +1,6 @@
 import pandas as pd
 
+from investing_algorithm_framework.domain import DEFAULT_DATETIME_FORMAT
 from .utils import safe_format, safe_format_date, safe_format_percentage
 
 
@@ -75,17 +76,16 @@ def create_html_trade_metrics_table(results, report):
         copy_results["Best Trade"] = "N/A"
         copy_results['Best Trade Date'] = "N/A"
     else:
-        copy_results['Best Trade'] = f"{copy_results['best_trade'].net_gain:.2f} {report.trading_symbol} ({copy_results['best_trade'].net_gain_percentage:.2f})%"
-        copy_results['Best Trade Date'] = copy_results['best_trade_date'].strftime('%Y-%m-%d')
-
+        copy_results['Best Trade'] = f"{best_trade['net_gain']:.2f} {report.trading_symbol}"
+        copy_results['Best Trade Date'] = safe_format_date(best_trade["opened_at"], format_str=DEFAULT_DATETIME_FORMAT)
     worst_trade = copy_results['worst_trade']
 
     if worst_trade is None:
         copy_results["Worst Trade"] = "N/A"
         copy_results['Worst Trade Date'] = "N/A"
     else:
-        copy_results['Worst Trade'] = f"{copy_results['worst_trade'].net_gain:.2f} {report.trading_symbol} ({copy_results['worst_trade'].net_gain_percentage:.2f})%"
-        copy_results['Worst Trade Date'] = copy_results['worst_trade_date'].strftime('%Y-%m-%d')
+        copy_results['Worst Trade'] = f"{worst_trade['net_gain']:.2f} {report.trading_symbol}"
+        copy_results['Worst Trade Date'] = safe_format_date(worst_trade['opened_at'], format_str=DEFAULT_DATETIME_FORMAT)
 
     copy_results['Trades Average Gain'] = f"{safe_format(copy_results['trades_average_gain'][0], string_format)} {report.trading_symbol} {copy_results['trades_average_gain'][1]:.2f}%"
     copy_results['Trades Average Loss'] = f"{safe_format(copy_results['trades_average_loss'][0], string_format)} {report.trading_symbol} {copy_results['trades_average_loss'][1]:.2f}%"

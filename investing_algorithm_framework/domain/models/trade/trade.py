@@ -250,7 +250,11 @@ class Trade(BaseModel):
         cost = self.available_amount * self.open_price
         gain = (self.available_amount * self.last_reported_price) - cost
         gain += self.net_gain
-        return (gain / cost) * 100
+
+        if cost != 0:
+            return (gain / cost) * 100
+
+        return 0
 
     def to_dict(self, datetime_format=None):
 

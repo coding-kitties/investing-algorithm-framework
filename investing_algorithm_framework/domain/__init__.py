@@ -11,7 +11,7 @@ from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
     APP_MODE, DATABASE_DIRECTORY_NAME, BACKTESTING_INITIAL_AMOUNT, \
     APPLICATION_DIRECTORY, SNAPSHOT_INTERVAL, AWS_S3_STATE_BUCKET_NAME, \
     LAST_SNAPSHOT_DATETIME, DATA_DIRECTORY, INDEX_DATETIME, \
-    DATETIME_FORMAT_FILE_NAME
+    DATETIME_FORMAT_FILE_NAME, DEFAULT_DATETIME_FORMAT
 from .data_provider import DataProvider
 from .data_structures import PeekableQueue
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
@@ -142,4 +142,5 @@ __all__ = [
     "DATETIME_FORMAT_FILE_NAME",
     "is_jupyter_notebook",
     "tqdm",
+    "DEFAULT_DATETIME_FORMAT",
 ]

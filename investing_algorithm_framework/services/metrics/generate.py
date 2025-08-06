@@ -46,8 +46,8 @@ def create_backtest_metrics(
         backtest_end_date=backtest_results.backtest_end_date,
         equity_curve=get_equity_curve(backtest_results.portfolio_snapshots),
         final_value=get_final_value(backtest_results.portfolio_snapshots),
-        total_return=total_return[0],
-        total_return_percentage=total_return[1],
+        total_net_gain=total_return[0],
+        total_net_gain_percentage=total_return[1],
         cagr=get_cagr(backtest_results.portfolio_snapshots),
         sharpe_ratio=get_sharpe_ratio(
             backtest_results.portfolio_snapshots,
