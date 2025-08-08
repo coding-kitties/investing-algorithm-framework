@@ -52,8 +52,8 @@ class Test(TestCase):
         self.assertEqual(report.backtest_results.initial_unallocated, 1000)
         self.assertEqual(report.backtest_results.growth, 0)
         self.assertEqual(report.backtest_results.growth_percentage, 0)
-        self.assertEqual(report.backtest_metrics.total_return, 0)
-        self.assertEqual(report.backtest_metrics.total_return_percentage, 0)
+        self.assertEqual(report.backtest_metrics.total_net_gain, 0)
+        self.assertEqual(report.backtest_metrics.total_net_gain_percentage, 0)
         self.assertAlmostEqual(report.backtest_results.number_of_runs, 373, places=1)
         self.assertEqual(report.backtest_results.trading_symbol, "USDT")
         database_uri = app.config[SQLALCHEMY_DATABASE_URI]
@@ -82,8 +82,8 @@ class Test(TestCase):
         self.assertEqual(report.backtest_results.initial_unallocated, 500)
         self.assertEqual(report.backtest_results.growth, 0)
         self.assertEqual(report.backtest_results.growth_percentage, 0)
-        self.assertEqual(report.backtest_metrics.total_return, 0)
-        self.assertEqual(report.backtest_metrics.total_return_percentage, 0)
+        self.assertEqual(report.backtest_metrics.total_net_gain, 0)
+        self.assertEqual(report.backtest_metrics.total_net_gain_percentage, 0)
         self.assertAlmostEqual(report.backtest_results.number_of_runs, 373, places=1)
         self.assertEqual(report.backtest_results.trading_symbol, "USDT")
         database_uri = app.config[SQLALCHEMY_DATABASE_URI]
