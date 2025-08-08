@@ -207,7 +207,7 @@
 #         self.assertIsNotNone(backtest_metrics.growth_percentage)
 #         self.assertIsNotNone(backtest_results.initial_unallocated)
 #         self.assertIsNotNone(backtest_results.trading_symbol)
-#         self.assertIsNotNone(backtest_metrics.total_return)
-#         self.assertIsNotNone(backtest_metrics.total_return_percentage)
+#         self.assertIsNotNone(backtest_metrics.total_net_gain)
+#         self.assertIsNotNone(backtest_metrics.total_net_gain_percentage)
 #         self.assertIsNotNone(backtest_results.get_portfolio_snapshots())
 #

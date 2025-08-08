@@ -68,10 +68,10 @@
 #             backtest_report.backtest_results.trading_symbol, "EUR"
 #         )
 #         self.assertAlmostEqual(
-#             backtest_report.backtest_metrics.total_return, 5.9, delta=0.5
+#             backtest_report.backtest_metrics.total_net_gain, 5.9, delta=0.5
 #         )
 #         self.assertAlmostEqual(
-#             backtest_report.backtest_metrics.total_return_percentage, 0.0149, delta=0.001
+#             backtest_report.backtest_metrics.total_net_gain_percentage, 0.0149, delta=0.001
 #         )
 #         end_time = time.time()
 #         elapsed_time = end_time - start_time

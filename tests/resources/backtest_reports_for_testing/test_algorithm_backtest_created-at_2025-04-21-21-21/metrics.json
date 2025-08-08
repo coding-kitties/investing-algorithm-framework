@@ -2943,7 +2943,7 @@
             "2021-03-03T00:00:00+00:00"
         ]
     ],
-    "total_return": 0.0,
+    "total_net_gain": 0.0,
     "cagr": 0.0,
     "sharpe_ratio": NaN,
     "rolling_sharpe_ratio": [

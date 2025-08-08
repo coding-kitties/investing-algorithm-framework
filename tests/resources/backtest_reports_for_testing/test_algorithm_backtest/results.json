@@ -1,8 +1,8 @@
 {
     "name": "TestStrategy",
     "backtest_date_range_identifier": null,
-    "backtest_start_date": "2023-12-01 23:00:00",
-    "backtest_end_date": "2023-12-02 23:00:00",
+    "backtest_start_date": "2023-12-01 21:00:00",
+    "backtest_end_date": "2023-12-02 21:00:00",
     "number_of_runs": 1441,
     "symbols": [],
     "number_of_days": 1,
@@ -25,14 +25,14 @@
     "portfolio_snapshots": [
         {
             "net_size": 1000.0,
-            "created_at": "2023-12-01 23:00:00",
+            "created_at": "2023-12-01 21:00:00",
             "total_value": 1000.0
         },
         {
             "net_size": 1000.0,
-            "created_at": "2023-12-02 23:00:00",
+            "created_at": "2023-12-02 21:00:00",
             "total_value": 1000.0
         }
     ],
-    "created_at": "2025-08-06 11:56:23"
+    "created_at": "2025-08-08 18:45:07"
 }

@@ -50,10 +50,10 @@
 #             backtest_report.backtest_results.trading_symbol, "EUR"
 #         )
 #         self.assertAlmostEqual(
-#             backtest_report.backtest_metrics.total_return, 18.6, delta=0.5
+#             backtest_report.backtest_metrics.total_net_gain, 18.6, delta=0.5
 #         )
 #         self.assertAlmostEqual(
-#             backtest_report.backtest_metrics.total_return_percentage, 0.045, delta=0.005
+#             backtest_report.backtest_metrics.total_net_gain_percentage, 0.045, delta=0.005
 #         )
 #         snapshots = backtest_report.backtest_results.get_portfolio_snapshots()
 #         # Check that the first two snapshots created at are the same
