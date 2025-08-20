@@ -1,8 +1,16 @@
 from datetime import timedelta
 from enum import Enum
+from investing_algorithm_framework.domain.exceptions import \
+    OperationalException
 
 
 class TimeUnit(Enum):
+    """
+    Enum class the represents a time unit such as
+    second, minute, hour or day. This can class
+    can be used to specify time specification within
+    the framework.
+    """
     SECOND = "SECOND"
     MINUTE = "MINUTE"
     HOUR = "HOUR"
@@ -18,7 +26,11 @@ class TimeUnit(Enum):
                 if value.upper() == entry.value:
                     return entry
 
-        raise ValueError(
+                raise OperationalException(
+                    f"Could not convert string {value} to time unit"
+                )
+
+        raise OperationalException(
             f"Could not convert value {value} to time unit," +
             " please make sure that the value is either of type string or" +
             f"TimeUnit. Its current type is {type(value)}"
@@ -38,17 +50,21 @@ class TimeUnit(Enum):
             TimeUnit: The extracted time unit.
         """
         if not isinstance(file_path, str):
-            raise ValueError("File path must be a string.")
+            raise OperationalException(
+                "File path must be a string."
+            )
 
         parts = file_path.split('_')
         if len(parts) < 2:
-            raise ValueError("File name does not contain a valid time unit.")
+            raise OperationalException(
+                "File name does not contain a valid time unit."
+            )
 
         time_unit_str = parts[-1].split('.')[0].upper()
         try:
             return TimeUnit.from_string(time_unit_str)
         except ValueError:
-            raise ValueError(
+            raise OperationalException(
                 f"Could not extract time unit from file name: {file_path}. "
                 "Expected format 'symbol_timeunit.csv', "
                 f"got '{time_unit_str}'."
