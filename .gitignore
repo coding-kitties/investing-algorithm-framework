@@ -154,3 +154,4 @@ bumpversion.egg-info/
 .logs
 venv
 **/app_logs.log
+/resources/

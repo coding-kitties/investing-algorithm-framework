@@ -26,9 +26,9 @@ class TimeUnit(Enum):
                 if value.upper() == entry.value:
                     return entry
 
-                raise OperationalException(
-                    f"Could not convert string {value} to time unit"
-                )
+            raise OperationalException(
+                f"Could not convert string {value} to time unit"
+            )
 
         raise OperationalException(
             f"Could not convert value {value} to time unit," +

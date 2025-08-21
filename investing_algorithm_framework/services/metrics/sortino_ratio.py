@@ -30,7 +30,7 @@ from .standard_deviation import get_downside_std_of_daily_returns
 
 
 def get_sortino_ratio(
-    snapshots: List[PortfolioSnapshot], risk_free_rate: Optional[float] = None,
+    snapshots: List[PortfolioSnapshot], risk_free_rate: float
 ) -> float:
     """
     Calculate the Sortino Ratio for a given report.
@@ -46,9 +46,8 @@ def get_sortino_ratio(
     Args:
         snapshots (List[PortfolioSnapshot]): List of portfolio snapshots
             from the backtest report.
-        risk_free_rate (float, optional): Annual risk-free rate as a decimal
-            (e.g., 0.047 for 4.7%). If not provided, defaults to the US risk-free
-            rate.
+        risk_free_rate (float): Annual risk-free rate as a decimal
+            (e.g., 0.047 for 4.7%).
 
     Returns:
         float: The Sortino Ratio.
@@ -60,9 +59,6 @@ def get_sortino_ratio(
 
     mean_daily_return = get_mean_daily_return(snapshots)
     std_downside_daily_return = get_downside_std_of_daily_returns(snapshots)
-
-    if risk_free_rate is None:
-        risk_free_rate = get_risk_free_rate_us()
 
     if std_downside_daily_return == 0:
         return float('nan')  # or 0.0, depending on preference

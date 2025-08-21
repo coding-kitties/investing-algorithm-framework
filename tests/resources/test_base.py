@@ -211,7 +211,6 @@ class FlaskTestBase(FlaskTestCase):
             self.iaf_app.initialize_portfolios()
 
         if self.initial_orders is not None:
-            print(self.initial_orders)
             for order in self.initial_orders:
                 created_order = self.app.context.create_order(
                     target_symbol=order.get_target_symbol(),

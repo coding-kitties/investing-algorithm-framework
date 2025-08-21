@@ -323,7 +323,7 @@ class BacktestService(Observable):
             algorithm: The algorithm to create the backtest report for
             number_of_runs: The number of runs
             backtest_date_range: The backtest date range of the backtest
-            risk_free_rate: The risk-free rate to use in the calculations
+            risk_free_rate: The risk-free rate to use for the backtest metrics
             strategy_directory_path (optional, str): The path to the
                 strategy directory
 

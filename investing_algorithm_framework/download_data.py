@@ -1,5 +1,7 @@
+import os
+from pathlib import Path
 from dateutil import parser
-from datetime import timezone
+from datetime import timezone, datetime
 import pandas
 import polars
 from typing import Union
@@ -8,21 +10,21 @@ from investing_algorithm_framework.services import DataProviderService, \
 from investing_algorithm_framework.infrastructure import \
     get_default_data_providers
 from investing_algorithm_framework.domain import DataSource, \
-    OperationalException
+    OperationalException, DataType
 
 
 def download(
     symbol: str,
-    market=None,
-    date=None,
+    market: str = None,
+    date: Union[datetime, str] = None,
     time_frame: str = None,
-    data_type: str = "ohlcv",
-    start_date: str = None,
-    end_date: str = None,
+    data_type: Union[str, DataType] = DataType.OHLCV,
+    start_date: Union[datetime, str] = None,
+    end_date: Union[datetime, str] = None,
     window_size: int = 200,
     pandas: bool = True,
     save: bool = True,
-    storage_path: str = None,
+    storage_path: Union[str, Path] = None,
 ) -> Union[pandas.DataFrame, polars.DataFrame]:
     """
     Download market data from the specified source. This function

@@ -27,6 +27,7 @@ from .exposure import get_exposure, get_average_trade_duration, \
 from .win_rate import get_win_rate, get_win_loss_ratio
 from .calmar_ratio import get_calmar_ratio
 from .generate import create_backtest_metrics
+from .risk_free_rate import get_risk_free_rate_us
 
 __all__ = [
     "get_annual_volatility",
@@ -81,4 +82,5 @@ __all__ = [
     "create_backtest_metrics",
     "get_growth",
     "get_growth_percentage",
+    "get_risk_free_rate_us"
 ]

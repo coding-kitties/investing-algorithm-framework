@@ -47,7 +47,8 @@ class Test(TestCase):
         app.add_algorithm(algorithm)
         report = app.run_backtest(
             backtest_date_range=date_range,
-            initial_amount=1000
+            initial_amount=1000,
+            risk_free_rate=0.027
         )
         self.assertEqual(report.backtest_results.initial_unallocated, 1000)
         self.assertEqual(report.backtest_results.growth, 0)
@@ -78,6 +79,7 @@ class Test(TestCase):
         app.add_algorithm(algorithm)
         report = app.run_backtest(
             backtest_date_range=date_range,
+            risk_free_rate=0.027
         )
         self.assertEqual(report.backtest_results.initial_unallocated, 500)
         self.assertEqual(report.backtest_results.growth, 0)

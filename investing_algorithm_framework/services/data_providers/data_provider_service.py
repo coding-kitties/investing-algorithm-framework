@@ -44,18 +44,18 @@ class DataProviderIndex:
 
     def register(self, data_source: DataSource) -> DataProvider:
         """
-        Register an ohlcv data provider for a given market and symbol.
+        Register a data source in the DataProvider Index.
 
-        This method will also check if the data provider supports
-        the market. If no data provider is found for the market and symbol,
-        it will raise an ImproperlyConfigured exception.
 
-        If multiple data providers are found for the market and symbol,
+        This method will go over all data providers and select the
+        best matching data provider for the data source.
+
+        If multiple data providers are found for the data source,
         it will sort them by priority and pick the best one.
 
         Args:
             data_source (DataSource): The data source to register the
-                ohlcv data provider for.
+                data provider for.
 
         Returns:
             None

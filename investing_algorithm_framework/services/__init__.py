@@ -12,6 +12,7 @@ from .portfolios import PortfolioService, BacktestPortfolioService, \
 from .positions import PositionService, PositionSnapshotService
 from .repository_service import RepositoryService
 from .trade_service import TradeService
+from .metrics import get_risk_free_rate_us
 
 __all__ = [
     "OrderService",
@@ -34,4 +35,5 @@ __all__ = [
     "PortfolioProviderLookup",
     "TradeOrderEvaluator",
     "DefaultTradeOrderEvaluator",
+    "get_risk_free_rate_us"
 ]

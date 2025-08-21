@@ -26,7 +26,7 @@ from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db
 from investing_algorithm_framework.services import OrderBacktestService, \
     BacktestPortfolioService, BacktestTradeOrderEvaluator, \
-    DefaultTradeOrderEvaluator
+    DefaultTradeOrderEvaluator, get_risk_free_rate_us
 from .app_hook import AppHook
 from .eventloop import EventLoopService
 
@@ -825,6 +825,18 @@ class App:
         self.initialize_backtest_services()
         self.initialize_backtest_portfolios()
 
+        if risk_free_rate is None:
+            logger.info("No risk free rate provided, retrieving it...")
+            risk_free_rate = get_risk_free_rate_us()
+
+            if risk_free_rate is None:
+                raise OperationalException(
+                    "Could not retrieve risk free rate for backtest metrics."
+                    "Please provide a risk free as an argument when running "
+                    "your backtest or make sure you have an internet "
+                    "connection"
+                )
+
         algorithm = self.container.algorithm_factory().create_algorithm(
             name=name if name else self._name,
             strategies=(
@@ -938,6 +950,19 @@ class App:
         self.initialize_data_sources_backtest(
             strategy.data_sources, backtest_date_range
         )
+
+        if risk_free_rate is None:
+            logger.info("No risk free rate provided, retrieving it...")
+            risk_free_rate = get_risk_free_rate_us()
+
+            if risk_free_rate is None:
+                raise OperationalException(
+                    "Could not retrieve risk free rate for backtest metrics."
+                    "Please provide a risk free as an argument when running "
+                    "your backtest or make sure you have an internet "
+                    "connection"
+                )
+
         backtest_service = self.container.backtest_service()
         backtest_service.validate_strategy_for_vector_backtest(strategy)
         backtest = backtest_service.create_vector_backtest(
@@ -977,7 +1002,8 @@ class App:
                 for the backtest. This is used to determine how often the
                 portfolio snapshot should be taken during the backtest.
             risk_free_rate (Optional[float]): The risk-free rate to use for
-                calculating performance metrics. If not provided, the default
+                the backtest. This is used to calculate the Sharpe ratio
+                and other performance metrics. If not provided, the default
                 risk-free rate will be tried to be fetched from the
                 US Treasury website.
             save (bool): Whether to save the backtest reports to disk.
@@ -994,7 +1020,6 @@ class App:
         """
         backtests = []
         backtest_service = self.container.backtest_service()
-        final_algorithms = []
 
         if algorithms is not None:
             final_algorithms = algorithms
@@ -1010,6 +1035,18 @@ class App:
             raise OperationalException(
                 "No algorithms or strategy provided for backtesting"
             )
+
+        if risk_free_rate is None:
+            logger.info("No risk free rate provided, retrieving it...")
+            risk_free_rate = get_risk_free_rate_us()
+
+            if risk_free_rate is None:
+                raise OperationalException(
+                    "Could not retrieve risk free rate for backtest metrics."
+                    "Please provide a risk free as an argument when running "
+                    "your backtest or make sure you have an internet "
+                    "connection"
+                )
 
         for date_range in backtest_date_ranges:
             for algorithm in final_algorithms:

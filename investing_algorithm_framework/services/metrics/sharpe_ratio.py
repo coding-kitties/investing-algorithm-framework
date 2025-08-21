@@ -53,12 +53,11 @@ from datetime import datetime
 
 from investing_algorithm_framework.domain import PortfolioSnapshot
 from .mean_daily_return import get_mean_daily_return
-from .risk_free_rate import get_risk_free_rate_us
 from .standard_deviation import get_daily_returns_std
 
 
 def get_sharpe_ratio(
-    snapshots: List[PortfolioSnapshot], risk_free_rate: Optional[float] = None,
+    snapshots: List[PortfolioSnapshot], risk_free_rate: float,
 ) -> float:
     """
     Calculate the Sharpe Ratio from a backtest report using daily or
@@ -79,9 +78,6 @@ def get_sharpe_ratio(
     mean_daily_return = get_mean_daily_return(snapshots)
     std_daily_return = get_daily_returns_std(snapshots)
 
-    if risk_free_rate is None:
-        risk_free_rate = get_risk_free_rate_us()
-
     if std_daily_return == 0:
         return float('nan')  # Avoid division by zero
 
@@ -92,21 +88,18 @@ def get_sharpe_ratio(
 
 
 def get_rolling_sharpe_ratio(
-    snapshots: List[PortfolioSnapshot], risk_free_rate: Optional[float] = None
+    snapshots: List[PortfolioSnapshot], risk_free_rate: float
 ) -> List[Tuple[float, datetime]]:
     """
     Calculate the rolling Sharpe Ratio over a 365-day window.
 
     Args:
         snapshots (List[PortfolioSnapshot]): Time-sorted list of snapshots.
-        risk_free_rate (float, optional): Annualized risk-free rate (e.g., 0.03 for 3%).
+        risk_free_rate (float): Annualized risk-free rate (e.g., 0.03 for 3%).
 
     Returns:
         List[Tuple[float, datetime]]: List of (sharpe_ratio, snapshot_date).
     """
-    if risk_free_rate is None:
-        risk_free_rate = get_risk_free_rate_us()
-
     data = [(s.created_at, s.total_value) for s in snapshots]
     df = pd.DataFrame(data, columns=["created_at", "total_value"])
     df['created_at'] = pd.to_datetime(df['created_at'])

@@ -142,7 +142,7 @@ class CCXTOHLCVDataProvider(DataProvider):
                 symbol=symbol,
                 market=market,
                 time_frame=data_source.time_frame,
-                storage_path=self.storage_path,
+                storage_path=data_source.storage_path,
                 start_date=start_date,
                 end_date=end_date
             )

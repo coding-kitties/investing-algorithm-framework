@@ -57,7 +57,9 @@ def create_backtest_metrics(
             backtest_results.portfolio_snapshots,
             risk_free_rate=risk_free_rate
         ),
-        sortino_ratio=get_sortino_ratio(backtest_results.portfolio_snapshots),
+        sortino_ratio=get_sortino_ratio(
+            backtest_results.portfolio_snapshots, risk_free_rate=risk_free_rate
+        ),
         profit_factor=get_profit_factor(backtest_results.trades),
         calmar_ratio=get_calmar_ratio(backtest_results.portfolio_snapshots),
         annual_volatility=get_annual_volatility(

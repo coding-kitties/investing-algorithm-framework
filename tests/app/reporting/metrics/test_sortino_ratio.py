@@ -27,7 +27,10 @@ class TestGetSortinoRatio(unittest.TestCase):
     def test_no_snapshots(self):
         report = MagicMock()
         report.get_snapshots.return_value = []
-        self.assertEqual(get_sortino_ratio(report.get_snapshots()), float("inf"))
+        self.assertEqual(
+            get_sortino_ratio(report.get_snapshots(), risk_free_rate=0.027),
+            float("inf")
+        )
 
     # def test_single_snapshot(self):
     #     report = MagicMock()
