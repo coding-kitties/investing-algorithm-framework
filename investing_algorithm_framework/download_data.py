@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from dateutil import parser
 from datetime import timezone, datetime
