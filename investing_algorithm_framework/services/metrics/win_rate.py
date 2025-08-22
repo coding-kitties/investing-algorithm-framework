@@ -42,7 +42,7 @@ def get_win_rate(trades: List[Trade]) -> float:
     The percentage of trades that are profitable.
 
     Formula:
-        Win Rate = (Number of Profitable Trades / Total Number of Trades) * 100
+        Win Rate = Number of Profitable Trades / Total Number of Trades
 
     Example: If 60 out of 100 trades are profitable, the win rate is 60%.
 
@@ -50,7 +50,7 @@ def get_win_rate(trades: List[Trade]) -> float:
         trades (List[Trade]): List of trades from the backtest report.
 
     Returns:
-        float: The win rate as a percentage (e.g., 75.0 for 75% win rate).
+        float: The win rate as a percentage (e.g., o.75 for 75% win rate).
     """
     trades = [
         trade for trade in trades if TradeStatus.CLOSED.equals(trade.status)
@@ -61,7 +61,7 @@ def get_win_rate(trades: List[Trade]) -> float:
     if total_trades == 0:
         return 0.0
 
-    return (positive_trades / total_trades) * 100.0
+    return positive_trades / total_trades
 
 
 def get_win_loss_ratio(trades: List[Trade]) -> float:
