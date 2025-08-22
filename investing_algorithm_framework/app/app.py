@@ -901,9 +901,7 @@ class App:
         # Add the metadata to the backtest
         if metadata is None:
 
-            if strategy.metadata is not None:
-                backtest.metadata = strategy.metadata
-            elif algorithm.metadata is not None:
+            if algorithm.metadata is not None:
                 backtest.metadata = algorithm.metadata
             else:
                 backtest.metadata = {}
