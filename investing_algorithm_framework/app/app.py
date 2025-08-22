@@ -381,6 +381,10 @@ class App:
             None
         """
         logger.info("Initializing data sources")
+
+        if data_sources is None or len(data_sources) == 0:
+            return
+
         data_provider_service = self.container.data_provider_service()
         data_provider_service.reset()
 
@@ -415,6 +419,10 @@ class App:
             None
         """
         logger.info("Initializing data sources for backtest")
+
+        if data_sources is None or len(data_sources) == 0:
+            return
+
         data_provider_service = self.container.data_provider_service()
         data_provider_service.reset()
 
@@ -900,18 +908,90 @@ class App:
 
         return backtest
 
+    def run_vector_backtests(
+        self,
+        backtest_date_range: BacktestDateRange,
+        initial_amount,
+        strategies: List[TradingStrategy],
+        snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
+        risk_free_rate: Optional[float] = None,
+        skip_data_sources_initialization: bool = False
+    ):
+        """
+        Run vectorized backtests for a set of strategies. The provided
+        set of strategies need to have their 'buy_signal_vectorized' and
+        'sell_signal_vectorized' methods implemented to support vectorized
+        backtesting.
+
+        Args:
+            backtest_date_range: The date range to run the backtest for
+                (instance of BacktestDateRange)
+            initial_amount: The initial amount to start the backtest with.
+                This will be the amount of trading currency that the backtest
+                portfolio will start with.
+            strategies (List[TradingStrategy]): List of strategy objects
+                that need to be backtested. Each strategy should implement
+                the 'buy_signal_vectorized' and 'sell_signal_vectorized'
+                methods to support vectorized backtesting.
+            snapshot_interval (SnapshotInterval): The snapshot
+                interval to use for the backtest. This is used to determine
+                how often the portfolio snapshot should be taken during the
+                backtest. The default is TRADE_CLOSE, which means that the
+                portfolio snapshot will be taken at the end of each trade.
+            risk_free_rate (Optional[float]): The risk-free rate to use for
+                the backtest. This is used to calculate the Sharpe ratio
+                and other performance metrics. If not provided, the default
+                risk-free rate will be tried to be fetched from the
+                US Treasury website.
+            skip_data_sources_initialization (bool): Whether to skip the
+                initialization of data sources. This is useful when the data
+                sources are already initialized, and you want to skip the
+                initialization step. This will speed up the backtesting
+                process, but make sure that the data sources are already
+                initialized before calling this method.
+
+        Returns:
+            List[Backtest]: List of Backtest instances for each strategy
+                that was backtested.
+        """
+        backtests = []
+        data_sources = []
+
+        for strategy in strategies:
+            data_sources.extend(strategy.data_sources)
+
+        if not skip_data_sources_initialization:
+            self.initialize_data_sources_backtest(
+                data_sources, backtest_date_range
+            )
+
+        for strategy in tqdm(strategies):
+            backtests.append(
+                self.run_vector_backtest(
+                    backtest_date_range=backtest_date_range,
+                    initial_amount=initial_amount,
+                    strategy=strategy,
+                    snapshot_interval=snapshot_interval,
+                    risk_free_rate=risk_free_rate,
+                    skip_data_sources_initialization=True
+                )
+            )
+
+        return backtests
+
     def run_vector_backtest(
         self,
         backtest_date_range: BacktestDateRange,
         initial_amount,
-        strategy,
+        strategy: TradingStrategy,
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         metadata: Optional[Dict[str, str]] = None,
         risk_free_rate: Optional[float] = None,
+        skip_data_sources_initialization: bool = False
     ) -> Backtest:
         """
-        Run a vectorized backtest for an algorithm. The provided algorithm
-        or set of strategies need to have their 'buy_signal_vectorized' and
+        Run vectorized backtests for a strategy. The provided
+        strategy needs to have its 'buy_signal_vectorized' and
         'sell_signal_vectorized' methods implemented to support vectorized
         backtesting.
 
@@ -937,6 +1017,12 @@ class App:
                 backtest report. This can be used to store additional
                 information about the backtest, such as the author, version,
                 parameters or any other relevant information.
+            skip_data_sources_initialization (bool): Whether to skip the
+                initialization of data sources. This is useful when the data
+                sources are already initialized, and you want to skip the
+                initialization step. This will speed up the backtesting
+                process, but make sure that the data sources are already
+                initialized before calling this method.
 
         Returns:
             Backtest: Instance of Backtest
@@ -947,9 +1033,11 @@ class App:
             snapshot_interval=snapshot_interval,
             initial_amount=initial_amount
         )
-        self.initialize_data_sources_backtest(
-            strategy.data_sources, backtest_date_range
-        )
+
+        if not skip_data_sources_initialization:
+            self.initialize_data_sources_backtest(
+                strategy.data_sources, backtest_date_range
+            )
 
         if risk_free_rate is None:
             logger.info("No risk free rate provided, retrieving it...")
@@ -971,7 +1059,17 @@ class App:
             initial_amount=initial_amount,
             risk_free_rate=risk_free_rate
         )
-        backtest.metadata = metadata if metadata is not None else {}
+
+        # Add the metadata to the backtest
+        if metadata is None:
+
+            if strategy.metadata is not None:
+                backtest.metadata = {}
+            else:
+                backtest.metadata = strategy.metadata
+        else:
+            backtest.metadata = metadata
+
         return backtest
 
     def run_backtests(

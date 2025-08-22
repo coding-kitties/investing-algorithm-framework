@@ -27,8 +27,12 @@ class TradingStrategy:
             sources to use for the strategy. The data sources will be used
             to indentify data providers that will be called to gather data
             and pass to the strategy before its run.
+        metadata (optional): Dict[str, Any] - a dictionary
+            containing metadata about the strategy. This can be used to
+            store additional information about the strategy, such as its
+            author, version, description, params etc.
     """
-    time_unit: str = None
+    time_unit: TimeUnit = None
     interval: int = None
     worker_id: str = None
     strategy_id: str = None
@@ -36,6 +40,7 @@ class TradingStrategy:
     data_sources: List[DataSource] = None
     traces = None
     context: Context = None
+    metadata: Dict[str, Any] = None
 
     def __init__(
         self,
@@ -43,6 +48,7 @@ class TradingStrategy:
         time_unit=None,
         interval=None,
         data_sources=None,
+        metadata=None,
         worker_id=None,
         decorated=None
     ):
@@ -64,6 +70,8 @@ class TradingStrategy:
 
         if data_sources is not None:
             self.data_sources = data_sources
+
+        self.metadata = metadata if metadata is not None else {}
 
         if decorated is not None:
             self.decorated = decorated

@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 from unittest import TestCase
 from datetime import datetime, timezone
