@@ -71,7 +71,7 @@ class TradingStrategy:
         if data_sources is not None:
             self.data_sources = data_sources
 
-        self.metadata = metadata if metadata is not None else {}
+        self.metadata = metadata
 
         if decorated is not None:
             self.decorated = decorated

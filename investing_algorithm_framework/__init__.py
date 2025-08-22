@@ -5,7 +5,7 @@ from .app import App, Algorithm, \
     pretty_print_orders, pretty_print_backtest, select_backtest_date_ranges, \
     get_equity_curve_with_drawdown_chart, \
     get_rolling_sharpe_ratio_chart, rank_results, \
-    get_monthly_returns_heatmap_chart, defaults_ranking_weights, \
+    get_monthly_returns_heatmap_chart, create_weights, \
     get_yearly_returns_bar_chart, get_entry_and_exit_signals, \
     get_ohlcv_data_completeness_chart
 from .domain import ApiException, \
@@ -159,7 +159,7 @@ __all__ = [
     "get_yearly_returns_bar_chart",
     "get_ohlcv_data_completeness_chart",
     "rank_results",
-    "defaults_ranking_weights",
+    "create_weights",
     "get_entry_and_exit_signals",
     "get_growth",
     "get_growth_percentage"

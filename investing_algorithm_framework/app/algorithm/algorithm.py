@@ -33,7 +33,8 @@ class Algorithm:
         strategies=None,
         tasks: List = None,
         data_sources: List[DataSource] = None,
-        on_strategy_run_hooks=None
+        on_strategy_run_hooks=None,
+        metadata=None
     ):
         self._name = name
         self._context = {}
@@ -46,6 +47,7 @@ class Algorithm:
         self._tasks = []
         self._data_sources = []
         self._on_strategy_run_hooks = []
+        self.metadata = metadata
 
         if data_sources is not None:
             self._data_sources = data_sources

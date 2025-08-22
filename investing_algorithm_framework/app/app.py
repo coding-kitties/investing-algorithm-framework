@@ -898,7 +898,18 @@ class App:
             risk_free_rate=risk_free_rate,
         )
 
-        backtest.metadata = metadata if metadata is not None else {}
+        # Add the metadata to the backtest
+        if metadata is None:
+
+            if strategy.metadata is not None:
+                backtest.metadata = strategy.metadata
+            elif algorithm.metadata is not None:
+                backtest.metadata = algorithm.metadata
+            else:
+                backtest.metadata = {}
+        else:
+            backtest.metadata = metadata
+
         self.cleanup_backtest_resources()
 
         if save and directory:
@@ -964,6 +975,18 @@ class App:
             self.initialize_data_sources_backtest(
                 data_sources, backtest_date_range
             )
+
+        if risk_free_rate is None:
+            logger.info("No risk free rate provided, retrieving it...")
+            risk_free_rate = get_risk_free_rate_us()
+
+            if risk_free_rate is None:
+                raise OperationalException(
+                    "Could not retrieve risk free rate for backtest metrics."
+                    "Please provide a risk free as an argument when running "
+                    "your backtest or make sure you have an internet "
+                    "connection"
+                )
 
         for strategy in tqdm(strategies):
             backtests.append(
@@ -1063,7 +1086,7 @@ class App:
         # Add the metadata to the backtest
         if metadata is None:
 
-            if strategy.metadata is not None:
+            if strategy.metadata is None:
                 backtest.metadata = {}
             else:
                 backtest.metadata = strategy.metadata

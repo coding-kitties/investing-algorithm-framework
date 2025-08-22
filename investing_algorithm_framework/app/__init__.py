@@ -14,7 +14,7 @@ from .reporting import add_html_report, \
     get_yearly_returns_bar_chart, \
     get_ohlcv_data_completeness_chart, get_entry_and_exit_signals
 from .analysis import select_backtest_date_ranges, rank_results, \
-    defaults_ranking_weights
+    create_weights
 
 
 __all__ = [
@@ -39,6 +39,6 @@ __all__ = [
     "get_yearly_returns_bar_chart",
     "get_ohlcv_data_completeness_chart",
     "rank_results",
-    "defaults_ranking_weights",
+    "create_weights",
     "get_entry_and_exit_signals"
 ]
