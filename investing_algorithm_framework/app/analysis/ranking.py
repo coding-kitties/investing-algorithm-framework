@@ -1,43 +1,16 @@
-default_weights = {
-    # Profitability
-    "total_net_gain": 3.0,
-    "total_net_loss": 0.0,
-    "total_return": 0.0,
-    "avg_return_per_trade": 0.0,
+import math
 
-    # Risk-adjusted returns
-    "sharpe_ratio": 1.0,
-    "sortino_ratio": 1.0,
-    "profit_factor": 1.0,
-
-    # Risk
-    "max_drawdown": -2.0,
-    "max_drawdown_duration": -0.5,
-
-    # Trading activity
-    "number_of_trades": 2.0,
-    "win_rate": 3.0,
-
-    # Exposure
-    "exposure_factor": 0.5,
-    "exposure_ratio": 0.0,
-    "exposure_time": 0.0,
-}
+from investing_algorithm_framework.domain import BacktestEvaluationFocus
+BacktestEvaluationFocus
 
 
 def normalize(value, min_val, max_val):
     """
     Normalize a value to a range [0, 1].
-
-    Args:
-        value (float): The value to normalize.
-        min_val (float): The minimum value of the range.
-        max_val (float): The maximum value of the range.
-
-    Returns:
-        float: The normalized value.
     """
-    if max_val == min_val:
+    if value is None or math.isnan(value) or math.isinf(value):
+        return 0
+    if min_val == max_val:
         return 0
     return (value - min_val) / (max_val - min_val)
 
@@ -56,11 +29,14 @@ def compute_score(metrics, weights, ranges):
     """
     score = 0
     for key, weight in weights.items():
-
         if not hasattr(metrics, key):
             continue
         value = getattr(metrics, key)
-
+        if value is None or (
+            isinstance(value, float) and
+            (math.isnan(value) or math.isinf(value))
+        ):
+            continue
         if key in ranges:
             value = normalize(value, ranges[key][0], ranges[key][1])
         score += weight * value
@@ -68,10 +44,7 @@ def compute_score(metrics, weights, ranges):
 
 
 def create_weights(
-    focus: str = "balanced",
-    gain: float = 3.0,
-    win_rate: float = 3.0,
-    trades: float = 2.0,
+    focus: BacktestEvaluationFocus | str | None = None,
     custom_weights: dict | None = None,
 ) -> dict:
     """
@@ -87,9 +60,7 @@ def create_weights(
     override defaults.
 
     Args:
-        focus (str): One of [
-            "balanced", "profit", "frequency", "risk_adjusted"
-        ].
+        focus (BacktestEvaluationFocus | str | None): The focus for ranking.
         gain (float): Weight for total_net_gain (default only).
         win_rate (float): Weight for win_rate (default only).
         trades (float): Weight for number_of_trades (default only).
@@ -99,55 +70,22 @@ def create_weights(
     Returns:
         dict: A dictionary of weights for ranking backtests.
     """
+    if focus is None:
+        focus = BacktestEvaluationFocus.BALANCED
 
-    # default / balanced
-    base = {
-        "total_net_gain": gain,
-        "win_rate": win_rate,
-        "number_of_trades": trades,
-        "sharpe_ratio": 1.0,
-        "sortino_ratio": 1.0,
-        "profit_factor": 1.0,
-        "max_drawdown": -2.0,
-        "max_drawdown_duration": -0.5,
-        "total_net_loss": 0.0,
-        "total_return": 0.0,
-        "avg_return_per_trade": 0.0,
-        "exposure_factor": 0.5,
-        "exposure_ratio": 0.0,
-        "exposure_time": 0.0,
-    }
-
-    # apply presets
-    if focus == "profit":
-        base.update({
-            "total_net_gain": 5.0,
-            "win_rate": 2.0,
-            "number_of_trades": 1.0,
-        })
-    elif focus == "frequency":
-        base.update({
-            "number_of_trades": 4.0,
-            "win_rate": 2.0,
-            "total_net_gain": 2.0,
-        })
-    elif focus == "risk_adjusted":
-        base.update({
-            "sharpe_ratio": 3.0,
-            "sortino_ratio": 3.0,
-            "max_drawdown": -3.0,
-        })
+    weights = focus.get_weights()
 
     # if full custom dict is given → override everything
     if custom_weights is not None:
-        base = {**base, **custom_weights}
+        weights = {**weights, **custom_weights}
 
-    return base
+    return weights
 
 
-def rank_results(backtests, focus=None, weights=None):
+def rank_results(backtests, focus=None, weights=None, filter_fn=None):
     """
-    Rank backtest results based on specified focus and weights.
+    Rank backtest results based on specified focus, weights, and filters.
+
     Args:
         backtests (list): List of backtest results to rank.
         focus (str, optional): Focus for ranking. If None,
@@ -155,6 +93,11 @@ def rank_results(backtests, focus=None, weights=None):
             "frequency", "risk_adjusted".
         weights (dict, optional): Custom weights for ranking metrics.
             If None, uses default weights based on focus.
+        filter_fn (callable | dict, optional): A filter to apply to
+            backtests before ranking.
+            - If callable: receives metrics and should return True/False.
+            - If dict: mapping {metric_name: condition_fn},
+              all conditions must pass.
 
     Returns:
         list: Sorted list of backtests based on computed scores.
@@ -163,11 +106,32 @@ def rank_results(backtests, focus=None, weights=None):
     if weights is None:
         weights = create_weights(focus=focus)
 
+    # Apply filtering
+    if filter_fn is not None:
+        if callable(filter_fn):
+            backtests = [
+                bt for bt in backtests
+                if filter_fn(bt.backtest_metrics)
+            ]
+        elif isinstance(filter_fn, dict):
+            backtests = [
+                bt for bt in backtests
+                if all(
+                    cond(getattr(bt.backtest_metrics, key, None))
+                    for key, cond in filter_fn.items()
+                )
+            ]
+
     # First compute metric ranges for normalization
     ranges = {}
     for key in weights:
         values = [getattr(bt.backtest_metrics, key, None) for bt in backtests]
-        values = [v for v in values if isinstance(v, (int, float))]
+        values = [
+            v for v in values
+            if isinstance(v, (int, float)) and v is not None
+            and not math.isnan(v) and not math.isinf(v)
+        ]
+
         if values:
             ranges[key] = (min(values), max(values))
 

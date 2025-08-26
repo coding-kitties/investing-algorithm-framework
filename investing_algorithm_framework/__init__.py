@@ -18,7 +18,7 @@ from .domain import ApiException, \
     DEFAULT_LOGGING_CONFIG, DataType, DataProvider, \
     BacktestResult, TradeStatus, TradeRiskType, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
-    SnapshotInterval, AWS_S3_STATE_BUCKET_NAME
+    SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CCXTOHLCVDataProvider, PandasOHLCVDataProvider, \
     AWSS3StorageStateHandler
@@ -162,5 +162,6 @@ __all__ = [
     "create_weights",
     "get_entry_and_exit_signals",
     "get_growth",
-    "get_growth_percentage"
+    "get_growth_percentage",
+    "BacktestEvaluationFocus"
 ]

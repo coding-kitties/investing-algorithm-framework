@@ -10,6 +10,7 @@ from investing_algorithm_framework.domain.exceptions \
 
 from .backtest_metrics import BacktestMetrics
 from .backtest_results import BacktestResult
+from .backtest_permutation_test_metrics import BacktestPermutationTestMetrics
 
 
 logger = getLogger(__name__)
@@ -37,6 +38,8 @@ class Backtest:
     """
     backtest_metrics: BacktestMetrics = field(default=None)
     backtest_results: BacktestResult = field(default=None)
+    backtest_permutation_test_metrics: BacktestPermutationTestMetrics = \
+        field(default=None)
     strategy_related_paths: list[str] = field(default_factory=list)
     data_file_paths: list[str] = field(default_factory=list)
     metadata: Dict[str, str] = field(default_factory=dict)
@@ -95,6 +98,12 @@ class Backtest:
         if os.path.isfile(metrics_file):
             backtest_metrics = BacktestMetrics.open(metrics_file)
 
+        # Load backtest permutation test metrics
+        perm_test_file = os.path.join(directory_path, "permutation_tests")
+        if os.path.isfile(perm_test_file):
+            permutation_metrics = \
+                BacktestPermutationTestMetrics.open(perm_test_file)
+
         # Load backtest results
         results_file = os.path.join(directory_path, "results.json")
 
@@ -144,6 +153,7 @@ class Backtest:
             backtest_results=backtest_results,
             strategy_related_paths=strategy_related_paths,
             data_file_paths=data_file_paths,
+            backtest_permutation_test_metrics=permutation_metrics,
             metadata=metadata,
             risk_free_rate=risk_free_rate
         )
@@ -176,6 +186,13 @@ class Backtest:
         # Call the save method of BacktestResult
         if self.backtest_results:
             self.backtest_results.save(directory_path)
+
+        if self.backtest_permutation_test_metrics:
+            permutation_path = os.path.join(
+                directory_path, "permutation_tests"
+            )
+            os.makedirs(permutation_path, exist_ok=True)
+            self.backtest_permutation_test_metrics.save(permutation_path)
 
         # Save the strategy
         if self.strategy_related_paths is not None:

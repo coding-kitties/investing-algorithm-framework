@@ -3,10 +3,11 @@ import os
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
+import polars as pl
 
 from investing_algorithm_framework.domain import BacktestResult, \
     TimeUnit, Trade, OperationalException, Observable, BacktestDateRange, \
@@ -80,6 +81,43 @@ class BacktestService(Observable):
                 "(sell_signal_vectorized)."
             )
 
+    def _get_data_frame_index(self, data: Union[pl.DataFrame, pd.DataFrame]):
+        """
+        Function to return the index for a given df. If the provided
+        data is of type pandas Dataframe, first will be checked if
+        it has a index. If this is not the case the function will
+        check if there is a 'DateTime' column and add this
+        as the index.
+
+        For a polars DataFrame, the 'DateTime' column will be
+        used as the index if it exists.
+
+        If no index is found an exception will be raised.
+
+        Args:
+            data: The data frame to process.
+
+        Raises:
+            OperationalException: If no valid index is found.
+
+        Returns:
+            The index of the data frame.
+        """
+        if isinstance(data, pl.DataFrame):
+            if "Datetime" in data.columns:
+                return data["Datetime"]
+            else:
+                raise OperationalException("No valid index found.")
+        elif isinstance(data, pd.DataFrame):
+            if data.index is not None:
+                return data.index
+            elif "Datetime" in data.columns:
+                return data["Datetime"]
+            else:
+                raise OperationalException("No valid index found.")
+        else:
+            raise ValueError("Unsupported data frame type.")
+
     def create_vector_backtest(
         self,
         strategy,
@@ -112,6 +150,7 @@ class BacktestService(Observable):
         # Verify signal functions
         buy_fn = getattr(strategy, 'buy_signal_vectorized', None)
         sell_fn = getattr(strategy, 'sell_signal_vectorized', None)
+
         if not buy_fn or not sell_fn:
             raise OperationalException(
                 "Strategy must define vectorized buy/sell signal functions."
@@ -120,16 +159,18 @@ class BacktestService(Observable):
         # Select main OHLCV source (most granular)
         ohlcv_sources = [ds for ds in data_sources if
                          DataType.OHLCV.equals(ds.data_type)]
+
         if not ohlcv_sources:
             raise OperationalException("No OHLCV data sources found.")
 
         most_granular_ds = min(ohlcv_sources, key=lambda ds: ds.time_frame)
         main_df = data[most_granular_ds.get_identifier()]
-
         close = main_df['Close']
-        index = main_df.index
 
-        # === Signal computation ===
+        index = self._get_data_frame_index(main_df)
+        # index = main_df.index
+
+        # Signal computation
         buy_signal = buy_fn(data)
         sell_signal = sell_fn(data)
 
@@ -142,7 +183,7 @@ class BacktestService(Observable):
         signal[sell_signal] = -1
         signal = signal.replace(0, np.nan).ffill().shift(1).fillna(0)
 
-        # === Portfolio computation ===
+        # Portfolio computation
         returns = close.pct_change().fillna(0)
         position = signal
         strategy_returns = position * returns
@@ -151,7 +192,7 @@ class BacktestService(Observable):
         total_value = holdings
         net_gain = total_value - initial_amount
 
-        # === Trade generation (semi-vectorized) ===
+        # Trade generation (semi-vectorized)
         trades = []
         position_state = 0
         trade_open_price = None
@@ -189,7 +230,7 @@ class BacktestService(Observable):
                 trade_open_date = None
                 position_state = 0
 
-        # === Snapshots ===
+        # Snapshots
         snapshots = [
             PortfolioSnapshot(
                 created_at=pd.Timestamp(ts),

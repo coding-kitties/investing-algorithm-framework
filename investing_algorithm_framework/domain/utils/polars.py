@@ -15,7 +15,6 @@ def convert_polars_to_pandas(
     for this is that You can filter with clean, readable code in a faster way
     then with filtering on a column that is not the index.
 
-
     Args:
         data:Polars Dataframe - The original polars dataframe
         remove_duplicates: Boolean - If set to true, all duplicate

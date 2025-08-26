@@ -5,11 +5,9 @@ from collections import defaultdict
 from datetime import datetime
 from typing import List, Tuple, Optional, Dict, Any
 
-from tqdm import tqdm
-
 from investing_algorithm_framework.domain import DataProvider, \
     OperationalException, ImproperlyConfigured, DataSource, DataType, \
-    BacktestDateRange
+    BacktestDateRange, tqdm
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -619,7 +617,8 @@ class DataProviderService:
     def index_backtest_data_providers(
         self,
         data_sources: List[DataSource],
-        backtest_date_range: BacktestDateRange
+        backtest_date_range: BacktestDateRange,
+        show_progress: bool = True
     ):
         """
         Index the data providers in the service.
@@ -630,19 +629,39 @@ class DataProviderService:
             data_sources (List[DataSource]): The data sources to index.
             backtest_date_range (BacktestDateRange): The date range for the
                 backtest data providers.
+            show_progress (bool): Whether to show progress while indexing
+                the data providers.
 
         Returns:
             None
         """
 
-        for data_source in data_sources:
-            self.data_provider_index.register_backtest_data_source(
-                data_source, backtest_date_range
-            )
-            logger.debug(
-                "Registered backtest "
-                f"data provider for data source: {data_source}"
-            )
+        # Filter out duplicate data_sources
+        unique_data_sources = set(data_sources)
+
+        if show_progress:
+
+            for data_source in tqdm(
+                unique_data_sources,
+                desc="Registering backtest data providers for data sources",
+                colour="green"
+            ):
+                self.data_provider_index.register_backtest_data_source(
+                    data_source, backtest_date_range
+                )
+                logger.debug(
+                    "Registered backtest "
+                    f"data provider for data source: {data_source}"
+                )
+        else:
+            for data_source in unique_data_sources:
+                self.data_provider_index.register_backtest_data_source(
+                    data_source, backtest_date_range
+                )
+                logger.debug(
+                    "Registered backtest "
+                    f"data provider for data source: {data_source}"
+                )
 
         self.backtest_mode = True
 
@@ -678,20 +697,34 @@ class DataProviderService:
             "Preparing backtest data for all registered data providers"
         )
 
-        for data_source, data_provider in tqdm(
-            self.data_provider_index.get_all(),
-            desc="Preparing backtest data",
-            disable=not show_progress,
-        ):
-            try:
-                data_provider.prepare_backtest_data(
-                    backtest_start_date=backtest_date_range.start_date,
-                    backtest_end_date=backtest_date_range.end_date
-                )
-            except Exception as e:
-                logger.error(
-                    f"Error preparing backtest data for {data_source}: {e}"
-                )
+        if show_progress:
+            for data_source, data_provider in tqdm(
+                self.data_provider_index.get_all(),
+                desc="Preparing backtest data",
+                colour="green"
+            ):
+                try:
+                    data_provider.prepare_backtest_data(
+                        backtest_start_date=backtest_date_range.start_date,
+                        backtest_end_date=backtest_date_range.end_date
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error preparing backtest data for {data_source}: {e}"
+                    )
+        else:
+            for data_source, data_provider \
+                    in self.data_provider_index.get_all():
+
+                try:
+                    data_provider.prepare_backtest_data(
+                        backtest_start_date=backtest_date_range.start_date,
+                        backtest_end_date=backtest_date_range.end_date
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error preparing backtest data for {data_source}: {e}"
+                    )
 
     def get_data_files(self):
         """

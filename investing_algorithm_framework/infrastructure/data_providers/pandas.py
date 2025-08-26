@@ -58,7 +58,7 @@ class PandasOHLCVDataProvider(DataProvider):
             market=market,
             time_frame=time_frame,
             window_size=window_size,
-            data_provider_identifier=data_provider_identifier
+            data_provider_identifier=data_provider_identifier,
         )
         self._start_date_data_source = None
         self._end_date_data_source = None
@@ -204,14 +204,12 @@ class PandasOHLCVDataProvider(DataProvider):
     def prepare_backtest_data(
         self,
         backtest_start_date,
-        backtest_end_date
+        backtest_end_date,
     ) -> None:
         """
         Prepares backtest data for a given symbol and date range.
 
         Args:
-            data_source (DataSource): The data source specification that
-                matches a data provider.
             backtest_start_date (datetime): The start date for the
                 backtest data.
             backtest_end_date (datetime): The end date for the
@@ -225,41 +223,69 @@ class PandasOHLCVDataProvider(DataProvider):
         Returns:
             None
         """
-
-        if backtest_start_date < self._start_date_data_source:
-            raise OperationalException(
-                f"Backtest start date {backtest_start_date} is before the "
-                f"start date {self._start_date_data_source}"
-            )
-
-        if backtest_end_date > self._end_date_data_source:
-            raise OperationalException(
-                f"Backtest end date {backtest_end_date} is after the "
-                f"end date {self._end_date_data_source}"
-            )
-
         # There must be at least backtest_start_date - window_size * time_frame
         # data available to create a sliding window.
-        required_start_date = backtest_start_date - \
-            timedelta(
-                minutes=TimeFrame.from_value(self.time_frame)
-                .amount_of_minutes * self.window_size
-            )
+        if self.window_size is not None:
+            required_start_date = backtest_start_date - \
+                timedelta(
+                    minutes=TimeFrame.from_value(
+                        self.time_frame
+                    ).amount_of_minutes * self.window_size
+                )
+        else:
+            required_start_date = backtest_start_date
 
+        required_end_date = backtest_end_date
+
+        self._start_date_data_source = self.data["Datetime"].min()
+        self._end_date_data_source = self.data["Datetime"].max()
+
+        # Check if the start date is before the available data
         if required_start_date < self._start_date_data_source:
             raise OperationalException(
-                f"Not enough data available for backtest. "
-                f"Data earlier then {required_start_date} is required, "
-                "but only "
-                f"{self._start_date_data_source} is available."
+                f"Request data date {required_start_date} "
+                f"is before the range of "
+                f"the available data "
+                f"{self._start_date_data_source} "
+                f"- {self._end_date_data_source}."
             )
 
-        # Create cache with sliding windows
-        self._precompute_sliding_windows(
-            window_size=self.window_size,
-            start_date=backtest_start_date,
-            end_date=backtest_end_date
-        )
+        if required_start_date > self._end_date_data_source:
+            raise OperationalException(
+                f"Request data date {required_start_date} "
+                f"is after the range of "
+                f"the available data "
+                f"{self._start_date_data_source} "
+                f"- {self._end_date_data_source}."
+            )
+
+        if required_end_date < self._start_date_data_source:
+            raise OperationalException(
+                f"Request data date {required_end_date} "
+                f"is before the range of "
+                f"the available data "
+                f"{self._start_date_data_source} "
+                f"- {self._end_date_data_source}."
+            )
+
+        if required_end_date > self._end_date_data_source:
+            raise OperationalException(
+                f"Request data date {required_end_date} "
+                f"is after the range of "
+                f"the available data "
+                f"{self._start_date_data_source} "
+                f"- {self._end_date_data_source}."
+            )
+
+        if self.window_size is not None:
+            # Create cache with sliding windows
+            self._precompute_sliding_windows(
+                data=self.data,
+                window_size=self.window_size,
+                time_frame=self.time_frame,
+                start_date=backtest_start_date,
+                end_date=backtest_end_date
+            )
 
     def get_backtest_data(
         self,
@@ -281,6 +307,7 @@ class PandasOHLCVDataProvider(DataProvider):
         Returns:
            pl.DataFrame: The backtest data for the given datasource.
         """
+
         if backtest_start_date is not None and \
                 backtest_end_date is not None:
 
@@ -340,31 +367,48 @@ class PandasOHLCVDataProvider(DataProvider):
         Args:
             dataframe (pd.DataFrame): The DataFrame containing OHLCV data.
         Raises:
-            OperationalException: If the CSV file does not contain all
+            OperationalException: If the DataFrame does not contain all
                 required OHLCV columns.
 
         Returns:
             None
         """
-        self.data = pl.from_pandas(dataframe)
+        df = dataframe.copy()
 
-        # Check if all column names are in the csv file
-        if not all(column in self.data.columns for column in self._columns):
-            # Identify missing columns
-            missing_columns = [column for column in self._columns if
-                               column not in self.data.columns]
+        # Ensure we have a Datetime column
+        if "Datetime" not in df.columns:
+            if isinstance(df.index, pd.DatetimeIndex):
+                df = df.reset_index().rename(
+                    columns={df.index.name or "index": "Datetime"})
+            else:
+                raise OperationalException(
+                    "DataFrame must contain a 'Datetime' "
+                    "column or a DatetimeIndex"
+                )
+
+        # Make sure column is datetime type
+        df["Datetime"] = pd.to_datetime(df["Datetime"], utc=True)
+
+        # Convert to polars
+        self.data = pl.from_pandas(df)
+
+        # Check required OHLCV columns (excluding Datetime)
+        missing_columns = [c for c in self._columns if
+                           c not in self.data.columns]
+        if missing_columns:
             raise OperationalException(
-                f"Pandas dataframe does not contain "
-                f"all required ohlcv columns. "
+                "Pandas dataframe does not contain all "
+                "required OHLCV columns. "
                 f"Missing columns: {missing_columns}"
             )
 
+        # Ensure proper polars datetime type (UTC, ms)
         self.data = self.data.with_columns(
             pl.col("Datetime").cast(
-                pl.Datetime(time_unit="ms", time_zone="UTC")
-            )
+                pl.Datetime(time_unit="ms", time_zone="UTC"))
         )
 
+        # Cache start/end for convenience
         first_row = self.data.head(1)
         last_row = self.data.tail(1)
         self._start_date_data_source = first_row["Datetime"][0]
@@ -436,5 +480,6 @@ class PandasOHLCVDataProvider(DataProvider):
             time_frame=data_source.time_frame,
             market=data_source.market,
             window_size=data_source.window_size,
-            data_provider_identifier=self.data_provider_identifier
+            data_provider_identifier=self.data_provider_identifier,
+            pandas=self.pandas
         )
