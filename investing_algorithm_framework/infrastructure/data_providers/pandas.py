@@ -280,9 +280,7 @@ class PandasOHLCVDataProvider(DataProvider):
         if self.window_size is not None:
             # Create cache with sliding windows
             self._precompute_sliding_windows(
-                data=self.data,
                 window_size=self.window_size,
-                time_frame=self.time_frame,
                 start_date=backtest_start_date,
                 end_date=backtest_end_date
             )

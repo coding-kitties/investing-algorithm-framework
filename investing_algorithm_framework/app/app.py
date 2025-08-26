@@ -458,8 +458,8 @@ class App:
             for _, data_provider in \
                     tqdm(data_providers, desc=description, colour="green"):
                 data_provider.prepare_backtest_data(
-                    backtest_date_range.start_date,
-                    backtest_date_range.end_date
+                    backtest_start_date=backtest_date_range.start_date,
+                    backtest_end_date=backtest_date_range.end_date
                 )
 
     def initialize_backtest_services(self):

@@ -83,6 +83,7 @@ class Backtest:
 
         backtest_metrics = None
         backtest_results = None
+        permutation_metrics = None
         data_file_paths = []
         strategy_related_paths = []
         metadata = {}
