@@ -25,7 +25,7 @@ class Order(BaseModel):
         order_type,
         order_side,
         amount,
-        status=OrderStatus.CREATED.value,
+        status: OrderStatus | None | str = OrderStatus.CREATED.value,
         target_symbol=None,
         trading_symbol=None,
         price=None,
@@ -276,7 +276,8 @@ class Order(BaseModel):
             updated_at = parse(updated_at)
 
         order = Order(
-            external_id=data.get("id", None),
+            id=data.get("id", None),
+            external_id=data.get("external_id", None),
             target_symbol=target_symbol,
             trading_symbol=trading_symbol,
             price=data.get("price", None),
@@ -287,12 +288,12 @@ class Order(BaseModel):
             filled=data.get("filled", None),
             remaining=data.get("remaining", None),
             fee=data.get("fee", None),
+            cost=data.get("cost", None),
             created_at=created_at,
             updated_at=updated_at,
             order_fee=data.get("order_fee", None),
             order_fee_currency=data.get("order_fee_currency", None),
             order_fee_rate=data.get("order_fee_rate", None),
-            id=data.get("id", None)
         )
         return order
 

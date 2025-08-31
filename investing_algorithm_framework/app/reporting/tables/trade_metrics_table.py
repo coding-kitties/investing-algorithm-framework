@@ -69,7 +69,8 @@ def create_html_trade_metrics_table(results, report):
     string_format = "{:.2f}"
     copy_results['Trades per Year'] = safe_format(copy_results['trades_per_year'], string_format)
     copy_results['Trades per Day'] =  safe_format(copy_results['trade_per_day'], string_format)
-    copy_results['Exposure Factor'] =  safe_format(copy_results['exposure_factor'],string_format)
+    copy_results['Exposure Ratio'] = safe_format(copy_results['exposure_ratio'],string_format)
+    copy_results["Cumulative Exposure"] = safe_format(copy_results['cumulative_exposure'],string_format)
     best_trade = copy_results['best_trade']
 
     if best_trade is None:
@@ -87,8 +88,8 @@ def create_html_trade_metrics_table(results, report):
         copy_results['Worst Trade'] = f"{worst_trade['net_gain']:.2f} {report.trading_symbol}"
         copy_results['Worst Trade Date'] = safe_format_date(worst_trade['opened_at'], format_str=DEFAULT_DATETIME_FORMAT)
 
-    copy_results['Trades Average Gain'] = f"{safe_format(copy_results['trades_average_gain'][0], string_format)} {report.trading_symbol} {copy_results['trades_average_gain'][1]:.2f}%"
-    copy_results['Trades Average Loss'] = f"{safe_format(copy_results['trades_average_loss'][0], string_format)} {report.trading_symbol} {copy_results['trades_average_loss'][1]:.2f}%"
+    copy_results['Trades Average Gain'] = f"{safe_format(copy_results['trades_average_gain'], string_format)} {report.trading_symbol} {copy_results['trades_average_gain_percentage']:.2f}%"
+    copy_results['Trades Average Loss'] = f"{safe_format(copy_results['trades_average_loss'], string_format)} {report.trading_symbol} {copy_results['trades_average_loss_percentage']:.2f}%"
     copy_results['Average Trade Duration'] = f"{copy_results['average_trade_duration']:.2f} hours"
     copy_results['Number of Trades'] = f"{copy_results['number_of_trades']}"
     copy_results['Win Rate'] = f"{copy_results['win_rate']:.2f}%"
@@ -98,7 +99,8 @@ def create_html_trade_metrics_table(results, report):
         "Metric": [
             "Trades per Year",
             "Trade per Day",
-            "Exposure Factor",
+            "Exposure Ratio",
+            "Cumulative Exposure",
             "Trades Average Gain",
             "Trades Average Loss",
             "Best Trade",
@@ -113,7 +115,8 @@ def create_html_trade_metrics_table(results, report):
         "Value": [
             copy_results['Trades per Year'],
             copy_results['Trades per Day'],
-            copy_results['Exposure Factor'],
+            copy_results['Exposure Ratio'],
+            copy_results['Cumulative Exposure'],
             copy_results['Trades Average Gain'],
             copy_results['Trades Average Loss'],
             copy_results['Best Trade'],

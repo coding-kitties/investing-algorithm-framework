@@ -106,6 +106,7 @@ def pretty_print_growth_evaluation(
 
 def pretty_print_stop_losses(
     backtest,
+    backtest_date_range: BacktestDateRange = None,
     triggered_only=False,
     amount_precision=4,
     price_precision=2,
@@ -114,8 +115,8 @@ def pretty_print_stop_losses(
 ):
     print(f"{COLOR_YELLOW}Stop losses overview{COLOR_RESET}")
     stop_loss_table = {}
-    results = backtest.backtest_results
-    trades = results.trades
+    results = backtest.get_backtest_run(backtest_date_range)
+    trades = results.get_trades()
     selection = []
 
     def get_sold_amount(stop_loss):
@@ -256,6 +257,7 @@ def pretty_print_stop_losses(
 
 def pretty_print_take_profits(
     backtest: Backtest,
+    backtest_date_range: BacktestDateRange = None,
     triggered_only=False,
     amount_precision=4,
     price_precision=2,
@@ -264,8 +266,8 @@ def pretty_print_take_profits(
 ):
     print(f"{COLOR_YELLOW}Take profits overview{COLOR_RESET}")
     take_profit_table = {}
-    results = backtest.backtest_results
-    trades = results.trades
+    results = backtest.get_backtest_run(backtest_date_range)
+    trades = results.get_trades()
     selection = []
 
     def get_high_water_mark(take_profit):
@@ -492,6 +494,7 @@ def pretty_print_price_efficiency(reports, precision=4):
 
 def pretty_print_orders(
     backtest: Backtest,
+    backtest_date_range: BacktestDateRange = None,
     target_symbol = None,
     order_status = None,
     amount_precesion=4,
@@ -503,7 +506,8 @@ def pretty_print_orders(
     Pretty print the orders of the backtest report to the console.
 
     Args:
-        backtest_report: The backtest report
+        backtest: The backtest
+        backtest_date_range: The date range of the backtest
         target_symbol: The target symbol of the orders
         order_status: The status of the orders
         amount_precesion: The precision of the amount
@@ -514,8 +518,8 @@ def pretty_print_orders(
     Returns:
         None
     """
-
-    selection = backtest.backtest_results.get_orders(
+    run = backtest.get_backtest_run(backtest_date_range)
+    selection = run.get_orders(
         target_symbol=target_symbol,
         order_status=order_status
     )
@@ -556,6 +560,7 @@ def pretty_print_orders(
 
 def pretty_print_positions(
     backtest,
+    backtest_date_range: BacktestDateRange = None,
     symbol = None,
     amount_precision=4,
     price_precision=2,
@@ -567,8 +572,7 @@ def pretty_print_positions(
 
     Args:
         backtest: The backtest report
-        target_symbol: The target symbol of the orders
-        order_status: The status of the orders
+        backtest_date_range: The date range of the backtest
         amount_precision: The precision of the amount
         price_precision: The precision of the price
         time_precision: The precision of the time
@@ -577,7 +581,7 @@ def pretty_print_positions(
     Returns:
         None
     """
-    results = backtest.backtest_results
+    results = backtest.get_backtest_run(backtest_date_range)
     selection = results.get_positions(symbol=symbol)
 
     print(f"{COLOR_YELLOW}Positions overview{COLOR_RESET}")
@@ -624,6 +628,7 @@ def pretty_print_positions(
 
 def pretty_print_trades(
     backtest: Backtest,
+    backtest_date_range: BacktestDateRange = None,
     target_symbol = None,
     status = None,
     amount_precision=4,
@@ -636,6 +641,7 @@ def pretty_print_trades(
 
     Args:
         backtest: The backtest report
+        backtest_date_range: The date range of the backtest
         target_symbol: The target symbol of the trades
         status: The status of the trades
         amount_precision: The precision of the amount
@@ -646,8 +652,8 @@ def pretty_print_trades(
     Returns:
         None
     """
-    results = backtest.backtest_results
-    selection = results.get_trades(
+    run = backtest.get_backtest_run(backtest_date_range)
+    selection = run.get_trades(
         target_symbol=target_symbol,
         trade_status=status
     )
@@ -725,7 +731,7 @@ def pretty_print_trades(
         f"{float(trade.amount):.{amount_precision}f} ({float(trade.remaining):.{amount_precision}f}) {trade.target_symbol}"
         for trade in selection
     ]
-    trades_table[f"Net gain ({results.trading_symbol})"] = [
+    trades_table[f"Net gain ({run.trading_symbol})"] = [
         f"{float(trade.net_gain):.{price_precision}f}"
         for trade in selection
     ]
@@ -739,15 +745,15 @@ def pretty_print_trades(
         f"{trade.duration:.{time_precision}f} hours" for trade in selection
     ]
     # Add (unrealized) to the net gain if the trade is still open
-    trades_table[f"Net gain ({results.trading_symbol})"] = [
+    trades_table[f"Net gain ({run.trading_symbol})"] = [
         f"{float(trade.net_gain_absolute):.{price_precision}f} ({float(trade.net_gain_percentage):.{percentage_precision}f}%)" + (" (unrealized)" if not TradeStatus.CLOSED.equals(trade.status) else "")
         for trade in selection
     ]
-    trades_table[f"Open price ({results.trading_symbol})"] = [
+    trades_table[f"Open price ({run.trading_symbol})"] = [
         f"{trade.open_price:.{price_precision}f}"  for trade in selection
     ]
     trades_table[
-        f"Close price's ({results.trading_symbol})"
+        f"Close price's ({run.trading_symbol})"
     ] = [
         get_close_prices(trade) for trade in selection
     ]
@@ -768,6 +774,7 @@ def print_number_of_runs(report):
 
 def pretty_print_backtest(
     backtest: Backtest,
+    backtest_date_range: BacktestDateRange = None,
     show_positions=True,
     show_trades=True,
     show_stop_losses=True,
@@ -798,8 +805,8 @@ def pretty_print_backtest(
     Returns:
         None
     """
-    backtest_results = backtest.backtest_results
-    backtest_metrics = backtest.backtest_metrics
+    backtest_results = backtest.get_backtest_run(backtest_date_range)
+    backtest_metrics = backtest.get_backtest_metrics(backtest_date_range)
     ascii_art = f"""
                   :%%%#+-          .=*#%%%        {COLOR_GREEN}Backtest report{COLOR_RESET}
                   *%%%%%%%+------=*%%%%%%%-       {COLOR_GREEN}---------------------------{COLOR_RESET}
@@ -811,14 +818,14 @@ def pretty_print_backtest(
               .:=+#%%%%%*###%%%%#*+#%%%%%%*+-:    {COLOR_YELLOW}Initial balance:{COLOR_RESET}{COLOR_GREEN} {backtest_results.initial_unallocated}{COLOR_RESET}
                     +%%%%%%%%%%%%%%%%%%%=         {COLOR_YELLOW}Final balance:{COLOR_RESET}{COLOR_GREEN} {float(backtest_metrics.final_value):.{price_precision}f}{COLOR_RESET}
                 :++  .=#%%%%%%%%%%%%%*-           {COLOR_YELLOW}Total net gain:{COLOR_RESET}{COLOR_GREEN} {float(backtest_metrics.total_net_gain):.{price_precision}f} {float(backtest_metrics.total_net_gain_percentage):.{percentage_precision}f}%{COLOR_RESET}
-               :++:      :+%%%%%%#-.              {COLOR_YELLOW}Growth:{COLOR_RESET}{COLOR_GREEN} {float(backtest_results.growth):.{price_precision}f} {float(backtest_results.growth_percentage):.{percentage_precision}f}%{COLOR_RESET}
+               :++:      :+%%%%%%#-.              {COLOR_YELLOW}Growth:{COLOR_RESET}{COLOR_GREEN} {float(backtest_metrics.growth):.{price_precision}f} {float(backtest_metrics.growth_percentage):.{percentage_precision}f}%{COLOR_RESET}
               :++:        .%%%%%#=                {COLOR_YELLOW}Number of trades:{COLOR_RESET}{COLOR_GREEN} {backtest_results.number_of_trades}{COLOR_RESET}
               :++:        .%%%%%#=                {COLOR_YELLOW}Number of trades closed:{COLOR_RESET}{COLOR_GREEN} {backtest_results.number_of_trades_closed}{COLOR_RESET}
              :++:        .#%%%%%#*=               {COLOR_YELLOW}Number of trades open(end of backtest):{COLOR_RESET}{COLOR_GREEN} {backtest_results.number_of_trades_open}{COLOR_RESET}
-            :++-        :%%%%%%%%%+=              {COLOR_YELLOW}Percentage positive trades:{COLOR_RESET}{COLOR_GREEN} {float(backtest_results.percentage_positive_trades):.{percentage_precision}f}%{COLOR_RESET}
-           .++-        -%%%%%%%%%%%+=             {COLOR_YELLOW}Percentage negative trades:{COLOR_RESET}{COLOR_GREEN} {float(backtest_results.percentage_negative_trades):.{percentage_precision}f}%{COLOR_RESET}
-          .++-        .%%%%%%%%%%%%%+=            {COLOR_YELLOW}Average trade size:{COLOR_RESET}{COLOR_GREEN} {float(backtest_results.average_trade_size):.{price_precision}f} {backtest_results.trading_symbol}{COLOR_RESET}
-         .++-         *%%%%%%%%%%%%%*+:           {COLOR_YELLOW}Average trade duration:{COLOR_RESET}{COLOR_GREEN} {float(backtest_results.average_trade_duration):.{0}f} hours{COLOR_RESET}
+            :++-        :%%%%%%%%%+=              {COLOR_YELLOW}Percentage positive trades:{COLOR_RESET}{COLOR_GREEN} {float(backtest_metrics.percentage_positive_trades):.{percentage_precision}f}%{COLOR_RESET}
+           .++-        -%%%%%%%%%%%+=             {COLOR_YELLOW}Percentage negative trades:{COLOR_RESET}{COLOR_GREEN} {float(backtest_metrics.percentage_negative_trades):.{percentage_precision}f}%{COLOR_RESET}
+          .++-        .%%%%%%%%%%%%%+=            {COLOR_YELLOW}Average trade size:{COLOR_RESET}{COLOR_GREEN} {float(backtest_metrics.average_trade_size):.{price_precision}f} {backtest_results.trading_symbol}{COLOR_RESET}
+         .++-         *%%%%%%%%%%%%%*+:           {COLOR_YELLOW}Average trade duration:{COLOR_RESET}{COLOR_GREEN} {float(backtest_metrics.average_trade_duration):.{0}f} hours{COLOR_RESET}
         .++-          %%%%%%%%%%%%%%#+=
         =++........:::%%%%%%%%%%%%%%*+-
         .=++++++++++**#%%%%%%%%%%%%%++.

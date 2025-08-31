@@ -51,28 +51,30 @@ class Test(TestCase):
         )
         app.add_data_provider(data_provider, priority=1)
         algorithm.add_strategy(strategy)
-        backtest_report = app.run_backtest(
+        backtest = app.run_backtest(
             backtest_date_range=date_range, algorithm=algorithm, risk_free_rate=0.027
         )
+        metrics = backtest.get_backtest_metrics(date_range)
+        run = backtest.get_backtest_run(date_range)
         self.assertAlmostEqual(
-            backtest_report.backtest_results.growth, 5.9, delta=0.5
+            metrics.growth, 5.9, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.backtest_results.growth_percentage, 1.49, delta=0.1
+            metrics.growth_percentage, 0.0149, delta=0.1
         )
         self.assertEqual(
-            backtest_report.backtest_results.initial_unallocated, 400
+            run.initial_unallocated, 400
         )
         self.assertEqual(
-            backtest_report.backtest_results.trading_symbol, "EUR"
+            run.trading_symbol, "EUR"
         )
         self.assertAlmostEqual(
-            backtest_report.backtest_metrics.total_net_gain,
+            metrics.total_net_gain,
             5.96,
             delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_report.backtest_metrics.total_net_gain_percentage,
+            metrics.total_net_gain_percentage,
             0.0149,
             delta=0.1
         )
@@ -80,7 +82,7 @@ class Test(TestCase):
         elapsed_time = end_time - start_time
         print(f"Test completed in {elapsed_time:.2f} seconds")
 
-        snapshots = backtest_report.backtest_results.get_portfolio_snapshots()
+        snapshots = run.get_portfolio_snapshots()
         # Check that the first two snapshots created at are the same
         # as the start date of the backtest
         self.assertEqual(

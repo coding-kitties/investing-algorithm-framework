@@ -5,8 +5,8 @@ from .utils import safe_format_percentage, safe_format_date
 
 def create_html_time_metrics_table(results, report):
     copy_results = results.to_dict().copy()
-    start_date = report.backtest_date_range.start_date
-    end_date = report.backtest_date_range.end_date
+    start_date = report.backtest_start_date
+    end_date = report.backtest_end_date
     string_format = "{:.2f}"
     # Format dates
     copy_results['Start Date'] = safe_format_date(start_date, "%Y-%m-%d %H:%M")

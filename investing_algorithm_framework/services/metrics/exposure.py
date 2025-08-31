@@ -11,7 +11,68 @@ from datetime import timedelta, datetime
 from investing_algorithm_framework.domain import Trade
 
 
-def get_exposure(
+from typing import List
+from datetime import datetime, timedelta
+
+
+def get_exposure_ratio(
+    trades: List["Trade"], start_date: datetime, end_date: datetime
+) -> float:
+    """
+    Calculates the exposure ratio (time in market) as the fraction of the total
+    backtest duration where at least one position was open.
+
+    Unlike cumulative exposure, overlapping trades are not double-counted.
+    The result is always between 0 and 1.
+
+    Args:
+        trades (List[Trade]): List of trades executed during the backtest.
+        start_date (datetime): The start date of the backtest.
+        end_date (datetime): The end date of the backtest.
+
+    Returns:
+        A float between 0 and 1 representing the exposure ratio.
+    """
+    if not trades:
+        return 0.0
+
+    # Collect trade intervals
+    intervals = []
+    for trade in trades:
+        entry = max(trade.opened_at, start_date)
+        exit = min(trade.closed_at or end_date, end_date)
+        if exit > entry:
+            intervals.append((entry, exit))
+
+    if not intervals:
+        return 0.0
+
+    # Sort intervals by start time
+    intervals.sort(key=lambda x: x[0])
+
+    # Merge overlapping intervals
+    merged = []
+    current_start, current_end = intervals[0]
+    for start, end in intervals[1:]:
+        if start <= current_end:  # overlap
+            current_end = max(current_end, end)
+        else:
+            merged.append((current_start, current_end))
+            current_start, current_end = start, end
+    merged.append((current_start, current_end))
+
+    # Total time with at least one open trade
+    total_exposed_time = sum((end - start for start, end in merged), timedelta(0))
+
+    backtest_duration = end_date - start_date
+    if backtest_duration.total_seconds() == 0:
+        return 0.0
+
+    return total_exposed_time.total_seconds() \
+        / backtest_duration.total_seconds()
+
+
+def get_cumulative_exposure(
     trades: List[Trade], start_date: datetime, end_date: datetime
 ) -> float:
     """

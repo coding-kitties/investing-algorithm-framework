@@ -1,5 +1,7 @@
 from dotenv import load_dotenv
+from typing import Dict, Any
 import logging.config
+
 from investing_algorithm_framework import TimeUnit, \
     DataSource, TradingStrategy, create_app, DEFAULT_LOGGING_CONFIG, Context
 """
@@ -22,7 +24,7 @@ class CoinbaseTradingStrategy(TradingStrategy):
         DataSource(data_type="Ticker", market="coinbase", symbol="BTC/EUR", identifier="BTC/EUR-ticker")
     ]
 
-    def apply_strategy(self, context: Context, data):
+    def run_strategy(self, context: Context, data: Dict[str, Any]):
         print(data["BTC/EUR-ohlcv"])
         print(data["BTC/EUR-ticker"])
 

@@ -22,8 +22,9 @@ from .returns import get_yearly_returns, get_monthly_returns, \
     get_average_monthly_return_winning_months, get_growth, \
     get_percentage_winning_years, get_worst_year, \
     get_growth_percentage
-from .exposure import get_exposure, get_average_trade_duration, \
-    get_trade_frequency, get_trades_per_day, get_trades_per_year
+from .exposure import get_average_trade_duration, \
+    get_trade_frequency, get_trades_per_day, get_trades_per_year, \
+    get_cumulative_exposure, get_exposure_ratio
 from .win_rate import get_win_rate, get_win_loss_ratio
 from .calmar_ratio import get_calmar_ratio
 from .generate import create_backtest_metrics
@@ -46,7 +47,8 @@ __all__ = [
     "get_standard_deviation_downside_returns",
     "get_max_drawdown_absolute",
     "get_total_return",
-    "get_exposure",
+    "get_cumulative_exposure",
+    "get_exposure_ratio",
     "get_average_trade_duration",
     "get_win_rate",
     "get_win_loss_ratio",
@@ -82,5 +84,5 @@ __all__ = [
     "create_backtest_metrics",
     "get_growth",
     "get_growth_percentage",
-    "get_risk_free_rate_us"
+    "get_risk_free_rate_us",
 ]

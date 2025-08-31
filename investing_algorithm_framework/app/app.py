@@ -19,8 +19,8 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, Backtest, \
     PortfolioConfiguration, SnapshotInterval, DataType, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured, \
-    DataProvider, INDEX_DATETIME, tqdm, \
-    LAST_SNAPSHOT_DATETIME, BacktestPermutationTestMetrics
+    DataProvider, INDEX_DATETIME, tqdm, BacktestPermutationTest, \
+    LAST_SNAPSHOT_DATETIME
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
     BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db, \
@@ -787,14 +787,15 @@ class App:
 
     def run_vector_backtests(
         self,
-        backtest_date_range: BacktestDateRange,
         initial_amount,
         strategies: List[TradingStrategy],
+        backtest_date_range: BacktestDateRange = None,
+        backtest_date_ranges: List[BacktestDateRange] = None,
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         risk_free_rate: Optional[float] = None,
         skip_data_sources_initialization: bool = False,
         show_progress: bool = True
-    ):
+    ) -> List[Backtest]:
         """
         Run vectorized backtests for a set of strategies. The provided
         set of strategies need to have their 'buy_signal_vectorized' and
@@ -802,8 +803,6 @@ class App:
         backtesting.
 
         Args:
-            backtest_date_range: The date range to run the backtest for
-                (instance of BacktestDateRange)
             initial_amount: The initial amount to start the backtest with.
                 This will be the amount of trading currency that the backtest
                 portfolio will start with.
@@ -811,6 +810,13 @@ class App:
                 that need to be backtested. Each strategy should implement
                 the 'buy_signal_vectorized' and 'sell_signal_vectorized'
                 methods to support vectorized backtesting.
+            backtest_date_range: The date range to run the backtest for
+                (instance of BacktestDateRange). This is used when
+                backtest_date_ranges is not provided.
+            backtest_date_ranges: List of date ranges to run the backtests for
+                (List of BacktestDateRange instances). If this is provided,
+                the backtests will be run for each date range in the list.
+                If this is not provided, the backtest_date_range will be used
             snapshot_interval (SnapshotInterval): The snapshot
                 interval to use for the backtest. This is used to determine
                 how often the portfolio snapshot should be taken during the
@@ -836,15 +842,17 @@ class App:
                 that was backtested.
         """
         backtests = []
+        backtests_ordered_by_strategy = {}
         data_sources = []
+
+        if backtest_date_range is None and backtest_date_ranges is None:
+            raise OperationalException(
+                "Either backtest_date_range or backtest_date_ranges must be "
+                "provided"
+            )
 
         for strategy in strategies:
             data_sources.extend(strategy.data_sources)
-
-        if not skip_data_sources_initialization:
-            self.initialize_data_sources_backtest(
-                data_sources, backtest_date_range, show_progress=show_progress
-            )
 
         if risk_free_rate is None:
             logger.info("No risk free rate provided, retrieving it...")
@@ -858,11 +866,18 @@ class App:
                     "connection"
                 )
 
-        for strategy in tqdm(
-            strategies, colour="green", desc="Running backtests"
-        ):
-            backtests.append(
-                self.run_vector_backtest(
+        if backtest_date_range is not None:
+            if not skip_data_sources_initialization:
+                self.initialize_data_sources_backtest(
+                    data_sources,
+                    backtest_date_range,
+                    show_progress=show_progress
+                )
+
+            for strategy in tqdm(
+                strategies, colour="green", desc="Running backtests"
+            ):
+                backtest = self.run_vector_backtest(
                     backtest_date_range=backtest_date_range,
                     initial_amount=initial_amount,
                     strategy=strategy,
@@ -870,7 +885,54 @@ class App:
                     risk_free_rate=risk_free_rate,
                     skip_data_sources_initialization=True
                 )
-            )
+                backtests.append(backtest)
+        else:
+            for backtest_date_range in tqdm(
+                backtest_date_ranges,
+                colour="green",
+                desc="Running backtests for all date ranges"
+            ):
+                if not skip_data_sources_initialization:
+                    self.initialize_data_sources_backtest(
+                        data_sources,
+                        backtest_date_range,
+                        show_progress=show_progress
+                    )
+                start_date = backtest_date_range.start_date.strftime(
+                    '%Y-%m-%d'
+                )
+                end_date = backtest_date_range.end_date.strftime('%Y-%m-%d')
+
+                for strategy in tqdm(
+                    strategies,
+                        colour="green",
+                        desc=f"Running backtests for "
+                             f"{start_date} to {end_date}"
+                ):
+
+                    if strategy not in backtests_ordered_by_strategy:
+                        backtests_ordered_by_strategy[strategy] = []
+
+                    backtests_ordered_by_strategy[strategy].append(
+                            self.run_vector_backtest(
+                                backtest_date_range=backtest_date_range,
+                                initial_amount=initial_amount,
+                                strategy=strategy,
+                                snapshot_interval=snapshot_interval,
+                                risk_free_rate=risk_free_rate,
+                                skip_data_sources_initialization=True
+                            )
+                        )
+
+            for strategy in backtests_ordered_by_strategy:
+                # Merge all backtests for the same strategy
+                main_backtest = Backtest()
+                strategy_backtests = backtests_ordered_by_strategy[strategy]
+
+                for backtest in strategy_backtests:
+                    main_backtest = main_backtest.merge(backtest)
+
+                backtests.append(main_backtest)
 
         return backtests
 
@@ -953,10 +1015,14 @@ class App:
 
         backtest_service = self.container.backtest_service()
         backtest_service.validate_strategy_for_vector_backtest(strategy)
-        backtest = backtest_service.create_vector_backtest(
+        run = backtest_service.create_vector_backtest(
             strategy=strategy,
             backtest_date_range=backtest_date_range,
             initial_amount=initial_amount,
+            risk_free_rate=risk_free_rate
+        )
+        backtest = Backtest(
+            backtest_runs=[run],
             risk_free_rate=risk_free_rate
         )
 
@@ -981,9 +1047,6 @@ class App:
         algorithms: Optional[List[Algorithm]] = None,
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         risk_free_rate: Optional[float] = None,
-        save=True,
-        directory: Optional[str] = None,
-        use_checkpoints: Optional[bool] = True,
     ) -> List[Backtest]:
         """
         Function to run multiple backtests for a list of algorithms over
@@ -1004,20 +1067,11 @@ class App:
                 and other performance metrics. If not provided, the default
                 risk-free rate will be tried to be fetched from the
                 US Treasury website.
-            save (bool): Whether to save the backtest reports to disk.
-            directory (Optional[str]): The directory to save the backtest
-                reports to. If not provided, the reports will not be saved
-            use_checkpoints (Optional[bool]): Whether to use checkpoints
-                to skip already run backtests. If True, the function will
-                check if a backtest report already exists for the given
-                algorithm and date range. If it does, it will skip running
-                the backtest and return the existing report.
 
         Returns:
             List[Backtest]: List of Backtest instances containing the results
         """
         backtests = []
-        backtest_service = self.container.backtest_service()
 
         if algorithms is not None:
             final_algorithms = algorithms
@@ -1048,26 +1102,6 @@ class App:
 
         for date_range in backtest_date_ranges:
             for algorithm in final_algorithms:
-
-                if use_checkpoints and directory is not None:
-                    report = backtest_service.get_backtest(
-                        algorithm=algorithm,
-                        backtest_date_range=date_range,
-                        directory=directory
-                    )
-
-                    if report is not None:
-                        print(
-                            f"{COLOR_YELLOW}Backtest already exists "
-                            f"for algorithm {algorithm.name} date "
-                            f"range:{COLOR_RESET} {COLOR_GREEN} "
-                            f"{date_range.name} "
-                            f"{date_range.start_date} - "
-                            f"{date_range.end_date}"
-                        )
-                        backtests.append(report)
-                        continue
-
                 backtest = self.run_backtest(
                     backtest_date_range=date_range,
                     initial_amount=initial_amount,
@@ -1075,12 +1109,6 @@ class App:
                     snapshot_interval=snapshot_interval,
                     risk_free_rate=risk_free_rate
                 )
-
-                if save and directory is not None:
-                    directory_name = backtest_service\
-                        .create_report_directory_name(backtest)
-                    backtest.save(os.path.join(directory, directory_name))
-
                 backtests.append(backtest)
 
         return backtests
@@ -1096,8 +1124,6 @@ class App:
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         risk_free_rate: Optional[float] = None,
         metadata: Optional[Dict[str, str]] = None,
-        save=True,
-        directory: str = None
     ) -> Backtest:
         """
         Run a backtest for an algorithm.
@@ -1131,8 +1157,6 @@ class App:
                 backtest report. This can be used to store additional
                 information about the backtest, such as the author, version,
                 parameters or any other relevant information.
-            save (bool): Whether to save the backtest report to the disk.
-            directory (str): The directory to save the backtest report to.
 
         Returns:
             Backtest: Instance of Backtest
@@ -1203,7 +1227,7 @@ class App:
         event_loop_service.start(schedule=schedule, show_progress=True)
         self._run_history = event_loop_service.history
 
-        # Convert the current run to a backtest and save it if needed
+        # Convert the current run to a backtest
         backtest = backtest_service.create_backtest(
             algorithm=algorithm,
             number_of_runs=event_loop_service.total_number_of_runs,
@@ -1222,12 +1246,6 @@ class App:
             backtest.metadata = metadata
 
         self.cleanup_backtest_resources()
-
-        if save and directory:
-            directory_name = backtest_service \
-                .create_report_directory_name(backtest)
-            backtest.save(os.path.join(directory, directory_name))
-
         return backtest
 
     def run_permutation_test(
@@ -1237,7 +1255,7 @@ class App:
         number_of_permutations: int = 100,
         initial_amount: float = 1000.0,
         risk_free_rate: Optional[float] = None
-    ) -> BacktestPermutationTestMetrics:
+    ) -> BacktestPermutationTest:
         """
         Run a permutation test for a given strategy over a specified
         date range. This test is used to determine the statistical
@@ -1290,8 +1308,9 @@ class App:
             snapshot_interval=SnapshotInterval.DAILY,
             risk_free_rate=risk_free_rate,
         )
+        backtest_metrics = backtest.get_backtest_metrics(backtest_date_range)
 
-        if backtest.backtest_metrics.number_of_trades == 0:
+        if backtest_metrics.number_of_trades == 0:
             raise OperationalException(
                 "The strategy did not make any trades during the backtest. "
                 "Cannot perform permutation test."
@@ -1363,11 +1382,13 @@ class App:
             )
 
             # Add the results of the permuted backtest to the main backtest
-            permuted_metrics.append(permuted_backtest.backtest_metrics)
+            permuted_metrics.append(
+                permuted_backtest.get_backtest_metrics(backtest_date_range)
+            )
 
         # Create a BacktestPermutationTestMetrics object
-        permutation_test_metrics = BacktestPermutationTestMetrics(
-            real_metrics=backtest.backtest_metrics,
+        permutation_test_metrics = BacktestPermutationTest(
+            real_metrics=backtest_metrics,
             permutated_metrics=permuted_metrics,
             ohlcv_permutated_datasets=permuted_datasets_ordered_by_symbol,
             ohlcv_original_datasets=original_datasets_ordered_by_symbol

@@ -76,17 +76,9 @@ class Test(TestCase):
             start_date=start_date,
             end_date=end_date
         )
-        directory = os.path.join(
-            self.resource_dir, "backtest_reports", "test_backtests"
-        )
         reports = app.run_backtests(
             algorithms=[algorithm_one, algorithm_two, algorithm_three],
             backtest_date_ranges=[backtest_date_range],
-            directory=directory,
             risk_free_rate=0.027
         )
-        backtest_service = app.container.backtest_service()
-
-        # Check if the backtest reports exist
-        for report in reports:
-            self.assertTrue(os.path.isdir(directory))
+        self.assertEqual(3, len(reports))

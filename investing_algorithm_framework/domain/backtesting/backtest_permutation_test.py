@@ -10,7 +10,7 @@ from .backtest_metrics import BacktestMetrics
 
 
 @dataclass
-class BacktestPermutationTestMetrics:
+class BacktestPermutationTest:
     """
     Represents the result of a permutation test on backtest metrics.
 
@@ -35,11 +35,10 @@ class BacktestPermutationTestMetrics:
         "win_loss_ratio",
         "average_monthly_return"
     ])
-
     real_metrics: BacktestMetrics = None
     permutated_metrics: List[BacktestMetrics] = field(default_factory=list)
     p_values: Dict[str, float] = field(default_factory=dict)
-    ohlcv_permutated_datasets: Dict[str, pd.DataFrame] = \
+    ohlcv_permutated_datasets: Dict[str, List[pd.DataFrame]] = \
         field(default_factory=dict)
     ohlcv_original_datasets: Dict[str, pd.DataFrame] = \
         field(default_factory=dict)
@@ -148,7 +147,7 @@ class BacktestPermutationTestMetrics:
             json.dump(self.p_values, f)
 
     @staticmethod
-    def open(path: str) -> "BacktestPermutationTestMetrics":
+    def open(path: str) -> "BacktestPermutationTest":
         """
         Load the permutation test results from disk (JSON + Parquet).
         """
@@ -176,10 +175,35 @@ class BacktestPermutationTestMetrics:
                     os.path.join(path, file)
                 )
 
-        return BacktestPermutationTestMetrics(
+        return BacktestPermutationTest(
             real_metrics=real_metrics,
             permutated_metrics=permutated_metrics,
             p_values=results["p_values"],
             ohlcv_original_datasets=ohlcv_original_datasets,
             ohlcv_permutated_datasets=ohlcv_permutated_datasets
         )
+
+    def create_directory_name(self) -> str:
+        """
+        Create a directory name for the backtest run based on its attributes.
+
+        Returns:
+            str: A string representing the directory name.
+        """
+        start_str = self.real_metrics.backtest_start_date.strftime("%Y%m%d")
+        end_str = self.real_metrics.backtest_end_date.strftime("%Y%m%d")
+        dir_name = f"permutation_test_{start_str}_{end_str}"
+        return dir_name
+
+    def to_dict(self) -> Dict:
+        """
+        Convert the permutation test results to a dictionary.
+        """
+        return {
+            "real_metrics": self.real_metrics.to_dict(),
+            "permutated_metrics": [
+                pm.to_dict() for pm in self.permutated_metrics
+            ],
+            "p_values": self.p_values,
+            # Note: DataFrames are not included in the dict representation
+        }

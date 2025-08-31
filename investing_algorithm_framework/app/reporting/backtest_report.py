@@ -11,8 +11,8 @@ from IPython import get_ipython
 from IPython.display import display, HTML
 from jinja2 import Environment, FileSystemLoader
 
-from investing_algorithm_framework.domain import OperationalException
-from investing_algorithm_framework.domain import TimeFrame, Backtest
+from investing_algorithm_framework.domain import TimeFrame, Backtest, \
+    OperationalException, BacktestDateRange
 from .charts import get_equity_curve_with_drawdown_chart, \
     get_rolling_sharpe_ratio_chart, get_monthly_returns_heatmap_chart, \
     get_yearly_returns_bar_chart, get_ohlcv_data_completeness_chart
@@ -99,19 +99,22 @@ class BacktestReport:
         strategy_path (str): The path to the strategy directory used in the
             backtest.
     """
-    backtests: List[Backtest] = field(default_factory=list)
+    backtest: Backtest = None
     html_report: str = None
     html_report_path: str = None
 
-
-    def show(self, browser: bool = False):
+    def show(
+        self,
+        backtest_date_range: BacktestDateRange,
+        browser: bool = False
+    ):
         """
         Display the HTML report in a Jupyter notebook cell.
         """
 
         if not self.html_report:
             # If the HTML report is not created, create it
-            self._create_html_report()
+            self._create_html_report(backtest_date_range)
 
         # Save the html report to a tmp location
         path = "/tmp/backtest_report.html"
@@ -133,7 +136,7 @@ class BacktestReport:
         else:
             webbrowser.open(f"file://{path}")
 
-    def _create_html_report(self):
+    def _create_html_report(self, backtest_date_range: BacktestDateRange):
         """
         Create an HTML report from the backtest metrics and results.
 
@@ -149,14 +152,14 @@ class BacktestReport:
             None
         """
         # Get the first backtest
-        if not self.backtests:
+        if not self.backtest:
             raise OperationalException(
-                "No backtests available to create a report."
+                "No backtest available to create a report."
             )
 
-        backtest = self.backtests[0]
-        metrics = backtest.backtest_metrics
-        results = backtest.backtest_results
+
+        metrics = self.backtest.get_backtest_metrics(backtest_date_range)
+        run = self.backtest.get_backtest_run(backtest_date_range)
         # Create plots
         equity_with_drawdown_fig = get_equity_curve_with_drawdown_chart(
             metrics.equity_curve, metrics.drawdown_series
@@ -188,7 +191,7 @@ class BacktestReport:
         )
 
         # Create OHLCV data completeness charts
-        data_files = backtest.data_file_paths
+        data_files = []
         ohlcv_data_completeness_charts_html = ""
 
         for file in data_files:
@@ -223,15 +226,15 @@ class BacktestReport:
 
         # Create HTML tables
         key_metrics_table_html = create_html_key_metrics_table(
-            metrics, results
+            metrics, run
         )
         trades_metrics_table_html = create_html_trade_metrics_table(
-            metrics, results
+            metrics, run
         )
         time_metrics_table_html = create_html_time_metrics_table(
-            metrics, results
+            metrics, run
         )
-        trades_table_html = create_html_trades_table(results)
+        trades_table_html = create_html_trades_table(run)
 
         # Jinja2 environment setup
         template_dir = os.path.join(os.path.dirname(__file__), 'templates')
@@ -240,7 +243,7 @@ class BacktestReport:
 
         # Render template with variables
         html_rendered = template.render(
-            report=results,
+            report=run,
             equity_with_drawdown_plot_html=equity_with_drawdown_plot_html,
             rolling_sharpe_ratio_plot_html=rolling_sharpe_ratio_plot_html,
             monthly_returns_heatmap_html=monthly_returns_heatmap_html,
@@ -343,4 +346,4 @@ class BacktestReport:
                 f"The directory {directory_path} is not a valid backtest report."
             )
 
-        return BacktestReport(backtests=loaded_backtests)
+        return BacktestReport(backtest=loaded_backtests)

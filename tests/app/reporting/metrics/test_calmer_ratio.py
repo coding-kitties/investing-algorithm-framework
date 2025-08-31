@@ -1,7 +1,7 @@
 import unittest
 from datetime import datetime
 from unittest.mock import patch, MagicMock
-from investing_algorithm_framework.domain import BacktestResult
+from investing_algorithm_framework.domain import BacktestRun
 
 from investing_algorithm_framework import get_calmar_ratio
 
@@ -33,7 +33,7 @@ class TestGetCalmarRatio(unittest.TestCase):
         self.backtest_report.snapshots = self.snapshots
 
     def _create_report(self, total_size_series, timestamps):
-        report = MagicMock(spec=BacktestResult)
+        report = MagicMock(spec=BacktestRun)
         report.portfolio_snapshots = [
             MagicMock(created_at=ts, total_value=size)
             for ts, size in zip(timestamps, total_size_series)

@@ -50,6 +50,15 @@ class Position(BaseModel):
             "portfolio_id": self.portfolio_id,
         }
 
+    @staticmethod
+    def from_dict(data: dict):
+        return Position(
+            symbol=data.get("symbol"),
+            amount=data.get("amount", 0),
+            cost=data.get("cost", 0),
+            portfolio_id=data.get("portfolio_id"),
+        )
+
     def __repr__(self):
         return self.repr(
             symbol=self.symbol,

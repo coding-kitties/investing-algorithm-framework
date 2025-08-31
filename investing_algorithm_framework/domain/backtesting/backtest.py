@@ -3,14 +3,16 @@ import os
 from pathlib import Path
 from dataclasses import dataclass, field
 from logging import getLogger
-from typing import Dict, Union
+from typing import Dict, Union, List
 
 from investing_algorithm_framework.domain.exceptions \
     import OperationalException
 
 from .backtest_metrics import BacktestMetrics
-from .backtest_results import BacktestResult
-from .backtest_permutation_test_metrics import BacktestPermutationTestMetrics
+from .backtest_run import BacktestRun
+from .backtest_permutation_test import BacktestPermutationTest
+from .backtest_date_range import BacktestDateRange
+from .backtest_summary_metrics import BacktestSummaryMetrics
 
 
 logger = getLogger(__name__)
@@ -23,27 +25,104 @@ class Backtest:
     backtest results, and paths to strategy and data files.
 
     Attributes:
-        backtest_metrics (BacktestMetrics): The metrics of the backtest.
-        backtest_results (BacktestResult): The results of the backtest.
-        strategy_related_paths (list[str]): List of paths to strategy related
-            files. These files are copied to the report directory.
-        data_file_paths (list[str]): List of paths to data files. These files
-            are copied to the report directory.
-        meta_data (Dict[str, str]): Metadata related to the backtest, such as
+        backtest_runs (List[BacktestRun]): A list of backtest runs,
+            each representing the performance metrics of a single
+            backtest run.
+        backtest_summary (BacktestSummaryMetrics): An aggregated view of
+            the backtest metrics, combining results from multiple backtests
+            metrics into a single summary.
+        backtest_permutation_tests (List[BacktestPermutationTestMetrics]): A
+            list of backtest permutation tests,
+            each representing the performance metrics of a single
+            backtest permutation test.
+        metadata (Dict[str, str]): Metadata related to the backtest, such as
             configuration parameters or additional information about the
             strategy that was backtested. This can be used for later
             reference or analysis.
         risk_free_rate (float): The risk-free rate used in the backtest,
             typically expressed as a decimal (e.g., 0.03 for 3%). This
+        strategy_ids (List[int]): List of strategy IDs associated with
+            this backtest.
+        algorithm_id (int): The ID of the algorithm associated with this
+            backtest.
     """
-    backtest_metrics: BacktestMetrics = field(default=None)
-    backtest_results: BacktestResult = field(default=None)
-    backtest_permutation_test_metrics: BacktestPermutationTestMetrics = \
-        field(default=None)
-    strategy_related_paths: list[str] = field(default_factory=list)
-    data_file_paths: list[str] = field(default_factory=list)
+    backtest_runs: List[BacktestRun] = field(default_factory=list)
+    backtest_summary: BacktestSummaryMetrics = field(default=None)
+    backtest_permutation_tests: List[BacktestPermutationTest] = \
+        field(default_factory=list)
     metadata: Dict[str, str] = field(default_factory=dict)
     risk_free_rate: float = None
+    strategy_ids: List[int] = field(default_factory=list)
+    algorithm_id: int = None
+
+    def __post_init__(self):
+        # Create the BacktestSummaryMetrics instance if it doesn't exist
+        if self.backtest_summary is None:
+            self.backtest_summary = BacktestSummaryMetrics()
+
+        for backtest_metrics in self.get_all_backtest_metrics():
+            self.backtest_summary.add(backtest_metrics)
+
+    def get_all_backtest_runs(self) -> List[BacktestRun]:
+        """
+        Retrieve all BacktestRun instances from the backtest.
+
+        Returns:
+            List[BacktestRun]: A list of all BacktestRun instances.
+        """
+        return self.backtest_runs
+
+    def get_backtest_run(
+        self, date_range: BacktestDateRange
+    ) -> Union[BacktestRun, None]:
+        """
+        Retrieve a specific BacktestRun based on the provided date range.
+
+        Args:
+            date_range (BacktestDateRange): The date range to search for.
+
+        Returns:
+            Union[BacktestRun, None]: The matching BacktestRun if found,
+                otherwise None.
+        """
+        for run in self.backtest_runs:
+            if (run.backtest_start_date == date_range.start_date and
+                    run.backtest_end_date == date_range.end_date):
+                return run
+        return None
+
+    def get_all_backtest_metrics(self) -> List[BacktestMetrics]:
+        """
+        Retrieve all BacktestMetrics from the backtest runs.
+
+        Returns:
+            List[BacktestMetrics]: A list of BacktestMetrics from
+                all backtest runs.
+        """
+        return [
+            run.backtest_metrics for run in self.backtest_runs
+            if run.backtest_metrics
+        ]
+
+    def get_backtest_metrics(
+        self, date_range: BacktestDateRange
+    ) -> Union[BacktestMetrics, None]:
+        """
+        Retrieve the BacktestMetrics for a specific BacktestRun based on
+        the provided date range.
+
+        Args:
+            date_range (Optional[BacktestDateRange]): The date range to
+                search for.
+
+        Returns:
+            Union[BacktestMetrics, None]: The BacktestMetrics of the matching
+                BacktestRun if found, otherwise None.
+        """
+        run = self.get_backtest_run(date_range)
+        if run:
+            return run.backtest_metrics
+        return None
 
     def to_dict(self) -> dict:
         """
@@ -52,15 +131,22 @@ class Backtest:
         Returns:
             dict: A dictionary representation of the Backtest instance.
         """
+
+        backtest_summary = self.backtest_summary.to_dict() \
+            if self.backtest_summary else None
         return {
-            'backtest_metrics':
-                (self.backtest_metrics.to_dict()
-                 if self.backtest_metrics else None),
-            'backtest_results':
-                (self.backtest_results.to_dict()
-                 if self.backtest_results else None),
-            'strategy_related_paths': self.strategy_related_paths,
-            'data_file_paths': self.data_file_paths
+            "backtest_runs": [
+                    br.to_dict() for br in self.backtest_runs
+                ] if self.backtest_runs else None,
+            "backtest_summary": backtest_summary,
+            "backtest_permutation_tests":
+                [
+                    bpt.to_dict() for bpt in self.backtest_permutation_tests
+                ] if self.backtest_permutation_tests else None,
+            "metadata": self.metadata,
+            "risk_free_rate": self.risk_free_rate,
+            "strategy_ids": self.strategy_ids,
+            "algorithm_id": self.algorithm_id
         }
 
     @staticmethod
@@ -80,12 +166,9 @@ class Backtest:
             OperationalException: If the directory does not exist or if
             there is an error loading the files.
         """
-
-        backtest_metrics = None
-        backtest_results = None
-        permutation_metrics = None
-        data_file_paths = []
-        strategy_related_paths = []
+        backtest_runs = []
+        backtest_summary_metrics = None
+        permutation_metrics = []
         metadata = {}
         risk_free_rate = None
 
@@ -94,43 +177,35 @@ class Backtest:
                 f"The directory {directory_path} does not exist."
             )
 
-        # Load backtest metrics
-        metrics_file = os.path.join(directory_path, "metrics.json")
-        if os.path.isfile(metrics_file):
-            backtest_metrics = BacktestMetrics.open(metrics_file)
+        summary_file = os.path.join(directory_path, "summary.json")
+
+        if os.path.isfile(summary_file):
+            backtest_summary_metrics = \
+                BacktestSummaryMetrics.open(summary_file)
 
         # Load backtest permutation test metrics
-        perm_test_file = os.path.join(directory_path, "permutation_tests")
-        if os.path.isfile(perm_test_file):
-            permutation_metrics = \
-                BacktestPermutationTestMetrics.open(perm_test_file)
+        perm_test_dir = os.path.join(directory_path, "permutation_tests")
 
-        # Load backtest results
-        results_file = os.path.join(directory_path, "results.json")
+        if os.path.isdir(perm_test_dir):
+            for dir_name in os.listdir(perm_test_dir):
+                perm_test_file = os.path.join(perm_test_dir, dir_name)
+                if os.path.isdir(perm_test_file):
+                    permutation_metrics.append(
+                        BacktestPermutationTest.open(perm_test_file)
+                    )
 
-        if os.path.isfile(results_file):
-            backtest_results = BacktestResult.open(results_file)
+        # Load all backtest runs
+        runs_dir = os.path.join(directory_path, "runs")
 
-        # Load strategy related paths
-        strategy_directory = os.path.join(directory_path, "strategies")
-        if os.path.isdir(strategy_directory):
-            strategy_related_paths = [
-                os.path.join(strategy_directory, f)
-                for f in os.listdir(strategy_directory)
-                if os.path.isfile(os.path.join(strategy_directory, f))
-            ]
-
-        # Load data file paths
-        data_directory = os.path.join(directory_path, "backtest_data")
-        if os.path.isdir(data_directory):
-            data_file_paths = [
-                os.path.join(data_directory, f)
-                for f in os.listdir(data_directory)
-                if os.path.isfile(os.path.join(data_directory, f))
-            ]
+        if os.path.isdir(runs_dir):
+            for dir_name in os.listdir(runs_dir):
+                run_path = os.path.join(runs_dir, dir_name)
+                if os.path.isdir(run_path):
+                    backtest_runs.append(BacktestRun.open(run_path))
 
         # Load metadata if available
         meta_file = os.path.join(directory_path, "metadata.json")
+
         if os.path.isfile(meta_file):
             with open(meta_file, 'r') as f:
                 metadata = json.load(f)
@@ -139,6 +214,7 @@ class Backtest:
         risk_free_rate_file = os.path.join(
             directory_path, "risk_free_rate.json"
         )
+
         if os.path.isfile(risk_free_rate_file):
             with open(risk_free_rate_file, 'r') as f:
                 try:
@@ -150,11 +226,9 @@ class Backtest:
                     risk_free_rate = None
 
         return Backtest(
-            backtest_metrics=backtest_metrics,
-            backtest_results=backtest_results,
-            strategy_related_paths=strategy_related_paths,
-            data_file_paths=data_file_paths,
-            backtest_permutation_test_metrics=permutation_metrics,
+            backtest_runs=backtest_runs,
+            backtest_summary=backtest_summary_metrics,
+            backtest_permutation_tests=permutation_metrics,
             metadata=metadata,
             risk_free_rate=risk_free_rate
         )
@@ -180,66 +254,35 @@ class Backtest:
         if not os.path.exists(directory_path):
             os.makedirs(directory_path)
 
-        # Call the save method of BacktestMetrics
-        if self.backtest_metrics:
-            self.backtest_metrics.save(directory_path)
+        # Call the save method of all backtest runs
+        if self.backtest_runs:
+            run_path = os.path.join(directory_path, "runs")
+            os.makedirs(run_path, exist_ok=True)
 
-        # Call the save method of BacktestResult
-        if self.backtest_results:
-            self.backtest_results.save(directory_path)
+            for bm in self.backtest_runs:
+                dir_name = bm.create_directory_name()
+                run_path = os.path.join(run_path, dir_name)
+                os.makedirs(run_path, exist_ok=True)
+                bm.save(run_path)
 
-        if self.backtest_permutation_test_metrics:
+        # Save combined backtest metrics if available
+        if self.backtest_summary:
+            summary_file = os.path.join(
+                directory_path, "summary.json"
+            )
+            self.backtest_summary.save(summary_file)
+
+        if self.backtest_permutation_tests:
             permutation_path = os.path.join(
                 directory_path, "permutation_tests"
             )
             os.makedirs(permutation_path, exist_ok=True)
-            self.backtest_permutation_test_metrics.save(permutation_path)
 
-        # Save the strategy
-        if self.strategy_related_paths is not None:
-            # Create a strategy directory if it does not exist
-            strategy_directory = os.path.join(directory_path, "strategies")
-            if not os.path.exists(strategy_directory):
-                os.makedirs(strategy_directory)
-
-            # Copy strategy related files to the report directory
-            for file in self.strategy_related_paths:
-                if not os.path.isfile(file):
-                    raise OperationalException(
-                        f"Strategy file {file} does not exist"
-                    )
-
-                destination_file = os.path.join(
-                    strategy_directory, os.path.basename(file)
-                )
-                with open(file, "rb") as src:
-                    with open(destination_file, "wb") as dst:
-                        dst.write(src.read())
-
-        # Save the data files
-        if self.data_file_paths is not None:
-            # Create a data directory if it does not exist
-            data_directory = os.path.join(directory_path, "backtest_data")
-
-            if not os.path.exists(data_directory):
-                os.makedirs(data_directory)
-
-            # Copy data files to the report directory
-            for file in self.data_file_paths:
-
-                try:
-                    if not os.path.isfile(file):
-                        raise OperationalException(
-                            f"Data file {file} does not exist"
-                        )
-                    destination_file = os.path.join(
-                        data_directory, os.path.basename(file)
-                    )
-                    with open(file, "rb") as src:
-                        with open(destination_file, "wb") as dst:
-                            dst.write(src.read())
-                except Exception as e:
-                    logger.error(f"Error copying data file {file}: {e}")
+            for pm in self.backtest_permutation_tests:
+                dir_name = pm.create_directory_name()
+                pm_path = os.path.join(permutation_path, dir_name)
+                os.makedirs(pm_path, exist_ok=True)
+                pm.save(pm_path)
 
         # Save metadata if available
         if self.metadata:
@@ -257,6 +300,24 @@ class Backtest:
                     {'risk_free_rate': self.risk_free_rate}, f, indent=4
                 )
 
+        # Save strategy IDs if available
+        if self.strategy_ids:
+            strategy_ids_file = os.path.join(
+                directory_path, "strategy_ids.json"
+            )
+            with open(strategy_ids_file, 'w') as f:
+                json.dump({'strategy_ids': self.strategy_ids}, f, indent=4)
+
+        # Save algorithm ID if available
+        if self.algorithm_id is not None:
+            algorithm_id_file = os.path.join(
+                directory_path, "algorithm_id.json"
+            )
+            with open(algorithm_id_file, 'w') as f:
+                json.dump(
+                    {'algorithm_id': self.algorithm_id}, f, indent=4
+                )
+
     def __repr__(self):
         """
         Return a string representation of the Backtest instance.
@@ -267,3 +328,57 @@ class Backtest:
         return json.dumps(
             self.to_dict(), indent=4, sort_keys=True, default=str
         )
+
+    def merge(self, other: 'Backtest') -> 'Backtest':
+        """
+        Function to merge another Backtest instance into this one.
+
+        Args:
+            other (Backtest): The other Backtest instance to merge.
+
+        Returns:
+            Backtest: The merged Backtest instance.
+        """
+
+        merged = Backtest()
+        merged.backtest_runs = self.backtest_runs + other.backtest_runs
+
+        summary = BacktestSummaryMetrics()
+
+        for bt_run in merged.get_all_backtest_metrics():
+            summary.add(bt_run)
+
+        merged.backtest_summary = summary
+        merged.backtest_permutation_tests = \
+            self.backtest_permutation_tests + other.backtest_permutation_tests
+
+        # Merge metadata
+        merged.metadata = {**self.metadata, **other.metadata}
+
+        if self.risk_free_rate is None:
+            merged.risk_free_rate = other.risk_free_rate
+
+        if self.strategy_ids is None:
+            merged.strategy_ids = other.strategy_ids
+
+        if self.algorithm_id is None:
+            merged.algorithm_id = other.algorithm_id
+
+        return merged
+
+    def get_backtest_date_ranges(self):
+        """
+        Get the date ranges for the backtest.
+
+        Returns:
+            List[BacktestDateRange]: A list of BacktestDateRange objects
+                representing the date ranges for each backtest run.
+        """
+        return [
+            BacktestDateRange(
+                start_date=run.backtest_start_date,
+                end_date=run.backtest_end_date,
+                name=run.backtest_date_range_name
+            )
+            for run in self.backtest_runs
+        ]

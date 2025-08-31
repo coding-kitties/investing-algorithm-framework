@@ -19,12 +19,9 @@ from .exceptions import OperationalException, ApiException, \
     PermissionDeniedApiException, ImproperlyConfigured, NetworkError
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, PortfolioConfiguration, Portfolio, Position, \
-    Order, TradeStatus, StrategyProfile, \
-    Trade, MarketCredential, \
-    AppMode, DataType, DataSource, \
-    PortfolioSnapshot, PositionSnapshot, \
-    TradeRiskType, TradeTakeProfit, TradeStopLoss, \
-    Event, SnapshotInterval
+    Order, TradeStatus, StrategyProfile, Trade, MarketCredential, \
+    AppMode, DataType, DataSource, PortfolioSnapshot, PositionSnapshot, \
+    TradeRiskType, TradeTakeProfit, TradeStopLoss, Event, SnapshotInterval
 from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
 from .services import MarketCredentialService, AbstractPortfolioSyncService, \
@@ -36,9 +33,9 @@ from .utils import random_string, append_dict_as_row_to_csv, \
     convert_polars_to_pandas, random_number, is_jupyter_notebook, \
     csv_to_list, StoppableThread, load_csv_into_dict, tqdm, \
     is_timezone_aware, sync_timezones, get_timezone
-from .backtesting import BacktestResult, BacktestPosition, \
+from .backtesting import BacktestRun, BacktestSummaryMetrics, \
     BacktestDateRange, Backtest, BacktestMetrics, \
-    BacktestPermutationTestMetrics, BacktestEvaluationFocus
+    BacktestPermutationTest, BacktestEvaluationFocus
 
 __all__ = [
     "OrderStatus",
@@ -78,13 +75,12 @@ __all__ = [
     "StatelessActions",
     "parse_decimal_to_string",
     "parse_string_to_decimal",
-    "BacktestResult",
+    "BacktestRun",
     "DATETIME_FORMAT_BACKTESTING",
     "BACKTESTING_FLAG",
     "PortfolioSnapshot",
     "BACKTESTING_START_DATE",
     "StrategyProfile",
-    "BacktestPosition",
     "CCXT_DATETIME_FORMAT",
     "BACKTEST_DATA_DIRECTORY_NAME",
     "Trade",
@@ -135,8 +131,8 @@ __all__ = [
     "DataSource",
     "Backtest",
     "BacktestMetrics",
-    "BacktestResult",
-    "BacktestPosition",
+    "BacktestSummaryMetrics",
+    "BacktestPermutationTest",
     "LAST_SNAPSHOT_DATETIME",
     "DATA_DIRECTORY",
     "INDEX_DATETIME",
@@ -144,6 +140,5 @@ __all__ = [
     "is_jupyter_notebook",
     "tqdm",
     "DEFAULT_DATETIME_FORMAT",
-    "BacktestPermutationTestMetrics",
     "BacktestEvaluationFocus"
 ]

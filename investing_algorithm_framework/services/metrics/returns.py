@@ -128,6 +128,32 @@ def get_average_gain(trades: List[Trade]) -> Tuple[float, float]:
     percentage = (average_gain / cost) if cost > 0 else 0.0
     return average_gain, percentage
 
+
+def get_average_return(trades: List[Trade]) -> Tuple[float, float]:
+    """
+    Calculate the average return from a list of trades.
+
+    The average return is calculated as the mean of all returns.
+
+    Args:
+        trades (List[Trade]): List of trades.
+
+    Returns:
+        Tuple[float, float]: The average return
+        percentage of the average return
+    """
+
+    returns = [t.net_gain for t in trades]
+    cost = sum(t.cost for t in trades)
+
+    if not returns:
+        return 0.0, 0.0
+
+    average_return = sum(returns) / len(returns)
+    percentage = (average_return / cost) if cost > 0 else 0.0
+    return average_return, percentage
+
+
 def get_best_trade(trades: List[Trade]) -> Trade:
     """
     Get the trade with the highest net gain.

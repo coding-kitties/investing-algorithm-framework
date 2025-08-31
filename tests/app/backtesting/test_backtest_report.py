@@ -4,8 +4,7 @@ from unittest import TestCase
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm, \
-    BacktestDateRange, BacktestReport
-from investing_algorithm_framework.services import BacktestService
+    BacktestDateRange
 
 
 class TestStrategy(TradingStrategy):
@@ -83,86 +82,3 @@ class Test(TestCase):
 
         # Check if the backtest report exists
         self.assertTrue(os.path.isdir(path))
-
-    def test_get_orders(self):
-        path = os.path.join(
-            self.resource_dir,
-            "backtest_reports_for_testing/test_algorithm_backtest_created-at_2025-04-21-21-21"
-        )
-        backtest_report = BacktestReport.open(directory_path=path)
-        report = backtest_report.backtests[0].backtest_results
-        self.assertEqual(
-            len(report.get_orders()),
-            331
-        )
-        self.assertEqual(
-            len(report.get_orders(order_status="OPEN")),
-            0
-        )
-        self.assertEqual(
-            len(report.get_orders(order_status="CLOSED")),
-            331
-        )
-        self.assertEqual(
-            len(report.get_orders(target_symbol="BTC")),
-            58
-        )
-        self.assertEqual(
-            len(report.get_orders(target_symbol="SOL")),
-            98
-        )
-        self.assertEqual(
-            len(report.get_orders(target_symbol="ETH")),
-            59
-        )
-        self.assertEqual(
-            len(report.get_orders(target_symbol="DOT")),
-            116
-        )
-        self.assertEqual(
-            len(report.get_orders(order_status="CLOSED", target_symbol="BTC")),
-            58
-        )
-
-    def test_get_trades(self):
-        path = os.path.join(
-            self.resource_dir,
-            "backtest_reports_for_testing/test_algorithm_backtest_created-at_2025-04-21-21-21"
-        )
-        backtest_report = BacktestReport.open(directory_path=path)
-        report = backtest_report.backtests[0].backtest_results
-        self.assertEqual(
-            len(report.get_trades(trade_status="OPEN")),
-            3
-        )
-        self.assertEqual(
-            len(report.get_trades(trade_status="CLOSED")),
-            133
-        )
-        self.assertEqual(
-            len(report.get_trades(target_symbol="BTC")),
-            25
-        )
-        self.assertEqual(
-            len(report.get_trades(target_symbol="SOL")),
-            40
-        )
-        self.assertEqual(
-            len(report.get_trades(target_symbol="ETH")),
-            23
-        )
-        self.assertEqual(
-            len(report.get_trades(target_symbol="DOT")),
-            48
-        )
-
-    def test_get_symbols(self):
-        path = os.path.join(
-            self.resource_dir,
-            "backtest_reports_for_testing/test_algorithm_backtest_created-at_2025-04-21-21-21"
-        )
-        backtest_report = BacktestReport.open(directory_path=path)
-        report = backtest_report.backtests[0].backtest_results
-        self.assertEqual(
-            set(report.symbols), {'SOL', 'ETH', 'DOT', 'BTC'}
-        )

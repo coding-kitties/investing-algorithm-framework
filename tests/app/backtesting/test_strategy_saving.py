@@ -80,28 +80,9 @@ class Test(TestCase):
         backtest_report_root_dir = os.path.join(
             self.resource_dir, "backtest_reports"
         )
-        report = app.run_backtest(
+        backtest = app.run_backtest(
             algorithm=algorithm,
             backtest_date_range=backtest_date_range,
-            directory=backtest_report_root_dir,
             risk_free_rate=0.027
         )
-        report_directory = BacktestService.create_report_directory_name(report)
-        report_name = "results.json"
 
-        backtest_report_dir = os.path.join(
-            backtest_report_root_dir, report_directory
-        )
-
-        # Check if the backtest report root directory exists
-        self.assertTrue(os.path.isdir(backtest_report_root_dir))
-
-        # Check if the backtest report directory exists
-        self.assertTrue(os.path.isdir(backtest_report_dir))
-
-        report_file_path = os.path.join(
-            backtest_report_dir, report_name
-        )
-
-        # check if the report json file exists
-        self.assertTrue(os.path.isfile(report_file_path))

@@ -1,7 +1,9 @@
 import math
+from typing import List
+from statistics import mean
 
-from investing_algorithm_framework.domain import BacktestEvaluationFocus
-BacktestEvaluationFocus
+from investing_algorithm_framework.domain import BacktestEvaluationFocus, \
+    BacktestDateRange, Backtest, BacktestMetrics, OperationalException
 
 
 def normalize(value, min_val, max_val):
@@ -61,9 +63,6 @@ def create_weights(
 
     Args:
         focus (BacktestEvaluationFocus | str | None): The focus for ranking.
-        gain (float): Weight for total_net_gain (default only).
-        win_rate (float): Weight for win_rate (default only).
-        trades (float): Weight for number_of_trades (default only).
         custom_weights (dict): Full override for weights (all metrics).
                                If provided, it takes precedence over presets.
 
@@ -82,12 +81,18 @@ def create_weights(
     return weights
 
 
-def rank_results(backtests, focus=None, weights=None, filter_fn=None):
+def rank_results(
+    backtests: List[Backtest],
+    focus=None,
+    weights=None,
+    filter_fn=None,
+    backtest_date_range: BacktestDateRange = None
+) -> List[Backtest]:
     """
     Rank backtest results based on specified focus, weights, and filters.
 
     Args:
-        backtests (list): List of backtest results to rank.
+        backtests (List[Backtest]): List of backtest results to rank.
         focus (str, optional): Focus for ranking. If None,
             uses default weights. Options: "balanced", "profit",
             "frequency", "risk_adjusted".
@@ -98,45 +103,178 @@ def rank_results(backtests, focus=None, weights=None, filter_fn=None):
             - If callable: receives metrics and should return True/False.
             - If dict: mapping {metric_name: condition_fn},
               all conditions must pass.
+        backtest_date_range (BacktestDateRange, optional): If provided,
+            only backtests matching this date range are considered.
 
     Returns:
-        list: Sorted list of backtests based on computed scores.
+        List[Backtest]: Sorted list of backtests based on computed scores.
     """
 
     if weights is None:
         weights = create_weights(focus=focus)
 
-    # Apply filtering
+    # Pair backtests with their metrics
+    paired = []
+    for backtest in backtests:
+        if backtest_date_range is not None:
+            metrics = backtest.get_backtest_metrics(backtest_date_range)
+        else:
+            metrics = backtest.backtest_summary
+
+        if metrics is not None:
+            paired.append((backtest, metrics))
+
+    # Apply filtering on metrics
     if filter_fn is not None:
         if callable(filter_fn):
-            backtests = [
-                bt for bt in backtests
-                if filter_fn(bt.backtest_metrics)
+            paired = [
+                (bt, m) for bt, m in paired if filter_fn(m)
             ]
         elif isinstance(filter_fn, dict):
-            backtests = [
-                bt for bt in backtests
+            paired = [
+                (bt, m) for bt, m in paired
                 if all(
-                    cond(getattr(bt.backtest_metrics, key, None))
+                    cond(getattr(m, key, None))
                     for key, cond in filter_fn.items()
                 )
             ]
 
-    # First compute metric ranges for normalization
+    # Compute normalization ranges
     ranges = {}
     for key in weights:
-        values = [getattr(bt.backtest_metrics, key, None) for bt in backtests]
+        values = [
+            getattr(m, key, None) for _, m in paired
+        ]
         values = [
             v for v in values
             if isinstance(v, (int, float)) and v is not None
             and not math.isnan(v) and not math.isinf(v)
         ]
-
         if values:
             ranges[key] = (min(values), max(values))
 
-    return sorted(
-        backtests,
-        key=lambda bt: compute_score(bt.backtest_metrics, weights, ranges),
+    # Sort Backtests by score
+    ranked = sorted(
+        paired,
+        key=lambda bm: compute_score(bm[1], weights, ranges),
         reverse=True
+    )
+
+    return [bt for bt, _ in ranked]
+
+
+def combine_backtest_metrics(
+    backtest_metrics: List[BacktestMetrics]
+) -> BacktestMetrics:
+    """
+    Combine backtest metrics from multiple backtests into a single list.
+
+    Args:
+        backtest_metrics (List[BacktestMetrics]): List of backtest
+            metrics to combine.
+
+    Returns:
+        BacktestMetrics: Combined list of backtest metrics.
+    """
+    if not backtest_metrics:
+        raise OperationalException("No BacktestMetrics provided")
+
+        # Helper to take mean safely
+
+    def safe_mean(values):
+        vals = [v for v in values if v is not None]
+        return mean(vals) if vals else 0.0
+
+        # Dates
+
+    start_date = min(m.backtest_start_date for m in backtest_metrics)
+    end_date = max(m.backtest_end_date for m in backtest_metrics)
+
+    # Aggregate
+    return BacktestMetrics(
+        backtest_start_date=start_date,
+        backtest_end_date=end_date,
+        equity_curve=[],  # leave empty to avoid misleading curves
+        growth=safe_mean([m.growth for m in backtest_metrics]),
+        growth_percentage=safe_mean(
+            [m.growth_percentage for m in backtest_metrics]),
+        total_net_gain=safe_mean([m.total_net_gain for m in backtest_metrics]),
+        total_net_gain_percentage=safe_mean(
+            [m.total_net_gain_percentage for m in backtest_metrics]),
+        final_value=safe_mean([m.final_value for m in backtest_metrics]),
+        cagr=safe_mean([m.cagr for m in backtest_metrics]),
+        sharpe_ratio=safe_mean([m.sharpe_ratio for m in backtest_metrics]),
+        rolling_sharpe_ratio=[],
+        sortino_ratio=safe_mean([m.sortino_ratio for m in backtest_metrics]),
+        calmar_ratio=safe_mean([m.calmar_ratio for m in backtest_metrics]),
+        profit_factor=safe_mean([m.profit_factor for m in backtest_metrics]),
+        gross_profit=sum(m.gross_profit or 0 for m in backtest_metrics),
+        gross_loss=sum(m.gross_loss or 0 for m in backtest_metrics),
+        annual_volatility=safe_mean(
+            [m.annual_volatility for m in backtest_metrics]),
+        monthly_returns=[],
+        yearly_returns=[],
+        drawdown_series=[],
+        max_drawdown=max(m.max_drawdown for m in backtest_metrics),
+        max_drawdown_absolute=max(
+            m.max_drawdown_absolute for m in backtest_metrics),
+        max_daily_drawdown=max(m.max_daily_drawdown for m in backtest_metrics),
+        max_drawdown_duration=max(
+            m.max_drawdown_duration for m in backtest_metrics),
+        trades_per_year=safe_mean(
+            [m.trades_per_year for m in backtest_metrics]
+        ),
+        trade_per_day=safe_mean([m.trade_per_day for m in backtest_metrics]),
+        exposure_ratio=safe_mean(
+            [m.exposure_ratio for m in backtest_metrics]
+        ),
+        trades_average_gain=safe_mean(
+            [m.trades_average_gain for m in backtest_metrics]),
+        trades_average_loss=safe_mean(
+            [m.trades_average_loss for m in backtest_metrics]),
+        best_trade=max((
+            m.best_trade for m in backtest_metrics if m.best_trade),
+            key=lambda t: t.net_gain if t else float('-inf'),
+            default=None
+        ),
+        worst_trade=min(
+            (m.worst_trade for m in backtest_metrics if m.worst_trade),
+            key=lambda t: t.net_gain if t else float('inf'),
+            default=None
+        ),
+        average_trade_duration=safe_mean(
+            [m.average_trade_duration for m in backtest_metrics]),
+        number_of_trades=sum(m.number_of_trades for m in backtest_metrics),
+        win_rate=safe_mean([m.win_rate for m in backtest_metrics]),
+        win_loss_ratio=safe_mean([m.win_loss_ratio for m in backtest_metrics]),
+        percentage_winning_months=safe_mean(
+            [m.percentage_winning_months for m in backtest_metrics]),
+        percentage_winning_years=safe_mean(
+            [m.percentage_winning_years for m in backtest_metrics]),
+        average_monthly_return=safe_mean(
+            [m.average_monthly_return for m in backtest_metrics]),
+        average_monthly_return_losing_months=safe_mean(
+            [m.average_monthly_return_losing_months for m in backtest_metrics]
+        ),
+        average_monthly_return_winning_months=safe_mean(
+            [m.average_monthly_return_winning_months for m in backtest_metrics]
+        ),
+        best_month=max(
+            (m.best_month for m in backtest_metrics if m.best_month),
+            key=lambda x: x[0] if x else float('-inf'),
+            default=None
+        ),
+        best_year=max((m.best_year for m in backtest_metrics if m.best_year),
+                      key=lambda x: x[0] if x else float('-inf'),
+                      default=None),
+        worst_month=min(
+            (m.worst_month for m in backtest_metrics if m.worst_month),
+            key=lambda x: x[0] if x else float('inf'),
+            default=None
+        ),
+        worst_year=min(
+            (m.worst_year for m in backtest_metrics if m.worst_year),
+            key=lambda x: x[0] if x else float('inf'),
+            default=None
+        ),
     )

@@ -16,7 +16,7 @@ from .domain import ApiException, \
     Trade, SYMBOLS, RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT, \
     BacktestDateRange, convert_polars_to_pandas, \
     DEFAULT_LOGGING_CONFIG, DataType, DataProvider, \
-    BacktestResult, TradeStatus, TradeRiskType, \
+    TradeStatus, TradeRiskType, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus
 from .infrastructure import AzureBlobStorageStateHandler, \
@@ -30,7 +30,7 @@ from .services.metrics import get_annual_volatility, get_sortino_ratio, \
     get_profit_factor, get_cumulative_profit_factor_series, \
     get_rolling_profit_factor_series, get_cagr, \
     get_standard_deviation_returns, get_standard_deviation_downside_returns, \
-    get_max_drawdown_absolute, get_total_return, get_exposure, \
+    get_max_drawdown_absolute, get_total_return, get_exposure_ratio, \
     get_average_trade_duration, get_win_rate, get_win_loss_ratio, \
     get_calmar_ratio, get_trade_frequency, get_yearly_returns, \
     get_monthly_returns, get_best_year, get_best_month, get_worst_year, \
@@ -41,7 +41,7 @@ from .services.metrics import get_annual_volatility, get_sortino_ratio, \
     get_trades_per_year, get_average_monthly_return_losing_months, \
     get_average_monthly_return_winning_months, get_percentage_winning_years, \
     get_rolling_sharpe_ratio, create_backtest_metrics, get_growth, \
-    get_growth_percentage
+    get_growth_percentage, get_cumulative_exposure
 
 
 __all__ = [
@@ -75,7 +75,6 @@ __all__ = [
     "AppMode",
     "DATETIME_FORMAT",
     "Backtest",
-    "BacktestResult",
     "BacktestDateRange",
     "convert_polars_to_pandas",
     "AzureBlobStorageStateHandler",
@@ -118,7 +117,8 @@ __all__ = [
     "get_standard_deviation_downside_returns",
     "get_max_drawdown_absolute",
     "get_total_return",
-    "get_exposure",
+    "get_exposure_ratio",
+    "get_cumulative_exposure",
     "get_average_trade_duration",
     "get_win_rate",
     "get_win_loss_ratio",

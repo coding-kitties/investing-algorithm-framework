@@ -3,15 +3,15 @@ import os
 import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Union
 
 import numpy as np
 import pandas as pd
 import polars as pl
 
-from investing_algorithm_framework.domain import BacktestResult, \
+from investing_algorithm_framework.domain import BacktestRun, \
     TimeUnit, Trade, OperationalException, Observable, BacktestDateRange, \
-    DATETIME_FORMAT_BACKTESTING, Backtest, TradeStatus, PortfolioSnapshot, \
+    Backtest, TradeStatus, PortfolioSnapshot, \
     DataType
 from investing_algorithm_framework.services.data_providers import \
     DataProviderService
@@ -19,16 +19,6 @@ from investing_algorithm_framework.services.metrics import \
     create_backtest_metrics
 
 logger = logging.getLogger(__name__)
-BACKTEST_REPORT_FILE_NAME_PATTERN = (
-    r"^report_\w+_backtest-start-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
-    r"backtest-end-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
-    r"created-at_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}\.json$"
-)
-BACKTEST_REPORT_DIRECTORY_PATTERN = (
-    r"^report_\w+_backtest-start-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
-    r"backtest-end-date_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}_"
-    r"created-at_\d{4}-\d{2}-\d{2}:\d{2}:\d{2}$"
-)
 
 
 class BacktestService(Observable):
@@ -125,7 +115,7 @@ class BacktestService(Observable):
         initial_amount,
         position_size: float = 1.0,
         risk_free_rate: float = 0.027
-    ):
+    ) -> BacktestRun:
         """
         Vectorized backtest using a strategy's buy/sell signals.
 
@@ -241,14 +231,8 @@ class BacktestService(Observable):
             for ts in index
         ]
 
-        backtest_start = pd.Timestamp(index[0]).to_pydatetime() if len(
-            index) > 0 else None
-        backtest_end = pd.Timestamp(index[-1]).to_pydatetime() if len(
-            index) > 0 else None
-
-        backtest_result = BacktestResult(
+        run = BacktestRun(
             trading_symbol="EUR",
-            name="vector_backtest",
             initial_unallocated=initial_amount,
             number_of_runs=1,
             portfolio_snapshots=snapshots,
@@ -256,20 +240,16 @@ class BacktestService(Observable):
             orders=[],
             positions=[],
             created_at=datetime.now(timezone.utc),
-            backtest_date_range=backtest_date_range,
-            backtest_start_date=backtest_start,
-            backtest_end_date=backtest_end,
+            backtest_start_date=backtest_date_range.start_date,
+            backtest_end_date=backtest_date_range.end_date,
+            backtest_date_range_name=backtest_date_range.name,
             symbols=[]
         )
-
         backtest_metrics = create_backtest_metrics(
-            backtest_result, risk_free_rate=risk_free_rate
+            run, risk_free_rate=risk_free_rate
         )
-
-        return Backtest(
-            backtest_metrics=backtest_metrics,
-            backtest_results=backtest_result
-        )
+        run.backtest_metrics = backtest_metrics
+        return run
 
     def generate_schedule(
         self,
@@ -403,9 +383,10 @@ class BacktestService(Observable):
                         if os.path.isfile(source_file):
                             strategy_related_paths.append(source_file)
 
-        backtest_result = BacktestResult(
-            name=algorithm.name,
-            backtest_date_range=backtest_date_range,
+        run = BacktestRun(
+            backtest_start_date=backtest_date_range.start_date,
+            backtest_end_date=backtest_date_range.end_date,
+            backtest_date_range_name=backtest_date_range.name,
             initial_unallocated=self._get_initial_unallocated(),
             trading_symbol=portfolio.trading_symbol,
             created_at=datetime.now(tz=timezone.utc),
@@ -424,80 +405,9 @@ class BacktestService(Observable):
             ),
         )
         backtest_metrics = create_backtest_metrics(
-            backtest_result, risk_free_rate=risk_free_rate
+            run, risk_free_rate=risk_free_rate
         )
+        run.backtest_metrics = backtest_metrics
         return Backtest(
-            backtest_results=backtest_result,
-            backtest_metrics=backtest_metrics,
-            strategy_related_paths=strategy_related_paths,
-            data_file_paths=self._data_provider_service.get_data_files(),
+            backtest_runs=[run],
         )
-
-    def get_backtest(
-        self,
-        algorithm,
-        backtest_date_range: BacktestDateRange,
-        directory
-    ) -> Optional[Backtest]:
-        """
-        Get a backtest for the given algorithm and date range.
-
-        Args:
-            algorithm: The algorithm to get the backtest for
-            backtest_date_range: The date range of the backtest
-            directory: The directory where the backtest report will be saved
-
-        Returns:
-            Optional[Backtest]: The backtest containing the
-                results and metrics.
-        """
-
-        if not os.path.exists(directory):
-            return None
-
-        for entry in os.listdir(directory):
-            path = os.path.join(directory, entry)
-
-            if not os.path.isdir(path):
-                continue
-
-            try:
-                # Load the backtest report
-                backtest = Backtest.open(path)
-
-                # Check if the algorithm name and date range match
-                if backtest.backtest_results.name == algorithm.name \
-                    and backtest.backtest_results.backtest_date_range \
-                        == backtest_date_range:
-                    return backtest
-            except Exception:
-                continue
-
-        return None
-
-    @staticmethod
-    def create_report_directory_name(backtest: Backtest) -> str:
-        """
-        Function to create a directory name for a backtest report.
-        The directory name will be automatically generated based on the
-        algorithm name and creation date.
-
-        Args:
-            backtest (Backtest): The backtest object containing the results
-                and metrics.
-
-        Returns:
-            directory_name: str The directory name for the
-                backtest report file.
-        """
-        created_at = backtest.backtest_results\
-            .created_at.strftime(DATETIME_FORMAT_BACKTESTING)
-        date_range = backtest.backtest_results.backtest_date_range
-        backtest_start_date = date_range.start_date
-        backtest_end_date = date_range.end_date
-        name = backtest.backtest_results.name
-        start_date = backtest_start_date.strftime(DATETIME_FORMAT_BACKTESTING)
-        end_date = backtest_end_date.strftime(DATETIME_FORMAT_BACKTESTING)
-        directory_name = f"report_{name}_backtest-start-date_" \
-            f"{start_date}_backtest-end-date_{end_date}_{created_at}"
-        return directory_name

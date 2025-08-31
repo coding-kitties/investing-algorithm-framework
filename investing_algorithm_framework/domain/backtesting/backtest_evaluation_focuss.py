@@ -4,9 +4,9 @@ from enum import Enum
 default_weights = {
     # Profitability
     "total_net_gain": 3.0,
-    "total_net_loss": 0.0,
-    "total_return": 0.0,
-    "avg_return_per_trade": 0.0,
+    "gross_loss": 0.0,
+    "growth": 0.0,
+    "trades_average_return": 0.0,
 
     # Risk-adjusted returns
     "sharpe_ratio": 1.0,
@@ -22,9 +22,8 @@ default_weights = {
     "win_rate": 3.0,
 
     # Exposure
-    "exposure_factor": 0.5,
+    "cumulative_exposure": 0.5,
     "exposure_ratio": 0.0,
-    "exposure_time": 0.0,
 }
 
 

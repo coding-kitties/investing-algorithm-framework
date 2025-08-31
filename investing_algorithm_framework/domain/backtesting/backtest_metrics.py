@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from dataclasses import dataclass, field
 from logging import getLogger
 from typing import Tuple, List
@@ -32,6 +33,7 @@ class BacktestMetrics:
             of the backtest.
         total_net_gain (float): The total return of the backtest.
         total_net_gain_percentage (float): The total return percentage
+        total_loss (float): The total loss of the backtest.
         cagr (float): The compound annual growth rate of the backtest.
         sharpe_ratio (float): The Sharpe ratio of the backtest, indicating
             risk-adjusted return.
@@ -62,10 +64,19 @@ class BacktestMetrics:
         trades_per_year (float): The average number of trades
             executed per year.
         trade_per_day (float): The average number of trades executed per day.
-        exposure_factor (float): The exposure factor, indicating the
+        exposure_ratio (float): The exposure ratio, indicating the
             average exposure of the portfolio.
+        cumulative_exposure (float): The cumulative exposure, indicating the
+            total exposure of the portfolio over the backtest period.
         trades_average_gain (float): The average gain from winning trades.
+        trades_average_gain_percentage (float): The average gain percentage
+            from winning trades.
         trades_average_loss (float): The average loss from losing trades.
+        trades_average_loss_percentage (float): The average loss percentage
+            from losing trades.
+        trades_average_return (float): The average return from all trades.
+        trades_average_return_percentage (float): The average return
+            percentage from all trades.
         best_trade (float): A string representation of the best trade,
             including net gain and percentage.
         worst_trade (float): A string representation of the worst trade,
@@ -82,6 +93,10 @@ class BacktestMetrics:
             with positive returns.
         percentage_winning_years (float): The percentage of years with
             positive returns.
+        percentage_positive_trades (float): The percentage of trades that
+            were profitable.
+        percentage_negative_trades (float): The percentage of trades that
+            were unprofitable.
         average_monthly_return (float): The average monthly return
             of the portfolio.
         average_monthly_return_losing_months (float): The average monthly
@@ -124,15 +139,23 @@ class BacktestMetrics:
     max_drawdown_duration: int = 0
     trades_per_year: float = 0.0
     trade_per_day: float = 0.0
-    exposure_factor: float = 0.0
-    trades_average_gain: Tuple[float, float] = 0.0
-    trades_average_loss: Tuple[float, float] = 0.0
+    exposure_ratio: float = 0.0
+    cumulative_exposure: float = 0.0
+    trades_average_gain: float = 0.0
+    trades_average_gain_percentage: float = 0.0
+    trades_average_loss: float = 0.0
+    trades_average_loss_percentage: float = 0.0
+    trades_average_return: float = 0.0
+    trades_average_return_percentage: float = 0.0
     best_trade: Trade = None
     worst_trade: Trade = None
     average_trade_duration: float = 0.0
+    average_trade_size: float = 0.0
     number_of_trades: int = 0
     win_rate: float = 0.0
     win_loss_ratio: float = 0.0
+    percentage_positive_trades: float = 0.0
+    percentage_negative_trades: float = 0.0
     percentage_winning_months: float = 0.0
     percentage_winning_years: float = 0.0
     average_monthly_return: float = 0.0
@@ -182,19 +205,30 @@ class BacktestMetrics:
             "max_drawdown_duration": self.max_drawdown_duration,
             "trades_per_year": self.trades_per_year,
             "trade_per_day": self.trade_per_day,
-            "exposure_factor": self.exposure_factor,
+            "exposure_ratio": self.exposure_ratio,
+            "cumulative_exposure": self.cumulative_exposure,
             "trades_average_gain": self.trades_average_gain,
+            "trades_average_gain_percentage":
+                self.trades_average_gain_percentage,
             "trades_average_loss": self.trades_average_loss,
+            "trades_average_loss_percentage":
+                self.trades_average_loss_percentage,
+            "trades_average_return": self.trades_average_return,
+            "trades_average_return_percentage":
+                self.trades_average_return_percentage,
             "best_trade": self.best_trade.to_dict()
             if self.best_trade else None,
             "worst_trade": self.worst_trade.to_dict()
             if self.worst_trade else None,
             "average_trade_duration": self.average_trade_duration,
+            "average_trade_size": self.average_trade_size,
             "number_of_trades": self.number_of_trades,
             "win_rate": self.win_rate,
             "win_loss_ratio": self.win_loss_ratio,
             "percentage_winning_months": self.percentage_winning_months,
             "percentage_winning_years": self.percentage_winning_years,
+            "percentage_positive_trades": self.percentage_positive_trades,
+            "percentage_negative_trades": self.percentage_negative_trades,
             "average_monthly_return": self.average_monthly_return,
             "average_monthly_return_losing_months":
                 self.average_monthly_return_losing_months,
@@ -206,20 +240,15 @@ class BacktestMetrics:
             "worst_year": self.worst_year
         }
 
-    def save(self, directory_path: str) -> None:
+    def save(self, file_path: str | Path) -> None:
         """
         Save the backtest metrics to a file in JSON format. The metrics will
         always be saved in a file named `metrics.json`
 
         Args:
-            directory_path (str): The directory where the metrics
+            file_path (str): The directory where the metrics
             file will be saved.
         """
-
-        if not os.path.exists(directory_path):
-            os.makedirs(directory_path)
-
-        file_path = os.path.join(directory_path, 'metrics.json')
         with open(file_path, 'w') as file:
             json.dump(self.to_dict(), file, indent=4, default=str)
 
@@ -288,7 +317,7 @@ class BacktestMetrics:
         return (value, date)
 
     @staticmethod
-    def open(file_path: str) -> 'BacktestMetrics':
+    def open(file_path: str | Path) -> 'BacktestMetrics':
         """
         Open a backtest metrics file from a directory and
         return a BacktestMetrics instance.
@@ -346,3 +375,14 @@ class BacktestMetrics:
             data['worst_trade'] = Trade.from_dict(data['worst_trade'])
 
         return BacktestMetrics(**data)
+
+    def __repr__(self):
+        """
+        Return a string representation of the Backtest instance.
+
+        Returns:
+            str: A string representation of the Backtest instance.
+        """
+        return json.dumps(
+            self.to_dict(), indent=4, sort_keys=True, default=str
+        )
