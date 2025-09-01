@@ -1325,9 +1325,10 @@ class App:
 
         for data_source in data_sources:
             if DataType.OHLCV.equals(data_source.data_type):
+                data_provider = data_provider_service.get(data_source)
                 data = data_provider_service.get_data(
                     data_source=data_source,
-                    start_date=backtest_date_range.start_date,
+                    start_date=data_provider._start_date_data_source,
                     end_date=backtest_date_range.end_date
                 )
                 original_data_combinations.append((data_source, data))

@@ -322,6 +322,19 @@ class DataProviderService:
         self.configuration_service = configuration_service
         self.market_credential_service = market_credential_service
 
+    def get(self, data_source: DataSource) -> Optional[DataProvider]:
+        """
+        Get a registered data provider by its data source.
+
+        Args:
+            data_source (DataSource): The data source to get the data provider for.
+
+        Returns:
+            Optional[DataProvider]: The registered data provider for
+              the data source, or None if not found.
+        """
+        return self.data_provider_index.get(data_source)
+
     def get_data(
         self,
         data_source: DataSource,
@@ -741,6 +754,15 @@ class DataProviderService:
                 data_files.append(market_data_source.file_path)
 
         return data_files
+
+    def get_all_registered_data_providers(self) -> List[DataProvider]:
+        """
+        Function to get all registered data providers.
+
+        Returns:
+            List[DataProvider]: A list of all registered data providers.
+        """
+        return self.data_provider_index.get_all()
 
     def reset(self):
         """
