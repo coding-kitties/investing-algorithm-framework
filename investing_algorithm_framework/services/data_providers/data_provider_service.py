@@ -327,7 +327,8 @@ class DataProviderService:
         Get a registered data provider by its data source.
 
         Args:
-            data_source (DataSource): The data source to get the data provider for.
+            data_source (DataSource): The data source to get the
+            data provider for.
 
         Returns:
             Optional[DataProvider]: The registered data provider for
