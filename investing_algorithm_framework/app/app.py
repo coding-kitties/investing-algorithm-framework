@@ -1332,7 +1332,12 @@ class App:
                     end_date=backtest_date_range.end_date
                 )
                 original_data_combinations.append((data_source, data))
-                original_datasets_ordered_by_symbol[data_source.symbol] = data
+                original_datasets_ordered_by_symbol[data_source.symbol] = \
+                    data_provider_service.get_data(
+                        data_source=data_source,
+                        start_date=data_provider._start_date_data_source,
+                        end_date=backtest_date_range.end_date
+                    )
 
         for _ in tqdm(
             range(number_of_permutations),
@@ -1394,7 +1399,10 @@ class App:
             real_metrics=backtest_metrics,
             permutated_metrics=permuted_metrics,
             ohlcv_permutated_datasets=permuted_datasets_ordered_by_symbol,
-            ohlcv_original_datasets=original_datasets_ordered_by_symbol
+            ohlcv_original_datasets=original_datasets_ordered_by_symbol,
+            backtest_start_date=backtest_date_range.start_date,
+            backtest_end_date=backtest_date_range.end_date,
+            backtest_date_range_name=backtest_date_range.name
         )
         return permutation_test_metrics
 

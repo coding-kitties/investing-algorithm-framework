@@ -42,6 +42,9 @@ class BacktestPermutationTest:
         field(default_factory=dict)
     ohlcv_original_datasets: Dict[str, pd.DataFrame] = \
         field(default_factory=dict)
+    backtest_start_date: pd.Timestamp = None
+    backtest_end_date: pd.Timestamp = None
+    backtest_date_range_name: str = None
 
     def compute_p_values(
         self, metrics: List[str] = None, one_sided: bool = True

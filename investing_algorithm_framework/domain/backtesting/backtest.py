@@ -91,6 +91,27 @@ class Backtest:
                 return run
         return None
 
+    def get_backtest_permutation_test(
+        self, date_range: BacktestDateRange
+    ) -> Union[BacktestPermutationTest, None]:
+        """
+        Retrieve a specific BacktestPermutationTest based on
+            the provided date range.
+
+        Args:
+            date_range (BacktestDateRange): The date range to search for.
+
+        Returns:
+            Union[BacktestPermutationTest, None]: The
+                matching BacktestPermutationTest if found,
+                otherwise None.
+        """
+        for perm_test in self.backtest_permutation_tests:
+            if (perm_test.backtest_start_date == date_range.start_date and
+                    perm_test.backtest_end_date == date_range.end_date):
+                return perm_test
+        return None
+
     def get_all_backtest_metrics(self) -> List[BacktestMetrics]:
         """
         Retrieve all BacktestMetrics from the backtest runs.
@@ -382,3 +403,15 @@ class Backtest:
             )
             for run in self.backtest_runs
         ]
+
+    def add_permutation_test(
+        self, permutation_test: BacktestPermutationTest
+    ) -> None:
+        """
+        Add a permutation test to the backtest.
+
+        Args:
+            permutation_test (BacktestPermutationTest): The permutation test
+                to add.
+        """
+        self.backtest_permutation_tests.append(permutation_test)
