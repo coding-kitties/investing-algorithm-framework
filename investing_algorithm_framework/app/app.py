@@ -1364,7 +1364,8 @@ class App:
                     market=data_source.market,
                     window_size=data_source.window_size,
                     time_frame=data_source.time_frame,
-                    data_provider_identifier=data_source.data_provider_identifier,
+                    data_provider_identifier=data_source
+                    .data_provider_identifier,
                     pandas=data_source.pandas,
                 )
                 # Add pandas ohlcv data provider to the data provider service
