@@ -592,6 +592,28 @@ class DataProviderService:
             f"No data provider found for the given parameters: {params}"
         )
 
+    def register_data_provider(
+        self, data_source: DataSource, data_provider: DataProvider
+    ) -> DataProvider:
+        """
+        Function to directly register a data provider for a given data source.
+
+        This method will not check if the data provider supports the
+        data source. It will directly register the data provider in the index.
+
+        Args:
+            data_source (DataSource): The data source to register the
+                data provider for.
+            data_provider (DataProvider): The data provider to register.
+
+        Returns:
+            DataProvider: The registered data provider.
+        """
+        data_provider = data_provider.copy(data_source)
+        self.data_provider_index.data_providers_lookup[data_source] = \
+            data_provider
+        return data_provider
+
     def add_data_provider(
         self, data_provider: DataProvider, priority: int = 3
     ):

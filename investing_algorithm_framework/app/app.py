@@ -1357,19 +1357,20 @@ class App:
             self._data_providers = []
 
             for combi in permutated_datasets:
-                dp_identifier = combi[0].data_provider_identifier
+                data_source = combi[0]
+                data_provider = PandasOHLCVDataProvider(
+                    dataframe=combi[1],
+                    symbol=data_source.symbol,
+                    market=data_source.market,
+                    window_size=data_source.window_size,
+                    time_frame=data_source.time_frame,
+                    data_provider_identifier=data_source.data_provider_identifier,
+                    pandas=data_source.pandas,
+                )
                 # Add pandas ohlcv data provider to the data provider service
-                self.add_data_provider(
-                    PandasOHLCVDataProvider(
-                        dataframe=combi[1],
-                        symbol=combi[0].symbol,
-                        market=combi[0].market,
-                        window_size=combi[0].window_size,
-                        time_frame=combi[0].time_frame,
-                        data_provider_identifier=dp_identifier,
-                        pandas=combi[0].pandas,
-                    ),
-                    priority=1
+                data_provider_service.register_data_provider(
+                    data_source=data_source,
+                    data_provider=data_provider
                 )
 
             # Run the backtest with the permuted strategy
@@ -1379,7 +1380,7 @@ class App:
                 strategy=strategy,
                 snapshot_interval=SnapshotInterval.DAILY,
                 risk_free_rate=risk_free_rate,
-                show_data_initialization_progress=False
+                skip_data_sources_initialization=True
             )
 
             # Add the results of the permuted backtest to the main backtest
