@@ -5,6 +5,7 @@ from .backtest_run import BacktestRun
 from .backtest import Backtest
 from .backtest_permutation_test import BacktestPermutationTest
 from .backtest_evaluation_focuss import BacktestEvaluationFocus
+from .combine_backtests import combine_backtests
 
 __all__ = [
     "Backtest",
@@ -13,5 +14,6 @@ __all__ = [
     "BacktestMetrics",
     "BacktestRun",
     "BacktestPermutationTest",
-    "BacktestEvaluationFocus"
+    "BacktestEvaluationFocus",
+    "combine_backtests"
 ]

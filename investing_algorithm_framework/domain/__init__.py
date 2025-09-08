@@ -34,7 +34,7 @@ from .utils import random_string, append_dict_as_row_to_csv, \
     csv_to_list, StoppableThread, load_csv_into_dict, tqdm, \
     is_timezone_aware, sync_timezones, get_timezone
 from .backtesting import BacktestRun, BacktestSummaryMetrics, \
-    BacktestDateRange, Backtest, BacktestMetrics, \
+    BacktestDateRange, Backtest, BacktestMetrics, combine_backtests, \
     BacktestPermutationTest, BacktestEvaluationFocus
 
 __all__ = [
@@ -140,5 +140,6 @@ __all__ = [
     "is_jupyter_notebook",
     "tqdm",
     "DEFAULT_DATETIME_FORMAT",
-    "BacktestEvaluationFocus"
+    "BacktestEvaluationFocus",
+    'combine_backtests'
 ]

@@ -20,9 +20,18 @@ class BacktestSummaryMetrics:
         total_net_gain (float): Total net gain from the backtest.
         total_net_gain_percentage (float): Total net gain percentage
             from the backtest.
+        average_total_net_gain (float): Average total net gain across
+            multiple backtests.
+        average_total_net_gain_percentage (float): Average total net gain
+            percentage across multiple backtests.
         gross_loss (float): Total gross loss from all trades.
+        average_gross_loss (float): Average gross loss across
+            multiple backtests.
         growth (float): Total growth from the backtest.
         growth_percentage (float): Total growth percentage from the backtest.
+        average_growth (float): Average growth across multiple backtests.
+        average_growth_percentage (float): Average growth percentage across
+            multiple backtests.
         trades_average_return (float): Average return per trade.
         cagr (float): Compound annual growth rate of the backtest.
         sharpe_ratio (float): Sharpe ratio, risk-adjusted return.
@@ -41,9 +50,14 @@ class BacktestSummaryMetrics:
     """
     total_net_gain: float = None
     total_net_gain_percentage: float = None
+    average_total_net_gain: float = None
+    average_total_net_gain_percentage: float = None
     gross_loss: float = None
+    average_gross_loss: float = None
     growth: float = None
     growth_percentage: float = None
+    average_growth: float = None
+    average_growth_percentage: float = None
     trades_average_return: float = None
     cagr: float = None
     sharpe_ratio: float = None
@@ -67,9 +81,15 @@ class BacktestSummaryMetrics:
         return {
             "total_net_gain": self.total_net_gain,
             "total_net_gain_percentage": self.total_net_gain_percentage,
+            "average_total_net_gain": self.average_total_net_gain,
+            "average_total_net_gain_percentage":
+                self.average_total_net_gain_percentage,
             "gross_loss": self.gross_loss,
+            "average_gross_loss": self.average_gross_loss,
             "growth": self.growth,
             "growth_percentage": self.growth_percentage,
+            "average_growth": self.average_growth,
+            "average_growth_percentage": self.average_growth_percentage,
             "trades_average_return": self.trades_average_return,
             "cagr": self.cagr,
             "sharpe_ratio": self.sharpe_ratio,
@@ -120,7 +140,8 @@ class BacktestSummaryMetrics:
             self.cumulative_exposure = other.cumulative_exposure
         else:
             self.cumulative_exposure = safe_mean(
-                self.cumulative_exposure, other.cumulative_exposure
+                self.cumulative_exposure,
+                other.cumulative_exposure
             )
 
         if self.exposure_ratio is None:

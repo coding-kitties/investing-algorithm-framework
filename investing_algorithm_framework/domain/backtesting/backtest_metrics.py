@@ -165,6 +165,11 @@ class BacktestMetrics:
     best_year: Tuple[float, date] = None
     worst_month: Tuple[float, datetime] = None
     worst_year: Tuple[float, date] = None
+    total_number_of_days: int = None
+
+    def __post_init__(self):
+        self.total_number_of_days = (self.backtest_end_date -
+                                     self.backtest_start_date).days
 
     def to_dict(self) -> dict:
         """
