@@ -1,6 +1,7 @@
 from typing import List
 
-from investing_algorithm_framework.domain.backtesting import Backtest, BacktestDateRange
+from investing_algorithm_framework.domain.backtesting import Backtest, \
+    BacktestDateRange
 from investing_algorithm_framework.domain.backtesting import \
     BacktestSummaryMetrics
 
