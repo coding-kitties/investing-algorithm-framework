@@ -17,7 +17,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, APP_MODE, MarketCredential, \
     AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, DataSource, \
     BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, Backtest, \
-    PortfolioConfiguration, SnapshotInterval, DataType, \
+    PortfolioConfiguration, SnapshotInterval, DataType, combine_backtests, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestPermutationTest, \
     LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG
@@ -929,14 +929,9 @@ class App:
                         )
 
             for strategy in backtests_ordered_by_strategy:
-                # Merge all backtests for the same strategy
-                main_backtest = Backtest()
-                strategy_backtests = backtests_ordered_by_strategy[strategy]
-
-                for backtest in strategy_backtests:
-                    main_backtest = main_backtest.merge(backtest)
-
-                backtests.append(main_backtest)
+                backtests.append(
+                    combine_backtests(backtests_ordered_by_strategy[strategy])
+                )
 
         return backtests
 

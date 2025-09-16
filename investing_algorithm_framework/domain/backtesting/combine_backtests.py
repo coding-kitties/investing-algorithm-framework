@@ -1,7 +1,6 @@
 from typing import List
 
-from investing_algorithm_framework.domain.backtesting import Backtest, \
-    BacktestDateRange
+from investing_algorithm_framework.domain.backtesting import Backtest
 from investing_algorithm_framework.domain.backtesting import \
     BacktestSummaryMetrics
 
@@ -30,7 +29,6 @@ def safe_weighted_mean(values, weights):
 
 def combine_backtests(
     backtests: List[Backtest],
-    backtest_date_range: BacktestDateRange = None
 ) -> Backtest:
     """
     Combine multiple backtests into a single backtest by aggregating
@@ -38,8 +36,6 @@ def combine_backtests(
 
     Args:
         backtests (List[Backtest]): List of Backtest instances to combine.
-        backtest_date_range (BacktestDateRange, optional): The date range
-            for the combined backtest.
 
     Returns:
         Backtest: A new Backtest instance representing the combined results.
@@ -49,19 +45,11 @@ def combine_backtests(
 
     for backtest in backtests:
         backtest_metric = None
-        backtest_run = None
+        backtest_run = backtest.backtest_runs[0] \
+            if len(backtest.backtest_runs) > 0 else None
 
-        if backtest_date_range is not None:
-            backtest_metric = \
-                backtest.get_backtest_metrics(backtest_date_range)
-            backtest_run = \
-                backtest.get_backtest_run(backtest_date_range)
-        else:
-            backtest_run = backtest.backtest_runs[0] \
-                if len(backtest.backtest_runs) > 0 else None
-
-            if backtest_run is not None:
-                backtest_metric = backtest_run.backtest_metrics
+        if backtest_run is not None:
+            backtest_metric = backtest_run.backtest_metrics
 
         if backtest_metric is not None:
             backtest_metrics.append(backtest_metric)
@@ -196,6 +184,7 @@ def combine_backtests(
     )
 
     metadata = None
+    risk_free_rate = None
 
     # Get first non-empty metadata
     for backtest in backtests:
@@ -203,9 +192,16 @@ def combine_backtests(
             metadata = backtest.metadata
             break
 
+    # Get the first risk-free rate
+    for backtest in backtests:
+        if backtest.risk_free_rate is not None:
+            risk_free_rate = backtest.risk_free_rate
+            break
+
     backtest = Backtest(
         backtest_summary=summary,
         metadata=metadata,
+        risk_free_rate=risk_free_rate,
         backtest_runs=backtest_runs
     )
     return backtest
