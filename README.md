@@ -14,17 +14,6 @@
 </div>
 
 The Investing Algorithm Framework is a Python-based framework built to streamline the entire lifecycle of quantitative trading strategies from signal generation and backtesting to live deployment.
-It offers a complete quantitative workflow, featuring two dedicated backtesting engines:
-
-* A vectorized backtest engine for fast signal research and prototyping
-
-* An event-based backtest engine for realistic and accurate strategy evaluation
-
-The framework supports live trading across multiple exchanges and offers flexible deployment options, including Azure Functions and AWS Lambda.
-Designed for extensibility, it allows you to integrate custom strategies, data providers, and order executors, enabling support for any exchange or broker.
-It natively supports multiple data formats, including OHLCV, ticker, and custom datasets with seamless compatibility for both Pandas and Polars DataFrames.
-
-
 
 ## Sponsors
 
@@ -43,6 +32,7 @@ It natively supports multiple data formats, including OHLCV, ticker, and custom 
 - [x] Event-Driven Backtest Engine: Accurate and realistic backtesting with event-driven architecture.
 - [x] Vectorized Backtest Engine: Fast signal research and prototyping with vectorized operations.
 - [x] Permutation testing: Run permutation tests to evaluate the strategy statistical significance.
+- [x] Metric tracking and backtest reports evaluation/comparison: Track and compare key performance metrics like CAGR, Sharpe ratio, max drawdown, and more (See example usage for a complete list of metrics the framework collects).
 - [x] Backtest Reporting: Generate detailed reports to analyse and compare backtests.
 - [x] Live Trading: Execute trades in real-time with support for multiple exchanges via ccxt.
 - [x] Portfolio Management: Manage portfolios, trades, and positions with persistence via SQLite.
@@ -52,6 +42,13 @@ It natively supports multiple data formats, including OHLCV, ticker, and custom 
 - [x] Web API: Interact with your bot via REST API.
 - [x] PyIndicators Integration: Perform technical analysis directly on your dataframes.
 - [x] Extensibility: Add custom strategies, data providers, order executors so you can connect your trading bot to your favorite exchange or broker.
+- [x] Modular Design: Build your bot using modular components for easy customization and maintenance.
+- [x] Multiple exchanges and brokers: **Detailed guides and API references to help you get started and make the most of the framework.
+ and offers flexible deployment options, including Azure Functions and AWS Lambda.
+Designed for extensibility, it allows you to integrate custom strategies, data providers, and order executors, enabling support for any exchange or broker.
+It natively supports multiple data formats, including OHLCV, ticker, and custom datasets with seamless compatibility for both Pandas and Polars DataFrames.
+
+
 
 ## 🚀 Quickstart
 
@@ -70,10 +67,10 @@ Run the following command to set up your project:
 investing-algorithm-framewor init
 ```
 
-For a web-enabled version:
+For a aws lambda compatible project, run:
 
 ```bash
-investing-algorithm-framework init --web
+investing-algorithm-framework init --type aws_lambda
 ```
 
 This will create:
@@ -97,74 +94,264 @@ the 20, 50 and 100 period exponential moving averages (EMA) and the
 > You can install it using pip: pip install pyindicators.
 
 ```python
-import logging.config
-from dotenv import load_dotenv
+from typing import Dict, Any
+from datetime import datetime, timezone
 
-from pyindicators import ema, rsi, crossunder, crossover, is_above
+import pandas as pd
+from pyindicators import ema, rsi, crossover, crossunder
 
-from investing_algorithm_framework import create_app, TimeUnit, Context, BacktestDateRange, \
-    DEFAULT_LOGGING_CONFIG, TradingStrategy, SnapshotInterval, BacktestReport, DataSource
+from investing_algorithm_framework import TradingStrategy, DataSource, \
+    TimeUnit, DataType, PositionSize, create_app, RESOURCE_DIRECTORY, \
+    BacktestDateRange, BacktestReport
 
-load_dotenv()
-logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
-logger = logging.getLogger(__name__)
 
-app = create_app()
-# Registered bitvavo market, credentials are read from .env file by default
-app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=100)
-
-class MyStrategy(TradingStrategy):
-    interval = 2
+class RSIEMACrossoverStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
-    data_sources = [
-        DataSource(data_type="OHLCV", market="bitvavo", symbol="BTC/EUR", window_size=200, time_frame="2h", identifier="BTC-ohlcv", pandas=True),
+    interval = 2
+    symbols = ["BTC"]
+    position_sizes = [
+        PositionSize(
+            symbol="BTC", percentage_of_portfolio=20.0
+        ),
+        PositionSize(
+            symbol="ETH", percentage_of_portfolio=20.0
+        )
     ]
-    symbols = ["BTC/EUR"]
 
-    def run_strategy(self, context: Context, data):
+    def __init__(
+        self,
+        time_unit: TimeUnit,
+        interval: int,
+        market: str,
+        rsi_time_frame: str,
+        rsi_period: int,
+        rsi_overbought_threshold,
+        rsi_oversold_threshold,
+        ema_time_frame,
+        ema_short_period,
+        ema_long_period,
+        ema_cross_lookback_window: int = 10
+    ):
+        self.rsi_time_frame = rsi_time_frame
+        self.rsi_period = rsi_period
+        self.rsi_result_column = f"rsi_{self.rsi_period}"
+        self.rsi_overbought_threshold = rsi_overbought_threshold
+        self.rsi_oversold_threshold = rsi_oversold_threshold
+        self.ema_time_frame = ema_time_frame
+        self.ema_short_result_column = f"ema_{ema_short_period}"
+        self.ema_long_result_column = f"ema_{ema_long_period}"
+        self.ema_crossunder_result_column = "ema_crossunder"
+        self.ema_crossover_result_column = "ema_crossover"
+        self.ema_short_period = ema_short_period
+        self.ema_long_period = ema_long_period
+        self.ema_cross_lookback_window = ema_cross_lookback_window
+        data_sources = []
 
-        if context.has_open_orders(target_symbol="BTC"):
-            logger.info("There are open orders, skipping strategy iteration.")
-            return
-
-        data = data["BTC-ohlcv"]
-        data = ema(data, source_column="Close", period=20, result_column="ema_20")
-        data = ema(data, source_column="Close", period=50, result_column="ema_50")
-        data = ema(data, source_column="Close", period=100, result_column="ema_100")
-        data = crossunder(data, first_column="ema_50", second_column="ema_100", result_column="crossunder_50_20")
-        data = crossover(data, first_column="ema_50", second_column="ema_100", result_column="crossover_50_20")
-        data = rsi(data, source_column="Close", period=14, result_column="rsi_14")
-
-        if context.has_position("BTC") and self.sell_signal(data):
-            context.create_limit_sell_order(
-                "BTC", percentage_of_position=100, price=data["Close"].iloc[-1]
+        for symbol in self.symbols:
+            full_symbol = f"{symbol}/EUR"
+            data_sources.append(
+                DataSource(
+                    identifier=f"{symbol}_rsi_data",
+                    data_type=DataType.OHLCV,
+                    time_frame=self.rsi_time_frame,
+                    market=market,
+                    symbol=full_symbol,
+                    pandas=True,
+                    window_size=800
+                )
             )
-            return
-
-        if not context.has_position("BTC") and self.buy_signal(data):
-            context.create_limit_buy_order(
-                "BTC", percentage_of_portfolio=20, price=data["Close"].iloc[-1]
+            data_sources.append(
+                DataSource(
+                    identifier=f"{symbol}_ema_data",
+                    data_type=DataType.OHLCV,
+                    time_frame=self.ema_time_frame,
+                    market=market,
+                    symbol=full_symbol,
+                    pandas=True,
+                    window_size=800
+                )
             )
-            return
 
-    def buy_signal(self, data) -> bool:
-        return False
+        super().__init__(
+            data_sources=data_sources, time_unit=time_unit, interval=interval
+        )
 
-    def sell_signal(self, data) -> bool:
-        return False
+        self.buy_signal_dates = {}
+        self.sell_signal_dates = {}
 
-date_range = BacktestDateRange(
-    start_date="2023-08-24 00:00:00", end_date="2023-12-02 00:00:00"
-)
-app.add_strategy(MyStrategy)
+        for symbol in self.symbols:
+            self.buy_signal_dates[symbol] = []
+            self.sell_signal_dates[symbol] = []
+
+    def _prepare_indicators(
+        self,
+        rsi_data,
+        ema_data
+    ):
+        """
+        Helper function to prepare the indicators 
+        for the strategy. The indicators are calculated
+        using the pyindicators library: https://github.com/coding-kitties/PyIndicators
+        """
+        ema_data = ema(
+            ema_data,
+            period=self.ema_short_period,
+            source_column="Close",
+            result_column=self.ema_short_result_column
+        )
+        ema_data = ema(
+            ema_data,
+            period=self.ema_long_period,
+            source_column="Close",
+            result_column=self.ema_long_result_column
+        )
+        # Detect crossover (short EMA crosses above long EMA)
+        ema_data = crossover(
+            ema_data,
+            first_column=self.ema_short_result_column,
+            second_column=self.ema_long_result_column,
+            result_column=self.ema_crossover_result_column
+        )
+        # Detect crossunder (short EMA crosses below long EMA)
+        ema_data = crossunder(
+            ema_data,
+            first_column=self.ema_short_result_column,
+            second_column=self.ema_long_result_column,
+            result_column=self.ema_crossunder_result_column
+        )
+        rsi_data = rsi(
+            rsi_data,
+            period=self.rsi_period,
+            source_column="Close",
+            result_column=self.rsi_result_column
+        )
+
+        return ema_data, rsi_data
+
+    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
+        """
+        Generate buy signals based on the moving average crossover.
+
+        data (Dict[str, Any]): Dictionary containing all the data for
+            the strategy data sources.
+
+        Returns:
+            Dict[str, pd.Series]: A dictionary where keys are symbols and values
+                are pandas Series indicating buy signals (True/False).
+        """
+
+        signals = {}
+
+        for symbol in self.symbols:
+            ema_data_identifier = f"{symbol}_ema_data"
+            rsi_data_identifier = f"{symbol}_rsi_data"
+            ema_data, rsi_data = self._prepare_indicators(
+                data[ema_data_identifier].copy(),
+                data[rsi_data_identifier].copy()
+            )
+
+            # crossover confirmed
+            ema_crossover_lookback = ema_data[
+                self.ema_crossover_result_column].rolling(
+                window=self.ema_cross_lookback_window
+            ).max().astype(bool)
+
+            # use only RSI column
+            rsi_oversold = rsi_data[self.rsi_result_column] \
+                < self.rsi_oversold_threshold
+
+            buy_signal = rsi_oversold & ema_crossover_lookback
+            buy_signals = buy_signal.fillna(False).astype(bool)
+            signals[symbol] = buy_signals
+
+            # Get all dates where there is a sell signal
+            buy_signal_dates = buy_signals[buy_signals].index.tolist()
+
+            if buy_signal_dates:
+                self.buy_signal_dates[symbol] += buy_signal_dates
+
+        return signals
+
+    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
+        """
+        Generate sell signals based on the moving average crossover.
+
+        Args:
+            data (Dict[str, Any]): Dictionary containing all the data for
+                the strategy data sources.
+
+        Returns:
+            Dict[str, pd.Series]: A dictionary where keys are symbols and values
+                are pandas Series indicating sell signals (True/False).
+        """
+
+        signals = {}
+        for symbol in self.symbols:
+            ema_data_identifier = f"{symbol}_ema_data"
+            rsi_data_identifier = f"{symbol}_rsi_data"
+            ema_data, rsi_data = self._prepare_indicators(
+                data[ema_data_identifier].copy(),
+                data[rsi_data_identifier].copy()
+            )
+
+            # Confirmed by crossover between short-term EMA and long-term EMA
+            # within a given lookback window
+            ema_crossunder_lookback = ema_data[
+                self.ema_crossunder_result_column].rolling(
+                window=self.ema_cross_lookback_window
+            ).max().astype(bool)
+
+            # use only RSI column
+            rsi_overbought = rsi_data[self.rsi_result_column] \
+               >= self.rsi_overbought_threshold
+
+            # Combine both conditions
+            sell_signal = rsi_overbought & ema_crossunder_lookback
+            sell_signal = sell_signal.fillna(False).astype(bool)
+            signals[symbol] = sell_signal
+
+            # Get all dates where there is a sell signal
+            sell_signal_dates = sell_signal[sell_signal].index.tolist()
+
+            if sell_signal_dates:
+                self.sell_signal_dates[symbol] += sell_signal_dates
+
+        return signals
+
 
 if __name__ == "__main__":
-    # Run the backtest with a daily snapshot interval for end-of-day granular reporting
-    backtest = app.run_backtest(
-        backtest_date_range=date_range, initial_amount=100, snapshot_interval=SnapshotInterval.DAILY
+    app = create_app()
+    app.add_strategy(
+        RSIEMACrossoverStrategy(
+            time_unit=TimeUnit.HOUR,
+            interval=2,
+            market="bitvavo",
+            rsi_time_frame="2h",
+            rsi_period=14,
+            rsi_overbought_threshold=70,
+            rsi_oversold_threshold=30,
+            ema_time_frame="2h",
+            ema_short_period=12,
+            ema_long_period=26,
+            ema_cross_lookback_window=10
+        )
     )
-    backtest_report = BacktestReport(backtests=[backtest])
-    backtest_report.show()
+
+    # Market credentials for coinbase for both the portfolio connection and data sources will
+    # be read from .env file, when not registering a market credential object in the app.
+    app.add_market(
+        market="bitvavo",
+        trading_symbol="EUR",
+    )
+    backtest_range = BacktestDateRange(
+        start_date=datetime(2023, 1, 1, tzinfo=timezone.utc),
+        end_date=datetime(2024, 6, 1, tzinfo=timezone.utc)
+    )
+    backtest = app.run_backtest(
+        backtest_date_range=backtest_range, initial_amount=1000
+    )
+    report = BacktestReport(backtest)
+    report.show(backtest_date_range=backtest_range, browser=True)
 ```
 
 > You can find more examples [here](./examples) folder.
