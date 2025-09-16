@@ -21,7 +21,7 @@ from .returns import get_yearly_returns, get_monthly_returns, \
     get_percentage_winning_months, get_average_monthly_return_losing_months, \
     get_average_monthly_return_winning_months, get_growth, \
     get_percentage_winning_years, get_worst_year, \
-    get_growth_percentage
+    get_growth_percentage, get_median_return, get_average_return
 from .exposure import get_average_trade_duration, \
     get_trade_frequency, get_trades_per_day, get_trades_per_year, \
     get_cumulative_exposure, get_exposure_ratio
@@ -85,4 +85,6 @@ __all__ = [
     "get_growth",
     "get_growth_percentage",
     "get_risk_free_rate_us",
+    "get_median_return",
+    "get_average_return"
 ]

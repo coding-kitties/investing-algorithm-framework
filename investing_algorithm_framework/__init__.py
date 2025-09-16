@@ -24,7 +24,7 @@ from .infrastructure import AzureBlobStorageStateHandler, \
     AWSS3StorageStateHandler
 from .create_app import create_app
 from .download_data import download
-from .services.metrics import get_annual_volatility, get_sortino_ratio, \
+from .services import get_annual_volatility, get_sortino_ratio, \
     get_drawdown_series, get_max_drawdown, get_equity_curve, \
     get_price_efficiency_ratio, get_sharpe_ratio, \
     get_profit_factor, get_cumulative_profit_factor_series, \
@@ -41,7 +41,8 @@ from .services.metrics import get_annual_volatility, get_sortino_ratio, \
     get_trades_per_year, get_average_monthly_return_losing_months, \
     get_average_monthly_return_winning_months, get_percentage_winning_years, \
     get_rolling_sharpe_ratio, create_backtest_metrics, get_growth, \
-    get_growth_percentage, get_cumulative_exposure
+    get_growth_percentage, get_cumulative_exposure, get_median_return, \
+    get_average_return, get_risk_free_rate_us
 
 
 __all__ = [
@@ -165,5 +166,8 @@ __all__ = [
     "get_growth_percentage",
     "BacktestEvaluationFocus",
     "combine_backtests",
-    "PositionSize"
+    "PositionSize",
+    "get_median_return",
+    "get_average_return",
+    "get_risk_free_rate_us"
 ]

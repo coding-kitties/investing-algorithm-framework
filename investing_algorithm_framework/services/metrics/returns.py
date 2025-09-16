@@ -154,6 +154,37 @@ def get_average_return(trades: List[Trade]) -> Tuple[float, float]:
     return average_return, percentage
 
 
+def get_median_return(trades: List[Trade]) -> Tuple[float, float]:
+    """
+    Calculate the median return from a list of trades.
+
+    The median return is calculated as the median of all returns.
+
+    Args:
+        trades (List[Trade]): List of trades.
+
+    Returns:
+        Tuple[float, float]: The median return
+        percentage of the median return
+    """
+
+    if not trades:
+        return 0.0, 0.0
+
+    sorted_returns = sorted(t.net_gain for t in trades)
+    n = len(sorted_returns)
+    mid = n // 2
+
+    if n % 2 == 0:
+        median_return = (sorted_returns[mid - 1] + sorted_returns[mid]) / 2
+    else:
+        median_return = sorted_returns[mid]
+
+    cost = sum(t.cost for t in trades)
+    percentage = (median_return / cost) if cost > 0 else 0.0
+    return median_return, percentage
+
+
 def get_best_trade(trades: List[Trade]) -> Trade:
     """
     Get the trade with the highest net gain.

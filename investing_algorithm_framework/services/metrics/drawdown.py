@@ -13,7 +13,7 @@ peak-to-trough decline of a portfolio:
 from typing import List, Tuple
 import pandas as pd
 from datetime import datetime
-from investing_algorithm_framework.domain import PortfolioSnapshot
+from investing_algorithm_framework.domain import PortfolioSnapshot, Trade
 from .equity_curve import get_equity_curve
 
 

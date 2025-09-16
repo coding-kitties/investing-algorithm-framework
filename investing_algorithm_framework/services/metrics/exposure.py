@@ -6,13 +6,10 @@ Exposure around 1 means capital is nearly fully invested most of the time, but n
 Low exposure (<1) means capital is mostly idle or only partially invested.
 """
 
-from typing import List
-from datetime import timedelta, datetime
-from investing_algorithm_framework.domain import Trade
-
-
-from typing import List
 from datetime import datetime, timedelta
+from typing import List
+
+from investing_algorithm_framework.domain import Trade
 
 
 def get_exposure_ratio(
