@@ -102,12 +102,12 @@ class PortfolioSnapshotService(RepositoryService):
 
         for position in \
                 self.position_repository.get_all({"portfolio": portfolio.id}):
-            symbol = \
-                f"{position.get_symbol()}/{portfolio.get_trading_symbol()}"
 
             if position.get_symbol() != portfolio.get_trading_symbol():
+                symbol_pair = f"{position.get_symbol()}/" \
+                    f"{portfolio.get_trading_symbol()}"
                 ticker = self.data_provider_service.get_ticker_data(
-                    symbol=symbol,
+                    symbol=symbol_pair,
                     market=portfolio.market,
                     date=created_at
                 )

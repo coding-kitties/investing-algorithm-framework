@@ -1,9 +1,11 @@
 from dataclasses import dataclass
+from datetime import datetime, timezone, timedelta
 from typing import Union
-from datetime import datetime, timezone
+
 from dateutil import parser
-from .data_type import DataType
+
 from investing_algorithm_framework.domain.models.time_frame import TimeFrame
+from .data_type import DataType
 
 
 @dataclass(frozen=True)
@@ -167,3 +169,13 @@ class DataSource:
                     self.market == other.market)
 
         return False
+
+    def create_start_date_data(self, index_date: datetime) -> datetime:
+
+        if self.window_size is None or self.time_frame is None:
+            return index_date
+
+        return index_date - \
+            (self.window_size * timedelta(
+                minutes=self.time_frame.amount_of_minutes
+            ))

@@ -8,8 +8,7 @@ from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository, \
     SQLTradeTakeProfitRepository, SQLTradeStopLossRepository, \
     SQLOrderMetadataRepository
-from .services import PerformanceService, \
-    AzureBlobStorageStateHandler, AWSS3StorageStateHandler
+from .services import AzureBlobStorageStateHandler, AWSS3StorageStateHandler
 from .data_providers import CSVOHLCVDataProvider, get_default_data_providers, \
     get_default_ohlcv_data_providers, CCXTOHLCVDataProvider, \
     PandasOHLCVDataProvider
@@ -30,7 +29,6 @@ __all__ = [
     "SQLTrade",
     "SQLOrder",
     "SQLPosition",
-    "PerformanceService",
     "SQLPortfolioSnapshot",
     "SQLPositionSnapshot",
     "AzureBlobStorageStateHandler",

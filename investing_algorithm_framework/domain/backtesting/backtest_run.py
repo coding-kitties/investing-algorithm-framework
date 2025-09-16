@@ -264,7 +264,7 @@ class BacktestRun:
         if target_symbol is not None:
             selection = [
                 trade for trade in selection
-                if trade.target_symbol == target_symbol
+                if trade.target_symbol.lower() == target_symbol.lower()
             ]
 
         if trade_status is not None:

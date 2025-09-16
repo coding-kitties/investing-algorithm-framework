@@ -25,7 +25,7 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
 from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
 from .services import MarketCredentialService, AbstractPortfolioSyncService, \
-    RoundingService, StateHandler, Observable, Observer
+    RoundingService, StateHandler
 from .stateless_actions import StatelessActions
 from .strategy import Strategy
 from .utils import random_string, append_dict_as_row_to_csv, \
@@ -36,6 +36,7 @@ from .utils import random_string, append_dict_as_row_to_csv, \
 from .backtesting import BacktestRun, BacktestSummaryMetrics, \
     BacktestDateRange, Backtest, BacktestMetrics, combine_backtests, \
     BacktestPermutationTest, BacktestEvaluationFocus
+from .positions import PositionSize
 
 __all__ = [
     "OrderStatus",
@@ -120,8 +121,6 @@ __all__ = [
     "is_timezone_aware",
     "sync_timezones",
     "get_timezone",
-    "Observer",
-    "Observable",
     "Event",
     "SNAPSHOT_INTERVAL",
     "SnapshotInterval",
@@ -141,5 +140,6 @@ __all__ = [
     "tqdm",
     "DEFAULT_DATETIME_FORMAT",
     "BacktestEvaluationFocus",
-    'combine_backtests'
+    'combine_backtests',
+    'PositionSize'
 ]

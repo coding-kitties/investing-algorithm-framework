@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timezone
 from typing import List
 
 from investing_algorithm_framework.services import ConfigurationService, \
@@ -420,9 +421,52 @@ class Context:
         """
 
         if market is None:
-            return self.portfolio_service.get_all()[0]
+            portfolio = self.portfolio_service.get_all()[0]
+        else:
+            portfolio = self.portfolio_service.find({"market": market})
 
-        return self.portfolio_service.find({"market": market})
+        # Retrieve positions
+        positions = self.position_service.get_all(
+            {"portfolio": portfolio.id}
+        )
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            date = self.configuration_service.config[INDEX_DATETIME]
+        else:
+            date = datetime.now(tz=timezone.utc)
+
+        allocated = 0.0
+
+        for position in positions:
+
+            if position.symbol != portfolio.trading_symbol:
+                ticker = self.data_provider_service.get_ticker_data(
+                    symbol=f"{position.symbol}/{portfolio.trading_symbol}",
+                    market=portfolio.market,
+                    date=date
+                )
+                if ticker is not None and "bid" in ticker:
+                    allocated += position.get_amount() * ticker["bid"]
+
+        portfolio.allocated = allocated
+        return portfolio
+
+    def get_latest_price(self, symbol, market=None):
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            date = self.configuration_service.config[INDEX_DATETIME]
+        else:
+            date = datetime.now(tz=timezone.utc)
+
+        ticker = self.data_provider_service.get_ticker_data(
+            symbol=symbol,
+            market=market,
+            date=date
+        )
+
+        return ticker['bid'] if ticker and 'bid' in ticker else None
 
     def get_portfolios(self):
         """
@@ -1597,3 +1641,27 @@ class Context:
             List[MarketCredential]: A list of all market credentials
         """
         return self.market_credential_service.get_all()
+
+    def get_trading_symbol(self, portfolio_id=None):
+        """
+        Function to get the trading symbol of a portfolio. If the
+        portfolio_id parameter is specified, the function will return
+        the trading symbol of the portfolio with the specified id.
+
+        Args:
+            portfolio_id: The id of the portfolio to get the trading symbol for
+
+        Returns:
+            str: The trading symbol of the portfolio
+        """
+        if portfolio_id is None:
+            if self.portfolio_service.count() > 1:
+                raise OperationalException(
+                    "Multiple portfolios found. Please specify a "
+                    "portfolio identifier."
+                )
+            portfolio = self.portfolio_service.get_all()[0]
+        else:
+            portfolio = self.portfolio_service.get(portfolio_id)
+
+        return portfolio.trading_symbol

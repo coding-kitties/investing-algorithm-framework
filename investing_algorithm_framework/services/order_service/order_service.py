@@ -1,15 +1,14 @@
 import logging
 
 from investing_algorithm_framework.domain import OrderType, OrderSide, \
-    OperationalException, OrderStatus, Order, random_number, \
-    Observable, INDEX_DATETIME
+    OperationalException, OrderStatus, Order, random_number, INDEX_DATETIME
 from investing_algorithm_framework.services.repository_service \
     import RepositoryService
 
 logger = logging.getLogger("investing_algorithm_framework")
 
 
-class OrderService(RepositoryService, Observable):
+class OrderService(RepositoryService):
     """
     Service to manage orders. This service will use the provided
     order executors to execute the orders. The order service is
@@ -48,8 +47,6 @@ class OrderService(RepositoryService, Observable):
         market_credential_service=None
     ):
         super(OrderService, self).__init__(order_repository)
-        # Call the observable constructor
-        Observable.__init__(self)
         self.configuration_service = configuration_service
         self.order_repository = order_repository
         self.position_service = position_service
@@ -807,33 +804,6 @@ class OrderService(RepositoryService, Observable):
         )
 
         self.trade_service.update_trade_with_removed_sell_order(order)
-
-    # def create_snapshot(self, portfolio_id, created_at=None):
-    #
-    #     if created_at is None:
-    #         created_at = datetime.now(tz=tzutc())
-    #
-    #     portfolio = self.portfolio_repository.get(portfolio_id)
-    #     pending_orders = self.get_all(
-    #         {
-    #             "order_side": OrderSide.BUY.value,
-    #             "status": OrderStatus.OPEN.value,
-    #             "portfolio_id": portfolio.id
-    #         }
-    #     )
-    #     created_orders = self.get_all(
-    #         {
-    #             "order_side": OrderSide.BUY.value,
-    #             "status": OrderStatus.CREATED.value,
-    #             "portfolio_id": portfolio.id
-    #         }
-    #     )
-    #     return self.portfolio_snapshot_service.create_snapshot(
-    #         portfolio,
-    #         pending_orders=pending_orders,
-    #         created_orders=created_orders,
-    #         created_at=created_at
-    #     )
 
     def _create_order_id(self):
         """

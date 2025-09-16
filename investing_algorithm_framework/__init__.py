@@ -8,7 +8,7 @@ from .app import App, Algorithm, \
     get_monthly_returns_heatmap_chart, create_weights, \
     get_yearly_returns_bar_chart, get_entry_and_exit_signals, \
     get_ohlcv_data_completeness_chart
-from .domain import ApiException, combine_backtests, \
+from .domain import ApiException, combine_backtests, PositionSize, \
     OrderType, OperationalException, OrderStatus, OrderSide, \
     TimeUnit, TimeInterval, Order, Portfolio, Backtest, \
     Position, TimeFrame, INDEX_DATETIME, MarketCredential, \
@@ -165,4 +165,5 @@ __all__ = [
     "get_growth_percentage",
     "BacktestEvaluationFocus",
     "combine_backtests",
+    "PositionSize"
 ]

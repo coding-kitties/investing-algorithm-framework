@@ -5,9 +5,8 @@ from investing_algorithm_framework.app.context import Context
 from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPositionRepository, SQLPortfolioRepository, \
     SQLPortfolioSnapshotRepository, SQLTradeRepository, \
-    SQLPositionSnapshotRepository, PerformanceService, \
-    SQLTradeStopLossRepository, SQLTradeTakeProfitRepository, \
-    SQLOrderMetadataRepository
+    SQLPositionSnapshotRepository, SQLTradeStopLossRepository, \
+    SQLTradeTakeProfitRepository, SQLOrderMetadataRepository
 from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, PortfolioConfigurationService, \
     BacktestService, ConfigurationService, PortfolioSnapshotService, \
@@ -129,20 +128,12 @@ class DependencyContainer(containers.DeclarativeContainer):
         market_credential_service=market_credential_service,
         portfolio_provider_lookup=portfolio_provider_lookup,
     )
-    performance_service = providers.Factory(
-        PerformanceService,
-        trade_repository=trade_repository,
-        order_repository=order_repository,
-        position_repository=position_repository,
-        portfolio_repository=portfolio_repository
-    )
     backtest_service = providers.Factory(
         BacktestService,
         configuration_service=configuration_service,
         order_service=order_service,
         trade_service=trade_service,
         portfolio_service=portfolio_service,
-        performance_service=performance_service,
         position_repository=position_repository,
         portfolio_configuration_service=portfolio_configuration_service,
         portfolio_snapshot_service=portfolio_snapshot_service,

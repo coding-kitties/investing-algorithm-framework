@@ -40,9 +40,10 @@ class Trade(BaseModel):
         last_reported_price: float, the last reported price of the trade
         last_reported_price_datetime: datetime, the datetime when the last
             reported price was reported
-        created_at: datetime, the datetime when the trade was created
         updated_at: datetime, the datetime when the trade was last updated
         status: str, the status of the trade
+        metadata: dict, the metadata of the trade, this can be used to store
+            additional information about the trade.
     """
 
     def __init__(
@@ -68,6 +69,7 @@ class Trade(BaseModel):
         updated_at=None,
         stop_losses=None,
         take_profits=None,
+        metadata=None,
     ):
         self.id = id
         self.orders = orders
@@ -90,6 +92,7 @@ class Trade(BaseModel):
         self.updated_at = updated_at
         self.stop_losses = stop_losses
         self.take_profits = take_profits
+        self.metadata = metadata if metadata is not None else {}
 
     def update(self, data):
 
@@ -296,6 +299,9 @@ class Trade(BaseModel):
                 take_profit.to_dict(datetime_format=datetime_format)
                 for take_profit in self.take_profits
             ] if self.take_profits else None,
+            "filled_amount": self.filled_amount,
+            "available_amount": self.available_amount,
+            "metadata": self.metadata,
         }
 
     @staticmethod
@@ -353,11 +359,13 @@ class Trade(BaseModel):
             updated_at=updated_at,
             stop_losses=stop_losses,
             take_profits=take_profits,
+            metadata=data.get("metadata", {}),
         )
 
     def __repr__(self):
         return self.repr(
             id=self.id,
+            symbol=self.symbol,
             target_symbol=self.target_symbol,
             trading_symbol=self.trading_symbol,
             status=self.status,
@@ -370,6 +378,8 @@ class Trade(BaseModel):
             closed_at=self.closed_at,
             net_gain=self.net_gain,
             last_reported_price=self.last_reported_price,
+            updated_at=self.updated_at,
+            metadata=self.metadata,
         )
 
     def __lt__(self, other):

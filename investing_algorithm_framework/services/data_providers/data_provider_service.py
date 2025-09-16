@@ -7,7 +7,7 @@ from typing import List, Tuple, Optional, Dict, Any
 
 from investing_algorithm_framework.domain import DataProvider, \
     OperationalException, ImproperlyConfigured, DataSource, DataType, \
-    BacktestDateRange, tqdm
+    BacktestDateRange, tqdm, convert_polars_to_pandas
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -168,6 +168,7 @@ class DataProviderIndex:
         market = data_source.market
 
         if DataType.OHLCV.equals(data_source.data_type):
+
             if symbol not in self.ohlcv_data_providers:
                 self.ohlcv_data_providers[(symbol, market)] = best_provider
                 self.ohlcv_data_providers_no_market[symbol] = best_provider
@@ -277,6 +278,7 @@ class DataProviderIndex:
             DataProvider: The OHLCV data provider for the symbol and market,
                 or None if no provider is found.
         """
+
         if market is None:
             # If no market is specified
             return self.ohlcv_data_providers_no_market.get(symbol, None)
@@ -460,7 +462,8 @@ class DataProviderService:
         date: Optional[datetime] = None,
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
-        window_size: Optional[int] = None
+        window_size: Optional[int] = None,
+        pandas: bool = False
     ):
         """
         Function to get OHLCV data from the data provider.
@@ -473,6 +476,7 @@ class DataProviderService:
             start_date (datetime): The start date for the OHLCV data.
             end_date (datetime): The end date for the OHLCV data.
             window_size (int): The window size for the OHLCV data.
+            pandas (bool): Whether to return the data as a pandas DataFrame.
 
         Returns:
             DataFrame: The OHLCV data for the given symbol and market.
@@ -505,6 +509,12 @@ class DataProviderService:
                 start_date=start_date,
                 end_date=end_date,
             )
+
+        if pandas:
+            if isinstance(data, pl.DataFrame):
+                return convert_polars_to_pandas(data)
+            else:
+                return data
 
         if isinstance(data, pd.DataFrame):
             # Convert to Polars DataFrame for consistency
@@ -565,13 +575,16 @@ class DataProviderService:
                 given data sources.
         """
         vectorized_data = {}
+
         for data_source in data_sources:
+            data_start_date = data_source.create_start_date_data(start_date)
             backtest_data = self.get_backtest_data(
                 data_source=data_source,
-                start_date=start_date,
+                start_date=data_start_date,
                 end_date=end_date,
             )
             vectorized_data[data_source.get_identifier()] = backtest_data
+
         return vectorized_data
 
     def _throw_no_data_provider_exception(self, params):

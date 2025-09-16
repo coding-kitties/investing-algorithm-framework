@@ -9,19 +9,21 @@ import numpy as np
 import pandas as pd
 import polars as pl
 
-from investing_algorithm_framework.domain import BacktestRun, \
-    TimeUnit, Trade, OperationalException, Observable, BacktestDateRange, \
-    Backtest, TradeStatus, PortfolioSnapshot, \
-    DataType
+from investing_algorithm_framework.domain import BacktestRun, OrderType, \
+    TimeUnit, Trade, OperationalException, BacktestDateRange, \
+    Backtest, TradeStatus, PortfolioSnapshot, Order, OrderStatus, OrderSide, \
+    Portfolio, DataType
 from investing_algorithm_framework.services.data_providers import \
     DataProviderService
+from investing_algorithm_framework.services.portfolios import \
+    PortfolioConfigurationService
 from investing_algorithm_framework.services.metrics import \
     create_backtest_metrics
 
 logger = logging.getLogger(__name__)
 
 
-class BacktestService(Observable):
+class BacktestService:
     """
     Service that facilitates backtests for algorithm objects.
     """
@@ -34,7 +36,6 @@ class BacktestService(Observable):
         portfolio_snapshot_service,
         position_repository,
         trade_service,
-        performance_service,
         configuration_service,
         portfolio_configuration_service,
     ):
@@ -42,11 +43,11 @@ class BacktestService(Observable):
         self._order_service = order_service
         self._trade_service = trade_service
         self._portfolio_service = portfolio_service
-        self._performance_service = performance_service
         self._portfolio_snapshot_service = portfolio_snapshot_service
         self._position_repository = position_repository
         self._configuration_service = configuration_service
-        self._portfolio_configuration_service = portfolio_configuration_service
+        self._portfolio_configuration_service: PortfolioConfigurationService \
+            = portfolio_configuration_service
         self._data_provider_service = data_provider_service
 
     def validate_strategy_for_vector_backtest(self, strategy):
@@ -60,12 +61,12 @@ class BacktestService(Observable):
             OperationalException: If the strategy does not have the required
                 buy/sell signal functions.
         """
-        if not hasattr(strategy, 'buy_signal_vectorized'):
+        if not hasattr(strategy, 'generate_buy_signals'):
             raise OperationalException(
                 "Strategy must define a vectorized buy signal function "
                 "(buy_signal_vectorized)."
             )
-        if not hasattr(strategy, 'sell_signal_vectorized'):
+        if not hasattr(strategy, 'generate_sell_signals'):
             raise OperationalException(
                 "Strategy must define a vectorized sell signal function "
                 "(sell_signal_vectorized)."
@@ -112,143 +113,262 @@ class BacktestService(Observable):
         self,
         strategy,
         backtest_date_range: BacktestDateRange,
-        initial_amount,
-        position_size: float = 1.0,
-        risk_free_rate: float = 0.027
+        initial_amount: float,
+        risk_free_rate: float = 0.027,
     ) -> BacktestRun:
         """
-        Vectorized backtest using a strategy's buy/sell signals.
+        Vectorized backtest for multiple assets using strategy
+        buy/sell signals.
 
         Args:
-            strategy: The strategy to use for the backtest.
+            strategy: The strategy to backtest.
             backtest_date_range: The date range for the backtest.
-            initial_amount: The initial capital.
-            position_size: Amount per trade.
-            risk_free_rate: Annualized risk-free rate.
+            initial_amount: The initial amount to use for the backtest.
 
         Returns:
-            Backtest: backtest result with trades and performance.
+            BacktestRun: The backtest run containing the results and metrics.
         """
-        # Load all data sources
-        data_sources = strategy.data_sources
+        portfolio_configurations = self._portfolio_configuration_service\
+            .get_all()
+
+        if (portfolio_configurations is None
+                or len(portfolio_configurations) == 0):
+            raise OperationalException(
+                "No portfolio configurations found, please register a "
+                "portfolio configuration before running a backtest."
+            )
+
+        trading_symbol = portfolio_configurations[0].trading_symbol
+
+        # Load vectorized backtest data
         data = self._data_provider_service.get_vectorized_backtest_data(
-            data_sources=data_sources,
+            data_sources=strategy.data_sources,
             start_date=backtest_date_range.start_date,
             end_date=backtest_date_range.end_date
         )
 
-        # Verify signal functions
-        buy_fn = getattr(strategy, 'buy_signal_vectorized', None)
-        sell_fn = getattr(strategy, 'sell_signal_vectorized', None)
+        # Compute signals from strategy
+        buy_signals = strategy.generate_buy_signals(data)
+        sell_signals = strategy.generate_sell_signals(data)
 
-        if not buy_fn or not sell_fn:
-            raise OperationalException(
-                "Strategy must define vectorized buy/sell signal functions."
-            )
+        # Build master index (union of all indices in signal dict)
+        index = pd.Index([])
 
-        # Select main OHLCV source (most granular)
-        ohlcv_sources = [ds for ds in data_sources if
-                         DataType.OHLCV.equals(ds.data_type)]
+        # Make sure to filter out the buy and sell signals that are before
+        # the backtest start date
+        buy_signals = {k: v[v.index >= backtest_date_range.start_date]
+                       for k, v in buy_signals.items()}
+        sell_signals = {k: v[v.index >= backtest_date_range.start_date]
+                        for k, v in sell_signals.items()}
 
-        if not ohlcv_sources:
-            raise OperationalException("No OHLCV data sources found.")
+        for sig in list(buy_signals.values()) + list(sell_signals.values()):
+            index = index.union(sig.index)
 
-        most_granular_ds = min(ohlcv_sources, key=lambda ds: ds.time_frame)
-        main_df = data[most_granular_ds.get_identifier()]
-        close = main_df['Close']
+        index = index.sort_values()
 
-        index = self._get_data_frame_index(main_df)
-        # index = main_df.index
-
-        # Signal computation
-        buy_signal = buy_fn(data)
-        sell_signal = sell_fn(data)
-
-        # Reindex to match main_df (avoid alignment issues)
-        buy_signal = buy_signal.reindex(index, fill_value=False)
-        sell_signal = sell_signal.reindex(index, fill_value=False)
-
-        signal = pd.Series(0, index=index)
-        signal[buy_signal] = 1
-        signal[sell_signal] = -1
-        signal = signal.replace(0, np.nan).ffill().shift(1).fillna(0)
-
-        # Portfolio computation
-        returns = close.pct_change().fillna(0)
-        position = signal
-        strategy_returns = position * returns
-
-        holdings = (strategy_returns + 1).cumprod() * initial_amount
-        total_value = holdings
-        net_gain = total_value - initial_amount
-
-        # Trade generation (semi-vectorized)
+        # Initialize trades and portfolio values
         trades = []
-        position_state = 0
-        trade_open_price = None
-        trade_open_date = None
-
-        for i in range(len(index)):
-            current_signal = signal.iloc[i]
-            current_price = close.iloc[i]
-            current_date = index[i]
-
-            if position_state == 0 and current_signal != 0:
-                position_state = current_signal
-                trade_open_price = current_price
-                trade_open_date = current_date
-            elif position_state != 0 and current_signal == -position_state:
-                net_gain_val = (current_price - trade_open_price) \
-                    * position_state * position_size
-                trades.append(Trade(
-                    id=len(trades) + 1,
-                    orders=[],
-                    target_symbol="BTC",
-                    trading_symbol="EUR",
-                    available_amount=0,
-                    remaining=0,
-                    filled_amount=position_size,
-                    opened_at=trade_open_date,
-                    closed_at=current_date,
-                    open_price=trade_open_price,
-                    amount=position_size,
-                    net_gain=net_gain_val,
-                    status=TradeStatus.CLOSED,
-                    cost=position_size * trade_open_price
-                ))
-                trade_open_price = None
-                trade_open_date = None
-                position_state = 0
-
-        # Snapshots
+        orders = []
+        granular_ohlcv_data_order_by_symbol = {}
         snapshots = [
             PortfolioSnapshot(
-                created_at=pd.Timestamp(ts),
-                unallocated=0.0,
-                total_value=total_value.loc[ts],
-                total_net_gain=net_gain.loc[ts]
+                created_at=backtest_date_range.start_date,
+                unallocated=initial_amount,
+                total_value=initial_amount,
+                total_net_gain=0.0
             )
-            for ts in index
         ]
+        unallocated = initial_amount
+        total_values = pd.Series(0.0, index=index)
 
+        for symbol in buy_signals.keys():
+            full_symbol = f"{symbol}/{trading_symbol}"
+            # find PositionSize object
+            pos_size_obj = next(
+                (p for p in strategy.position_sizes if
+                 p.symbol == symbol), None
+            )
+            # Load most granular OHLCV data for the symbol
+            df = self._data_provider_service.get_ohlcv_data(
+                symbol=full_symbol,
+                start_date=backtest_date_range.start_date,
+                end_date=backtest_date_range.end_date,
+                pandas=True
+            )
+            granular_ohlcv_data_order_by_symbol[full_symbol] = df
+
+            # Align signals with most granular OHLCV data
+            close = df["Close"]
+            buy_signal = buy_signals[symbol].reindex(index, fill_value=False)
+            sell_signal = sell_signals[symbol].reindex(index, fill_value=False)
+
+            signal = pd.Series(0, index=index)
+            signal[buy_signal] = 1
+            signal[sell_signal] = -1
+            signal = signal.replace(0, np.nan).ffill().shift(1).fillna(0)
+
+            # Portfolio value for this asset
+            returns = close.pct_change().fillna(0)
+            returns = returns.astype(float)
+            signal = signal.astype(float)
+            strategy_returns = signal * returns
+
+            if pos_size_obj is None:
+                raise OperationalException(
+                    f"No position size object defined "
+                    f"for symbol {symbol}, please make sure to "
+                    f"register a PositionSize object in the strategy."
+                )
+
+            capital_for_trade = pos_size_obj.get_size(
+                Portfolio(
+                    unallocated=initial_amount,
+                    initial_balance=initial_amount,
+                    trading_symbol=trading_symbol,
+                    net_size=0,
+                    market="BACKTEST",
+                    identifier="vector_backtest"
+                ) if pos_size_obj else (initial_amount / len(buy_signals)),
+                asset_price=close.iloc[0]
+            )
+
+            holdings = (strategy_returns + 1).cumprod() * capital_for_trade
+            total_values += holdings
+
+            # Trade generation
+            last_trade = None
+
+            # Loop over all timestamps in the backtest
+            for i in range(len(index)):
+
+                # 1 = buy, -1 = sell, 0 = hold
+                current_signal = signal.iloc[i]
+                current_price = float(close.iloc[i])
+                current_date = index[i]
+
+                # Convert the pd.Timestamp to an utc datetime object
+                if isinstance(current_date, pd.Timestamp):
+                    current_date = current_date.to_pydatetime()
+
+                if current_date.tzinfo is None:
+                    current_date = current_date.replace(tzinfo=timezone.utc)
+
+                # If we are not in a position, and we get a buy signal
+                if current_signal == 1 and last_trade is None:
+                    amount = float(capital_for_trade / current_price)
+                    order = Order(
+                        id=len(orders) + 1,
+                        target_symbol=symbol,
+                        trading_symbol=trading_symbol,
+                        order_type=OrderType.LIMIT,
+                        price=current_price,
+                        amount=amount,
+                        status=OrderStatus.CLOSED,
+                        created_at=current_date,
+                        updated_at=current_date,
+                        order_side=OrderSide.BUY
+                    )
+                    orders.append(order)
+                    trade = Trade(
+                        id=len(trades) + 1,
+                        orders=[
+                            order
+                        ],
+                        target_symbol=symbol,
+                        trading_symbol=trading_symbol,
+                        available_amount=amount,
+                        remaining=0,
+                        filled_amount=amount,
+                        open_price=current_price,
+                        opened_at=current_date,
+                        closed_at=None,
+                        amount=amount,
+                        net_gain=0,
+                        status=TradeStatus.OPEN,
+                        cost=capital_for_trade
+                    )
+                    trade.updated_at = current_date
+                    last_trade = trade
+                    trades.append(trade)
+
+                # If we are in a position, and we get a sell signal
+                if current_signal == -1 and last_trade is not None:
+                    net_gain_val = (
+                        current_price - last_trade.open_price
+                    ) * last_trade.available_amount
+                    last_trade.closed_at = current_date
+                    last_trade.updated_at = current_date
+                    last_trade.net_gain = net_gain_val
+                    last_trade.status = TradeStatus.CLOSED
+                    order = Order(
+                        id=len(orders) + 1,
+                        target_symbol=symbol,
+                        trading_symbol=trading_symbol,
+                        order_type=OrderType.LIMIT,
+                        price=current_price,
+                        amount=last_trade.available_amount,
+                        status=OrderStatus.CLOSED,
+                        created_at=current_date,
+                        updated_at=current_date,
+                        order_side=OrderSide.SELL
+                    )
+                    orders.append(order)
+                    last_trade.orders.append(order)
+                    last_trade = None
+
+        # Create portfolio snapshots
+        for ts in index:
+            invested_value = 0.0
+
+            for trade in trades:
+                if trade.opened_at <= ts and (
+                        trade.closed_at is None or trade.closed_at >= ts):
+
+                    # Trade is still open at this time
+                    ohlcv = granular_ohlcv_data_order_by_symbol[trade.symbol]
+
+                    # Datetime is the index for pandas DataFrame, find the
+                    # closest timestamp that is less than or equal to ts
+                    prices = ohlcv.loc[ohlcv.index <= ts, "Close"].values
+
+                    if len(prices) == 0:
+                        # No price data for this timestamp
+                        price = trade.open_price
+                    else:
+                        price = prices[-1]
+
+                    invested_value += trade.filled_amount * price
+            total_value = invested_value + unallocated
+            total_net_gain = total_value - initial_amount
+            snapshots.append(
+                PortfolioSnapshot(
+                    created_at=pd.Timestamp(ts),
+                    unallocated=unallocated,
+                    total_value=total_value,
+                    total_net_gain=total_net_gain
+                )
+            )
+
+        # Create a backtest run object
         run = BacktestRun(
-            trading_symbol="EUR",
+            trading_symbol=trading_symbol,
             initial_unallocated=initial_amount,
             number_of_runs=1,
             portfolio_snapshots=snapshots,
             trades=trades,
-            orders=[],
+            orders=orders,
             positions=[],
             created_at=datetime.now(timezone.utc),
             backtest_start_date=backtest_date_range.start_date,
             backtest_end_date=backtest_date_range.end_date,
             backtest_date_range_name=backtest_date_range.name,
-            symbols=[]
+            symbols=list(buy_signals.keys())
         )
-        backtest_metrics = create_backtest_metrics(
+
+        # Create backtest metrics
+        run.backtest_metrics = create_backtest_metrics(
             run, risk_free_rate=risk_free_rate
         )
-        run.backtest_metrics = backtest_metrics
         return run
 
     def generate_schedule(
@@ -411,3 +531,39 @@ class BacktestService(Observable):
         return Backtest(
             backtest_runs=[run],
         )
+
+    @staticmethod
+    def _get_most_granular_ohlcv_data_source(data_sources):
+        """
+        Get the most granular data source from a list of data sources.
+
+        Args:
+            data_sources: List of data sources.
+
+        Returns:
+            The most granular data source.
+        """
+        granularity_order = {
+            TimeUnit.SECOND: 1,
+            TimeUnit.MINUTE: 2,
+            TimeUnit.HOUR: 3,
+            TimeUnit.DAY: 4
+        }
+
+        most_granular = None
+        highest_granularity = float('inf')
+
+        ohlcv_data_sources = [
+            ds for ds in data_sources if DataType.OHLCV.equals(ds.data_type)
+        ]
+
+        if len(ohlcv_data_sources) == 0:
+            raise OperationalException("No OHLCV data sources found")
+
+        for source in ohlcv_data_sources:
+
+            if granularity_order[source.time_unit] < highest_granularity:
+                highest_granularity = granularity_order[source.time_unit]
+                most_granular = source
+
+        return most_granular

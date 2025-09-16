@@ -46,7 +46,6 @@ class Portfolio(BaseModel):
         total_revenue=0,
         total_cost=0,
         total_net_gain=0,
-
         total_trade_volume=0,
         created_at=None,
         updated_at=None,
@@ -67,6 +66,7 @@ class Portfolio(BaseModel):
         self.created_at = created_at
         self.updated_at = updated_at
         self.initialized = initialized
+        self._allocated = None
 
     def __repr__(self):
         return self.repr(
@@ -119,6 +119,18 @@ class Portfolio(BaseModel):
 
     def get_initial_balance(self):
         return self.initial_balance
+
+    @property
+    def allocated(self):
+
+        if self._allocated is None:
+            return 0.0
+
+        return self._allocated
+
+    @allocated.setter
+    def allocated(self, value):
+        self._allocated = value
 
     @staticmethod
     def from_portfolio_configuration(portfolio_configuration):

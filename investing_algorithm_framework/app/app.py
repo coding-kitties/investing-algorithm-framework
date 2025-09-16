@@ -20,7 +20,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     PortfolioConfiguration, SnapshotInterval, DataType, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestPermutationTest, \
-    LAST_SNAPSHOT_DATETIME
+    LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
     BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db, \
@@ -312,7 +312,8 @@ class App:
             ),
             BACKTESTING_INITIAL_AMOUNT: initial_amount,
             INDEX_DATETIME: backtest_date_range.start_date,
-            LAST_SNAPSHOT_DATETIME: None
+            LAST_SNAPSHOT_DATETIME: None,
+            BACKTESTING_FLAG: True
         }
         configuration_service = self.container.configuration_service()
         configuration_service.initialize_from_dict(data)
@@ -451,12 +452,15 @@ class App:
         if not show_progress:
             for _, data_provider in data_providers:
                 data_provider.prepare_backtest_data(
-                    backtest_date_range.start_date,
-                    backtest_date_range.end_date
+                    backtest_start_date=backtest_date_range.start_date,
+                    backtest_end_date=backtest_date_range.end_date
                 )
         else:
             for _, data_provider in \
-                    tqdm(data_providers, desc=description, colour="green"):
+                    tqdm(
+                        data_providers, desc=description, colour="green"
+                    ):
+
                 data_provider.prepare_backtest_data(
                     backtest_start_date=backtest_date_range.start_date,
                     backtest_end_date=backtest_date_range.end_date

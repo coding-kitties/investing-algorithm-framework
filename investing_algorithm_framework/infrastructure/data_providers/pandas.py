@@ -479,5 +479,5 @@ class PandasOHLCVDataProvider(DataProvider):
             market=data_source.market,
             window_size=data_source.window_size,
             data_provider_identifier=self.data_provider_identifier,
-            pandas=self.pandas
+            pandas=data_source.pandas
         )

@@ -4,8 +4,8 @@ from typing import List, Dict, Any
 import pandas as pd
 
 from investing_algorithm_framework.domain import OperationalException, Position
-from investing_algorithm_framework.domain import \
-    TimeUnit, StrategyProfile, Trade, DataSource
+from investing_algorithm_framework.domain import PositionSize, \
+    TimeUnit, StrategyProfile, Trade, DataSource, OrderSide
 from .context import Context
 
 
@@ -37,10 +37,13 @@ class TradingStrategy:
     worker_id: str = None
     strategy_id: str = None
     decorated = None
-    data_sources: List[DataSource] = None
+    data_sources: List[DataSource] = []
     traces = None
     context: Context = None
     metadata: Dict[str, Any] = None
+    position_sizes: List[PositionSize] = []
+    symbols: List[str] = []
+    trading_symbol: str = None
 
     def __init__(
         self,
@@ -49,10 +52,12 @@ class TradingStrategy:
         interval=None,
         data_sources=None,
         metadata=None,
+        position_sizes=None,
+        symbols=None,
+        trading_symbol=None,
         worker_id=None,
         decorated=None
     ):
-
         if time_unit is not None:
             self.time_unit = TimeUnit.from_value(time_unit)
         else:
@@ -88,6 +93,15 @@ class TradingStrategy:
         else:
             self.strategy_id = self.worker_id
 
+        if position_sizes is not None:
+            self.position_sizes = position_sizes
+
+        if symbols is not None:
+            self.symbols = symbols
+
+        if trading_symbol is not None:
+            self.trading_symbol = trading_symbol
+
         # Check if interval is None
         if self.interval is None:
             raise OperationalException(
@@ -98,7 +112,9 @@ class TradingStrategy:
         self._context = None
         self._last_run = None
 
-    def buy_signal_vectorized(self, data: Dict[str, Any]) -> pd.Series:
+    def generate_buy_signals(
+        self, data: Dict[str, Any]
+    ) -> Dict[str, pd.Series]:
         """
         Function that needs to be implemented by the user.
         This function should return a pandas Series containing the buy signals.
@@ -108,13 +124,17 @@ class TradingStrategy:
                 data sources of the strategy.
 
         Returns:
-            Series: A pandas Series containing the buy signals.
+            Dict[str, Series]: A dictionary where the keys are the
+              symbols and the values are pandas Series containing
+              the buy signals.
         """
         raise NotImplementedError(
-            "is_buy_signal_vectorized method not implemented"
+            "generate_buy_signals method not implemented"
         )
 
-    def sell_signal_vectorized(self, data: Dict[str, Any]) -> pd.Series:
+    def generate_sell_signals(
+        self, data: Dict[str, Any]
+    ) -> Dict[str, pd.Series]:
         """
         Function that needs to be implemented by the user.
         This function should return a pandas Series containing
@@ -125,10 +145,12 @@ class TradingStrategy:
                 data sources of the strategy.
 
         Returns:
-            Series: A pandas Series containing the sell signals.
+            Dict[str, Series]: A dictionary where the keys are the
+                symbols and the values are pandas Series containing
+                the sell signals.
         """
         raise NotImplementedError(
-            "is_sell_signal_vectorized method not implemented"
+            "generate_sell_signals method not implemented"
         )
 
     def run_strategy(self, context: Context, data: Dict[str, Any]):
@@ -157,7 +179,81 @@ class TradingStrategy:
             None
         """
         self.context = context
-        self.apply_strategy(context=context, data=data)
+        buy_signals = self.generate_buy_signals(data)
+        sell_signals = self.generate_sell_signals(data)
+
+        for symbol in self.symbols:
+
+            if self.has_open_orders(symbol):
+                continue
+
+            if not self.has_position(symbol) \
+                    and not self.has_open_orders(symbol):
+
+                if symbol in buy_signals:
+                    signals = buy_signals[symbol]
+
+                    # Check in the last row if there is a buy signal
+                    last_row = signals.iloc[-1]
+                    if last_row:
+                        position_size = next(
+                            (ps for ps in self.position_sizes
+                             if ps.symbol == symbol), None
+                        )
+                        if position_size is None:
+                            raise OperationalException(
+                                f"No position size defined for symbol "
+                                f"{symbol} in strategy "
+                                f"{self.strategy_id}"
+                            )
+                        full_symbol = (f"{symbol}/"
+                                       f"{self.context.get_trading_symbol()}")
+                        price = self.context.get_latest_price(full_symbol)
+                        amount = position_size.get_size(
+                            self.context.get_portfolio(), price
+                        )
+                        order_amount = amount / price
+                        self.create_limit_order(
+                            target_symbol=symbol,
+                            order_side=OrderSide.BUY,
+                            amount=order_amount,
+                            price=price,
+                            execute=True,
+                            validate=True,
+                            sync=True
+                        )
+
+            if self.has_position(symbol) \
+                    and not self.has_open_orders(symbol):
+
+                # Check in the last row if there is a sell signal
+                if symbol in sell_signals:
+                    signals = sell_signals[symbol]
+
+                    # Check in the last row if there is a sell signal
+                    last_row = signals.iloc[-1]
+
+                    if last_row:
+                        position = self.get_position(symbol)
+
+                        if position is None:
+                            raise OperationalException(
+                                f"No position found for symbol {symbol} "
+                                f"in strategy {self.strategy_id}"
+                            )
+
+                        full_symbol = (f"{symbol}/"
+                                       f"{self.context.get_trading_symbol()}")
+                        price = self.context.get_latest_price(full_symbol)
+                        self.create_limit_order(
+                            target_symbol=symbol,
+                            order_side=OrderSide.SELL,
+                            amount=position.amount,
+                            execute=True,
+                            validate=True,
+                            sync=True,
+                            price=price
+                        )
 
     def apply_strategy(self, context, data):
         if self.decorated:
@@ -265,67 +361,6 @@ class TradingStrategy:
 
         return self.worker_id
 
-    def add_trace(
-        self,
-        symbol: str,
-        data,
-        drop_duplicates=True
-    ) -> None:
-        """
-        Add data to the straces object for a given symbol
-
-        Args:
-            symbol (str): The symbol
-            data (pd.DataFrame): The data to add to the tracing
-            drop_duplicates (bool): Drop duplicates
-
-        Returns:
-            None
-        """
-
-        # Check if data is a DataFrame
-        if not isinstance(data, pd.DataFrame):
-            raise ValueError(
-                "Currently only pandas DataFrames are "
-                "supported as tracing data objects."
-            )
-
-        data: pd.DataFrame = data
-
-        # Check if index is a datetime object
-        if not isinstance(data.index, pd.DatetimeIndex):
-            raise ValueError("Dataframe Index must be a datetime object.")
-
-        if self.traces is None:
-            self.traces = {}
-
-        # Check if the key is already in the context dictionary
-        if symbol in self.traces:
-            # If the key is already in the context dictionary,
-            # append the new data to the existing data
-            combined = pd.concat([self.traces[symbol], data])
-        else:
-            # If the key is not in the context dictionary,
-            # add the new data to the context dictionary
-            combined = data
-
-        if drop_duplicates:
-            # Drop duplicates and sort the data by the index
-            combined = combined[~combined.index.duplicated(keep='first')]
-
-        # Set the datetime column as the index
-        combined.set_index(pd.DatetimeIndex(combined.index), inplace=True)
-        self.traces[symbol] = combined
-
-    def get_traces(self) -> dict:
-        """
-        Get the traces object
-
-        Returns:
-            dict: The traces object
-        """
-        return self.traces
-
     def has_open_orders(
         self, target_symbol=None, identifier=None, market=None
     ) -> bool:
@@ -402,44 +437,6 @@ class TradingStrategy:
             percentage_of_portfolio=percentage_of_portfolio,
             percentage_of_position=percentage_of_position,
             precision=precision,
-            market=market,
-            execute=execute,
-            validate=validate,
-            sync=sync
-        )
-
-    def create_market_order(
-        self,
-        target_symbol,
-        order_side,
-        amount,
-        market=None,
-        execute=False,
-        validate=False,
-        sync=True
-    ):
-        """
-        Function to create a market order. This function will create a market
-        order and execute it if the execute parameter is set to True. If the
-        validate parameter is set to True, the order will be validated
-
-        Args:
-            target_symbol: The symbol of the asset to trade
-            order_side: The side of the order
-            amount: The amount of the asset to trade
-            market: The market to trade the asset
-            execute: If set to True, the order will be executed
-            validate: If set to True, the order will be validated
-            sync: If set to True, the created order will be synced with the
-                portfolio of the context
-
-        Returns:
-            Order: Instance of the order created
-        """
-        self.context.create_market_order(
-            target_symbol=target_symbol,
-            order_side=order_side,
-            amount=amount,
             market=market,
             execute=execute,
             validate=validate,

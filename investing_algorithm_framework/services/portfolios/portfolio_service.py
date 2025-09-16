@@ -2,8 +2,7 @@ import logging
 from datetime import datetime
 
 from investing_algorithm_framework.domain import OperationalException, \
-    MarketCredentialService, Portfolio, \
-    Environment, ENVIRONMENT, Observable
+    MarketCredentialService, Portfolio, Environment, ENVIRONMENT
 from investing_algorithm_framework.services.configuration_service import \
     ConfigurationService
 from investing_algorithm_framework.services.repository_service \
@@ -12,7 +11,7 @@ from investing_algorithm_framework.services.repository_service \
 logger = logging.getLogger("investing_algorithm_framework")
 
 
-class PortfolioService(RepositoryService, Observable):
+class PortfolioService(RepositoryService):
     """
     Service to manage portfolios. This service will sync the portfolios with
     the exchange balances and orders. It will also create portfolios based on
@@ -31,8 +30,6 @@ class PortfolioService(RepositoryService, Observable):
         portfolio_provider_lookup
     ):
         super().__init__(repository=portfolio_repository)
-        # Call the observable constructor
-        Observable.__init__(self)
         self.configuration_service = configuration_service
         self.market_credential_service = market_credential_service
         self.portfolio_configuration_service = portfolio_configuration_service

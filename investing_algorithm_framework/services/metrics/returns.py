@@ -389,17 +389,17 @@ def get_total_return(
 
     Returns:
         Tuple[Float, Float]: First number is the absolute return and the
-            second number is the percetage total return
+            second number is the percentage total return
     """
 
     if not snapshots or len(snapshots) < 2:
-        return 0.0
+        return 0.0, 0.0
 
     initial_value = snapshots[0].total_value
     final_value = snapshots[-1].total_value
 
     if initial_value == 0:
-        return 0.0
+        return 0.0, 0.0
 
     absolute_return = final_value - initial_value
     percentage = (absolute_return / initial_value)
