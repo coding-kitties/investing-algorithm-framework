@@ -52,4 +52,4 @@ class Test(TestCase):
         self.assertEqual(len(algorithm.strategies), 1)
         self.assertEqual(len(algorithm.tasks), 0)
         self.assertEqual(len(algorithm.on_strategy_run_hooks), 0)
-        self.assertEqual(len(algorithm.strategies[0].data_sources), 1)
+        self.assertEqual(len(algorithm.strategies[0].data_sources), 2)

@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from investing_algorithm_framework import PortfolioConfiguration, \
     OrderStatus, MarketCredential
 from tests.resources import TestBase
@@ -48,7 +49,17 @@ class Test(TestBase):
         order = order_repository.find({"target_symbol": "BTC"})
         self.assertEqual(OrderStatus.OPEN.value, order.status)
 
-    def test_create_limit_buy_order_with_percentage_of_portfolio(self):
+    # path data_provider_service.get_ticker_data
+    @patch("investing_algorithm_framework.services.data_providers.DataProviderService."
+            "get_ticker_data")
+    def test_create_limit_buy_order_with_percentage_of_portfolio(
+        self, mock_get_ticker
+    ):
+        mock_get_ticker.return_value = {
+            "symbol": "BTCEUR",
+            "ask": 100,
+            "bid": 90
+        }
         self.app.add_strategy(StrategyOne)
         self.app.context.create_limit_order(
             target_symbol="BTC",

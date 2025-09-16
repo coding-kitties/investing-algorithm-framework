@@ -377,6 +377,4 @@ class TestBacktestMetrics(TestCase):
         backtest_run.save(file_path)
         opened_backtest_run = BacktestRun.open(file_path)
 
-        print(backtest_run.to_dict())
-        print(opened_backtest_run.to_dict())
         self.assertEqual(backtest_run.to_dict(), opened_backtest_run.to_dict())

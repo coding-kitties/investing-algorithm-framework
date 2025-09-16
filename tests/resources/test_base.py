@@ -8,7 +8,7 @@ from flask_testing import TestCase as FlaskTestCase
 from investing_algorithm_framework import create_app, App, \
     TradingStrategy, TimeUnit, OrderStatus
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
-    ENVIRONMENT, Environment, BACKTEST_DATA_DIRECTORY_NAME
+    ENVIRONMENT, Environment, BACKTEST_DATA_DIRECTORY_NAME, BACKTESTING_FLAG
 from investing_algorithm_framework.infrastructure import BacktestOrderExecutor
 from tests.resources.stubs import OrderExecutorTest, PortfolioProviderTest
 

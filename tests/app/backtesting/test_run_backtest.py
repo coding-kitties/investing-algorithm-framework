@@ -2,6 +2,8 @@ import os
 import shutil
 from datetime import datetime, timedelta, timezone
 from unittest import TestCase
+from typing import Dict, Any
+import pandas as pd
 
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm, \
@@ -13,7 +15,12 @@ class TestStrategy(TradingStrategy):
     time_unit = TimeUnit.MINUTE
     interval = 1
 
-    def run_strategy(self, context, data):
+    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[
+        str, pd.Series]:
+        pass
+
+    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[
+        str, pd.Series]:
         pass
 
 
@@ -110,45 +117,6 @@ class Test(TestCase):
         path = os.path.join(
             self.resource_directory, "backtest_reports/test_backtest"
         )
-        backtest.save(path)
-        # Check if the backtest report exists
-        self.assertTrue(os.path.isdir(path))
-
-    def test_report_creation_with_multiple_strategies_with_id(self):
-        app = create_app(
-            config={RESOURCE_DIRECTORY: self.resource_directory}
-        )
-        algorithm = Algorithm()
-
-        @app.strategy()
-        def run_strategy(context, data):
-            pass
-
-        algorithm.add_strategy(TestStrategy)
-        app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="bitvavo",
-                trading_symbol="EUR",
-                initial_balance=1000
-            )
-        )
-
-        self.assertEqual(1, len(algorithm.strategies))
-        end_date = datetime(2023, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=1)
-        backtest_date_range = BacktestDateRange(
-            start_date=start_date,
-            end_date=end_date
-        )
-        backtest = app.run_backtest(
-            algorithm=algorithm,
-            backtest_date_range=backtest_date_range,
-            risk_free_rate=0.027
-        )
-        path = os.path.join(
-            self.resource_directory, "backtest_reports/test_backtest"
-        )
-
         backtest.save(path)
         # Check if the backtest report exists
         self.assertTrue(os.path.isdir(path))

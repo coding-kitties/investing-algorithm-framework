@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from datetime import datetime
 from investing_algorithm_framework import PortfolioConfiguration, \
     MarketCredential, OrderStatus, TradeStatus, OrderSide
@@ -3416,7 +3417,15 @@ class TestTradeService(TestBase):
         )
         self.assertFalse(take_profit_one.active)
 
-    def test_trade_net_gain_when_stop_loss_order_canceled(self):
+    @patch("investing_algorithm_framework.services.data_providers.DataProviderService."
+            "get_ticker_data")
+    def test_trade_net_gain_when_stop_loss_order_canceled(
+        self, mock_get_ticker_data
+    ):
+        mock_get_ticker_data.return_value = {
+            "ask": 18,
+            "bid": 17.5,
+        }
         order_service = self.app.container.order_service()
         buy_order_one = order_service.create(
             {
@@ -3521,7 +3530,15 @@ class TestTradeService(TestBase):
             self.assertTrue(stop_loss.active)
             self.assertIsNone(stop_loss.sell_prices)
 
-    def test_trade_net_gain_when_take_profit_order_canceled(self):
+    @patch("investing_algorithm_framework.services.data_providers.DataProviderService."
+            "get_ticker_data")
+    def test_trade_net_gain_when_take_profit_order_canceled(
+        self, mock_get_ticker_data
+    ):
+        mock_get_ticker_data.return_value = {
+            "ask": 22,
+            "bid": 21.5,
+        }
         order_service = self.app.container.order_service()
         buy_order_one = order_service.create(
             {

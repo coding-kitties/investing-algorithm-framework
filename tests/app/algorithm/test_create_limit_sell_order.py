@@ -1,3 +1,4 @@
+from unittest.mock import patch
 from investing_algorithm_framework import PortfolioConfiguration, \
     OrderStatus, MarketCredential
 from tests.resources import TestBase
@@ -22,7 +23,17 @@ class Test(TestBase):
         "EUR": 1000
     }
 
-    def test_create_limit_sell_order(self):
+    @patch(
+        "investing_algorithm_framework.services.data_providers"
+        ".DataProviderService.get_ticker_data"
+    )
+    def test_create_limit_sell_order(self, mock_get_ticker):
+        mock_get_ticker.return_value = {
+            "symbol": "BTCEUR",
+            "bid": 10,
+            "ask": 10,
+            "last": 10
+        }
         self.app.add_strategy(StrategyOne)
         self.app.run(number_of_iterations=1)
         self.app.context.create_limit_order(
@@ -55,7 +66,20 @@ class Test(TestBase):
         )
         self.assertEqual(20, order.get_amount())
 
-    def test_create_limit_sell_order_with_percentage_position(self):
+    @patch(
+        "investing_algorithm_framework.services.data_providers"
+        ".DataProviderService.get_ticker_data"
+    )
+    def test_create_limit_sell_order_with_percentage_position(
+        self, mock_get_ticker
+    ):
+        mock_get_ticker.return_value = {
+            "symbol": "BTCEUR",
+            "bid": 10,
+            "ask": 10,
+            "last": 10
+        }
+
         self.app.add_strategy(StrategyOne)
         self.app.run(number_of_iterations=1)
         self.app.context.create_limit_order(

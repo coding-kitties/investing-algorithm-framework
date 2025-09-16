@@ -1,27 +1,33 @@
 import os
 import time
-import pandas as pd
 from datetime import datetime, timedelta, timezone
+from typing import Dict, Any
 from unittest import TestCase
-from typing import Dict, Any, List
 
-from pyindicators import ema, rsi, crossover, crossunder, macd
+import pandas as pd
+from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    Algorithm, RESOURCE_DIRECTORY, SnapshotInterval
-
-
+    RESOURCE_DIRECTORY, SnapshotInterval
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 2
+    symbols = ["BTC", "ETH"]
+    position_sizes = [
+        PositionSize(
+            symbol="BTC", percentage_of_portfolio=20.0
+        ),
+        PositionSize(
+            symbol="ETH", percentage_of_portfolio=20.0
+        )
+    ]
+
 
     def __init__(
         self,
-        symbols,
-        position_sizes,
         time_unit: TimeUnit,
         interval: int,
         market: str,
@@ -49,14 +55,6 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         self.ema_cross_lookback_window = ema_cross_lookback_window
         data_sources = []
 
-        super().__init__(
-            data_sources=data_sources,
-            time_unit=time_unit,
-            interval=interval,
-            symbols=symbols,
-            position_sizes=position_sizes
-        )
-
         for symbol in self.symbols:
             full_symbol = f"{symbol}/EUR"
             data_sources.append(
@@ -66,7 +64,8 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     time_frame=self.rsi_time_frame,
                     market=market,
                     symbol=full_symbol,
-                    pandas=True
+                    pandas=True,
+                    window_size=800
                 )
             )
             data_sources.append(
@@ -76,9 +75,21 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     time_frame=self.ema_time_frame,
                     market=market,
                     symbol=full_symbol,
-                    pandas=True
+                    pandas=True,
+                    window_size=800
                 )
             )
+
+        super().__init__(
+            data_sources=data_sources, time_unit=time_unit, interval=interval
+        )
+
+        self.buy_signal_dates = {}
+        self.sell_signal_dates = {}
+
+        for symbol in self.symbols:
+            self.buy_signal_dates[symbol] = []
+            self.sell_signal_dates[symbol] = []
 
     def prepare_indicators(
         self,
@@ -133,6 +144,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         """
 
         signals = {}
+
         for symbol in self.symbols:
             ema_data_identifier = f"{symbol}_ema_data"
             rsi_data_identifier = f"{symbol}_rsi_data"
@@ -151,10 +163,16 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             rsi_oversold = rsi_data[self.rsi_result_column] \
                 < self.rsi_oversold_threshold
 
-            # Combine both conditions
             buy_signal = rsi_oversold & ema_crossover_lookback
             buy_signals = buy_signal.fillna(False).astype(bool)
             signals[symbol] = buy_signals
+
+            # Get all dates where there is a sell signal
+            buy_signal_dates = buy_signals[buy_signals].index.tolist()
+
+            if buy_signal_dates:
+                self.buy_signal_dates[symbol] += buy_signal_dates
+
         return signals
 
     def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
@@ -195,7 +213,23 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             sell_signal = rsi_overbought & ema_crossunder_lookback
             sell_signal = sell_signal.fillna(False).astype(bool)
             signals[symbol] = sell_signal
+
+            # Get all dates where there is a sell signal
+            sell_signal_dates = sell_signal[sell_signal].index.tolist()
+
+            if sell_signal_dates:
+                self.sell_signal_dates[symbol] += sell_signal_dates
+
         return signals
+
+    def reset(self):
+
+        self.buy_signal_dates = {}
+        self.sell_signal_dates = {}
+
+        for symbol in self.symbols:
+            self.buy_signal_dates[symbol] = []
+            self.sell_signal_dates[symbol] = []
 
 class Test(TestCase):
 
@@ -219,162 +253,41 @@ class Test(TestCase):
         date_range = BacktestDateRange(
             start_date=start_date, end_date=end_date
         )
-        strategies = [
-            RSIEMACrossoverStrategy(
-                time_unit=TimeUnit.HOUR,
-                interval=2,
-                market="BITVAVO",
-                rsi_time_frame="2h",
-                rsi_period=14,
-                rsi_overbought_threshold=70,
-                rsi_oversold_threshold=30,
-                ema_time_frame="2h",
-                ema_short_period=50,
-                ema_long_period=200,
-                ema_cross_lookback_window=10,
-                symbols=[
-                    "BTC",
-                    "ETH"
-                ],
-                position_sizes = [
-                    PositionSize(
-                        symbol="BTC", percentage_of_portfolio=20.0
-                    ),
-                    PositionSize(
-                        symbol="ETH", percentage_of_portfolio=20.0
-                    )
-                ]
-            ),
-            RSIEMACrossoverStrategy(
-                time_unit=TimeUnit.HOUR,
-                interval=2,
-                market="BITVAVO",
-                rsi_time_frame="2h",
-                rsi_period=14,
-                rsi_overbought_threshold=70,
-                rsi_oversold_threshold=30,
-                ema_time_frame="2h",
-                ema_short_period=50,
-                ema_long_period=150,
-                ema_cross_lookback_window=10,
-                symbols=[
-                    "BTC",
-                    "ETH"
-                ],
-                position_sizes=[
-                    PositionSize(
-                        symbol="BTC", percentage_of_portfolio=20.0
-                    ),
-                    PositionSize(
-                        symbol="ETH", percentage_of_portfolio=20.0
-                    )
-                ]
-            )
-        ]
-        backtests = app.run_vector_backtests(
+        strategy = RSIEMACrossoverStrategy(
+            time_unit=TimeUnit.HOUR,
+            interval=2,
+            market="BITVAVO",
+            rsi_time_frame="2h",
+            rsi_period=14,
+            rsi_overbought_threshold=70,
+            rsi_oversold_threshold=30,
+            ema_time_frame="2h",
+            ema_short_period=50,
+            ema_long_period=200,
+            ema_cross_lookback_window=10,
+        )
+        vector_backtests = app.run_vector_backtest(
             initial_amount=1000,
             backtest_date_range=date_range,
-            strategies=strategies,
+            strategy=strategy,
             snapshot_interval=SnapshotInterval.DAILY,
             risk_free_rate=0.027
         )
+        run = vector_backtests.backtest_runs[0]
         end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f"Test completed in {elapsed_time:.2f} seconds")
-        self.assertEqual(2, len(backtests))
 
-        first_backtest = backtests[0]
-        run = first_backtest.backtest_runs[0]
-        self.assertNotEqual(0, len(run.get_trades(target_symbol="ETH")))
-        self.assertNotEqual(0, len(run.get_trades(target_symbol="BTC")))
 
-    def test_run_without_data_sources_initialization(self):
-        start_time = time.time()
-        # RESOURCE_DIRECTORY should always point to the parent directory/resources
-        # Resource directory should point to /tests/resources
-        # Resource directory is two levels up from the current file
-        resource_directory = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
-        )
-        config = {RESOURCE_DIRECTORY: resource_directory}
-        app = create_app(name="GoldenCrossStrategy", config=config)
-        app.add_market(
-            market="BITVAVO", trading_symbol="EUR", initial_balance=400
-        )
-        end_date = datetime(2023, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=400)
-        date_range = BacktestDateRange(
-            start_date=start_date, end_date=end_date
-        )
-        strategies = [
-            RSIEMACrossoverStrategy(
-                time_unit=TimeUnit.HOUR,
-                interval=2,
-                market="BITVAVO",
-                rsi_time_frame="2h",
-                rsi_period=14,
-                rsi_overbought_threshold=70,
-                rsi_oversold_threshold=30,
-                ema_time_frame="2h",
-                ema_short_period=50,
-                ema_long_period=200,
-                ema_cross_lookback_window=10,
-                symbols=[
-                    "BTC",
-                    "ETH"
-                ],
-                position_sizes=[
-                    PositionSize(
-                        symbol="BTC", percentage_of_portfolio=20.0
-                    ),
-                    PositionSize(
-                        symbol="ETH", percentage_of_portfolio=20.0
-                    )
-                ]
-            ),
-            RSIEMACrossoverStrategy(
-                time_unit=TimeUnit.HOUR,
-                interval=2,
-                market="BITVAVO",
-                rsi_time_frame="2h",
-                rsi_period=14,
-                rsi_overbought_threshold=70,
-                rsi_oversold_threshold=30,
-                ema_time_frame="2h",
-                ema_short_period=50,
-                ema_long_period=150,
-                ema_cross_lookback_window=10,
-                symbols=[
-                    "BTC",
-                    "ETH"
-                ],
-                position_sizes=[
-                    PositionSize(
-                        symbol="BTC", percentage_of_portfolio=20.0
-                    ),
-                    PositionSize(
-                        symbol="ETH", percentage_of_portfolio=20.0
-                    )
-                ]
-            )
-        ]
-        data_sources = []
+        self.assertEqual(3, len(run.get_trades()))
+        strategy.reset()
 
-        for strategy in strategies:
-           data_sources.extend(strategy.data_sources)
-
-        app.initialize_data_sources_backtest(
-            data_sources=data_sources, backtest_date_range=date_range
-        )
-        backtests = app.run_vector_backtests(
+        event_backtest = app.run_backtest(
             initial_amount=1000,
             backtest_date_range=date_range,
-            strategies=strategies,
+            strategy=strategy,
             snapshot_interval=SnapshotInterval.DAILY,
-            skip_data_sources_initialization=True,
             risk_free_rate=0.027
         )
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f"Test completed in {elapsed_time:.2f} seconds")
-        self.assertEqual(2, len(backtests))
+        run = event_backtest.backtest_runs[0]
+
+        self.assertEqual(3, len(run.get_trades()))
+

@@ -9,12 +9,22 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, \
-    RESOURCE_DIRECTORY
+    RESOURCE_DIRECTORY, PositionSize
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 2
+    symbols = ["BTC", "ETH"]
+    position_sizes = [
+        PositionSize(
+            symbol="BTC", percentage_of_portfolio=20.0
+        ),
+        PositionSize(
+            symbol="ETH", percentage_of_portfolio=20.0
+        )
+    ]
+
 
     def __init__(
         self,
@@ -45,28 +55,41 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         self.ema_cross_lookback_window = ema_cross_lookback_window
         data_sources = []
 
-        data_sources.append(
-            DataSource(
-                identifier=f"rsi_data",
-                data_type=DataType.OHLCV,
-                time_frame=self.rsi_time_frame,
-                market=market,
-                symbol="BTC/EUR",
-                pandas=True
+        for symbol in self.symbols:
+            full_symbol = f"{symbol}/EUR"
+            data_sources.append(
+                DataSource(
+                    identifier=f"{symbol}_rsi_data",
+                    data_type=DataType.OHLCV,
+                    time_frame=self.rsi_time_frame,
+                    market=market,
+                    symbol=full_symbol,
+                    pandas=True,
+                    window_size=800
+                )
             )
-        )
-        data_sources.append(
-            DataSource(
-                identifier=f"ema_data",
-                data_type=DataType.OHLCV,
-                time_frame=self.ema_time_frame,
-                market=market,
-                symbol="BTC/EUR",
-                pandas=True
+            data_sources.append(
+                DataSource(
+                    identifier=f"{symbol}_ema_data",
+                    data_type=DataType.OHLCV,
+                    time_frame=self.ema_time_frame,
+                    market=market,
+                    symbol=full_symbol,
+                    pandas=True,
+                    window_size=800
+                )
             )
+
+        super().__init__(
+            data_sources=data_sources, time_unit=time_unit, interval=interval
         )
 
-        super().__init__(data_sources=data_sources, time_unit=time_unit, interval=interval)
+        self.buy_signal_dates = {}
+        self.sell_signal_dates = {}
+
+        for symbol in self.symbols:
+            self.buy_signal_dates[symbol] = []
+            self.sell_signal_dates[symbol] = []
 
     def prepare_indicators(
         self,
@@ -108,59 +131,96 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
         return ema_data, rsi_data
 
-    def buy_signal_vectorized(self, data: Dict[str, Any]) -> pd.Series:
-        ema_data_identifier = "ema_data"
-        rsi_data_identifier = "rsi_data"
-        ema_data, rsi_data = self.prepare_indicators(
-            data[ema_data_identifier].copy(),
-            data[rsi_data_identifier].copy()
-        )
+    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
+        """
+        Generate buy signals based on the moving average crossover.
 
-        # crossover confirmed
-        ema_crossover_confirmed = (
-                ema_data[self.ema_crossover_result_column]
-                .rolling(window=self.ema_cross_lookback_window)
-                .sum() > 0
-        )
+        data (Dict[str, Any]): Dictionary containing all the data for
+            the strategy data sources.
 
-        # use only RSI column
-        rsi_oversold = rsi_data[self.rsi_result_column] \
-                       < self.rsi_oversold_threshold
+        Returns:
+            Dict[str, pd.Series]: A dictionary where keys are symbols and values
+                are pandas Series indicating buy signals (True/False).
+        """
 
-        buy_signal = rsi_oversold & ema_crossover_confirmed
-        return buy_signal.fillna(False).astype(bool)
+        signals = {}
 
-    def sell_signal_vectorized(self, data: Dict[str, Any]) -> pd.Series:
+        for symbol in self.symbols:
+            ema_data_identifier = f"{symbol}_ema_data"
+            rsi_data_identifier = f"{symbol}_rsi_data"
+            ema_data, rsi_data = self.prepare_indicators(
+                data[ema_data_identifier].copy(),
+                data[rsi_data_identifier].copy()
+            )
+
+            # crossover confirmed
+            ema_crossover_lookback = ema_data[
+                self.ema_crossover_result_column].rolling(
+                window=self.ema_cross_lookback_window
+            ).max().astype(bool)
+
+            # use only RSI column
+            rsi_oversold = rsi_data[self.rsi_result_column] \
+                < self.rsi_oversold_threshold
+
+            buy_signal = rsi_oversold & ema_crossover_lookback
+            buy_signals = buy_signal.fillna(False).astype(bool)
+            signals[symbol] = buy_signals
+
+            # Get all dates where there is a sell signal
+            buy_signal_dates = buy_signals[buy_signals].index.tolist()
+
+            if buy_signal_dates:
+                self.buy_signal_dates[symbol] += buy_signal_dates
+
+        return signals
+
+    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
         """
         Generate sell signals based on the moving average crossover.
 
         Args:
-            data (pd.DataFrame): DataFrame containing OHLCV data.
+            data (Dict[str, Any]): Dictionary containing all the data for
+                the strategy data sources.
 
         Returns:
-            pd.Series: Series of sell signals (1 for sell, 0 for no action).
+            Dict[str, pd.Series]: A dictionary where keys are symbols and values
+                are pandas Series indicating sell signals (True/False).
         """
-        ema_data_identifier = "ema_data"
-        rsi_data_identifier = "rsi_data"
-        ema_data, rsi_data = self.prepare_indicators(
-            data[ema_data_identifier].copy(),
-            data[rsi_data_identifier].copy()
-        )
+        signals = {}
 
-        # Confirmed by crossover between short-term EMA and long-term EMA
-        # within a given lookback window
-        ema_crossunder_confirmed = ema_data[self.ema_crossunder_result_column] \
-                                      .rolling(
-            window=self.ema_cross_lookback_window).sum() > 0
+        for symbol in self.symbols:
+            ema_data_identifier = f"{symbol}_ema_data"
+            rsi_data_identifier = f"{symbol}_rsi_data"
 
-        # use only RSI column
-        rsi_overbought = rsi_data[self.rsi_result_column] \
-                       >= self.rsi_overbought_threshold
+            ema_data, rsi_data = self.prepare_indicators(
+                data[ema_data_identifier].copy(),
+                data[rsi_data_identifier].copy()
+            )
 
-        # Combine both conditions
-        sell_signal = rsi_overbought & ema_crossunder_confirmed
-        sell_signal = sell_signal.fillna(False).astype(bool)
-        return sell_signal
+            # Confirmed by crossover between short-term EMA and long-term EMA
+            # within a given lookback window
+            ema_crossunder_lookback = ema_data[
+                self.ema_crossunder_result_column].rolling(
+                window=self.ema_cross_lookback_window
+            ).max().astype(bool)
+
+            # use only RSI column
+            rsi_overbought = rsi_data[self.rsi_result_column] \
+               >= self.rsi_overbought_threshold
+
+            # Combine both conditions
+            sell_signal = rsi_overbought & ema_crossunder_lookback
+            sell_signal = sell_signal.fillna(False).astype(bool)
+            signals[symbol] = sell_signal
+
+            # Get all dates where there is a sell signal
+            sell_signal_dates = sell_signal[sell_signal].index.tolist()
+
+            if sell_signal_dates:
+                self.sell_signal_dates[symbol] += sell_signal_dates
+
+        return signals
 
 class Test(TestCase):
 
@@ -198,7 +258,6 @@ class Test(TestCase):
             ema_long_period=200,
             ema_cross_lookback_window=10
         )
-
         backtests = app.run_permutation_test(
             initial_amount=1000,
             backtest_date_range=date_range,

@@ -1,6 +1,8 @@
 import os
 from unittest import TestCase
 
+from typing import Dict, Any
+import pandas as pd
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration, Algorithm, \
     MarketCredential
@@ -38,6 +40,14 @@ class StrategyOne(TradingStrategy):
     ):
         StrategyOne.number_of_runs += 1
 
+    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[
+        str, pd.Series]:
+        pass
+
+    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[
+        str, pd.Series]:
+        pass
+
 
 class StrategyTwo(TradingStrategy):
     time_unit = TimeUnit.SECOND
@@ -70,6 +80,13 @@ class StrategyTwo(TradingStrategy):
     ):
         StrategyTwo.number_of_runs += 1
 
+    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[
+        str, pd.Series]:
+        pass
+
+    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[
+        str, pd.Series]:
+        pass
 
 class Test(TestCase):
 

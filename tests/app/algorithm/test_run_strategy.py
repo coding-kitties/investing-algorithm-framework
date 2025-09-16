@@ -1,5 +1,8 @@
 import os
+from typing import Dict, Any
 from unittest import TestCase
+
+import pandas as pd
 
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, Algorithm, \
@@ -12,17 +15,23 @@ class StrategyOne(TradingStrategy):
     time_unit = TimeUnit.SECOND
     interval = 2
 
-    def apply_strategy(self, context, data):
+    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[
+        str, pd.Series]:
         pass
 
+    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[
+        str, pd.Series]:
+        pass
 
 class StrategyTwo(TradingStrategy):
     time_unit = TimeUnit.SECOND
     interval = 2
 
-    def apply_strategy(self, context, data):
+    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
         pass
 
+    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
+        pass
 
 class Test(TestCase):
     portfolio_configurations = [
@@ -97,34 +106,6 @@ class Test(TestCase):
         app.run(number_of_iterations=1)
         self.assertTrue(app.has_run("StrategyOne"))
         self.assertTrue(app.has_run("StrategyTwo"))
-
-    def test_with_decorator(self):
-        app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
-        app.add_portfolio_provider(PortfolioProviderTest)
-        app.add_order_executor(OrderExecutorTest)
-        app.container.portfolio_configuration_service().clear()
-        app.add_portfolio_configuration(
-            PortfolioConfiguration(
-                market="BINANCE",
-                trading_symbol="EUR",
-            )
-        )
-        app.add_market_credential(
-            MarketCredential(
-                market="BINANCE",
-                api_key=random_string(10),
-                secret_key=random_string(10)
-            )
-        )
-        algorithm = Algorithm()
-
-        @app.strategy(time_unit=TimeUnit.SECOND, interval=1)
-        def run_strategy(context, data):
-            pass
-
-        app.add_algorithm(algorithm)
-        app.run(number_of_iterations=1)
-        self.assertTrue(app.has_run("run_strategy"))
 
     def test_stateless(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})

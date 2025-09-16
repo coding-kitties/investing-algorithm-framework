@@ -14,8 +14,6 @@ from tests.resources.strategies_for_testing.strategy_v1 import \
 class Test(TestCase):
 
     def test_run(self):
-        """
-        """
         start_time = time.time()
         # RESOURCE_DIRECTORY should point to three directories up from this file
         # to the resources directory
@@ -57,7 +55,7 @@ class Test(TestCase):
         metrics = backtest.get_backtest_metrics(date_range)
         run = backtest.get_backtest_run(date_range)
         self.assertAlmostEqual(
-            metrics.growth, 5.9, delta=0.5
+            metrics.growth, 13.5, delta=0.5
         )
         self.assertAlmostEqual(
             metrics.growth_percentage, 0.0149, delta=0.1
@@ -70,7 +68,7 @@ class Test(TestCase):
         )
         self.assertAlmostEqual(
             metrics.total_net_gain,
-            5.96,
+            13.49,
             delta=0.5
         )
         self.assertAlmostEqual(
