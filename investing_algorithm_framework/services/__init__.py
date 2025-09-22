@@ -32,7 +32,7 @@ from .metrics import get_annual_volatility, \
     get_average_monthly_return_winning_months, get_percentage_winning_years, \
     get_rolling_sharpe_ratio, create_backtest_metrics, get_growth, \
     get_growth_percentage, get_risk_free_rate_us, get_median_return, \
-    get_average_return
+    get_average_return, get_cumulative_return, get_cumulative_return_series
 
 __all__ = [
     "OrderService",
@@ -109,5 +109,7 @@ __all__ = [
     "create_backtest_metrics",
     "get_growth",
     "get_median_return",
-    "get_average_return"
+    "get_average_return",
+    "get_cumulative_return",
+    "get_cumulative_return_series",
 ]

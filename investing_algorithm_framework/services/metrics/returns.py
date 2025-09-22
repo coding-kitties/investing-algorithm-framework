@@ -149,9 +149,11 @@ def get_average_return(trades: List[Trade]) -> Tuple[float, float]:
     if not returns:
         return 0.0, 0.0
 
-    average_return = sum(returns) / len(returns)
-    percentage = (average_return / cost) if cost > 0 else 0.0
-    return average_return, percentage
+    percentages = [t.net_gain / t.cost for t in trades if t.cost > 0]
+    average_percentage = sum(percentages) / len(
+        percentages) if percentages else 0.0
+    average_return = sum(returns) / len(trades)
+    return average_return, average_percentage
 
 
 def get_median_return(trades: List[Trade]) -> Tuple[float, float]:
@@ -548,3 +550,51 @@ def get_growth_percentage(snapshots: List[PortfolioSnapshot]) -> float:
         return 0.0
 
     return (final_value - initial_value) / initial_value
+
+
+def get_cumulative_return(snapshots: list[PortfolioSnapshot]) -> float:
+    """
+    Calculate cumulative return over the full period of snapshots.
+    Returns a single float (e.g., 0.25 for +25%).
+    """
+    if len(snapshots) < 2:
+        return 0.0
+
+    # Sort snapshots by date
+    snapshots = sorted(snapshots, key=lambda s: s.created_at)
+
+    start_value = snapshots[0].total_value
+    end_value = snapshots[-1].total_value
+
+    if start_value == 0:
+        return 0.0
+
+    return (end_value / start_value) - 1
+
+
+def get_cumulative_return_series(
+    snapshots: list[PortfolioSnapshot]
+) -> List[Tuple[float, datetime]]:
+    """
+    Calculate cumulative returns from a list of PortfolioSnapshot objects.
+
+    Args:
+        snapshots (list[PortfolioSnapshot]): List of snapshots ordered by time.
+
+    Returns:
+        List[Tuple[float, datetime]]: Cumulative returns for each snapshot.
+    """
+
+    # Ensure snapshots are sorted by date
+    snapshots = sorted(snapshots, key=lambda s: s.get_created_at())
+
+    initial_value = snapshots[0].get_total_value()
+    if initial_value == 0:
+        raise ValueError("Initial portfolio value cannot be zero.")
+
+    cumulative_returns = []
+    for snap in snapshots:
+        cum_return = (snap.get_total_value() / initial_value) - 1
+        cumulative_returns.append((cum_return, snap.created_at))
+
+    return cumulative_returns

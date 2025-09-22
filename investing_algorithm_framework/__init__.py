@@ -42,7 +42,8 @@ from .services import get_annual_volatility, get_sortino_ratio, \
     get_average_monthly_return_winning_months, get_percentage_winning_years, \
     get_rolling_sharpe_ratio, create_backtest_metrics, get_growth, \
     get_growth_percentage, get_cumulative_exposure, get_median_return, \
-    get_average_return, get_risk_free_rate_us
+    get_average_return, get_risk_free_rate_us, get_cumulative_return, \
+    get_cumulative_return_series
 
 
 __all__ = [
@@ -169,5 +170,7 @@ __all__ = [
     "PositionSize",
     "get_median_return",
     "get_average_return",
-    "get_risk_free_rate_us"
+    "get_risk_free_rate_us",
+    "get_cumulative_return",
+    "get_cumulative_return_series",
 ]

@@ -20,8 +20,9 @@ from .returns import get_yearly_returns, get_monthly_returns, \
     get_average_gain, get_average_loss, get_average_monthly_return, \
     get_percentage_winning_months, get_average_monthly_return_losing_months, \
     get_average_monthly_return_winning_months, get_growth, \
-    get_percentage_winning_years, get_worst_year, \
-    get_growth_percentage, get_median_return, get_average_return
+    get_percentage_winning_years, get_worst_year, get_cumulative_return, \
+    get_growth_percentage, get_median_return, get_average_return, \
+    get_cumulative_return_series
 from .exposure import get_average_trade_duration, \
     get_trade_frequency, get_trades_per_day, get_trades_per_year, \
     get_cumulative_exposure, get_exposure_ratio
@@ -49,7 +50,6 @@ __all__ = [
     "get_total_return",
     "get_cumulative_exposure",
     "get_exposure_ratio",
-    "get_average_trade_duration",
     "get_win_rate",
     "get_win_loss_ratio",
     "get_calmar_ratio",
@@ -86,5 +86,7 @@ __all__ = [
     "get_growth_percentage",
     "get_risk_free_rate_us",
     "get_median_return",
-    "get_average_return"
+    "get_average_return",
+    "get_cumulative_return",
+    "get_cumulative_return_series",
 ]

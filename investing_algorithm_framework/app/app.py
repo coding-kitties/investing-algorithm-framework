@@ -1323,7 +1323,9 @@ class App:
         original_datasets_ordered_by_symbol = {}
 
         for data_source in data_sources:
+            print(data_source)
             if DataType.OHLCV.equals(data_source.data_type):
+                print(data_source.symbol)
                 data_provider = data_provider_service.get(data_source)
                 data = data_provider_service.get_data(
                     data_source=data_source,

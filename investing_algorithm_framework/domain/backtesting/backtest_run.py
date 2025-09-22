@@ -151,6 +151,10 @@ class BacktestRun:
 
         if os.path.isfile(run_file):
             data = json.load(open(run_file, 'r'))
+        else:
+            raise OperationalException(
+                f"The run file {run_file} does not exist."
+            )
 
         # Parse datetime fields
         data["backtest_start_date"] = datetime.strptime(

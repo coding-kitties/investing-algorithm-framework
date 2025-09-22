@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from dataclasses import dataclass, field
 from logging import getLogger
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 from datetime import datetime, date
 import json
 import pandas as pd
@@ -85,6 +85,12 @@ class BacktestMetrics:
             trades in hours.
         number_of_trades (int): The total number of trades executed
             during the backtest.
+        number_of_trades_closed (int): The total number of trades close
+            during the backtest.
+        number_of_trades_opened (int): The total number of trades opened
+            during the backtest.
+        number_of_trades_open_at_end (int): The number of trades
+            still open at the end of the backtest.
         win_rate (float): The win rate of the trades, expressed
             as a percentage.
         win_loss_ratio (float): The ratio of winning trades
@@ -111,6 +117,8 @@ class BacktestMetrics:
             including return and date.
         worst_year (datetime): A string representation of the worst year,
             including return and date.
+        metadata (Dict[str, str]): A dictionary to store any additional
+            metadata related to the backtest.
     """
     backtest_start_date: datetime
     backtest_end_date: datetime
@@ -120,6 +128,9 @@ class BacktestMetrics:
     total_net_gain: float = 0.0
     total_net_gain_percentage: float = 0.0
     final_value: float = 0.0
+    cumulative_return: float = 0.0
+    cumulative_return_series: List[Tuple[float, datetime]] = \
+        field(default_factory=list)
     cagr: float = 0.0
     sharpe_ratio: float = 0.0
     rolling_sharpe_ratio: List[Tuple[float, datetime]] = \
@@ -152,6 +163,9 @@ class BacktestMetrics:
     average_trade_duration: float = 0.0
     average_trade_size: float = 0.0
     number_of_trades: int = 0
+    number_of_trades_closed: int = 0
+    number_of_trades_opened: int = 0
+    number_of_trades_open_at_end: int = 0
     win_rate: float = 0.0
     win_loss_ratio: float = 0.0
     percentage_positive_trades: float = 0.0
@@ -166,6 +180,7 @@ class BacktestMetrics:
     worst_month: Tuple[float, datetime] = None
     worst_year: Tuple[float, date] = None
     total_number_of_days: int = None
+    metadata: Dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self):
         self.total_number_of_days = (self.backtest_end_date -
@@ -186,6 +201,12 @@ class BacktestMetrics:
             "total_net_gain": self.total_net_gain,
             "total_net_gain_percentage": self.total_net_gain_percentage,
             "final_value": self.final_value,
+            "growth": self.growth,
+            "growth_percentage": self.growth_percentage,
+            "cumulative_return": self.cumulative_return,
+            "cumulative_return_series": [(value, date.isoformat())
+                                         for value, date in
+                                         self.cumulative_return_series],
             "cagr": self.cagr,
             "sharpe_ratio": self.sharpe_ratio,
             "rolling_sharpe_ratio": [
