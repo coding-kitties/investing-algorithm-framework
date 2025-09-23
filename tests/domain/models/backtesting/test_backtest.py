@@ -61,12 +61,12 @@ class TestBacktestSaveOpen(unittest.TestCase):
                 (0.5, datetime(2020, 6, 30)),
                 (0.2, datetime(2020, 3, 31))
             ],
-            growth=0.0,
-            growth_percentage=0.0,
-            total_net_gain=0.0,
-            total_net_gain_percentage=0.0,
-            final_value=0.0,
-            cagr=0.0,
+            growth=1.0,
+            growth_percentage=1.0,
+            total_net_gain=1.0,
+            total_net_gain_percentage=1.0,
+            final_value=1.0,
+            cagr=1.0,
             sharpe_ratio=0.0,
             rolling_sharpe_ratio=[
                 (0.0, datetime(2020, 1, 1)),
@@ -280,16 +280,23 @@ class TestBacktestSaveOpen(unittest.TestCase):
         backtest = Backtest(
             backtest_runs=[backtest_run],
             backtest_permutation_tests=[permutation_test_metrics],
-            backtest_summary=backtest_metrics
+            backtest_summary=backtest_metrics,
+            metadata={"strategy": "test_strategy"},
+            risk_free_rate=0.02
         )
 
         # Save the backtest
         backtest.save(self.dir_path)
         self.assertTrue((self.dir_path / "runs").exists())
 
-        # Check that there is atleast one results file
+        # Check that there is at least one results file
         results_dir = (self.dir_path / "runs")
         self.assertEqual(1, (len(os.listdir(results_dir))))
+
+        # Get the first run
+        first_run_dir = results_dir / os.listdir(results_dir)[0]
+        self.assertTrue((first_run_dir / "run.json").exists())
+        self.assertTrue((first_run_dir / "metrics.json").exists())
 
         # Check that there is a permutation tests directory
         self.assertTrue((self.dir_path / "permutation_tests").exists())
@@ -298,6 +305,54 @@ class TestBacktestSaveOpen(unittest.TestCase):
         permutated_metrics_dir = (self.dir_path / "permutation_tests")
 
         self.assertEqual(1, (len(os.listdir(permutated_metrics_dir))))
+        self.assertTrue((self.dir_path / "metadata.json").exists())
+        self.assertTrue((self.dir_path / "summary.json").exists())
+
+        loaded_backtest = Backtest.open(self.dir_path)
+        self.assertEqual(
+            len(loaded_backtest.get_all_backtest_runs()), 1
+        )
+        self.assertEqual(
+            len(loaded_backtest.get_all_backtest_permutation_tests()),
+            1
+        )
+
+        first_backtest_run = loaded_backtest.get_all_backtest_runs()[0]
+        self.assertEqual(
+            first_backtest_run.trading_symbol, "EUR"
+        )
+        self.assertEqual(
+            first_backtest_run.backtest_start_date,
+            datetime(2020, 1, 1)
+        )
+        self.assertEqual(
+            first_backtest_run.backtest_end_date,
+            datetime(2020, 12, 31)
+        )
+        self.assertEqual(
+            first_backtest_run.initial_unallocated, 1000.0
+        )
+        self.assertEqual(
+            len(first_backtest_run.portfolio_snapshots), 2
+        )
+        self.assertEqual(
+            len(first_backtest_run.trades), 1
+        )
+        self.assertEqual(
+            len(first_backtest_run.orders), 1
+        )
+        self.assertEqual(
+            len(first_backtest_run.positions), 1
+        )
+
+        backtest_metrics = first_backtest_run.backtest_metrics
+        self.assertIsInstance(backtest_metrics, BacktestMetrics)
+        self.assertEqual(backtest_metrics.cagr, 1.0)
+        self.assertEqual(backtest_metrics.sharpe_ratio, 0.0)
+        self.assertEqual(backtest_metrics.sortino_ratio, 0.0)
+        self.assertEqual(backtest_metrics.calmar_ratio, 0.0)
+        self.assertEqual(backtest_metrics.profit_factor, 0.0)
+        self.assertEqual(backtest_metrics.annual_volatility, 0.0)
 
     def test_get_backtest_run(self):
         pass
