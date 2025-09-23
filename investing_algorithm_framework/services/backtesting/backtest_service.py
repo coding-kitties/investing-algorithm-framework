@@ -273,7 +273,7 @@ class BacktestService:
                     )
                     orders.append(order)
                     trade = Trade(
-                        id=len(trades) + 1,
+                        id=uuid4(),
                         orders=[
                             order
                         ],
@@ -304,7 +304,7 @@ class BacktestService:
                     last_trade.net_gain = net_gain_val
                     last_trade.status = TradeStatus.CLOSED
                     order = Order(
-                        id=len(orders) + 1,
+                        id=uuid4(),
                         target_symbol=symbol,
                         trading_symbol=trading_symbol,
                         order_type=OrderType.LIMIT,
