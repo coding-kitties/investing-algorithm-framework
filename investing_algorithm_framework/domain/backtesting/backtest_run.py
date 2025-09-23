@@ -1,7 +1,7 @@
 import json
 import os
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from logging import getLogger
 from typing import Union, List, Optional
@@ -167,6 +167,12 @@ class BacktestRun:
         data["created_at"] = datetime.strptime(
             data["created_at"], "%Y-%m-%d %H:%M:%S"
         )
+        # Convert all to utc timezone
+        data["backtest_start_date"] = data[
+            "backtest_start_date"].replace(tzinfo=timezone.utc)
+        data["backtest_end_date"] = data[
+            "backtest_end_date"].replace(tzinfo=timezone.utc)
+        data["created_at"] = data["created_at"].replace(tzinfo=timezone.utc)
 
         # Parse orders
         data["orders"] = [
