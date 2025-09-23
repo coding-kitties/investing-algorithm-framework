@@ -137,7 +137,7 @@ class BacktestPermutationTest:
         os.makedirs(path, exist_ok=True)
 
         # Save the real metrics
-        self.real_metrics.save(os.path.join(path, "original_metrics"))
+        self.real_metrics.save(os.path.join(path, "original_metrics.json"))
 
         permuted_dir = os.path.join(path, "permuted_metrics")
         os.makedirs(permuted_dir, exist_ok=True)
@@ -154,36 +154,33 @@ class BacktestPermutationTest:
         """
         Load the permutation test results from disk (JSON + Parquet).
         """
-        with open(os.path.join(path, "results.json"), "r") as f:
-            results = json.load(f)
+        original_metrics = os.path.join(path, "original_metrics.json")
 
         # Rehydrate BacktestMetrics
-        real_metrics = BacktestMetrics(**results["real_metrics"])
-        permutated_metrics = [
-            BacktestMetrics(**pm) for pm in results["permutated_metrics"]
-        ]
+        real_metrics = BacktestMetrics.open(original_metrics)
 
-        # Reload DataFrames
-        ohlcv_original_datasets = {}
-        ohlcv_permutated_datasets = {}
-        for file in os.listdir(path):
-            if file.startswith("original_") and file.endswith(".parquet"):
-                key = file.replace("original_", "").replace(".parquet", "")
-                ohlcv_original_datasets[key] = pd.read_parquet(
-                    os.path.join(path, file)
-                )
-            elif file.startswith("permuted_") and file.endswith(".parquet"):
-                key = file.replace("permuted_", "").replace(".parquet", "")
-                ohlcv_permutated_datasets[key] = pd.read_parquet(
-                    os.path.join(path, file)
-                )
+        permuted_dir = os.path.join(path, "permuted_metrics")
+
+        permutated_metrics = []
+        if os.path.exists(permuted_dir):
+            for fname in os.listdir(permuted_dir):
+                if fname.startswith("permuted_"):
+                    pm = BacktestMetrics.open(
+                        os.path.join(permuted_dir, fname)
+                    )
+                    permutated_metrics.append(pm)
+
+        p_values_path = os.path.join(path, "p_values.json")
+        p_values = {}
+
+        if os.path.exists(p_values_path):
+            with open(p_values_path, "r") as f:
+                p_values = json.load(f)
 
         return BacktestPermutationTest(
             real_metrics=real_metrics,
             permutated_metrics=permutated_metrics,
-            p_values=results["p_values"],
-            ohlcv_original_datasets=ohlcv_original_datasets,
-            ohlcv_permutated_datasets=ohlcv_permutated_datasets
+            p_values=p_values,
         )
 
     def create_directory_name(self) -> str:

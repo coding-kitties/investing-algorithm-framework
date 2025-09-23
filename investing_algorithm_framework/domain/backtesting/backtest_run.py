@@ -82,6 +82,7 @@ class BacktestRun:
     number_of_positions: int = 0
     backtest_metrics: BacktestMetrics = None
     backtest_date_range_name: str = None
+    data_sources: List[dict] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """

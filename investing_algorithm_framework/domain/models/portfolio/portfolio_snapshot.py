@@ -1,5 +1,7 @@
 from dateutil import parser
 from investing_algorithm_framework.domain.models.base_model import BaseModel
+from investing_algorithm_framework.domain.constants import \
+    DEFAULT_DATETIME_FORMAT
 
 
 class PortfolioSnapshot(BaseModel):
@@ -17,7 +19,8 @@ class PortfolioSnapshot(BaseModel):
         total_value=None,
         cash_flow=None,
         created_at=None,
-        position_snapshots=None
+        position_snapshots=None,
+        metadata=None,
     ):
         self.portfolio_id = portfolio_id
         self.trading_symbol = trading_symbol
@@ -29,6 +32,7 @@ class PortfolioSnapshot(BaseModel):
         self.net_size = net_size
         self.total_cost = total_cost
         self.cash_flow = cash_flow
+        self.metadata = metadata if metadata is not None else {}
 
         if created_at is not None and isinstance(created_at, str):
             self.created_at = parser.parse(created_at)
@@ -144,9 +148,18 @@ class PortfolioSnapshot(BaseModel):
                 if self.created_at else None
 
         else:
-            created_at = self.created_at
+            created_at = self.created_at.strftime(DEFAULT_DATETIME_FORMAT)
 
         return {
+            "metadata": self.metadata,
+            "portfolio_id": self.portfolio_id,
+            "trading_symbol": self.trading_symbol,
+            "pending_value": self.pending_value,
+            "unallocated": self.unallocated,
+            "total_net_gain": self.total_net_gain,
+            "total_revenue": self.total_revenue,
+            "total_cost": self.total_cost,
+            "cash_flow": self.cash_flow,
             "net_size": self.net_size,
             "created_at": created_at,
             "total_value": self.total_value,
@@ -169,4 +182,15 @@ class PortfolioSnapshot(BaseModel):
             net_size=data.get("net_size", 0.0),
             created_at=created_at,
             total_value=data.get("total_value", 0.0),
+            trading_symbol=data.get(
+                "trading_symbol", None
+            ),
+            portfolio_id=data.get("portfolio_id", None),
+            pending_value=data.get("pending_value", 0.0),
+            unallocated=data.get("unallocated", 0.0),
+            total_net_gain=data.get("total_net_gain", 0.0),
+            total_revenue=data.get("total_revenue", 0.0),
+            total_cost=data.get("total_cost", 0.0),
+            cash_flow=data.get("cash_flow", 0.0),
+            metadata=data.get("metadata", {})
         )

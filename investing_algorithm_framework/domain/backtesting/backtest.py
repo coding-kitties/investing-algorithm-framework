@@ -91,6 +91,18 @@ class Backtest:
                 return run
         return None
 
+    def get_all_backtest_permutation_tests(
+        self
+    ) -> List[BacktestPermutationTest]:
+        """
+        Retrieve all BacktestPermutationTest instances from the backtest.
+
+        Returns:
+            List[BacktestPermutationTest]: A list of all
+                BacktestPermutationTest instances.
+        """
+        return self.backtest_permutation_tests
+
     def get_backtest_permutation_test(
         self, date_range: BacktestDateRange
     ) -> Union[BacktestPermutationTest, None]:
