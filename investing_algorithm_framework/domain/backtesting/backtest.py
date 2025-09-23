@@ -292,11 +292,11 @@ class Backtest:
             run_path = os.path.join(directory_path, "runs")
             os.makedirs(run_path, exist_ok=True)
 
-            for bm in self.backtest_runs:
-                dir_name = bm.create_directory_name()
-                run_path = os.path.join(run_path, dir_name)
-                os.makedirs(run_path, exist_ok=True)
-                bm.save(run_path)
+            for br in self.backtest_runs:
+                dir_name = br.create_directory_name()
+                destination_run_path = os.path.join(run_path, dir_name)
+                os.makedirs(destination_run_path, exist_ok=True)
+                br.save(destination_run_path)
 
         # Save combined backtest metrics if available
         if self.backtest_summary:
