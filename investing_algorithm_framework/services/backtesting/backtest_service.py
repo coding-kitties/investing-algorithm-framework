@@ -4,6 +4,7 @@ import sys
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Union
+from uuid import uuid4
 
 import numpy as np
 import pandas as pd
@@ -124,6 +125,8 @@ class BacktestService:
             strategy: The strategy to backtest.
             backtest_date_range: The date range for the backtest.
             initial_amount: The initial amount to use for the backtest.
+            risk_free_rate: The risk-free rate to use for the backtest
+                metrics. Default is 0.027 (2.7%).
 
         Returns:
             BacktestRun: The backtest run containing the results and metrics.
@@ -257,7 +260,7 @@ class BacktestService:
                 if current_signal == 1 and last_trade is None:
                     amount = float(capital_for_trade / current_price)
                     order = Order(
-                        id=len(orders) + 1,
+                        id=uuid4(),
                         target_symbol=symbol,
                         trading_symbol=trading_symbol,
                         order_type=OrderType.LIMIT,
