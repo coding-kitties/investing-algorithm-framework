@@ -817,7 +817,7 @@ class TestBacktestSaveOpen(unittest.TestCase):
             backtest_runs=[backtest_run_two],
             backtest_permutation_tests=[permutation_test_metrics],
             backtest_summary=backtest_metrics,
-            metadata={"strategy": "test_strategy"},
+            metadata={"strategy": "test_strategy", "params": {"param1": 1, "param2": 2}},
             risk_free_rate=0.02
         )
 
