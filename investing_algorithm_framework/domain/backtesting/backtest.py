@@ -1,5 +1,6 @@
 import json
 import os
+from uuid import uuid4
 from pathlib import Path
 from dataclasses import dataclass, field
 from logging import getLogger
@@ -46,6 +47,7 @@ class Backtest:
         algorithm_id (int): The ID of the algorithm associated with this
             backtest.
     """
+    id: str = field(default_factory=lambda: str(uuid4()))
     backtest_runs: List[BacktestRun] = field(default_factory=list)
     backtest_summary: BacktestSummaryMetrics = field(default=None)
     backtest_permutation_tests: List[BacktestPermutationTest] = \
@@ -199,6 +201,7 @@ class Backtest:
             OperationalException: If the directory does not exist or if
             there is an error loading the files.
         """
+        id = None
         backtest_runs = []
         backtest_summary_metrics = None
         permutation_metrics = []
@@ -209,6 +212,17 @@ class Backtest:
             raise OperationalException(
                 f"The directory {directory_path} does not exist."
             )
+
+        # Load id if available
+        id_file = os.path.join(directory_path, "id.json")
+        if os.path.isfile(id_file):
+            with open(id_file, 'r') as f:
+                try:
+                    id = json.load(f).get('id', None)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Error decoding id JSON: {e}")
+                    id = None
+        # Load combined backtest metrics if available
 
         summary_file = os.path.join(directory_path, "summary.json")
 
@@ -259,6 +273,7 @@ class Backtest:
                     risk_free_rate = None
 
         return Backtest(
+            id=id,
             backtest_runs=backtest_runs,
             backtest_summary=backtest_summary_metrics,
             backtest_permutation_tests=permutation_metrics,
@@ -286,6 +301,11 @@ class Backtest:
 
         if not os.path.exists(directory_path):
             os.makedirs(directory_path)
+
+        # Save id of the backtest
+        id_file = os.path.join(directory_path, "id.json")
+        with open(id_file, 'w') as f:
+            json.dump({'id': self.id}, f, indent=4)
 
         # Call the save method of all backtest runs
         if self.backtest_runs:
@@ -429,11 +449,7 @@ class Backtest:
         self.backtest_permutation_tests.append(permutation_test)
 
     def __hash__(self):
-        start_dates = [run.backtest_start_date for run in self.backtest_runs]
-        end_dates = [run.backtest_end_date for run in self.backtest_runs]
-        metadata_items = tuple(sorted(self.metadata.items()))
-        return hash((
-            tuple(sorted(start_dates)),
-            tuple(sorted(end_dates)),
-            metadata_items
-        ))
+        return hash(self.id)
+
+    def __eq__(self, other):
+        return isinstance(other, Backtest) and self.id == other.id
