@@ -1,5 +1,5 @@
 from unittest import TestCase
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 import tempfile
 from pathlib import Path
 
@@ -16,8 +16,8 @@ class TestBacktestMetrics(TestCase):
 
     def test_save(self):
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            backtest_end_date=datetime(2020, 12, 31, tzinfo=timezone.utc),
             equity_curve = [
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -115,8 +115,8 @@ class TestBacktestMetrics(TestCase):
         )
 
         backtest_run = BacktestRun(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            backtest_end_date=datetime(2020, 12, 31, tzinfo=timezone.utc),
             trading_symbol="EUR",
             initial_unallocated=1000.0,
             number_of_runs=50,
@@ -193,8 +193,8 @@ class TestBacktestMetrics(TestCase):
 
     def test_open(self):
         backtest_metrics = BacktestMetrics(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            backtest_end_date=datetime(2020, 12, 31, tzinfo=timezone.utc),
             equity_curve=[
                 (0.0, datetime(2020, 1, 1)),
                 (1.0, datetime(2020, 12, 31)),
@@ -300,8 +300,8 @@ class TestBacktestMetrics(TestCase):
         )
 
         backtest_run = BacktestRun(
-            backtest_start_date=datetime(2020, 1, 1),
-            backtest_end_date=datetime(2020, 12, 31),
+            backtest_start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
+            backtest_end_date=datetime(2020, 12, 31, tzinfo=timezone.utc),
             trading_symbol="EUR",
             initial_unallocated=1000.0,
             number_of_runs=50,
@@ -376,5 +376,4 @@ class TestBacktestMetrics(TestCase):
         file_path = self.dir_path
         backtest_run.save(file_path)
         opened_backtest_run = BacktestRun.open(file_path)
-
         self.assertEqual(backtest_run.to_dict(), opened_backtest_run.to_dict())
