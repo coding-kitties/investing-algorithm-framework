@@ -254,6 +254,10 @@ class BacktestRun:
             data["backtest_end_date"] = self.backtest_end_date.strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
+
+            if self.created_at.tzinfo is None:
+                self.created_at = self.created_at.replace(tzinfo=timezone.utc)
+
             data["created_at"] = self.created_at.strftime(
                 "%Y-%m-%d %H:%M:%S"
             )

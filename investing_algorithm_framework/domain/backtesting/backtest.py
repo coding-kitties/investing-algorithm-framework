@@ -427,3 +427,13 @@ class Backtest:
                 to add.
         """
         self.backtest_permutation_tests.append(permutation_test)
+
+    def __hash__(self):
+        start_dates = [run.backtest_start_date for run in self.backtest_runs]
+        end_dates = [run.backtest_end_date for run in self.backtest_runs]
+        metadata_items = tuple(sorted(self.metadata.items()))
+        return hash((
+            tuple(sorted(start_dates)),
+            tuple(sorted(end_dates)),
+            metadata_items
+        ))
