@@ -20,19 +20,24 @@ class BacktestSummaryMetrics:
         total_net_gain (float): Total net gain from the backtest.
         total_net_gain_percentage (float): Total net gain percentage
             from the backtest.
-        average_total_net_gain (float): Average total net gain across
+        total_loss (float): Total gross loss from all trades.
+        total_loss_percentage (float): Total gross loss percentage.
+        total_growth (float): Total growth from the backtest.
+        total_growth_percentage (float): Total growth percentage
+            from the backtest.
+        average_net_gain (float): Average returns across multiple backtests.
+        average_net_gain_percentage (float): Average return percentage across
             multiple backtests.
-        average_total_net_gain_percentage (float): Average total net gain
-            percentage across multiple backtests.
-        gross_loss (float): Total gross loss from all trades.
-        average_gross_loss (float): Average gross loss across
-            multiple backtests.
-        growth (float): Total growth from the backtest.
-        growth_percentage (float): Total growth percentage from the backtest.
         average_growth (float): Average growth across multiple backtests.
         average_growth_percentage (float): Average growth percentage across
             multiple backtests.
-        trades_average_return (float): Average return per trade.
+        average_trade_return (float): Average return per trade.
+        average_trade_return_percentage (float): Average return percentage
+            per trade.
+        average_trade_loss (float): Total gross loss from all trades.
+        average_trade_loss_percentage (float): Average trade loss percentage.
+        average_trade_gain (float): Average gain from winning trades.
+        average_trade_gain_percentage (float): Average gain percentage
         cagr (float): Compound annual growth rate of the backtest.
         sharpe_ratio (float): Sharpe ratio, risk-adjusted return.
         sortino_ratio (float): Sortino ratio, downside-risk adjusted return.
@@ -50,14 +55,20 @@ class BacktestSummaryMetrics:
     """
     total_net_gain: float = None
     total_net_gain_percentage: float = None
-    average_total_net_gain: float = None
-    average_total_net_gain_percentage: float = None
-    gross_loss: float = None
-    average_gross_loss: float = None
-    growth: float = None
-    growth_percentage: float = None
+    total_growth: float = None
+    total_growth_percentage: float = None
+    total_loss: float = None
+    total_loss_percentage: float = None
+    average_net_gain: float = None
+    average_net_gain_percentage: float = None
     average_growth: float = None
     average_growth_percentage: float = None
+    average_trade_return: float = None
+    average_trade_return_percentage: float = None
+    average_trade_loss: float = None
+    average_trade_loss_percentage: float = None
+    average_trade_gain: float = None
+    average_trade_gain_percentage: float = None
     trades_average_return: float = None
     cagr: float = None
     sharpe_ratio: float = None
@@ -81,16 +92,23 @@ class BacktestSummaryMetrics:
         return {
             "total_net_gain": self.total_net_gain,
             "total_net_gain_percentage": self.total_net_gain_percentage,
-            "average_total_net_gain": self.average_total_net_gain,
-            "average_total_net_gain_percentage":
-                self.average_total_net_gain_percentage,
-            "gross_loss": self.gross_loss,
-            "average_gross_loss": self.average_gross_loss,
-            "growth": self.growth,
-            "growth_percentage": self.growth_percentage,
+            "total_growth": self.total_growth,
+            "total_growth_percentage": self.total_growth_percentage,
+            "total_loss": self.total_loss,
+            "total_loss_percentage": self.total_loss_percentage,
+            "average_net_gain": self.average_net_gain,
+            "average_net_gain_percentage": self.average_net_gain_percentage,
             "average_growth": self.average_growth,
             "average_growth_percentage": self.average_growth_percentage,
-            "trades_average_return": self.trades_average_return,
+            "average_trade_return": self.average_trade_return,
+            "average_trade_return_percentage":
+                self.average_trade_return_percentage,
+            "average_trade_loss": self.average_trade_loss,
+            "average_trade_loss_percentage":
+                self.average_trade_loss_percentage,
+            "average_trade_gain": self.average_trade_gain,
+            "average_trade_gain_percentage":
+                self.average_trade_gain_percentage,
             "cagr": self.cagr,
             "sharpe_ratio": self.sharpe_ratio,
             "sortino_ratio": self.sortino_ratio,
@@ -154,9 +172,7 @@ class BacktestSummaryMetrics:
         if self.total_net_gain is None:
             self.total_net_gain = other.total_net_gain
         else:
-            self.total_net_gain = safe_mean(
-                self.total_net_gain, other.total_net_gain
-            )
+            self.total_net_gain += other.total_net_gain
 
         if self.total_net_gain_percentage is None:
             self.total_net_gain_percentage = other.total_net_gain_percentage
@@ -165,28 +181,71 @@ class BacktestSummaryMetrics:
                 self.total_net_gain_percentage, other.total_net_gain_percentage
             )
 
-        if self.gross_loss is None:
-            self.gross_loss = other.gross_loss
+        if self.total_loss is None:
+            self.total_loss = other.total_loss
         else:
-            self.gross_loss = safe_mean(self.gross_loss, other.gross_loss)
+            self.total_loss = safe_mean(self.total_loss, other.total_loss)
 
-        if self.growth is None:
-            self.growth = other.growth
+        if self.total_growth is None:
+            self.total_growth = other.total_growth
         else:
-            self.growth = safe_mean(self.growth, other.growth)
-
-        if self.growth_percentage is None:
-            self.growth_percentage = other.growth_percentage
-        else:
-            self.growth_percentage = safe_mean(
-                self.growth_percentage, other.growth_percentage
+            self.total_growth = safe_mean(
+                self.total_growth, other.total_growth
             )
 
-        if self.trades_average_return is None:
-            self.trades_average_return = other.trades_average_return
+        if self.total_growth_percentage is None:
+            self.total_growth_percentage = other.total_growth_percentage
         else:
-            self.trades_average_return = safe_mean(
-                self.trades_average_return, other.trades_average_return
+            self.total_growth_percentage = safe_mean(
+                self.total_growth_percentage, other.total_growth_percentage
+            )
+
+        if self.average_trade_return is None:
+            self.average_trade_return = other.average_trade_return
+        else:
+            self.average_trade_return = safe_mean(
+                self.average_trade_return, other.average_trade_return
+            )
+
+        if self.average_trade_return_percentage is None:
+            self.average_trade_return_percentage = \
+                other.average_trade_return_percentage
+        else:
+            self.average_trade_return_percentage = safe_mean(
+                self.average_trade_return_percentage,
+                other.average_trade_return_percentage
+            )
+
+        if self.average_trade_loss is None:
+            self.average_trade_loss = other.average_trade_loss
+        else:
+            self.average_trade_loss = safe_mean(
+                self.average_trade_loss, other.average_trade_loss
+            )
+
+        if self.average_trade_loss_percentage is None:
+            self.average_trade_loss_percentage = \
+                other.average_trade_loss_percentage
+        else:
+            self.average_trade_loss_percentage = safe_mean(
+                self.average_trade_loss_percentage,
+                other.average_trade_loss_percentage
+            )
+
+        if self.average_trade_gain is None:
+            self.average_trade_gain = other.average_trade_gain
+        else:
+            self.average_trade_gain = safe_mean(
+                self.average_trade_gain, other.average_trade_gain
+            )
+
+        if self.average_trade_gain_percentage is None:
+            self.average_trade_gain_percentage = \
+                other.average_trade_gain_percentage
+        else:
+            self.average_trade_gain_percentage = safe_mean(
+                self.average_trade_gain_percentage,
+                other.average_trade_gain_percentage
             )
 
         if self.cagr is None:
@@ -264,6 +323,36 @@ class BacktestSummaryMetrics:
             self.number_of_trades = other.number_of_trades
         else:
             self.number_of_trades += other.number_of_trades
+
+        if self.average_net_gain is None:
+            self.average_net_gain = other.total_net_gain
+        else:
+            self.average_net_gain = safe_mean(
+                self.average_net_gain, other.total_net_gain
+            )
+
+        if self.average_net_gain_percentage is None:
+            self.average_net_gain_percentage = other.total_net_gain_percentage
+        else:
+            self.average_net_gain_percentage = safe_mean(
+                self.average_net_gain_percentage,
+                other.total_net_gain_percentage
+            )
+
+        if self.average_growth is None:
+            self.average_growth = other.total_growth
+        else:
+            self.average_growth = safe_mean(
+                self.average_growth, other.total_growth
+            )
+
+        if self.average_growth_percentage is None:
+            self.average_growth_percentage = other.total_growth_percentage
+        else:
+            self.average_growth_percentage = safe_mean(
+                self.average_growth_percentage,
+                other.total_growth_percentage
+            )
 
     def __repr__(self):
         return json.dumps(

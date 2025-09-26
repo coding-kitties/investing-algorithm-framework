@@ -88,8 +88,8 @@ def create_html_trade_metrics_table(results, report):
         copy_results['Worst Trade'] = f"{worst_trade['net_gain']:.2f} {report.trading_symbol}"
         copy_results['Worst Trade Date'] = safe_format_date(worst_trade['opened_at'], format_str=DEFAULT_DATETIME_FORMAT)
 
-    copy_results['Trades Average Gain'] = f"{safe_format(copy_results['trades_average_gain'], string_format)} {report.trading_symbol} {copy_results['trades_average_gain_percentage']:.2f}%"
-    copy_results['Trades Average Loss'] = f"{safe_format(copy_results['trades_average_loss'], string_format)} {report.trading_symbol} {copy_results['trades_average_loss_percentage']:.2f}%"
+    copy_results['Trades Average Gain'] = f"{safe_format(copy_results['average_trade_gain'], string_format)} {report.trading_symbol} {copy_results['trades_average_gain_percentage']:.2f}%"
+    copy_results['Trades Average Loss'] = f"{safe_format(copy_results['average_trade_loss'], string_format)} {report.trading_symbol} {copy_results['trades_average_loss_percentage']:.2f}%"
     copy_results['Average Trade Duration'] = f"{copy_results['average_trade_duration']:.2f} hours"
     copy_results['Number of Trades'] = f"{copy_results['number_of_trades']}"
     copy_results['Win Rate'] = f"{copy_results['win_rate']:.2f}%"

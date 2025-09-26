@@ -3,7 +3,8 @@ from datetime import datetime, date
 
 import pandas as pd
 
-from investing_algorithm_framework.domain import PortfolioSnapshot, Trade
+from investing_algorithm_framework.domain import PortfolioSnapshot, Trade, \
+    OperationalException
 
 
 def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, datetime]]:
@@ -77,148 +78,6 @@ def get_yearly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, 
         (float(row['return']), row.name) for _, row in yearly_df.iterrows()
     ]
     return yearly_returns
-
-
-def get_average_loss(trades: List[Trade]) -> Tuple[float, float]:
-    """
-    Calculate the average loss from a list of trades
-
-    The average loss is calculated as the mean of all negative returns.
-
-    Args:
-        trades (List[Trade]): List of trades.
-
-    Returns:
-        Tuple[float, float]: The average loss
-        percentage of the average loss
-    """
-
-    losses = [t.net_gain for t in trades if t.net_gain < 0]
-    cost = sum(t.cost for t in trades if t.net_gain < 0)
-
-    if not losses:
-        return 0.0, 0.0
-
-    average_loss = sum(losses) / len(losses)
-    percentage = (average_loss / cost) if cost > 0 else 0.0
-    return average_loss, percentage
-
-
-def get_average_gain(trades: List[Trade]) -> Tuple[float, float]:
-    """
-    Calculate the average gain from a list of trades.
-
-    The average gain is calculated as the mean of all positive returns.
-
-    Args:
-        trades (List[Trade]): List of trades.
-
-    Returns:
-        Tuple[float, float]: The average gain
-        percentage of the average loss
-    """
-
-    gains = [t.net_gain for t in trades if t.net_gain > 0]
-    cost = sum(t.cost for t in trades if t.net_gain > 0)
-
-    if not gains:
-        return 0.0, 0.0
-
-    average_gain = sum(gains) / len(gains)
-    percentage = (average_gain / cost) if cost > 0 else 0.0
-    return average_gain, percentage
-
-
-def get_average_return(trades: List[Trade]) -> Tuple[float, float]:
-    """
-    Calculate the average return from a list of trades.
-
-    The average return is calculated as the mean of all returns.
-
-    Args:
-        trades (List[Trade]): List of trades.
-
-    Returns:
-        Tuple[float, float]: The average return
-        percentage of the average return
-    """
-
-    returns = [t.net_gain for t in trades]
-    cost = sum(t.cost for t in trades)
-
-    if not returns:
-        return 0.0, 0.0
-
-    percentages = [t.net_gain / t.cost for t in trades if t.cost > 0]
-    average_percentage = sum(percentages) / len(
-        percentages) if percentages else 0.0
-    average_return = sum(returns) / len(trades)
-    return average_return, average_percentage
-
-
-def get_median_return(trades: List[Trade]) -> Tuple[float, float]:
-    """
-    Calculate the median return from a list of trades.
-
-    The median return is calculated as the median of all returns.
-
-    Args:
-        trades (List[Trade]): List of trades.
-
-    Returns:
-        Tuple[float, float]: The median return
-        percentage of the median return
-    """
-
-    if not trades:
-        return 0.0, 0.0
-
-    sorted_returns = sorted(t.net_gain for t in trades)
-    n = len(sorted_returns)
-    mid = n // 2
-
-    if n % 2 == 0:
-        median_return = (sorted_returns[mid - 1] + sorted_returns[mid]) / 2
-    else:
-        median_return = sorted_returns[mid]
-
-    cost = sum(t.cost for t in trades)
-    percentage = (median_return / cost) if cost > 0 else 0.0
-    return median_return, percentage
-
-
-def get_best_trade(trades: List[Trade]) -> Trade:
-    """
-    Get the trade with the highest net gain.
-
-    Args:
-        trades (List[Trade]): List of trades.
-
-    Returns:
-        Trade: The trade with the highest net gain.
-    """
-
-    if not trades:
-        return None
-
-    return max(trades, key=lambda t: t.net_gain)
-
-
-def get_worst_trade(trades: List[Trade]) -> Trade:
-    """
-    Get the trade with the lowest net gain (worst trade).
-
-    Args:
-        trades (List[Trade]): List of trades.
-
-    Returns:
-        Trade: The trade with the lowest net gain.
-    """
-
-    if not trades:
-        return None
-
-    return min(trades, key=lambda t: t.net_gain)
 
 
 def get_percentage_winning_months(snapshots: List[PortfolioSnapshot]) -> float:
@@ -439,6 +298,72 @@ def get_total_return(
     return absolute_return, percentage
 
 
+def get_total_loss(
+    snapshots: List[PortfolioSnapshot]
+) -> Tuple[float, float]:
+    """
+    Calculate the total loss from portfolio snapshots.
+
+    The total loss is calculated as the percentage change in portfolio value
+    from the first snapshot to the last snapshot, only if there is a loss.
+
+    Args:
+        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
+
+    Returns:
+        Tuple[Float, Float]: First number is the absolute loss and the
+            second number is the percentage total loss
+    """
+
+    if not snapshots or len(snapshots) < 2:
+        return 0.0, 0.0
+
+    initial_value = snapshots[0].total_value
+    final_value = snapshots[-1].total_value
+
+    if initial_value == 0:
+        return 0.0, 0.0
+
+    absolute_return = final_value - initial_value
+
+    if absolute_return >= 0:
+        return 0.0, 0.0
+
+    percentage = (absolute_return / initial_value)
+    return absolute_return, percentage
+
+
+def get_total_growth(
+    snapshots: List[PortfolioSnapshot]
+) -> Tuple[float, float]:
+    """
+    Calculate the total growth from portfolio snapshots.
+
+    The total return is calculated as the percentage change in portfolio value
+    from the first snapshot to the last snapshot added to the initial value.
+
+    Args:
+        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
+
+    Returns:
+        Tuple[Float, Float]: First number is the absolute return and the
+            second number is the percentage total return
+    """
+
+    if not snapshots or len(snapshots) < 2:
+        return 0.0, 0.0
+
+    initial_value = snapshots[0].total_value
+    final_value = snapshots[-1].total_value
+
+    if initial_value == 0:
+        return 0.0, 0.0
+
+    growth = final_value - initial_value
+    growth_percentage = (growth / initial_value)
+    return growth, growth_percentage
+
+
 def get_percentage_winning_years(snapshots: List[PortfolioSnapshot]) -> float:
     """
     Calculate the percentage of winning years from portfolio snapshots.
@@ -459,27 +384,7 @@ def get_percentage_winning_years(snapshots: List[PortfolioSnapshot]) -> float:
     if not yearly_returns:
         return 0.0
 
-    return (winning_years / len(yearly_returns))
-
-
-def get_total_net_gain(snapshots: List[PortfolioSnapshot]) -> float:
-    """
-    Calculate the total net gain from portfolio snapshots.
-
-    The total net gain is calculated as the difference between the final
-    portfolio value and the initial portfolio value.
-
-    Args:
-        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
-
-    Returns:
-        float: The total net gain.
-    """
-
-    if not snapshots:
-        return 0.0
-
-    return snapshots[-1].total_net_gain
+    return winning_years / len(yearly_returns)
 
 
 def get_final_value(snapshots: List[PortfolioSnapshot]) -> float:
@@ -497,59 +402,6 @@ def get_final_value(snapshots: List[PortfolioSnapshot]) -> float:
         return 0.0
 
     return snapshots[-1].total_value
-
-
-def get_growth(snapshots: List[PortfolioSnapshot]) -> float:
-    """
-    Calculate the growth of the portfolio from the first to the last snapshot.
-
-    The growth is calculated as the percentage change in portfolio value
-    from the first snapshot to the last snapshot.
-
-    Args:
-        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
-
-    Returns:
-        float: The growth as a percentage.
-    """
-
-    if not snapshots or len(snapshots) < 2:
-        return 0.0
-
-    initial_value = snapshots[0].total_value
-    final_value = snapshots[-1].total_value
-
-    if initial_value == 0:
-        return 0.0
-
-    return (final_value - initial_value)
-
-
-def get_growth_percentage(snapshots: List[PortfolioSnapshot]) -> float:
-    """
-    Calculate the growth percentage of the portfolio from the first
-    to the last snapshot.
-
-    The growth percentage is calculated as the percentage change in
-    portfolio value from the first snapshot to the last snapshot.
-
-    Args:
-        snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
-
-    Returns:
-        float: The growth percentage.
-    """
-
-    if not snapshots or len(snapshots) < 2:
-        return 0.0
-
-    initial_value = snapshots[0].total_value
-    final_value = snapshots[-1].total_value
-
-    if initial_value == 0:
-        return 0.0
-
-    return (final_value - initial_value) / initial_value
 
 
 def get_cumulative_return(snapshots: list[PortfolioSnapshot]) -> float:

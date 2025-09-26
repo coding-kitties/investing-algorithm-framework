@@ -195,9 +195,9 @@ def combine_backtest_metrics(
         backtest_start_date=start_date,
         backtest_end_date=end_date,
         equity_curve=[],  # leave empty to avoid misleading curves
-        growth=safe_mean([m.growth for m in backtest_metrics]),
-        growth_percentage=safe_mean(
-            [m.growth_percentage for m in backtest_metrics]),
+        total_growth=safe_mean([m.total_growth for m in backtest_metrics]),
+        total_growth_percentage=safe_mean(
+            [m.total_growth_percentage for m in backtest_metrics]),
         total_net_gain=safe_mean([m.total_net_gain for m in backtest_metrics]),
         total_net_gain_percentage=safe_mean(
             [m.total_net_gain_percentage for m in backtest_metrics]),
@@ -228,10 +228,27 @@ def combine_backtest_metrics(
         exposure_ratio=safe_mean(
             [m.exposure_ratio for m in backtest_metrics]
         ),
-        trades_average_gain=safe_mean(
-            [m.trades_average_gain for m in backtest_metrics]),
-        trades_average_loss=safe_mean(
-            [m.trades_average_loss for m in backtest_metrics]),
+        average_trade_gain=safe_mean(
+            [m.average_trade_gain for m in backtest_metrics]),
+        average_trade_gain_percentage=(
+            safe_mean(
+                [m.average_trade_gain_percentage for m in backtest_metrics]
+            )
+        ),
+        average_trade_loss=safe_mean(
+            [m.average_trade_loss for m in backtest_metrics]),
+        average_trade_loss_percentage=(
+            safe_mean(
+                [m.average_trade_loss_percentage for m in backtest_metrics]
+            )
+        ),
+        median_trade_return=safe_mean(
+            [m.median_trade_return for m in backtest_metrics]),
+        median_trade_return_percentage=(
+            safe_mean(
+                [m.median_trade_return_percentage for m in backtest_metrics]
+            )
+        ),
         best_trade=max((
             m.best_trade for m in backtest_metrics if m.best_trade),
             key=lambda t: t.net_gain if t else float('-inf'),

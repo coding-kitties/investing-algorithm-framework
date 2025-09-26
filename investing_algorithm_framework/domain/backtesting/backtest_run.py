@@ -66,13 +66,13 @@ class BacktestRun:
     backtest_start_date: datetime
     backtest_end_date: datetime
     trading_symbol: str
-    initial_unallocated: float
-    number_of_runs: int
-    portfolio_snapshots: List[PortfolioSnapshot]
-    trades: List[Trade]
-    orders: List[Order]
-    positions: List[Position]
-    created_at: datetime
+    initial_unallocated: float = 0.0
+    number_of_runs: int = 0
+    portfolio_snapshots: List[PortfolioSnapshot] = field(default_factory=list)
+    trades: List[Trade] = field(default_factory=list)
+    orders: List[Order] = field(default_factory=list)
+    positions: List[Position] = field(default_factory=list)
+    created_at: datetime = None,
     symbols: List[str] = field(default_factory=list)
     number_of_days: int = 0
     number_of_trades: int = 0

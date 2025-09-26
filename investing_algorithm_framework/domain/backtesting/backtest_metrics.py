@@ -23,17 +23,19 @@ class BacktestMetrics:
     Attributes:
         backtest_start_date (datetime): The start date of the backtest.
         backtest_end_date (datetime): The end date of the backtest.
+        final_value (float): The final value of the portfolio at the end
+            of the backtest.
         equity_curve (List[Tuple[datetime, float]]): A list of
             tuples representing  the equity curve, where each tuple
             contains a date and the  corresponding portfolio value.
-        growth (float): The growth of the portfolio over the backtest period.
-        growth_percentage (float): The percentage growth of the portfolio
+        total_growth (float): The growth of the portfolio over the
+            backtest period.
+        total_growth_percentage (float): The percentage growth of the portfolio
             over the backtest period.
-        final_value (float): The final value of the portfolio at the end
-            of the backtest.
         total_net_gain (float): The total return of the backtest.
         total_net_gain_percentage (float): The total return percentage
         total_loss (float): The total loss of the backtest.
+        total_loss_percentage (float): The total loss percentage
         cagr (float): The compound annual growth rate of the backtest.
         sharpe_ratio (float): The Sharpe ratio of the backtest, indicating
             risk-adjusted return.
@@ -68,15 +70,24 @@ class BacktestMetrics:
             average exposure of the portfolio.
         cumulative_exposure (float): The cumulative exposure, indicating the
             total exposure of the portfolio over the backtest period.
-        trades_average_gain (float): The average gain from winning trades.
-        trades_average_gain_percentage (float): The average gain percentage
-            from winning trades.
-        trades_average_loss (float): The average loss from losing trades.
-        trades_average_loss_percentage (float): The average loss percentage
+        average_trade_size (float): The average size of trades executed
+            during the backtest.
+        average_trade_loss (float): The average loss from losing trades.
+        average_trade_loss_percentage (float): The average loss percentage
             from losing trades.
-        trades_average_return (float): The average return from all trades.
-        trades_average_return_percentage (float): The average return
-            percentage from all trades.
+        average_trade_gain (float): The average gain from winning trades.
+        average_trade_gain_percentage (float): The average gain percentage
+            from winning trades.
+        average_trade_return (float): The average return from all trades.
+        average_trade_return_percentage (float): The average return percentage
+            from all trades.
+        median_trade_return (float): The median return from all trades.
+        median_trade_return_percentage (float): The median return percentage
+            from all trades.
+        number_of_positive_trades (int): The total number of profitable trades
+            executed during the backtest.
+        number_of_negative_trades (int): The total number of unprofitable
+            trades executed during the backtest.
         best_trade (float): A string representation of the best trade,
             including net gain and percentage.
         worst_trade (float): A string representation of the worst trade,
@@ -123,10 +134,12 @@ class BacktestMetrics:
     backtest_start_date: datetime
     backtest_end_date: datetime
     equity_curve: List[Tuple[float, datetime]] = field(default_factory=list)
-    growth: float = 0.0
-    growth_percentage: float = 0.0
+    total_growth: float = 0.0
+    total_growth_percentage: float = 0.0
     total_net_gain: float = 0.0
     total_net_gain_percentage: float = 0.0
+    total_loss: float = 0.0
+    total_loss_percentage: float = 0.0
     final_value: float = 0.0
     cumulative_return: float = 0.0
     cumulative_return_series: List[Tuple[float, datetime]] = \
@@ -152,24 +165,28 @@ class BacktestMetrics:
     trade_per_day: float = 0.0
     exposure_ratio: float = 0.0
     cumulative_exposure: float = 0.0
-    trades_average_gain: float = 0.0
-    trades_average_gain_percentage: float = 0.0
-    trades_average_loss: float = 0.0
-    trades_average_loss_percentage: float = 0.0
-    trades_average_return: float = 0.0
-    trades_average_return_percentage: float = 0.0
     best_trade: Trade = None
     worst_trade: Trade = None
+    number_of_positive_trades: int = 0
+    percentage_positive_trades: float = 0.0
+    number_of_negative_trades: int = 0
+    percentage_negative_trades: float = 0.0
     average_trade_duration: float = 0.0
     average_trade_size: float = 0.0
+    average_trade_loss: float = 0.0
+    average_trade_loss_percentage: float = 0.0
+    average_trade_gain: float = 0.0
+    average_trade_gain_percentage: float = 0.0
+    average_trade_return: float = 0.0
+    average_trade_return_percentage: float = 0.0
+    median_trade_return: float = 0.0
+    median_trade_return_percentage: float = 0.0
     number_of_trades: int = 0
     number_of_trades_closed: int = 0
     number_of_trades_opened: int = 0
     number_of_trades_open_at_end: int = 0
     win_rate: float = 0.0
     win_loss_ratio: float = 0.0
-    percentage_positive_trades: float = 0.0
-    percentage_negative_trades: float = 0.0
     percentage_winning_months: float = 0.0
     percentage_winning_years: float = 0.0
     average_monthly_return: float = 0.0
@@ -198,11 +215,13 @@ class BacktestMetrics:
             "backtest_end_date": self.backtest_end_date.isoformat(),
             "equity_curve": [(value, date.isoformat())
                              for value, date in self.equity_curve],
+            "final_value": self.final_value,
             "total_net_gain": self.total_net_gain,
             "total_net_gain_percentage": self.total_net_gain_percentage,
-            "final_value": self.final_value,
-            "growth": self.growth,
-            "growth_percentage": self.growth_percentage,
+            "total_growth": self.total_growth,
+            "total_growth_percentage": self.total_growth_percentage,
+            "total_loss": self.total_loss,
+            "total_loss_percentage": self.total_loss_percentage,
             "cumulative_return": self.cumulative_return,
             "cumulative_return_series": [(value, date.isoformat())
                                          for value, date in
@@ -216,8 +235,6 @@ class BacktestMetrics:
             "sortino_ratio": self.sortino_ratio,
             "calmar_ratio": self.calmar_ratio,
             "profit_factor": self.profit_factor,
-            "gross_profit": self.gross_profit,
-            "gross_loss": self.gross_loss,
             "annual_volatility": self.annual_volatility,
             "monthly_returns": [(value, date.isoformat())
                                 for value, date in self.monthly_returns],
@@ -233,15 +250,22 @@ class BacktestMetrics:
             "trade_per_day": self.trade_per_day,
             "exposure_ratio": self.exposure_ratio,
             "cumulative_exposure": self.cumulative_exposure,
-            "trades_average_gain": self.trades_average_gain,
-            "trades_average_gain_percentage":
-                self.trades_average_gain_percentage,
-            "trades_average_loss": self.trades_average_loss,
-            "trades_average_loss_percentage":
-                self.trades_average_loss_percentage,
-            "trades_average_return": self.trades_average_return,
-            "trades_average_return_percentage":
-                self.trades_average_return_percentage,
+            "average_trade_gain": self.average_trade_gain,
+            "average_trade_gain_percentage":
+                self.average_trade_gain_percentage,
+            "average_trade_loss": self.average_trade_loss,
+            "average_trade_loss_percentage":
+                self.average_trade_loss_percentage,
+            "average_trade_return": self.average_trade_return,
+            "average_trade_return_percentage":
+                self.average_trade_return_percentage,
+            "median_trade_return": self.median_trade_return,
+            "median_trade_return_percentage":
+                self.median_trade_return_percentage,
+            "number_of_positive_trades": self.number_of_positive_trades,
+            "percentage_positive_trades": self.percentage_positive_trades,
+            "number_of_negative_trades": self.number_of_negative_trades,
+            "percentage_negative_trades": self.percentage_negative_trades,
             "best_trade": self.best_trade.to_dict()
             if self.best_trade else None,
             "worst_trade": self.worst_trade.to_dict()
@@ -253,8 +277,6 @@ class BacktestMetrics:
             "win_loss_ratio": self.win_loss_ratio,
             "percentage_winning_months": self.percentage_winning_months,
             "percentage_winning_years": self.percentage_winning_years,
-            "percentage_positive_trades": self.percentage_positive_trades,
-            "percentage_negative_trades": self.percentage_negative_trades,
             "average_monthly_return": self.average_monthly_return,
             "average_monthly_return_losing_months":
                 self.average_monthly_return_losing_months,

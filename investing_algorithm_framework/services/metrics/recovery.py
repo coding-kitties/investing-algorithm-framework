@@ -40,7 +40,7 @@ from typing import List
 
 from investing_algorithm_framework.domain import PortfolioSnapshot
 from .drawdown import get_max_drawdown_absolute
-from .returns import get_total_net_gain
+from .returns import get_total_return
 
 
 def get_recovery_factor(snapshots: List[PortfolioSnapshot]) -> float:
@@ -67,7 +67,7 @@ def get_recovery_factor(snapshots: List[PortfolioSnapshot]) -> float:
         return 0.0
 
     max_drawdown_absolute = get_max_drawdown_absolute(snapshots)
-    net_profit = get_total_net_gain(snapshots)
+    net_profit, _ = get_total_return(snapshots)
 
     if max_drawdown_absolute == 0:
         return float('inf') if net_profit > 0 else 0.0
