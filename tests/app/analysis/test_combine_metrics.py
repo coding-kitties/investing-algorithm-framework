@@ -16,8 +16,8 @@ class TestCombineMetrics(TestCase):
                 (1.5, datetime(2020, 6, 30)),
                 (2.0, datetime(2020, 12, 31)),
             ],
-            growth=1000.0,
-            growth_percentage=100.0,
+            total_growth=1000.0,
+            total_growth_percentage=100.0,
             total_net_gain=1000.0,
             total_net_gain_percentage=100.0,
             final_value=2000.0,
@@ -43,10 +43,10 @@ class TestCombineMetrics(TestCase):
             trades_per_year=50,
             trade_per_day=0.2,
             exposure_ratio=0.75,
-            trades_average_gain=200,
-            trades_average_gain_percentage=0.1,
-            trades_average_loss=100,
-            trades_average_loss_percentage=0.1,
+            average_trade_gain=200,
+            average_trade_gain_percentage=0.1,
+            average_trade_loss=100,
+            average_trade_loss_percentage=0.1,
             best_trade=Trade(id=1, open_price=100,
                              opened_at=datetime(2020, 1, 1),
                              closed_at=datetime(2020, 2, 1), orders=[],
@@ -85,8 +85,8 @@ class TestCombineMetrics(TestCase):
                 (1.2, datetime(2020, 6, 30)),
                 (1.4, datetime(2020, 12, 31)),
             ],
-            growth=400.0,
-            growth_percentage=40.0,
+            total_growth=400.0,
+            total_growth_percentage=40.0,
             total_net_gain=400.0,
             total_net_gain_percentage=40.0,
             final_value=1400.0,
@@ -112,10 +112,10 @@ class TestCombineMetrics(TestCase):
             trades_per_year=30,
             trade_per_day=0.12,
             exposure_ratio=0.6,
-            trades_average_gain_percentage=0.07,
-            trades_average_gain=140.0,
-            trades_average_loss=-80.0,
-            trades_average_loss_percentage=-0.04,
+            average_trade_gain_percentage=0.07,
+            average_trade_gain=140.0,
+            average_trade_loss=-80.0,
+            average_trade_loss_percentage=-0.04,
             best_trade=Trade(id=3, open_price=120,
                              opened_at=datetime(2020, 5, 1),
                              closed_at=datetime(2020, 6, 1), orders=[],
@@ -151,6 +151,6 @@ class TestCombineMetrics(TestCase):
 
         self.assertEqual(700, combined.total_net_gain)
         self.assertAlmostEqual(70.0, combined.total_net_gain_percentage)
-        self.assertAlmostEqual(70.0, combined.growth_percentage)
-        self.assertEqual(700.0, combined.growth)
+        self.assertAlmostEqual(70.0, combined.total_growth_percentage)
+        self.assertEqual(700.0, combined.total_growth)
         self.assertEqual(0.5, combined.win_rate)

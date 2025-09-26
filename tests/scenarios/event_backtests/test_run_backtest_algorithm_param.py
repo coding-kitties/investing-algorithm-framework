@@ -43,10 +43,10 @@ class Test(TestCase):
         backtest_metrics = backtest.get_backtest_metrics(date_range)
         backtest_run = backtest.get_backtest_run(date_range)
         self.assertAlmostEqual(
-            backtest_metrics.growth, 15.2, delta=0.5
+            backtest_metrics.total_growth, 15.2, delta=0.5
         )
         self.assertAlmostEqual(
-            backtest_metrics.growth_percentage, 0.039, delta=0.001
+            backtest_metrics.total_growth_percentage, 0.039, delta=0.001
         )
         self.assertEqual(
             backtest_run.initial_unallocated, 400
