@@ -176,13 +176,6 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             data_sources=data_sources, time_unit=time_unit, interval=interval
         )
 
-        self.buy_signal_dates = {}
-        self.sell_signal_dates = {}
-
-        for symbol in self.symbols:
-            self.buy_signal_dates[symbol] = []
-            self.sell_signal_dates[symbol] = []
-
     def _prepare_indicators(
         self,
         rsi_data,
@@ -263,13 +256,6 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             buy_signal = rsi_oversold & ema_crossover_lookback
             buy_signals = buy_signal.fillna(False).astype(bool)
             signals[symbol] = buy_signals
-
-            # Get all dates where there is a sell signal
-            buy_signal_dates = buy_signals[buy_signals].index.tolist()
-
-            if buy_signal_dates:
-                self.buy_signal_dates[symbol] += buy_signal_dates
-
         return signals
 
     def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
@@ -309,13 +295,6 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             sell_signal = rsi_overbought & ema_crossunder_lookback
             sell_signal = sell_signal.fillna(False).astype(bool)
             signals[symbol] = sell_signal
-
-            # Get all dates where there is a sell signal
-            sell_signal_dates = sell_signal[sell_signal].index.tolist()
-
-            if sell_signal_dates:
-                self.sell_signal_dates[symbol] += sell_signal_dates
-
         return signals
 
 
