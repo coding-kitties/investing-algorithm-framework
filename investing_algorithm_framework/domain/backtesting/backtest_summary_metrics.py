@@ -1,11 +1,8 @@
+import json
 import os
-from pathlib import Path
 from dataclasses import dataclass
 from logging import getLogger
-import json
-from statistics import mean
-
-from .backtest_metrics import BacktestMetrics
+from pathlib import Path
 
 logger = getLogger(__name__)
 
