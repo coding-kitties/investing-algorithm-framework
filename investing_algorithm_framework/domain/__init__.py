@@ -35,7 +35,8 @@ from .utils import random_string, append_dict_as_row_to_csv, \
     is_timezone_aware, sync_timezones, get_timezone
 from .backtesting import BacktestRun, BacktestSummaryMetrics, \
     BacktestDateRange, Backtest, BacktestMetrics, combine_backtests, \
-    BacktestPermutationTest, BacktestEvaluationFocus
+    BacktestPermutationTest, BacktestEvaluationFocus, \
+    generate_backtest_summary_metrics
 from .positions import PositionSize
 
 __all__ = [
@@ -141,5 +142,6 @@ __all__ = [
     "DEFAULT_DATETIME_FORMAT",
     "BacktestEvaluationFocus",
     'combine_backtests',
-    'PositionSize'
+    'PositionSize',
+    'generate_backtest_summary_metrics'
 ]

@@ -13,7 +13,7 @@ import polars as pl
 from investing_algorithm_framework.domain import BacktestRun, OrderType, \
     TimeUnit, Trade, OperationalException, BacktestDateRange, \
     Backtest, TradeStatus, PortfolioSnapshot, Order, OrderStatus, OrderSide, \
-    Portfolio, DataType
+    Portfolio, DataType, generate_backtest_summary_metrics
 from investing_algorithm_framework.services.data_providers import \
     DataProviderService
 from investing_algorithm_framework.services.portfolios import \
@@ -426,15 +426,9 @@ class BacktestService:
 
         raise ValueError(f"Strategy profile with id {id} not found.")
 
-    def _get_initial_unallocated(
-        self
-    ) -> float:
+    def _get_initial_unallocated(self) -> float:
         """
         Get the initial unallocated amount for the backtest.
-
-        Args:
-            algorithm: The algorithm to create the backtest report for
-            backtest_date_range: The backtest date range of the backtest
 
         Returns:
             float: The initial unallocated amount.
@@ -533,6 +527,9 @@ class BacktestService:
         run.backtest_metrics = backtest_metrics
         return Backtest(
             backtest_runs=[run],
+            backtest_summary=generate_backtest_summary_metrics(
+                [backtest_metrics]
+            )
         )
 
     @staticmethod

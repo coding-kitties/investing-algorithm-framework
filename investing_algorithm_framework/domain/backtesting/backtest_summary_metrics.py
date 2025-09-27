@@ -31,6 +31,9 @@ class BacktestSummaryMetrics:
         average_growth (float): Average growth across multiple backtests.
         average_growth_percentage (float): Average growth percentage across
             multiple backtests.
+        average_loss (float): Average loss across multiple backtests.
+        average_loss_percentage (float): Average loss percentage across
+            multiple backtests.
         average_trade_return (float): Average return per trade.
         average_trade_return_percentage (float): Average return percentage
             per trade.
@@ -63,13 +66,14 @@ class BacktestSummaryMetrics:
     average_net_gain_percentage: float = None
     average_growth: float = None
     average_growth_percentage: float = None
+    average_loss: float = None
+    average_loss_percentage: float = None
     average_trade_return: float = None
     average_trade_return_percentage: float = None
     average_trade_loss: float = None
     average_trade_loss_percentage: float = None
     average_trade_gain: float = None
     average_trade_gain_percentage: float = None
-    trades_average_return: float = None
     cagr: float = None
     sharpe_ratio: float = None
     sortino_ratio: float = None
@@ -96,6 +100,8 @@ class BacktestSummaryMetrics:
             "total_growth_percentage": self.total_growth_percentage,
             "total_loss": self.total_loss,
             "total_loss_percentage": self.total_loss_percentage,
+            "average_loss": self.average_loss,
+            "average_loss_percentage": self.average_loss_percentage,
             "average_net_gain": self.average_net_gain,
             "average_net_gain_percentage": self.average_net_gain_percentage,
             "average_growth": self.average_growth,
@@ -144,215 +150,6 @@ class BacktestSummaryMetrics:
             data = json.load(file)
 
         return BacktestSummaryMetrics(**data)
-
-    def add(self, other: BacktestMetrics) -> None:
-        """
-        Update this summary with another BacktestMetrics.
-        Averages ratios, sums trade counts, and takes worst drawdowns.
-        """
-        def safe_mean(a, b):
-            vals = [v for v in [a, b] if v is not None]
-            return mean(vals) if vals else 0.0
-
-        if self.cumulative_exposure is None:
-            self.cumulative_exposure = other.cumulative_exposure
-        else:
-            self.cumulative_exposure = safe_mean(
-                self.cumulative_exposure,
-                other.cumulative_exposure
-            )
-
-        if self.exposure_ratio is None:
-            self.exposure_ratio = other.exposure_ratio
-        else:
-            self.exposure_ratio = safe_mean(
-                self.exposure_ratio, other.exposure_ratio
-            )
-
-        if self.total_net_gain is None:
-            self.total_net_gain = other.total_net_gain
-        else:
-            self.total_net_gain += other.total_net_gain
-
-        if self.total_net_gain_percentage is None:
-            self.total_net_gain_percentage = other.total_net_gain_percentage
-        else:
-            self.total_net_gain_percentage = safe_mean(
-                self.total_net_gain_percentage, other.total_net_gain_percentage
-            )
-
-        if self.total_loss is None:
-            self.total_loss = other.total_loss
-        else:
-            self.total_loss = safe_mean(self.total_loss, other.total_loss)
-
-        if self.total_growth is None:
-            self.total_growth = other.total_growth
-        else:
-            self.total_growth = safe_mean(
-                self.total_growth, other.total_growth
-            )
-
-        if self.total_growth_percentage is None:
-            self.total_growth_percentage = other.total_growth_percentage
-        else:
-            self.total_growth_percentage = safe_mean(
-                self.total_growth_percentage, other.total_growth_percentage
-            )
-
-        if self.average_trade_return is None:
-            self.average_trade_return = other.average_trade_return
-        else:
-            self.average_trade_return = safe_mean(
-                self.average_trade_return, other.average_trade_return
-            )
-
-        if self.average_trade_return_percentage is None:
-            self.average_trade_return_percentage = \
-                other.average_trade_return_percentage
-        else:
-            self.average_trade_return_percentage = safe_mean(
-                self.average_trade_return_percentage,
-                other.average_trade_return_percentage
-            )
-
-        if self.average_trade_loss is None:
-            self.average_trade_loss = other.average_trade_loss
-        else:
-            self.average_trade_loss = safe_mean(
-                self.average_trade_loss, other.average_trade_loss
-            )
-
-        if self.average_trade_loss_percentage is None:
-            self.average_trade_loss_percentage = \
-                other.average_trade_loss_percentage
-        else:
-            self.average_trade_loss_percentage = safe_mean(
-                self.average_trade_loss_percentage,
-                other.average_trade_loss_percentage
-            )
-
-        if self.average_trade_gain is None:
-            self.average_trade_gain = other.average_trade_gain
-        else:
-            self.average_trade_gain = safe_mean(
-                self.average_trade_gain, other.average_trade_gain
-            )
-
-        if self.average_trade_gain_percentage is None:
-            self.average_trade_gain_percentage = \
-                other.average_trade_gain_percentage
-        else:
-            self.average_trade_gain_percentage = safe_mean(
-                self.average_trade_gain_percentage,
-                other.average_trade_gain_percentage
-            )
-
-        if self.cagr is None:
-            self.cagr = other.cagr
-        else:
-            self.cagr = safe_mean(self.cagr, other.cagr)
-
-        if self.sharpe_ratio is None:
-            self.sharpe_ratio = other.sharpe_ratio
-        else:
-            self.sharpe_ratio = safe_mean(
-                self.sharpe_ratio, other.sharpe_ratio
-            )
-
-        if self.sortino_ratio is None:
-            self.sortino_ratio = other.sortino_ratio
-        else:
-            self.sortino_ratio = safe_mean(
-                self.sortino_ratio, other.sortino_ratio
-            )
-
-        if self.calmar_ratio is None:
-            self.calmar_ratio = other.calmar_ratio
-        else:
-            self.calmar_ratio = safe_mean(
-                self.calmar_ratio, other.calmar_ratio
-            )
-
-        if self.profit_factor is None:
-            self.profit_factor = other.profit_factor
-        else:
-            self.profit_factor = safe_mean(
-                self.profit_factor, other.profit_factor
-            )
-
-        if self.annual_volatility is None:
-            self.annual_volatility = other.annual_volatility
-        else:
-            self.annual_volatility = safe_mean(
-                self.annual_volatility, other.annual_volatility
-            )
-
-        if self.max_drawdown is None:
-            self.max_drawdown = other.max_drawdown
-        else:
-            self.max_drawdown = min(self.max_drawdown, other.max_drawdown)
-
-        if self.max_drawdown_duration is None:
-            self.max_drawdown_duration = other.max_drawdown_duration
-        else:
-            self.max_drawdown_duration = max(
-                self.max_drawdown_duration, other.max_drawdown_duration
-            )
-
-        if self.trades_per_year is None:
-            self.trades_per_year = other.trades_per_year
-        else:
-            self.trades_per_year = safe_mean(
-                self.trades_per_year, other.trades_per_year
-            )
-
-        if self.win_rate is None:
-            self.win_rate = other.win_rate
-        else:
-            self.win_rate = safe_mean(self.win_rate, other.win_rate)
-
-        if self.win_loss_ratio is None:
-            self.win_loss_ratio = other.win_loss_ratio
-        else:
-            self.win_loss_ratio = safe_mean(
-                self.win_loss_ratio, other.win_loss_ratio
-            )
-
-        if self.number_of_trades is None:
-            self.number_of_trades = other.number_of_trades
-        else:
-            self.number_of_trades += other.number_of_trades
-
-        if self.average_net_gain is None:
-            self.average_net_gain = other.total_net_gain
-        else:
-            self.average_net_gain = safe_mean(
-                self.average_net_gain, other.total_net_gain
-            )
-
-        if self.average_net_gain_percentage is None:
-            self.average_net_gain_percentage = other.total_net_gain_percentage
-        else:
-            self.average_net_gain_percentage = safe_mean(
-                self.average_net_gain_percentage,
-                other.total_net_gain_percentage
-            )
-
-        if self.average_growth is None:
-            self.average_growth = other.total_growth
-        else:
-            self.average_growth = safe_mean(
-                self.average_growth, other.total_growth
-            )
-
-        if self.average_growth_percentage is None:
-            self.average_growth_percentage = other.total_growth_percentage
-        else:
-            self.average_growth_percentage = safe_mean(
-                self.average_growth_percentage,
-                other.total_growth_percentage
-            )
 
     def __repr__(self):
         return json.dumps(

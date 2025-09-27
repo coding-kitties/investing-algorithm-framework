@@ -20,7 +20,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     PortfolioConfiguration, SnapshotInterval, DataType, combine_backtests, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestPermutationTest, \
-    LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG
+    LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, generate_backtest_summary_metrics
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
     BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db, \
@@ -1022,7 +1022,10 @@ class App:
         )
         backtest = Backtest(
             backtest_runs=[run],
-            risk_free_rate=risk_free_rate
+            risk_free_rate=risk_free_rate,
+            backtest_summary=generate_backtest_summary_metrics(
+                [run.backtest_metrics]
+            )
         )
 
         # Add the metadata to the backtest
@@ -1323,9 +1326,7 @@ class App:
         original_datasets_ordered_by_symbol = {}
 
         for data_source in data_sources:
-            print(data_source)
             if DataType.OHLCV.equals(data_source.data_type):
-                print(data_source.symbol)
                 data_provider = data_provider_service.get(data_source)
                 data = data_provider_service.get_data(
                     data_source=data_source,

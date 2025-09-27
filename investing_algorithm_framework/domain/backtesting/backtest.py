@@ -57,14 +57,6 @@ class Backtest:
     strategy_ids: List[int] = field(default_factory=list)
     algorithm_id: int = None
 
-    def __post_init__(self):
-        # Create the BacktestSummaryMetrics instance if it doesn't exist
-        if self.backtest_summary is None:
-            self.backtest_summary = BacktestSummaryMetrics()
-
-        for backtest_metrics in self.get_all_backtest_metrics():
-            self.backtest_summary.add(backtest_metrics)
-
     def get_all_backtest_runs(self) -> List[BacktestRun]:
         """
         Retrieve all BacktestRun instances from the backtest.

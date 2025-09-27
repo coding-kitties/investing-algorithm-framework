@@ -1,8 +1,8 @@
 from typing import List
 
-from investing_algorithm_framework.domain.backtesting import Backtest
-from investing_algorithm_framework.domain.backtesting import \
-    BacktestSummaryMetrics
+from .backtest import Backtest
+from .backtest_summary_metrics import BacktestSummaryMetrics
+from .backtest_metrics import BacktestMetrics
 
 
 def safe_weighted_mean(values, weights):
@@ -55,9 +55,54 @@ def combine_backtests(
             backtest_metrics.append(backtest_metric)
             backtest_runs.append(backtest_run)
 
+    summary = generate_backtest_summary_metrics(backtest_metrics)
+
+    metadata = None
+    risk_free_rate = None
+
+    # Get first non-empty metadata
+    for backtest in backtests:
+        if backtest.metadata:
+            metadata = backtest.metadata
+            break
+
+    # Get the first risk-free rate
+    for backtest in backtests:
+        if backtest.risk_free_rate is not None:
+            risk_free_rate = backtest.risk_free_rate
+            break
+
+    backtest = Backtest(
+        backtest_summary=summary,
+        metadata=metadata,
+        risk_free_rate=risk_free_rate,
+        backtest_runs=backtest_runs
+    )
+    return backtest
+
+
+def generate_backtest_summary_metrics(
+    backtest_metrics: List[BacktestMetrics]
+) -> BacktestSummaryMetrics:
+    """
+    Combine multiple BacktestMetrics into a single BacktestMetrics
+    by aggregating their results.
+
+    Args:
+        backtest_metrics (List[BacktestMetrics]): List of BacktestMetrics
+            instances to combine.
+
+    Returns:
+        BacktestMetrics: A new BacktestMetrics instance representing the
+            combined results.
+    """
     total_net_gain = sum(
         b.total_net_gain for b in backtest_metrics
         if b.total_net_gain is not None
+    )
+    total_net_gain_percentage = sum(
+        b.total_net_gain_percentage for b in backtest_metrics
+        if b.total_net_gain_percentage is not None
     )
     average_total_net_gain = safe_weighted_mean(
         [b.total_net_gain for b in backtest_metrics],
@@ -67,36 +112,36 @@ def combine_backtests(
         [b.total_net_gain_percentage for b in backtest_metrics],
         [b.total_number_of_days for b in backtest_metrics]
     )
-    total_net_gain_percentage = sum(
-        b.total_net_gain_percentage for b in backtest_metrics
-        if b.total_net_gain_percentage is not None
-    )
-    gross_loss = sum(
+    total_loss = sum(
         b.gross_loss for b in backtest_metrics
         if b.gross_loss is not None
     )
-    average_gross_loss = safe_weighted_mean(
+    total_loss_percentage = sum(
+        b.total_loss_percentage for b in backtest_metrics
+        if b.total_loss_percentage is not None
+    )
+    average_total_loss = safe_weighted_mean(
         [b.gross_loss for b in backtest_metrics],
         [b.total_number_of_days for b in backtest_metrics]
     )
-    growth = sum(
-        b.growth for b in backtest_metrics
-        if b.growth is not None
+    average_total_loss_percentage = safe_weighted_mean(
+        [b.total_loss_percentage for b in backtest_metrics],
+        [b.total_number_of_days for b in backtest_metrics]
     )
-    growth_percentage = sum(
-        b.growth_percentage for b in backtest_metrics
-        if b.growth_percentage is not None
+    total_growth = sum(
+        b.total_growth for b in backtest_metrics
+        if b.total_growth is not None
+    )
+    total_growth_percentage = sum(
+        b.total_growth_percentage for b in backtest_metrics
+        if b.total_growth_percentage is not None
     )
     average_growth = safe_weighted_mean(
-        [b.growth for b in backtest_metrics],
+        [b.total_growth for b in backtest_metrics],
         [b.total_number_of_days for b in backtest_metrics]
     )
     average_growth_percentage = safe_weighted_mean(
-        [b.growth_percentage for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
-    )
-    trades_average_return = safe_weighted_mean(
-        [b.trades_average_return for b in backtest_metrics],
+        [b.total_growth_percentage for b in backtest_metrics],
         [b.total_number_of_days for b in backtest_metrics]
     )
     cagr = safe_weighted_mean(
@@ -155,18 +200,43 @@ def combine_backtests(
         [b.exposure_ratio for b in backtest_metrics],
         [b.total_number_of_days for b in backtest_metrics]
     )
-    summary = BacktestSummaryMetrics(
+    average_trade_return = safe_weighted_mean(
+        [b.average_trade_return for b in backtest_metrics],
+        [b.number_of_trades for b in backtest_metrics]
+    )
+    average_trade_return_percentage = safe_weighted_mean(
+        [b.average_trade_return_percentage for b in backtest_metrics],
+        [b.number_of_trades for b in backtest_metrics]
+    )
+    average_trade_loss = safe_weighted_mean(
+        [b.average_trade_loss for b in backtest_metrics],
+        [b.number_of_trades for b in backtest_metrics]
+    )
+    average_trade_loss_percentage = safe_weighted_mean(
+        [b.average_trade_loss_percentage for b in backtest_metrics],
+        [b.number_of_trades for b in backtest_metrics]
+    )
+    average_trade_gain = safe_weighted_mean(
+        [b.average_trade_gain for b in backtest_metrics],
+        [b.number_of_trades for b in backtest_metrics]
+    )
+    average_trade_gain_percentage = safe_weighted_mean(
+        [b.average_trade_gain_percentage for b in backtest_metrics],
+        [b.number_of_trades for b in backtest_metrics]
+    )
+    return BacktestSummaryMetrics(
         total_net_gain=total_net_gain,
         total_net_gain_percentage=total_net_gain_percentage,
-        average_total_net_gain=average_total_net_gain,
-        average_total_net_gain_percentage=average_total_net_gain_percentage,
-        gross_loss=gross_loss,
-        average_gross_loss=average_gross_loss,
-        growth=growth,
-        growth_percentage=growth_percentage,
+        average_net_gain=average_total_net_gain,
+        average_net_gain_percentage=average_total_net_gain_percentage,
+        total_loss=total_loss,
+        total_loss_percentage=total_loss_percentage,
+        average_loss=average_total_loss,
+        average_loss_percentage=average_total_loss_percentage,
+        total_growth=total_growth,
+        total_growth_percentage=total_growth_percentage,
         average_growth=average_growth,
         average_growth_percentage=average_growth_percentage,
-        trades_average_return=trades_average_return,
         cagr=cagr,
         sharpe_ratio=sharp_ratio,
         sortino_ratio=sortino_ratio,
@@ -180,28 +250,26 @@ def combine_backtests(
         win_loss_ratio=win_loss_ratio,
         number_of_trades=number_of_trades,
         cumulative_exposure=cumulative_exposure,
-        exposure_ratio=exposure_ratio
+        exposure_ratio=exposure_ratio,
+        average_trade_return=average_trade_return,
+        average_trade_return_percentage=average_trade_return_percentage,
+        average_trade_loss=average_trade_loss,
+        average_trade_loss_percentage=average_trade_loss_percentage,
+        average_trade_gain=average_trade_gain,
+        average_trade_gain_percentage=average_trade_gain_percentage
     )
 
-    metadata = None
-    risk_free_rate = None
 
-    # Get first non-empty metadata
-    for backtest in backtests:
-        if backtest.metadata:
-            metadata = backtest.metadata
-            break
+def create_backtest_summary_metrics(
+    backtest_metrics: List[BacktestMetrics]
+) -> BacktestSummaryMetrics:
+    """
+    Create a combined BacktestSummaryMetrics from multiple backtests.
 
-    # Get the first risk-free rate
-    for backtest in backtests:
-        if backtest.risk_free_rate is not None:
-            risk_free_rate = backtest.risk_free_rate
-            break
+    Args:
+        backtest_metrics (List[BacktestMetrics]): List of BacktestMetrics
+            instances.
 
-    backtest = Backtest(
-        backtest_summary=summary,
-        metadata=metadata,
-        risk_free_rate=risk_free_rate,
-        backtest_runs=backtest_runs
-    )
-    return backtest
+    Returns:
+        BacktestSummaryMetrics: Combined summary metrics.
+    """

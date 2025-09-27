@@ -16,7 +16,7 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     Trade, SYMBOLS, RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT, \
     BacktestDateRange, convert_polars_to_pandas, \
     DEFAULT_LOGGING_CONFIG, DataType, DataProvider, \
-    TradeStatus, TradeRiskType, \
+    TradeStatus, TradeRiskType, generate_backtest_summary_metrics, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus
 from .infrastructure import AzureBlobStorageStateHandler, \
@@ -173,5 +173,6 @@ __all__ = [
     "get_cumulative_return",
     "get_cumulative_return_series",
     "get_total_loss",
-    "get_total_growth"
+    "get_total_growth",
+    "generate_backtest_summary_metrics"
 ]
