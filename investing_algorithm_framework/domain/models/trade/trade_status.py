@@ -1,4 +1,6 @@
 from enum import Enum
+from investing_algorithm_framework.domain.exceptions import \
+    OperationalException
 
 
 class TradeStatus(Enum):
@@ -15,7 +17,9 @@ class TradeStatus(Enum):
                 if value.upper() == status.value:
                     return status
 
-        raise ValueError("Could not convert value to TradeStatus")
+        raise OperationalException(
+            f"Could not convert value: '{value}' to TradeStatus"
+        )
 
     @staticmethod
     def from_value(value):
@@ -28,7 +32,9 @@ class TradeStatus(Enum):
         elif isinstance(value, str):
             return TradeStatus.from_string(value)
 
-        raise ValueError("Could not convert value to TradeStatus")
+        raise OperationalException(
+            f"Could not convert value: {value} to TradeStatus"
+        )
 
     def equals(self, other):
         return TradeStatus.from_value(other) == self

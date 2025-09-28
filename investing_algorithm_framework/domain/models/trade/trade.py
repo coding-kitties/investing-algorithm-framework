@@ -88,7 +88,7 @@ class Trade(BaseModel):
         self.last_reported_price_datetime = last_reported_price_datetime
         self.high_water_mark = high_water_mark
         self.high_water_mark_datetime = high_water_mark_datetime
-        self.status = status
+        self.status = TradeStatus.from_value(status).value
         self.updated_at = updated_at
         self.stop_losses = stop_losses
         self.take_profits = take_profits
