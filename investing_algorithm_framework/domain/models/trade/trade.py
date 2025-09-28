@@ -97,7 +97,7 @@ class Trade(BaseModel):
     def update(self, data):
 
         if "status" in data:
-            self.status = TradeStatus.from_value(data["status"])
+            self.status = TradeStatus.from_value(data["status"]).value
 
             if TradeStatus.CLOSED.equals(self.status):
 
