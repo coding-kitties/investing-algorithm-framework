@@ -287,7 +287,7 @@ class BacktestService:
                         closed_at=None,
                         amount=amount,
                         net_gain=0,
-                        status=TradeStatus.OPEN,
+                        status=TradeStatus.OPEN.value,
                         cost=capital_for_trade
                     )
                     trade.updated_at = current_date
@@ -302,7 +302,7 @@ class BacktestService:
                     last_trade.closed_at = current_date
                     last_trade.updated_at = current_date
                     last_trade.net_gain = net_gain_val
-                    last_trade.status = TradeStatus.CLOSED
+                    last_trade.status = TradeStatus.CLOSED.value
                     order = Order(
                         id=uuid4(),
                         target_symbol=symbol,
