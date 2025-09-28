@@ -206,14 +206,21 @@ class BacktestMetrics:
     def to_dict(self) -> dict:
         """
         Convert the BacktestMetrics instance to a dictionary.
+        Ensures all datetime values are serialized to ISO format, but
+        leaves strings unchanged.
 
         Returns:
             dict: A dictionary representation of the BacktestMetrics instance.
         """
+
+        def ensure_iso(value):
+            return value.isoformat() \
+                if hasattr(value, "isoformat") else value
+
         return {
-            "backtest_start_date": self.backtest_start_date.isoformat(),
-            "backtest_end_date": self.backtest_end_date.isoformat(),
-            "equity_curve": [(value, date.isoformat())
+            "backtest_start_date": ensure_iso(self.backtest_start_date),
+            "backtest_end_date": ensure_iso(self.backtest_end_date),
+            "equity_curve": [(value, ensure_iso(date))
                              for value, date in self.equity_curve],
             "final_value": self.final_value,
             "total_net_gain": self.total_net_gain,
@@ -223,24 +230,23 @@ class BacktestMetrics:
             "total_loss": self.total_loss,
             "total_loss_percentage": self.total_loss_percentage,
             "cumulative_return": self.cumulative_return,
-            "cumulative_return_series": [(value, date.isoformat())
+            "cumulative_return_series": [(value, ensure_iso(date))
                                          for value, date in
                                          self.cumulative_return_series],
             "cagr": self.cagr,
             "sharpe_ratio": self.sharpe_ratio,
-            "rolling_sharpe_ratio": [
-                (value, date.isoformat())
-                for value, date in self.rolling_sharpe_ratio
-            ],
+            "rolling_sharpe_ratio": [(value, ensure_iso(date))
+                                     for value, date in
+                                     self.rolling_sharpe_ratio],
             "sortino_ratio": self.sortino_ratio,
             "calmar_ratio": self.calmar_ratio,
             "profit_factor": self.profit_factor,
             "annual_volatility": self.annual_volatility,
-            "monthly_returns": [(value, date.isoformat())
+            "monthly_returns": [(value, ensure_iso(date))
                                 for value, date in self.monthly_returns],
-            "yearly_returns": [(value, date.isoformat())
+            "yearly_returns": [(value, ensure_iso(date))
                                for value, date in self.yearly_returns],
-            "drawdown_series": [(value, date.isoformat())
+            "drawdown_series": [(value, ensure_iso(date))
                                 for value, date in self.drawdown_series],
             "max_drawdown": self.max_drawdown,
             "max_drawdown_absolute": self.max_drawdown_absolute,
@@ -251,25 +257,19 @@ class BacktestMetrics:
             "exposure_ratio": self.exposure_ratio,
             "cumulative_exposure": self.cumulative_exposure,
             "average_trade_gain": self.average_trade_gain,
-            "average_trade_gain_percentage":
-                self.average_trade_gain_percentage,
+            "average_trade_gain_percentage": self.average_trade_gain_percentage,
             "average_trade_loss": self.average_trade_loss,
-            "average_trade_loss_percentage":
-                self.average_trade_loss_percentage,
+            "average_trade_loss_percentage": self.average_trade_loss_percentage,
             "average_trade_return": self.average_trade_return,
-            "average_trade_return_percentage":
-                self.average_trade_return_percentage,
+            "average_trade_return_percentage": self.average_trade_return_percentage,
             "median_trade_return": self.median_trade_return,
-            "median_trade_return_percentage":
-                self.median_trade_return_percentage,
+            "median_trade_return_percentage": self.median_trade_return_percentage,
             "number_of_positive_trades": self.number_of_positive_trades,
             "percentage_positive_trades": self.percentage_positive_trades,
             "number_of_negative_trades": self.number_of_negative_trades,
             "percentage_negative_trades": self.percentage_negative_trades,
-            "best_trade": self.best_trade.to_dict()
-            if self.best_trade else None,
-            "worst_trade": self.worst_trade.to_dict()
-            if self.worst_trade else None,
+            "best_trade": self.best_trade.to_dict() if self.best_trade else None,
+            "worst_trade": self.worst_trade.to_dict() if self.worst_trade else None,
             "average_trade_duration": self.average_trade_duration,
             "average_trade_size": self.average_trade_size,
             "number_of_trades": self.number_of_trades,
@@ -278,10 +278,8 @@ class BacktestMetrics:
             "percentage_winning_months": self.percentage_winning_months,
             "percentage_winning_years": self.percentage_winning_years,
             "average_monthly_return": self.average_monthly_return,
-            "average_monthly_return_losing_months":
-                self.average_monthly_return_losing_months,
-            "average_monthly_return_winning_months":
-                self.average_monthly_return_winning_months,
+            "average_monthly_return_losing_months": self.average_monthly_return_losing_months,
+            "average_monthly_return_winning_months": self.average_monthly_return_winning_months,
             "best_month": self.best_month,
             "best_year": self.best_year,
             "worst_month": self.worst_month,
