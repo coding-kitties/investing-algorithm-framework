@@ -201,7 +201,8 @@ def get_average_trade_return(trades: List[Trade]) -> Tuple[float, float]:
             "Trades list is empty, cannot compute average return."
         )
 
-    closed_trades = [t for t in trades if t.status == TradeStatus.CLOSED]
+    closed_trades = [t for t in trades if TradeStatus.CLOSED.equals(t.status)]
+
     if not closed_trades:
         return 0.0, 0.0
 
@@ -265,15 +266,22 @@ def get_average_trade_loss(trades: List[Trade]) -> Tuple[float, float]:
             "Trades list is empty or None, cannot calculate average loss."
         )
 
-    losses = [t.net_gain for t in trades if t.net_gain < 0]
-    cost = sum(t.cost for t in trades if t.net_gain < 0)
+    closed_trades = [t for t in trades if TradeStatus.CLOSED.equals(t.status)]
+    losing_trades = [t for t in closed_trades if t.net_gain < 0]
 
-    if not losses:
+    if not losing_trades or len(losing_trades) == 0:
         return 0.0, 0.0
 
+    losses = [t.net_gain for t in losing_trades]
     average_loss = sum(losses) / len(losses)
-    percentage = (average_loss / cost) if cost > 0 else 0.0
-    return average_loss, percentage
+    percentage_returns = [
+        (t.net_gain / t.cost) * 100.0 for t in losing_trades if t.cost > 0
+    ]
+    average_return_percentage = (
+        sum(percentage_returns) / len(percentage_returns)
+        if percentage_returns else 0.0
+    )
+    return average_loss, average_return_percentage
 
 
 def get_median_trade_return(trades: List[Trade]) -> Tuple[float, float]:
@@ -339,5 +347,3 @@ def get_worst_trade(trades: List[Trade]) -> Trade:
         return None
 
     return min(trades, key=lambda t: t.net_gain)
-
-

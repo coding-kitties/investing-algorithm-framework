@@ -259,7 +259,7 @@ class BacktestService:
                 # If we are not in a position, and we get a buy signal
                 if current_signal == 1 and last_trade is None:
                     amount = float(capital_for_trade / current_price)
-                    order = Order(
+                    buy_order = Order(
                         id=uuid4(),
                         target_symbol=symbol,
                         trading_symbol=trading_symbol,
@@ -271,12 +271,10 @@ class BacktestService:
                         updated_at=current_date,
                         order_side=OrderSide.BUY
                     )
-                    orders.append(order)
+                    orders.append(buy_order)
                     trade = Trade(
                         id=uuid4(),
-                        orders=[
-                            order
-                        ],
+                        orders=[buy_order],
                         target_symbol=symbol,
                         trading_symbol=trading_symbol,
                         available_amount=amount,
@@ -286,11 +284,9 @@ class BacktestService:
                         opened_at=current_date,
                         closed_at=None,
                         amount=amount,
-                        net_gain=0,
                         status=TradeStatus.OPEN.value,
                         cost=capital_for_trade
                     )
-                    trade.updated_at = current_date
                     last_trade = trade
                     trades.append(trade)
 
@@ -299,11 +295,7 @@ class BacktestService:
                     net_gain_val = (
                         current_price - last_trade.open_price
                     ) * last_trade.available_amount
-                    last_trade.closed_at = current_date
-                    last_trade.updated_at = current_date
-                    last_trade.net_gain = net_gain_val
-                    last_trade.status = TradeStatus.CLOSED.value
-                    order = Order(
+                    sell_order = Order(
                         id=uuid4(),
                         target_symbol=symbol,
                         trading_symbol=trading_symbol,
@@ -315,8 +307,18 @@ class BacktestService:
                         updated_at=current_date,
                         order_side=OrderSide.SELL
                     )
-                    orders.append(order)
-                    last_trade.orders.append(order)
+                    orders.append(sell_order)
+                    trade_orders = last_trade.orders
+                    trade_orders.append(sell_order)
+                    last_trade.update(
+                        {
+                            "orders": trade_orders,
+                            "closed_at": current_date,
+                            "trade_status": TradeStatus.CLOSED,
+                            "updated_at": current_date,
+                            "net_gain": net_gain_val
+                        }
+                    )
                     last_trade = None
 
         # Create portfolio snapshots

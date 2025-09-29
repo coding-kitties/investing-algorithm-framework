@@ -128,6 +128,7 @@ class PortfolioSnapshot(BaseModel):
             total_revenue=self.total_revenue,
             total_cost=self.total_cost,
             cash_flow=self.cash_flow,
+            metadata=self.metadata,
         )
 
     def to_dict(self, datetime_format=None):

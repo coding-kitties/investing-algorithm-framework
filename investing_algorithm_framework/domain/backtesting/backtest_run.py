@@ -293,13 +293,22 @@ class BacktestRun:
 
     def get_portfolio_snapshots(
         self,
-        created_at_lt: Optional[datetime] = None
+        created_at_lt: Optional[datetime] = None,
+        created_at_lte: Optional[datetime] = None,
+        created_at_gt: Optional[datetime] = None,
+        created_at_gte: Optional[datetime] = None
     ) -> List[PortfolioSnapshot]:
         """
         Get the portfolio snapshots of the backtest report
 
         Args:
             created_at_lt (datetime): The created_at date to filter
+                the snapshots
+            created_at_lte (datetime): The created_at date to filter
+                the snapshots
+            created_at_gt (datetime): The created_at date to filter
+                the snapshots
+            created_at_gte (datetime): The created_at date to filter
                 the snapshots
 
         Returns:
@@ -311,6 +320,24 @@ class BacktestRun:
             selection = [
                 snapshot for snapshot in selection
                 if snapshot.created_at < created_at_lt
+            ]
+
+        if created_at_lte is not None:
+            selection = [
+                snapshot for snapshot in selection
+                if snapshot.created_at <= created_at_lte
+            ]
+
+        if created_at_gt is not None:
+            selection = [
+                snapshot for snapshot in selection
+                if snapshot.created_at > created_at_gt
+            ]
+
+        if created_at_gte is not None:
+            selection = [
+                snapshot for snapshot in selection
+                if snapshot.created_at >= created_at_gte
             ]
 
         return selection
