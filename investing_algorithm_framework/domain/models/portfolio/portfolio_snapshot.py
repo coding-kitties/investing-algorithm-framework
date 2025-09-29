@@ -1,4 +1,5 @@
 from dateutil import parser
+from datetime import timezone
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.constants import \
     DEFAULT_DATETIME_FORMAT
@@ -38,6 +39,9 @@ class PortfolioSnapshot(BaseModel):
             self.created_at = parser.parse(created_at)
         else:
             self.created_at = created_at
+
+        # Make sure that created_at is a timezone aware datetime object
+        self.created_at.replace(tzinfo=timezone.utc)
 
         if position_snapshots is None:
             position_snapshots = []
@@ -143,7 +147,6 @@ class PortfolioSnapshot(BaseModel):
         Returns:
             dict: A dictionary representation of the portfolio snapshot object.
         """
-
         if datetime_format is not None:
             created_at = self.created_at.strftime(datetime_format) \
                 if self.created_at else None
