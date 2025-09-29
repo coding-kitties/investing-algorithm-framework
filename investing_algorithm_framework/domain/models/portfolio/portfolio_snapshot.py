@@ -182,6 +182,10 @@ class PortfolioSnapshot(BaseModel):
         """
         created_at_str = data.get("created_at")
         created_at = parser.parse(created_at_str)
+
+        # Ensure created_at is timezone aware
+        created_at.replace(tzinfo=timezone.utc)
+
         return PortfolioSnapshot(
             net_size=data.get("net_size", 0.0),
             created_at=created_at,
