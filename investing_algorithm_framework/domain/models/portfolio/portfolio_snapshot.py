@@ -41,7 +41,7 @@ class PortfolioSnapshot(BaseModel):
             self.created_at = created_at
 
         # Make sure that created_at is a timezone aware datetime object
-        self.created_at.replace(tzinfo=timezone.utc)
+        self.created_at = self.created_at.replace(tzinfo=timezone.utc)
 
         if position_snapshots is None:
             position_snapshots = []
@@ -184,7 +184,7 @@ class PortfolioSnapshot(BaseModel):
         created_at = parser.parse(created_at_str)
 
         # Ensure created_at is timezone aware
-        created_at.replace(tzinfo=timezone.utc)
+        created_at = created_at.replace(tzinfo=timezone.utc)
 
         return PortfolioSnapshot(
             net_size=data.get("net_size", 0.0),
