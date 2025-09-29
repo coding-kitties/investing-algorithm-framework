@@ -257,19 +257,25 @@ class BacktestMetrics:
             "exposure_ratio": self.exposure_ratio,
             "cumulative_exposure": self.cumulative_exposure,
             "average_trade_gain": self.average_trade_gain,
-            "average_trade_gain_percentage": self.average_trade_gain_percentage,
+            "average_trade_gain_percentage":
+                self.average_trade_gain_percentage,
             "average_trade_loss": self.average_trade_loss,
-            "average_trade_loss_percentage": self.average_trade_loss_percentage,
+            "average_trade_loss_percentage":
+                self.average_trade_loss_percentage,
             "average_trade_return": self.average_trade_return,
-            "average_trade_return_percentage": self.average_trade_return_percentage,
+            "average_trade_return_percentage":
+                self.average_trade_return_percentage,
             "median_trade_return": self.median_trade_return,
-            "median_trade_return_percentage": self.median_trade_return_percentage,
+            "median_trade_return_percentage":
+                self.median_trade_return_percentage,
             "number_of_positive_trades": self.number_of_positive_trades,
             "percentage_positive_trades": self.percentage_positive_trades,
             "number_of_negative_trades": self.number_of_negative_trades,
             "percentage_negative_trades": self.percentage_negative_trades,
-            "best_trade": self.best_trade.to_dict() if self.best_trade else None,
-            "worst_trade": self.worst_trade.to_dict() if self.worst_trade else None,
+            "best_trade": self.best_trade.to_dict()
+                if self.best_trade else None,
+            "worst_trade": self.worst_trade.to_dict()
+                if self.worst_trade else None,
             "average_trade_duration": self.average_trade_duration,
             "average_trade_size": self.average_trade_size,
             "number_of_trades": self.number_of_trades,
@@ -278,8 +284,10 @@ class BacktestMetrics:
             "percentage_winning_months": self.percentage_winning_months,
             "percentage_winning_years": self.percentage_winning_years,
             "average_monthly_return": self.average_monthly_return,
-            "average_monthly_return_losing_months": self.average_monthly_return_losing_months,
-            "average_monthly_return_winning_months": self.average_monthly_return_winning_months,
+            "average_monthly_return_losing_months":
+                self.average_monthly_return_losing_months,
+            "average_monthly_return_winning_months":
+                self.average_monthly_return_winning_months,
             "best_month": self.best_month,
             "best_year": self.best_year,
             "worst_month": self.worst_month,
