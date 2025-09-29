@@ -11,7 +11,7 @@ import pandas as pd
 import polars as pl
 
 from investing_algorithm_framework.domain import BacktestRun, OrderType, \
-    TimeUnit, Trade, OperationalException, BacktestDateRange, \
+    TimeUnit, Trade, OperationalException, BacktestDateRange, TimeFrame, \
     Backtest, TradeStatus, PortfolioSnapshot, Order, OrderStatus, OrderSide, \
     Portfolio, DataType, generate_backtest_summary_metrics
 from investing_algorithm_framework.services.data_providers import \
@@ -157,6 +157,15 @@ class BacktestService:
         # Build master index (union of all indices in signal dict)
         index = pd.Index([])
 
+        most_granular_ohlcv_data_source = \
+            self._get_most_granular_ohlcv_data_source(strategy.data_sources)
+        most_granular_ohlcv_data = self._data_provider_service.get_ohlcv_data(
+                symbol=most_granular_ohlcv_data_source.symbol,
+                start_date=backtest_date_range.start_date,
+                end_date=backtest_date_range.end_date,
+                pandas=True
+            )
+
         # Make sure to filter out the buy and sell signals that are before
         # the backtest start date
         buy_signals = {k: v[v.index >= backtest_date_range.start_date]
@@ -164,9 +173,7 @@ class BacktestService:
         sell_signals = {k: v[v.index >= backtest_date_range.start_date]
                         for k, v in sell_signals.items()}
 
-        for sig in list(buy_signals.values()) + list(sell_signals.values()):
-            index = index.union(sig.index)
-
+        index = index.union(most_granular_ohlcv_data.index)
         index = index.sort_values()
 
         # Initialize trades and portfolio values
@@ -289,6 +296,7 @@ class BacktestService:
                     )
                     last_trade = trade
                     trades.append(trade)
+                    unallocated -= capital_for_trade
 
                 # If we are in a position, and we get a sell signal
                 if current_signal == -1 and last_trade is not None:
@@ -319,6 +327,7 @@ class BacktestService:
                             "net_gain": net_gain_val
                         }
                     )
+                    unallocated += last_trade.available_amount * current_price
                     last_trade = None
 
         # Create portfolio snapshots
@@ -334,13 +343,17 @@ class BacktestService:
 
                     # Datetime is the index for pandas DataFrame, find the
                     # closest timestamp that is less than or equal to ts
-                    prices = ohlcv.loc[ohlcv.index <= ts, "Close"].values
-
-                    if len(prices) == 0:
-                        # No price data for this timestamp
-                        price = trade.open_price
-                    else:
-                        price = prices[-1]
+                    # prices = ohlcv.loc[ohlcv.index <= ts, "Close"].values
+                    #
+                    # if len(prices) == 0:
+                    #     # No price data for this timestamp
+                    #     price = trade.open_price
+                    # else:
+                    #     price = prices[-1]
+                    try:
+                        price = ohlcv.loc[:ts, "Close"].iloc[-1]
+                    except IndexError:
+                        continue  # skip if no price yet
 
                     invested_value += trade.filled_amount * price
             total_value = invested_value + unallocated
@@ -546,10 +559,16 @@ class BacktestService:
             The most granular data source.
         """
         granularity_order = {
-            TimeUnit.SECOND: 1,
-            TimeUnit.MINUTE: 2,
-            TimeUnit.HOUR: 3,
-            TimeUnit.DAY: 4
+            TimeFrame.ONE_MINUTE: 1,
+            TimeFrame.FIVE_MINUTE: 5,
+            TimeFrame.FIFTEEN_MINUTE: 15,
+            TimeFrame.ONE_HOUR: 60,
+            TimeFrame.TWO_HOUR: 120,
+            TimeFrame.FOUR_HOUR: 240,
+            TimeFrame.TWELVE_HOUR: 720,
+            TimeFrame.ONE_DAY: 1440,
+            TimeFrame.ONE_WEEK: 10080,
+            TimeFrame.ONE_MONTH: 43200
         }
 
         most_granular = None
@@ -564,8 +583,8 @@ class BacktestService:
 
         for source in ohlcv_data_sources:
 
-            if granularity_order[source.time_unit] < highest_granularity:
-                highest_granularity = granularity_order[source.time_unit]
+            if granularity_order[source.time_frame] < highest_granularity:
+                highest_granularity = granularity_order[source.time_frame]
                 most_granular = source
 
         return most_granular
