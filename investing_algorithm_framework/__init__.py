@@ -7,7 +7,7 @@ from .app import App, Algorithm, \
     get_rolling_sharpe_ratio_chart, rank_results, \
     get_monthly_returns_heatmap_chart, create_weights, \
     get_yearly_returns_bar_chart, get_entry_and_exit_signals, \
-    get_ohlcv_data_completeness_chart
+    get_ohlcv_data_completeness_chart, get_equity_curve_chart
 from .domain import ApiException, combine_backtests, PositionSize, \
     OrderType, OperationalException, OrderStatus, OrderSide, \
     TimeUnit, TimeInterval, Order, Portfolio, Backtest, \
@@ -174,5 +174,6 @@ __all__ = [
     "get_cumulative_return_series",
     "get_total_loss",
     "get_total_growth",
-    "generate_backtest_summary_metrics"
+    "generate_backtest_summary_metrics",
+    "get_equity_curve_chart"
 ]

@@ -13,7 +13,8 @@ import polars as pl
 from investing_algorithm_framework.domain import BacktestRun, OrderType, \
     TimeUnit, Trade, OperationalException, BacktestDateRange, TimeFrame, \
     Backtest, TradeStatus, PortfolioSnapshot, Order, OrderStatus, OrderSide, \
-    Portfolio, DataType, generate_backtest_summary_metrics
+    Portfolio, DataType, generate_backtest_summary_metrics, \
+    PortfolioConfiguration
 from investing_algorithm_framework.services.data_providers import \
     DataProviderService
 from investing_algorithm_framework.services.portfolios import \
@@ -114,8 +115,10 @@ class BacktestService:
         self,
         strategy,
         backtest_date_range: BacktestDateRange,
-        initial_amount: float,
         risk_free_rate: float = 0.027,
+        initial_amount: float = None,
+        trading_symbol: str = None,
+        market: str = None,
     ) -> BacktestRun:
         """
         Vectorized backtest for multiple assets using strategy
@@ -124,9 +127,16 @@ class BacktestService:
         Args:
             strategy: The strategy to backtest.
             backtest_date_range: The date range for the backtest.
-            initial_amount: The initial amount to use for the backtest.
             risk_free_rate: The risk-free rate to use for the backtest
                 metrics. Default is 0.027 (2.7%).
+            initial_amount: The initial amount to use for the backtest.
+                If None, the initial amount will be taken from the first
+                portfolio configuration.
+            trading_symbol: The trading symbol to use for the backtest.
+                If None, the trading symbol will be taken from the first
+                portfolio configuration.
+            market: The market to use for the backtest. If None, the market
+                will be taken from the first portfolio configuration.
 
         Returns:
             BacktestRun: The backtest run containing the results and metrics.
@@ -135,10 +145,24 @@ class BacktestService:
             .get_all()
 
         if (portfolio_configurations is None
-                or len(portfolio_configurations) == 0):
+                or len(portfolio_configurations) == 0
+                and initial_amount is None
+                or trading_symbol is None
+                or market is None):
             raise OperationalException(
                 "No portfolio configurations found, please register a "
                 "portfolio configuration before running a backtest."
+            )
+
+        if portfolio_configurations is None \
+                or len(portfolio_configurations) == 0:
+            portfolio_configurations = []
+            portfolio_configurations.append(
+                PortfolioConfiguration(
+                    market=market,
+                    trading_symbol=trading_symbol,
+                    initial_balance=initial_amount
+                )
             )
 
         trading_symbol = portfolio_configurations[0].trading_symbol
@@ -188,8 +212,6 @@ class BacktestService:
                 total_net_gain=0.0
             )
         ]
-        unallocated = initial_amount
-        total_values = pd.Series(0.0, index=index)
 
         for symbol in buy_signals.keys():
             full_symbol = f"{symbol}/{trading_symbol}"
@@ -221,7 +243,6 @@ class BacktestService:
             returns = close.pct_change().fillna(0)
             returns = returns.astype(float)
             signal = signal.astype(float)
-            strategy_returns = signal * returns
 
             if pos_size_obj is None:
                 raise OperationalException(
@@ -241,9 +262,6 @@ class BacktestService:
                 ) if pos_size_obj else (initial_amount / len(buy_signals)),
                 asset_price=close.iloc[0]
             )
-
-            holdings = (strategy_returns + 1).cumprod() * capital_for_trade
-            total_values += holdings
 
             # Trade generation
             last_trade = None
@@ -296,7 +314,6 @@ class BacktestService:
                     )
                     last_trade = trade
                     trades.append(trade)
-                    unallocated -= capital_for_trade
 
                 # If we are in a position, and we get a sell signal
                 if current_signal == -1 and last_trade is not None:
@@ -327,42 +344,50 @@ class BacktestService:
                             "net_gain": net_gain_val
                         }
                     )
-                    unallocated += last_trade.available_amount * current_price
                     last_trade = None
+
+        unallocated = initial_amount
+        total_net_gain = 0.0
+        open_trades = []
 
         # Create portfolio snapshots
         for ts in index:
-            invested_value = 0.0
+            allocated = 0
+            interval_datetime = pd.Timestamp(ts).to_pydatetime()
+            interval_datetime = interval_datetime.replace(tzinfo=timezone.utc)
 
             for trade in trades:
-                if trade.opened_at <= ts and (
-                        trade.closed_at is None or trade.closed_at >= ts):
 
-                    # Trade is still open at this time
-                    ohlcv = granular_ohlcv_data_order_by_symbol[trade.symbol]
+                if trade.opened_at == interval_datetime:
+                    # Snapshot taken at the moment a trade is opened
+                    unallocated -= trade.cost
+                    open_trades.append(trade)
 
-                    # Datetime is the index for pandas DataFrame, find the
-                    # closest timestamp that is less than or equal to ts
-                    # prices = ohlcv.loc[ohlcv.index <= ts, "Close"].values
-                    #
-                    # if len(prices) == 0:
-                    #     # No price data for this timestamp
-                    #     price = trade.open_price
-                    # else:
-                    #     price = prices[-1]
-                    try:
-                        price = ohlcv.loc[:ts, "Close"].iloc[-1]
-                    except IndexError:
-                        continue  # skip if no price yet
+                if trade.closed_at == interval_datetime:
+                    # Snapshot taken at the moment a trade is closed
+                    unallocated += trade.cost + trade.net_gain
+                    total_net_gain += trade.net_gain
+                    open_trades.remove(trade)
 
-                    invested_value += trade.filled_amount * price
-            total_value = invested_value + unallocated
-            total_net_gain = total_value - initial_amount
+            for open_trade in open_trades:
+                ohlcv = granular_ohlcv_data_order_by_symbol[
+                    f"{open_trade.target_symbol}/{trading_symbol}"
+                ]
+
+                try:
+                    price = ohlcv.loc[:ts, "Close"].iloc[-1]
+                except IndexError:
+                    continue  # skip if no price yet
+
+                allocated += open_trade.filled_amount * price
+
+            # total_value = invested_value + unallocated
+            # total_net_gain = total_value - initial_amount
             snapshots.append(
                 PortfolioSnapshot(
-                    created_at=pd.Timestamp(ts),
+                    created_at=interval_datetime,
                     unallocated=unallocated,
-                    total_value=total_value,
+                    total_value=unallocated + allocated,
                     total_net_gain=total_net_gain
                 )
             )

@@ -798,7 +798,9 @@ class App:
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         risk_free_rate: Optional[float] = None,
         skip_data_sources_initialization: bool = False,
-        show_progress: bool = True
+        show_progress: bool = True,
+        market: Optional[str] = None,
+        trading_symbol: Optional[str] = None,
     ) -> List[Backtest]:
         """
         Run vectorized backtests for a set of strategies. The provided
@@ -840,6 +842,12 @@ class App:
             show_progress (bool): Whether to show progress bars during
                 data source initialization. This is useful for long-running
                 initialization processes.
+            market (str): The market to use for the backtest. This is used
+                to create a portfolio configuration if no portfolio
+                configuration is provided in the strategy.
+            trading_symbol (str): The trading symbol to use for the backtest.
+                This is used to create a portfolio configuration if no
+                portfolio configuration is provided in the strategy.
 
         Returns:
             List[Backtest]: List of Backtest instances for each strategy
@@ -887,7 +895,9 @@ class App:
                     strategy=strategy,
                     snapshot_interval=snapshot_interval,
                     risk_free_rate=risk_free_rate,
-                    skip_data_sources_initialization=True
+                    skip_data_sources_initialization=True,
+                    market=market,
+                    trading_symbol=trading_symbol
                 )
                 backtests.append(backtest)
         else:
@@ -938,13 +948,15 @@ class App:
     def run_vector_backtest(
         self,
         backtest_date_range: BacktestDateRange,
-        initial_amount,
         strategy: TradingStrategy,
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         metadata: Optional[Dict[str, str]] = None,
         risk_free_rate: Optional[float] = None,
         skip_data_sources_initialization: bool = False,
-        show_data_initialization_progress: bool = True
+        show_data_initialization_progress: bool = True,
+        initial_amount: float = None,
+        market: str = None,
+        trading_symbol: str = None
     ) -> Backtest:
         """
         Run vectorized backtests for a strategy. The provided
@@ -982,6 +994,20 @@ class App:
                 initialized before calling this method.
             show_data_initialization_progress (bool): Whether to show the
                 progress bar when initializing data sources.
+            market (str): The market to use for the backtest. This is used
+                to create a portfolio configuration if no portfolio
+                configuration is found for the strategy. If not provided,
+                the first portfolio configuration found will be used.
+            trading_symbol (str): The trading symbol to use for the backtest.
+                This is used to create a portfolio configuration if no
+                portfolio configuration is found for the strategy. If not
+                provided, the first trading symbol found in the portfolio
+                configuration will be used.
+            initial_amount (float): The initial amount to start the
+                backtest with. This will be the amount of trading currency
+                that the portfolio will start with. If not provided,
+                the initial amount from the portfolio configuration will
+                be used.
 
         Returns:
             Backtest: Instance of Backtest
@@ -1017,8 +1043,10 @@ class App:
         run = backtest_service.create_vector_backtest(
             strategy=strategy,
             backtest_date_range=backtest_date_range,
-            initial_amount=initial_amount,
-            risk_free_rate=risk_free_rate
+            risk_free_rate=risk_free_rate,
+            market=market,
+            trading_symbol=trading_symbol,
+            initial_amount=initial_amount
         )
         backtest = Backtest(
             backtest_runs=[run],
@@ -1256,6 +1284,8 @@ class App:
         backtest_date_range: BacktestDateRange,
         number_of_permutations: int = 100,
         initial_amount: float = 1000.0,
+        market: str = None,
+        trading_symbol: str = None,
         risk_free_rate: Optional[float] = None
     ) -> BacktestPermutationTest:
         """
@@ -1281,6 +1311,15 @@ class App:
             risk_free_rate (Optional[float]): The risk-free rate to use for
                 the backtest metrics. If not provided, it will try to fetch
                 the risk-free rate from the US Treasury website.
+            market (str): The market to use for the backtest. This is used
+                to create a portfolio configuration if no portfolio
+                configuration is found for the strategy. If not provided,
+                the first portfolio configuration found will be used.
+            trading_symbol (str): The trading symbol to use for the backtest.
+                This is used to create a portfolio configuration if no
+                portfolio configuration is found for the strategy. If not
+                provided, the first trading symbol found in the portfolio
+                configuration will be used.
 
         Raises:
             OperationalException: If the risk-free rate cannot be retrieved.
@@ -1309,6 +1348,8 @@ class App:
             strategy=strategy,
             snapshot_interval=SnapshotInterval.DAILY,
             risk_free_rate=risk_free_rate,
+            market=market,
+            trading_symbol=trading_symbol
         )
         backtest_metrics = backtest.get_backtest_metrics(backtest_date_range)
 
@@ -1388,7 +1429,9 @@ class App:
                 strategy=strategy,
                 snapshot_interval=SnapshotInterval.DAILY,
                 risk_free_rate=risk_free_rate,
-                skip_data_sources_initialization=True
+                skip_data_sources_initialization=True,
+                market=market,
+                trading_symbol=trading_symbol
             )
 
             # Add the results of the permuted backtest to the main backtest

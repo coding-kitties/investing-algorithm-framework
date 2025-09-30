@@ -271,7 +271,9 @@ class Test(TestCase):
             backtest_date_range=date_range,
             strategy=strategy,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027
+            risk_free_rate=0.027,
+            trading_symbol="EUR",
+            market="BITVAVO"
         )
         run = vector_backtests.backtest_runs[0]
         end_time = time.time()

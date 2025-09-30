@@ -260,6 +260,8 @@ class Test(TestCase):
         )
         backtests = app.run_permutation_test(
             initial_amount=1000,
+            market="bitvavo",
+            trading_symbol="EUR",
             backtest_date_range=date_range,
             strategy=strategy,
             number_of_permutations=50

@@ -11,7 +11,7 @@ from .reporting import add_html_report, \
     get_equity_curve_with_drawdown_chart, \
     get_rolling_sharpe_ratio_chart, \
     get_monthly_returns_heatmap_chart, \
-    get_yearly_returns_bar_chart, \
+    get_yearly_returns_bar_chart, get_equity_curve_chart, \
     get_ohlcv_data_completeness_chart, get_entry_and_exit_signals
 from .analysis import select_backtest_date_ranges, rank_results, \
     create_weights
@@ -40,5 +40,6 @@ __all__ = [
     "get_ohlcv_data_completeness_chart",
     "rank_results",
     "create_weights",
-    "get_entry_and_exit_signals"
+    "get_entry_and_exit_signals",
+    "get_equity_curve_chart"
 ]

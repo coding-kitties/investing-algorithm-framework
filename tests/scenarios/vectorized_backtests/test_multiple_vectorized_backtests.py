@@ -276,7 +276,9 @@ class Test(TestCase):
             backtest_date_range=date_range,
             strategies=strategies,
             snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027
+            risk_free_rate=0.027,
+            trading_symbol="EUR",
+            market="BITVAVO"
         )
         end_time = time.time()
         elapsed_time = end_time - start_time
@@ -372,7 +374,9 @@ class Test(TestCase):
             strategies=strategies,
             snapshot_interval=SnapshotInterval.DAILY,
             skip_data_sources_initialization=True,
-            risk_free_rate=0.027
+            risk_free_rate=0.027,
+            trading_symbol="EUR",
+            market="BITVAVO"
         )
         end_time = time.time()
         elapsed_time = end_time - start_time
