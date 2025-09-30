@@ -144,14 +144,20 @@ class BacktestService:
         portfolio_configurations = self._portfolio_configuration_service\
             .get_all()
 
-        if (portfolio_configurations is None
+        if (
+                portfolio_configurations is None
                 or len(portfolio_configurations) == 0
-                and initial_amount is None
+        ) and (
+                initial_amount is None
                 or trading_symbol is None
-                or market is None):
+                or market is None
+        ):
             raise OperationalException(
-                "No portfolio configurations found, please register a "
-                "portfolio configuration before running a backtest."
+                "No initial amount, trading symbol or market provided "
+                "for the backtest and no portfolio configurations found. "
+                "please register a portfolio configuration "
+                "or specify the initial amount, trading symbol and "
+                "market parameters before running a backtest."
             )
 
         if portfolio_configurations is None \
@@ -238,10 +244,6 @@ class BacktestService:
             signal[buy_signal] = 1
             signal[sell_signal] = -1
             signal = signal.replace(0, np.nan).ffill().shift(1).fillna(0)
-
-            # Portfolio value for this asset
-            returns = close.pct_change().fillna(0)
-            returns = returns.astype(float)
             signal = signal.astype(float)
 
             if pos_size_obj is None:
