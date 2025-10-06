@@ -298,8 +298,7 @@ def get_average_trade_gain(trades: List[Trade]) -> Tuple[float, float]:
         trades (List[Trade]): List of trades.
 
     Returns:
-        Tuple[float, float]: The average gain
-        percentage of the average loss
+        Tuple[float, float]: The average gain and average gain percentage
     """
     if trades is None or len(trades) == 0:
         raise OperationalException(
@@ -307,19 +306,26 @@ def get_average_trade_gain(trades: List[Trade]) -> Tuple[float, float]:
         )
 
     gains = [t.net_gain_absolute for t in trades if t.net_gain_absolute > 0]
-    cost = sum(t.cost for t in trades if t.net_gain_absolute > 0)
 
     if not gains:
         return 0.0, 0.0
 
     average_gain = sum(gains) / len(gains)
-    percentage = (average_gain / cost) if cost > 0 else 0.0
-    return average_gain, percentage
+
+    # Updated percentage calculation to match other functions
+    percentage_returns = [
+        (t.net_gain_absolute / t.cost) for t in trades
+        if t.net_gain_absolute > 0 and t.cost > 0
+    ]
+    average_gain_percentage = (
+        sum(percentage_returns) / len(percentage_returns)
+        if percentage_returns else 0.0
+    )
+
+    return average_gain, average_gain_percentage
 
 
-def get_current_average_trade_gain(
-    trades: List[Trade]
-) -> Tuple[float, float]:
+def get_current_average_trade_gain(trades: List[Trade]) -> Tuple[float, float]:
     """
     Calculate the average gain from a list of trades,
     including both closed and open trades.
@@ -329,8 +335,7 @@ def get_current_average_trade_gain(
     Args:
         trades (List[Trade]): List of trades.
     Returns:
-        Tuple[float, float]: The average gain
-        percentage of the average loss
+        Tuple[float, float]: The average gain and average gain percentage
     """
     if trades is None or len(trades) == 0:
         raise OperationalException(
@@ -338,14 +343,23 @@ def get_current_average_trade_gain(
         )
 
     gains = [t.net_gain_absolute for t in trades if t.net_gain_absolute > 0]
-    cost = sum(t.cost for t in trades if t.net_gain_absolute > 0)
 
     if not gains:
         return 0.0, 0.0
 
     average_gain = sum(gains) / len(gains)
-    percentage = (average_gain / cost) if cost > 0 else 0.0
-    return average_gain, percentage
+
+    # Updated percentage calculation to match other functions
+    percentage_returns = [
+        (t.net_gain_absolute / t.cost) for t in trades
+        if t.net_gain_absolute > 0 and t.cost > 0
+    ]
+    average_gain_percentage = (
+        sum(percentage_returns) / len(percentage_returns)
+        if percentage_returns else 0.0
+    )
+
+    return average_gain, average_gain_percentage
 
 
 def get_average_trade_loss(trades: List[Trade]) -> Tuple[float, float]:
