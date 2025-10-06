@@ -23,7 +23,8 @@ from .returns import get_total_return, get_final_value, get_total_loss, \
 from .sharpe_ratio import get_sharpe_ratio, get_rolling_sharpe_ratio
 from .sortino_ratio import get_sortino_ratio
 from .volatility import get_annual_volatility
-from .win_rate import get_win_rate, get_win_loss_ratio
+from .win_rate import get_win_rate, get_win_loss_ratio, get_current_win_rate, \
+    get_current_win_loss_ratio
 from .trades import get_average_trade_duration, get_average_trade_size, \
     get_number_of_trades, get_positive_trades, get_number_of_closed_trades, \
     get_negative_trades, get_average_trade_return, get_number_of_open_trades, \
@@ -105,7 +106,9 @@ def create_backtest_metrics(
             "number_of_trades_opened",
             "number_of_trades_open_at_end",
             "win_rate",
+            "current_win_rate",
             "win_loss_ratio",
+            "current_win_loss_ratio",
             "percentage_winning_months",
             "percentage_winning_years",
             "average_monthly_return",
@@ -295,7 +298,9 @@ def create_backtest_metrics(
     safe_set("best_trade", get_best_trade, backtest_run.trades)
     safe_set("worst_trade", get_worst_trade, backtest_run.trades)
     safe_set("win_rate", get_win_rate, backtest_run.trades)
+    safe_set("current_win_rate", get_current_win_rate, backtest_run.trades, backtest_run)
     safe_set("win_loss_ratio", get_win_loss_ratio, backtest_run.trades)
+    safe_set("current_win_loss_ratio", get_current_win_loss_ratio, backtest_run.trades, backtest_run)
     safe_set("percentage_winning_months", get_percentage_winning_months, backtest_run.portfolio_snapshots)
     safe_set("percentage_winning_years", get_percentage_winning_years, backtest_run.portfolio_snapshots)
     safe_set("average_monthly_return", get_average_monthly_return, backtest_run.portfolio_snapshots)

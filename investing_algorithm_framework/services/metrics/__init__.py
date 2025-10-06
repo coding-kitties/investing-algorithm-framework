@@ -35,7 +35,8 @@ from .trades import get_negative_trades, get_positive_trades, \
     get_worst_trade, get_average_trade_gain, get_median_trade_return, \
     get_average_trade_loss, get_current_average_trade_loss, \
     get_current_average_trade_duration, get_current_average_trade_gain, \
-    get_current_average_trade_return
+    get_current_average_trade_return, get_number_of_open_trades, \
+    get_average_trade_duration
 
 __all__ = [
     "get_annual_volatility",
@@ -106,4 +107,6 @@ __all__ = [
     "get_current_average_trade_duration",
     "get_current_average_trade_gain",
     "get_current_average_trade_return",
+    "get_number_of_open_trades",
+    "get_average_trade_duration",
 ]
