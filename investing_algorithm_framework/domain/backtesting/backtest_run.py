@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Dict
 from pathlib import Path
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
@@ -82,7 +83,8 @@ class BacktestRun:
     number_of_positions: int = 0
     backtest_metrics: BacktestMetrics = None
     backtest_date_range_name: str = None
-    data_sources: List[dict] = field(default_factory=list)
+    data_sources: List[Dict] = field(default_factory=list)
+    metadata: Dict[str, str] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """
@@ -114,7 +116,8 @@ class BacktestRun:
             "number_of_trades_closed": self.number_of_trades_closed,
             "number_of_trades_open": self.number_of_trades_open,
             "number_of_orders": self.number_of_orders,
-            "number_of_positions": self.number_of_positions
+            "number_of_positions": self.number_of_positions,
+            "metadata": self.metadata,
         }
 
     @staticmethod
