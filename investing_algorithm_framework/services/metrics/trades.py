@@ -245,7 +245,7 @@ def get_average_trade_return(trades: List[Trade]) -> Tuple[float, float]:
     average_return = total_return / len(closed_trades)
 
     percentage_returns = [
-        (t.net_gain / t.cost) * 100.0 for t in closed_trades if t.cost > 0
+        (t.net_gain / t.cost) for t in closed_trades if t.cost > 0
     ]
     average_return_percentage = (
         sum(percentage_returns) / len(percentage_returns)
@@ -278,7 +278,7 @@ def get_current_average_trade_return(
     average_return = total_return / len(trades)
 
     percentage_returns = [
-        (t.net_gain / t.cost) * 100.0 for t in trades if t.cost > 0
+        (t.net_gain / t.cost) for t in trades if t.cost > 0
     ]
     average_return_percentage = (
         sum(percentage_returns) / len(percentage_returns)
@@ -374,7 +374,7 @@ def get_average_trade_loss(trades: List[Trade]) -> Tuple[float, float]:
     losses = [t.net_gain for t in losing_trades]
     average_loss = sum(losses) / len(losses)
     percentage_returns = [
-        (t.net_gain / t.cost) * 100.0 for t in losing_trades if t.cost > 0
+        (t.net_gain / t.cost) for t in losing_trades if t.cost > 0
     ]
     average_return_percentage = (
         sum(percentage_returns) / len(percentage_returns)
@@ -412,7 +412,7 @@ def get_current_average_trade_loss(
     losses = [t.net_gain for t in losing_trades]
     average_loss = sum(losses) / len(losses)
     percentage_returns = [
-        (t.net_gain / t.cost) * 100.0 for t in losing_trades if t.cost > 0
+        (t.net_gain / t.cost) for t in losing_trades if t.cost > 0
     ]
     average_return_percentage = (
         sum(percentage_returns) / len(percentage_returns)

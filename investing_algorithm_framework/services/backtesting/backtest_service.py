@@ -375,9 +375,9 @@ class BacktestService:
                 ohlcv = granular_ohlcv_data_order_by_symbol[
                     f"{open_trade.target_symbol}/{trading_symbol}"
                 ]
-
                 try:
                     price = ohlcv.loc[:ts, "Close"].iloc[-1]
+                    open_trade.last_reported_price = price
                 except IndexError:
                     continue  # skip if no price yet
 
