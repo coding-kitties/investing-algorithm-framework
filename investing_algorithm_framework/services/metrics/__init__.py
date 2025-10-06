@@ -24,7 +24,8 @@ from .returns import get_yearly_returns, get_monthly_returns, \
 from .exposure import get_average_trade_duration, \
     get_trade_frequency, get_trades_per_day, get_trades_per_year, \
     get_cumulative_exposure, get_exposure_ratio
-from .win_rate import get_win_rate, get_win_loss_ratio
+from .win_rate import get_win_rate, get_win_loss_ratio, get_current_win_rate, \
+    get_current_win_loss_ratio
 from .calmar_ratio import get_calmar_ratio
 from .generate import create_backtest_metrics
 from .risk_free_rate import get_risk_free_rate_us
@@ -32,7 +33,9 @@ from .trades import get_negative_trades, get_positive_trades, \
     get_number_of_trades, get_number_of_closed_trades, \
     get_average_trade_size, get_average_trade_return, get_best_trade, \
     get_worst_trade, get_average_trade_gain, get_median_trade_return, \
-    get_average_trade_loss
+    get_average_trade_loss, get_current_average_trade_loss, \
+    get_current_average_trade_duration, get_current_average_trade_gain, \
+    get_current_average_trade_return
 
 __all__ = [
     "get_annual_volatility",
@@ -97,4 +100,10 @@ __all__ = [
     "get_positive_trades",
     "get_cumulative_return",
     "get_cumulative_return_series",
+    "get_current_win_rate",
+    "get_current_win_loss_ratio",
+    "get_current_average_trade_loss",
+    "get_current_average_trade_duration",
+    "get_current_average_trade_gain",
+    "get_current_average_trade_return",
 ]

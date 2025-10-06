@@ -2,7 +2,7 @@ from typing import List
 from logging import getLogger
 
 from investing_algorithm_framework.domain import BacktestMetrics, \
-    TradeStatus, BacktestRun, OperationalException
+    BacktestRun, OperationalException
 from .cagr import get_cagr
 from .calmar_ratio import get_calmar_ratio
 from .drawdown import get_drawdown_series, get_max_drawdown, \
@@ -28,7 +28,9 @@ from .trades import get_average_trade_duration, get_average_trade_size, \
     get_number_of_trades, get_positive_trades, get_number_of_closed_trades, \
     get_negative_trades, get_average_trade_return, get_number_of_open_trades, \
     get_worst_trade, get_best_trade, get_average_trade_gain, \
-    get_average_trade_loss, get_median_trade_return
+    get_average_trade_loss, get_median_trade_return, \
+    get_current_average_trade_gain, get_current_average_trade_return, \
+    get_current_average_trade_duration, get_current_average_trade_loss
 
 logger = getLogger("investing_algorithm_framework")
 
@@ -113,7 +115,11 @@ def create_backtest_metrics(
             "best_year",
             "worst_month",
             "worst_year",
-            "total_number_of_days"
+            "total_number_of_days",
+            "current_average_trade_gain",
+            "current_average_trade_return",
+            "current_average_trade_duration",
+            "current_average_trade_loss",
         ]
 
     backtest_metrics = BacktestMetrics(
@@ -197,6 +203,68 @@ def create_backtest_metrics(
         except OperationalException as e:
             logger.warning(f"average_trade_loss failed: {e}")
 
+    if ("current_average_trade_gain" in metrics
+            or "get_current_average_trade_gain_percentage" in metrics):
+        try:
+            current_avg_gain = get_current_average_trade_gain(
+                backtest_run.trades
+            )
+
+            if "current_average_trade_gain" in metrics:
+                backtest_metrics.current_average_trade_gain = \
+                    current_avg_gain[0]
+
+            if "current_average_trade_gain_percentage" in metrics:
+                backtest_metrics.current_average_trade_gain_percentage = \
+                    current_avg_gain[1]
+        except OperationalException as e:
+            logger.warning(f"current_average_trade_gain failed: {e}")
+
+    if ("current_average_trade_return" in metrics
+            or "current_average_trade_return_percentage" in metrics):
+        try:
+            current_avg_return = get_current_average_trade_return(
+                backtest_run.trades
+            )
+
+            if "current_average_trade_return" in metrics:
+                backtest_metrics.current_average_trade_return = \
+                    current_avg_return[0]
+            if "current_average_trade_return_percentage" in metrics:
+                backtest_metrics.current_average_trade_return_percentage =\
+                    current_avg_return[1]
+        except OperationalException as e:
+            logger.warning(f"current_average_trade_return failed: {e}")
+
+    if "current_average_trade_duration" in metrics:
+        try:
+            current_avg_duration = get_current_average_trade_duration(
+                backtest_run.trades, backtest_run
+            )
+            backtest_metrics.current_average_trade_duration = \
+                current_avg_duration
+        except OperationalException as e:
+            logger.warning(f"current_average_trade_duration failed: {e}")
+
+    if ("current_average_trade_loss" in metrics
+            or "current_average_trade_loss_percentage" in metrics):
+        try:
+            current_avg_loss = get_current_average_trade_loss(
+                backtest_run.trades
+            )
+            if "current_average_trade_loss" in metrics:
+                backtest_metrics.current_average_trade_loss = \
+                    current_avg_loss[0]
+            if "current_average_trade_loss_percentage" in metrics:
+                backtest_metrics.current_average_trade_loss_percentage = \
+                    current_avg_loss[1]
+        except OperationalException as e:
+            logger.warning(f"current_average_trade_loss failed: {e}")
+
+    safe_set("number_of_positive_trades", get_positive_trades, backtest_run.trades)
+    safe_set("percentage_positive_trades", get_positive_trades, backtest_run.trades, index=1)
+    safe_set("number_of_negative_trades", get_negative_trades, backtest_run.trades)
+    safe_set("percentage_negative_trades", get_negative_trades, backtest_run.trades, index=1)
     safe_set("median_trade_return", get_median_trade_return, backtest_run.trades, index=0)
     safe_set("median_trade_return_percentage", get_median_trade_return, backtest_run.trades, index=1)
     safe_set("number_of_trades", get_number_of_trades, backtest_run.trades)
@@ -241,5 +309,4 @@ def create_backtest_metrics(
     safe_set("gross_profit", get_gross_profit, backtest_run.trades)
     safe_set("cumulative_return_series", get_cumulative_return_series, backtest_run.portfolio_snapshots)
     safe_set("cumulative_return", get_cumulative_return, backtest_run.portfolio_snapshots)
-
     return backtest_metrics

@@ -63,6 +63,33 @@ def get_win_rate(trades: List[Trade]) -> float:
 
     return positive_trades / total_trades
 
+def get_current_win_rate(trades: List[Trade]) -> float:
+    """
+    Calculate the current win rate of the portfolio based on a list
+    of recent trades.
+
+    Current Win Rate is defined as the percentage of the most recent trades
+    that were profitable. This metric also includes trades that are still open.
+
+    Formula:
+        Current Win Rate = Number of Profitable Recent Trades
+            / Total Number of Recent Trades
+
+    Args:
+        trades (List[Trade]): List of recent trades.
+
+    Returns:
+        float: The current win rate as a percentage (e.g., 0.75 for
+            75% win rate).
+    """
+    if not trades:
+        return 0.0
+
+    positive_trades = sum(1 for trade in trades if trade.net_gain > 0)
+    total_trades = len(trades)
+
+    return positive_trades / total_trades
+
 
 def get_win_loss_ratio(trades: List[Trade]) -> float:
     """
@@ -88,6 +115,46 @@ def get_win_loss_ratio(trades: List[Trade]) -> float:
         trade for trade in trades if TradeStatus.CLOSED.equals(trade.status)
     ]
 
+    if not trades:
+        return 0.0
+
+    # Separate winning and losing trades
+    winning_trades = [t for t in trades if t.net_gain > 0]
+    losing_trades = [t for t in trades if t.net_gain < 0]
+
+    if not winning_trades or not losing_trades:
+        return 0.0
+
+    # Compute averages
+    avg_win = sum(t.net_gain for t in winning_trades) / len(winning_trades)
+    avg_loss = abs(
+        sum(t.net_gain for t in losing_trades) / len(losing_trades))
+
+    # Avoid division by zero
+    if avg_loss == 0:
+        return float('inf')
+
+    return avg_win / avg_loss
+
+
+def get_current_win_loss_ratio(trades: List[Trade]) -> float:
+    """
+    Calculate the current win/loss ratio of the portfolio based on a list
+    of recent trades.
+
+    Current Win/Loss Ratio is defined as the average profit of winning
+    recent trades divided by the average loss of losing recent trades.
+    This metric also includes trades that are still open.
+
+    Formula:
+        Current Win/Loss Ratio = Average Profit of Winning Recent Trades
+            / Average Loss of Losing Recent Trades
+    Args:
+        trades (List[Trade]): List of recent trades.
+
+    Returns:
+        float: The current win/loss ratio.
+    """
     if not trades:
         return 0.0
 

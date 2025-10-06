@@ -26,7 +26,7 @@ from .metrics import get_annual_volatility, \
     get_average_trade_loss, get_average_monthly_return, \
     get_percentage_winning_months, get_average_trade_duration, \
     get_trade_frequency, get_win_rate, get_win_loss_ratio, \
-    get_calmar_ratio, get_max_drawdown_absolute, \
+    get_calmar_ratio, get_max_drawdown_absolute, get_current_win_loss_ratio, \
     get_max_drawdown_duration, get_max_daily_drawdown, get_trades_per_day, \
     get_trades_per_year, get_average_monthly_return_losing_months, \
     get_average_monthly_return_winning_months, get_percentage_winning_years, \
@@ -34,7 +34,10 @@ from .metrics import get_annual_volatility, \
     get_total_loss, get_risk_free_rate_us, get_median_trade_return, \
     get_average_trade_return, get_cumulative_return, \
     get_cumulative_return_series, get_average_trade_size, \
-    get_positive_trades, get_negative_trades, get_number_of_trades
+    get_positive_trades, get_negative_trades, get_number_of_trades, \
+    get_current_win_rate, get_current_average_trade_return, \
+    get_current_average_trade_loss, get_current_average_trade_duration, \
+    get_current_average_trade_gain
 
 __all__ = [
     "OrderService",
@@ -118,4 +121,11 @@ __all__ = [
     "get_number_of_trades",
     "get_cumulative_return",
     "get_cumulative_return_series",
+    "get_current_win_loss_ratio",
+    "get_current_win_rate",
+    "get_current_win_loss_ratio",
+    "get_current_average_trade_loss",
+    "get_current_average_trade_duration",
+    "get_current_average_trade_gain",
+    "get_current_average_trade_return",
 ]

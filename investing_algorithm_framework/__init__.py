@@ -44,7 +44,11 @@ from .services import get_annual_volatility, get_sortino_ratio, \
     get_rolling_sharpe_ratio, create_backtest_metrics, get_total_growth, \
     get_total_loss, get_cumulative_exposure, get_median_trade_return, \
     get_average_trade_return, get_risk_free_rate_us, get_cumulative_return, \
-    get_cumulative_return_series
+    get_cumulative_return_series, get_current_average_trade_return, \
+    get_current_average_trade_gain, get_current_average_trade_duration, \
+    get_current_average_trade_loss, get_negative_trades, \
+    get_positive_trades, get_number_of_trades, get_current_win_rate, \
+    get_current_win_loss_ratio
 
 
 __all__ = [
@@ -175,5 +179,14 @@ __all__ = [
     "get_total_loss",
     "get_total_growth",
     "generate_backtest_summary_metrics",
-    "get_equity_curve_chart"
+    "get_equity_curve_chart",
+    "get_current_win_rate",
+    "get_current_win_loss_ratio",
+    "get_current_average_trade_loss",
+    "get_current_average_trade_duration",
+    "get_current_average_trade_gain",
+    "get_current_average_trade_return",
+    "get_negative_trades",
+    "get_positive_trades",
+    "get_number_of_trades",
 ]

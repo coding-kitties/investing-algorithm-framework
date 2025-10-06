@@ -179,6 +179,13 @@ class BacktestMetrics:
     average_trade_gain_percentage: float = 0.0
     average_trade_return: float = 0.0
     average_trade_return_percentage: float = 0.0
+    current_average_trade_gain: float = 0.0
+    current_average_trade_gain_percentage: float = 0.0
+    current_average_trade_return: float = 0.0
+    current_average_trade_return_percentage: float = 0.0
+    current_average_trade_duration: float = 0.0
+    current_average_trade_loss: float = 0.0
+    current_average_trade_loss_percentage: float = 0.0
     median_trade_return: float = 0.0
     median_trade_return_percentage: float = 0.0
     number_of_trades: int = 0
