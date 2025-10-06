@@ -208,7 +208,7 @@ class Trade(BaseModel):
 
             if self.last_reported_price is not None:
                 gain = (
-                    self.remaining *
+                    self.available_amount *
                     (self.last_reported_price - self.open_price)
                 )
 
@@ -228,7 +228,7 @@ class Trade(BaseModel):
 
             if self.last_reported_price is not None:
                 gain = (
-                    self.remaining *
+                    self.available_amount *
                     (self.last_reported_price - self.open_price)
                 )
 
