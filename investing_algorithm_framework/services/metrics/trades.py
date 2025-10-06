@@ -27,7 +27,7 @@ def get_positive_trades(
     ]
 
     positive_trades = [
-        trade for trade in closed_trades if trade.net_gain > 0
+        trade for trade in closed_trades if trade.net_gain_absolute > 0
     ]
     number_of_positive_trades = len(positive_trades)
     percentage_positive_trades = (
@@ -60,7 +60,7 @@ def get_negative_trades(
     ]
 
     negative_trades = [
-        trade for trade in closed_trades if trade.net_gain < 0
+        trade for trade in closed_trades if trade.net_gain_absolute < 0
     ]
     number_of_negative_trades = len(negative_trades)
     percentage_negative_trades = (
@@ -241,11 +241,11 @@ def get_average_trade_return(trades: List[Trade]) -> Tuple[float, float]:
     if not closed_trades:
         return 0.0, 0.0
 
-    total_return = sum(t.net_gain for t in closed_trades)
+    total_return = sum(t.net_gain_absolute for t in closed_trades)
     average_return = total_return / len(closed_trades)
 
     percentage_returns = [
-        (t.net_gain / t.cost) for t in closed_trades if t.cost > 0
+        (t.net_gain_absolute / t.cost) for t in closed_trades if t.cost > 0
     ]
     average_return_percentage = (
         sum(percentage_returns) / len(percentage_returns)
@@ -274,11 +274,11 @@ def get_current_average_trade_return(
             "Trades list is empty, cannot compute average return."
         )
 
-    total_return = sum(t.net_gain for t in trades)
+    total_return = sum(t.net_gain_absolute for t in trades)
     average_return = total_return / len(trades)
 
     percentage_returns = [
-        (t.net_gain / t.cost) for t in trades if t.cost > 0
+        (t.net_gain_absolute / t.cost) for t in trades if t.cost > 0
     ]
     average_return_percentage = (
         sum(percentage_returns) / len(percentage_returns)
@@ -306,8 +306,8 @@ def get_average_trade_gain(trades: List[Trade]) -> Tuple[float, float]:
             "Trades list is empty or None, cannot calculate average gain."
         )
 
-    gains = [t.net_gain for t in trades if t.net_gain > 0]
-    cost = sum(t.cost for t in trades if t.net_gain > 0)
+    gains = [t.net_gain_absolute for t in trades if t.net_gain_absolute > 0]
+    cost = sum(t.cost for t in trades if t.net_gain_absolute > 0)
 
     if not gains:
         return 0.0, 0.0
@@ -337,8 +337,8 @@ def get_current_average_trade_gain(
             "Trades list is empty or None, cannot calculate average gain."
         )
 
-    gains = [t.net_gain for t in trades if t.net_gain > 0]
-    cost = sum(t.cost for t in trades if t.net_gain > 0)
+    gains = [t.net_gain_absolute for t in trades if t.net_gain_absolute > 0]
+    cost = sum(t.cost for t in trades if t.net_gain_absolute > 0)
 
     if not gains:
         return 0.0, 0.0
@@ -371,10 +371,10 @@ def get_average_trade_loss(trades: List[Trade]) -> Tuple[float, float]:
     if not losing_trades or len(losing_trades) == 0:
         return 0.0, 0.0
 
-    losses = [t.net_gain for t in losing_trades]
+    losses = [t.net_gain_absolute for t in losing_trades]
     average_loss = sum(losses) / len(losses)
     percentage_returns = [
-        (t.net_gain / t.cost) for t in losing_trades if t.cost > 0
+        (t.net_gain_absolute / t.cost) for t in losing_trades if t.cost > 0
     ]
     average_return_percentage = (
         sum(percentage_returns) / len(percentage_returns)
@@ -404,15 +404,15 @@ def get_current_average_trade_loss(
             "Trades list is empty or None, cannot calculate average loss."
         )
 
-    losing_trades = [t for t in trades if t.net_gain < 0]
+    losing_trades = [t for t in trades if t.net_gain_absolute < 0]
 
     if not losing_trades or len(losing_trades) == 0:
         return 0.0, 0.0
 
-    losses = [t.net_gain for t in losing_trades]
+    losses = [t.net_gain_absolute for t in losing_trades]
     average_loss = sum(losses) / len(losses)
     percentage_returns = [
-        (t.net_gain / t.cost) for t in losing_trades if t.cost > 0
+        (t.net_gain_absolute / t.cost) for t in losing_trades if t.cost > 0
     ]
     average_return_percentage = (
         sum(percentage_returns) / len(percentage_returns)
@@ -438,7 +438,7 @@ def get_median_trade_return(trades: List[Trade]) -> Tuple[float, float]:
     if not trades:
         return 0.0, 0.0
 
-    sorted_returns = sorted(t.net_gain for t in trades)
+    sorted_returns = sorted(t.net_gain_absolute for t in trades)
     n = len(sorted_returns)
     mid = n // 2
 
@@ -466,7 +466,7 @@ def get_best_trade(trades: List[Trade]) -> Trade:
     if not trades:
         return None
 
-    return max(trades, key=lambda t: t.net_gain)
+    return max(trades, key=lambda t: t.net_gain_absolute)
 
 
 def get_worst_trade(trades: List[Trade]) -> Trade:
