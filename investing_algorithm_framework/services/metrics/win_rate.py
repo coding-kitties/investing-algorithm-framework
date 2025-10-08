@@ -85,7 +85,7 @@ def get_current_win_rate(trades: List[Trade]) -> float:
     if not trades:
         return 0.0
 
-    positive_trades = sum(1 for trade in trades if trade.net_gain > 0)
+    positive_trades = sum(1 for trade in trades if trade.net_gain_absolute > 0)
     total_trades = len(trades)
 
     return positive_trades / total_trades
@@ -159,16 +159,16 @@ def get_current_win_loss_ratio(trades: List[Trade]) -> float:
         return 0.0
 
     # Separate winning and losing trades
-    winning_trades = [t for t in trades if t.net_gain > 0]
-    losing_trades = [t for t in trades if t.net_gain < 0]
+    winning_trades = [t for t in trades if t.net_gain_absolute > 0]
+    losing_trades = [t for t in trades if t.net_gain_absolute < 0]
 
     if not winning_trades or not losing_trades:
         return 0.0
 
     # Compute averages
-    avg_win = sum(t.net_gain for t in winning_trades) / len(winning_trades)
+    avg_win = sum(t.net_gain_absolute for t in winning_trades) / len(winning_trades)
     avg_loss = abs(
-        sum(t.net_gain for t in losing_trades) / len(losing_trades))
+        sum(t.net_gain_absolute for t in losing_trades) / len(losing_trades))
 
     # Avoid division by zero
     if avg_loss == 0:
