@@ -139,7 +139,7 @@ def create_backtest_metrics(
                 else:
                     setattr(backtest_metrics, metric_name, value)
             except OperationalException as e:
-                logger.warning(f"{metric_name} failed: {e}")
+                logger.error(f"{metric_name} failed: {e}")
 
     # Grouped metrics needing special handling
     if "total_net_gain" in metrics or "total_net_gain_percentage" in metrics:
@@ -150,7 +150,7 @@ def create_backtest_metrics(
             if "total_net_gain_percentage" in metrics:
                 backtest_metrics.total_net_gain_percentage = total_return[1]
         except OperationalException as e:
-            logger.warning(f"total_return failed: {e}")
+            logger.error(f"total_return failed: {e}")
 
     if "total_growth" in metrics or "total_growth_percentage" in metrics:
         try:
@@ -160,7 +160,7 @@ def create_backtest_metrics(
             if "total_growth_percentage" in metrics:
                 backtest_metrics.total_growth_percentage = total_growth[1]
         except OperationalException as e:
-            logger.warning(f"total_growth failed: {e}")
+            logger.error(f"total_growth failed: {e}")
 
     if "total_loss" in metrics or "total_loss_percentage" in metrics:
         try:
@@ -170,7 +170,7 @@ def create_backtest_metrics(
             if "total_loss_percentage" in metrics:
                 backtest_metrics.total_loss_percentage = total_loss[1]
         except OperationalException as e:
-            logger.warning(f"total_loss failed: {e}")
+            logger.error(f"total_loss failed: {e}")
 
     if ("average_trade_return" in metrics
             or "average_trade_return_percentage" in metrics):
@@ -182,7 +182,7 @@ def create_backtest_metrics(
                 backtest_metrics.average_trade_return_percentage = \
                     avg_return[1]
         except OperationalException as e:
-            logger.warning(f"average_trade_return failed: {e}")
+            logger.error(f"average_trade_return failed: {e}")
 
     if ("average_trade_gain" in metrics
             or "average_trade_gain_percentage" in metrics):
@@ -193,7 +193,7 @@ def create_backtest_metrics(
             if "average_trade_gain_percentage" in metrics:
                 backtest_metrics.average_trade_gain_percentage = avg_gain[1]
         except OperationalException as e:
-            logger.warning(f"average_trade_gain failed: {e}")
+            logger.error(f"average_trade_gain failed: {e}")
 
     if ("average_trade_loss" in metrics
             or "average_trade_loss_percentage" in metrics):
@@ -204,7 +204,7 @@ def create_backtest_metrics(
             if "average_trade_loss_percentage" in metrics:
                 backtest_metrics.average_trade_loss_percentage = avg_loss[1]
         except OperationalException as e:
-            logger.warning(f"average_trade_loss failed: {e}")
+            logger.error(f"average_trade_loss failed: {e}")
 
     if ("current_average_trade_gain" in metrics
             or "get_current_average_trade_gain_percentage" in metrics):
@@ -221,7 +221,7 @@ def create_backtest_metrics(
                 backtest_metrics.current_average_trade_gain_percentage = \
                     current_avg_gain[1]
         except OperationalException as e:
-            logger.warning(f"current_average_trade_gain failed: {e}")
+            logger.error(f"current_average_trade_gain failed: {e}")
 
     if ("current_average_trade_return" in metrics
             or "current_average_trade_return_percentage" in metrics):
@@ -237,7 +237,7 @@ def create_backtest_metrics(
                 backtest_metrics.current_average_trade_return_percentage =\
                     current_avg_return[1]
         except OperationalException as e:
-            logger.warning(f"current_average_trade_return failed: {e}")
+            logger.error(f"current_average_trade_return failed: {e}")
 
     if "current_average_trade_duration" in metrics:
         try:
@@ -247,7 +247,7 @@ def create_backtest_metrics(
             backtest_metrics.current_average_trade_duration = \
                 current_avg_duration
         except OperationalException as e:
-            logger.warning(f"current_average_trade_duration failed: {e}")
+            logger.error(f"current_average_trade_duration failed: {e}")
 
     if ("current_average_trade_loss" in metrics
             or "current_average_trade_loss_percentage" in metrics):
@@ -262,7 +262,7 @@ def create_backtest_metrics(
                 backtest_metrics.current_average_trade_loss_percentage = \
                     current_avg_loss[1]
         except OperationalException as e:
-            logger.warning(f"current_average_trade_loss failed: {e}")
+            logger.error(f"current_average_trade_loss failed: {e}")
 
     safe_set("number_of_positive_trades", get_positive_trades, backtest_run.trades)
     safe_set("percentage_positive_trades", get_positive_trades, backtest_run.trades, index=1)
