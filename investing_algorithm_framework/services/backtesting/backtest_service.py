@@ -268,6 +268,11 @@ class BacktestService:
             # Trade generation
             last_trade = None
 
+            # Align signals with most granular OHLCV data
+            close = df["Close"].reindex(index, method='ffill')
+            buy_signal = buy_signals[symbol].reindex(index, fill_value=False)
+            sell_signal = sell_signals[symbol].reindex(index, fill_value=False)
+
             # Loop over all timestamps in the backtest
             for i in range(len(index)):
 
