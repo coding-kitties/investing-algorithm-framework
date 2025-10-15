@@ -150,23 +150,24 @@ class PortfolioSnapshot(BaseModel):
         if datetime_format is not None:
             created_at = self.created_at.strftime(datetime_format) \
                 if self.created_at else None
-
         else:
             created_at = self.created_at.strftime(DEFAULT_DATETIME_FORMAT)
 
         return {
-            "metadata": self.metadata,
-            "portfolio_id": self.portfolio_id,
-            "trading_symbol": self.trading_symbol,
-            "pending_value": self.pending_value,
-            "unallocated": self.unallocated,
-            "total_net_gain": self.total_net_gain,
-            "total_revenue": self.total_revenue,
-            "total_cost": self.total_cost,
-            "cash_flow": self.cash_flow,
-            "net_size": self.net_size,
-            "created_at": created_at,
-            "total_value": self.total_value,
+            "metadata": self.metadata if self.metadata else {},
+            "portfolio_id": self.portfolio_id if self.portfolio_id else "",
+            "trading_symbol": self.trading_symbol
+            if self.trading_symbol else "",
+            "pending_value": self.pending_value if self.pending_value else 0.0,
+            "unallocated": self.unallocated if self.unallocated else 0.0,
+            "total_net_gain": self.total_net_gain
+            if self.total_net_gain else 0.0,
+            "total_revenue": self.total_revenue if self.total_revenue else 0.0,
+            "total_cost": self.total_cost if self.total_cost else 0.0,
+            "cash_flow": self.cash_flow if self.cash_flow else 0.0,
+            "net_size": self.net_size if self.net_size else 0.0,
+            "created_at": created_at if created_at else "",
+            "total_value": self.total_value if self.total_value else 0.0,
         }
 
     @staticmethod

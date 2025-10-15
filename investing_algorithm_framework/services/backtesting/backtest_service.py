@@ -165,13 +165,19 @@ class BacktestService:
             portfolio_configurations = []
             portfolio_configurations.append(
                 PortfolioConfiguration(
+                    identifier="vector_backtest",
                     market=market,
                     trading_symbol=trading_symbol,
                     initial_balance=initial_amount
                 )
             )
 
+        portfolio_configuration = portfolio_configurations[0]
+
         trading_symbol = portfolio_configurations[0].trading_symbol
+        portfolio = Portfolio.from_portfolio_configuration(
+            portfolio_configuration
+        )
 
         # Load vectorized backtest data
         data = self._data_provider_service.get_vectorized_backtest_data(
@@ -188,7 +194,9 @@ class BacktestService:
         index = pd.Index([])
 
         most_granular_ohlcv_data_source = \
-            self._get_most_granular_ohlcv_data_source(strategy.data_sources)
+            BacktestService.get_most_granular_ohlcv_data_source(
+                strategy.data_sources
+            )
         most_granular_ohlcv_data = self._data_provider_service.get_ohlcv_data(
                 symbol=most_granular_ohlcv_data_source.symbol,
                 start_date=backtest_date_range.start_date,
@@ -212,6 +220,8 @@ class BacktestService:
         granular_ohlcv_data_order_by_symbol = {}
         snapshots = [
             PortfolioSnapshot(
+                trading_symbol=trading_symbol,
+                portfolio_id=portfolio.identifier,
                 created_at=backtest_date_range.start_date,
                 unallocated=initial_amount,
                 total_value=initial_amount,
@@ -346,7 +356,7 @@ class BacktestService:
                         {
                             "orders": trade_orders,
                             "closed_at": current_date,
-                            "trade_status": TradeStatus.CLOSED,
+                            "status": TradeStatus.CLOSED,
                             "updated_at": current_date,
                             "net_gain": net_gain_val
                         }
@@ -392,6 +402,7 @@ class BacktestService:
             # total_net_gain = total_value - initial_amount
             snapshots.append(
                 PortfolioSnapshot(
+                    portfolio_id=portfolio.identifier,
                     created_at=interval_datetime,
                     unallocated=unallocated,
                     total_value=unallocated + allocated,
@@ -580,7 +591,7 @@ class BacktestService:
         )
 
     @staticmethod
-    def _get_most_granular_ohlcv_data_source(data_sources):
+    def get_most_granular_ohlcv_data_source(data_sources):
         """
         Get the most granular data source from a list of data sources.
 

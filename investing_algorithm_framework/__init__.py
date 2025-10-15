@@ -14,7 +14,7 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     Position, TimeFrame, INDEX_DATETIME, MarketCredential, \
     PortfolioConfiguration, RESOURCE_DIRECTORY, AWS_LAMBDA_LOGGING_CONFIG, \
     Trade, SYMBOLS, RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT, \
-    BacktestDateRange, convert_polars_to_pandas, \
+    BacktestDateRange, convert_polars_to_pandas, BacktestRun, \
     DEFAULT_LOGGING_CONFIG, DataType, DataProvider, \
     TradeStatus, TradeRiskType, generate_backtest_summary_metrics, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
@@ -189,4 +189,5 @@ __all__ = [
     "get_negative_trades",
     "get_positive_trades",
     "get_number_of_trades",
+    "BacktestRun"
 ]

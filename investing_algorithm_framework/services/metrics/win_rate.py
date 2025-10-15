@@ -55,6 +55,7 @@ def get_win_rate(trades: List[Trade]) -> float:
     trades = [
         trade for trade in trades if TradeStatus.CLOSED.equals(trade.status)
     ]
+    print(len(trades))
     positive_trades = sum(1 for trade in trades if trade.net_gain > 0)
     total_trades = len(trades)
 

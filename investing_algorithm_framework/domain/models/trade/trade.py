@@ -283,14 +283,14 @@ class Trade(BaseModel):
             "trading_symbol": self.trading_symbol,
             "status": self.status,
             "amount": self.amount,
-            "remaining": self.remaining,
+            "remaining": self.remaining if self.remaining is not None else 0,
             "open_price": self.open_price,
             "last_reported_price": self.last_reported_price,
             "opened_at": opened_at,
             "closed_at": closed_at,
             "updated_at": updated_at,
-            "net_gain": self.net_gain,
-            "cost": self.cost,
+            "net_gain": self.net_gain if self.net_gain is not None else 0,
+            "cost": self.cost if self.cost is not None else 0,
             "stop_losses": [
                 stop_loss.to_dict(datetime_format=datetime_format)
                 for stop_loss in self.stop_losses

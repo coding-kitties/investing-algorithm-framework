@@ -3,13 +3,13 @@ import time
 import pandas as pd
 from datetime import datetime, timedelta, timezone
 from unittest import TestCase
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from pyindicators import ema, rsi, crossover, crossunder, macd
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    Algorithm, RESOURCE_DIRECTORY, SnapshotInterval
+    TradeStatus, RESOURCE_DIRECTORY, SnapshotInterval
 
 
 
@@ -289,6 +289,12 @@ class Test(TestCase):
         run = first_backtest.backtest_runs[0]
         self.assertNotEqual(0, len(run.get_trades(target_symbol="ETH")))
         self.assertNotEqual(0, len(run.get_trades(target_symbol="BTC")))
+
+        # Get first trade
+        trade = run.get_trades(target_symbol="BTC")[0]
+        self.assertEqual("BTC", trade.target_symbol)
+        self.assertEqual("EUR", trade.trading_symbol)
+        self.assertTrue(TradeStatus.CLOSED.equals(trade.status))
 
     def test_run_without_data_sources_initialization(self):
         start_time = time.time()
