@@ -238,6 +238,9 @@ class Order(BaseModel):
             created_at = self.created_at
             updated_at = self.updated_at
 
+        # Ensure status is a string
+        self.status = OrderStatus.from_value(self.status).value
+
         return {
             "id": self.id,
             "external_id": self.external_id,
