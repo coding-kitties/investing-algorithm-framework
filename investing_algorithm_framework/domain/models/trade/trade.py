@@ -273,6 +273,9 @@ class Trade(BaseModel):
             closed_at = self.closed_at
             updated_at = self.updated_at
 
+        # Ensure status is a string
+        self.status = TradeStatus.from_value(self.status).value
+
         return {
             "id": self.id,
             "orders": [
