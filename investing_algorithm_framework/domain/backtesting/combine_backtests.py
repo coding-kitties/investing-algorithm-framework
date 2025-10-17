@@ -192,6 +192,10 @@ def generate_backtest_summary_metrics(
         b.number_of_trades for b in backtest_metrics
         if b.number_of_trades is not None
     )
+    number_of_trades_closed = sum(
+        b.number_of_trades_closed for b in backtest_metrics
+        if b.number_of_trades_closed is not None
+    )
     cumulative_exposure = safe_weighted_mean(
         [b.cumulative_exposure for b in backtest_metrics],
         [b.total_number_of_days for b in backtest_metrics]
@@ -249,6 +253,7 @@ def generate_backtest_summary_metrics(
         win_rate=win_rate,
         win_loss_ratio=win_loss_ratio,
         number_of_trades=number_of_trades,
+        number_of_trades_closed=number_of_trades_closed,
         cumulative_exposure=cumulative_exposure,
         exposure_ratio=exposure_ratio,
         average_trade_return=average_trade_return,
@@ -258,18 +263,3 @@ def generate_backtest_summary_metrics(
         average_trade_gain=average_trade_gain,
         average_trade_gain_percentage=average_trade_gain_percentage
     )
-
-
-def create_backtest_summary_metrics(
-    backtest_metrics: List[BacktestMetrics]
-) -> BacktestSummaryMetrics:
-    """
-    Create a combined BacktestSummaryMetrics from multiple backtests.
-
-    Args:
-        backtest_metrics (List[BacktestMetrics]): List of BacktestMetrics
-            instances.
-
-    Returns:
-        BacktestSummaryMetrics: Combined summary metrics.
-    """

@@ -83,6 +83,7 @@ class BacktestSummaryMetrics:
     win_rate: float = None
     win_loss_ratio: float = None
     number_of_trades: int = None
+    number_of_trades_closed: int = None
     cumulative_exposure: float = None
     exposure_ratio: float = None
 
@@ -124,6 +125,7 @@ class BacktestSummaryMetrics:
             "win_rate": self.win_rate,
             "win_loss_ratio": self.win_loss_ratio,
             "number_of_trades": self.number_of_trades,
+            "number_of_trades_closed": self.number_of_trades_closed,
             "cumulative_exposure": self.cumulative_exposure,
             "exposure_ratio": self.exposure_ratio,
         }
