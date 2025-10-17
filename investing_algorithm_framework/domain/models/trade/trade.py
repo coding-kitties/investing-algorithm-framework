@@ -342,7 +342,7 @@ class Trade(BaseModel):
                 Order.from_dict(order)
                 for order in data["orders"]
             ]
-
+        print(data)
         return Trade(
             id=data.get("id", None),
             orders=orders,
@@ -357,7 +357,7 @@ class Trade(BaseModel):
             remaining=data.get("remaining", 0),
             net_gain=data.get("net_gain", 0),
             last_reported_price=data.get("last_reported_price"),
-            status=data["status"],
+            status=TradeStatus.from_value(data["status"]).value,
             cost=data.get("cost", 0),
             updated_at=updated_at,
             stop_losses=stop_losses,

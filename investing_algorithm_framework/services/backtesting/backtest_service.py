@@ -410,6 +410,16 @@ class BacktestService:
                 )
             )
 
+        unique_symbols = set()
+        for trade in trades:
+            unique_symbols.add(trade.target_symbol)
+
+        number_of_trades_closed = len(
+            [t for t in trades if TradeStatus.CLOSED.equals(t.status)]
+        )
+        number_of_trades_open = len(
+            [t for t in trades if TradeStatus.OPEN.equals(t.status)]
+        )
         # Create a backtest run object
         run = BacktestRun(
             trading_symbol=trading_symbol,
@@ -423,6 +433,14 @@ class BacktestService:
             backtest_start_date=backtest_date_range.start_date,
             backtest_end_date=backtest_date_range.end_date,
             backtest_date_range_name=backtest_date_range.name,
+            number_of_days=(
+                backtest_date_range.end_date - backtest_date_range.end_date
+            ).days,
+            number_of_trades=len(trades),
+            number_of_orders=len(orders),
+            number_of_trades_closed=number_of_trades_closed,
+            number_of_trades_open=number_of_trades_open,
+            number_of_positions=len(unique_symbols),
             symbols=list(buy_signals.keys())
         )
 
