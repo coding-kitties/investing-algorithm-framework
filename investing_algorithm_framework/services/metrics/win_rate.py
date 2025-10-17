@@ -52,13 +52,9 @@ def get_win_rate(trades: List[Trade]) -> float:
     Returns:
         float: The win rate as a percentage (e.g., o.75 for 75% win rate).
     """
-    for trade in trades:
-        print(trade.status)
-
     trades = [
         trade for trade in trades if TradeStatus.CLOSED.equals(trade.status)
     ]
-    print(len(trades))
     positive_trades = sum(1 for trade in trades if trade.net_gain > 0)
     total_trades = len(trades)
 

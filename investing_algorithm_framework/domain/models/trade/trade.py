@@ -342,7 +342,6 @@ class Trade(BaseModel):
                 Order.from_dict(order)
                 for order in data["orders"]
             ]
-        print(data)
         return Trade(
             id=data.get("id", None),
             orders=orders,
