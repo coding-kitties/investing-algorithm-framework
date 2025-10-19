@@ -286,6 +286,8 @@ class BacktestMetrics:
             "average_trade_duration": self.average_trade_duration,
             "average_trade_size": self.average_trade_size,
             "number_of_trades": self.number_of_trades,
+            "number_of_trades_closed": self.number_of_trades_closed,
+            "number_of_trades_opened": self.number_of_trades_opened,
             "win_rate": self.win_rate,
             "win_loss_ratio": self.win_loss_ratio,
             "percentage_winning_months": self.percentage_winning_months,
