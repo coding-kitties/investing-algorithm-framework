@@ -48,7 +48,9 @@ class BacktestSummaryMetrics:
         max_drawdown_duration (int): Duration of the maximum drawdown.
         trades_per_year (float): Average trades executed per year.
         win_rate (float): Percentage of winning trades.
+        current_win_rate (float): Win rate over recent trades.
         win_loss_ratio (float): Ratio of average win to average loss.
+        current_win_loss_ratio (float): Win/loss ratio over recent trades.
         number_of_trades (int): Total number of trades executed.
         cumulative_exposure (float): Total exposure over the backtest period.
         exposure_ratio (float): Ratio of exposure to available capital.
@@ -81,7 +83,9 @@ class BacktestSummaryMetrics:
     max_drawdown_duration: int = None
     trades_per_year: float = None
     win_rate: float = None
+    current_win_rate: float = None
     win_loss_ratio: float = None
+    current_win_loss_ratio: float = None
     number_of_trades: int = None
     number_of_trades_closed: int = None
     cumulative_exposure: float = None
@@ -123,7 +127,9 @@ class BacktestSummaryMetrics:
             "max_drawdown_duration": self.max_drawdown_duration,
             "trades_per_year": self.trades_per_year,
             "win_rate": self.win_rate,
+            "current_win_rate": self.current_win_rate,
             "win_loss_ratio": self.win_loss_ratio,
+            "current_win_loss_ratio": self.current_win_loss_ratio,
             "number_of_trades": self.number_of_trades,
             "number_of_trades_closed": self.number_of_trades_closed,
             "cumulative_exposure": self.cumulative_exposure,

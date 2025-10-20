@@ -184,8 +184,16 @@ def generate_backtest_summary_metrics(
         [b.win_rate for b in backtest_metrics],
         [b.total_number_of_days for b in backtest_metrics]
     )
+    current_win_rate = safe_weighted_mean(
+        [b.current_win_rate for b in backtest_metrics],
+        [b.total_number_of_days for b in backtest_metrics]
+    )
     win_loss_ratio = safe_weighted_mean(
         [b.win_loss_ratio for b in backtest_metrics],
+        [b.total_number_of_days for b in backtest_metrics]
+    )
+    current_win_loss_ratio = safe_weighted_mean(
+        [b.current_win_loss_ratio for b in backtest_metrics],
         [b.total_number_of_days for b in backtest_metrics]
     )
     number_of_trades = sum(
@@ -251,7 +259,9 @@ def generate_backtest_summary_metrics(
         max_drawdown_duration=max_drawdown_duration,
         trades_per_year=trades_per_year,
         win_rate=win_rate,
+        current_win_rate=current_win_rate,
         win_loss_ratio=win_loss_ratio,
+        current_win_loss_ratio=current_win_loss_ratio,
         number_of_trades=number_of_trades,
         number_of_trades_closed=number_of_trades_closed,
         cumulative_exposure=cumulative_exposure,
