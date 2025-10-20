@@ -104,8 +104,12 @@ class BacktestMetrics:
             still open at the end of the backtest.
         win_rate (float): The win rate of the trades, expressed
             as a percentage.
+        current_win_rate (float): The current win rate of the trades,
+            including open trades.
         win_loss_ratio (float): The ratio of winning trades
             to losing trades.
+        current_win_loss_ratio (float): The current ratio of winning
+            trades to losing trades, including open trades.
         percentage_winning_months (float): The percentage of months
             with positive returns.
         percentage_winning_years (float): The percentage of years with
@@ -193,7 +197,9 @@ class BacktestMetrics:
     number_of_trades_opened: int = 0
     number_of_trades_open_at_end: int = 0
     win_rate: float = 0.0
+    current_win_rate: float = 0.0
     win_loss_ratio: float = 0.0
+    current_win_loss_ratio: float = 0.0
     percentage_winning_months: float = 0.0
     percentage_winning_years: float = 0.0
     average_monthly_return: float = 0.0
@@ -289,7 +295,9 @@ class BacktestMetrics:
             "number_of_trades_closed": self.number_of_trades_closed,
             "number_of_trades_opened": self.number_of_trades_opened,
             "win_rate": self.win_rate,
+            "current_win_rate": self.current_win_rate,
             "win_loss_ratio": self.win_loss_ratio,
+            "current_win_loss_ratio": self.current_win_loss_ratio,
             "percentage_winning_months": self.percentage_winning_months,
             "percentage_winning_years": self.percentage_winning_years,
             "average_monthly_return": self.average_monthly_return,
