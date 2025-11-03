@@ -1,6 +1,5 @@
 from typing import List
 
-from .backtest import Backtest
 from .backtest_summary_metrics import BacktestSummaryMetrics
 from .backtest_metrics import BacktestMetrics
 
@@ -27,9 +26,7 @@ def safe_weighted_mean(values, weights):
     ) / total_weight if total_weight > 0 else None
 
 
-def combine_backtests(
-    backtests: List[Backtest],
-) -> Backtest:
+def combine_backtests(backtests):
     """
     Combine multiple backtests into a single backtest by aggregating
     their results.
@@ -71,6 +68,8 @@ def combine_backtests(
         if backtest.risk_free_rate is not None:
             risk_free_rate = backtest.risk_free_rate
             break
+
+    from .backtest import Backtest
 
     backtest = Backtest(
         backtest_summary=summary,
