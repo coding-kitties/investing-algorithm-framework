@@ -286,7 +286,6 @@ class Backtest:
                         BacktestPermutationTest.open(perm_test_file)
                     )
 
-
         # Load metadata if available
         meta_file = os.path.join(directory_path, "metadata.json")
 

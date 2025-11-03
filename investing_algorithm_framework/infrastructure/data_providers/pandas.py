@@ -378,7 +378,7 @@ class PandasOHLCVDataProvider(DataProvider):
                             "within the prepared backtest data "
                             f"for data source {data_source.identifier}."
                         )
-                    
+
                     raise OperationalException(
                         "No data available for the "
                         f"date: {backtest_index_date} "
