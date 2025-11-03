@@ -5,7 +5,7 @@ import pandas as pd
 from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
-    TimeUnit, DataType
+    TimeUnit, DataType, PositionSize
 
 
 class EMACrossoverRSIFFilterStrategy(TradingStrategy):
@@ -13,6 +13,7 @@ class EMACrossoverRSIFFilterStrategy(TradingStrategy):
     def __init__(
         self,
         symbols: list[str],
+        trading_symbol: str,
         rsi_timeframe: str,
         rsi_period: int,
         rsi_overbought_threshold,
@@ -46,30 +47,40 @@ class EMACrossoverRSIFFilterStrategy(TradingStrategy):
         self.ema_long_period = ema_long_period
         self.ema_cross_lookback_window = ema_cross_lookback_window
         data_sources = []
+        position_sizes = []
 
-        data_sources.append(
-            DataSource(
-                identifier=f"rsi_data",
-                data_type=DataType.OHLCV,
-                time_frame=self.rsi_timeframe,
-                market=market,
-                symbol="BTC/EUR",
-                pandas=True
+        for symbol in symbols:
+            full_symbol = f"{symbol}/{trading_symbol}"
+            data_sources.append(
+                DataSource(
+                    identifier=f"rsi_data_{symbol}",
+                    data_type=DataType.OHLCV,
+                    time_frame=self.rsi_timeframe,
+                    market=market,
+                    symbol=full_symbol,
+                    pandas=True
+                )
             )
-        )
-        data_sources.append(
-            DataSource(
-                identifier=f"ema_data",
-                data_type=DataType.OHLCV,
-                time_frame=self.ema_timeframe,
-                market=market,
-                symbol="BTC/EUR",
-                pandas=True
+            data_sources.append(
+                DataSource(
+                    identifier=f"ema_data_{symbol}",
+                    data_type=DataType.OHLCV,
+                    time_frame=self.ema_timeframe,
+                    market=market,
+                    symbol=full_symbol,
+                    pandas=True
+                )
             )
-        )
+            position_sizes.append(
+                PositionSize(
+                    symbol=symbol,
+                    percentage_of_portfolio=1 / len(symbols)
+                )
+            )
 
         super().__init__(
             data_sources=data_sources,
+            position_sizes=position_sizes,
             time_unit=time_unit,
             interval=interval,
             metadata=metadata
@@ -115,24 +126,36 @@ class EMACrossoverRSIFFilterStrategy(TradingStrategy):
 
         return ema_data, rsi_data
 
-    def buy_signal_vectorized(self, data: Dict[str, Any]) -> pd.Series:
-        ema_data_identifier = "ema_data"
-        rsi_data_identifier = "rsi_data"
-        ema_data, rsi_data = self.prepare_indicators(
-            ema_data=data[ema_data_identifier],
-            rsi_data=data[rsi_data_identifier]
-        )
+    def generate_buy_signals(
+        self, data: Dict[str, Any]
+    ) -> Dict[str, pd.Series]:
 
-        # use only RSI column
-        rsi_oversold = rsi_data[self.rsi_result_column] \
-                       < self.rsi_oversold_threshold
+        signals = {}
 
-        crossover = ema_data[self.ema_crossover_result_column] \
-            .rolling(window=self.ema_cross_lookback_window).sum() > 0
-        buy_signal = rsi_oversold & crossover
-        return buy_signal.fillna(False).astype(bool)
+        for symbol in self.symbols:
+            ema_data_identifier = f"ema_data_{symbol}"
+            rsi_data_identifier = f"rsi_data_{symbol}"
+            ema_data, rsi_data = self.prepare_indicators(
+                ema_data=data[ema_data_identifier],
+                rsi_data=data[rsi_data_identifier]
+            )
 
-    def sell_signal_vectorized(self, data: Dict[str, Any]) -> pd.Series:
+
+            # use only RSI column
+            rsi_oversold = rsi_data[self.rsi_result_column] \
+                        < self.rsi_oversold_threshold
+
+            crossover = ema_data[self.ema_crossover_result_column] \
+                .rolling(window=self.ema_cross_lookback_window).sum() > 0
+            buy_signal = rsi_oversold & crossover
+            buy_signal = buy_signal.fillna(False).astype(bool)
+            signals[symbol] = buy_signal
+
+        return signals
+
+    def generate_sell_signals(
+        self, data: Dict[str, Any]
+    ) -> Dict[str, pd.Series]:
         """
         Generate sell signals based on the moving average crossover.
 
@@ -142,22 +165,27 @@ class EMACrossoverRSIFFilterStrategy(TradingStrategy):
         Returns:
             pd.Series: Series of sell signals (1 for sell, 0 for no action).
         """
-        ema_data_identifier = "ema_data"
-        rsi_data_identifier = "rsi_data"
-        ema_data, rsi_data = self.prepare_indicators(
-            ema_data=data[ema_data_identifier],
-            rsi_data=data[rsi_data_identifier]
-        )
+        signals = {}
 
-        # # use only RSI column
-        rsi_overbought = rsi_data[self.rsi_result_column] \
-                       >= self.rsi_overbought_threshold
+        for symbol in self.symbols:
+            ema_data_identifier = f"ema_data_{symbol}"
+            rsi_data_identifier = f"rsi_data_{symbol}"
 
-        # Check that within the lookback window there was a crossunder
-        crossunder = ema_data[self.ema_crossunder_result_column] \
-            .rolling(window=self.ema_cross_lookback_window).sum() > 0
+            ema_data, rsi_data = self.prepare_indicators(
+                ema_data=data[ema_data_identifier],
+                rsi_data=data[rsi_data_identifier]
+            )
 
+            # # use only RSI column
+            rsi_overbought = rsi_data[self.rsi_result_column] \
+                        >= self.rsi_overbought_threshold
 
-        # crossunder = ema_data[self.ema_crossunder_result_column].diff() == 1
-        sell_signal = crossunder & rsi_overbought
-        return sell_signal.fillna(False).astype(bool)
+            # Check that within the lookback window there was a crossunder
+            crossunder = ema_data[self.ema_crossunder_result_column] \
+                .rolling(window=self.ema_cross_lookback_window).sum() > 0
+
+            sell_signal = crossunder & rsi_overbought
+            sell_signal = sell_signal.fillna(False).astype(bool)
+            signals[symbol] = sell_signal
+
+        return signals

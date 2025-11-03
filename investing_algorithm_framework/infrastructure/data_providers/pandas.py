@@ -290,17 +290,20 @@ class PandasOHLCVDataProvider(DataProvider):
         backtest_index_date: datetime = None,
         backtest_start_date: datetime = None,
         backtest_end_date: datetime = None,
+        data_source: DataSource = None
     ) -> None:
         """
         Fetches backtest data for a given datasource
 
         Args:
-           backtest_index_date (datetime): The date for which to fetch
+            backtest_index_date (datetime): The date for which to fetch
                backtest data.
-           backtest_start_date (datetime): The start date for the
+            backtest_start_date (datetime): The start date for the
                backtest data.
-           backtest_end_date (datetime): The end date for the
+            backtest_end_date (datetime): The end date for the
                backtest data.
+            data_source (Optional[DataSource]): The data source for which to
+                fetch backtest data.
 
         Returns:
            pl.DataFrame: The backtest data for the given datasource.
@@ -310,6 +313,17 @@ class PandasOHLCVDataProvider(DataProvider):
                 backtest_end_date is not None:
 
             if backtest_start_date < self._start_date_data_source:
+
+                if data_source is not None:
+                    raise OperationalException(
+                        f"Request data date {backtest_end_date} "
+                        f"is after the range of "
+                        f"the available data "
+                        f"{self._start_date_data_source} "
+                        f"- {self._end_date_data_source}."
+                        f" for data source {data_source.identifier}."
+                    )
+
                 raise OperationalException(
                     f"Request data date {backtest_start_date} "
                     f"is before the range of "
@@ -319,6 +333,17 @@ class PandasOHLCVDataProvider(DataProvider):
                 )
 
             if backtest_end_date > self._end_date_data_source:
+
+                if data_source is not None:
+                    raise OperationalException(
+                        f"Request data date {backtest_end_date} "
+                        f"is after the range of "
+                        f"the available data "
+                        f"{self._start_date_data_source} "
+                        f"- {self._end_date_data_source}."
+                        f" for data source {data_source.identifier}."
+                    )
+
                 raise OperationalException(
                     f"Request data date {backtest_end_date} "
                     f"is after the range of "
@@ -345,6 +370,15 @@ class PandasOHLCVDataProvider(DataProvider):
                     )
                     data = self.window_cache[closest_key]
                 except ValueError:
+
+                    if data_source is not None:
+                        raise OperationalException(
+                            "No data available for the "
+                            f"date: {backtest_index_date} "
+                            "within the prepared backtest data "
+                            f"for data source {data_source.identifier}."
+                        )
+                    
                     raise OperationalException(
                         "No data available for the "
                         f"date: {backtest_index_date} "

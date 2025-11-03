@@ -156,7 +156,6 @@ class DataProviderIndex:
                 f"provider for the defined datasource. If you are using a "
                 "custom data provider, make sure it has a "
                 "data_provider_identifier set"
-
             )
 
         # Sort by priority and pick the best one (lowest priority first)
@@ -553,6 +552,7 @@ class DataProviderService:
             backtest_index_date=backtest_index_date,
             backtest_start_date=start_date,
             backtest_end_date=end_date,
+            data_source=data_source
         )
 
     def get_vectorized_backtest_data(

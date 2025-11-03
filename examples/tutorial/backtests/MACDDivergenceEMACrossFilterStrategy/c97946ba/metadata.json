@@ -1,0 +1,17 @@
+{
+    "params": {
+        "close_timeframe": "2h",
+        "macd_timeframe": "2h",
+        "macd_short_period": 12,
+        "macd_long_period": 26,
+        "macd_signal_period": 9,
+        "ema_timeframe": "4h",
+        "ema_short_period": 50,
+        "ema_long_period": 100,
+        "ema_cross_lookback_window": 168,
+        "number_of_neighbors_to_compare": 3,
+        "min_consecutive": 2,
+        "divergence_lookback_window_size": 12
+    },
+    "id": "c97946ba"
+}

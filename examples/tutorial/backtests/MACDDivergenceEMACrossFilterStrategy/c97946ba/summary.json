@@ -1,0 +1,22 @@
+{
+    "total_net_gain": -308.8692671762445,
+    "total_net_gain_percentage": -0.30886926717624447,
+    "gross_loss": 46265.0,
+    "growth": -308.8692671762445,
+    "growth_percentage": -0.30886926717624447,
+    "trades_average_return": 149.19128787878788,
+    "cagr": -0.17320500098666272,
+    "sharpe_ratio": -0.2574612762731505,
+    "sortino_ratio": -0.336585983691573,
+    "calmar_ratio": -0.25038054112464303,
+    "profit_factor": 1.19941972831242,
+    "annual_volatility": 0.46009878534454796,
+    "max_drawdown": 0.6739576184327103,
+    "max_drawdown_duration": 6423,
+    "trades_per_year": 9.756678082191781,
+    "win_rate": 0.6912878787878788,
+    "win_loss_ratio": 0.5118973713361823,
+    "number_of_trades": 56,
+    "cumulative_exposure": 0.8569063926940639,
+    "exposure_ratio": 0.8569063926940639
+}

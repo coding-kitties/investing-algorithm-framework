@@ -24,3 +24,6 @@ class TestGenerateMetrics(TestCase):
         backtest_metrics = create_backtest_metrics(
             backtest_run, risk_free_rate=0.024
         )
+        print(backtest_metrics.win_rate)
+        print(backtest_metrics.win_loss_ratio)
+        print(backtest_metrics.profit_factor)

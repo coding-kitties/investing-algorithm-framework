@@ -240,6 +240,7 @@ class DataProvider(ABC):
         backtest_index_date: datetime,
         backtest_start_date: datetime = None,
         backtest_end_date: datetime = None,
+        data_source: DataSource = None,
     ) -> Any:
         """
         Fetches backtest data for a given datasource
@@ -251,6 +252,10 @@ class DataProvider(ABC):
                 backtest data.
             backtest_end_date (datetime): The end date for the
                 backtest data.
+            data_source (Optional[DataSource]): The data source
+                specification that is used to fetch the data.
+                This param is optional and can be used to
+                help identify errors in data fetching.
 
         Returns:
             Any: The data for the given symbol and date range.

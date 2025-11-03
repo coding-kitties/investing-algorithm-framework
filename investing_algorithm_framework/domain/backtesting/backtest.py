@@ -14,6 +14,7 @@ from .backtest_run import BacktestRun
 from .backtest_permutation_test import BacktestPermutationTest
 from .backtest_date_range import BacktestDateRange
 from .backtest_summary_metrics import BacktestSummaryMetrics
+from .combine_backtests import generate_backtest_summary_metrics
 
 
 logger = getLogger(__name__)
@@ -177,13 +178,19 @@ class Backtest:
         }
 
     @staticmethod
-    def open(directory_path: Union[str, Path]) -> 'Backtest':
+    def open(
+        directory_path: Union[str, Path],
+        backtest_date_ranges: List[BacktestDateRange] = None
+    ) -> 'Backtest':
         """
         Open a backtest report from a directory and return a Backtest instance.
 
         Args:
             directory_path (str): The path to the directory containing the
                 backtest report files.
+            backtest_date_ranges (List[BacktestDateRange], optional): A list of
+                date ranges to filter the backtest runs. If provided, only
+                backtest runs matching these date ranges will be loaded.
 
         Returns:
             Backtest: An instance of Backtest with the loaded metrics
@@ -214,13 +221,59 @@ class Backtest:
                 except json.JSONDecodeError as e:
                     logger.error(f"Error decoding id JSON: {e}")
                     id = None
-        # Load combined backtest metrics if available
 
-        summary_file = os.path.join(directory_path, "summary.json")
+        # Load all backtest runs
+        runs_dir = os.path.join(directory_path, "runs")
 
-        if os.path.isfile(summary_file):
+        if os.path.isdir(runs_dir):
+            for dir_name in os.listdir(runs_dir):
+                run_path = os.path.join(runs_dir, dir_name)
+                if os.path.isdir(run_path):
+
+                    if backtest_date_ranges is not None:
+                        temp_run = BacktestRun.open(run_path)
+                        match_found = False
+
+                        for date_range in backtest_date_ranges:
+                            if (
+                                temp_run.backtest_start_date ==
+                                date_range.start_date and
+                                temp_run.backtest_end_date ==
+                                date_range.end_date
+                            ):
+
+                                if date_range.name is not None:
+                                    if (
+                                        temp_run.backtest_date_range_name ==
+                                        date_range.name
+                                    ):
+                                        match_found = True
+                                        break
+                                else:
+                                    match_found = True
+                                    break
+
+                        if not match_found:
+                            continue
+
+                    backtest_runs.append(BacktestRun.open(run_path))
+
+        # Load combined backtests summary
+        if backtest_date_ranges is not None:
+            summary_file = os.path.join(directory_path, "summary.json")
+
+            if os.path.isfile(summary_file):
+                backtest_summary_metrics = \
+                    BacktestSummaryMetrics.open(summary_file)
+        else:
+            # Generate new summary from loaded backtest runs
+            temp_metrics = []
+            for br in backtest_runs:
+                if br.backtest_metrics:
+                    temp_metrics.append(br.backtest_metrics)
+
             backtest_summary_metrics = \
-                BacktestSummaryMetrics.open(summary_file)
+                generate_backtest_summary_metrics(temp_metrics)
 
         # Load backtest permutation test metrics
         perm_test_dir = os.path.join(directory_path, "permutation_tests")
@@ -233,14 +286,6 @@ class Backtest:
                         BacktestPermutationTest.open(perm_test_file)
                     )
 
-        # Load all backtest runs
-        runs_dir = os.path.join(directory_path, "runs")
-
-        if os.path.isdir(runs_dir):
-            for dir_name in os.listdir(runs_dir):
-                run_path = os.path.join(runs_dir, dir_name)
-                if os.path.isdir(run_path):
-                    backtest_runs.append(BacktestRun.open(run_path))
 
         # Load metadata if available
         meta_file = os.path.join(directory_path, "metadata.json")

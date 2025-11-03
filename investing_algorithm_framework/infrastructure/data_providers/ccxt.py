@@ -386,7 +386,8 @@ class CCXTOHLCVDataProvider(DataProvider):
         self,
         backtest_index_date: datetime,
         backtest_start_date: datetime = None,
-        backtest_end_date: datetime = None
+        backtest_end_date: datetime = None,
+        data_source: DataSource = None
     ) -> None:
         """
         Fetches backtest data for a given datasource
@@ -398,6 +399,8 @@ class CCXTOHLCVDataProvider(DataProvider):
                 backtest data.
             backtest_end_date (datetime): The end date for the
                 backtest data.
+            data_source (Optional[Datasource]): The data source for which to
+                fetch backtest data. Defaults to None.
 
         Returns:
             pl.DataFrame: The backtest data for the given datasource.
@@ -407,6 +410,17 @@ class CCXTOHLCVDataProvider(DataProvider):
                 backtest_end_date is not None:
 
             if backtest_start_date < self._start_date_data_source:
+
+                if data_source is not None:
+                    raise OperationalException(
+                        f"Request data date {backtest_start_date} "
+                        f"is before the range of "
+                        f"the available data "
+                        f"{self._start_date_data_source} "
+                        f"- {self._end_date_data_source}."
+                        f" for data source {data_source.identifier}."
+                    )
+
                 raise OperationalException(
                     f"Request data date {backtest_start_date} "
                     f"is before the range of "
@@ -416,6 +430,17 @@ class CCXTOHLCVDataProvider(DataProvider):
                 )
 
             if backtest_end_date > self._end_date_data_source:
+
+                if data_source is not None:
+                    raise OperationalException(
+                        f"Request data date {backtest_end_date} "
+                        f"is after the range of "
+                        f"the available data "
+                        f"{self._start_date_data_source} "
+                        f"- {self._end_date_data_source}."
+                        f" for data source {data_source.identifier}."
+                    )
+
                 raise OperationalException(
                     f"Request data date {backtest_end_date} "
                     f"is after the range of "
@@ -442,6 +467,15 @@ class CCXTOHLCVDataProvider(DataProvider):
                     )
                     data = self.window_cache[closest_key]
                 except ValueError:
+
+                    if data_source is not None:
+                        raise OperationalException(
+                            "No OHLCV data available for the "
+                            f"date: {backtest_index_date} "
+                            f"within the prepared backtest data "
+                            f"for data source {data_source.identifier}. "
+                        )
+
                     raise OperationalException(
                         "No OHLCV data available for the "
                         f"date: {backtest_index_date} "
