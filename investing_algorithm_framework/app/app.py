@@ -801,6 +801,7 @@ class App:
         show_progress: bool = True,
         market: Optional[str] = None,
         trading_symbol: Optional[str] = None,
+        continue_on_error: bool = False,
     ) -> List[Backtest]:
         """
         Run vectorized backtests for a set of strategies. The provided
@@ -848,6 +849,10 @@ class App:
             trading_symbol (str): The trading symbol to use for the backtest.
                 This is used to create a portfolio configuration if no
                 portfolio configuration is provided in the strategy.
+            continue_on_error (bool): Whether to continue running other
+                backtests if an error occurs in one of the backtests. If set
+                to True, the backtest will return an empty Backtest instance
+                in case of an error. If set to False, the error will be raised.
 
         Returns:
             List[Backtest]: List of Backtest instances for each strategy
@@ -956,7 +961,8 @@ class App:
         show_data_initialization_progress: bool = True,
         initial_amount: float = None,
         market: str = None,
-        trading_symbol: str = None
+        trading_symbol: str = None,
+        continue_on_error: bool = False,
     ) -> Backtest:
         """
         Run vectorized backtests for a strategy. The provided
@@ -1008,6 +1014,10 @@ class App:
                 that the portfolio will start with. If not provided,
                 the initial amount from the portfolio configuration will
                 be used.
+            continue_on_error (bool): Whether to continue running other
+                backtests if an error occurs in one of the backtests. If set
+                to True, the backtest will return an empty Backtest instance
+                in case of an error. If set to False, the error will be raised.
 
         Returns:
             Backtest: Instance of Backtest
@@ -1040,21 +1050,36 @@ class App:
 
         backtest_service = self.container.backtest_service()
         backtest_service.validate_strategy_for_vector_backtest(strategy)
-        run = backtest_service.create_vector_backtest(
-            strategy=strategy,
-            backtest_date_range=backtest_date_range,
-            risk_free_rate=risk_free_rate,
-            market=market,
-            trading_symbol=trading_symbol,
-            initial_amount=initial_amount
-        )
-        backtest = Backtest(
-            backtest_runs=[run],
-            risk_free_rate=risk_free_rate,
-            backtest_summary=generate_backtest_summary_metrics(
-                [run.backtest_metrics]
+
+        try:
+            run = backtest_service.create_vector_backtest(
+                strategy=strategy,
+                backtest_date_range=backtest_date_range,
+                risk_free_rate=risk_free_rate,
+                market=market,
+                trading_symbol=trading_symbol,
+                initial_amount=initial_amount
             )
-        )
+            backtest = Backtest(
+                backtest_runs=[run],
+                risk_free_rate=risk_free_rate,
+                backtest_summary=generate_backtest_summary_metrics(
+                    [run.backtest_metrics]
+                )
+            )
+        except Exception as e:
+            logger.error(
+                f"Error occurred during vector backtest for strategy "
+                f"{strategy.name}: {str(e)}"
+            )
+            if continue_on_error:
+                backtest = Backtest(
+                    backtest_runs=[],
+                    risk_free_rate=risk_free_rate,
+                    backtest_summary={}
+                )
+            else:
+                raise e
 
         # Add the metadata to the backtest
         if metadata is None:
