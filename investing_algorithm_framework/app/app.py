@@ -835,7 +835,8 @@ class App:
                     )
                     df = df.copy()
                     df['Datetime'] = pd.to_datetime(df['Datetime'])
-                    df = df.sort_values('Datetime').tail(data_source.window_size)
+                    df = df.sort_values('Datetime')\
+                        .tail(data_source.window_size)
                     start = df['Datetime'].iloc[0]
                     end = df['Datetime'].iloc[-1]
                     freq = pd.to_timedelta(data_source.time_frame.value)
