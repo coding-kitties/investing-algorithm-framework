@@ -84,3 +84,20 @@ class NetworkError(Exception):
             "status": "error",
             "message": self.error_message
         }
+
+
+class DataError(Exception):
+    """
+    Class DataError: Exception class indicating a problem occurred
+    during data retrieval or processing
+    """
+
+    def __init__(self, message) -> None:
+        super(DataError, self).__init__(message)
+        self.error_message = message
+
+    def to_response(self):
+        return {
+            "status": "error",
+            "message": self.error_message
+        }

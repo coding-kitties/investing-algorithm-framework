@@ -15,7 +15,7 @@ from .constants import ITEMIZE, ITEMIZED, PER_PAGE, PAGE, ENVIRONMENT, \
 from .data_provider import DataProvider
 from .data_structures import PeekableQueue
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
-from .exceptions import OperationalException, ApiException, \
+from .exceptions import OperationalException, ApiException, DataError, \
     PermissionDeniedApiException, ImproperlyConfigured, NetworkError
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, PortfolioConfiguration, Portfolio, Position, \
@@ -143,5 +143,6 @@ __all__ = [
     "BacktestEvaluationFocus",
     'combine_backtests',
     'PositionSize',
-    'generate_backtest_summary_metrics'
+    'generate_backtest_summary_metrics',
+    'DataError'
 ]

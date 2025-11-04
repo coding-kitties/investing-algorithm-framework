@@ -10,7 +10,7 @@ from .app import App, Algorithm, \
     get_ohlcv_data_completeness_chart, get_equity_curve_chart
 from .domain import ApiException, combine_backtests, PositionSize, \
     OrderType, OperationalException, OrderStatus, OrderSide, \
-    TimeUnit, TimeInterval, Order, Portfolio, Backtest, \
+    TimeUnit, TimeInterval, Order, Portfolio, Backtest, DataError, \
     Position, TimeFrame, INDEX_DATETIME, MarketCredential, \
     PortfolioConfiguration, RESOURCE_DIRECTORY, AWS_LAMBDA_LOGGING_CONFIG, \
     Trade, SYMBOLS, RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT, \
@@ -191,5 +191,6 @@ __all__ = [
     "get_number_of_trades",
     "BacktestRun",
     "load_backtests_from_directory",
-    "save_backtests_to_directory"
+    "save_backtests_to_directory",
+    "DataError"
 ]

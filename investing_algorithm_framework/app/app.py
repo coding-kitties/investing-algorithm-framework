@@ -5,6 +5,7 @@ import threading
 from datetime import datetime, timezone
 from typing import List, Optional, Any, Dict, Tuple
 
+import pandas as pd
 from flask import Flask
 
 from investing_algorithm_framework.app.algorithm import Algorithm
@@ -16,7 +17,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     SQLALCHEMY_DATABASE_URI, OperationalException, StateHandler, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, APP_MODE, MarketCredential, \
     AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, DataSource, \
-    BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, Backtest, \
+    BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, Backtest, DataError, \
     PortfolioConfiguration, SnapshotInterval, DataType, combine_backtests, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestPermutationTest, \
@@ -31,6 +32,7 @@ from investing_algorithm_framework.services import OrderBacktestService, \
 from .app_hook import AppHook
 from .eventloop import EventLoopService
 from .analysis import create_ohlcv_permutation
+
 
 logger = logging.getLogger("investing_algorithm_framework")
 COLOR_RESET = '\033[0m'
@@ -788,6 +790,69 @@ class App:
         market_credential_service = self.container \
             .market_credential_service()
         return market_credential_service.get_all()
+
+    def check_data_completeness(
+        self,
+        strategies: List[TradingStrategy],
+        backtest_date_range: BacktestDateRange
+    ) -> None:
+        """
+        Function to check the data completeness for a set of strategies
+        over a given backtest date range. This method checks if all data
+        sources required by the strategies have complete data for the
+        specified date range.
+
+        Args:
+            strategies (List[TradingStrategy]): List of strategy objects
+                to check data completeness for.
+            backtest_date_range (BacktestDateRange): The date range to
+                check data completeness for.
+        Returns:
+            None
+        """
+        data_sources = []
+
+        for strategy in strategies:
+            data_sources.extend(strategy.data_sources)
+
+        self.initialize_data_sources_backtest(
+            data_sources,
+            backtest_date_range,
+            show_progress=True
+        )
+        data_provider_service = self.container.data_provider_service()
+
+        for strategy in strategies:
+
+            for data_source in strategy.data_sources:
+
+                if DataType.OHLCV.equals(data_source.data_type):
+                    df = data_provider_service.get_ohlcv_data(
+                        symbol=data_source.symbol,
+                        start_date=backtest_date_range.start_date,
+                        end_date=backtest_date_range.end_date,
+                        pandas=True
+                    )
+                    df = df.copy()
+                    df['Datetime'] = pd.to_datetime(df['Datetime'])
+                    df = df.sort_values('Datetime').tail(data_source.window_size)
+                    start = df['Datetime'].iloc[0]
+                    end = df['Datetime'].iloc[-1]
+                    freq = pd.to_timedelta(data_source.time_frame.value)
+                    expected = pd.date_range(start, end, freq=freq)
+                    actual = df['Datetime']
+                    missing = expected.difference(actual)
+
+                    # Calculate the percentage completeness
+                    completeness = len(actual) / len(expected) * 100
+
+                    if completeness < 100:
+                        raise DataError(
+                            f"Data completeness for data source "
+                            f"{data_source.data_provider_identifier} "
+                            f"({data_source.symbol}) is {completeness:.2f}% "
+                            f"complete. Missing data points: {len(missing)}"
+                        )
 
     def run_vector_backtests(
         self,
