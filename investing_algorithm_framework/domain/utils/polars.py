@@ -6,6 +6,7 @@ def convert_polars_to_pandas(
     data: PolarsDataFrame,
     remove_duplicates=True,
     add_index=True,
+    add_datetime_column=True,
     datetime_column_name="Datetime"
 ):
     """
@@ -21,6 +22,8 @@ def convert_polars_to_pandas(
         dates will be removed from the dataframe
         add_index: Boolean - If set to true, an index will
             be added to the dataframe
+        add_datetime_column: Boolean - If set to true, a datetime
+            column will be added to the dataframe
         datetime_column_name: String - the column name that has the
             datetime object. By default this is set to column name Datetime
             This is only used if add_index is set to True
@@ -34,6 +37,9 @@ def convert_polars_to_pandas(
         raise ValueError("Data must be a Polars DataFrame")
 
     df = data.to_pandas().copy()
+
+    if add_datetime_column and datetime_column_name not in df.columns:
+        df[datetime_column_name] = pd.to_datetime(df.index)
 
     # Ensure datetime column is datetime type
     df[datetime_column_name] = pd.to_datetime(df[datetime_column_name])

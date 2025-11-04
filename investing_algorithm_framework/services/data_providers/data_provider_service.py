@@ -494,6 +494,7 @@ class DataProviderService:
         window_size: Optional[int] = None,
         pandas: bool = False,
         add_pandas_index: bool = True,
+        add_datetime_column: bool = False,
     ):
         """
         Function to get OHLCV data from the data provider.
@@ -507,6 +508,10 @@ class DataProviderService:
             end_date (datetime): The end date for the OHLCV data.
             window_size (int): The window size for the OHLCV data.
             pandas (bool): Whether to return the data as a pandas DataFrame.
+            add_pandas_index (bool): Whether to add a pandas index to
+                the DataFrame if pandas is True.
+            add_datetime_column (bool): Whether to add a datetime column
+                to the DataFrame if pandas is True.
 
         Returns:
             DataFrame: The OHLCV data for the given symbol and market.
@@ -544,7 +549,9 @@ class DataProviderService:
         if pandas:
             if isinstance(data, pl.DataFrame):
                 return convert_polars_to_pandas(
-                    data, add_index=add_pandas_index
+                    data,
+                    add_index=add_pandas_index,
+                    add_datetime_column=add_datetime_column
                 )
             else:
                 return data

@@ -833,6 +833,7 @@ class App:
                         end_date=backtest_date_range.end_date,
                         pandas=True,
                         add_pandas_index=False,
+                        add_datetime_column=True,
                         time_frame=data_source.time_frame
                     )
                     df = df.copy()
