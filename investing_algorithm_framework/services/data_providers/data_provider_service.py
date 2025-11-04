@@ -7,7 +7,7 @@ from typing import List, Tuple, Optional, Dict, Any
 
 from investing_algorithm_framework.domain import DataProvider, \
     OperationalException, ImproperlyConfigured, DataSource, DataType, \
-    BacktestDateRange, tqdm, convert_polars_to_pandas
+    BacktestDateRange, tqdm, convert_polars_to_pandas, TimeFrame
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -26,6 +26,7 @@ class DataProviderIndex:
         self.data_providers_lookup = defaultdict()
         self.ohlcv_data_providers = defaultdict()
         self.ohlcv_data_providers_no_market = defaultdict()
+        self.ohlcv_data_providers_with_timeframe = defaultdict()
         self.ticker_data_providers = defaultdict()
 
     def add(self, data_provider: DataProvider):
@@ -80,11 +81,15 @@ class DataProviderIndex:
 
         symbol = data_source.symbol
         market = data_source.market
+        time_frame = data_source.time_frame
 
         if DataType.OHLCV.equals(data_source.data_type):
             if symbol not in self.ohlcv_data_providers:
                 self.ohlcv_data_providers[(symbol, market)] = best_provider
                 self.ohlcv_data_providers_no_market[symbol] = best_provider
+                self.ohlcv_data_providers_with_timeframe[
+                    (symbol, market, time_frame)
+                ] = best_provider
             else:
                 try:
                     # If the symbol already exists, we can update the provider
@@ -104,6 +109,11 @@ class DataProviderIndex:
                     if existing_provider.time_frame > best_provider.time_frame:
                         self.ohlcv_data_providers_no_market[symbol] =\
                             best_provider
+
+                    time_frame_key = (symbol, market, time_frame)
+                    self.ohlcv_data_providers_with_timeframe[
+                        time_frame_key
+                    ] = best_provider
 
                 except Exception:
                     # If the existing provider does not have a time_frame
@@ -165,12 +175,16 @@ class DataProviderIndex:
 
         symbol = data_source.symbol
         market = data_source.market
+        time_frame = data_source.time_frame
 
         if DataType.OHLCV.equals(data_source.data_type):
 
             if symbol not in self.ohlcv_data_providers:
                 self.ohlcv_data_providers[(symbol, market)] = best_provider
                 self.ohlcv_data_providers_no_market[symbol] = best_provider
+                self.ohlcv_data_providers_with_timeframe[
+                    (symbol, market, time_frame)
+                ] = best_provider
             else:
                 try:
                     # If the symbol already exists, we can update the provider
@@ -191,6 +205,11 @@ class DataProviderIndex:
                     if existing_provider.time_frame > best_provider.time_frame:
                         self.ohlcv_data_providers_no_market[symbol] = \
                             best_provider
+
+                    time_frame_key = (symbol, market, data_source.time_frame)
+                    self.ohlcv_data_providers_with_timeframe[
+                        time_frame_key
+                    ] = best_provider
 
                 except Exception:
                     # If the existing provider does not have a time_frame
@@ -264,7 +283,10 @@ class DataProviderIndex:
         return len(self.data_providers_lookup)
 
     def get_ohlcv_data_provider(
-        self, symbol: str, market: Optional[str] = None
+        self,
+        symbol: str,
+        market: Optional[str] = None,
+        time_frame: Optional[str] = None
     ) -> Optional[DataProvider]:
         """
         Get the OHLCV data provider for a given symbol and market.
@@ -272,11 +294,19 @@ class DataProviderIndex:
         Args:
             symbol (str): The symbol to get the data provider for.
             market (Optional[str]): The market to get the data provider for.
+            time_frame (Optional[str]): The time frame to get the
+                data provider for.
 
         Returns:
             DataProvider: The OHLCV data provider for the symbol and market,
                 or None if no provider is found.
         """
+
+        if market is not None and time_frame is not None:
+            time_frame = TimeFrame.from_value(time_frame)
+            return self.ohlcv_data_providers_with_timeframe.get(
+                (symbol, market, time_frame), None
+            )
 
         if market is None:
             # If no market is specified
@@ -462,7 +492,8 @@ class DataProviderService:
         start_date: Optional[datetime] = None,
         end_date: Optional[datetime] = None,
         window_size: Optional[int] = None,
-        pandas: bool = False
+        pandas: bool = False,
+        add_pandas_index: bool = True,
     ):
         """
         Function to get OHLCV data from the data provider.
@@ -483,6 +514,7 @@ class DataProviderService:
         data_provider = self.data_provider_index.get_ohlcv_data_provider(
             symbol=symbol,
             market=market,
+            time_frame=time_frame
         )
 
         if data_provider is None:
@@ -511,7 +543,9 @@ class DataProviderService:
 
         if pandas:
             if isinstance(data, pl.DataFrame):
-                return convert_polars_to_pandas(data)
+                return convert_polars_to_pandas(
+                    data, add_index=add_pandas_index
+                )
             else:
                 return data
 

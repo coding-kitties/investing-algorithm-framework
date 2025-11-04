@@ -831,7 +831,9 @@ class App:
                         symbol=data_source.symbol,
                         start_date=backtest_date_range.start_date,
                         end_date=backtest_date_range.end_date,
-                        pandas=True
+                        pandas=True,
+                        add_pandas_index=False,
+                        time_frame=data_source.time_frame
                     )
                     df = df.copy()
                     df['Datetime'] = pd.to_datetime(df['Datetime'])
