@@ -256,14 +256,20 @@ class BacktestRun:
 
             if backtest_start_date.tzinfo is None:
                 # Naive datetime - treat as UTC
-                backtest_start_date = backtest_start_date.replace(tzinfo=timezone.utc)
+                backtest_start_date = backtest_start_date.replace(
+                    tzinfo=timezone.utc
+                )
             else:
                 # Timezone-aware - convert to UTC
-                backtest_start_date = backtest_start_date.astimezone(timezone.utc)
+                backtest_start_date = backtest_start_date.astimezone(
+                    timezone.utc
+                )
 
             backtest_end_date = self.backtest_end_date
             if backtest_end_date.tzinfo is None:
-                backtest_end_date = backtest_end_date.replace(tzinfo=timezone.utc)
+                backtest_end_date = backtest_end_date.replace(
+                    tzinfo=timezone.utc
+                )
             else:
                 backtest_end_date = backtest_end_date.astimezone(timezone.utc)
 

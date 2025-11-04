@@ -9,6 +9,7 @@ from investing_algorithm_framework.domain import Backtest
 
 logger = getLogger("investing_algorithm_framework")
 
+
 def save_backtests_to_directory(
     backtests: List[Backtest],
     directory_path: Union[str, Path]
@@ -24,7 +25,6 @@ def save_backtests_to_directory(
     Returns:
         None
     """
-
 
     if not os.path.exists(directory_path):
         os.makedirs(directory_path)
