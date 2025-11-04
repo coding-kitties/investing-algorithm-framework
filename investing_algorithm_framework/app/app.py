@@ -850,7 +850,7 @@ class App:
                     if completeness < 100:
                         raise DataError(
                             f"Data completeness for data source "
-                            f"{data_source.data_provider_identifier} "
+                            f"{data_source.identifier} "
                             f"({data_source.symbol}) is {completeness:.2f}% "
                             f"complete. Missing data points: {len(missing)}"
                         )
