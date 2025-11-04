@@ -251,17 +251,35 @@ class BacktestRun:
             # Remove backtest_metrics to avoid redundancy
             data.pop("backtest_metrics", None)
 
-            data["backtest_start_date"] = self.backtest_start_date.strftime(
+            # Ensure datetime objects are in UTC before formatting
+            backtest_start_date = self.backtest_start_date
+
+            if backtest_start_date.tzinfo is None:
+                # Naive datetime - treat as UTC
+                backtest_start_date = backtest_start_date.replace(tzinfo=timezone.utc)
+            else:
+                # Timezone-aware - convert to UTC
+                backtest_start_date = backtest_start_date.astimezone(timezone.utc)
+
+            backtest_end_date = self.backtest_end_date
+            if backtest_end_date.tzinfo is None:
+                backtest_end_date = backtest_end_date.replace(tzinfo=timezone.utc)
+            else:
+                backtest_end_date = backtest_end_date.astimezone(timezone.utc)
+
+            created_at = self.created_at
+            if created_at.tzinfo is None:
+                created_at = created_at.replace(tzinfo=timezone.utc)
+            else:
+                created_at = created_at.astimezone(timezone.utc)
+
+            data["backtest_start_date"] = backtest_start_date.strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
-            data["backtest_end_date"] = self.backtest_end_date.strftime(
+            data["backtest_end_date"] = backtest_end_date.strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
-
-            if self.created_at.tzinfo is None:
-                self.created_at = self.created_at.replace(tzinfo=timezone.utc)
-
-            data["created_at"] = self.created_at.strftime(
+            data["created_at"] = created_at.strftime(
                 "%Y-%m-%d %H:%M:%S"
             )
             json.dump(data, f, default=str)

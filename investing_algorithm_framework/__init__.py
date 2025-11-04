@@ -1,9 +1,9 @@
 from .app import App, Algorithm, \
     TradingStrategy, StatelessAction, Task, AppHook, Context, \
-    add_html_report, BacktestReport, \
+    add_html_report, BacktestReport, save_backtests_to_directory, \
     pretty_print_trades, pretty_print_positions, \
     pretty_print_orders, pretty_print_backtest, select_backtest_date_ranges, \
-    get_equity_curve_with_drawdown_chart, \
+    get_equity_curve_with_drawdown_chart, load_backtests_from_directory, \
     get_rolling_sharpe_ratio_chart, rank_results, \
     get_monthly_returns_heatmap_chart, create_weights, \
     get_yearly_returns_bar_chart, get_entry_and_exit_signals, \
@@ -189,5 +189,7 @@ __all__ = [
     "get_negative_trades",
     "get_positive_trades",
     "get_number_of_trades",
-    "BacktestRun"
+    "BacktestRun",
+    "load_backtests_from_directory",
+    "save_backtests_to_directory"
 ]

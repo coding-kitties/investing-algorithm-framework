@@ -1070,13 +1070,12 @@ class App:
         except Exception as e:
             logger.error(
                 f"Error occurred during vector backtest for strategy "
-                f"{strategy.name}: {str(e)}"
+                f"{strategy.strategy_id}: {str(e)}"
             )
             if continue_on_error:
                 backtest = Backtest(
                     backtest_runs=[],
                     risk_free_rate=risk_free_rate,
-                    backtest_summary={}
                 )
             else:
                 raise e
