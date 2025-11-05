@@ -37,7 +37,8 @@ class DataProviderTest(DataProvider):
         self,
         backtest_index_date: datetime,
         backtest_start_date: datetime = None,
-        backtest_end_date: datetime = None
+        backtest_end_date: datetime = None,
+        data_source: DataSource = None,
     ):
         return "provided"
 
