@@ -881,8 +881,8 @@ class App:
                             f"({data_source.symbol}): {str(e)}"
                         )
 
-                    if len(missing_data_info.keys()) > 0:
-                        return False, missing_data_info
+        if len(missing_data_info.keys()) > 0:
+            return False, missing_data_info
 
         return True, missing_data_info
 
