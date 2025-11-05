@@ -445,7 +445,9 @@ class CCXTOHLCVDataProvider(DataProvider):
                         f"the available data "
                         f"{self._start_date_data_source} "
                         f"- {self._end_date_data_source}."
-                        f" for data source {data_source.identifier}.",
+                        f" for data source {data_source.identifier}."
+                        f" Data source file path: "
+                        f"{self.get_data_source_file_path()}"
                     )
 
                 raise OperationalException(
@@ -453,7 +455,9 @@ class CCXTOHLCVDataProvider(DataProvider):
                     f"is before the range of "
                     f"the available data "
                     f"{self._start_date_data_source} "
-                    f"- {self._end_date_data_source}.",
+                    f"- {self._end_date_data_source}."
+                    f" Data source file path: "
+                    f"{self.get_data_source_file_path()}"
                 )
 
             if backtest_end_date > self._end_date_data_source:
@@ -466,6 +470,8 @@ class CCXTOHLCVDataProvider(DataProvider):
                         f"{self._start_date_data_source} "
                         f"- {self._end_date_data_source}."
                         f" for data source {data_source.identifier}."
+                        f" Data source file path: "
+                        f"{self.get_data_source_file_path()}"
                     )
 
                 raise OperationalException(
@@ -474,6 +480,8 @@ class CCXTOHLCVDataProvider(DataProvider):
                     f"the available data "
                     f"{self._start_date_data_source} "
                     f"- {self._end_date_data_source}."
+                    f" Data source file path: "
+                    f"{self.get_data_source_file_path()}"
                 )
 
             data = self.data.filter(
