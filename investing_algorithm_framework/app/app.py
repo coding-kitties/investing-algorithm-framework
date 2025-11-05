@@ -857,7 +857,7 @@ class App:
                                 required_start_date,
                                 backtest_date_range.end_date
                             )
-                        if number_of_available_data_points > 0:
+                        if len(missing_dates) > 0:
                             missing_data_info[data_source.identifier] = {
                                 "data_source_id": data_source.identifier,
                                 "completeness_percentage": (
