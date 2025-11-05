@@ -257,13 +257,12 @@ class CCXTOHLCVDataProvider(DataProvider):
                 end_date=backtest_end_date
             )
 
+        n_min = TimeFrame.from_value(self.time_frame).amount_of_minutes
         # Assume self.data is a Polars DataFrame with a "Datetime" column
         expected_dates = pl.datetime_range(
             start=required_start_date,
             end=backtest_end_date,
-            interval=f"{
-                TimeFrame.from_value(self.time_frame).amount_of_minutes
-            }m",
+            interval=f"{n_min}m",
             eager=True
         ).to_list()
 
