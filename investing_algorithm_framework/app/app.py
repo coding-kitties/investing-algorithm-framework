@@ -2,10 +2,9 @@ import inspect
 import logging
 import os
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Any, Dict, Tuple
 
-import pandas as pd
 from flask import Flask
 
 from investing_algorithm_framework.app.algorithm import Algorithm
@@ -19,7 +18,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, DataSource, \
     BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, Backtest, DataError, \
     PortfolioConfiguration, SnapshotInterval, DataType, combine_backtests, \
-    PortfolioProvider, OrderExecutor, ImproperlyConfigured, \
+    PortfolioProvider, OrderExecutor, ImproperlyConfigured, TimeFrame, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestPermutationTest, \
     LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, generate_backtest_summary_metrics
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
@@ -794,8 +793,9 @@ class App:
     def check_data_completeness(
         self,
         strategies: List[TradingStrategy],
-        backtest_date_range: BacktestDateRange
-    ) -> None:
+        backtest_date_range: BacktestDateRange,
+        show_progress: bool = True
+    ) -> Tuple[bool, Dict[str, Any]]:
         """
         Function to check the data completeness for a set of strategies
         over a given backtest date range. This method checks if all data
@@ -807,10 +807,15 @@ class App:
                 to check data completeness for.
             backtest_date_range (BacktestDateRange): The date range to
                 check data completeness for.
+            show_progress (bool): Whether to show a progress bar when
+                checking data completeness.
         Returns:
-            None
+            Tuple[bool, Dict[str, Any]]: A tuple containing a boolean
+                indicating if the data is complete and a dictionary
+                with information about missing data for each data source.
         """
         data_sources = []
+        missing_data_info = {}
 
         for strategy in strategies:
             data_sources.extend(strategy.data_sources)
@@ -818,7 +823,7 @@ class App:
         self.initialize_data_sources_backtest(
             data_sources,
             backtest_date_range,
-            show_progress=True
+            show_progress=show_progress
         )
         data_provider_service = self.container.data_provider_service()
 
@@ -827,36 +832,59 @@ class App:
             for data_source in strategy.data_sources:
 
                 if DataType.OHLCV.equals(data_source.data_type):
-                    df = data_provider_service.get_ohlcv_data(
-                        symbol=data_source.symbol,
-                        start_date=backtest_date_range.start_date,
-                        end_date=backtest_date_range.end_date,
-                        pandas=True,
-                        add_pandas_index=False,
-                        add_datetime_column=True,
-                        time_frame=data_source.time_frame
-                    )
-                    df = df.copy()
-                    df['Datetime'] = pd.to_datetime(df['Datetime'])
-                    df = df.sort_values('Datetime')\
-                        .tail(data_source.window_size)
-                    start = df['Datetime'].iloc[0]
-                    end = df['Datetime'].iloc[-1]
-                    freq = pd.to_timedelta(data_source.time_frame.value)
-                    expected = pd.date_range(start, end, freq=freq)
-                    actual = df['Datetime']
-                    missing = expected.difference(actual)
-
-                    # Calculate the percentage completeness
-                    completeness = len(actual) / len(expected) * 100
-
-                    if completeness < 100:
-                        raise DataError(
-                            f"Data completeness for data source "
-                            f"{data_source.identifier} "
-                            f"({data_source.symbol}) is {completeness:.2f}% "
-                            f"complete. Missing data points: {len(missing)}"
+                    required_start_date = backtest_date_range.start_date - \
+                        timedelta(
+                            minutes=TimeFrame.from_value(
+                                data_source.time_frame
+                            ).amount_of_minutes * data_source.window_size
                         )
+                    number_of_required_data_points = \
+                        data_source.get_number_of_required_data_points(
+                            backtest_date_range.start_date,
+                            backtest_date_range.end_date
+                        )
+
+                    try:
+                        data_provider = data_provider_service.get(data_source)
+                        number_of_available_data_points = \
+                            data_provider.get_number_of_data_points(
+                                backtest_date_range.start_date,
+                                backtest_date_range.end_date
+                            )
+
+                        missing_dates = \
+                            data_provider.get_missing_data_dates(
+                                required_start_date,
+                                backtest_date_range.end_date
+                            )
+                        if number_of_available_data_points > 0:
+                            missing_data_info[data_source.identifier] = {
+                                "data_source_id": data_source.identifier,
+                                "completeness_percentage": (
+                                    (
+                                        number_of_available_data_points /
+                                        number_of_required_data_points
+                                    ) * 100
+                                ),
+                                "missing_data_points": len(
+                                    missing_dates
+                                ),
+                                "missing_dates": missing_dates,
+                                "data_source_file_path":
+                                    data_provider.get_data_source_file_path()
+                            }
+
+                    except Exception as e:
+                        raise DataError(
+                            f"Error getting data provider for data source "
+                            f"{data_source.identifier} "
+                            f"({data_source.symbol}): {str(e)}"
+                        )
+
+                    if len(missing_data_info.keys()) > 0:
+                        return False, missing_data_info
+
+        return True, missing_data_info
 
     def run_vector_backtests(
         self,
@@ -1071,13 +1099,10 @@ class App:
                 progress bar when initializing data sources.
             market (str): The market to use for the backtest. This is used
                 to create a portfolio configuration if no portfolio
-                configuration is found for the strategy. If not provided,
-                the first portfolio configuration found will be used.
+                configuration is provided in the strategy.
             trading_symbol (str): The trading symbol to use for the backtest.
                 This is used to create a portfolio configuration if no
-                portfolio configuration is found for the strategy. If not
-                provided, the first trading symbol found in the portfolio
-                configuration will be used.
+                portfolio configuration is provided in the strategy.
             initial_amount (float): The initial amount to start the
                 backtest with. This will be the amount of trading currency
                 that the portfolio will start with. If not provided,
@@ -1181,7 +1206,7 @@ class App:
             backtest_date_ranges (List[BacktestDateRange]): List of date ranges
             initial_amount (float): The initial amount to start the
                 backtest with. This will be the amount of trading currency
-                that the portfolio will start with.
+                that the backtest portfolio will start with.
             snapshot_interval (SnapshotInterval): The snapshot interval to use
                 for the backtest. This is used to determine how often the
                 portfolio snapshot should be taken during the backtest.
@@ -1406,11 +1431,11 @@ class App:
                 the risk-free rate from the US Treasury website.
             market (str): The market to use for the backtest. This is used
                 to create a portfolio configuration if no portfolio
-                configuration is found for the strategy. If not provided,
+                configuration is provided in the strategy. If not provided,
                 the first portfolio configuration found will be used.
             trading_symbol (str): The trading symbol to use for the backtest.
                 This is used to create a portfolio configuration if no
-                portfolio configuration is found for the strategy. If not
+                portfolio configuration is provided in the strategy. If not
                 provided, the first trading symbol found in the portfolio
                 configuration will be used.
 

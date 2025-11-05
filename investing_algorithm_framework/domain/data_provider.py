@@ -1,4 +1,4 @@
-from typing import List, Any
+from typing import List, Any, Union
 from abc import ABC, abstractmethod
 from datetime import datetime
 from investing_algorithm_framework.domain.exceptions import \
@@ -280,5 +280,55 @@ class DataProvider(ABC):
         Returns:
             DataProvider: A new instance of the data provider with the same
                 configuration.
+        """
+        raise NotImplementedError("Subclasses should implement this method.")
+
+    @abstractmethod
+    def get_number_of_data_points(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> int:
+        """
+        Returns the number of data points available between the
+        given start and end dates.
+
+        Args:
+            start_date (datetime): The start date for the data points.
+            end_date (datetime): The end date for the data points.
+        Returns:
+            int: The number of data points available between the
+                given start and end dates.
+        """
+        raise NotImplementedError("Subclasses should implement this method.")
+
+    @abstractmethod
+    def get_missing_data_dates(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> List[datetime]:
+        """
+        Returns a list of dates for which data is missing between the
+        given start and end dates.
+
+        Args:
+            start_date (datetime): The start date for checking missing data.
+            end_date (datetime): The end date for checking missing data.
+
+        Returns:
+            List[datetime]: A list of dates for which data is missing
+                between the given start and end dates.
+        """
+        raise NotImplementedError("Subclasses should implement this method.")
+
+    @abstractmethod
+    def get_data_source_file_path(self) -> Union[str, None]:
+        """
+        Returns the file path for the given data source if applicable.
+
+        Returns:
+            Union[str, None]: The file path for the data source or None
+                if not applicable.
         """
         raise NotImplementedError("Subclasses should implement this method.")

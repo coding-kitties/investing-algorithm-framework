@@ -92,9 +92,18 @@ class DataError(Exception):
     during data retrieval or processing
     """
 
-    def __init__(self, message) -> None:
+    def __init__(
+        self,
+        message,
+        data_source_file_path: str = None,
+        number_of_missing_data_points: int = None,
+        total_number_of_data_points: int = None,
+    ) -> None:
         super(DataError, self).__init__(message)
         self.error_message = message
+        self.data_source_file_path = data_source_file_path
+        self.number_of_missing_data_points = number_of_missing_data_points
+        self.total_number_of_data_points = total_number_of_data_points
 
     def to_response(self):
         return {

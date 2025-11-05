@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta
+from typing import List, Union
 
 import pandas as pd
 import polars as pl
@@ -66,6 +67,8 @@ class PandasOHLCVDataProvider(DataProvider):
         self.window_cache = {}
         self._load_data(dataframe)
         self.pandas = pandas
+        self.total_number_of_data_points = 0
+        self.missing_data_point_dates = []
 
     def has_data(
         self,
@@ -284,6 +287,29 @@ class PandasOHLCVDataProvider(DataProvider):
                 start_date=backtest_start_date,
                 end_date=backtest_end_date
             )
+
+        self.number_of_missing_data_points = (
+            self._start_date_data_source - required_start_date
+        ).total_seconds() / (
+            TimeFrame.from_value(self.time_frame).amount_of_minutes * 60
+        )
+
+        # Assume self.data is a Polars DataFrame with a "Datetime" column
+        expected_dates = pl.datetime_range(
+            start=required_start_date,
+            end=backtest_end_date,
+            interval=f"{
+                TimeFrame.from_value(self.time_frame).amount_of_minutes
+            }m",
+            eager=True
+        ).to_list()
+
+        actual_dates = self.data["Datetime"].to_list()
+
+        # Find missing dates
+        self.missing_data_point_dates = sorted(
+            set(expected_dates) - set(actual_dates)
+        )
 
     def get_backtest_data(
         self,
@@ -515,3 +541,60 @@ class PandasOHLCVDataProvider(DataProvider):
             data_provider_identifier=self.data_provider_identifier,
             pandas=data_source.pandas
         )
+
+    def get_number_of_data_points(
+        self,
+        start_date: datetime,
+        end_date: datetime
+    ) -> int:
+
+        """
+        Returns the number of data points available between the given
+        start and end dates.
+
+        Args:
+            start_date (datetime): The start date for checking missing data.
+            end_date (datetime): The end date for checking missing data.
+
+        Returns:
+            int: The number of available data points between the given
+                start and end dates.
+        """
+        available_dates = [
+            date for date in self.data["Datetime"].to_list()
+            if start_date <= date <= end_date
+        ]
+        return len(available_dates)
+
+    def get_missing_data_dates(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> List[datetime]:
+        """
+        Returns a list of dates for which data is missing between the
+        given start and end dates.
+
+        Args:
+            start_date (datetime): The start date for checking missing data.
+            end_date (datetime): The end date for checking missing data.
+
+        Returns:
+            List[datetime]: A list of dates for which data is missing
+                between the given start and end dates.
+        """
+        missing_dates = [
+            date for date in self.missing_data_point_dates
+            if start_date < date < end_date
+        ]
+        return missing_dates
+
+    def get_data_source_file_path(self) -> Union[str, None]:
+        """
+        Get the file path of the data source if stored in local storage.
+
+        Returns:
+            Union[str, None]: The file path of the data source if stored
+                locally, otherwise None.
+        """
+        return None

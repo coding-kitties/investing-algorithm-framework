@@ -179,3 +179,36 @@ class DataSource:
             (self.window_size * timedelta(
                 minutes=self.time_frame.amount_of_minutes
             ))
+
+    def get_number_of_required_data_points(
+        self, start_date: datetime, end_date: datetime
+    ) -> int:
+        """
+        Returns the number of data points required based on the given
+        attributes of the data source. If the required number of data points
+        can't be determined, it returns None.
+
+        E.g., for OHLCV data source, it
+        calculates the number of data points needed between the
+        start_date and end_date based on the time frame.
+
+        Args:
+            start_date (datetime): The start date for the data points.
+            end_date (datetime): The end date for the data points.
+
+        Returns:
+            int: The number of required data points, or None if it can't
+            be determined.
+        """
+
+        if self.time_frame is None:
+            return None
+
+        delta = end_date - start_date
+        total_minutes = delta.total_seconds() / 60
+        data_points = total_minutes / self.time_frame.amount_of_minutes
+
+        if self.window_size is not None:
+            data_points += self.window_size
+
+        return int(data_points)
