@@ -826,60 +826,59 @@ class App:
             show_progress=show_progress
         )
         data_provider_service = self.container.data_provider_service()
+        unique_data_sources = set(data_sources)
 
-        for strategy in strategies:
+        for data_source in unique_data_sources:
 
-            for data_source in strategy.data_sources:
+            if DataType.OHLCV.equals(data_source.data_type):
+                required_start_date = backtest_date_range.start_date - \
+                    timedelta(
+                        minutes=TimeFrame.from_value(
+                            data_source.time_frame
+                        ).amount_of_minutes * data_source.window_size
+                    )
+                number_of_required_data_points = \
+                    data_source.get_number_of_required_data_points(
+                        backtest_date_range.start_date,
+                        backtest_date_range.end_date
+                    )
 
-                if DataType.OHLCV.equals(data_source.data_type):
-                    required_start_date = backtest_date_range.start_date - \
-                        timedelta(
-                            minutes=TimeFrame.from_value(
-                                data_source.time_frame
-                            ).amount_of_minutes * data_source.window_size
-                        )
-                    number_of_required_data_points = \
-                        data_source.get_number_of_required_data_points(
+                try:
+                    data_provider = data_provider_service.get(data_source)
+                    number_of_available_data_points = \
+                        data_provider.get_number_of_data_points(
                             backtest_date_range.start_date,
                             backtest_date_range.end_date
                         )
 
-                    try:
-                        data_provider = data_provider_service.get(data_source)
-                        number_of_available_data_points = \
-                            data_provider.get_number_of_data_points(
-                                backtest_date_range.start_date,
-                                backtest_date_range.end_date
-                            )
-
-                        missing_dates = \
-                            data_provider.get_missing_data_dates(
-                                required_start_date,
-                                backtest_date_range.end_date
-                            )
-                        if len(missing_dates) > 0:
-                            missing_data_info[data_source.identifier] = {
-                                "data_source_id": data_source.identifier,
-                                "completeness_percentage": (
-                                    (
-                                        number_of_available_data_points /
-                                        number_of_required_data_points
-                                    ) * 100
-                                ),
-                                "missing_data_points": len(
-                                    missing_dates
-                                ),
-                                "missing_dates": missing_dates,
-                                "data_source_file_path":
-                                    data_provider.get_data_source_file_path()
-                            }
-
-                    except Exception as e:
-                        raise DataError(
-                            f"Error getting data provider for data source "
-                            f"{data_source.identifier} "
-                            f"({data_source.symbol}): {str(e)}"
+                    missing_dates = \
+                        data_provider.get_missing_data_dates(
+                            required_start_date,
+                            backtest_date_range.end_date
                         )
+                    if len(missing_dates) > 0:
+                        missing_data_info[data_source.identifier] = {
+                            "data_source_id": data_source.identifier,
+                            "completeness_percentage": (
+                                (
+                                    number_of_available_data_points /
+                                    number_of_required_data_points
+                                ) * 100
+                            ),
+                            "missing_data_points": len(
+                                missing_dates
+                            ),
+                            "missing_dates": missing_dates,
+                            "data_source_file_path":
+                                data_provider.get_data_source_file_path()
+                        }
+
+                except Exception as e:
+                    raise DataError(
+                        f"Error getting data provider for data source "
+                        f"{data_source.identifier} "
+                        f"({data_source.symbol}): {str(e)}"
+                    )
 
         if len(missing_data_info.keys()) > 0:
             return False, missing_data_info
@@ -999,7 +998,8 @@ class App:
                     risk_free_rate=risk_free_rate,
                     skip_data_sources_initialization=True,
                     market=market,
-                    trading_symbol=trading_symbol
+                    trading_symbol=trading_symbol,
+                    continue_on_error=continue_on_error
                 )
                 backtests.append(backtest)
         else:
