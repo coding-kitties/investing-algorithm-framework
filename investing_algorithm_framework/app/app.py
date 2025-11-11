@@ -1030,15 +1030,17 @@ class App:
                         backtests_ordered_by_strategy[strategy] = []
 
                     backtests_ordered_by_strategy[strategy].append(
-                            self.run_vector_backtest(
-                                backtest_date_range=backtest_date_range,
-                                initial_amount=initial_amount,
-                                strategy=strategy,
-                                snapshot_interval=snapshot_interval,
-                                risk_free_rate=risk_free_rate,
-                                skip_data_sources_initialization=True
-                            )
+                        self.run_vector_backtest(
+                            backtest_date_range=backtest_date_range,
+                            initial_amount=initial_amount,
+                            strategy=strategy,
+                            snapshot_interval=snapshot_interval,
+                            risk_free_rate=risk_free_rate,
+                            skip_data_sources_initialization=True,
+                            market=market,
+                            trading_symbol=trading_symbol,
                         )
+                    )
 
             for strategy in backtests_ordered_by_strategy:
                 backtests.append(

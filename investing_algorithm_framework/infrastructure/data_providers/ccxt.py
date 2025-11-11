@@ -219,7 +219,6 @@ class CCXTOHLCVDataProvider(DataProvider):
         )
 
         if data is None:
-
             # Disable pandas if it is set to True, because logic
             # depends on polars DataFrame
             has_pandas_flag = self.pandas
@@ -806,20 +805,8 @@ class CCXTOHLCVDataProvider(DataProvider):
         """
         Helper function to retrieve the data from the storage path if
         it exists. If the data does not exist, it returns None.
-
-        Args:
-            storage_path (str): The path to the storage.
-            symbol (str): The symbol for which to retrieve the data.
-            market (str): The market for which to retrieve the data.
-            time_frame (TimeFrame): The time frame for which to retrieve the
-            start_date (datetime): The start date for the data.
-            end_date (datetime): The end date for the data.
-
-        Returns:
-            Union[pl.DataFrame, None]: The data from the storage path as a
-                Polars DataFrame, or None if the data does not exist.
         """
-
+        data = None
         if storage_path is None:
             return None
 
@@ -846,35 +833,71 @@ class CCXTOHLCVDataProvider(DataProvider):
                     if data_source_spec.symbol.upper() == symbol.upper() and \
                         data_source_spec.market.upper() == market.upper() and \
                             data_source_spec.time_frame.equals(time_frame):
+
                         # Check if the data source specification matches
                         # the start and end date if its specified
-                        if data_source_spec.start_date is not None and \
-                            data_source_spec.end_date is not None and \
+                        if (data_source_spec.start_date is not None and
+                            data_source_spec.end_date is not None and
                                 (data_source_spec.start_date <= start_date
-                                 and data_source_spec.end_date >= end_date):
+                                 and data_source_spec.end_date >= end_date)):
+
                             # If the data source specification matches,
                             # read the file
                             file_path = os.path.join(storage_path, file_name)
                             self.data_file_path = file_path
-                            data = pl.read_csv(
-                                file_path,
-                                schema_overrides={"Datetime": pl.Datetime},
-                                low_memory=True
-                            ).with_columns(
-                                pl.col("Datetime").cast(
-                                    pl.Datetime(
-                                        time_unit="ms", time_zone="UTC"
+
+                            # Read CSV as-is first
+                            data = pl.read_csv(file_path, low_memory=True)
+
+                            # Check what columns we have
+                            if "Datetime" in data.columns:
+                                # Try to parse the datetime column
+                                try:
+                                    # Try the ISO format with timezone first
+                                    data = data.with_columns(
+                                        pl.col("Datetime").str.to_datetime(
+                                            format="%Y-%m-%dT%H:%M:%S%.f%z",
+                                            time_zone="UTC"
+                                        )
                                     )
+                                except Exception as e1:
+                                    try:
+                                        # Fallback: let Polars infer the format
+                                        data = data.with_columns(
+                                            pl.col("Datetime").str.to_datetime(
+                                                time_zone="UTC"
+                                            )
+                                        )
+                                    except Exception as e2:
+                                        logger.warning(
+                                            f"Could not parse Datetime "
+                                            f"column in {file_name}: "
+                                            f"Format error: {str(e1)}, "
+                                            f"Infer error: {str(e2)}"
+                                        )
+                                        continue
+                            else:
+                                logger.warning(
+                                    f"No 'Datetime' column "
+                                    f"found in {file_name}. "
+                                    f"Available columns: {data.columns}"
                                 )
-                            )
+                                continue
+
+                            # Filter by date range
                             data = data.filter(
                                 (pl.col("Datetime") >= start_date) &
                                 (pl.col("Datetime") <= end_date)
                             )
-                            return data
+                            break
+
                 except Exception as e:
-                    logger.warning(e)
+                    logger.warning(
+                        f"Error reading data from {file_name}: {str(e)}"
+                    )
                     continue
+
+        return data
 
     def _get_data_source_specification_from_file_name(
         self, file_name: str
