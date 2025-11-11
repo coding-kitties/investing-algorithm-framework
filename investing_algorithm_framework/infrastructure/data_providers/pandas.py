@@ -584,7 +584,7 @@ class PandasOHLCVDataProvider(DataProvider):
         """
         missing_dates = [
             date for date in self.missing_data_point_dates
-            if start_date < date < end_date
+            if start_date <= date <= end_date
         ]
         return missing_dates
 
