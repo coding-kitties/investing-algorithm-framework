@@ -1,0 +1,20 @@
+{
+    "params": {
+        "macd_short_period": 12,
+        "macd_long_period": 26,
+        "macd_signal_period": 9,
+        "close_timeframe": "1h",
+        "macd_timeframe": "2h",
+        "stochastic_timeframe": "2h",
+        "stochastic_k_period": 14,
+        "stochastic_d_period": 3,
+        "stochastic_k_slowing": 3,
+        "stochastic_lookback_window_size": 14,
+        "number_of_neighbors_to_compare": 3,
+        "min_consecutive": 2,
+        "stochastic_oversold_threshold": 20,
+        "stochastic_overbought_threshold": 85,
+        "divergence_lookback_window_size": 14
+    },
+    "id": "e7f6fcf3"
+}

@@ -1,9 +1,24 @@
+import os
 from unittest import TestCase
 from investing_algorithm_framework.domain import BacktestMetrics, \
-    BacktestSummaryMetrics, Trade, generate_backtest_summary_metrics
+    BacktestSummaryMetrics, Trade, generate_backtest_summary_metrics, \
+    combine_backtests, Backtest
 from datetime import datetime, date
 
 class TestCombine(TestCase):
+
+    def setUp(self):
+        self.resource_directory = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), '..', '..', '..', 'resources')
+        )
+        self.test_data_directory = os.path.join(
+            self.resource_directory,
+            "test_data"
+        )
+        self.test_backtests_directory = os.path.join(
+            self.test_data_directory,
+            "backtests"
+        )
 
     def test_add(self):
         # Metrics one: a winning backtest
@@ -148,3 +163,20 @@ class TestCombine(TestCase):
         # Extreme metrics
         self.assertEqual(summary.max_drawdown, 0.2)  # worst of the two
         self.assertEqual(summary.max_drawdown_duration, 30)  # longest
+
+    def test_add_from_storage(self):
+        backtest_one_path = os.path.join(
+            self.test_backtests_directory,
+            "backtest_one"
+        )
+        backtest_two_path = os.path.join(
+            self.test_backtests_directory,
+            "backtest_two"
+        )
+        backtest_one = Backtest.open(backtest_one_path)
+        backtest_two = Backtest.open(backtest_two_path)
+
+        self.assertEqual(3, len(backtest_one.get_all_backtest_runs()))
+        self.assertEqual(3, len(backtest_two.get_all_backtest_runs()))
+        backtest = combine_backtests([backtest_one, backtest_two])
+        self.assertEqual(6, len(backtest.get_all_backtest_runs()))
