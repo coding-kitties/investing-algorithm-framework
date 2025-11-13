@@ -27,7 +27,8 @@ from .exposure import get_average_trade_duration, \
 from .win_rate import get_win_rate, get_win_loss_ratio, get_current_win_rate, \
     get_current_win_loss_ratio
 from .calmar_ratio import get_calmar_ratio
-from .generate import create_backtest_metrics
+from .generate import create_backtest_metrics, \
+    create_backtest_metrics_for_backtest
 from .risk_free_rate import get_risk_free_rate_us
 from .trades import get_negative_trades, get_positive_trades, \
     get_number_of_trades, get_number_of_closed_trades, \
@@ -109,4 +110,5 @@ __all__ = [
     "get_current_average_trade_return",
     "get_number_of_open_trades",
     "get_average_trade_duration",
+    "create_backtest_metrics_for_backtest"
 ]

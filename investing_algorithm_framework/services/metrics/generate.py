@@ -2,7 +2,7 @@ from typing import List
 from logging import getLogger
 
 from investing_algorithm_framework.domain import BacktestMetrics, \
-    BacktestRun, OperationalException
+    BacktestRun, OperationalException, Backtest, BacktestDateRange
 from .cagr import get_cagr
 from .calmar_ratio import get_calmar_ratio
 from .drawdown import get_drawdown_series, get_max_drawdown, \
@@ -34,6 +34,47 @@ from .trades import get_average_trade_duration, get_average_trade_size, \
     get_current_average_trade_duration, get_current_average_trade_loss
 
 logger = getLogger("investing_algorithm_framework")
+
+def create_backtest_metrics_for_backtest(
+    backtest: Backtest,
+    risk_free_rate: float, metrics: List[str] = None,
+    backtest_date_range: BacktestDateRange = None
+) -> Backtest:
+
+    """
+    Create BacktestMetrics for a Backtest object.
+
+    Args:
+        backtest (Backtest): The Backtest object containing
+            backtest runs.
+        risk_free_rate (float): The risk-free rate used in certain
+            metric calculations.
+        metrics (List[str], optional): List of metric names to compute.
+            If None, a default set of metrics will be computed.
+        backtest_date_range (BacktestDateRange, optional): The date range
+            for the backtest. If None, all backtest metrics will be computed
+            for each backtest run.
+
+    Returns:
+        Backtest: The Backtest object with computed metrics for each run.
+    """
+    if backtest_date_range is not None:
+        backtest_runs = [
+            backtest.get_backtest_run(backtest_date_range)
+        ]
+    else:
+        backtest_runs = backtest.get_all_backtest_runs()
+
+    for backtest_run in backtest_runs:
+        # If a date range is provided, check if the backtest run falls
+        # within the range
+        backtest_metrics = create_backtest_metrics(
+            backtest_run, risk_free_rate, metrics
+        )
+        backtest_run.backtest_metrics = backtest_metrics
+
+    backtest.backtest_runs = backtest_runs
+    return backtest
 
 
 def create_backtest_metrics(

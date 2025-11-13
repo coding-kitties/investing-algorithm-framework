@@ -1,7 +1,11 @@
+import logging
 from typing import List
 
-from .backtest_summary_metrics import BacktestSummaryMetrics
+from .backtest import Backtest
 from .backtest_metrics import BacktestMetrics
+from .backtest_summary_metrics import BacktestSummaryMetrics
+
+logger = logging.getLogger("investing_algorithm_framework")
 
 
 def safe_weighted_mean(values, weights):
@@ -41,21 +45,25 @@ def combine_backtests(backtests):
     backtest_runs = []
 
     for backtest in backtests:
-        backtest_metric = None
-        backtest_run = backtest.backtest_runs[0] \
-            if len(backtest.backtest_runs) > 0 else None
-
-        if backtest_run is not None:
-            backtest_metric = backtest_run.backtest_metrics
-
-        if backtest_metric is not None:
-            backtest_metrics.append(backtest_metric)
-            backtest_runs.append(backtest_run)
+        backtest_runs += backtest.get_all_backtest_runs()
+        backtest_metrics += backtest.get_all_backtest_metrics()
 
     summary = generate_backtest_summary_metrics(backtest_metrics)
 
     metadata = None
     risk_free_rate = None
+
+    # Check if there are duplicate backtest runs
+    unique_date_ranges = set()
+    for backtest in backtests:
+        for run in backtest.get_all_backtest_runs():
+            date_range = (run.start_date, run.end_date)
+            if date_range in unique_date_ranges:
+                logger.warning(
+                    "Duplicate backtest run detected for date range: "
+                    f"{date_range} when combining backtests."
+                )
+            unique_date_ranges.add(date_range)
 
     # Get first non-empty metadata
     for backtest in backtests:
@@ -68,8 +76,6 @@ def combine_backtests(backtests):
         if backtest.risk_free_rate is not None:
             risk_free_rate = backtest.risk_free_rate
             break
-
-    from .backtest import Backtest
 
     backtest = Backtest(
         backtest_summary=summary,
