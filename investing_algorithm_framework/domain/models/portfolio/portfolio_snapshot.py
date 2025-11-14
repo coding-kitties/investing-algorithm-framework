@@ -1,8 +1,8 @@
-from dateutil import parser
 from datetime import timezone
+
+from dateutil import parser
+
 from investing_algorithm_framework.domain.models.base_model import BaseModel
-from investing_algorithm_framework.domain.constants import \
-    DEFAULT_DATETIME_FORMAT
 
 
 class PortfolioSnapshot(BaseModel):
@@ -147,11 +147,14 @@ class PortfolioSnapshot(BaseModel):
         Returns:
             dict: A dictionary representation of the portfolio snapshot object.
         """
-        if datetime_format is not None:
-            created_at = self.created_at.strftime(datetime_format) \
-                if self.created_at else None
-        else:
-            created_at = self.created_at.strftime(DEFAULT_DATETIME_FORMAT)
+        def ensure_iso(value):
+            if hasattr(value, "isoformat"):
+                if value.tzinfo is None:
+                    value = value.replace(tzinfo=timezone.utc)
+                return value.isoformat()
+            return value
+
+        created_at = ensure_iso(self.created_at) if self.created_at else None
 
         return {
             "metadata": self.metadata if self.metadata else {},

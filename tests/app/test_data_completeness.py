@@ -19,6 +19,7 @@ class TestStrategy(TradingStrategy):
             time_frame="1d",
             window_size=200,
             symbol="SOL/EUR",
+            market="BITVAVO",
         )
     ]
 

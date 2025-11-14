@@ -1,4 +1,5 @@
 from dateutil.parser import parse
+from datetime import timezone
 
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.order import OrderSide, Order
@@ -260,18 +261,16 @@ class Trade(BaseModel):
         return 0
 
     def to_dict(self, datetime_format=None):
+        def ensure_iso(value):
+            if hasattr(value, "isoformat"):
+                if value.tzinfo is None:
+                    value = value.replace(tzinfo=timezone.utc)
+                return value.isoformat()
+            return value
 
-        if datetime_format is not None:
-            opened_at = self.opened_at.strftime(datetime_format) \
-                if self.opened_at else None
-            closed_at = self.closed_at.strftime(datetime_format) \
-                if self.closed_at else None
-            updated_at = self.updated_at.strftime(datetime_format) \
-                if self.updated_at else None
-        else:
-            opened_at = self.opened_at
-            closed_at = self.closed_at
-            updated_at = self.updated_at
+        opened_at = ensure_iso(self.opened_at) if self.opened_at else None
+        closed_at = ensure_iso(self.closed_at) if self.closed_at else None
+        updated_at = ensure_iso(self.updated_at) if self.updated_at else None
 
         # Ensure status is a string
         self.status = TradeStatus.from_value(self.status).value
@@ -304,7 +303,7 @@ class Trade(BaseModel):
             ] if self.take_profits else None,
             "filled_amount": self.filled_amount,
             "available_amount": self.available_amount,
-            "metadata": self.metadata,
+            "metadata": self.metadata if self.metadata else {},
         }
 
     @staticmethod

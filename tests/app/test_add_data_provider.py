@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Union, List
 
 from investing_algorithm_framework import DataProvider, DataSource, DataType, \
     PortfolioConfiguration, MarketCredential, TradingStrategy
@@ -44,6 +45,18 @@ class DataProviderTest(DataProvider):
 
     def copy(self, data_source: DataSource) -> "DataProvider":
         return DataProviderTest()
+
+    def get_number_of_data_points(
+            self, start_date: datetime,
+                                  end_date: datetime) -> int:
+        return 0
+
+    def get_missing_data_dates(self, start_date: datetime,
+                               end_date: datetime) -> List[datetime]:
+        return []
+
+    def get_data_source_file_path(self) -> Union[str, None]:
+        return None
 
 
 class TestCustomDataProviderStrategy(TradingStrategy):

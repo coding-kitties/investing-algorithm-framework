@@ -229,14 +229,15 @@ class Order(BaseModel):
             dict: A dictionary representation of the Order object.
         """
 
-        if datetime_format is not None:
-            created_at = self.created_at.strftime(datetime_format) \
-                if self.created_at else None
-            updated_at = self.updated_at.strftime(datetime_format) \
-                if self.updated_at else None
-        else:
-            created_at = self.created_at
-            updated_at = self.updated_at
+        def ensure_iso(value):
+            if hasattr(value, "isoformat"):
+                if value.tzinfo is None:
+                    value = value.replace(tzinfo=timezone.utc)
+                return value.isoformat()
+            return value
+
+        created_at = ensure_iso(self.created_at) if self.created_at else None
+        updated_at = ensure_iso(self.updated_at) if self.updated_at else None
 
         # Ensure status is a string
         self.status = OrderStatus.from_value(self.status).value
@@ -259,7 +260,7 @@ class Order(BaseModel):
             "order_fee_currency": self.order_fee_currency,
             "order_fee_rate": self.order_fee_rate,
             "order_fee": self.order_fee,
-            "metadata": self.metadata if self.metadata else {},
+            "metadata": self.metadata if hasattr(self, 'metadata') else {},
         }
 
     @staticmethod

@@ -1,6 +1,7 @@
 import logging
 from abc import ABC, abstractmethod
 from typing import Callable
+from dateutil.parser import parse
 
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.datastructures import MultiDict
@@ -10,6 +11,16 @@ from investing_algorithm_framework.domain import OperationalException, \
 from investing_algorithm_framework.infrastructure.database import Session
 
 logger = logging.getLogger("investing_algorithm_framework")
+
+
+def convert_datetime_fields(data, datetime_fields):
+    for field in datetime_fields:
+        if field in data and isinstance(data[field], str):
+            try:
+                data[field] = parse(data[field])
+            except Exception:
+                pass  # Ignore if not a valid datetime string
+    return data
 
 
 class Repository(ABC):
@@ -34,7 +45,11 @@ class Repository(ABC):
         return created_object
 
     def update(self, object_id, data):
-
+        # List all datetime fields for your model
+        datetime_fields = [
+            "created_at", "updated_at", "closed_at", "opened_at"
+        ]
+        data = convert_datetime_fields(data, datetime_fields)
         with Session() as db:
             try:
                 update_object = self.get(object_id)

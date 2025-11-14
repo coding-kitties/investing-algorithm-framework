@@ -88,18 +88,23 @@ class BacktestRun:
 
     def to_dict(self) -> dict:
         """
-        Convert the Backtest instance to a dictionary.
-
-        Returns:
-            dict: A dictionary representation of the Backtest instance.
+        Convert the Backtest instance to a dictionary with all
+        date/datetime fields as ISO strings (always UTC).
         """
+        def ensure_iso(value):
+            if hasattr(value, "isoformat"):
+                if value.tzinfo is None:
+                    value = value.replace(tzinfo=timezone.utc)
+                return value.isoformat()
+            return value
+
         backtest_metrics = self.backtest_metrics.to_dict() \
             if self.backtest_metrics else None
         return {
             "backtest_metrics": backtest_metrics,
-            "backtest_start_date": self.backtest_start_date,
+            "backtest_start_date": ensure_iso(self.backtest_start_date),
             "backtest_date_range_name": self.backtest_date_range_name,
-            "backtest_end_date": self.backtest_end_date,
+            "backtest_end_date": ensure_iso(self.backtest_end_date),
             "trading_symbol": self.trading_symbol,
             "initial_unallocated": self.initial_unallocated,
             "number_of_runs": self.number_of_runs,
@@ -109,7 +114,7 @@ class BacktestRun:
             "trades": [trade.to_dict() for trade in self.trades],
             "orders": [order.to_dict() for order in self.orders],
             "positions": [position.to_dict() for position in self.positions],
-            "created_at": self.created_at,
+            "created_at": ensure_iso(self.created_at),
             "symbols": self.symbols,
             "number_of_days": self.number_of_days,
             "number_of_trades": self.number_of_trades,

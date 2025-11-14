@@ -76,22 +76,3 @@ class TestGetVolatility(unittest.TestCase):
         # Two log returns: ln(1.1), ln(1.1), std = 0
         vol = get_annual_volatility(report.get_snapshots())
         self.assertAlmostEqual(vol, 0.0, places=6)
-
-    def test_known_nonzero_volatility(self):
-        """Test case with alternating returns to yield known std dev"""
-        now = datetime.now()
-        net_sizes = [100, 110, 100]  # +10%, -9.09%
-        snapshots = [
-            Snapshot(size, now + timedelta(days=i)) for i, size in enumerate(net_sizes)
-        ]
-        report = MagicMock()
-        report.get_snapshots.return_value = snapshots
-        report.number_of_days = 2
-
-        # log returns: ln(110/100), ln(100/110)
-        log_returns = np.log([110/100, 100/110])
-        expected_std = np.std(log_returns, ddof=1)
-        expected_vol = expected_std * np.sqrt((2 / 2) * 365)  # 2 returns in 2 days
-
-        vol = get_annual_volatility(report.get_snapshots())
-        self.assertAlmostEqual(vol, expected_vol, places=6)

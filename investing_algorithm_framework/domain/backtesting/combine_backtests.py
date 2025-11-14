@@ -1,7 +1,6 @@
 import logging
 from typing import List
 
-from .backtest import Backtest
 from .backtest_metrics import BacktestMetrics
 from .backtest_summary_metrics import BacktestSummaryMetrics
 
@@ -57,7 +56,7 @@ def combine_backtests(backtests):
     unique_date_ranges = set()
     for backtest in backtests:
         for run in backtest.get_all_backtest_runs():
-            date_range = (run.start_date, run.end_date)
+            date_range = (run.backtest_start_date, run.backtest_end_date)
             if date_range in unique_date_ranges:
                 logger.warning(
                     "Duplicate backtest run detected for date range: "
@@ -76,6 +75,7 @@ def combine_backtests(backtests):
         if backtest.risk_free_rate is not None:
             risk_free_rate = backtest.risk_free_rate
             break
+    from .backtest import Backtest
 
     backtest = Backtest(
         backtest_summary=summary,

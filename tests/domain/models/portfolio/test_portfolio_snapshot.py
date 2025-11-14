@@ -42,7 +42,7 @@ class Test(TestCase):
         self.assertEqual(snapshot_dict["cash_flow"], 1000)
         self.assertEqual(
             snapshot_dict["created_at"],
-            "2023-10-01 12:00:00"
+            "2023-10-01T12:00:00+00:00"
         )
         self.assertEqual(
             snapshot_dict["metadata"], {"strategy": "mean_reversion"}
