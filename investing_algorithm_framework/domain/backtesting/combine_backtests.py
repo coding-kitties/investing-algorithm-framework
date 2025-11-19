@@ -64,11 +64,11 @@ def combine_backtests(backtests):
                 )
             unique_date_ranges.add(date_range)
 
-    # Get first non-empty metadata
+    # Merge all metadata dictionaries
+    metadata = {}
     for backtest in backtests:
         if backtest.metadata:
-            metadata = backtest.metadata
-            break
+            metadata.update(backtest.metadata)
 
     # Get the first risk-free rate
     for backtest in backtests:

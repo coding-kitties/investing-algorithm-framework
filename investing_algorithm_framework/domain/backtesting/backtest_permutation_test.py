@@ -133,6 +133,12 @@ class BacktestPermutationTest:
     def save(self, path: str) -> None:
         """
         Save the permutation test results to disk (JSON + Parquet).
+
+        Args:
+            path (str): The directory path where to save the results.
+
+        Returns:
+            None
         """
         os.makedirs(path, exist_ok=True)
 
@@ -153,6 +159,12 @@ class BacktestPermutationTest:
     def open(path: str) -> "BacktestPermutationTest":
         """
         Load the permutation test results from disk (JSON + Parquet).
+
+        Args:
+            path (str): The directory path where the results are saved.
+
+        Returns:
+            BacktestPermutationTest: The loaded permutation test results.
         """
         original_metrics = os.path.join(path, "original_metrics.json")
 
@@ -198,6 +210,9 @@ class BacktestPermutationTest:
     def to_dict(self) -> Dict:
         """
         Convert the permutation test results to a dictionary.
+
+        Returns:
+            dict: A dictionary representation of the permutation test results.
         """
         return {
             "real_metrics": self.real_metrics.to_dict(),

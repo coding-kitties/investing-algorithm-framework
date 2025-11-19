@@ -362,15 +362,14 @@ class Backtest:
             self.backtest_summary.save(summary_file)
 
         if self.backtest_permutation_tests:
-            permutation_path = os.path.join(
+            permutation_dir_path = os.path.join(
                 directory_path, "permutation_tests"
             )
-            os.makedirs(permutation_path, exist_ok=True)
+            os.makedirs(permutation_dir_path, exist_ok=True)
 
             for pm in self.backtest_permutation_tests:
                 dir_name = pm.create_directory_name()
-                pm_path = os.path.join(permutation_path, dir_name)
-                os.makedirs(pm_path, exist_ok=True)
+                pm_path = os.path.join(permutation_dir_path, dir_name)
                 pm.save(pm_path)
 
         # Save metadata if available
@@ -406,6 +405,19 @@ class Backtest:
                 json.dump(
                     {'algorithm_id': self.algorithm_id}, f, indent=4
                 )
+
+        # Save the permutation tests if available
+        if self.backtest_permutation_tests:
+            permutation_tests_path = os.path.join(
+                directory_path, "permutation_tests"
+            )
+            os.makedirs(permutation_tests_path, exist_ok=True)
+
+            for bpt in self.backtest_permutation_tests:
+                dir_name = bpt.create_directory_name()
+                bpt_path = os.path.join(permutation_tests_path, dir_name)
+                os.makedirs(bpt_path, exist_ok=True)
+                bpt.save(bpt_path)
 
     def __repr__(self):
         """
