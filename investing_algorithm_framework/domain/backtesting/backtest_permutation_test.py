@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict
 import numpy as np
 import pandas as pd
+from datetime import timezone
 
 from .backtest_metrics import BacktestMetrics
 
@@ -91,6 +92,15 @@ class BacktestPermutationTest:
     ) -> Dict[str, Dict[str, float]]:
         """
         Return a summary of real values, mean permuted values, and p-values.
+
+        Args:
+            metrics (List[str]): List of metric names to include
+                in the summary. If None, uses DEFAULT_METRICS.
+
+        Returns:
+            Dict[str, Dict[str, float]]: A dictionary where each key
+                is a metric name and the value is another dictionary
+                with keys 'real', 'permuted_mean', and 'p_value'.
         """
 
         if metrics is None:
@@ -123,7 +133,7 @@ class BacktestPermutationTest:
                 continue
 
             summary_dict[metric] = {
-                "real": real_value,
+                "real": float(real_value),
                 "permuted_mean": float(np.mean(dist)),
                 "p_value": self.p_values.get(metric, None),
             }
@@ -140,6 +150,13 @@ class BacktestPermutationTest:
         Returns:
             None
         """
+        def ensure_iso(value):
+            if hasattr(value, "isoformat"):
+                if value.tzinfo is None:
+                    value = value.replace(tzinfo=timezone.utc)
+                return value.isoformat()
+            return value
+
         os.makedirs(path, exist_ok=True)
 
         # Save the real metrics
@@ -149,11 +166,22 @@ class BacktestPermutationTest:
         os.makedirs(permuted_dir, exist_ok=True)
 
         for i, pm in enumerate(self.permutated_metrics):
-            pm.save(os.path.join(permuted_dir, f"permuted_{i}"))
+            pm.save(os.path.join(permuted_dir, f"permuted_{i}.json"))
 
         # Save the P-values
         with open(os.path.join(path, "p_values.json"), "w") as f:
             json.dump(self.p_values, f)
+
+        # Create a metadata file to store additional info such as
+        # date range name, start and end dates
+        metadata = {
+            "backtest_start_date": ensure_iso(self.backtest_start_date),
+            "backtest_date_range_name": self.backtest_date_range_name,
+            "backtest_end_date": ensure_iso(self.backtest_end_date),
+        }
+
+        with open(os.path.join(path, "metadata.json"), "w") as f:
+            json.dump(metadata, f)
 
     @staticmethod
     def open(path: str) -> "BacktestPermutationTest":
@@ -189,10 +217,33 @@ class BacktestPermutationTest:
             with open(p_values_path, "r") as f:
                 p_values = json.load(f)
 
+        # Load metadata
+        metadata_path = os.path.join(path, "metadata.json")
+        backtest_start_date = None
+        backtest_end_date = None
+        backtest_date_range_name = None
+
+        if os.path.exists(metadata_path):
+            with open(metadata_path, "r") as f:
+                metadata = json.load(f)
+
+            backtest_start_date = pd.to_datetime(
+                metadata.get("backtest_start_date"), utc=True
+            )
+            backtest_end_date = pd.to_datetime(
+                metadata.get("backtest_end_date"), utc=True
+            )
+            backtest_date_range_name = metadata.get(
+                "backtest_date_range_name"
+            )
+
         return BacktestPermutationTest(
             real_metrics=real_metrics,
             permutated_metrics=permutated_metrics,
             p_values=p_values,
+            backtest_start_date=backtest_start_date,
+            backtest_end_date=backtest_end_date,
+            backtest_date_range_name=backtest_date_range_name
         )
 
     def create_directory_name(self) -> str:
