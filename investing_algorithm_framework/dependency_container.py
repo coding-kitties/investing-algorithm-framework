@@ -12,7 +12,7 @@ from investing_algorithm_framework.services import OrderService, \
     BacktestService, ConfigurationService, PortfolioSnapshotService, \
     PositionSnapshotService, MarketCredentialService, TradeService, \
     PortfolioSyncService, OrderExecutorLookup, PortfolioProviderLookup, \
-    DataProviderService
+    DataProviderService, TradeTakeProfitService, TradeStopLossService
 
 
 def setup_dependency_container(app, modules=None, packages=None):
@@ -88,6 +88,14 @@ class DependencyContainer(containers.DeclarativeContainer):
         position_repository=position_repository,
         order_metadata_repository=order_metadata_repository,
     )
+    trade_take_profit_service = providers.Factory(
+        TradeTakeProfitService,
+        repository=trade_take_profit_repository,
+    )
+    trade_stop_loss_service = providers.Factory(
+        TradeStopLossService,
+        repository=trade_stop_loss_repository,
+    )
     position_service = providers.Factory(
         PositionService,
         portfolio_repository=portfolio_repository,
@@ -149,6 +157,8 @@ class DependencyContainer(containers.DeclarativeContainer):
         market_credential_service=market_credential_service,
         trade_service=trade_service,
         data_provider_service=data_provider_service,
+        trade_stop_loss_service=trade_stop_loss_service,
+        trade_take_profit_service=trade_take_profit_service,
     )
     algorithm_factory = providers.Factory(
         AlgorithmFactory,

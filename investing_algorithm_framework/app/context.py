@@ -4,11 +4,13 @@ from typing import List
 
 from investing_algorithm_framework.services import ConfigurationService, \
     MarketCredentialService, OrderService, PortfolioConfigurationService, \
-    PortfolioService, PositionService, TradeService, DataProviderService
+    PortfolioService, PositionService, TradeService, DataProviderService, \
+    TradeStopLossService, TradeTakeProfitService
 from investing_algorithm_framework.domain import OrderStatus, OrderType, \
     OrderSide, OperationalException, Portfolio, RoundingService, \
-    BACKTESTING_FLAG, INDEX_DATETIME, TradeRiskType, Order, \
-    Position, Trade, TradeStatus, MarketCredential
+    BACKTESTING_FLAG, INDEX_DATETIME, Order, \
+    Position, Trade, TradeStatus, MarketCredential, TradeStopLoss, \
+    TradeTakeProfit
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -29,6 +31,8 @@ class Context:
         order_service: OrderService,
         market_credential_service: MarketCredentialService,
         trade_service: TradeService,
+        trade_stop_loss_service: TradeStopLossService,
+        trade_take_profit_service: TradeTakeProfitService,
         data_provider_service: DataProviderService
     ):
         self.configuration_service: ConfigurationService = \
@@ -42,6 +46,10 @@ class Context:
             market_credential_service
         self.data_provider_service: DataProviderService = data_provider_service
         self.trade_service: TradeService = trade_service
+        self.trade_stop_loss_service: TradeStopLossService = \
+            trade_stop_loss_service
+        self.trade_take_profit_service: TradeTakeProfitService = \
+            trade_take_profit_service
 
     @property
     def config(self):
@@ -1372,9 +1380,10 @@ class Context:
         self,
         trade: Trade,
         percentage: float,
-        trade_risk_type=TradeRiskType.FIXED,
+        trailing: bool = False,
         sell_percentage: float = 100,
-    ):
+        created_at: datetime = None,
+    ) -> TradeStopLoss:
         """
         Function to add a stop loss to a trade.
 
@@ -1397,30 +1406,34 @@ class Context:
                 of the open price that the stop loss should
                 be set at. This must be a positive
                 number, e.g. 5 for 5%, or 10 for 10%.
-            trade_risk_type (TradeRiskType): The type of the stop
-                loss, fixed or trailing
+            trailing (bool): Whether the stop loss should be trailing
+                or fixed.
             sell_percentage (float): float representing the
                 percentage of the trade that should be sold if the
                 stop loss is triggered
+            created_at: datetime: The date and time when the stop loss
+                was created. If not specified, the current date and time
+                will be used.
 
         Returns:
             None
         """
-        self.trade_service.add_stop_loss(
+        return self.trade_service.add_stop_loss(
             trade,
             percentage=percentage,
-            trade_risk_type=trade_risk_type,
+            trailing=trailing,
             sell_percentage=sell_percentage,
+            created_at=created_at,
         )
-        return self.trade_service.get(trade.id)
 
     def add_take_profit(
         self,
         trade: Trade,
         percentage: float,
-        trade_risk_type=TradeRiskType.FIXED,
+        trailing: bool = False,
         sell_percentage: float = 100,
-    ) -> None:
+        created_at: datetime = None,
+    ) -> TradeTakeProfit:
         """
         Function to add a take profit to a trade. This function will add a
         take profit to the specified trade. If the take profit is triggered,
@@ -1445,22 +1458,25 @@ class Context:
                 of the open price that the stop loss should
                 be set at. This must be a positive
                 number, e.g. 5 for 5%, or 10 for 10%.
-            trade_risk_type (TradeRiskType): The type of the stop
-                loss, fixed or trailing
+            trailing (bool): Whether the take profit should be trailing
+                or fixed.
             sell_percentage (float): float representing the
                 percentage of the trade that should be sold if the
                 stop loss is triggered
+            created_at: datetime: The date and time when the take profit
+                was created. If not specified, the current date and time
+                will be used.
 
         Returns:
             None
         """
-        self.trade_service.add_take_profit(
+        return self.trade_service.add_take_profit(
             trade,
             percentage=percentage,
-            trade_risk_type=trade_risk_type,
+            trailing=trailing,
             sell_percentage=sell_percentage,
+            created_at=created_at,
         )
-        return self.trade_service.get(trade.id)
 
     def close_trade(self, trade, precision=None) -> None:
         """
@@ -1665,3 +1681,45 @@ class Context:
             portfolio = self.portfolio_service.get(portfolio_id)
 
         return portfolio.trading_symbol
+
+    def get_take_profits(
+        self, triggered: bool = None
+    ) -> List[TradeTakeProfit]:
+        """
+        Function to get all take profits. If the triggered parameter
+        is specified, the function will return all take profits that
+        match the triggered status.
+
+        Args:
+            triggered (bool): The triggered status of the take profits
+
+        Returns:
+            List[TradeTakeProfit]: A list of take profits
+        """
+        query_params = {}
+
+        if triggered is not None:
+            query_params["triggered"] = triggered
+
+        return self.trade_take_profit_service.get_all(query_params)
+
+    def get_stop_losses(
+        self, triggered: bool = None
+    ) -> List[TradeStopLoss]:
+        """
+        Function to get all stop losses. If the triggered parameter
+        is specified, the function will return all stop losses that
+        match the triggered status.
+
+        Args:
+            triggered (bool): The triggered status of the stop losses
+
+        Returns:
+            List[TradeStopLoss]: A list of stop losses
+        """
+        query_params = {}
+
+        if triggered is not None:
+            query_params["triggered"] = triggered
+
+        return self.trade_stop_loss_service.get_all(query_params)

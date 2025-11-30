@@ -11,7 +11,8 @@ from .portfolios import PortfolioService, BacktestPortfolioService, \
     PortfolioSnapshotService, PortfolioProviderLookup
 from .positions import PositionService, PositionSnapshotService
 from .repository_service import RepositoryService
-from .trade_service import TradeService
+from .trade_service import TradeService, TradeStopLossService, \
+    TradeTakeProfitService
 from .metrics import get_annual_volatility, \
     get_sortino_ratio, get_drawdown_series, get_max_drawdown, \
     get_equity_curve, get_price_efficiency_ratio, get_sharpe_ratio, \
@@ -128,5 +129,7 @@ __all__ = [
     "get_current_average_trade_duration",
     "get_current_average_trade_gain",
     "get_current_average_trade_return",
-    "create_backtest_metrics_for_backtest"
+    "create_backtest_metrics_for_backtest",
+    "TradeStopLossService",
+    "TradeTakeProfitService"
 ]

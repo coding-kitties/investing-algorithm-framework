@@ -18,7 +18,6 @@ DEFAULT_CONFIGURATION = {
     or os.path.join(caller_dir, "resources"),
     "APP_MODE": AppMode.DEFAULT.value,
     "CHECK_PENDING_ORDERS": True,
-    "SQLITE_INITIALIZED": False,
     "BACKTEST_DATA_DIRECTORY_NAME": "backtest_data",
     "SYMBOLS": None,
     "DATETIME_FORMAT": "%Y-%m-%d %H:%M:%S",

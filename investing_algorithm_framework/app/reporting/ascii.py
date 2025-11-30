@@ -4,8 +4,8 @@ from typing import List
 
 from tabulate import tabulate
 
-from investing_algorithm_framework.domain import DATETIME_FORMAT, \
-    BacktestDateRange, TradeStatus, OrderSide, TradeRiskType, Backtest
+from investing_algorithm_framework.domain import DATETIME_FORMAT, Backtest, \
+    BacktestDateRange, TradeStatus, OrderSide
 from investing_algorithm_framework.domain.constants import \
     DATETIME_FORMAT_BACKTESTING
 
@@ -144,7 +144,7 @@ def pretty_print_stop_losses(
 
     def get_stop_loss_price(take_profit):
 
-        if TradeRiskType.TRAILING.equals(take_profit["trade_risk_type"]):
+        if take_profit["trailing"]:
             initial_price = take_profit["open_price"]
             percentage = take_profit["percentage"]
             initial_stop_loss_price = \
@@ -164,7 +164,7 @@ def pretty_print_stop_losses(
                         "trading_symbol": trade.trading_symbol,
                         "status": get_status(stop_loss),
                         "trade_id": stop_loss.trade_id,
-                        "trade_risk_type": stop_loss.trade_risk_type,
+                        "trailing": stop_loss.trailing,
                         "percentage": stop_loss.percentage,
                         "open_price": stop_loss.open_price,
                         "sell_percentage": stop_loss.sell_percentage,
@@ -188,7 +188,7 @@ def pretty_print_stop_losses(
                         "trading_symbol": trade.trading_symbol,
                         "status": get_status(stop_loss),
                         "trade_id": stop_loss.trade_id,
-                        "trade_risk_type": stop_loss.trade_risk_type,
+                        "trailing": stop_loss.trailing,
                         "percentage": stop_loss.percentage,
                         "open_price": stop_loss.open_price,
                         "sell_percentage": stop_loss.sell_percentage,
@@ -229,7 +229,7 @@ def pretty_print_stop_losses(
         for stop_loss in selection
     ]
     stop_loss_table["Type"] = [
-        f"{stop_loss['trade_risk_type']}" for stop_loss in selection
+        f"{stop_loss['trailing']}" for stop_loss in selection
     ]
     stop_loss_table["Stop Loss (Initial Stop Loss)"] = [
         get_stop_loss_price(stop_loss) for stop_loss in selection
@@ -284,7 +284,7 @@ def pretty_print_take_profits(
 
     def get_take_profit_price(take_profit):
 
-        if TradeRiskType.TRAILING.equals(take_profit["trade_risk_type"]):
+        if take_profit["trailing"]:
             initial_price = take_profit["open_price"]
             percentage = take_profit["percentage"]
             initial_take_profit_price = \
@@ -315,7 +315,7 @@ def pretty_print_take_profits(
                         "trading_symbol": trade.trading_symbol,
                         "status": get_status(take_profit),
                         "trade_id": take_profit.trade_id,
-                        "trade_risk_type": take_profit.trade_risk_type,
+                        "trailing": take_profit.trailing,
                         "percentage": take_profit.percentage,
                         "open_price": take_profit.open_price,
                         "sell_percentage": take_profit.sell_percentage,
@@ -341,7 +341,7 @@ def pretty_print_take_profits(
                         "trading_symbol": trade.trading_symbol,
                         "status": get_status(take_profit),
                         "trade_id": take_profit.trade_id,
-                        "trade_risk_type": take_profit.trade_risk_type,
+                        "trailing": take_profit.trailing,
                         "percentage": take_profit.percentage,
                         "open_price": take_profit.open_price,
                         "sell_percentage": take_profit.sell_percentage,
@@ -383,7 +383,7 @@ def pretty_print_take_profits(
         for stop_loss in selection
     ]
     take_profit_table["Type"] = [
-        f"{stop_loss['trade_risk_type']}" for stop_loss
+        f"{take_profit['trailing']}" for take_profit
         in selection
     ]
     take_profit_table["Take profit (Initial Take Profit)"] = [

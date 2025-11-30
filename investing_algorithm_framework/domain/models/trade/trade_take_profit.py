@@ -1,25 +1,14 @@
+from datetime import timezone, datetime
+from dateutil.parser import parse
+
 from investing_algorithm_framework.domain.models.base_model import BaseModel
-from investing_algorithm_framework.domain.models.trade.trade_risk_type import \
-    TradeRiskType
 
 
 class TradeTakeProfit(BaseModel):
     """
     TradeTakeProfit represents a take profit strategy for a trade.
 
-    Attributes:
-        trade: Trade - the trade that the take profit is for
-        take_profit: float - the take profit percentage
-        trade_risk_type: TradeRiskType - the type of trade risk, either
-            trailing or fixed
-        percentage: float - the take profit percentage
-        sell_percentage: float - the percentage of the trade to sell when the
-            take profit is hit. Default is 100% of the trade.
-            If the take profit percentage is lower than 100% a check
-            must be made that the combined sell percentage of
-            all take profits is less or equal than 100%.
-
-    if trade_risk_type is fixed, the take profit price is
+    if trailing is set to False, the take profit price is
     calculated as follows:
         You buy a stock at $100.
         You set a 5% take profit, meaning you will sell if the price
@@ -29,7 +18,7 @@ class TradeTakeProfit(BaseModel):
         But if the price keeps falling below $105, the take profit is not
             triggered.
 
-    if trade_risk_type is trailing, the take profit price is
+    if trailing is set to True, the take profit price is
     calculated as follows:
         You buy a stock at $100.
         You set a 5% trailing take profit, the moment the price rises
@@ -44,31 +33,65 @@ class TradeTakeProfit(BaseModel):
         securing a $14 profit.
         But if the price keeps rising to $150, the take profit
         moves up to $142.50.
+
+    Attributes:
+        - trade (Trade): the trade that the take profit is for
+        - trailing (bool): whether the take profit is trailing or fixed
+        - percentage (float): the stop loss percentage
+        - sell_percentage (float): the percentage of the trade to sell when the
+            take profit is hit. Default is 100% of the trade. If the
+            take profit percentage is lower than 100% a check must
+            be made that the combined sell percentage of all
+            take profits is less or equal than 100%.
+        - open_price (float): the price at which the trade was opened
+        - take_profit_price (float): the price at which the take profit
+            triggers
+        - high_water_mark_date (str): the date at which the high water mark
+            was reached
+        - active (bool): whether the take profit is active
+        - triggered (bool): whether the take profit has been triggered
+        - sell_amount (float): the amount to sell when the stop loss triggers
+        - sold_amount (float): the amount that has been sold
+        - high_water_mark (float) the highest price of the trade
+        - stop_loss_price (float) the price at which the stop loss triggers
     """
 
     def __init__(
         self,
         trade_id: int,
-        trade_risk_type: TradeRiskType,
         percentage: float,
         open_price: float,
+        trailing: bool = False,
         total_amount_trade: float = None,
         sell_percentage: float = 100,
         active: bool = True,
+        triggered: bool = False,
+        triggered_at: datetime = None,
         sell_prices: str = None,
         sell_dates: str = None,
         sell_amount: float = None,
+        high_water_mark: float = None,
         high_water_mark_date: str = None,
+        created_at: datetime = None,
+        updated_at: datetime = None
     ):
         self.trade_id = trade_id
-        self.trade_risk_type = TradeRiskType.from_value(trade_risk_type).value
+        self.trailing = trailing
         self.percentage = percentage
         self.sell_percentage = sell_percentage
-        self.high_water_mark = None
+        self.triggered = triggered
+        self.triggered_at = triggered_at
+        self.high_water_mark = high_water_mark
         self.high_water_mark_date = high_water_mark_date
         self.open_price = open_price
-        self.take_profit_price = open_price * \
-            (1 + (self.percentage / 100))
+        self.created_at = created_at
+        self.updated_at = updated_at
+
+        if high_water_mark is None and not self.trailing:
+            self.take_profit_price = self.open_price * \
+                (1 + (self.percentage / 100))
+        else:
+            self.take_profit_price = None
 
         if sell_amount is not None:
             self.sell_amount = sell_amount
@@ -84,99 +107,98 @@ class TradeTakeProfit(BaseModel):
         """
         Function to update the take profit price based on
             the last reported price.
-        The take profit price is only updated when the
-            trade risk type is trailing.
-        The take profit price is updated based on the
-            current price and the percentage of the take profit.
+        For fixed take profits: track the high water mark when price
+            exceeds the take profit price.
+        For trailing take profits: update the take profit price based on
+            the current price and the percentage of the take profit.
 
         Args:
             current_price: float - the last reported price of the trade
+            date: the date of the price update
         """
 
-        # Do nothing for fixed take profit
-        if TradeRiskType.FIXED.equals(self.trade_risk_type):
-
-            if self.high_water_mark is not None:
-                if current_price > self.high_water_mark:
+        if not self.trailing:
+            # Fixed take profit: track high watermark
+            if current_price >= self.take_profit_price:
+                if (self.high_water_mark is None
+                        or current_price > self.high_water_mark):
                     self.high_water_mark = current_price
                     self.high_water_mark_date = date
-            else:
-                if current_price >= self.take_profit_price:
-                    self.high_water_mark = current_price
-                    self.high_water_mark_date = date
-                return
-
             return
-        else:
 
-            if self.high_water_mark is None:
+        # Trailing take profit logic
+        if self.high_water_mark is None:
+            # High water mark not set yet
+            # Calculate the initial take profit threshold
+            initial_threshold = self.open_price * (1 + (self.percentage / 100))
 
-                if current_price >= self.take_profit_price:
-                    self.high_water_mark = current_price
-                    self.high_water_mark_date = date
-                    new_take_profit_price = self.high_water_mark * \
-                        (1 - (self.percentage / 100))
-
-                    if self.take_profit_price <= new_take_profit_price:
-                        self.take_profit_price = new_take_profit_price
-
-                return
-
-            # Check if the current price is less than the take profit price
-            if current_price < self.take_profit_price:
-                return
-
-            # Increase the high water mark and take profit price
-            elif current_price > self.high_water_mark:
+            # Wait for price to reach the initial take profit threshold
+            if current_price >= initial_threshold:
+                # Initial threshold reached, set high watermark
                 self.high_water_mark = current_price
                 self.high_water_mark_date = date
+                # Calculate new take profit price based on high watermark
+                self.take_profit_price = self.high_water_mark * \
+                    (1 - (self.percentage / 100))
+        else:
+            # High watermark is set, check for updates
+            # Check if price has risen above high watermark (adjust upward)
+            if current_price > self.high_water_mark:
+                self.high_water_mark = current_price
+                self.high_water_mark_date = date
+                # Recalculate take profit price based on new high water mark
                 new_take_profit_price = self.high_water_mark * \
                     (1 - (self.percentage / 100))
-
-                # Only increase the take profit price if the new take
-                # profit price based on the new high water mark is higher
-                # then the current take profit price
-                if self.take_profit_price <= new_take_profit_price:
+                # Update take profit price if it's higher than current
+                if new_take_profit_price > self.take_profit_price:
                     self.take_profit_price = new_take_profit_price
-
-        return
 
     def has_triggered(self, current_price: float = None) -> bool:
 
-        if TradeRiskType.FIXED.equals(self.trade_risk_type):
-            # Check if the current price is less than the high water mark
+        if not self.trailing:
+            # Fixed take profit: trigger when price reaches take_profit_price
             return current_price >= self.take_profit_price
         else:
-            # Always return false, when the high water mark is not set
-            # But check if we can set the high water mark
+            # Trailing take profit logic
             if self.high_water_mark is None:
+                # High water mark not set yet
+                # Calculate the initial take profit threshold
+                # (open_price * (1 + percentage))
+                initial_threshold = (self.open_price
+                                     * (1 + (self.percentage / 100)))
 
-                if current_price >= self.take_profit_price:
+                # Wait for price to reach the initial take profit threshold
+                if current_price >= initial_threshold:
+                    # Initial threshold reached, set high water mark
                     self.high_water_mark = current_price
+                    # Calculate new take profit price based on high water mark
+                    # This is the pullback level
+                    # (high_water_mark * (1 - percentage))
+                    self.take_profit_price = self.high_water_mark * \
+                        (1 - (self.percentage / 100))
+                # Don't trigger yet, wait for pullback
+                return False
+            else:
+                # High watermark is set, check for triggers and updates
+
+                # Check if price has pulled back below take profit
+                # price (trigger condition)
+                if current_price < self.take_profit_price:
+                    return True
+
+                # Check if price has risen above high
+                # water mark (adjust upward)
+                if current_price > self.high_water_mark:
+                    self.high_water_mark = current_price
+                    # Recalculate take profit price based on
+                    # new high water mark
                     new_take_profit_price = self.high_water_mark * \
                         (1 - (self.percentage / 100))
-                    if self.take_profit_price <= new_take_profit_price:
+                    # Update take profit price if it's higher than current
+                    if new_take_profit_price > self.take_profit_price:
                         self.take_profit_price = new_take_profit_price
 
                 return False
-
-            # Check if the current price is less than the take profit price
-            if current_price < self.take_profit_price:
-                return True
-
-            # Increase the high watermark and take profit price
-            elif current_price > self.high_water_mark:
-                self.high_water_mark = current_price
-                new_take_profit_price = self.high_water_mark * \
-                    (1 - (self.percentage / 100))
-
-                # Only increase the take profit price if the new take
-                # profit price based on the new high water mark is higher
-                # then the current take profit price
-                if self.take_profit_price <= new_take_profit_price:
-                    self.take_profit_price = new_take_profit_price
-
-        return False
 
     def get_sell_amount(self) -> float:
         """
@@ -189,9 +211,8 @@ class TradeTakeProfit(BaseModel):
             trade stop loss is responsible for setting the trade stop
             loss to inactive.
 
-        Args:
-            trade: Trade - the trade to calculate the sell amount for
-
+        Returns:
+            float - the amount to sell
         """
 
         if not self.active:
@@ -206,8 +227,8 @@ class TradeTakeProfit(BaseModel):
         date is added to the list of sell dates.
 
         Args:
-            price: float - the price at which the trade was sold
-            date: str - the date at which the trade was sold
+            price (float): the price at which the trade was sold
+            date (datetime): the date at which the trade was sold
 
         Returns:
             None
@@ -255,9 +276,16 @@ class TradeTakeProfit(BaseModel):
             self.sell_dates = None
 
     def to_dict(self, datetime_format=None):
+        def ensure_iso(value):
+            if hasattr(value, "isoformat"):
+                if value.tzinfo is None:
+                    value = value.replace(tzinfo=timezone.utc)
+                return value.isoformat()
+            return value
+
         return {
             "trade_id": self.trade_id,
-            "trade_risk_type": self.trade_risk_type,
+            "trailing": self.trailing,
             "percentage": self.percentage,
             "open_price": self.open_price,
             "sell_percentage": self.sell_percentage,
@@ -266,38 +294,72 @@ class TradeTakeProfit(BaseModel):
             "sell_amount": self.sell_amount,
             "sold_amount": self.sold_amount,
             "active": self.active,
-            "sell_prices": self.sell_prices
+            "triggered": self.triggered,
+            "triggered_at": ensure_iso(self.triggered_at),
+            "high_water_mark_date": self.high_water_mark_date,
+            "sell_prices": self.sell_prices,
+            "created_at": ensure_iso(self.created_at),
+            "updated_at": ensure_iso(self.updated_at)
         }
 
     @staticmethod
     def from_dict(data: dict):
+        created_at = parse(data["created_at"]) \
+            if data.get("created_at") is not None else None
+        updated_at = parse(data["updated_at"]) \
+            if data.get("updated_at") is not None else None
+        triggered_at = parse(data["triggered_at"]) \
+            if data.get("triggered_at") is not None else None
+        high_water_mark_date = parse(data.get("high_water_mark_date")) \
+            if data.get("high_water_mark_date") is not None else None
+
+        # Make sure all the dates are timezone utc aware
+        if created_at and created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        if updated_at and updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=timezone.utc)
+        if triggered_at and triggered_at.tzinfo is None:
+            triggered_at = triggered_at.replace(tzinfo=timezone.utc)
+        if high_water_mark_date and high_water_mark_date.tzinfo is None:
+            high_water_mark_date = high_water_mark_date.replace(
+                tzinfo=timezone.utc
+            )
+
         return TradeTakeProfit(
             trade_id=data.get("trade_id"),
-            trade_risk_type=TradeRiskType.from_string(
-                data.get("trade_risk_type")
-            ),
+            trailing=data.get("trailing"),
             percentage=data.get("percentage"),
             open_price=data.get("open_price"),
             total_amount_trade=data.get("total_amount_trade"),
             sell_percentage=data.get("sell_percentage", 100),
             active=data.get("active", True),
+            triggered=data.get("triggered", False),
+            triggered_at=triggered_at,
             sell_prices=data.get("sell_prices"),
             sell_dates=data.get("sell_dates"),
             sell_amount=data.get("sell_amount"),
-            high_water_mark_date=data.get("high_water_mark_date")
+            high_water_mark=data.get("high_water_mark"),
+            high_water_mark_date=high_water_mark_date,
+            created_at=created_at,
+            updated_at=updated_at
         )
 
     def __repr__(self):
         return self.repr(
             trade_id=self.trade_id,
-            trade_risk_type=self.trade_risk_type,
+            trailing=self.trailing,
             percentage=self.percentage,
             open_price=self.open_price,
             sell_percentage=self.sell_percentage,
             high_water_mark=self.high_water_mark,
+            high_water_mark_date=self.high_water_mark_date,
+            triggered=self.triggered,
+            triggered_at=self.triggered_at,
             take_profit_price=self.take_profit_price,
             sell_amount=self.sell_amount,
             sold_amount=self.sold_amount,
             active=self.active,
-            sell_prices=self.sell_prices
+            sell_prices=self.sell_prices,
+            created_at=self.created_at,
+            updated_at=self.updated_at
         )

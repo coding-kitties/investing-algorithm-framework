@@ -10,7 +10,7 @@ class PortfolioConfiguration(BaseModel):
     This class represents a portfolio configuration. It is used to
     configure the portfolio that the user wants to create.
 
-    The portfolio configuration will have the following attributes:
+    Attributes:
     - market: The market where the portfolio will be created
     - trading_symbol: The trading symbol of the portfolio
     - track_from: The date from which the portfolio will be tracked

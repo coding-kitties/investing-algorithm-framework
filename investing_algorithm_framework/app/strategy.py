@@ -1,11 +1,12 @@
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 
 import pandas as pd
 
-from investing_algorithm_framework.domain import OperationalException, Position
-from investing_algorithm_framework.domain import PositionSize, \
-    TimeUnit, StrategyProfile, Trade, DataSource, OrderSide
+from investing_algorithm_framework.domain import OperationalException, \
+    Position, PositionSize, TimeUnit, StrategyProfile, Trade, \
+    DataSource, OrderSide, StopLossRule, TakeProfitRule, Order, \
+    INDEX_DATETIME
 from .context import Context
 
 
@@ -42,6 +43,8 @@ class TradingStrategy:
     context: Context = None
     metadata: Dict[str, Any] = None
     position_sizes: List[PositionSize] = []
+    stop_loss_rules: List[StopLossRule] = []
+    take_profit_rules: List[TakeProfitRule] = []
     symbols: List[str] = []
     trading_symbol: str = None
 
@@ -111,6 +114,9 @@ class TradingStrategy:
         # context initialization
         self._context = None
         self._last_run = None
+        self.stop_loss_rules_lookup = {}
+        self.take_profit_rules_lookup = {}
+        self.position_sizes_lookup = {}
 
     def generate_buy_signals(
         self, data: Dict[str, Any]
@@ -125,8 +131,18 @@ class TradingStrategy:
 
         Returns:
             Dict[str, Series]: A dictionary where the keys are the
-              symbols and the values are pandas Series containing
-              the buy signals.
+                symbols and the values are pandas Series containing
+                the buy signals. The series must be a pandas Series with
+                a boolean value for each row in the data source, e.g.
+                pd.Series([True, False, False, True, ...], index=data.index)
+                Also the return dictionary must look like:
+                {
+                    "BTC": pd.Series([...]),
+                    "ETH": pd.Series([...]),
+                    ...
+                }
+                where the symbols are exactly the same as defined in the
+                symbols attribute of the strategy.
         """
         raise NotImplementedError(
             "generate_buy_signals method not implemented"
@@ -141,13 +157,28 @@ class TradingStrategy:
         the sell signals.
 
         Args:
-            data (Dict[str, Any]): All the data that matched the
-                data sources of the strategy.
+            data (Dict[str, Any]): All the data that is defined in the
+                data sources of the strategy. E.g. if there is a data source
+                defined as DataSource(identifier="bitvavo_btc_eur_1h",
+                symbol="BTC/EUR", time_frame="1h", data_type=DataType.OHLCV,
+                window_size=100, market="BITVAVO"), the data dictionary
+                will contain a key "bitvavo_btc_eur_1h"
+                with the corresponding data as a polars DataFrame.
 
         Returns:
             Dict[str, Series]: A dictionary where the keys are the
                 symbols and the values are pandas Series containing
-                the sell signals.
+                the sell signals. The series must be a pandas Series with
+                a boolean value for each row in the data source, e.g.
+                pd.Series([True, False, False, True, ...], index=data.index)
+                Also the return dictionary must look like:
+                {
+                    "BTC": pd.Series([...]),
+                    "ETH": pd.Series([...]),
+                    ...
+                }
+                where the symbols are exactly the same as defined in the
+                symbols attribute of the strategy.
         """
         raise NotImplementedError(
             "generate_sell_signals method not implemented"
@@ -155,8 +186,24 @@ class TradingStrategy:
 
     def run_strategy(self, context: Context, data: Dict[str, Any]):
         """
-        Main function for running your strategy. This function will be called
+        Main function for running the strategy. This function will be called
         by the framework when the trigger of your strategy is met.
+
+        The flow of this function is as follows:
+        1. Loop through all the symbols defined in the strategy.
+        2. For each symbol, check if there are any open orders.
+            A. If there are open orders, skip to the next symbol.
+        3. If there is no open position, generate buy signals
+            A. Generate buy signals
+            B. If there is a buy signal, retrieve the position size
+                defined for the symbol.
+            C. If there is a take profit or stop loss rule defined
+                for the symbol, register them for the trade that
+                has been created as part of the order execution.
+        4. If there is an open position, generate sell signals
+            A. Generate sell signals
+            B. If there is a sell signal, create a limit order to
+                sell the position.
 
         During execution of this function, the context and market data
         will be passed to the function. The context is an instance of
@@ -166,6 +213,18 @@ class TradingStrategy:
         The market data is a dictionary containing all the data retrieved
         from the specified data sources.
 
+        When buy or sell signals are generated, the strategy will create
+        limit orders to buy or sell the assets based on the generated signals.
+        For each symbol a corresponding position size must be defined. If
+        no position size is defined, an OperationalException will be raised.
+
+        Before creating new orders, the strategy will check if there are any
+        stop losses or take profits for symbol registered. It will
+        use the function get_stop_losses and get_take_profits, these functions
+        can be overridden by the user to provide custom stop losses and
+        take profits logic. The default functions will return the stop losses
+        and take profits that are registered for the symbol if any.
+
         Args:
             context (Context): The context of the strategy. This is an instance
                 of the Context class, this class has various methods to do
@@ -173,12 +232,15 @@ class TradingStrategy:
                 other components.
             data (Dict[str, Any]): The data for the strategy.
                 This is a dictionary containing all the data retrieved from the
-                specified data sources.
+                specified data sources. The keys are either the
+                identifiers of the data sources or a generated key, usually
+                <target_symbol>_<trading_symbol>_<time_frame> e.g. BTC-EUR_1h.
 
         Returns:
             None
         """
         self.context = context
+        index_datetime = context.config[INDEX_DATETIME]
         buy_signals = self.generate_buy_signals(data)
         sell_signals = self.generate_sell_signals(data)
 
@@ -187,73 +249,89 @@ class TradingStrategy:
             if self.has_open_orders(symbol):
                 continue
 
-            if not self.has_position(symbol) \
-                    and not self.has_open_orders(symbol):
+            if not self.has_position(symbol):
 
-                if symbol in buy_signals:
-                    signals = buy_signals[symbol]
+                if symbol not in buy_signals:
+                    continue
 
-                    # Check in the last row if there is a buy signal
-                    last_row = signals.iloc[-1]
-                    if last_row:
-                        position_size = next(
-                            (ps for ps in self.position_sizes
-                             if ps.symbol == symbol), None
+                signals = buy_signals[symbol]
+                last_row = signals.iloc[-1]
+
+                if last_row:
+                    position_size = self.get_position_size(symbol)
+                    full_symbol = (f"{symbol}/"
+                                   f"{self.context.get_trading_symbol()}")
+                    price = self.context.get_latest_price(full_symbol)
+                    amount = position_size.get_size(
+                        self.context.get_portfolio(), price
+                    )
+                    order_amount = amount / price
+                    order = self.create_limit_order(
+                        target_symbol=symbol,
+                        order_side=OrderSide.BUY,
+                        amount=order_amount,
+                        price=price,
+                        execute=True,
+                        validate=True,
+                        sync=True
+                    )
+
+                    # Retrieve stop loss and take profit rules if any
+                    stop_loss_rule = self.get_stop_loss_rule(symbol)
+                    take_profit_rule = self.get_take_profit_rule(symbol)
+
+                    if stop_loss_rule is not None:
+                        trade = self.context.get_trade(
+                            order_id=order.id
                         )
-                        if position_size is None:
-                            raise OperationalException(
-                                f"No position size defined for symbol "
-                                f"{symbol} in strategy "
-                                f"{self.strategy_id}"
-                            )
-                        full_symbol = (f"{symbol}/"
-                                       f"{self.context.get_trading_symbol()}")
-                        price = self.context.get_latest_price(full_symbol)
-                        amount = position_size.get_size(
-                            self.context.get_portfolio(), price
-                        )
-                        order_amount = amount / price
-                        self.create_limit_order(
-                            target_symbol=symbol,
-                            order_side=OrderSide.BUY,
-                            amount=order_amount,
-                            price=price,
-                            execute=True,
-                            validate=True,
-                            sync=True
+                        self.context.add_stop_loss(
+                            trade=trade,
+                            percentage=stop_loss_rule.percentage_threshold,
+                            trailing=stop_loss_rule.trailing,
+                            sell_percentage=stop_loss_rule.sell_percentage,
+                            created_at=index_datetime
                         )
 
-            if self.has_position(symbol) \
-                    and not self.has_open_orders(symbol):
-
+                    if take_profit_rule is not None:
+                        trade = self.context.get_trade(
+                            order_id=order.id
+                        )
+                        self.context.add_take_profit(
+                            trade=trade,
+                            percentage=take_profit_rule.percentage_threshold,
+                            trailing=take_profit_rule.trailing,
+                            sell_percentage=take_profit_rule.sell_percentage,
+                            created_at=index_datetime
+                        )
+            else:
                 # Check in the last row if there is a sell signal
-                if symbol in sell_signals:
-                    signals = sell_signals[symbol]
+                if symbol not in sell_signals:
+                    continue
 
-                    # Check in the last row if there is a sell signal
-                    last_row = signals.iloc[-1]
+                signals = sell_signals[symbol]
+                last_row = signals.iloc[-1]
 
-                    if last_row:
-                        position = self.get_position(symbol)
+                if last_row:
+                    position = self.get_position(symbol)
 
-                        if position is None:
-                            raise OperationalException(
-                                f"No position found for symbol {symbol} "
-                                f"in strategy {self.strategy_id}"
-                            )
-
-                        full_symbol = (f"{symbol}/"
-                                       f"{self.context.get_trading_symbol()}")
-                        price = self.context.get_latest_price(full_symbol)
-                        self.create_limit_order(
-                            target_symbol=symbol,
-                            order_side=OrderSide.SELL,
-                            amount=position.amount,
-                            execute=True,
-                            validate=True,
-                            sync=True,
-                            price=price
+                    if position is None:
+                        raise OperationalException(
+                            f"No position found for symbol {symbol} "
+                            f"in strategy {self.strategy_id}"
                         )
+
+                    full_symbol = (f"{symbol}/"
+                                   f"{self.context.get_trading_symbol()}")
+                    price = self.context.get_latest_price(full_symbol)
+                    self.create_limit_order(
+                        target_symbol=symbol,
+                        order_side=OrderSide.SELL,
+                        amount=position.amount,
+                        execute=True,
+                        validate=True,
+                        sync=True,
+                        price=price
+                    )
 
     def apply_strategy(self, context, data):
         if self.decorated:
@@ -270,41 +348,81 @@ class TradingStrategy:
             data_sources=self.data_sources
         )
 
-    def _update_trades_and_orders(self, market_data):
-        self.context.order_service.check_pending_orders()
-        self.context.trade_service\
-            .update_trades_with_market_data(market_data)
-
-    def _update_trades_and_orders_for_backtest(self, market_data):
-        self.context.order_service.check_pending_orders(market_data)
-        self.context.trade_service\
-            .update_trades_with_market_data(market_data)
-
-    def _check_stop_losses(self):
+    def get_take_profit_rule(self, symbol: str) -> Union[TakeProfitRule, None]:
         """
-        Check if there are any stop losses that result in trades being closed.
+        Get the take profit definition for a given symbol.
+
+        Args:
+            symbol (str): The symbol of the asset.
+
+        Returns:
+            Union[TakeProfitRule, None]: The take profit rule if found,
+              None otherwise.
         """
-        trade_service = self.context.trade_service
 
-        stop_losses_orders_data = trade_service\
-            .get_triggered_stop_loss_orders()
+        if len(self.take_profit_rules) == 0:
+            return None
 
-        order_service = self.context.order_service
+        if self.take_profit_rules_lookup == {}:
+            for tp in self.take_profit_rules:
+                self.take_profit_rules_lookup[tp.symbol] = tp
 
-        for stop_loss_order in stop_losses_orders_data:
-            order_service.create(stop_loss_order)
+        return self.take_profit_rules_lookup.get(symbol, None)
 
-    def _check_take_profits(self):
+    def get_stop_loss_rule(self, symbol: str) -> Union[StopLossRule, None]:
         """
-        Check if there are any take profits that result in trades being closed.
-        """
-        trade_service = self.context.trade_service
-        take_profit_orders_data = trade_service.\
-            get_triggered_take_profit_orders()
-        order_service = self.context.order_service
+        Get the stop loss definition for a given symbol.
 
-        for take_profit_order in take_profit_orders_data:
-            order_service.create(take_profit_order)
+        Args:
+            symbol (str): The symbol of the asset.
+
+        Returns:
+            Union[StopLossRule, None]: The stop loss rule if found,
+              None otherwise.
+        """
+
+        if len(self.stop_loss_rules) == 0:
+            return None
+
+        if self.stop_loss_rules_lookup == {}:
+            for sl in self.stop_loss_rules:
+                self.stop_loss_rules_lookup[sl.symbol] = sl
+
+        return self.stop_loss_rules_lookup.get(symbol, None)
+
+    def get_position_size(self, symbol: str) -> Union[PositionSize, None]:
+        """
+        Get the position size definition for a given symbol.
+
+        Args:
+            symbol (str): The symbol of the asset.
+
+        Returns:
+            Union[PositionSize, None]: The position size if found,
+              None otherwise.
+        """
+
+        if len(self.position_sizes) == 0:
+            raise OperationalException(
+                f"No position size defined for symbol "
+                f"{symbol} in strategy "
+                f"{self.strategy_id}"
+            )
+
+        if self.position_sizes_lookup == {}:
+            for ps in self.position_sizes:
+                self.position_sizes_lookup[ps.symbol] = ps
+
+        position_size = self.position_sizes_lookup.get(symbol, None)
+
+        if position_size is None:
+            raise OperationalException(
+                f"No position size defined for symbol "
+                f"{symbol} in strategy "
+                f"{self.strategy_id}"
+            )
+
+        return position_size
 
     def on_trade_closed(self, context: Context, trade: Trade):
         pass
@@ -395,7 +513,7 @@ class TradingStrategy:
         execute=True,
         validate=True,
         sync=True
-    ):
+    ) -> Order:
         """
         Function to create a limit order. This function will create
         a limit order and execute it if the execute parameter is set to True.
@@ -427,7 +545,7 @@ class TradingStrategy:
         Returns:
             Order: Instance of the order created
         """
-        self.context.create_limit_order(
+        return self.context.create_limit_order(
             target_symbol=target_symbol,
             price=price,
             order_side=order_side,
@@ -445,7 +563,7 @@ class TradingStrategy:
 
     def close_position(
         self, symbol, market=None, identifier=None, precision=None
-    ):
+    ) -> Order:
         """
         Function to close a position. This function will close a position
         by creating a market order to sell the position. If the precision
@@ -461,7 +579,7 @@ class TradingStrategy:
         Returns:
             None
         """
-        self.context.close_position(
+        return self.context.close_position(
             symbol=symbol,
             market=market,
             identifier=identifier,

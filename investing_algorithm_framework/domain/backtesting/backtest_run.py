@@ -1,11 +1,10 @@
 import json
 import os
-from typing import Dict
 from pathlib import Path
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from logging import getLogger
-from typing import Union, List, Optional
+from typing import Union, List, Optional, Dict
 
 from investing_algorithm_framework.domain.exceptions \
     import OperationalException
@@ -17,6 +16,10 @@ from investing_algorithm_framework.domain.models.portfolio import \
     PortfolioSnapshot
 from investing_algorithm_framework.domain.models.trade.trade_status import \
     TradeStatus
+from investing_algorithm_framework.domain.models.trade.trade_stop_loss import \
+    TradeStopLoss
+from investing_algorithm_framework.domain.models.trade.trade_take_profit \
+    import TradeTakeProfit
 
 
 from .backtest_metrics import BacktestMetrics
@@ -295,13 +298,45 @@ class BacktestRun:
             )
             json.dump(data, f, default=str)
 
-    def get_trades(self, target_symbol=None, trade_status=None) -> List[Trade]:
+    def get_trade(self, trade_id: str) -> Optional[Trade]:
+        """
+        Get a trade by its ID from the backtest report
+
+        Args:
+            trade_id (str): The trade ID
+
+        Returns:
+            Trade: The trade with the given ID, or None if not found
+        """
+        for trade in self.trades:
+            if trade.trade_id == trade_id:
+                return trade
+
+        return None
+
+    def get_trades(
+        self,
+        target_symbol: str = None,
+        trade_status: Union[TradeStatus, str] = None,
+        opened_at: datetime = None,
+        opened_at_lt: datetime = None,
+        opened_at_lte: datetime = None,
+        opened_at_gt: datetime = None,
+        opened_at_gte: datetime = None,
+        order_id: str = None
+    ) -> List[Trade]:
         """
         Get the trades of a backtest report
 
         Args:
             target_symbol (str): The target_symbol
-            trade_status: The trade_status
+            trade_status (Union[TradeStatus, str]): The trade status
+            opened_at (datetime): The created_at date to filter the trades
+            opened_at_lt (datetime): The created_at date to filter the trades
+            opened_at_lte (datetime): The created_at date to filter the trades
+            opened_at_gt (datetime): The created_at date to filter the trades
+            opened_at_gte (datetime): The created_at date to filter the trades
+            order_id (str): The order ID to filter the trades
 
         Returns:
             list: The trades of the backtest report
@@ -321,7 +356,110 @@ class BacktestRun:
                 if trade.status == trade_status.value
             ]
 
+        if opened_at is not None:
+            selection = [
+                trade for trade in selection
+                if trade.opened_at == opened_at
+            ]
+
+        if opened_at_lt is not None:
+            selection = [
+                trade for trade in selection
+                if trade.opened_at < opened_at_lt
+            ]
+
+        if opened_at_lte is not None:
+            selection = [
+                trade for trade in selection
+                if trade.opened_at <= opened_at_lte
+            ]
+
+        if opened_at_gt is not None:
+            selection = [
+                trade for trade in selection
+                if trade.opened_at > opened_at_gt
+            ]
+
+        if opened_at_gte is not None:
+            selection = [
+                trade for trade in selection
+                if trade.opened_at >= opened_at_gte
+            ]
+
+        if order_id is not None:
+            new_selection = []
+            for trade in selection:
+
+                for order in trade.orders:
+                    if order.order_id == order_id:
+                        new_selection.append(trade)
+                        break
+
+            selection = new_selection
+
         return selection
+
+    def get_stop_losses(
+        self,
+        trade_id: str = None,
+        triggered: bool = None
+    ) -> List[TradeStopLoss]:
+        """
+        Get the stop losses of the backtest report
+
+        Args:
+            trade_id (str): The trade ID to filter the stop losses
+            triggered (bool): Whether to filter by triggered stop losses
+
+        Returns:
+            list: The stop losses of the backtest report
+        """
+        stop_losses = []
+
+        for trade in self.trades:
+            if trade_id is not None and trade.id != trade_id:
+                continue
+
+            for sl in trade.stop_losses:
+                if isinstance(sl, TradeStopLoss):
+                    if triggered is not None:
+                        if sl.triggered == triggered:
+                            stop_losses.append(sl)
+                    else:
+                        stop_losses.append(sl)
+
+        return stop_losses
+
+    def get_take_profits(
+        self,
+        trade_id: str = None,
+        triggered: bool = None
+    ) -> List[TradeStopLoss]:
+        """
+        Get the take profits of the backtest report
+
+        Args:
+            trade_id (str): The trade ID to filter the take profits
+            triggered (bool): Whether to filter by triggered take profits
+
+        Returns:
+            list: The take profits of the backtest report
+        """
+        take_profits = []
+
+        for trade in self.trades:
+            if trade_id is not None and trade.id != trade_id:
+                continue
+
+            for tp in trade.take_profits:
+                if isinstance(tp, TradeTakeProfit):
+                    if triggered is not None:
+                        if tp.triggered == triggered:
+                            take_profits.append(tp)
+                    else:
+                        take_profits.append(tp)
+
+        return take_profits
 
     def get_portfolio_snapshots(
         self,
@@ -376,10 +514,14 @@ class BacktestRun:
 
     def get_orders(
         self,
-        target_symbol=None,
-        order_side=None,
-        order_status=None,
-        created_at_lt=None,
+        target_symbol: str = None,
+        order_side: str = None,
+        order_status: Union[OrderStatus, str] = None,
+        created_at: datetime = None,
+        created_at_lt: datetime = None,
+        created_at_lte: datetime = None,
+        created_at_gt: datetime = None,
+        created_at_gte: datetime = None
     ) -> List[Order]:
         """
         Get the orders of a backtest report
@@ -387,18 +529,46 @@ class BacktestRun:
         Args:
             target_symbol (str): The target_symbol
             order_side (str): The order side
-            order_status (str): The order status
+            order_status (Union[OrderStatus, str]): The order status
+            created_at (datetime): The created_at date to filter the orders
             created_at_lt (datetime): The created_at date to filter the orders
+            created_at_lte (datetime): The created_at date to filter the orders
+            created_at_gt (datetime): The created_at date to filter the orders
+            created_at_gte (datetime): The created_at date to filter the orders
 
         Returns:
             list: The orders of the backtest report
         """
         selection = self.orders
 
+        if created_at is not None:
+            selection = [
+                order for order in selection
+                if order.created_at == created_at
+            ]
+
         if created_at_lt is not None:
             selection = [
                 order for order in selection
                 if order.created_at < created_at_lt
+            ]
+
+        if created_at_lte is not None:
+            selection = [
+                order for order in selection
+                if order.created_at <= created_at_lte
+            ]
+
+        if created_at_gt is not None:
+            selection = [
+                order for order in selection
+                if order.created_at > created_at_gt
+            ]
+
+        if created_at_gte is not None:
+            selection = [
+                order for order in selection
+                if order.created_at >= created_at_gte
             ]
 
         if target_symbol is not None:

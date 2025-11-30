@@ -4,9 +4,9 @@ from queue import PriorityQueue
 from typing import Union
 
 from investing_algorithm_framework.domain import OrderStatus, TradeStatus, \
-    Trade, OperationalException, TradeRiskType, OrderType, \
-    OrderSide, Environment, ENVIRONMENT, PeekableQueue, DataType, \
-    INDEX_DATETIME, random_number, random_string
+    Trade, OperationalException, OrderType, TradeTakeProfit, \
+    TradeStopLoss, OrderSide, Environment, ENVIRONMENT, PeekableQueue, \
+    DataType, INDEX_DATETIME, random_number, random_string
 from investing_algorithm_framework.services.repository_service import \
     RepositoryService
 
@@ -607,7 +607,14 @@ class TradeService(RepositoryService):
         function will update all the metadata objects that where
         created by the sell order.
 
+        Args:
+            filled_difference: float representing the difference between
+                the filled amount of the sell order and the filled amount
+                of the trade
+            sell_order: Order object representing the sell order
 
+        Returns:
+            Trade object
         """
         # Update all metadata objects
         metadata_objects = self.order_metadata_repository.get_all({
@@ -736,9 +743,10 @@ class TradeService(RepositoryService):
         self,
         trade,
         percentage: float,
-        trade_risk_type: TradeRiskType = TradeRiskType.FIXED,
+        trailing: bool = False,
         sell_percentage: float = 100,
-    ):
+        created_at: datetime = None
+    ) -> TradeStopLoss:
         """
         Function to add a stop loss to a trade.
 
@@ -759,10 +767,12 @@ class TradeService(RepositoryService):
             trade: Trade object representing the trade
             percentage: float representing the percentage of the open price
                 that the stop loss should be set at
-            trade_risk_type (TradeRiskType): The type of the stop loss, fixed
-                or trailing
+            trailing (bool): representing whether the stop loss is a
+                trailing stop loss or not. Default is False.
             sell_percentage: float representing the percentage of the trade
-                that should be sold if the stop loss is triggered
+                that should be sold if the stop loss is triggered.
+            created_at: datetime representing the creation date of the
+                stop loss. If None, the current datetime will be used.
 
         Returns:
             None
@@ -783,12 +793,14 @@ class TradeService(RepositoryService):
 
         creation_data = {
             "trade_id": trade.id,
-            "trade_risk_type": TradeRiskType.from_value(trade_risk_type).value,
+            "trailing": trailing,
             "percentage": percentage,
             "open_price": trade.open_price,
             "total_amount_trade": trade.amount,
             "sell_percentage": sell_percentage,
-            "active": True
+            "active": True,
+            "created_at": created_at if created_at is not None
+            else datetime.now(tz=timezone.utc)
         }
         return self.trade_stop_loss_repository.create(creation_data)
 
@@ -796,9 +808,10 @@ class TradeService(RepositoryService):
         self,
         trade,
         percentage: float,
-        trade_risk_type: TradeRiskType = TradeRiskType.FIXED,
+        trailing: bool = False,
         sell_percentage: float = 100,
-    ) -> None:
+        created_at: datetime = None
+    ) -> TradeTakeProfit:
         """
         Function to add a take profit to a trade. This function will add a
         take profit to the specified trade. If the take profit is triggered,
@@ -819,13 +832,16 @@ class TradeService(RepositoryService):
 
         Args:
             trade: Trade object representing the trade
-            percentage: float representing the percentage of the open price
+            percentage (float): representing the percentage of the open price
                 that the stop loss should be set at. This must be a positive
                 number, e.g. 5 for 5%, or 10 for 10%.
-            trade_risk_type (TradeRiskType): The type of the stop loss, fixed
-                or trailing
-            sell_percentage: float representing the percentage of the trade
+            trailing (bool): representing whether the take profit is a
+                trailing take profit or not. Default is False.
+            sell_percentage (float): representing the percentage of the trade
                 that should be sold if the stop loss is triggered
+            created_at (datetime): datetime representing the creation
+                date of the take profit. If None, the current datetime
+                will be used.
 
         Returns:
             None
@@ -843,15 +859,16 @@ class TradeService(RepositoryService):
                 "Combined sell percentages of stop losses belonging "
                 "to trade exceeds 100."
             )
-
         creation_data = {
             "trade_id": trade.id,
-            "trade_risk_type": TradeRiskType.from_value(trade_risk_type).value,
+            "trailing": trailing,
             "percentage": percentage,
             "open_price": trade.open_price,
             "total_amount_trade": trade.amount,
             "sell_percentage": sell_percentage,
-            "active": True
+            "active": True,
+            "created_at": created_at if created_at is not None
+            else datetime.now(tz=timezone.utc)
         }
         return self.trade_take_profit_repository.create(creation_data)
 
@@ -980,7 +997,6 @@ class TradeService(RepositoryService):
                 continue
 
             for take_profit in open_trade.take_profits:
-
                 if (
                     take_profit.active and
                     take_profit.has_triggered(open_trade.last_reported_price)

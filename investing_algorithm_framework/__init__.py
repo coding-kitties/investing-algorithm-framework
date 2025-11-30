@@ -11,12 +11,12 @@ from .app import App, Algorithm, \
 from .domain import ApiException, combine_backtests, PositionSize, \
     OrderType, OperationalException, OrderStatus, OrderSide, \
     TimeUnit, TimeInterval, Order, Portfolio, Backtest, DataError, \
-    Position, TimeFrame, INDEX_DATETIME, MarketCredential, \
+    Position, TimeFrame, INDEX_DATETIME, MarketCredential, TakeProfitRule, \
     PortfolioConfiguration, RESOURCE_DIRECTORY, AWS_LAMBDA_LOGGING_CONFIG, \
-    Trade, SYMBOLS, RESERVED_BALANCES, APP_MODE, AppMode, DATETIME_FORMAT, \
+    Trade, APP_MODE, AppMode, DATETIME_FORMAT, \
     BacktestDateRange, convert_polars_to_pandas, BacktestRun, \
-    DEFAULT_LOGGING_CONFIG, DataType, DataProvider, \
-    TradeStatus, TradeRiskType, generate_backtest_summary_metrics, \
+    DEFAULT_LOGGING_CONFIG, DataType, DataProvider, StopLossRule, \
+    TradeStatus, generate_backtest_summary_metrics, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus
 from .infrastructure import AzureBlobStorageStateHandler, \
@@ -48,7 +48,8 @@ from .services import get_annual_volatility, get_sortino_ratio, \
     get_current_average_trade_gain, get_current_average_trade_duration, \
     get_current_average_trade_loss, get_negative_trades, \
     get_positive_trades, get_number_of_trades, get_current_win_rate, \
-    get_current_win_loss_ratio, create_backtest_metrics_for_backtest
+    get_current_win_loss_ratio, create_backtest_metrics_for_backtest, \
+    TradeTakeProfitService, TradeStopLossService
 
 
 __all__ = [
@@ -76,8 +77,6 @@ __all__ = [
     "TimeFrame",
     "MarketCredential",
     "OperationalException",
-    "SYMBOLS",
-    "RESERVED_BALANCES",
     "APP_MODE",
     "AppMode",
     "DATETIME_FORMAT",
@@ -88,7 +87,6 @@ __all__ = [
     "DEFAULT_LOGGING_CONFIG",
     "BacktestReport",
     "TradeStatus",
-    "TradeRiskType",
     "Context",
     "APPLICATION_DIRECTORY",
     "download",
@@ -193,5 +191,9 @@ __all__ = [
     "load_backtests_from_directory",
     "save_backtests_to_directory",
     "DataError",
-    "create_backtest_metrics_for_backtest"
+    "create_backtest_metrics_for_backtest",
+    "TakeProfitRule",
+    "StopLossRule",
+    "TradeStopLossService",
+    "TradeTakeProfitService"
 ]

@@ -9,13 +9,6 @@ from .trade_order_evaluator import TradeOrderEvaluator
 
 class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
 
-    def __init__(
-        self,
-        trade_service,
-        order_service
-    ):
-        super().__init__(trade_service, order_service)
-
     def evaluate(
         self,
         open_trades: List[Trade],
@@ -34,13 +27,11 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
         Returns:
             List[dict]: Updated trades with latest prices and execution status.
         """
-
         # First check pending orders
         for open_order in open_orders:
             data = ohlcv_data.get(open_order.symbol)
             self._check_has_executed(open_order, data)
 
-        # self.order_service.save_all(orders)
         if len(open_trades) > 0:
             for open_trade in open_trades:
                 data = ohlcv_data[open_trade.symbol]
@@ -58,18 +49,8 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
                 open_trade.update(update_data)
 
             self.trade_service.save_all(open_trades)
-
-            stop_losses_orders_data = self.trade_service \
-                .get_triggered_stop_loss_orders()
-
-            for stop_loss_order in stop_losses_orders_data:
-                self.order_service.create(stop_loss_order)
-
-            take_profits_orders_data = self.trade_service \
-                .get_triggered_take_profit_orders()
-
-            for take_profit_order in take_profits_orders_data:
-                self.order_service.create(take_profit_order)
+            self._check_take_profits()
+            self._check_stop_losses()
 
     def _check_has_executed(self, order, ohlcv_df):
         """

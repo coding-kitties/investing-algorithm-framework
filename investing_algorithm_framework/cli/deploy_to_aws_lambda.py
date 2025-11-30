@@ -312,7 +312,7 @@ def create_s3_bucket(bucket_name, region):
         click.echo(f"S3 bucket {bucket_name} already exists.")
 
 
-def read_env_file(env_path):
+def read_env_file(env_path) -> dict:
     """
     Function to read environment variables from a .env file.
 
@@ -434,7 +434,8 @@ def command(
     lambda_function_name,
     region,
     project_dir=None,
-    memory_size=3000
+    memory_size=3000,
+    env_vars=None
 ):
     """
     Command-line tool for deploying a trading bot to AWS Lambda.
@@ -469,13 +470,14 @@ def command(
     if not s3_bucket_exists(bucket_name, region):
         create_s3_bucket(bucket_name, region)
 
-    env_vars = read_env_file(
+    local_env_vars = read_env_file(
         env_path=os.path.join(project_dir, ".env") if project_dir else ".env"
     )
-    for key, value in env_vars.items():
-        click.echo(f"{key}={value}")
+    if env_vars is None:
+        env_vars = {}
 
-    click.echo("Read the following environment variables from .env file:")
+    env_vars.update(local_env_vars)
+
     click.echo("Adding S3 bucket name to environment variables")
     env_vars[AWS_S3_STATE_BUCKET_NAME] = bucket_name
 

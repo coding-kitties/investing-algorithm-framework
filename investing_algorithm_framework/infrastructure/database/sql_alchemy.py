@@ -84,7 +84,9 @@ def clear_db(db_uri):
 def attach_utc_timezone_on_load(target, context):
     """
     For each model instance loaded from the database,
-    this function will check if the `created_at` and `updated_at`
+    this function will check if one of the following attributes are
+    present: created_at, updated_at, closed_at, opened_at, triggered_at.
+    If so, it will check if these datetime
     attributes are timezone-naive and, if so, will set them to UTC.
 
     Its documented in the contributing guide (https://coding-kitties.github
@@ -118,3 +120,8 @@ def attach_utc_timezone_on_load(target, context):
         dt = getattr(target, "opened_at")
         if dt and dt.tzinfo is None:
             target.opened_at = dt.replace(tzinfo=timezone.utc)
+
+    if hasattr(target, "triggered_at"):
+        dt = getattr(target, "triggered_at")
+        if dt and dt.tzinfo is None:
+            target.triggered_at = dt.replace(tzinfo=timezone.utc)

@@ -14,10 +14,16 @@ class SQLTradeStopLossRepository(Repository):
 
     def _apply_query_params(self, db, query, query_params):
         trade_query_param = self.get_query_param("trade_id", query_params)
+        triggered_query_param = self.get_query_param(
+            "triggered", query_params
+        )
 
         if trade_query_param:
             query = query.filter(
                 SQLTradeStopLoss.trade_id == trade_query_param
             )
+
+        if triggered_query_param is not None:
+            query = query.filter_by(triggered=triggered_query_param)
 
         return query

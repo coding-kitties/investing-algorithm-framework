@@ -2,18 +2,11 @@ from typing import List, Dict
 
 import polars as pl
 
-from investing_algorithm_framework.domain import Trade, Order
+from investing_algorithm_framework.domain import Trade, Order, INDEX_DATETIME
 from .trade_order_evaluator import TradeOrderEvaluator
 
 
 class DefaultTradeOrderEvaluator(TradeOrderEvaluator):
-
-    def __init__(
-        self,
-        trade_service,
-        order_service
-    ):
-        super().__init__(trade_service, order_service)
 
     def evaluate(
         self,
@@ -34,6 +27,7 @@ class DefaultTradeOrderEvaluator(TradeOrderEvaluator):
             List[dict]: Updated trades with latest prices and execution status.
         """
         self.order_service.check_pending_orders()
+        current_date = self.configuration_service.config[INDEX_DATETIME]
 
         if len(open_trades) > 0:
             for open_trade in open_trades:
@@ -44,23 +38,14 @@ class DefaultTradeOrderEvaluator(TradeOrderEvaluator):
 
                 # Get last row of data
                 last_row = data.tail(1)
+                last_row_date = last_row["Datetime"][0]
                 update_data = {
                     "last_reported_price": last_row["Close"][0],
-                    "last_reported_price_datetime": last_row["Datetime"][0],
-                    "updated_at": last_row["Datetime"][0]
+                    "last_reported_price_datetime": last_row_date,
+                    "updated_at": current_date
                 }
                 open_trade.update(update_data)
 
             self.trade_service.save_all(open_trades)
-
-            stop_losses_orders_data = self.trade_service \
-                .get_triggered_stop_loss_orders()
-
-            for stop_loss_order in stop_losses_orders_data:
-                self.order_service.create(stop_loss_order)
-
-            take_profits_orders_data = self.trade_service \
-                .get_triggered_take_profit_orders()
-
-            for take_profit_order in take_profits_orders_data:
-                self.order_service.create(take_profit_order)
+            self._check_take_profits()
+            self._check_stop_losses()

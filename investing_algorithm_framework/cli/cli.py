@@ -171,11 +171,21 @@ def deploy_azure_function(
     type=int,
     help='The memory size for the Lambda function in MB. Default is 3000 MB.'
 )
+@click.option(
+    '--env',
+    '-e',
+    multiple=True,
+    nargs=2,
+    type=str,
+    help='Environment variables to pass to the Lambda function. '
+         'Can be used multiple times: -e KEY VALUE -e KEY2 VALUE2'
+)
 def deploy_aws_lambda(
     lambda_function_name,
     region,
     project_dir=None,
-    memory_size=3000
+    memory_size=3000,
+    env=None
 ):
     """
     Command-line tool for deploying a trading bot to AWS lambda
@@ -190,15 +200,24 @@ def deploy_aws_lambda(
             the current directory.
         memory_size (int): The memory size for the Lambda function in MB.
             Default is 3000 MB.
+        env (tuple): Environment variables as tuples of (KEY, VALUE).
+            Can be specified multiple times.
 
     Returns:
         None
     """
+    # Convert env tuples to dictionary
+    env_vars = {}
+    if env:
+        for key, value in env:
+            env_vars[key] = value
+
     deploy_to_aws_lambda_command(
         lambda_function_name=lambda_function_name,
         region=region,
         project_dir=project_dir,
-        memory_size=memory_size
+        memory_size=memory_size,
+        env_vars=env_vars
     )
 
 

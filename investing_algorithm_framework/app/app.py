@@ -452,6 +452,7 @@ class App:
         # Prepare the backtest data for each data provider
         if not show_progress:
             for _, data_provider in data_providers:
+
                 data_provider.prepare_backtest_data(
                     backtest_start_date=backtest_date_range.start_date,
                     backtest_end_date=backtest_date_range.end_date
@@ -616,7 +617,12 @@ class App:
 
             trade_order_evaluator = DefaultTradeOrderEvaluator(
                 trade_service=self.container.trade_service(),
-                order_service=self.container.order_service()
+                order_service=self.container.order_service(),
+                trade_stop_loss_service=self.container
+                .trade_stop_loss_service(),
+                trade_take_profit_service=self.container
+                .trade_take_profit_service(),
+                configuration_service=self.container.configuration_service()
             )
             event_loop_service = EventLoopService(
                 configuration_service=self.container.configuration_service(),
@@ -1368,7 +1374,11 @@ class App:
         )
         trade_order_evaluator = BacktestTradeOrderEvaluator(
             trade_service=self.container.trade_service(),
-            order_service=self.container.order_service()
+            order_service=self.container.order_service(),
+            trade_stop_loss_service=self.container.trade_stop_loss_service(),
+            trade_take_profit_service=self.container
+            .trade_take_profit_service(),
+            configuration_service=self.container.configuration_service()
         )
         event_loop_service.initialize(
             algorithm=algorithm,

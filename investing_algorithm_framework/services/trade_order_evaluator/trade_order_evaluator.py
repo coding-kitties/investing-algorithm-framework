@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict
 import polars as pl
-from investing_algorithm_framework.domain import Trade, Order
+from investing_algorithm_framework.domain import Trade, Order, INDEX_DATETIME
 
 
 class TradeOrderEvaluator(ABC):
@@ -9,10 +9,16 @@ class TradeOrderEvaluator(ABC):
     def __init__(
         self,
         trade_service,
-        order_service
+        trade_stop_loss_service,
+        trade_take_profit_service,
+        order_service,
+        configuration_service=None
     ):
         self.trade_service = trade_service
+        self.trade_stop_loss_service = trade_stop_loss_service
+        self.trade_take_profit_service = trade_take_profit_service
         self.order_service = order_service
+        self.configuration_service = configuration_service
 
     @abstractmethod
     def evaluate(
@@ -39,3 +45,36 @@ class TradeOrderEvaluator(ABC):
             List[dict]: Updated trades with latest prices and execution status.
         """
         pass
+
+    def _check_take_profits(self):
+        current_date = self.configuration_service.config[INDEX_DATETIME]
+        take_profits_orders_data = self.trade_service \
+            .get_triggered_take_profit_orders()
+
+        for take_profit_order in take_profits_orders_data:
+            take_profits = take_profit_order["take_profits"]
+            self.order_service.create(take_profit_order)
+            self.trade_take_profit_service.mark_triggered(
+                [
+                    take_profit.get("take_profit_id")
+                    for take_profit in take_profits
+                ],
+                trigger_date=current_date
+            )
+
+    def _check_stop_losses(self):
+        current_date = self.configuration_service.config[INDEX_DATETIME]
+        stop_losses_orders_data = self.trade_service \
+            .get_triggered_stop_loss_orders()
+
+        for stop_loss_order in stop_losses_orders_data:
+            stop_losses = stop_loss_order["stop_losses"]
+
+            self.order_service.create(stop_loss_order)
+            self.trade_stop_loss_service.mark_triggered(
+                [
+                    stop_loss.get("stop_loss_id") for stop_loss in
+                    stop_losses
+                ],
+                trigger_date=current_date
+            )

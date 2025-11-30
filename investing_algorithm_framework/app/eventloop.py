@@ -351,7 +351,7 @@ class EventLoopService:
                     sorted_times,
                     total=len(sorted_times),
                     colour="GREEN",
-                    desc="Running backtest"
+                    desc="Running event backtest"
                 ):
                     self._configuration_service.add_value(
                         INDEX_DATETIME, current_time

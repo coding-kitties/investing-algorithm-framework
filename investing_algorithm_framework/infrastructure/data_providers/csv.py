@@ -92,7 +92,6 @@ class CSVOHLCVDataProvider(DataProvider):
             bool: True if the data provider has data for the given data source,
                 False otherwise.
         """
-
         if start_date is None and end_date is None:
             return False
 
@@ -507,7 +506,8 @@ class CSVOHLCVDataProvider(DataProvider):
             time_frame=data_source.time_frame,
             market=data_source.market,
             window_size=data_source.window_size,
-            data_provider_identifier=self.data_provider_identifier
+            data_provider_identifier=self.data_provider_identifier,
+            pandas=data_source.pandas
         )
 
     def get_number_of_data_points(
