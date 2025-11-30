@@ -1580,7 +1580,6 @@ class TestBacktestSaveOpen(unittest.TestCase):
 
         # Save the backtest
         backtest.save(self.dir_path)
-
         loaded_backtest = Backtest.open(self.dir_path)
 
         self.assertEqual(

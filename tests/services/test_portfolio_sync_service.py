@@ -1,5 +1,5 @@
 from investing_algorithm_framework import PortfolioConfiguration, Algorithm, \
-    MarketCredential, OperationalException, RESERVED_BALANCES
+    MarketCredential, OperationalException
 from tests.resources import TestBase
 
 
@@ -97,8 +97,6 @@ class TestPortfolioSyncService(TestBase):
         )
 
     def test_sync_unallocated_with_reserved(self):
-        configuration_service = self.app.container.configuration_service()
-        configuration_service.config[RESERVED_BALANCES] = {"EUR": 500}
         self.app.add_portfolio_configuration(
             PortfolioConfiguration(
                 identifier="test",

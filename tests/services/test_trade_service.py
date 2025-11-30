@@ -862,12 +862,26 @@ class TestTradeService(TestBase):
         trade = self.app.container.trade_service().find(
             {"order_id": buy_order.id}
         )
-        trade_service.add_stop_loss(
+        stop_loss = trade_service.add_stop_loss(
             trade,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
+
+        self.assertIsNotNone(stop_loss)
+        self.assertIsNotNone(stop_loss.id)
+        self.assertTrue(stop_loss.active)
+        self.assertFalse(stop_loss.triggered)
+        self.assertIsNone(stop_loss.triggered_at)
+        self.assertIsNotNone(stop_loss.created_at)
+        self.assertIsNone(stop_loss.updated_at)
+        self.assertIsNotNone(stop_loss.stop_loss_price)
+        self.assertIsNotNone(stop_loss.high_water_mark)
+        self.assertEqual(10, stop_loss.percentage)
+        self.assertFalse(stop_loss.trailing)
+        self.assertEqual(50, stop_loss.sell_percentage)
+
         trade = trade_service.find(
             {"order_id": buy_order.id}
         )
@@ -875,7 +889,7 @@ class TestTradeService(TestBase):
         trade_service.add_stop_loss(
             trade,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         trade = trade_service.find(
@@ -909,20 +923,32 @@ class TestTradeService(TestBase):
         trade = self.app.container.trade_service().find(
             {"order_id": buy_order.id}
         )
-        trade_service.add_stop_loss(
+        stop_loss = trade_service.add_stop_loss(
             trade,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
-        trade = trade_service.find(
-            {"order_id": buy_order.id}
-        )
+
+        self.assertIsNotNone(stop_loss)
+        self.assertIsNotNone(stop_loss.id)
+        self.assertTrue(stop_loss.active)
+        self.assertFalse(stop_loss.triggered)
+        self.assertIsNone(stop_loss.triggered_at)
+        self.assertIsNotNone(stop_loss.created_at)
+        self.assertIsNone(stop_loss.updated_at)
+        self.assertIsNotNone(stop_loss.stop_loss_price)
+        self.assertIsNotNone(stop_loss.high_water_mark)
+        self.assertEqual(10, stop_loss.percentage)
+        self.assertFalse(stop_loss.trailing)
+        self.assertEqual(50, stop_loss.sell_percentage)
+
+        trade = trade_service.find({"order_id": buy_order.id})
         self.assertEqual(1, len(trade.stop_losses))
         trade_service.add_stop_loss(
             trade,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         trade = trade_service.find(
@@ -934,7 +960,7 @@ class TestTradeService(TestBase):
             trade_service.add_stop_loss(
                 trade,
                 10,
-                "fixed",
+                False,
                 sell_percentage=50,
             )
 
@@ -971,12 +997,26 @@ class TestTradeService(TestBase):
         trade = self.app.container.trade_service().find(
             {"order_id": buy_order.id}
         )
-        trade_service.add_take_profit(
+        take_profit = trade_service.add_take_profit(
             trade,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
+
+        self.assertIsNotNone(take_profit)
+        self.assertIsNotNone(take_profit.id)
+        self.assertTrue(take_profit.active)
+        self.assertFalse(take_profit.triggered)
+        self.assertIsNone(take_profit.triggered_at)
+        self.assertIsNotNone(take_profit.created_at)
+        self.assertIsNone(take_profit.updated_at)
+        self.assertIsNotNone(take_profit.take_profit_price)
+        self.assertIsNone(take_profit.high_water_mark)
+        self.assertEqual(10, take_profit.percentage)
+        self.assertFalse(take_profit.trailing)
+        self.assertEqual(50, take_profit.sell_percentage)
+
         trade = trade_service.find(
             {"order_id": buy_order.id}
         )
@@ -984,7 +1024,7 @@ class TestTradeService(TestBase):
         trade_service.add_take_profit(
             trade,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         trade = trade_service.find(
@@ -1021,7 +1061,7 @@ class TestTradeService(TestBase):
         trade_service.add_take_profit(
             trade,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         trade = trade_service.find(
@@ -1031,7 +1071,7 @@ class TestTradeService(TestBase):
         trade_service.add_take_profit(
             trade,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         trade = trade_service.find(
@@ -1043,7 +1083,7 @@ class TestTradeService(TestBase):
             trade_service.add_take_profit(
                 trade,
                 10,
-                "fixed",
+                False,
                 sell_percentage=50,
             )
 
@@ -1099,14 +1139,14 @@ class TestTradeService(TestBase):
         stop_loss_one = trade_service.add_stop_loss(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         self.assertEqual(18, stop_loss_one.stop_loss_price)
         stop_loss_two = trade_service.add_stop_loss(
             trade_one,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
         self.assertEqual(18, stop_loss_two.stop_loss_price)
@@ -1134,7 +1174,7 @@ class TestTradeService(TestBase):
         stop_loss_two = trade_service.add_stop_loss(
             trade_two,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
         trade_two = trade_service.get(trade_two_id)
@@ -1223,14 +1263,14 @@ class TestTradeService(TestBase):
         stop_loss_one = trade_service.add_stop_loss(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         self.assertEqual(18, stop_loss_one.stop_loss_price)
         stop_loss_two = trade_service.add_stop_loss(
             trade_one,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
         self.assertEqual(18, stop_loss_two.stop_loss_price)
@@ -1258,7 +1298,7 @@ class TestTradeService(TestBase):
         trade_service.add_stop_loss(
             trade_two,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
         trade_two = trade_service.get(trade_two_id)
@@ -1356,14 +1396,14 @@ class TestTradeService(TestBase):
         stop_loss_one = trade_service.add_stop_loss(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         self.assertEqual(18, stop_loss_one.stop_loss_price)
         stop_loss_two = trade_service.add_stop_loss(
             trade_one,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
         self.assertEqual(18, stop_loss_two.stop_loss_price)
@@ -1399,7 +1439,7 @@ class TestTradeService(TestBase):
         stop_loss_two = trade_service.add_stop_loss(
             trade_two,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
         trade_two = trade_service.get(trade_two_id)
@@ -1525,7 +1565,7 @@ class TestTradeService(TestBase):
         for stop_loss in stop_losses:
             self.assertTrue(stop_loss.active)
 
-            if stop_loss.trade_risk_type == "FIXED":
+            if not stop_loss.trailing:
                 self.assertEqual(10, stop_loss.sell_amount)
                 self.assertEqual(5, stop_loss.sold_amount)
             else:
@@ -1602,14 +1642,14 @@ class TestTradeService(TestBase):
         stop_loss_one = trade_service.add_stop_loss(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         self.assertEqual(18, stop_loss_one.stop_loss_price)
         stop_loss_two = trade_service.add_stop_loss(
             trade_one,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
         self.assertEqual(18, stop_loss_two.stop_loss_price)
@@ -1648,7 +1688,7 @@ class TestTradeService(TestBase):
         stop_loss_two = trade_service.add_stop_loss(
             trade_two,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
         trade_two = trade_service.get(trade_two_id)
@@ -1770,17 +1810,17 @@ class TestTradeService(TestBase):
         take_profit_one = trade_service.add_take_profit(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         self.assertEqual(22, take_profit_one.take_profit_price)
         take_profit_two = trade_service.add_take_profit(
             trade_one,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
-        self.assertEqual(22, take_profit_two.take_profit_price)
+        self.assertIsNone(take_profit_two.take_profit_price)
         self.assertEqual(None, take_profit_two.high_water_mark)
         trade_one = trade_service.get(trade_one_id)
         self.assertEqual(2, len(trade_one.take_profits))
@@ -1812,14 +1852,14 @@ class TestTradeService(TestBase):
         take_profit_three = trade_service.add_take_profit(
             trade_two,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
         take_profit_three = trade_take_profit_repository.get(
             take_profit_three.id
         )
         trade_two = trade_service.get(trade_two_id)
-        self.assertEqual(11, take_profit_three.take_profit_price)
+        self.assertIsNone(take_profit_three.take_profit_price)
         self.assertEqual(1, len(trade_two.take_profits))
 
         trade_service.update(
@@ -1980,17 +2020,17 @@ class TestTradeService(TestBase):
         take_profit_one = trade_service.add_take_profit(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         self.assertEqual(22, take_profit_one.take_profit_price)
         take_profit_two = trade_service.add_take_profit(
             trade_one,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
-        self.assertEqual(22, take_profit_two.take_profit_price)
+        self.assertIsNone(take_profit_two.take_profit_price)
         self.assertEqual(None, take_profit_two.high_water_mark)
         trade_one = trade_service.get(trade_one_id)
         self.assertEqual(2, len(trade_one.take_profits))
@@ -2022,14 +2062,14 @@ class TestTradeService(TestBase):
         take_profit_three = trade_service.add_take_profit(
             trade_two,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
         take_profit_three = trade_take_profit_repository.get(
             take_profit_three.id
         )
         trade_two = trade_service.get(trade_two_id)
-        self.assertEqual(11, take_profit_three.take_profit_price)
+        self.assertIsNone(take_profit_three.take_profit_price)
         self.assertEqual(1, len(trade_two.take_profits))
 
         trade_service.update(
@@ -2211,17 +2251,17 @@ class TestTradeService(TestBase):
         take_profit_one = trade_service.add_take_profit(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         self.assertEqual(22, take_profit_one.take_profit_price)
         take_profit_two = trade_service.add_take_profit(
             trade_one,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
-        self.assertEqual(22, take_profit_two.take_profit_price)
+        self.assertIsNone(take_profit_two.take_profit_price)
         self.assertEqual(None, take_profit_two.high_water_mark)
         trade_one = trade_service.get(trade_one_id)
         self.assertEqual(2, len(trade_one.take_profits))
@@ -2253,14 +2293,14 @@ class TestTradeService(TestBase):
         take_profit_three = trade_service.add_take_profit(
             trade_two,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
         take_profit_three = trade_take_profit_repository.get(
             take_profit_three.id
         )
         trade_two = trade_service.get(trade_two_id)
-        self.assertEqual(11, take_profit_three.take_profit_price)
+        self.assertIsNone(take_profit_three.take_profit_price)
         self.assertEqual(1, len(trade_two.take_profits))
 
         trade_service.update(
@@ -2572,17 +2612,17 @@ class TestTradeService(TestBase):
         take_profit_one = trade_service.add_take_profit(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         self.assertEqual(22, take_profit_one.take_profit_price)
         take_profit_two = trade_service.add_take_profit(
             trade_one,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
-        self.assertEqual(22, take_profit_two.take_profit_price)
+        self.assertIsNone(take_profit_two.take_profit_price)
         self.assertEqual(None, take_profit_two.high_water_mark)
         trade_one = trade_service.get(trade_one_id)
         self.assertEqual(2, len(trade_one.take_profits))
@@ -2616,14 +2656,14 @@ class TestTradeService(TestBase):
         take_profit_three = trade_service.add_take_profit(
             trade_two,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
         take_profit_three = trade_take_profit_repository.get(
             take_profit_three.id
         )
         trade_two = trade_service.get(trade_two_id)
-        self.assertEqual(11, take_profit_three.take_profit_price)
+        self.assertIsNone(take_profit_three.take_profit_price)
         self.assertEqual(1, len(trade_two.take_profits))
 
         trade_service.update(
@@ -2776,14 +2816,14 @@ class TestTradeService(TestBase):
         stop_loss_one = trade_service.add_stop_loss(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=100,
         )
         self.assertEqual(18, stop_loss_one.stop_loss_price)
         take_profit_one = trade_service.add_take_profit(
             trade_one,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
 
@@ -2875,14 +2915,14 @@ class TestTradeService(TestBase):
         take_profit_one = trade_service.add_take_profit(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=100,
         )
         self.assertEqual(22, take_profit_one.take_profit_price)
         stop_loss_one = trade_service.add_stop_loss(
             trade_one,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
 
@@ -2972,7 +3012,7 @@ class TestTradeService(TestBase):
         stop_loss_one = trade_service.add_stop_loss(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=25,
         )
         self.assertEqual(18, stop_loss_one.stop_loss_price)
@@ -2982,7 +3022,7 @@ class TestTradeService(TestBase):
         stop_loss_two = trade_service.add_stop_loss(
             trade_one,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
         self.assertEqual(18, stop_loss_two.stop_loss_price)
@@ -3082,7 +3122,7 @@ class TestTradeService(TestBase):
         take_profit_one = trade_service.add_take_profit(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=25,
         )
         self.assertEqual(22, take_profit_one.take_profit_price)
@@ -3092,11 +3132,11 @@ class TestTradeService(TestBase):
         take_profit_two = trade_service.add_take_profit(
             trade_one,
             10,
-            "trailing",
+            True,
             sell_percentage=25,
         )
-        self.assertEqual(22, take_profit_two.take_profit_price)
-        self.assertEqual(None, take_profit_two.high_water_mark)
+        self.assertIsNone(take_profit_two.take_profit_price)
+        self.assertIsNone(take_profit_two.high_water_mark)
 
         # Update the last reported price of ada to 21 EUR, triggering 0
         # stop loss orders. The trailing stop loss should be updated to
@@ -3115,14 +3155,16 @@ class TestTradeService(TestBase):
             take_profit_one.id
         )
         self.assertEqual(22, take_profit_one.take_profit_price)
-        self.assertEqual(None, take_profit_one.high_water_mark)
+        # Price 21 < threshold 22, so high_water_mark not set yet
+        self.assertIsNone(take_profit_one.high_water_mark)
 
         take_profit_two = take_profit_repository.get(
             take_profit_two.id
         )
 
-        self.assertAlmostEqual(22, take_profit_two.take_profit_price)
-        self.assertEqual(None, take_profit_two.high_water_mark)
+        # Price 21 < initial threshold 22, so still None
+        self.assertIsNone(take_profit_two.take_profit_price)
+        self.assertIsNone(take_profit_two.high_water_mark)
 
         trade_service.update(
             trade_one_id,
@@ -3195,7 +3237,7 @@ class TestTradeService(TestBase):
         take_profit_one = trade_service.add_take_profit(
             trade_one,
             5,
-            "fixed",
+            False,
             sell_percentage=25,
         )
         self.assertEqual(21, take_profit_one.take_profit_price)
@@ -3203,7 +3245,7 @@ class TestTradeService(TestBase):
         take_profit_two = trade_service.add_take_profit(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=25,
         )
         self.assertEqual(22, take_profit_two.take_profit_price)
@@ -3213,7 +3255,7 @@ class TestTradeService(TestBase):
         stop_loss_one = trade_service.add_stop_loss(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=100,
         )
         self.assertEqual(18, stop_loss_one.stop_loss_price)
@@ -3342,7 +3384,7 @@ class TestTradeService(TestBase):
         stop_loss_one = trade_service.add_stop_loss(
             trade_one,
             5,
-            "fixed",
+            False,
             sell_percentage=25,
         )
         self.assertEqual(19, stop_loss_one.stop_loss_price)
@@ -3350,7 +3392,7 @@ class TestTradeService(TestBase):
         stop_loss_two = trade_service.add_stop_loss(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=25,
         )
         self.assertEqual(18, stop_loss_two.stop_loss_price)
@@ -3360,7 +3402,7 @@ class TestTradeService(TestBase):
         take_profit_one = trade_service.add_take_profit(
             trade_one,
             5,
-            "fixed",
+            False,
             sell_percentage=100,
         )
         self.assertEqual(21, take_profit_one.take_profit_price)
@@ -3456,7 +3498,7 @@ class TestTradeService(TestBase):
         stop_loss_one = trade_service.add_stop_loss(
             trade_one,
             5,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         self.assertEqual(19, stop_loss_one.stop_loss_price)
@@ -3464,7 +3506,7 @@ class TestTradeService(TestBase):
         stop_loss_two = trade_service.add_stop_loss(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         self.assertEqual(18, stop_loss_two.stop_loss_price)
@@ -3569,7 +3611,7 @@ class TestTradeService(TestBase):
         take_profit_one = trade_service.add_take_profit(
             trade_one,
             5,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         self.assertEqual(21, take_profit_one.take_profit_price)
@@ -3577,7 +3619,7 @@ class TestTradeService(TestBase):
         take_profit_two = trade_service.add_take_profit(
             trade_one,
             10,
-            "fixed",
+            False,
             sell_percentage=50,
         )
         self.assertEqual(22, take_profit_two.take_profit_price)
