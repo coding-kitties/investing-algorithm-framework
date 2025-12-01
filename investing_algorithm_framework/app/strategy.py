@@ -43,8 +43,8 @@ class TradingStrategy:
     context: Context = None
     metadata: Dict[str, Any] = None
     position_sizes: List[PositionSize] = []
-    stop_loss_rules: List[StopLossRule] = []
-    take_profit_rules: List[TakeProfitRule] = []
+    stop_losses: List[StopLossRule] = []
+    take_profits: List[TakeProfitRule] = []
     symbols: List[str] = []
     trading_symbol: str = None
 
@@ -56,6 +56,8 @@ class TradingStrategy:
         data_sources=None,
         metadata=None,
         position_sizes=None,
+        stop_losses=None,
+        take_profits=None,
         symbols=None,
         trading_symbol=None,
         worker_id=None,
@@ -110,6 +112,9 @@ class TradingStrategy:
             raise OperationalException(
                 f"Interval not set for strategy instance {self.strategy_id}"
             )
+
+        self.stop_losses = stop_losses
+        self.take_profits = take_profits
 
         # context initialization
         self._context = None
@@ -360,11 +365,11 @@ class TradingStrategy:
               None otherwise.
         """
 
-        if len(self.take_profit_rules) == 0:
+        if self.take_profits is not None and len(self.take_profits) == 0:
             return None
 
         if self.take_profit_rules_lookup == {}:
-            for tp in self.take_profit_rules:
+            for tp in self.take_profits:
                 self.take_profit_rules_lookup[tp.symbol] = tp
 
         return self.take_profit_rules_lookup.get(symbol, None)
@@ -381,11 +386,11 @@ class TradingStrategy:
               None otherwise.
         """
 
-        if len(self.stop_loss_rules) == 0:
+        if self.stop_losses is not None and len(self.stop_losses) == 0:
             return None
 
         if self.stop_loss_rules_lookup == {}:
-            for sl in self.stop_loss_rules:
+            for sl in self.stop_losses:
                 self.stop_loss_rules_lookup[sl.symbol] = sl
 
         return self.stop_loss_rules_lookup.get(symbol, None)
@@ -402,7 +407,7 @@ class TradingStrategy:
               None otherwise.
         """
 
-        if len(self.position_sizes) == 0:
+        if self.position_sizes is not None and len(self.position_sizes) == 0:
             raise OperationalException(
                 f"No position size defined for symbol "
                 f"{symbol} in strategy "
