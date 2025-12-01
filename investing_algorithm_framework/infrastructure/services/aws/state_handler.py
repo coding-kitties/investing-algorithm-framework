@@ -1,5 +1,6 @@
 import os
 import logging
+import stat
 import boto3
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 from investing_algorithm_framework.domain import OperationalException, \
@@ -34,6 +35,34 @@ class AWSS3StorageStateHandler(StateHandler):
 
         self.s3_client = boto3.client("s3")
 
+    def _fix_permissions(self, target_directory: str):
+        """
+        Fix permissions on downloaded files to make them writable.
+
+        Args:
+            target_directory (str): Directory to fix permissions for
+        """
+        try:
+            # Fix directory permissions
+            os.chmod(target_directory, 0o755)
+
+            # Recursively fix all files and subdirectories
+            for root, dirs, files in os.walk(target_directory):
+                # Fix subdirectories
+                for dir_name in dirs:
+                    dir_path = os.path.join(root, dir_name)
+                    os.chmod(dir_path, 0o755)
+
+                # Fix files - make them readable and writable
+                for file_name in files:
+                    file_path = os.path.join(root, file_name)
+                    # Set to 0o644 (rw-r--r--)
+                    os.chmod(file_path, 0o644)
+
+            logger.info(f"Permissions fixed for {target_directory}")
+        except Exception as e:
+            logger.warning(f"Error fixing permissions: {e}")
+
     def save(self, source_directory: str):
         """
         Save the state to AWS S3.
@@ -54,7 +83,7 @@ class AWSS3StorageStateHandler(StateHandler):
                     file_path = os.path.join(root, file_name)
 
                     # Construct the S3 object key (relative path in the bucket)
-                    s3_key = os.path.relpath(file_path, source_directory)\
+                    s3_key = os.path.relpath(file_path, source_directory) \
                         .replace("\\", "/")
 
                     # Upload the file
@@ -102,6 +131,9 @@ class AWSS3StorageStateHandler(StateHandler):
                     self.s3_client.download_file(
                         self.bucket_name, s3_key, file_path
                     )
+
+            # Fix permissions on all downloaded files
+            self._fix_permissions(target_directory)
 
         except (NoCredentialsError, PartialCredentialsError) as ex:
             logger.error(f"Error loading state from AWS S3: {ex}")
