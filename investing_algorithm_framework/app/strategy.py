@@ -113,8 +113,12 @@ class TradingStrategy:
                 f"Interval not set for strategy instance {self.strategy_id}"
             )
 
-        self.stop_losses = stop_losses
-        self.take_profits = take_profits
+
+        if stop_losses is not None:
+            self.stop_losses = stop_losses
+
+        if take_profits is not None:
+            self.take_profits = take_profits
 
         # context initialization
         self._context = None
