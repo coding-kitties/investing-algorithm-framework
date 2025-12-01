@@ -365,7 +365,7 @@ class TradingStrategy:
               None otherwise.
         """
 
-        if self.take_profits is not None and len(self.take_profits) == 0:
+        if self.take_profits is not None or len(self.take_profits) == 0:
             return None
 
         if self.take_profit_rules_lookup == {}:
@@ -386,7 +386,7 @@ class TradingStrategy:
               None otherwise.
         """
 
-        if self.stop_losses is not None and len(self.stop_losses) == 0:
+        if self.stop_losses is not None or len(self.stop_losses) == 0:
             return None
 
         if self.stop_loss_rules_lookup == {}:
