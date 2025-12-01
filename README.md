@@ -490,9 +490,6 @@ If you discover a bug in the framework, please [search our issue tracker](https:
 
 <div align="center">
   <p>
-    Made with ❤️ by the trading community
-  </p>
-  <p>
     <a href="https://github.com/coding-kitties/investing-algorithm-framework/stargazers">⭐ Star us on GitHub</a> · 
     <a href="https://discord.gg/dQsRmGZP">💬 Join Discord</a> · 
     <a href="https://github.com/coding-kitties/investing-algorithm-framework/issues/new">🐛 Report Bug</a>
