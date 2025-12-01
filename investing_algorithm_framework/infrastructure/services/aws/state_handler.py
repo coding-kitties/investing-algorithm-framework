@@ -139,13 +139,16 @@ class AWSS3StorageStateHandler(StateHandler):
             # Final recursive fix
             _fix_permissions(target_directory)
 
-            # Add write permission to file (0o666 = rw-rw-rw-, then masked by umask)
+            # Add write permission to file (
+            # 0o666 = rw-rw-rw-, then masked by umask)
             db_file = os.path.join(target_directory,
                                    'databases/prod-database.sqlite3')
             if os.path.exists(db_file):
                 os.chmod(db_file, 0o666)
                 logger.info(
-                    f"Database file permissions after fix: {oct(os.stat(db_file).st_mode)}")
+                    f"Database file permissions "
+                    f"after fix: {oct(os.stat(db_file).st_mode)}"
+                )
 
         except (NoCredentialsError, PartialCredentialsError) as ex:
             logger.error(f"Error loading state from AWS S3: {ex}")
