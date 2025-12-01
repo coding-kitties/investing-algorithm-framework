@@ -20,7 +20,8 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     PortfolioConfiguration, SnapshotInterval, DataType, combine_backtests, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured, TimeFrame, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestPermutationTest, \
-    LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, generate_backtest_summary_metrics
+    LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, \
+    generate_backtest_summary_metrics, DATA_DIRECTORY
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
     BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db, \
@@ -367,6 +368,17 @@ class App:
         # Setup sql if needed
         setup_sqlalchemy(self)
         create_all_tables()
+
+        # Create the DATA_DIRECTORY if it does not exist
+        data_directory_dir_name = self.config[DATA_DIRECTORY]
+        data_directory_path = os.path.join(
+            resource_directory_path, data_directory_dir_name
+        )
+        if not os.path.exists(data_directory_path):
+            os.makedirs(data_directory_path)
+            logger.info(
+                f"Data directory created at {data_directory_path}"
+            )
 
     def initialize_data_sources(
         self,

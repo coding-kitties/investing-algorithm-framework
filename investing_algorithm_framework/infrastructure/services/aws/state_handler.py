@@ -1,6 +1,7 @@
 import os
 import logging
 import boto3
+import stat
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 from investing_algorithm_framework.domain import OperationalException, \
     StateHandler
@@ -17,22 +18,25 @@ def _fix_permissions(target_directory: str):
     """
     try:
         # Fix the target directory itself
-        os.chmod(target_directory, 0o755)
+        os.chmod(target_directory, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
 
         # Recursively fix all subdirectories and files
         for root, dirs, files in os.walk(target_directory):
             # Fix current directory permissions
-            os.chmod(root, 0o755)
+            os.chmod(root, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
 
             # Fix all subdirectories
             for dir_name in dirs:
                 dir_path = os.path.join(root, dir_name)
-                os.chmod(dir_path, 0o755)
+                os.chmod(dir_path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
 
             # Fix all files - make them readable and writable
             for file_name in files:
                 file_path = os.path.join(root, file_name)
-                os.chmod(file_path, 0o644)
+                os.chmod(
+                    file_path,
+                    stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH
+                )
 
         logger.info(f"Update permissions for {target_directory}")
     except Exception as e:
@@ -86,8 +90,9 @@ class AWSS3StorageStateHandler(StateHandler):
                     file_path = os.path.join(root, file_name)
 
                     # Construct the S3 object key (relative path in the bucket)
-                    s3_key = os.path.relpath(file_path, source_directory) \
-                        .replace("\\", "/")
+                    s3_key = os.path.relpath(file_path, source_directory)
+                    # Convert to forward slashes for S3 compatibility
+                    s3_key = s3_key.replace(os.sep, "/")
 
                     self.s3_client.upload_file(
                         file_path,
@@ -113,38 +118,66 @@ class AWSS3StorageStateHandler(StateHandler):
 
         try:
             if not os.path.exists(target_directory):
-                os.makedirs(target_directory, mode=0o755)
+                os.makedirs(
+                    target_directory,
+                    mode=stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+                )
 
-            os.chmod(target_directory, 0o755)
+            os.chmod(
+                target_directory, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+            )
 
             response = self.s3_client.list_objects_v2(Bucket=self.bucket_name)
 
             if "Contents" in response:
                 for obj in response["Contents"]:
                     s3_key = obj["Key"]
-                    file_path = os.path.join(target_directory, s3_key)
+                    # Convert S3 forward slashes to OS-specific separators
+                    file_path = os.path.join(
+                        target_directory, s3_key.replace("/", os.sep)
+                    )
 
-                    os.makedirs(os.path.dirname(file_path), exist_ok=True,
-                                mode=0o755)
+                    os.makedirs(
+                        os.path.dirname(file_path),
+                        exist_ok=True,
+                        mode=stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+                    )
 
                     self.s3_client.download_file(
                         self.bucket_name, s3_key, file_path
                     )
 
                     if os.path.isfile(file_path):
-                        os.chmod(file_path, 0o644)
+                        os.chmod(
+                            file_path,
+                            stat.S_IRUSR |
+                            stat.S_IWUSR |
+                            stat.S_IRGRP |
+                            stat.S_IROTH
+                        )
                     else:
-                        os.chmod(file_path, 0o755)
+                        os.chmod(
+                            file_path,
+                            stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO
+                        )
 
             # Final recursive fix
             _fix_permissions(target_directory)
 
-            # Add write permission to file (
-            # 0o666 = rw-rw-rw-, then masked by umask)
-            db_file = os.path.join(target_directory,
-                                   'databases/prod-database.sqlite3')
+            # Add write permission to database file
+            db_file = os.path.join(
+                target_directory, "databases", "prod-database.sqlite3"
+            )
             if os.path.exists(db_file):
-                os.chmod(db_file, 0o666)
+                os.chmod(
+                    db_file,
+                    stat.S_IRUSR |
+                    stat.S_IWUSR |
+                    stat.S_IRGRP |
+                    stat.S_IWGRP |
+                    stat.S_IROTH |
+                    stat.S_IWOTH
+                )
                 logger.info(
                     f"Database file permissions "
                     f"after fix: {oct(os.stat(db_file).st_mode)}"
