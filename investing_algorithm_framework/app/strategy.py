@@ -113,7 +113,6 @@ class TradingStrategy:
                 f"Interval not set for strategy instance {self.strategy_id}"
             )
 
-
         if stop_losses is not None:
             self.stop_losses = stop_losses
 

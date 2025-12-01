@@ -1,6 +1,5 @@
 import os
 import logging
-import stat
 import boto3
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 from investing_algorithm_framework.domain import OperationalException, \
