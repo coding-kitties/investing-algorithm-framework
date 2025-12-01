@@ -582,20 +582,19 @@ class App:
             None
         """
         self.initialize_config()
+
+        # Load the state if a state handler is provided
+        if self._state_handler is not None:
+            logger.info("Detected state handler, loading state")
+            self._state_handler.initialize()
+            config = self.container.configuration_service().get_config()
+            self._state_handler.load(config[RESOURCE_DIRECTORY])
+
         self.initialize_storage()
+        logger.info("App initialization complete")
         event_loop_service = None
 
         try:
-
-            # Load the state if a state handler is provided
-            if self._state_handler is not None:
-                logger.info("Detected state handler, loading state")
-                self._state_handler.initialize()
-                config = self.container.configuration_service().get_config()
-                self._state_handler.load(config[RESOURCE_DIRECTORY])
-
-            logger.info("App initialization complete")
-
             # Run all on_initialize hooks
             for hook in self._on_initialize_hooks:
                 hook.on_run(self.context)

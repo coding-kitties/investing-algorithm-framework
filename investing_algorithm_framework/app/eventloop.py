@@ -315,6 +315,16 @@ class EventLoopService:
             )
 
     def cleanup(self):
+        """
+        Cleans up the event loop service by saving all snapshots
+        taken during the event loop run. The snapshots are saved at the
+        end of the event to prevent too many database writes during the
+        event loop execution. Saving snapshots in bulk at the end improves
+        performance and reduces the number of database transactions.
+
+        Returns:
+            None
+        """
         self._portfolio_snapshot_service.save_all(self._snapshots)
 
     def start(

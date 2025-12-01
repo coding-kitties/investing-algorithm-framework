@@ -11,7 +11,15 @@ from .data_type import DataType
 @dataclass(frozen=True)
 class DataSource:
     """
-    Base class for data sources.
+    Data registration model. Defines the data source for a strategy. A simple
+    data source can be defined as:
+    DataSource(
+        symbol="BTC/EUR",
+        data_type="ohlcv",
+        window_size=200,
+        market="BITVAVO",
+        identifier="BTC/EUR_ohlcv"
+    )
     """
     identifier: str = None
     data_provider_identifier: str = None

@@ -8,6 +8,37 @@ from investing_algorithm_framework.domain import OperationalException, \
 logger = logging.getLogger("investing_algorithm_framework")
 
 
+def _fix_permissions(target_directory: str):
+    """
+    Fix permissions on downloaded files to make them writable.
+
+    Args:
+        target_directory (str): Directory to fix permissions for
+    """
+    try:
+        # Fix the target directory itself
+        os.chmod(target_directory, 0o755)
+
+        # Recursively fix all subdirectories and files
+        for root, dirs, files in os.walk(target_directory):
+            # Fix current directory permissions
+            os.chmod(root, 0o755)
+
+            # Fix all subdirectories
+            for dir_name in dirs:
+                dir_path = os.path.join(root, dir_name)
+                os.chmod(dir_path, 0o755)
+
+            # Fix all files - make them readable and writable
+            for file_name in files:
+                file_path = os.path.join(root, file_name)
+                os.chmod(file_path, 0o644)
+
+        logger.info(f"Update permissions for {target_directory}")
+    except Exception as e:
+        logger.warning(f"Error fixing permissions: {e}")
+
+
 class AWSS3StorageStateHandler(StateHandler):
     """
     A state handler for AWS S3 storage.
@@ -28,39 +59,12 @@ class AWSS3StorageStateHandler(StateHandler):
 
         if not self.bucket_name:
             raise OperationalException(
-                "AWS S3 state handler requires a bucket name or the "
-                "AWS_S3_BUCKET_NAME environment variable to be set."
+                "AWS S3 state handler requires a bucket_name para or the "
+                "AWS_S3_BUCKET_NAME environment variable needs to be set "
+                "in the environment."
             )
 
         self.s3_client = boto3.client("s3")
-
-    def _fix_permissions(self, target_directory: str):
-        """
-        Fix permissions on downloaded files to make them writable.
-
-        Args:
-            target_directory (str): Directory to fix permissions for
-        """
-        try:
-            # Fix directory permissions
-            os.chmod(target_directory, 0o755)
-
-            # Recursively fix all files and subdirectories
-            for root, dirs, files in os.walk(target_directory):
-                # Fix subdirectories
-                for dir_name in dirs:
-                    dir_path = os.path.join(root, dir_name)
-                    os.chmod(dir_path, 0o755)
-
-                # Fix files - make them readable and writable
-                for file_name in files:
-                    file_path = os.path.join(root, file_name)
-                    # Set to 0o644 (rw-r--r--)
-                    os.chmod(file_path, 0o644)
-
-            logger.info(f"Permissions fixed for {target_directory}")
-        except Exception as e:
-            logger.warning(f"Error fixing permissions: {e}")
 
     def save(self, source_directory: str):
         """
@@ -85,9 +89,11 @@ class AWSS3StorageStateHandler(StateHandler):
                     s3_key = os.path.relpath(file_path, source_directory) \
                         .replace("\\", "/")
 
-                    # Upload the file
                     self.s3_client.upload_file(
-                        file_path, self.bucket_name, s3_key
+                        file_path,
+                        self.bucket_name,
+                        s3_key,
+                        ExtraArgs={'ACL': 'private'}
                     )
 
         except (NoCredentialsError, PartialCredentialsError) as ex:
@@ -102,37 +108,44 @@ class AWSS3StorageStateHandler(StateHandler):
     def load(self, target_directory: str):
         """
         Load the state from AWS S3.
-
-        Args:
-            target_directory (str): Directory to load the state
-
-        Returns:
-            None
         """
         logger.info("Loading state from AWS S3 ...")
 
         try:
-            # Ensure the local directory exists
             if not os.path.exists(target_directory):
-                os.makedirs(target_directory)
+                os.makedirs(target_directory, mode=0o755)
 
-            # List and download objects
+            os.chmod(target_directory, 0o755)
+
             response = self.s3_client.list_objects_v2(Bucket=self.bucket_name)
+
             if "Contents" in response:
                 for obj in response["Contents"]:
                     s3_key = obj["Key"]
                     file_path = os.path.join(target_directory, s3_key)
 
-                    # Create subdirectories locally if needed
-                    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+                    os.makedirs(os.path.dirname(file_path), exist_ok=True,
+                                mode=0o755)
 
-                    # Download object to file
                     self.s3_client.download_file(
                         self.bucket_name, s3_key, file_path
                     )
 
-            # Fix permissions on all downloaded files
-            self._fix_permissions(target_directory)
+                    if os.path.isfile(file_path):
+                        os.chmod(file_path, 0o644)
+                    else:
+                        os.chmod(file_path, 0o755)
+
+            # Final recursive fix
+            _fix_permissions(target_directory)
+
+            # Add write permission to file (0o666 = rw-rw-rw-, then masked by umask)
+            db_file = os.path.join(target_directory,
+                                   'databases/prod-database.sqlite3')
+            if os.path.exists(db_file):
+                os.chmod(db_file, 0o666)
+                logger.info(
+                    f"Database file permissions after fix: {oct(os.stat(db_file).st_mode)}")
 
         except (NoCredentialsError, PartialCredentialsError) as ex:
             logger.error(f"Error loading state from AWS S3: {ex}")
