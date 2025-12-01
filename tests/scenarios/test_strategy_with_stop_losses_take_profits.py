@@ -32,7 +32,7 @@ class FixedStopLossTakeProfitStrategy(TradingStrategy):
             percentage_of_portfolio=20.0
         ),
     ]
-    take_profit_rules = [
+    take_profits = [
         TakeProfitRule(
             symbol="BTC",
             percentage_threshold=10.0,
@@ -40,7 +40,7 @@ class FixedStopLossTakeProfitStrategy(TradingStrategy):
             sell_percentage=100
         ),
     ]
-    stop_loss_rules = [
+    stop_losses = [
         StopLossRule(
             symbol="BTC",
             percentage_threshold=10.0,
@@ -269,7 +269,7 @@ class Test(TestCase):
         start_date = datetime(2020, 12, 29, tzinfo=timezone.utc)
         end_date = datetime(2021, 1, 31, 22, 0, 0, tzinfo=timezone.utc)
         strategy = FixedStopLossTakeProfitStrategy()
-        strategy.take_profit_rules = [
+        strategy.take_profits = [
             TakeProfitRule(
                 symbol="BTC",
                 percentage_threshold=10.0,
@@ -277,7 +277,7 @@ class Test(TestCase):
                 sell_percentage=100
             ),
         ]
-        strategy.stop_loss_rules = [
+        strategy.stop_losses = [
             StopLossRule(
                 symbol="BTC",
                 percentage_threshold=10.0,
