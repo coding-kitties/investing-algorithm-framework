@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta, timezone
 from time import sleep
 from typing import List, Set, Dict
+from logging import getLogger
 
 import polars as pl
 
@@ -12,6 +13,8 @@ from investing_algorithm_framework.services import TradeOrderEvaluator
 
 from .algorithm import Algorithm
 from .strategy import TradingStrategy
+
+logger = getLogger("investing_algorithm_framework")
 
 
 class EventLoopService:
@@ -256,7 +259,7 @@ class EventLoopService:
     def initialize(
         self,
         algorithm: Algorithm,
-        trade_order_evaluator: TradeOrderEvaluator
+        trade_order_evaluator: TradeOrderEvaluator,
     ):
         """
         Initializes the event loop service by calculating the schedule for
@@ -279,6 +282,7 @@ class EventLoopService:
         """
         self._algorithm = algorithm
         self.strategies = algorithm.strategies
+        self.tasks = algorithm.tasks
 
         if len(self.strategies) == 0:
             raise OperationalException(
@@ -367,9 +371,10 @@ class EventLoopService:
                         INDEX_DATETIME, current_time
                     )
                     strategy_ids = schedule[current_time]["strategy_ids"]
-                    # task_ids = schedule[current_time]["task_ids"]
                     strategies = self._get_strategies(strategy_ids)
-                    self._run_iteration(strategies=strategies, tasks=[])
+                    self._run_iteration(
+                        strategies=strategies
+                    )
 
             else:
                 for current_time in sorted_times:
@@ -379,14 +384,18 @@ class EventLoopService:
                     strategy_ids = schedule[current_time]["strategy_ids"]
                     # task_ids = schedule[current_time]["task_ids"]
                     strategies = self._get_strategies(strategy_ids)
-                    self._run_iteration(strategies=strategies, tasks=[])
+                    self._run_iteration(
+                        strategies=strategies
+                    )
         else:
             if number_of_iterations is None:
                 try:
                     config = self._configuration_service.config
                     current_time = config[INDEX_DATETIME]
                     strategies = self._get_due_strategies(current_time)
-                    self._run_iteration(strategies)
+                    self._run_iteration(
+                        strategies=strategies, tasks=self.tasks
+                    )
                     current_time = datetime.now(timezone.utc)
                     self._configuration_service.add_value(
                         INDEX_DATETIME, current_time
@@ -405,7 +414,9 @@ class EventLoopService:
                             config = self._configuration_service.config
                             current_time = config[INDEX_DATETIME]
                             strategies = self._get_due_strategies(current_time)
-                            self._run_iteration(strategies)
+                            self._run_iteration(
+                                strategies=strategies, tasks=self.tasks
+                            )
                             current_time = datetime.now(timezone.utc)
                             self._configuration_service.add_value(
                                 INDEX_DATETIME, current_time
@@ -419,7 +430,9 @@ class EventLoopService:
                         config = self._configuration_service.config
                         current_time = config[INDEX_DATETIME]
                         strategies = self._get_due_strategies(current_time)
-                        self._run_iteration(strategies)
+                        self._run_iteration(
+                            strategies=strategies, tasks=self.tasks
+                        )
                         current_time = datetime.now(timezone.utc)
                         self._configuration_service.add_value(
                             INDEX_DATETIME, current_time
@@ -526,6 +539,9 @@ class EventLoopService:
         if not strategies:
             return
 
+        for task in self.tasks:
+            logger.info(f"Running task {task.__class__.__name__}")
+
         for strategy in strategies:
 
             if strategy.data_sources is not None:
@@ -537,12 +553,8 @@ class EventLoopService:
             else:
                 data = {}
 
-            # Select data for the strategy
+            logger.info(f"Running strategy {strategy.strategy_id}")
             strategy.run_strategy(context=self.context, data=data)
-
-        # # Step 6: Run all on_strategy_run hooks
-        # for strategy in due_strategies:
-        #     strategy.run_on_strategy_run_hooks(context=self.context)
 
         # Step 7: Snapshot the portfolios if needed and update history
         created_orders = self._order_service.get_all(

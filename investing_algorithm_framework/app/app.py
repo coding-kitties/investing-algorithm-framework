@@ -595,6 +595,13 @@ class App:
         """
         self.initialize_config()
 
+        # Run all on_initialize hooks
+        for hook in self._on_initialize_hooks:
+            logger.info(
+                f"Running on_initialize hook: {hook.__class__.__name__}"
+            )
+            hook.on_run(self.context)
+
         # Load the state if a state handler is provided
         if self._state_handler is not None:
             logger.info("Detected state handler, loading state")
@@ -607,8 +614,12 @@ class App:
         event_loop_service = None
 
         try:
-            # Run all on_initialize hooks
-            for hook in self._on_initialize_hooks:
+            # Run all on_after_initialize hooks
+            for hook in self._on_after_initialize_hooks:
+                logger.info(
+                    f"Running on_after_initialize "
+                    f"hook: {hook.__class__.__name__}"
+                )
                 hook.on_run(self.context)
 
             algorithm = self.get_algorithm()
