@@ -554,7 +554,7 @@ class EventLoopService:
                 data = {}
 
             for on_strategy_run_hook in \
-                self._algorithm.on_strategy_run_hooks:
+                    self._algorithm.on_strategy_run_hooks:
                 on_strategy_run_hook.execute(
                     strategy=strategy,
                     context=self.context,
