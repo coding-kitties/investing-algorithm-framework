@@ -162,7 +162,7 @@ class BacktestEvaluationFocus(Enum):
                 "cagr": 2.5,
                 "total_net_gain": 2.0,
                 "average_trade_return_percentage": 1.5,
-                "best_trade": 1.0,
+                "average_trade_gain_percentage": 1.0,
 
                 # Profit consistency
                 "win_rate": 2.0,
@@ -217,7 +217,6 @@ class BacktestEvaluationFocus(Enum):
                 "max_drawdown": -3.0,
                 "max_drawdown_duration": -1.5,
                 "annual_volatility": -2.0,
-                "worst_trade": -1.0,
 
                 # Consistent performance
                 "win_rate": 2.0,

@@ -34,10 +34,10 @@ def compute_score(metrics, weights, ranges):
         if not hasattr(metrics, key):
             continue
         value = getattr(metrics, key)
-        if value is None or (
-            isinstance(value, float) and
-            (math.isnan(value) or math.isinf(value))
-        ):
+        # Skip non-numeric values (e.g., Trade objects for best_trade/worst_trade)
+        if not isinstance(value, (int, float)):
+            continue
+        if value is None or math.isnan(value) or math.isinf(value):
             continue
         if key in ranges:
             value = normalize(value, ranges[key][0], ranges[key][1])

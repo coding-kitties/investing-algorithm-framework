@@ -553,6 +553,14 @@ class EventLoopService:
             else:
                 data = {}
 
+            for on_strategy_run_hook in \
+                self._algorithm.on_strategy_run_hooks:
+                on_strategy_run_hook.execute(
+                    strategy=strategy,
+                    context=self.context,
+                    data=data
+                )
+
             logger.info(f"Running strategy {strategy.strategy_id}")
             strategy.run_strategy(context=self.context, data=data)
 
