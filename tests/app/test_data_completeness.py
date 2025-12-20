@@ -118,4 +118,3 @@ class TestConfig(TestBase):
         self.assertIn(
             "sol_1d_incomplete_ohlcv_data", completeness_info
         )
-        print(completeness_info)

@@ -1,12 +1,12 @@
 from unittest import TestCase
 from datetime import datetime, timezone, timedelta, date
-from investing_algorithm_framework.services import get_annual_volatility
+from investing_algorithm_framework.services import get_sharpe_ratio
 from investing_algorithm_framework.domain import PortfolioSnapshot
 
 
 class TestVolatilityMetrics(TestCase):
 
-    def test_volatility_metrics_calculation(self):
+    def test_sharpe_ratio_metrics_calculation(self):
         total_values = [
             100000,
             101154,
@@ -66,9 +66,5 @@ class TestVolatilityMetrics(TestCase):
             for d, val in zip(dates, total_values)
         ]
 
-        annual_volatility = get_annual_volatility(snapshots, trading_days_per_year=252)
-
-        # Expected annual volatility = 0.01502 * sqrt(252) ≈ 0.2383 from the
-        # book trading systems and methods by perry j. kaufman page 42
-        expected = 0.01502 * (252 ** 0.5)
-        self.assertAlmostEqual(annual_volatility, expected, places=2)
+        sharpe_ratio = get_sharpe_ratio(snapshots, risk_free_rate=0.024)
+        self.assertAlmostEqual(sharpe_ratio, 3.386, places=1)
