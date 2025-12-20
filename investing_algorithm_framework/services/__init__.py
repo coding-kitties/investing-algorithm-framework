@@ -13,11 +13,11 @@ from .positions import PositionService, PositionSnapshotService
 from .repository_service import RepositoryService
 from .trade_service import TradeService, TradeStopLossService, \
     TradeTakeProfitService
-from .metrics import get_annual_volatility, \
+from .metrics import get_annual_volatility, get_mean_daily_return, \
     get_sortino_ratio, get_drawdown_series, get_max_drawdown, \
     get_equity_curve, get_price_efficiency_ratio, get_sharpe_ratio, \
     get_profit_factor, get_cumulative_profit_factor_series, \
-    get_rolling_profit_factor_series, \
+    get_rolling_profit_factor_series, get_daily_returns_std, \
     get_cagr, get_standard_deviation_returns, \
     get_standard_deviation_downside_returns, \
     get_total_return, get_cumulative_exposure, get_exposure_ratio, \
@@ -41,6 +41,8 @@ from .metrics import get_annual_volatility, \
     get_current_average_trade_gain, create_backtest_metrics_for_backtest
 
 __all__ = [
+    "get_mean_daily_return",
+    "get_daily_returns_std",
     "OrderService",
     "RepositoryService",
     "PortfolioService",

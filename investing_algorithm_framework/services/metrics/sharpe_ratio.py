@@ -44,12 +44,12 @@ When do we use actual returns vs CAGR?
 
 """
 
-from typing import Optional, List, Tuple
-
 import math
-import pandas as pd
-import numpy as np
 from datetime import datetime
+from typing import List, Tuple
+
+import numpy as np
+import pandas as pd
 
 from investing_algorithm_framework.domain import PortfolioSnapshot
 from .mean_daily_return import get_mean_daily_return
@@ -76,7 +76,10 @@ def get_sharpe_ratio(
     """
     snapshots = sorted(snapshots, key=lambda s: s.created_at)
     mean_daily_return = get_mean_daily_return(snapshots)
+
+    print(f"mean daily return {mean_daily_return}")
     std_daily_return = get_daily_returns_std(snapshots)
+    print(f"std daily return {std_daily_return}")
 
     if std_daily_return == 0:
         return float('nan')  # Avoid division by zero

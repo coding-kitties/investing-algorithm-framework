@@ -108,9 +108,8 @@ def get_daily_returns_std(snapshots):
     df["created_at"] = pd.to_datetime(df["created_at"])
     df = df.drop_duplicates("created_at").set_index("created_at")
     df = df.sort_index()
-
     # Resample to daily frequency (end of day)
-    daily_df = df.resample("D").last().dropna()
+    daily_df = df.resample("D").last().ffill().dropna()
 
     # Calculate daily returns
     daily_df["return"] = daily_df["total_value"].pct_change().dropna()

@@ -38,8 +38,12 @@ from .trades import get_negative_trades, get_positive_trades, \
     get_current_average_trade_duration, get_current_average_trade_gain, \
     get_current_average_trade_return, get_number_of_open_trades, \
     get_average_trade_duration
+from .mean_daily_return import get_mean_daily_return
+from .standard_deviation import get_daily_returns_std
 
 __all__ = [
+    "get_mean_daily_return",
+    "get_daily_returns_std",
     "get_annual_volatility",
     "get_sortino_ratio",
     "get_drawdown_series",

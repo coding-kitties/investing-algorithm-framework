@@ -14,6 +14,7 @@ def save_backtests_to_directory(
     backtests: List[Backtest],
     directory_path: Union[str, Path],
     dir_name_generation_function: Callable[[Backtest], str] = None,
+    number_of_backtests_to_save: int = None,
     filter_function: Callable[[Backtest], bool] = None
 ) -> None:
     """
@@ -28,6 +29,8 @@ def save_backtests_to_directory(
             a string to be used as the directory name for that backtest.
             If not provided, the backtest's metadata 'id' will be used.
             Defaults to None.
+        number_of_backtests_to_save (int, optional): Maximum number of
+            backtests to save. If None, all backtests will be saved.
         filter_function (Callable[[Backtest], bool], optional): A function
             that takes a Backtest object as input and returns True if the
             backtest should be saved. Defaults to None.
@@ -40,6 +43,12 @@ def save_backtests_to_directory(
         os.makedirs(directory_path)
 
     for backtest in backtests:
+
+        # Check if we have reached the limit of backtests to save
+        if number_of_backtests_to_save is not None:
+            if number_of_backtests_to_save <= 0:
+                break
+            number_of_backtests_to_save -= 1
 
         if filter_function is not None:
             if not filter_function(backtest):
@@ -63,7 +72,8 @@ def save_backtests_to_directory(
 
 def load_backtests_from_directory(
     directory_path: Union[str, Path],
-    filter_function: Callable[[Backtest], bool] = None
+    filter_function: Callable[[Backtest], bool] = None,
+    number_of_backtests_to_load: int = None
 ) -> List[Backtest]:
     """
     Loads Backtest objects from the specified directory.
@@ -74,6 +84,8 @@ def load_backtests_from_directory(
         filter_function (Callable[[Backtest], bool], optional): A function
             that takes a Backtest object as input and returns True if the
             backtest should be included in the result. Defaults to None.
+        number_of_backtests_to_load (int, optional): Maximum number of
+            backtests to load. If None, all backtests will be loaded.
 
     Returns:
         List[Backtest]: List of loaded Backtest objects.
@@ -89,6 +101,13 @@ def load_backtests_from_directory(
         return backtests
 
     for file_name in os.listdir(directory_path):
+
+        # Check if we have reached the limit of backtests to load
+        if number_of_backtests_to_load is not None:
+            if number_of_backtests_to_load <= 0:
+                break
+            number_of_backtests_to_load -= 1
+
         file_path = os.path.join(directory_path, file_name)
 
         try:
