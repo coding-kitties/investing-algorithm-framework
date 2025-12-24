@@ -1,4 +1,5 @@
 import gc
+import shutil
 import inspect
 import logging
 import os
@@ -1142,7 +1143,9 @@ class App:
                             market=market,
                             trading_symbol=trading_symbol,
                             use_checkpoints=use_checkpoints,
-                            backtest_storage_directory=None,
+                            backtest_storage_directory=(
+                                backtest_storage_directory
+                            )
                         )
                     )
 
@@ -1200,6 +1203,9 @@ class App:
                         backtests_ordered_by_strategy.setdefault(
                             backtest.metadata["id"], []
                         ).append(backtest)
+
+                    # Remove all temp storage directories
+                    shutil.rmtree(path)
             else:
                 # Remove all strategies that are not in the final selection
                 backtests_ordered_by_strategy = {
@@ -1212,6 +1218,13 @@ class App:
             for strategy in backtests_ordered_by_strategy:
                 backtests.append(
                     combine_backtests(backtests_ordered_by_strategy[strategy])
+                )
+
+            if backtest_storage_directory is not None:
+                # Save final combined backtests to storage directory
+                save_backtests_to_directory(
+                    backtests=backtests,
+                    directory_path=backtest_storage_directory,
                 )
 
         return backtests
@@ -1339,11 +1352,12 @@ class App:
             backtest_date_range=backtest_date_range,
             storage_directory=backtest_storage_directory,
         ):
-            backtest = backtest_service.load_backtest_by_strategy(
-                strategy=strategy,
-                backtest_date_range=backtest_date_range,
-                storage_directory=backtest_storage_directory,
-            )
+            backtest = backtest_service\
+                .load_backtest_by_strategy_and_backtest_date_range(
+                    strategy=strategy,
+                    backtest_date_range=backtest_date_range,
+                    storage_directory=backtest_storage_directory,
+                )
         else:
             try:
                 run = backtest_service.create_vector_backtest(
@@ -1671,7 +1685,8 @@ class App:
             snapshot_interval=SnapshotInterval.DAILY,
             risk_free_rate=risk_free_rate,
             market=market,
-            trading_symbol=trading_symbol
+            trading_symbol=trading_symbol,
+            use_checkpoints=False
         )
         backtest_metrics = backtest.get_backtest_metrics(backtest_date_range)
 
@@ -1753,7 +1768,8 @@ class App:
                 risk_free_rate=risk_free_rate,
                 skip_data_sources_initialization=True,
                 market=market,
-                trading_symbol=trading_symbol
+                trading_symbol=trading_symbol,
+                use_checkpoints=False
             )
 
             # Add the results of the permuted backtest to the main backtest

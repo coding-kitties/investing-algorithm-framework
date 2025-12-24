@@ -672,21 +672,20 @@ class BacktestService:
         backtest_directory = os.path.join(storage_directory, strategy_id)
 
         if os.path.exists(backtest_directory):
-            backtest = Backtest.load(backtest_directory)
-            backtest_date_ranges = backtest\
-                .get_most_granular_ohlcv_data_source()
+            backtest = Backtest.open(backtest_directory)
+            backtest_date_ranges = backtest.get_backtest_date_ranges()
 
             for backtest_date_range_ref in backtest_date_ranges:
 
                 if backtest_date_range_ref.start_date \
-                        == backtest_date_range_ref.start_date and \
+                        == backtest_date_range.start_date and \
                         backtest_date_range_ref.end_date \
-                        == backtest_date_range_ref.end_date:
+                        == backtest_date_range.end_date:
                     return True
 
         return False
 
-    def load_backtest_by_strategy(
+    def load_backtest_by_strategy_and_backtest_date_range(
         self,
         strategy,
         backtest_date_range: BacktestDateRange,
@@ -694,6 +693,9 @@ class BacktestService:
     ) -> Backtest:
         """
         Load a backtest for the given strategy and backtest date range.
+        If the backtest does not exist, an exception will be raised.
+        For the given backtest, only the run and metrics corresponding
+        to the backtest date range will be returned.
 
         Args:
             strategy: The strategy to load the backtest for.
@@ -709,14 +711,9 @@ class BacktestService:
         backtest_directory = os.path.join(storage_directory, strategy_id)
 
         if os.path.exists(backtest_directory):
-            backtest = Backtest.load(backtest_directory)
-            run = backtest.get_run(backtest_date_range)
-            metrics = backtest.get_metrics(backtest_date_range)
-            return Backtest(
-                backtest_runs=[run],
-                backtest_summary=generate_backtest_summary_metrics(
-                    [metrics]
-                )
-            )
+            backtest = Backtest.open(backtest_directory)
+            run = backtest.get_backtest_run(backtest_date_range)
+            metadata = backtest.get_metadata()
+            return Backtest(backtest_runs=[run], metadata=metadata)
         else:
             raise OperationalException("Backtest does not exist.")

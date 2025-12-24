@@ -467,6 +467,16 @@ class Backtest:
 
         return merged
 
+    def get_metadata(self) -> Dict[str, str]:
+        """
+        Get the metadata of the backtest.
+
+        Returns:
+            Dict[str, str]: A dictionary containing the metadata
+                of the backtest.
+        """
+        return self.metadata
+
     def get_backtest_date_ranges(self):
         """
         Get the date ranges for the backtest.
