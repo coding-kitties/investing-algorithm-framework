@@ -649,3 +649,74 @@ class BacktestService:
                 most_granular = source
 
         return most_granular
+
+    def backtest_exists(
+        self,
+        strategy,
+        backtest_date_range: BacktestDateRange,
+        storage_directory: str
+    ) -> bool:
+        """
+        Check if a backtest already exists for the given strategy
+        and backtest date range.
+
+        Args:
+            strategy: The strategy to check.
+            backtest_date_range: The backtest date range to check.
+            storage_directory: The directory where backtests are stored.
+
+        Returns:
+            bool: True if the backtest exists, False otherwise.
+        """
+        strategy_id = strategy.id
+        backtest_directory = os.path.join(storage_directory, strategy_id)
+
+        if os.path.exists(backtest_directory):
+            backtest = Backtest.load(backtest_directory)
+            backtest_date_ranges = backtest\
+                .get_most_granular_ohlcv_data_source()
+
+            for backtest_date_range_ref in backtest_date_ranges:
+
+                if backtest_date_range_ref.start_date \
+                        == backtest_date_range_ref.start_date and \
+                        backtest_date_range_ref.end_date \
+                        == backtest_date_range_ref.end_date:
+                    return True
+
+        return False
+
+    def load_backtest_by_strategy(
+        self,
+        strategy,
+        backtest_date_range: BacktestDateRange,
+        storage_directory: str
+    ) -> Backtest:
+        """
+        Load a backtest for the given strategy and backtest date range.
+
+        Args:
+            strategy: The strategy to load the backtest for.
+            backtest_date_range: The backtest date range to load.
+            storage_directory: The directory where backtests are stored.
+
+        Returns:
+            Backtest: instance of the loaded backtest with only
+                the given run and metrics corresponding to the
+                backtest date range.
+        """
+        strategy_id = strategy.id
+        backtest_directory = os.path.join(storage_directory, strategy_id)
+
+        if os.path.exists(backtest_directory):
+            backtest = Backtest.load(backtest_directory)
+            run = backtest.get_run(backtest_date_range)
+            metrics = backtest.get_metrics(backtest_date_range)
+            return Backtest(
+                backtest_runs=[run],
+                backtest_summary=generate_backtest_summary_metrics(
+                    [metrics]
+                )
+            )
+        else:
+            raise OperationalException("Backtest does not exist.")

@@ -1,4 +1,4 @@
-from .app import App, Algorithm, \
+from .app import App, Algorithm, generate_strategy_id, \
     TradingStrategy, StatelessAction, Task, AppHook, Context, \
     add_html_report, BacktestReport, save_backtests_to_directory, \
     pretty_print_trades, pretty_print_positions, \
@@ -195,5 +195,6 @@ __all__ = [
     "TakeProfitRule",
     "StopLossRule",
     "TradeStopLossService",
-    "TradeTakeProfitService"
+    "TradeTakeProfitService",
+    "generate_strategy_id"
 ]

@@ -16,14 +16,15 @@ class TradingStrategy:
     strategy is a set of rules that defines when to buy or sell an asset.
 
     Attributes:
-        time_unit: TimeUnit - the time unit of the strategy that defines
+        id (string): the unique id for your combined strategy instances
+        time_unit (TimeUnit): the time unit of the strategy that defines
             when the strategy should run e.g. HOUR, DAY, WEEK, MONTH
-        interval: int - the interval of the strategy that defines how often
+        interval (int): the interval of the strategy that defines how often
             the strategy should run within the time unit e.g. every 5 hours,
             every 2 days, every 3 weeks, every 4 months
-        worker_id (optional): str - the id of the worker
-        strategy_id (optional): str - the id of the strategy
-        decorated (optional): function - the decorated function
+        worker_id ((optional) str): the id of the worker
+        strategy_id ((optional) str): the id of the strategy
+        decorated ((optional) bool): the decorated function
         data_sources (List[DataSource] optional): the list of data
             sources to use for the strategy. The data sources will be used
             to indentify data providers that will be called to gather data
@@ -33,6 +34,7 @@ class TradingStrategy:
             store additional information about the strategy, such as its
             author, version, description, params etc.
     """
+    id: str
     time_unit: TimeUnit = None
     interval: int = None
     worker_id: str = None
@@ -50,6 +52,7 @@ class TradingStrategy:
 
     def __init__(
         self,
+        id,
         strategy_id=None,
         time_unit=None,
         interval=None,
@@ -63,6 +66,7 @@ class TradingStrategy:
         worker_id=None,
         decorated=None
     ):
+        self.id = id
         if time_unit is not None:
             self.time_unit = TimeUnit.from_value(time_unit)
         else:
@@ -81,7 +85,13 @@ class TradingStrategy:
         if data_sources is not None:
             self.data_sources = data_sources
 
+        if metadata is None:
+            metadata = {}
+
         self.metadata = metadata
+
+        if "id" not in self.metadata:
+            self.metadata["id"] = self.id
 
         if decorated is not None:
             self.decorated = decorated

@@ -27,6 +27,7 @@ class Algorithm:
     """
     def __init__(
         self,
+        id: str = None,
         name: str = None,
         description: str = None,
         strategy=None,
@@ -36,6 +37,7 @@ class Algorithm:
         on_strategy_run_hooks=None,
         metadata=None
     ):
+        self.id = id
         self._name = name
         self._context = {}
         self._description = None

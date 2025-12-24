@@ -38,13 +38,11 @@ def get_mean_daily_return(snapshots):
 
     # Check if the period is less than a year
     if (end_date - start_date).days < 365:
-        print("Less than a year of data, using CAGR to calculate mean daily return.")
         # Use CAGR to calculate mean daily return
         cagr = get_cagr(snapshots)
         if cagr == 0.0:
             return 0.0
 
-        print(f"CAGR: {cagr}")
         return (1 + cagr) ** (1 / 365) - 1
 
     # Resample to daily frequency using last value of the day

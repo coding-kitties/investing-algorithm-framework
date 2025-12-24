@@ -162,7 +162,8 @@ class BacktestRun:
         run_file = os.path.join(directory_path, "run.json")
 
         if os.path.isfile(run_file):
-            data = json.load(open(run_file, 'r'))
+            with open(run_file, 'r') as f:
+                data = json.load(f)
         else:
             raise OperationalException(
                 f"The run file {run_file} does not exist."

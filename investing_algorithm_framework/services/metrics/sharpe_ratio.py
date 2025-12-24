@@ -76,10 +76,7 @@ def get_sharpe_ratio(
     """
     snapshots = sorted(snapshots, key=lambda s: s.created_at)
     mean_daily_return = get_mean_daily_return(snapshots)
-
-    print(f"mean daily return {mean_daily_return}")
     std_daily_return = get_daily_returns_std(snapshots)
-    print(f"std daily return {std_daily_return}")
 
     if std_daily_return == 0:
         return float('nan')  # Avoid division by zero

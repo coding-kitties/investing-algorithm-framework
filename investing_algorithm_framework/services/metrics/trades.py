@@ -18,9 +18,7 @@ def get_positive_trades(
             and the percentage of positive trades.
     """
     if trades is None or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is empty or None, cannot compute positive trades."
-        )
+        return 0, 0.0
 
     closed_trades = [
         trade for trade in trades if TradeStatus.CLOSED.equals(trade.status)
@@ -48,12 +46,10 @@ def get_negative_trades(
 
     Returns:
         Tuple[int, float]: A tuple containing the number of negative trades
-            and the percentage of negative trades.
+            and the percentage ofr negative trades.
     """
     if trades is None or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is empty or None, cannot compute negative trades."
-        )
+        return 0, 0.0
 
     closed_trades = [
         trade for trade in trades if TradeStatus.CLOSED.equals(trade.status)
@@ -82,10 +78,9 @@ def get_number_of_trades(
     Returns:
         int: The total number of trades.
     """
-    if trades is None or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is None, cannot compute number of trades."
-        )
+    if trades is None:
+        return 0
+
     return len(trades)
 
 
@@ -101,10 +96,8 @@ def get_number_of_open_trades(
     Returns:
         int: The number of open trades.
     """
-    if trades is None or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is None, cannot compute number of open trades."
-        )
+    if trades is None:
+        return 0
 
     open_trades = [
         trade for trade in trades if TradeStatus.OPEN.equals(trade.status)
@@ -124,10 +117,8 @@ def get_number_of_closed_trades(
     Returns:
         int: The number of closed trades.
     """
-    if trades is None or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is None, cannot compute number of closed trades."
-        )
+    if trades is None:
+        return 0
 
     closed_trades = [
         trade for trade in trades if TradeStatus.CLOSED.equals(trade.status)
@@ -147,10 +138,8 @@ def get_average_trade_duration(
     Returns:
         float: The average trade duration in hours.
     """
-    if trades is None or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is None, cannot compute average trade duration."
-        )
+    if trades is None:
+        return 0.0
 
     total_duration = 0.0
 
@@ -177,10 +166,8 @@ def get_current_average_trade_duration(
     Returns:
         float: The average trade duration in hours.
     """
-    if trades is None or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is None, cannot compute average trade duration."
-        )
+    if trades is None:
+        return 0.0
 
     total_duration = 0.0
 
@@ -212,10 +199,8 @@ def get_average_trade_size(
         float: The average trade size.
     """
 
-    if trades is None or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is None, cannot compute average trade size."
-        )
+    if trades is None:
+        return 0.0
 
     total_trade_size = 0.0
 
@@ -232,9 +217,7 @@ def get_average_trade_return(trades: List[Trade]) -> Tuple[float, float]:
     average return percentage (per trade) of closed trades.
     """
     if not trades or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is empty, cannot compute average return."
-        )
+        return 0.0, 0.0
 
     closed_trades = [t for t in trades if TradeStatus.CLOSED.equals(t.status)]
 
@@ -270,9 +253,7 @@ def get_current_average_trade_return(
         percentage of the average return
     """
     if not trades or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is empty, cannot compute average return."
-        )
+        return 0.0, 0.0
 
     total_return = sum(t.net_gain_absolute for t in trades)
     average_return = total_return / len(trades)
@@ -301,9 +282,7 @@ def get_average_trade_gain(trades: List[Trade]) -> Tuple[float, float]:
         Tuple[float, float]: The average gain and average gain percentage
     """
     if trades is None or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is empty or None, cannot calculate average gain."
-        )
+        return 0.0, 0.0
 
     gains = [t.net_gain_absolute for t in trades if t.net_gain_absolute > 0]
 
@@ -338,9 +317,7 @@ def get_current_average_trade_gain(trades: List[Trade]) -> Tuple[float, float]:
         Tuple[float, float]: The average gain and average gain percentage
     """
     if trades is None or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is empty or None, cannot calculate average gain."
-        )
+        return 0.0, 0.0
 
     gains = [t.net_gain_absolute for t in trades if t.net_gain_absolute > 0]
 
@@ -375,9 +352,7 @@ def get_average_trade_loss(trades: List[Trade]) -> Tuple[float, float]:
         percentage of the average loss
     """
     if trades is None or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is empty or None, cannot calculate average loss."
-        )
+        return 0.0, 0.0
 
     closed_trades = [t for t in trades if TradeStatus.CLOSED.equals(t.status)]
     losing_trades = [t for t in closed_trades if t.net_gain < 0]
@@ -414,9 +389,7 @@ def get_current_average_trade_loss(
         percentage of the average loss
     """
     if trades is None or len(trades) == 0:
-        raise OperationalException(
-            "Trades list is empty or None, cannot calculate average loss."
-        )
+        return 0.0, 0.0
 
     losing_trades = [t for t in trades if t.net_gain_absolute < 0]
 

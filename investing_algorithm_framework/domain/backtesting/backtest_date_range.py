@@ -89,6 +89,23 @@ class BacktestDateRange:
     def name(self):
         return self._name
 
+    def __eq__(self, other):
+        """
+        Two BacktestDateRange objects are equal if they have the same
+        start and end dates, regardless of their names.
+        """
+        if not isinstance(other, BacktestDateRange):
+            return False
+        return (self._start_date == other._start_date and
+                self._end_date == other._end_date)
+
+    def __hash__(self):
+        """
+        Hash based on start and end dates to make the object hashable
+        for use in sets and as dictionary keys.
+        """
+        return hash((self._start_date, self._end_date))
+
     def __repr__(self):
         return f"{self.name}: {self._start_date} - {self._end_date}"
 
