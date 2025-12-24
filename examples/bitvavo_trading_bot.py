@@ -21,6 +21,7 @@ load_dotenv()
 
 # Define your bitvavo trading strategy and register the data sources
 class BitvavoTradingStrategy(TradingStrategy):
+    id = "bitvavo-trading-strategy"
     time_unit = TimeUnit.SECOND
     interval = 10
     data_sources = [

@@ -24,6 +24,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
     def __init__(
         self,
+        id: str,
         time_unit: TimeUnit,
         interval: int,
         market: str,
@@ -77,7 +78,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             )
 
         super().__init__(
-            data_sources=data_sources, time_unit=time_unit, interval=interval
+            id=id, data_sources=data_sources, time_unit=time_unit, interval=interval
         )
 
         self.buy_signal_dates = {}
@@ -222,6 +223,7 @@ if __name__ == "__main__":
     app = create_app()
     app.add_strategy(
         RSIEMACrossoverStrategy(
+            id="rsi-ema-crossover",
             time_unit=TimeUnit.HOUR,
             interval=2,
             market="bitvavo",
