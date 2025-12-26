@@ -42,8 +42,17 @@ def combine_backtests(backtests):
     """
     backtest_metrics = []
     backtest_runs = []
+    algorithm_id = None
 
     for backtest in backtests:
+        if algorithm_id is None:
+            algorithm_id = backtest.algorithm_id
+        elif algorithm_id != backtest.algorithm_id:
+            raise ValueError(
+                "All backtests must belong to the same algorithm id"
+                "to be combined."
+            )
+
         backtest_runs += backtest.get_all_backtest_runs()
         backtest_metrics += backtest.get_all_backtest_metrics()
 
@@ -78,6 +87,7 @@ def combine_backtests(backtests):
     from .backtest import Backtest
 
     backtest = Backtest(
+        algorithm_id=backtest.algorithm_id,
         backtest_summary=summary,
         metadata=metadata,
         risk_free_rate=risk_free_rate,

@@ -1022,13 +1022,13 @@ class App:
                 that was backtested.
         """
         backtests = []
-        strategy_ids = [strategy.id for strategy in strategies]
-        strategy_id_selection = strategy_ids.copy()
+        algorithm_ids = [strategy.algorithm_id for strategy in strategies]
+        algorithm_ids_selection = algorithm_ids.copy()
         data_sources = []
 
         # Only used when backtest_storage_directory is None and
         # backtest_date_ranges is provided
-        backtests_ordered_by_strategy = {}
+        backtests_ordered_by_algorithm = {}
 
         if backtest_date_range is None and backtest_date_ranges is None:
             raise OperationalException(
@@ -1052,7 +1052,6 @@ class App:
                 )
 
         if backtest_date_range is not None:
-            backtest_results = []
             if not skip_data_sources_initialization:
                 self.initialize_data_sources_backtest(
                     data_sources,
@@ -1076,6 +1075,7 @@ class App:
                         continue_on_error=continue_on_error,
                         use_checkpoints=use_checkpoints,
                         backtest_storage_directory=backtest_storage_directory,
+                        show_progress=False,
                     )
                 )
 
@@ -1145,7 +1145,8 @@ class App:
                             use_checkpoints=use_checkpoints,
                             backtest_storage_directory=(
                                 backtest_storage_directory
-                            )
+                            ),
+                            show_progress=False
                         )
                     )
 
@@ -1155,13 +1156,12 @@ class App:
                     backtest_results = filter_function(
                         backtest_results, backtest_date_range
                     )
-                    strategy_id_selection = [
-                        backtest.metadata["id"] for backtest
-                        in backtest_results
+                    algorithm_ids_selection = [
+                        backtest.algorithm_id for backtest in backtest_results
                     ]
                     active_strategies = [
                         strategy for strategy in active_strategies
-                        if strategy.id in strategy_id_selection
+                        if strategy.algorithm_id in algorithm_ids_selection
                     ]
 
                 # Save the intermediate backtests to a temp storage location
@@ -1174,8 +1174,8 @@ class App:
 
                 else:
                     for backtest in backtest_results:
-                        backtests_ordered_by_strategy.setdefault(
-                            backtest.metadata["id"], []
+                        backtests_ordered_by_algorithm.setdefault(
+                            backtest.algorithm_id, []
                         ).append(backtest)
 
                 del backtest_results
@@ -1184,15 +1184,11 @@ class App:
                 gc.collect()
 
             def load_backtest_filter_fn(bt: Backtest) -> bool:
-                return bt.metadata["id"] in strategy_id_selection
+                return bt.algorithm_id in algorithm_ids_selection
 
             # load all backtests from storage directories and combine them
             if backtest_storage_directory is not None:
-                strategy_id_selection = [
-                    strategy.id for strategy in active_strategies
-                ]
                 for backtest_range in storage_directories:
-
                     path = storage_directories[backtest_range]
                     loaded_backtests = load_backtests_from_directory(
                         directory_path=path,
@@ -1200,24 +1196,26 @@ class App:
                     )
 
                     for backtest in loaded_backtests:
-                        backtests_ordered_by_strategy.setdefault(
-                            backtest.metadata["id"], []
+                        backtests_ordered_by_algorithm.setdefault(
+                            backtest.algorithm_id, []
                         ).append(backtest)
 
                     # Remove all temp storage directories
                     shutil.rmtree(path)
             else:
                 # Remove all strategies that are not in the final selection
-                backtests_ordered_by_strategy = {
-                    strategy_id: backtests
-                    for strategy_id, backtests in
-                    backtests_ordered_by_strategy.items()
-                    if strategy_id in strategy_id_selection
+                backtests_ordered_by_algorithm = {
+                    algorithm_id: backtests
+                    for algorithm_id, backtests in
+                    backtests_ordered_by_algorithm.items()
+                    if algorithm_id in algorithm_ids_selection
                 }
 
-            for strategy in backtests_ordered_by_strategy:
+            for algorith_id in backtests_ordered_by_algorithm.keys():
                 backtests.append(
-                    combine_backtests(backtests_ordered_by_strategy[strategy])
+                    combine_backtests(
+                        backtests_ordered_by_algorithm[algorith_id]
+                    )
                 )
 
             if backtest_storage_directory is not None:
@@ -1237,18 +1235,18 @@ class App:
         metadata: Optional[Dict[str, str]] = None,
         risk_free_rate: Optional[float] = None,
         skip_data_sources_initialization: bool = False,
-        show_data_initialization_progress: bool = True,
         initial_amount: float = None,
         market: str = None,
         trading_symbol: str = None,
         continue_on_error: bool = False,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
-        use_checkpoints: bool = True
+        use_checkpoints: bool = False,
+        show_progress=False,
     ) -> Backtest:
         """
         Run vectorized backtests for a strategy. The provided
-        strategy needs to have its 'buy_signal_vectorized' and
-        'sell_signal_vectorized' methods implemented to support vectorized
+        strategy needs to have its 'generate_buy_signals' and
+        'generate_sell_signals' methods implemented to support vectorized
         backtesting.
 
         Args:
@@ -1279,8 +1277,6 @@ class App:
                 initialization step. This will speed up the backtesting
                 process, but make sure that the data sources are already
                 initialized before calling this method.
-            show_data_initialization_progress (bool): Whether to show the
-                progress bar when initializing data sources.
             market (str): The market to use for the backtest. This is used
                 to create a portfolio configuration if no portfolio
                 configuration is provided in the strategy.
@@ -1307,6 +1303,9 @@ class App:
                 backtest exists, it will be loaded
                 instead of running a new backtest. This is useful for
                 long-running backtests that might take a while to complete.
+            show_progress (bool): Whether to show progress bars during
+                data source initialization. This is useful for long-running
+                initialization processes.
 
         Returns:
             Backtest: Instance of Backtest
@@ -1328,7 +1327,7 @@ class App:
             self.initialize_data_sources_backtest(
                 strategy.data_sources,
                 backtest_date_range,
-                show_progress=show_data_initialization_progress
+                show_progress=show_progress
             )
 
         if risk_free_rate is None:
@@ -1360,6 +1359,16 @@ class App:
                 )
         else:
             try:
+
+                if show_progress:
+                    start_date = backtest_date_range \
+                        .start_date.strftime('%Y-%m-%d')
+                    end_date = backtest_date_range.end_date.strftime(
+                        '%Y-%m-%d')
+                    print(
+                        f"Running backtests for {start_date} to {end_date}"
+                    )
+
                 run = backtest_service.create_vector_backtest(
                     strategy=strategy,
                     backtest_date_range=backtest_date_range,
@@ -1369,6 +1378,7 @@ class App:
                     initial_amount=initial_amount
                 )
                 backtest = Backtest(
+                    algorithm_id=strategy.algorithm_id,
                     backtest_runs=[run],
                     risk_free_rate=risk_free_rate,
                     backtest_summary=generate_backtest_summary_metrics(
@@ -1380,8 +1390,10 @@ class App:
                     f"Error occurred during vector backtest for strategy "
                     f"{strategy.strategy_id}: {str(e)}"
                 )
+
                 if continue_on_error:
                     backtest = Backtest(
+                        algorithm_id=strategy.algorithm_id,
                         backtest_runs=[],
                         risk_free_rate=risk_free_rate,
                     )

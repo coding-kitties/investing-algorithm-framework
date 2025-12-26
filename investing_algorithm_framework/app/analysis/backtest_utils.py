@@ -4,7 +4,8 @@ from typing import List, Union, Callable
 from logging import getLogger
 from random import Random
 
-from investing_algorithm_framework.domain import Backtest
+from investing_algorithm_framework.domain import Backtest, \
+    OperationalException
 
 
 logger = getLogger("investing_algorithm_framework")
@@ -57,8 +58,18 @@ def save_backtests_to_directory(
         if dir_name_generation_function is not None:
             dir_name = dir_name_generation_function(backtest)
         else:
+
+            if backtest.algorithm_id is None:
+                raise OperationalException(
+                    "algorithm_id is not set in backtest instance,"
+                    "cannot generate directory name automatically, "
+                    "please make sure to set the algorithm_id field "
+                    "in your strategies or provide "
+                    "a dir_name_generation_function."
+                )
+
             # Check if there is an ID in the backtest metadata
-            dir_name = backtest.metadata.get('id', None)
+            dir_name = backtest.algorithm_id
 
         if dir_name is None:
             logger.warning(

@@ -52,7 +52,7 @@ class TradingStrategy:
 
     def __init__(
         self,
-        id,
+        algorithm_id=None,
         strategy_id=None,
         time_unit=None,
         interval=None,
@@ -66,7 +66,29 @@ class TradingStrategy:
         worker_id=None,
         decorated=None
     ):
-        self.id = id
+        if metadata is None:
+            metadata = {}
+
+        self.metadata = metadata
+
+        if worker_id is not None:
+            self.worker_id = worker_id
+        elif self.decorated:
+            self.worker_id = decorated.__name__
+        else:
+            self.worker_id = self.__class__.__name__
+
+        if strategy_id is not None:
+            self.strategy_id = strategy_id
+        else:
+            self.strategy_id = self.worker_id
+
+        if algorithm_id is not None:
+            self.algorithm_id = algorithm_id
+
+        if "algorithm_id" in self.metadata:
+            self.algorithm_id = self.metadata["algorithm_id"]
+
         if time_unit is not None:
             self.time_unit = TimeUnit.from_value(time_unit)
         else:
@@ -85,28 +107,8 @@ class TradingStrategy:
         if data_sources is not None:
             self.data_sources = data_sources
 
-        if metadata is None:
-            metadata = {}
-
-        self.metadata = metadata
-
-        if "id" not in self.metadata:
-            self.metadata["id"] = self.id
-
         if decorated is not None:
             self.decorated = decorated
-
-        if worker_id is not None:
-            self.worker_id = worker_id
-        elif self.decorated:
-            self.worker_id = decorated.__name__
-        else:
-            self.worker_id = self.__class__.__name__
-
-        if strategy_id is not None:
-            self.strategy_id = strategy_id
-        else:
-            self.strategy_id = self.worker_id
 
         if position_sizes is not None:
             self.position_sizes = position_sizes

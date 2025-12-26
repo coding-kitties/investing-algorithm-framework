@@ -1,6 +1,5 @@
 import json
 import os
-from uuid import uuid4
 from pathlib import Path
 from dataclasses import dataclass, field
 from logging import getLogger
@@ -48,7 +47,7 @@ class Backtest:
         algorithm_id (int): The ID of the algorithm associated with this
             backtest.
     """
-    id: str = field(default_factory=lambda: str(uuid4()))
+    algorithm_id: str
     backtest_runs: List[BacktestRun] = field(default_factory=list)
     backtest_summary: BacktestSummaryMetrics = field(default=None)
     backtest_permutation_tests: List[BacktestPermutationTest] = \
@@ -56,7 +55,6 @@ class Backtest:
     metadata: Dict[str, str] = field(default_factory=dict)
     risk_free_rate: float = None
     strategy_ids: List[int] = field(default_factory=list)
-    algorithm_id: int = None
 
     def get_all_backtest_runs(self) -> List[BacktestRun]:
         """
@@ -200,7 +198,7 @@ class Backtest:
             OperationalException: If the directory does not exist or if
             there is an error loading the files.
         """
-        id = None
+        algorithm_id = None
         backtest_runs = []
         backtest_summary_metrics = None
         permutation_metrics = []
@@ -212,15 +210,16 @@ class Backtest:
                 f"The directory {directory_path} does not exist."
             )
 
-        # Load id if available
-        id_file = os.path.join(directory_path, "id.json")
+        # Load algorithm_id if available
+        id_file = os.path.join(directory_path, "algorithm_id.json")
+
         if os.path.isfile(id_file):
             with open(id_file, 'r') as f:
                 try:
-                    id = json.load(f).get('id', None)
+                    algorithm_id = json.load(f).get('algorithm_id', None)
                 except json.JSONDecodeError as e:
-                    logger.error(f"Error decoding id JSON: {e}")
-                    id = None
+                    logger.error(f"Error decoding algorithm_id JSON: {e}")
+                    algorithm_id = None
 
         # Load all backtest runs
         runs_dir = os.path.join(directory_path, "runs")
@@ -309,7 +308,7 @@ class Backtest:
                     risk_free_rate = None
 
         return Backtest(
-            id=id,
+            algorithm_id=algorithm_id,
             backtest_runs=backtest_runs,
             backtest_summary=backtest_summary_metrics,
             backtest_permutation_tests=permutation_metrics,
@@ -334,14 +333,8 @@ class Backtest:
             None: This method does not return anything, it saves the
             metrics to a file.
         """
-
         if not os.path.exists(directory_path):
             os.makedirs(directory_path)
-
-        # Save id of the backtest
-        id_file = os.path.join(directory_path, "id.json")
-        with open(id_file, 'w') as f:
-            json.dump({'id': self.id}, f, indent=4)
 
         # Call the save method of all backtest runs
         if self.backtest_runs:
@@ -507,7 +500,17 @@ class Backtest:
         self.backtest_permutation_tests.append(permutation_test)
 
     def __hash__(self):
-        return hash(self.id)
+        if self.algorithm_id is None:
+            raise ValueError(
+                "Cannot hash Backtest without an algorithm_id value, Please "
+                "make sure the Backtest instance has an algorithm_id set."
+            )
+
+        meta_id = self.metadata.get("algorithm_id")
+        return hash(meta_id)
 
     def __eq__(self, other):
-        return isinstance(other, Backtest) and self.id == other.id
+        if not isinstance(other, Backtest):
+            return False
+
+        return self.algorithm_id == other.algorithm_id

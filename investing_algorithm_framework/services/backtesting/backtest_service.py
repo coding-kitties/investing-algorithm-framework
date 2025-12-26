@@ -602,6 +602,7 @@ class BacktestService:
         )
         run.backtest_metrics = backtest_metrics
         return Backtest(
+            algorithm_id=algorithm.id,
             backtest_runs=[run],
             backtest_summary=generate_backtest_summary_metrics(
                 [backtest_metrics]
@@ -668,8 +669,8 @@ class BacktestService:
         Returns:
             bool: True if the backtest exists, False otherwise.
         """
-        strategy_id = strategy.id
-        backtest_directory = os.path.join(storage_directory, strategy_id)
+        algorithm_id = strategy.algorithm_id
+        backtest_directory = os.path.join(storage_directory, algorithm_id)
 
         if os.path.exists(backtest_directory):
             backtest = Backtest.open(backtest_directory)
