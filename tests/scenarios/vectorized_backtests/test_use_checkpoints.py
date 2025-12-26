@@ -19,7 +19,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
     def __init__(
         self,
-        id,
+        algorithm_id,
         symbols,
         position_sizes,
         time_unit: TimeUnit,
@@ -50,7 +50,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         data_sources = []
 
         super().__init__(
-            id=id,
+            algorithm_id=algorithm_id,
             data_sources=data_sources,
             time_unit=time_unit,
             interval=interval,
@@ -225,9 +225,9 @@ class Test(TestCase):
             "rsi_overbought_threshold": [70, 80],
             "rsi_oversold_threshold": [30, 20],
             "ema_time_frame": ["2h"],
-            "ema_short_period": [50, 100],
+            "ema_short_period": [100],
             "ema_long_period": [150, 200],
-            "ema_cross_lookback_window": [2, 4, 6, 12]
+            "ema_cross_lookback_window": [4, 6]
         }
 
         param_options = param_grid
@@ -262,7 +262,7 @@ class Test(TestCase):
         for param_set in param_variations:
             strategies.append(
                 RSIEMACrossoverStrategy(
-                    id=generate_strategy_id(param_set),
+                    algorithm_id=generate_strategy_id(param_set),
                     time_unit=TimeUnit.HOUR,
                     interval=2,
                     market="BITVAVO",

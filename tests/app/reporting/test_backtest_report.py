@@ -73,6 +73,7 @@ class Test(TestCase):
         ]
 
         backtest = Backtest(
+            algorithm_id="alg-025",
             backtest_runs=[run],
         )
         output_path = os.path.join(self.resource_dir, "backtest_report")
@@ -161,6 +162,7 @@ class Test(TestCase):
         ]
 
         backtest = Backtest(
+            algorithm_id="alg-025",
             backtest_runs=[results],
             risk_free_rate=0.0
         )

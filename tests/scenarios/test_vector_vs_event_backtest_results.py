@@ -28,6 +28,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
     def __init__(
         self,
+        algorithm_id: str,
         time_unit: TimeUnit,
         interval: int,
         market: str,
@@ -81,7 +82,10 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             )
 
         super().__init__(
-            data_sources=data_sources, time_unit=time_unit, interval=interval
+            algorithm_id=algorithm_id,
+            data_sources=data_sources,
+            time_unit=time_unit,
+            interval=interval
         )
 
         self.buy_signal_dates = {}
@@ -254,6 +258,7 @@ class Test(TestCase):
             start_date=start_date, end_date=end_date
         )
         strategy = RSIEMACrossoverStrategy(
+            algorithm_id="RSIEMACrossover",
             time_unit=TimeUnit.HOUR,
             interval=2,
             market="BITVAVO",
@@ -278,10 +283,8 @@ class Test(TestCase):
         run = vector_backtests.backtest_runs[0]
         end_time = time.time()
 
-
         self.assertEqual(3, len(run.get_trades()))
         strategy.reset()
-
         event_backtest = app.run_backtest(
             initial_amount=1000,
             backtest_date_range=date_range,
@@ -290,6 +293,5 @@ class Test(TestCase):
             risk_free_rate=0.027
         )
         run = event_backtest.backtest_runs[0]
-
         self.assertEqual(3, len(run.get_trades()))
 

@@ -20,6 +20,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
     def __init__(
         self,
+        algorithm_id: str,
         symbols,
         position_sizes,
         time_unit: TimeUnit,
@@ -34,6 +35,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         ema_long_period,
         ema_cross_lookback_window: int = 10
     ):
+        self.algorithm_id = algorithm_id
         self.rsi_time_frame = rsi_time_frame
         self.rsi_period = rsi_period
         self.rsi_result_column = f"rsi_{self.rsi_period}"
@@ -221,6 +223,7 @@ class Test(TestCase):
         )
         strategies = [
             RSIEMACrossoverStrategy(
+                algorithm_id="RSIEMACrossover",
                 time_unit=TimeUnit.HOUR,
                 interval=2,
                 market="BITVAVO",
@@ -246,6 +249,7 @@ class Test(TestCase):
                 ]
             ),
             RSIEMACrossoverStrategy(
+                algorithm_id="RSIEMACrossoverTwo",
                 time_unit=TimeUnit.HOUR,
                 interval=2,
                 market="BITVAVO",
@@ -316,6 +320,7 @@ class Test(TestCase):
         )
         strategies = [
             RSIEMACrossoverStrategy(
+                algorithm_id="RSIEMACrossoverThree",
                 time_unit=TimeUnit.HOUR,
                 interval=2,
                 market="BITVAVO",
@@ -341,6 +346,7 @@ class Test(TestCase):
                 ]
             ),
             RSIEMACrossoverStrategy(
+                algorithm_id="RSIEMACrossoverFour",
                 time_unit=TimeUnit.HOUR,
                 interval=2,
                 market="BITVAVO",

@@ -40,6 +40,7 @@ class CrossOverStrategyV1(TradingStrategy):
 
     def __init__(
         self,
+        algorithm_id: str = "crossover_strategy_v1",
         symbols = ["BTC"],
         ema_time_frame="2h",
         ema_crossover_result_column="ema_crossover",
@@ -50,7 +51,7 @@ class CrossOverStrategyV1(TradingStrategy):
         self.ema_cross_lookback_window = crossover_lookback_window
         self.ema_crossover_result_column = ema_crossover_result_column
         self.ema_crossunder_result_column = ema_crossunder_result_column
-        super().__init__(symbols=symbols)
+        super().__init__(algorithm_id=algorithm_id, symbols=symbols)
 
         for symbol in symbols:
             full_symbol = f"{symbol}/EUR"

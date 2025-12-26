@@ -104,7 +104,9 @@ class Test(TestCase):
         # Use a date range where we expect TP to trigger
         start_date = datetime(2020, 12, 29, tzinfo=timezone.utc)
         end_date = datetime(2021, 1, 31, 22, 0, 0, tzinfo=timezone.utc)
-        strategy = FixedStopLossTakeProfitStrategy()
+        strategy = FixedStopLossTakeProfitStrategy(
+            algorithm_id="FixedTPStrategy"
+        )
         csv_data_provider = CSVOHLCVDataProvider(
             storage_path=str(Path(__file__).parent.parent / 'resources' / 'test_data' / 'ohlcv' / 'OHLCV_BTC-EUR_BITVAVO_2h_2020-12-15-07-00_2021-01-31-23-00.csv'),
             symbol="BTC/EUR",
@@ -268,7 +270,9 @@ class Test(TestCase):
         # Use a date range where we expect SL to trigger after peak
         start_date = datetime(2020, 12, 29, tzinfo=timezone.utc)
         end_date = datetime(2021, 1, 31, 22, 0, 0, tzinfo=timezone.utc)
-        strategy = FixedStopLossTakeProfitStrategy()
+        strategy = FixedStopLossTakeProfitStrategy(
+            algorithm_id="FixedSLStrategy"
+        )
         strategy.take_profits = [
             TakeProfitRule(
                 symbol="BTC",

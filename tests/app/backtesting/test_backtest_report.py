@@ -8,6 +8,7 @@ from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
 
 
 class TestStrategy(TradingStrategy):
+    id = "test_algorithm"
     strategy_id = "test_strategy"
     time_unit = TimeUnit.MINUTE
     interval = 1

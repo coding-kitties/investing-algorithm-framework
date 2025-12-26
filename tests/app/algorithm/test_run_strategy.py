@@ -12,6 +12,7 @@ from tests.resources import random_string, OrderExecutorTest, \
 
 
 class StrategyOne(TradingStrategy):
+    id = "strategy_one"
     time_unit = TimeUnit.SECOND
     interval = 2
 
@@ -24,6 +25,7 @@ class StrategyOne(TradingStrategy):
         pass
 
 class StrategyTwo(TradingStrategy):
+    id = "strategy_two"
     time_unit = TimeUnit.SECOND
     interval = 2
 

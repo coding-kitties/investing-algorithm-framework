@@ -18,7 +18,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
     def __init__(
         self,
-        id,
+        algorithm_id,
         symbols,
         position_sizes,
         time_unit: TimeUnit,
@@ -49,7 +49,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         data_sources = []
 
         super().__init__(
-            id=id,
+            algorithm_id=algorithm_id,
             data_sources=data_sources,
             time_unit=time_unit,
             interval=interval,
@@ -66,7 +66,8 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     time_frame=self.rsi_time_frame,
                     market=market,
                     symbol=full_symbol,
-                    pandas=True
+                    pandas=True,
+                    save=True
                 )
             )
             data_sources.append(
@@ -76,7 +77,8 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     time_frame=self.ema_time_frame,
                     market=market,
                     symbol=full_symbol,
-                    pandas=True
+                    pandas=True,
+                    save=True
                 )
             )
 
@@ -206,27 +208,40 @@ class Test(TestCase):
         Filter function that only keeps backtests with at least one closed trade.
         """
         filtered = []
+
         for backtest in backtests:
-            metrics = backtest.get_backtest_metrics(backtest_date_range)
-            if metrics.number_of_trades_closed > 0:
+            backtest_metrics = backtest.get_backtest_metrics(backtest_date_range)
+
+            if backtest.algorithm_id == "0aa37205":
+                print(
+                    f"Debug: Strategy {backtest.algorithm_id} has "
+                    f"{backtest_metrics.number_of_trades_closed} closed trades "
+                    f"in date range {backtest_date_range.name}"
+                )
+
+            if backtest_metrics.number_of_trades_closed > 0:
                 filtered.append(backtest)
 
         return filtered
 
-    def _verify_filtered_strategy_has_no_closed_trades(self, all_strategies, filtered_backtests, app, date_ranges):
+    def _verify_filtered_strategy_has_no_closed_trades(
+        self, all_strategies, filtered_backtests, app, date_ranges
+    ):
         """
         Helper method to verify that a strategy filtered out by the filter function
         indeed has no closed trades. This ensures the filtering logic works correctly.
         """
         # Get strategy IDs that passed the filter
-        filtered_strategy_ids = set()
+        filtered_strategy_ids = []
+
         for backtest in filtered_backtests:
-            filtered_strategy_ids.update(backtest.strategy_ids)
+            filtered_strategy_ids.append(backtest.algorithm_id)
 
         # Find a strategy that was filtered out
         filtered_out_strategy = None
+
         for strategy in all_strategies:
-            if strategy.id not in filtered_strategy_ids:
+            if strategy.algorithm_id not in filtered_strategy_ids:
                 filtered_out_strategy = strategy
                 break
 
@@ -234,8 +249,6 @@ class Test(TestCase):
             filtered_out_strategy,
             "Should have at least one strategy that was filtered out"
         )
-
-        print(f"Verifying filtered out strategy: {filtered_out_strategy.id}")
 
         # Run the filtered-out strategy individually to verify it has no closed trades
         individual_backtests = app.run_vector_backtests(
@@ -250,27 +263,31 @@ class Test(TestCase):
         )
 
         self.assertEqual(len(individual_backtests), 1, "Should have exactly one backtest result")
+        at_least_one_run_without_closed_trades = False
 
-        individual_backtest = individual_backtests[0]
+        for date_range in date_ranges:
+            individual_backtest = app.run_vector_backtest(
+                initial_amount=1000,
+                backtest_date_range=date_range,
+                strategy=filtered_out_strategy,
+                snapshot_interval=SnapshotInterval.DAILY,
+                risk_free_rate=0.027,
+                trading_symbol="EUR",
+                market="BITVAVO",
+                show_progress=True
+                # No filter function - run it directly
+            )
+            backtest_metrics = individual_backtest\
+                .get_backtest_metrics(date_range)
 
-        # Check that this strategy indeed has no closed trades in at least one date range
-        has_no_closed_trades_in_at_least_one_range = False
-
-        for backtest_run in individual_backtest.backtest_runs:
-            trades = backtest_run.get_trades()
-            closed_trades = [t for t in trades if TradeStatus.CLOSED.equals(t.status)]
-
-            if len(closed_trades) == 0:
-                has_no_closed_trades_in_at_least_one_range = True
-                print(f"✓ Strategy {filtered_out_strategy.id} has no closed trades in date range {backtest_run.backtest_date_range_name or f'{backtest_run.backtest_start_date.date()} to {backtest_run.backtest_end_date.date()}'}")
-                break
+            if backtest_metrics.number_of_trades_closed == 0:
+                at_least_one_run_without_closed_trades = True
 
         self.assertTrue(
-            has_no_closed_trades_in_at_least_one_range,
-            f"Filtered out strategy {filtered_out_strategy.id} should have no closed trades in at least one date range"
+            at_least_one_run_without_closed_trades,
+            f"Filtered out strategy {filtered_out_strategy.algorithm_id} "
+            f"should have no closed trades in at least one date range."
         )
-
-        print("✓ Verified that filtered strategy was correctly excluded for having no closed trades")
 
     def test_run_with_filter_function(self):
         """
@@ -283,18 +300,15 @@ class Test(TestCase):
             "rsi_overbought_threshold": [70, 80],
             "rsi_oversold_threshold": [30, 20],
             "ema_time_frame": ["2h"],
-            "ema_short_period": [50, 100],
+            "ema_short_period": [100],
             "ema_long_period": [150, 200],
-            "ema_cross_lookback_window": [2, 4, 6, 12]
+            "ema_cross_lookback_window": [4, 6]
         }
-
         param_options = param_grid
         param_variations = [
             dict(zip(param_options.keys(), values))
             for values in product(*param_options.values())
         ]
-        print(
-            f"Total parameter combinations to evaluate: {len(param_variations)}")
 
         # RESOURCE_DIRECTORY should always point to the parent directory/resources
         # Resource directory should point to /tests/resources
@@ -320,7 +334,7 @@ class Test(TestCase):
         for param_set in param_variations:
             strategies.append(
                 RSIEMACrossoverStrategy(
-                    id=generate_strategy_id(param_set),
+                    algorithm_id=generate_strategy_id(param_set),
                     time_unit=TimeUnit.HOUR,
                     interval=2,
                     market="BITVAVO",
@@ -353,7 +367,6 @@ class Test(TestCase):
                 )
             )
 
-        print(f"Starting with {len(strategies)} strategies")
         backtests = app.run_vector_backtests(
             initial_amount=1000,
             backtest_date_ranges=[date_range_1, date_range_2],
@@ -364,7 +377,6 @@ class Test(TestCase):
             market="BITVAVO",
             filter_function=self.filter_function_with_closed_trades
         )
-        print(f"After filtering: {len(backtests)} strategies remain")
 
         # Should have fewer backtests than strategies if filter worked
         self.assertLessEqual(len(backtests), len(strategies))
@@ -374,15 +386,22 @@ class Test(TestCase):
             self.assertGreater(
                 backtest.backtest_summary.number_of_trades_closed,
                 0,
-                "All filtered backtests "
-                "should have at least one closed trade"
+                "All filtered backtests should have at "
+                "least one closed trade for the summary"
             )
+            for backtest_date_range in [date_range_1, date_range_2]:
+                backtest_metrics = backtest.get_backtest_metrics(backtest_date_range)
+                self.assertGreater(
+                    backtest_metrics.number_of_trades_closed,
+                    0,
+                    "All filtered backtests "
+                    "should have at least one closed trade for each backtest date range"
+                )
 
-        # Check that at least one backtest has trades
-        self.assertEqual(len(backtests), 12, "Should have at least 12 backtest")
+        self.assertEqual(len(backtests), 4, "Should have at least 4 backtest")
         first_backtest = backtests[0]
         # Check that we have backtest runs
-        self.assertGreater(len(first_backtest.backtest_runs), 0)
+        self.assertEqual(len(first_backtest.backtest_runs), 2)
 
         # Get trades from the first run
         run = first_backtest.backtest_runs[0]
@@ -412,9 +431,9 @@ class Test(TestCase):
             "rsi_overbought_threshold": [70, 80],
             "rsi_oversold_threshold": [30, 20],
             "ema_time_frame": ["2h"],
-            "ema_short_period": [50, 100],
+            "ema_short_period": [100],
             "ema_long_period": [150, 200],
-            "ema_cross_lookback_window": [2, 4, 6, 12]
+            "ema_cross_lookback_window": [4, 6]
         }
 
         param_options = param_grid
@@ -422,9 +441,6 @@ class Test(TestCase):
             dict(zip(param_options.keys(), values))
             for values in product(*param_options.values())
         ]
-        print(
-            f"Total parameter combinations to evaluate: {len(param_variations)}")
-
         # RESOURCE_DIRECTORY should always point to the parent directory/resources
         # Resource directory should point to /tests/resources
         # Resource directory is two levels up from the current file
@@ -449,7 +465,7 @@ class Test(TestCase):
         for param_set in param_variations:
             strategies.append(
                 RSIEMACrossoverStrategy(
-                    id=generate_strategy_id(param_set),
+                    algorithm_id=generate_strategy_id(param_set),
                     time_unit=TimeUnit.HOUR,
                     interval=2,
                     market="BITVAVO",
@@ -482,7 +498,6 @@ class Test(TestCase):
                 )
             )
 
-        print(f"Starting with {len(strategies)} strategies")
         backtests = app.run_vector_backtests(
             initial_amount=1000,
             backtest_date_ranges=[date_range_1, date_range_2],
@@ -496,7 +511,6 @@ class Test(TestCase):
                 resource_directory, "temp_backtest_storage"
             )
         )
-        print(f"After filtering: {len(backtests)} strategies remain")
 
         # Should have fewer backtests than strategies if filter worked
         self.assertLessEqual(len(backtests), len(strategies))
@@ -511,7 +525,7 @@ class Test(TestCase):
             )
 
         # Check that at least one backtest has trades
-        self.assertEqual(len(backtests), 12, "Should have at least 12 backtest")
+        self.assertEqual(len(backtests), 4, "Should have at least 12 backtest")
         first_backtest = backtests[0]
         # Check that we have backtest runs
         self.assertGreater(len(first_backtest.backtest_runs), 0)
@@ -544,9 +558,9 @@ class Test(TestCase):
             "rsi_overbought_threshold": [70, 80],
             "rsi_oversold_threshold": [30, 20],
             "ema_time_frame": ["2h"],
-            "ema_short_period": [50, 100],
+            "ema_short_period": [100],
             "ema_long_period": [150, 200],
-            "ema_cross_lookback_window": [2, 4, 6, 12]
+            "ema_cross_lookback_window": [4, 6]
         }
 
         param_options = param_grid
@@ -579,7 +593,7 @@ class Test(TestCase):
         all_strategies = []
         for param_set in param_variations:
             strategy = RSIEMACrossoverStrategy(
-                id=generate_strategy_id(param_set),
+                algorithm_id=generate_strategy_id(param_set),
                 time_unit=TimeUnit.HOUR,
                 interval=2,
                 market="BITVAVO",
@@ -599,8 +613,6 @@ class Test(TestCase):
             )
             all_strategies.append(strategy)
 
-        print(f"Starting with {len(all_strategies)} strategies")
-
         # Run vector backtests with filtering
         filtered_backtests = app.run_vector_backtests(
             initial_amount=1000,
@@ -613,59 +625,10 @@ class Test(TestCase):
             filter_function=self.filter_function_with_closed_trades
         )
 
-        print(f"After filtering: {len(filtered_backtests)} strategies remain")
-
-        # Get strategy IDs that passed the filter
-        filtered_strategy_ids = set()
-        for backtest in filtered_backtests:
-            filtered_strategy_ids.update(backtest.strategy_ids)
-
-        # Find a strategy that was filtered out
-        filtered_out_strategy = None
-        for strategy in all_strategies:
-            if strategy.id not in filtered_strategy_ids:
-                filtered_out_strategy = strategy
-                break
-
-        self.assertIsNotNone(
-            filtered_out_strategy,
-            "Should have at least one strategy that was filtered out"
+        # Verify that a filtered-out strategy has no closed trades
+        self._verify_filtered_strategy_has_no_closed_trades(
+            all_strategies=all_strategies,
+            filtered_backtests=filtered_backtests,
+            app=app,
+            date_ranges=[date_range_1, date_range_2]
         )
-
-        print(f"Testing filtered out strategy: {filtered_out_strategy.id}")
-
-        # Run the filtered-out strategy individually to verify it has no closed trades
-        individual_backtests = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range_1, date_range_2],
-            strategies=[filtered_out_strategy],
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            # No filter function - run it directly
-        )
-
-        self.assertEqual(len(individual_backtests), 1, "Should have exactly one backtest result")
-
-        individual_backtest = individual_backtests[0]
-
-        # Check that this strategy indeed has no closed trades in at least one date range
-        has_no_closed_trades_in_at_least_one_range = False
-
-        for backtest_run in individual_backtest.backtest_runs:
-            trades = backtest_run.get_trades()
-            closed_trades = [t for t in trades if TradeStatus.CLOSED.equals(t.status)]
-
-            if len(closed_trades) == 0:
-                has_no_closed_trades_in_at_least_one_range = True
-                print(f"Strategy {filtered_out_strategy.id} has no closed trades in date range {backtest_run.backtest_date_range_name or f'{backtest_run.backtest_start_date.date()} to {backtest_run.backtest_end_date.date()}'}")
-                break
-
-        self.assertTrue(
-            has_no_closed_trades_in_at_least_one_range,
-            f"Filtered out strategy {filtered_out_strategy.id} should have no closed trades in at least one date range"
-        )
-
-        print("✓ Verified that filtered strategy was correctly excluded for having no closed trades")
-

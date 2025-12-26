@@ -9,6 +9,7 @@ from tests.resources import TestBase
 
 
 class StrategyOne(TradingStrategy):
+    id = "strategy_one"
     time_unit = TimeUnit.SECOND
     interval = 2
 
