@@ -341,13 +341,14 @@ class Trade(BaseModel):
                 Order.from_dict(order)
                 for order in data["orders"]
             ]
+
         return Trade(
             id=data.get("id", None),
             orders=orders,
-            target_symbol=data["target_symbol"],
-            trading_symbol=data["trading_symbol"],
-            amount=data["amount"],
-            open_price=data["open_price"],
+            target_symbol=data.get("target_symbol", ""),
+            trading_symbol=data.get("trading_symbol", ""),
+            amount=data.get("amount", 0),
+            open_price=data.get("open_price", 0),
             opened_at=opened_at,
             closed_at=closed_at,
             filled_amount=data.get("filled_amount", 0),
@@ -355,7 +356,7 @@ class Trade(BaseModel):
             remaining=data.get("remaining", 0),
             net_gain=data.get("net_gain", 0),
             last_reported_price=data.get("last_reported_price"),
-            status=TradeStatus.from_value(data["status"]).value,
+            status=TradeStatus.from_value(data.get("status", "OPEN")).value,
             cost=data.get("cost", 0),
             updated_at=updated_at,
             stop_losses=stop_losses,

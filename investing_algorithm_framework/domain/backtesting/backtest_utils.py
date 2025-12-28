@@ -1,13 +1,12 @@
 import os
-from pathlib import Path
-from typing import List, Union, Callable
 from logging import getLogger
+from pathlib import Path
 from random import Random
+from typing import List, Union, Callable
 
-from .backtest import Backtest
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
-
+from .backtest import Backtest
 
 logger = getLogger("investing_algorithm_framework")
 
@@ -29,7 +28,7 @@ def save_backtests_to_directory(
         dir_name_generation_function (Callable[[Backtest], str], optional):
             A function that takes a Backtest object as input and returns
             a string to be used as the directory name for that backtest.
-            If not provided, the backtest's metadata 'id' will be used.
+            If not provided, the backtest's algorithm_id will be used.
             Defaults to None.
         number_of_backtests_to_save (int, optional): Maximum number of
             backtests to save. If None, all backtests will be saved.
@@ -74,7 +73,7 @@ def save_backtests_to_directory(
 
         if dir_name is None:
             logger.warning(
-                "Backtest metadata does not contain an 'id' field. "
+                "Backtest algorithm_id is None. "
                 "Generating a random directory name."
             )
             dir_name = str(Random().randint(100000, 999999))
@@ -123,16 +122,47 @@ def load_backtests_from_directory(
         file_path = os.path.join(directory_path, file_name)
 
         try:
-            backtest = Backtest.open(file_path)
+
+            # Add step-by-step debugging
+            try:
+                backtest = Backtest.open(file_path)
+            except KeyError as ke:
+                logger.error(
+                    f"KeyError during Backtest.open for {file_path}: {ke}"
+                )
+                import traceback
+                logger.error(
+                    f"Backtest.open KeyError "
+                    f"traceback: {traceback.format_exc()}"
+                )
+                continue  # Skip this backtest and continue with the next one
+            except Exception as be:
+                logger.error(
+                    f"Other error during Backtest.open for {file_path}: {be}"
+                )
+                import traceback
+                logger.error(
+                    f"Backtest.open error traceback: {traceback.format_exc()}"
+                )
+                continue  # Skip this backtest and continue with the next one
 
             if filter_function is not None:
-                if not filter_function(backtest):
+                try:
+                    if not filter_function(backtest):
+                        continue
+                except Exception as fe:
+                    logger.error(
+                        f"Error in filter_function for {file_path}: {fe}"
+                    )
                     continue
 
             backtests.append(backtest)
+
         except Exception as e:
             logger.error(
-                f"Failed to load backtest from {file_path}: {e}"
+                f"Unexpected top-level error loading "
+                f"backtest from {file_path}: {e}"
             )
+            import traceback
 
     return backtests

@@ -169,6 +169,21 @@ class BacktestRun:
                 f"The run file {run_file} does not exist."
             )
 
+        # Validate and set defaults for required fields
+        required_fields = {
+            "backtest_start_date": "2020-01-01 00:00:00",
+            "backtest_end_date": "2020-01-02 00:00:00",
+            "created_at": "2020-01-01 00:00:00",
+            "trading_symbol": "USD",
+            "initial_unallocated": 1000.0,
+            "number_of_runs": 1
+        }
+
+        for field, default_value in required_fields.items():
+            if field not in data:
+                logger.warning(f"Missing required field '{field}' in backtest data, using default: {default_value}")
+                data[field] = default_value
+
         # Parse datetime fields
         data["backtest_start_date"] = datetime.strptime(
             data["backtest_start_date"], "%Y-%m-%d %H:%M:%S"
@@ -186,27 +201,62 @@ class BacktestRun:
             "backtest_end_date"].replace(tzinfo=timezone.utc)
         data["created_at"] = data["created_at"].replace(tzinfo=timezone.utc)
 
-        # Parse orders
-        data["orders"] = [
-            Order.from_dict(order) for order in data.get("orders", [])
-        ]
+        # Parse orders with error handling
+        orders = []
+        for order_data in data.get("orders", []):
+            try:
+                order = Order.from_dict(order_data)
+                orders.append(order)
+            except KeyError as e:
+                logger.error(f"Failed to parse order data, missing field {e}: {order_data}")
+                continue
+            except Exception as e:
+                logger.error(f"Failed to parse order data: {e}")
+                continue
+        data["orders"] = orders
 
-        # Parse positions
-        data["positions"] = [
-            Position.from_dict(position)
-            for position in data.get("positions", [])
-        ]
+        # Parse positions with error handling
+        positions = []
+        for position_data in data.get("positions", []):
+            try:
+                position = Position.from_dict(position_data)
+                positions.append(position)
+            except KeyError as e:
+                logger.error(f"Failed to parse position data, missing field {e}: {position_data}")
+                continue
+            except Exception as e:
+                logger.error(f"Failed to parse position data: {e}")
+                continue
+        data["positions"] = positions
 
-        # Parse trades
-        data["trades"] = [
-            Trade.from_dict(trade) for trade in data.get("trades", [])
-        ]
+        # Parse trades with error handling
+        trades = []
+        for trade_data in data.get("trades", []):
+            try:
+                trade = Trade.from_dict(trade_data)
+                trades.append(trade)
+            except KeyError as e:
+                logger.error(f"Failed to parse trade data, missing field {e}: {trade_data}")
+                # Skip this trade and continue with the next one
+                continue
+            except Exception as e:
+                logger.error(f"Failed to parse trade data: {e}")
+                continue
+        data["trades"] = trades
 
-        # Parse portfolio snapshots
-        data["portfolio_snapshots"] = [
-            PortfolioSnapshot.from_dict(ps)
-            for ps in data.get("portfolio_snapshots", [])
-        ]
+        # Parse portfolio snapshots with error handling
+        portfolio_snapshots = []
+        for ps_data in data.get("portfolio_snapshots", []):
+            try:
+                ps = PortfolioSnapshot.from_dict(ps_data)
+                portfolio_snapshots.append(ps)
+            except KeyError as e:
+                logger.error(f"Failed to parse portfolio snapshot data, missing field {e}: {ps_data}")
+                continue
+            except Exception as e:
+                logger.error(f"Failed to parse portfolio snapshot data: {e}")
+                continue
+        data["portfolio_snapshots"] = portfolio_snapshots
 
         return BacktestRun(
             backtest_metrics=backtest_metrics,
