@@ -1,5 +1,6 @@
 import os
 import time
+import shutil
 from itertools import product
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -199,25 +200,10 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
 class Test(TestCase):
 
-    @staticmethod
-    def filter_function_with_closed_trades(
-        backtests, backtest_date_range: BacktestDateRange
-    ):
+    def test_run_with_backtest_storage_directory(self):
         """
-        Filter function that only keeps backtests with at least one closed trade.
-        """
-        filtered = []
-        for backtest in backtests:
-            metrics = backtest.get_backtest_metrics(backtest_date_range)
-            if metrics.number_of_trades_closed > 0:
-                filtered.append(backtest)
-
-        return filtered
-
-    def test_run_with_checkpoints(self):
-        """
-        Test run_vector_backtests with a filter_function that filters
-        strategies based on whether they have closed trades.
+        Test run_vector_backtests with backtest storage directory and verify
+        that temporary directories are properly cleaned up.
         """
         param_grid = {
             "rsi_time_frame": ["2h"],
@@ -236,8 +222,7 @@ class Test(TestCase):
             for values in product(*param_options.values())
         ]
         print(
-            f"Total parameter combinations to evaluate: {len(param_variations)}"
-        )
+            f"Total parameter combinations to evaluate: {len(param_variations)}")
 
         # RESOURCE_DIRECTORY should always point to the parent directory/resources
         # Resource directory should point to /tests/resources
@@ -259,6 +244,16 @@ class Test(TestCase):
         date_range_2 = BacktestDateRange(
             start_date=mid_date, end_date=end_date, name="Period 2"
         )
+
+        # Create backtest storage directory
+        backtest_storage_dir = os.path.join(
+            resource_directory, "backtest_reports_for_testing"
+        )
+
+        # Clean up any existing storage directory
+        if os.path.exists(backtest_storage_dir):
+            shutil.rmtree(backtest_storage_dir)
+
         strategies = []
         for param_set in param_variations:
             strategies.append(
@@ -296,7 +291,14 @@ class Test(TestCase):
                 )
             )
 
-        self.assertEqual(len(strategies), 16)
+        # Create expected temporary directory names
+        start_str_1 = date_range_1.start_date.strftime('%Y-%m-%d')
+        end_str_1 = date_range_1.end_date.strftime('%Y-%m-%d')
+        temp_dir_1 = os.path.join(backtest_storage_dir, f"{start_str_1}_to_{end_str_1}")
+
+        start_str_2 = date_range_2.start_date.strftime('%Y-%m-%d')
+        end_str_2 = date_range_2.end_date.strftime('%Y-%m-%d')
+        temp_dir_2 = os.path.join(backtest_storage_dir, f"{start_str_2}_to_{end_str_2}")
 
         start_time = time.time()
         backtests = app.run_vector_backtests(
@@ -307,19 +309,13 @@ class Test(TestCase):
             risk_free_rate=0.027,
             trading_symbol="EUR",
             market="BITVAVO",
-            backtest_storage_directory=os.path.join(
-                resource_directory, "backtest_reports_for_testing"
-            ),
-            use_checkpoints=True,
+            backtest_storage_directory=backtest_storage_dir,
+            use_checkpoints=False,
         )
         end_time = time.time()
-        duration = end_time - start_time
 
-        # There should be 16 backtests with at least one closed trade
-        self.assertEqual(
-            len(backtests), 16,"There should be 16 backtests returned"
-        )
-
+        self.assertEqual(len(backtests), 16)
+        # Duration must be less than 300 seconds (5 minutes)
         # Each backtest should have atleast 2 backtest runs (one for each date range)
         for backtest in backtests:
             self.assertGreaterEqual(
@@ -327,7 +323,44 @@ class Test(TestCase):
                 "Each backtest should have at least 2 backtest runs"
             )
 
-        # Should have fewer backtests than strategies if filter worked
-        self.assertLessEqual(len(backtests), len(strategies))
+        # Verify that temporary directories were cleaned up
+        self.assertFalse(
+            os.path.exists(temp_dir_1),
+            f"Temporary directory {temp_dir_1} should be cleaned up after backtest execution"
+        )
+        self.assertFalse(
+            os.path.exists(temp_dir_2),
+            f"Temporary directory {temp_dir_2} should be cleaned up after backtest execution"
+        )
+
+        # Verify that the main storage directory exists and contains final results
+        self.assertTrue(
+            os.path.exists(backtest_storage_dir),
+            f"Main storage directory {backtest_storage_dir} should exist with final results"
+        )
+
+        # Check that there are actual backtest files in the storage directory
+        storage_contents = os.listdir(backtest_storage_dir) if os.path.exists(backtest_storage_dir) else []
+        self.assertGreater(
+            len(storage_contents), 0,
+            "Storage directory should contain backtest result files"
+        )
+
+        # Check that total amount of folders are the same as the total amount of strategies
+        self.assertEqual(
+            len(storage_contents), len(strategies),
+            "Storage directory should contain result files for all strategies"
+        )
+
+    def tearDown(self):
+        """Clean up test artifacts"""
+        resource_directory = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
+        )
+        backtest_storage_dir = os.path.join(
+            resource_directory, "backtest_reports_for_testing"
+        )
+        if os.path.exists(backtest_storage_dir):
+            shutil.rmtree(backtest_storage_dir)
 
 
