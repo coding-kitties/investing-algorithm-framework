@@ -7,6 +7,8 @@ from .backtest_permutation_test import BacktestPermutationTest
 from .backtest_evaluation_focuss import BacktestEvaluationFocus
 from .combine_backtests import combine_backtests, \
     generate_backtest_summary_metrics
+from .backtest_utils import load_backtests_from_directory, \
+    save_backtests_to_directory
 
 __all__ = [
     "Backtest",
@@ -17,5 +19,7 @@ __all__ = [
     "BacktestPermutationTest",
     "BacktestEvaluationFocus",
     "combine_backtests",
-    "generate_backtest_summary_metrics"
+    "generate_backtest_summary_metrics",
+    "load_backtests_from_directory",
+    "save_backtests_to_directory",
 ]

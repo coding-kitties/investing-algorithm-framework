@@ -3,13 +3,13 @@ from dependency_injector import containers, providers
 from investing_algorithm_framework.app.algorithm import AlgorithmFactory
 from investing_algorithm_framework.app.context import Context
 from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
-    SQLPositionRepository, SQLPortfolioRepository, \
+    SQLPositionRepository, SQLPortfolioRepository, BacktestService, \
     SQLPortfolioSnapshotRepository, SQLTradeRepository, \
     SQLPositionSnapshotRepository, SQLTradeStopLossRepository, \
     SQLTradeTakeProfitRepository, SQLOrderMetadataRepository
 from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, PortfolioConfigurationService, \
-    BacktestService, ConfigurationService, PortfolioSnapshotService, \
+    ConfigurationService, PortfolioSnapshotService, \
     PositionSnapshotService, MarketCredentialService, TradeService, \
     PortfolioSyncService, OrderExecutorLookup, PortfolioProviderLookup, \
     DataProviderService, TradeTakeProfitService, TradeStopLossService

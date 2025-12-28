@@ -1,4 +1,3 @@
-from .backtesting import BacktestService
 from .trade_order_evaluator import BacktestTradeOrderEvaluator, \
     TradeOrderEvaluator, DefaultTradeOrderEvaluator
 from .configuration_service import ConfigurationService
@@ -48,7 +47,6 @@ __all__ = [
     "PortfolioService",
     "PositionService",
     "PortfolioConfigurationService",
-    "BacktestService",
     "OrderBacktestService",
     "ConfigurationService",
     "PortfolioSyncService",

@@ -1,5 +1,3 @@
-import gc
-import shutil
 import inspect
 import logging
 import os
@@ -20,11 +18,11 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, APP_MODE, MarketCredential, \
     AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, DataSource, \
     BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, Backtest, DataError, \
-    PortfolioConfiguration, SnapshotInterval, DataType, combine_backtests, \
+    PortfolioConfiguration, SnapshotInterval, DataType, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured, TimeFrame, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestPermutationTest, \
-    LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, \
-    generate_backtest_summary_metrics, DATA_DIRECTORY
+    LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, DATA_DIRECTORY, \
+    generate_backtest_summary_metrics
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
     BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db, \
@@ -34,9 +32,7 @@ from investing_algorithm_framework.services import OrderBacktestService, \
     DefaultTradeOrderEvaluator, get_risk_free_rate_us
 from .app_hook import AppHook
 from .eventloop import EventLoopService
-from .analysis import create_ohlcv_permutation, save_backtests_to_directory, \
-    load_backtests_from_directory
-
+from .analysis import create_ohlcv_permutation
 
 logger = logging.getLogger("investing_algorithm_framework")
 COLOR_RESET = '\033[0m'
@@ -1021,14 +1017,13 @@ class App:
             List[Backtest]: List of Backtest instances for each strategy
                 that was backtested.
         """
-        backtests = []
-        algorithm_ids = [strategy.algorithm_id for strategy in strategies]
-        algorithm_ids_selection = algorithm_ids.copy()
-        data_sources = []
+        backtest_service = self.container.backtest_service()
 
-        # Only used when backtest_storage_directory is None and
-        # backtest_date_ranges is provided
-        backtests_ordered_by_algorithm = {}
+        if use_checkpoints and backtest_storage_directory is None:
+            raise OperationalException(
+                "backtest_storage_directory must be provided when "
+                "use_checkpoints is set to True"
+            )
 
         if backtest_date_range is None and backtest_date_ranges is None:
             raise OperationalException(
@@ -1036,196 +1031,54 @@ class App:
                 "provided"
             )
 
-        for strategy in strategies:
-            data_sources.extend(strategy.data_sources)
+        if not skip_data_sources_initialization:
+            print("adding default data providers")
+            data_provider_service = self.container.data_provider_service()
+            data_provider_service.reset()
 
-        if risk_free_rate is None:
-            logger.info("No risk free rate provided, retrieving it...")
-            risk_free_rate = get_risk_free_rate_us()
-
-            if risk_free_rate is None:
-                raise OperationalException(
-                    "Could not retrieve risk free rate for backtest metrics."
-                    "Please provide a risk free as an argument when running "
-                    "your backtest or make sure you have an internet "
-                    "connection"
+            for data_provider_tuple in self._data_providers:
+                data_provider_service.add_data_provider(
+                    data_provider_tuple[0], priority=data_provider_tuple[1]
                 )
 
-        if backtest_date_range is not None:
-            if not skip_data_sources_initialization:
-                self.initialize_data_sources_backtest(
-                    data_sources,
-                    backtest_date_range,
-                    show_progress=show_progress
-                )
-
-            for strategy in tqdm(
-                strategies, colour="green", desc="Running backtests"
-            ):
-                backtests.append(
-                    self.run_vector_backtest(
-                        backtest_date_range=backtest_date_range,
-                        initial_amount=initial_amount,
-                        strategy=strategy,
-                        snapshot_interval=snapshot_interval,
-                        risk_free_rate=risk_free_rate,
-                        skip_data_sources_initialization=True,
-                        market=market,
-                        trading_symbol=trading_symbol,
-                        continue_on_error=continue_on_error,
-                        use_checkpoints=use_checkpoints,
-                        backtest_storage_directory=backtest_storage_directory,
-                        show_progress=False,
-                    )
-                )
-
-            # Apply filter function if set
-            if filter_function is not None:
-                backtests = filter_function(backtests, backtest_date_range)
-
-            # Save to storage directory if provided
-            if backtest_storage_directory is not None:
-                save_backtests_to_directory(
-                    backtests=backtests,
-                    directory_path=backtest_storage_directory,
-                )
-
-            return backtests
-        else:
-            active_strategies = strategies.copy()
-            storage_directories = {}
-
-            # Make sure that the backtest date ranges are sorted by start date
-            # and unique
-            unique_date_ranges = set(backtest_date_ranges)
-            backtest_date_ranges = sorted(
-                unique_date_ranges, key=lambda x: x.start_date
+            # Add the default data providers
+            data_provider_service.add_data_provider(
+                CCXTOHLCVDataProvider()
             )
 
-            for backtest_date_range in tqdm(
-                backtest_date_ranges,
-                colour="green",
-                desc="Running backtests for all date ranges"
-            ):
-                backtest_results = []
-                if not skip_data_sources_initialization:
-                    self.initialize_data_sources_backtest(
-                        data_sources,
-                        backtest_date_range,
-                        show_progress=show_progress
-                    )
-
-                start_date = backtest_date_range\
-                    .start_date.strftime('%Y-%m-%d')
-                end_date = backtest_date_range.end_date.strftime('%Y-%m-%d')
-
-                if backtest_storage_directory is not None:
-                    storage_directories[backtest_date_range] = os.path.join(
-                        backtest_storage_directory,
-                        f"{start_date}_to_{end_date}"
-                    )
-
-                # Run backtests for active strategies only
-                for strategy in tqdm(
-                    active_strategies,
-                        colour="green",
-                        desc=f"Running backtests for "
-                             f"{start_date} to {end_date}"
-                ):
-                    backtest_results.append(
-                        self.run_vector_backtest(
-                            backtest_date_range=backtest_date_range,
-                            initial_amount=initial_amount,
-                            strategy=strategy,
-                            snapshot_interval=snapshot_interval,
-                            risk_free_rate=risk_free_rate,
-                            skip_data_sources_initialization=True,
-                            market=market,
-                            trading_symbol=trading_symbol,
-                            use_checkpoints=use_checkpoints,
-                            backtest_storage_directory=(
-                                backtest_storage_directory
-                            ),
-                            show_progress=False
-                        )
-                    )
-
-                # Apply filter function after each date range to determine
-                # which strategies continue to the next period
-                if filter_function is not None:
-                    backtest_results = filter_function(
-                        backtest_results, backtest_date_range
-                    )
-                    algorithm_ids_selection = [
-                        backtest.algorithm_id for backtest in backtest_results
-                    ]
-                    active_strategies = [
-                        strategy for strategy in active_strategies
-                        if strategy.algorithm_id in algorithm_ids_selection
-                    ]
-
-                # Save the intermediate backtests to a temp storage location
-                # if backtest_storage_directory is provided and clean up memory
-                if backtest_storage_directory is not None:
-                    path = storage_directories[backtest_date_range]
-                    save_backtests_to_directory(
-                        backtests=backtest_results, directory_path=path,
-                    )
-
-                else:
-                    for backtest in backtest_results:
-                        backtests_ordered_by_algorithm.setdefault(
-                            backtest.algorithm_id, []
-                        ).append(backtest)
-
-                del backtest_results
-
-                # Free up memory
-                gc.collect()
-
-            def load_backtest_filter_fn(bt: Backtest) -> bool:
-                return bt.algorithm_id in algorithm_ids_selection
-
-            # load all backtests from storage directories and combine them
-            if backtest_storage_directory is not None:
-                for backtest_range in storage_directories:
-                    path = storage_directories[backtest_range]
-                    loaded_backtests = load_backtests_from_directory(
-                        directory_path=path,
-                        filter_function=load_backtest_filter_fn
-                    )
-
-                    for backtest in loaded_backtests:
-                        backtests_ordered_by_algorithm.setdefault(
-                            backtest.algorithm_id, []
-                        ).append(backtest)
-
-                    # Remove all temp storage directories
-                    shutil.rmtree(path)
-            else:
-                # Remove all strategies that are not in the final selection
-                backtests_ordered_by_algorithm = {
-                    algorithm_id: backtests
-                    for algorithm_id, backtests in
-                    backtests_ordered_by_algorithm.items()
-                    if algorithm_id in algorithm_ids_selection
-                }
-
-            for algorith_id in backtests_ordered_by_algorithm.keys():
-                backtests.append(
-                    combine_backtests(
-                        backtests_ordered_by_algorithm[algorith_id]
-                    )
-                )
-
-            if backtest_storage_directory is not None:
-                # Save final combined backtests to storage directory
-                save_backtests_to_directory(
-                    backtests=backtests,
-                    directory_path=backtest_storage_directory,
-                )
-
-        return backtests
+        if use_checkpoints:
+            sdsi = skip_data_sources_initialization
+            return backtest_service.run_vector_backtests_with_checkpoints(
+                strategies=strategies,
+                backtest_date_range=backtest_date_range,
+                backtest_date_ranges=backtest_date_ranges,
+                snapshot_interval=snapshot_interval,
+                risk_free_rate=risk_free_rate,
+                initial_amount=initial_amount,
+                skip_data_sources_initialization=sdsi,
+                show_progress=show_progress,
+                market=market,
+                trading_symbol=trading_symbol,
+                continue_on_error=continue_on_error,
+                backtest_storage_directory=backtest_storage_directory,
+                filter_function=filter_function
+            )
+        sdsi = skip_data_sources_initialization
+        return backtest_service.run_vector_backtests(
+            strategies=strategies,
+            backtest_date_range=backtest_date_range,
+            backtest_date_ranges=backtest_date_ranges,
+            snapshot_interval=snapshot_interval,
+            risk_free_rate=risk_free_rate,
+            initial_amount=initial_amount,
+            skip_data_sources_initialization=sdsi,
+            show_progress=show_progress,
+            market=market,
+            trading_symbol=trading_symbol,
+            continue_on_error=continue_on_error,
+            filter_function=filter_function,
+            backtest_storage_directory=backtest_storage_directory,
+        )
 
     def run_vector_backtest(
         self,

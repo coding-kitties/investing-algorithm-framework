@@ -37,7 +37,8 @@ from .utils import random_string, append_dict_as_row_to_csv, \
 from .backtesting import BacktestRun, BacktestSummaryMetrics, \
     BacktestDateRange, Backtest, BacktestMetrics, combine_backtests, \
     BacktestPermutationTest, BacktestEvaluationFocus, \
-    generate_backtest_summary_metrics
+    generate_backtest_summary_metrics, load_backtests_from_directory, \
+    save_backtests_to_directory
 
 __all__ = [
     "OrderStatus",
@@ -143,5 +144,7 @@ __all__ = [
     'generate_backtest_summary_metrics',
     'DataError',
     'TakeProfitRule',
-    'StopLossRule'
+    'StopLossRule',
+    "load_backtests_from_directory",
+    "save_backtests_to_directory",
 ]

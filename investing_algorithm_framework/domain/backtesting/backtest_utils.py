@@ -4,7 +4,8 @@ from typing import List, Union, Callable
 from logging import getLogger
 from random import Random
 
-from investing_algorithm_framework.domain import Backtest, \
+from .backtest import Backtest
+from investing_algorithm_framework.domain.exceptions import \
     OperationalException
 
 
