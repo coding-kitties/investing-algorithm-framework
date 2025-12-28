@@ -179,10 +179,12 @@ class BacktestRun:
             "number_of_runs": 1
         }
 
-        for field, default_value in required_fields.items():
-            if field not in data:
-                logger.warning(f"Missing required field '{field}' in backtest data, using default: {default_value}")
-                data[field] = default_value
+        for field_name, default_value in required_fields.items():
+            if field_name not in data:
+                logger.warning(f"Missing required field '{field_name}' in "
+                               f"backtest data, using "
+                               f"default: {default_value}")
+                data[field_name] = default_value
 
         # Parse datetime fields
         data["backtest_start_date"] = datetime.strptime(
@@ -208,7 +210,8 @@ class BacktestRun:
                 order = Order.from_dict(order_data)
                 orders.append(order)
             except KeyError as e:
-                logger.error(f"Failed to parse order data, missing field {e}: {order_data}")
+                logger.error(f"Failed to parse order "
+                             f"data, missing field {e}: {order_data}")
                 continue
             except Exception as e:
                 logger.error(f"Failed to parse order data: {e}")
@@ -222,7 +225,8 @@ class BacktestRun:
                 position = Position.from_dict(position_data)
                 positions.append(position)
             except KeyError as e:
-                logger.error(f"Failed to parse position data, missing field {e}: {position_data}")
+                logger.error(f"Failed to parse position data, "
+                             f"missing field {e}: {position_data}")
                 continue
             except Exception as e:
                 logger.error(f"Failed to parse position data: {e}")
@@ -236,7 +240,8 @@ class BacktestRun:
                 trade = Trade.from_dict(trade_data)
                 trades.append(trade)
             except KeyError as e:
-                logger.error(f"Failed to parse trade data, missing field {e}: {trade_data}")
+                logger.error(f"Failed to parse trade data, "
+                             f"missing field {e}: {trade_data}")
                 # Skip this trade and continue with the next one
                 continue
             except Exception as e:
@@ -251,7 +256,8 @@ class BacktestRun:
                 ps = PortfolioSnapshot.from_dict(ps_data)
                 portfolio_snapshots.append(ps)
             except KeyError as e:
-                logger.error(f"Failed to parse portfolio snapshot data, missing field {e}: {ps_data}")
+                logger.error(f"Failed to parse portfolio snapshot data, "
+                             f"missing field {e}: {ps_data}")
                 continue
             except Exception as e:
                 logger.error(f"Failed to parse portfolio snapshot data: {e}")
