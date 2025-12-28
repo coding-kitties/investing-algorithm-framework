@@ -17,7 +17,7 @@ load_dotenv()
 
 # Define your coinbase trading strategy and register the data sources
 class CoinbaseTradingStrategy(TradingStrategy):
-    id = "coinbase-trading-strategy"
+    algorithm_id = "coinbase-trading-strategy"
     time_unit = TimeUnit.SECOND
     interval = 10
     data_sources = [
