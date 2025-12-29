@@ -21,8 +21,13 @@ class BacktestMetrics:
     and maximum drawdown.
 
     Attributes:
+        backtest_date_range_name (str): The name of the date range
+            used for the backtest.
         backtest_start_date (datetime): The start date of the backtest.
         backtest_end_date (datetime): The end date of the backtest.
+        trading_symbol (str): The trading symbol used in the backtest.
+        initial_unallocated (float): The initial unallocated cash
+            at the start of the backtest.
         final_value (float): The final value of the portfolio at the end
             of the backtest.
         equity_curve (List[Tuple[datetime, float]]): A list of
@@ -137,6 +142,9 @@ class BacktestMetrics:
     """
     backtest_start_date: datetime
     backtest_end_date: datetime
+    backtest_date_range_name: str = ""
+    trading_symbol: str = ""
+    initial_unallocated: float = 0.0
     equity_curve: List[Tuple[float, datetime]] = field(default_factory=list)
     total_growth: float = 0.0
     total_growth_percentage: float = 0.0
@@ -233,6 +241,9 @@ class BacktestMetrics:
         return {
             "backtest_start_date": ensure_iso(self.backtest_start_date),
             "backtest_end_date": ensure_iso(self.backtest_end_date),
+            "backtest_date_range_name": self.backtest_date_range_name,
+            "trading_symbol": self.trading_symbol,
+            "initial_unallocated": self.initial_unallocated,
             "equity_curve": [(value, ensure_iso(date))
                              for value, date in self.equity_curve],
             "final_value": self.final_value,

@@ -11,6 +11,10 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Getting Started/simple-example',
+                },
+                {
+                    type: 'doc',
                     id: 'Getting Started/application-setup',
                 },
                 {

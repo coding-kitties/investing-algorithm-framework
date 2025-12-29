@@ -1196,11 +1196,10 @@ class Context:
         portfolio=None,
         status=None,
         order_id=None
-    ) -> List[Trade]:
+    ) -> Trade:
         """
-        Function to get all trades. This function will return all trades
-        that match the specified query parameters. If the market parameter
-        is specified, the trades with the specified market will be returned.
+        Function to retrieve a trade. This function will return the first
+        trade that matches the specified query parameters.
 
         Args:
             market: The market of the asset
@@ -1211,7 +1210,7 @@ class Context:
             trading_symbol: The trading symbol of the asset
 
         Returns:
-            List[Trade]: A list of trades that match the query parameters
+            Trade: A instance of a trade that matches the query parameters
         """
         query_params = {}
 

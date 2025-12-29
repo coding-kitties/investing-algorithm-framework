@@ -16,7 +16,12 @@ class TradingStrategy:
     strategy is a set of rules that defines when to buy or sell an asset.
 
     Attributes:
-        id (string): the unique id for your combined strategy instances
+        algorithm_id (string): the unique id for your
+            combined strategy instances. An algorithm consists out of one or
+            more strategy instances that run together. The algorithm_id
+            is used to uniquely indentify the combined strategy instances.
+            This is id is used in various places in the framework, e.g. for
+            backtesting results, logging, monitoring etc.
         time_unit (TimeUnit): the time unit of the strategy that defines
             when the strategy should run e.g. HOUR, DAY, WEEK, MONTH
         interval (int): the interval of the strategy that defines how often
@@ -34,7 +39,7 @@ class TradingStrategy:
             store additional information about the strategy, such as its
             author, version, description, params etc.
     """
-    id: str
+    algorithm_id: str
     time_unit: TimeUnit = None
     interval: int = None
     worker_id: str = None
