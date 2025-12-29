@@ -89,6 +89,10 @@ const sidebars = {
             items: [
                 {
                     type: 'doc',
+                    id: 'Advanced Concepts/execution-logic',
+                },
+                {
+                    type: 'doc',
                     id: 'Advanced Concepts/logging-configuration',
                 },
             ],
