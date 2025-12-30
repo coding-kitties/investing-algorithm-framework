@@ -926,8 +926,11 @@ class App:
         market: Optional[str] = None,
         trading_symbol: Optional[str] = None,
         continue_on_error: bool = False,
-        filter_function: Optional[
+        window_filter_function: Optional[
             Callable[[List[Backtest], BacktestDateRange], List[Backtest]]
+        ] = None,
+        final_filter_function: Optional[
+            Callable[[List[Backtest]], List[Backtest]]
         ] = None,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
         use_checkpoints: bool = False
@@ -982,7 +985,7 @@ class App:
                 backtests if an error occurs in one of the backtests. If set
                 to True, the backtest will return an empty Backtest instance
                 in case of an error. If set to False, the error will be raised.
-            filter_function (
+            window_filter_function (
                 Optional[Callable[[List[Backtest], BacktestDateRange],
                 List[Backtest]]]
             ):
@@ -999,6 +1002,20 @@ class App:
                     def filter_function(
                         backtests: List[Backtest],
                         backtest_date_range: BacktestDateRange
+                    ) -> List[Backtest]
+            final_filter_function (
+                Optional[Callable[[List[Backtest]], List[Backtest]]]
+            ):
+                A function that takes a list of Backtest objects and
+                returns a filtered list of Backtest objects. This is applied
+                after all backtest date ranges have been processed when
+                backtest_date_ranges is provided. Only the strategies from
+                the filtered backtests will be returned as the final result.
+                This allows for final filtering of strategies based on
+                their overall performance across all periods. The function
+                signature should be:
+                    def filter_function(
+                        backtests: List[Backtest]
                     ) -> List[Backtest]
             backtest_storage_directory (Optional[Union[str, Path]]): If
                 provided, the backtests will be saved to the
@@ -1061,7 +1078,8 @@ class App:
                 trading_symbol=trading_symbol,
                 continue_on_error=continue_on_error,
                 backtest_storage_directory=backtest_storage_directory,
-                filter_function=filter_function
+                window_filter_function=window_filter_function,
+                final_filter_function=final_filter_function,
             )
         sdsi = skip_data_sources_initialization
         return backtest_service.run_vector_backtests(
@@ -1076,7 +1094,8 @@ class App:
             market=market,
             trading_symbol=trading_symbol,
             continue_on_error=continue_on_error,
-            filter_function=filter_function,
+            window_filter_function=window_filter_function,
+            final_filter_function=final_filter_function,
             backtest_storage_directory=backtest_storage_directory,
         )
 

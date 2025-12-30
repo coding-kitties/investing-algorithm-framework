@@ -844,8 +844,11 @@ class BacktestService:
         market: Optional[str] = None,
         trading_symbol: Optional[str] = None,
         continue_on_error: bool = False,
-        filter_function: Optional[
+        window_filter_function: Optional[
             Callable[[List[Backtest], BacktestDateRange], List[Backtest]]
+        ] = None,
+        final_filter_function: Optional[
+            Callable[[List[Backtest]], List[Backtest]]
         ] = None,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
     ):
@@ -863,7 +866,7 @@ class BacktestService:
                 initialization of data sources.
             show_progress (bool): Whether to show a progress bar and
                 debug for the different processing steps.
-            filter_function (
+            window_filter_function (
                 Optional[Callable[[List[Backtest], BacktestDateRange],
                 List[Backtest]]]
             ):
@@ -880,6 +883,20 @@ class BacktestService:
                     def filter_function(
                         backtests: List[Backtest],
                         backtest_date_range: BacktestDateRange
+                    ) -> List[Backtest]
+            final_filter_function (
+                Optional[Callable[[List[Backtest]], List[Backtest]]]
+            ):
+                A function that takes a list of Backtest objects and
+                returns a filtered list of Backtest objects. This is applied
+                after all backtest date ranges have been processed when
+                backtest_date_ranges is provided. Only the strategies from
+                the filtered backtests will be returned as the final result.
+                This allows for final filtering of strategies based on
+                their overall performance across all periods. The function
+                signature should be:
+                    def filter_function(
+                        backtests: List[Backtest]
                     ) -> List[Backtest]
         Returns:
             None
@@ -954,7 +971,9 @@ class BacktestService:
             missing_backtests = []
 
             for strategy in tqdm(
-                strategies, colour="green", desc="Running backtests"
+                strategies,
+                    colour="green",
+                    desc=f"{GREEN_COLOR}Running backtests{COLOR_RESET}"
             ):
                 missing_backtests.append(
                     self.run_vector_backtest(
@@ -974,9 +993,15 @@ class BacktestService:
 
             backtests.extend(missing_backtests)
 
-            # Apply filter function if set
-            if filter_function is not None:
-                backtests = filter_function(backtests, backtest_date_range)
+            # Apply window filter function if set
+            if window_filter_function is not None:
+                backtests = window_filter_function(
+                    backtests, backtest_date_range
+                )
+
+            # Apply final filter function if set
+            if final_filter_function is not None:
+                backtests = final_filter_function(backtests)
 
             backtests_to_be_saved = [
                 bt for bt in missing_backtests if bt in backtests
@@ -1012,7 +1037,8 @@ class BacktestService:
             for backtest_date_range in tqdm(
                 backtest_date_ranges,
                 colour="green",
-                desc="Running backtests for all date ranges"
+                desc=f"{GREEN_COLOR}Running backtests for "
+                     f"all date ranges{COLOR_RESET}"
             ):
                 if not skip_data_sources_initialization:
                     self.initialize_data_sources_backtest(
@@ -1055,7 +1081,7 @@ class BacktestService:
                     else:
                         print(
                             GREEN_COLOR +
-                            f"Found {len(backtest_results)} checkpoints, " +
+                            f"Found {len(backtest_results)} checkpoints." +
                             COLOR_RESET
                         )
 
@@ -1064,8 +1090,9 @@ class BacktestService:
                     for strategy in tqdm(
                         strategies_to_run,
                         colour="green",
-                        desc=f"Running backtests for {start_date} "
-                             f"to {end_date}"
+                        desc=f"{GREEN_COLOR}Running backtests "
+                             f"for {start_date} "
+                             f"to {end_date}{COLOR_RESET}"
                     ):
                         backtest_results.append(
                             self.run_vector_backtest(
@@ -1086,8 +1113,8 @@ class BacktestService:
 
                 # Apply filter function after each date range to determine
                 # which strategies continue to the next period
-                if filter_function is not None:
-                    backtest_results = filter_function(
+                if window_filter_function is not None:
+                    backtest_results = window_filter_function(
                         backtest_results, backtest_date_range
                     )
                     active_algorithm_ids = [
@@ -1128,6 +1155,10 @@ class BacktestService:
                     )
                 )
 
+            # Apply final filter function if set
+            if final_filter_function is not None:
+                backtests = final_filter_function(backtests)
+
             if show_progress:
                 print(GREEN_COLOR + "Saving all backtests ..." + COLOR_RESET)
 
@@ -1159,8 +1190,11 @@ class BacktestService:
         market: Optional[str] = None,
         trading_symbol: Optional[str] = None,
         continue_on_error: bool = False,
-        filter_function: Optional[
+        window_filter_function: Optional[
             Callable[[List[Backtest], BacktestDateRange], List[Backtest]]
+        ] = None,
+        final_filter_function: Optional[
+            Callable[[List[Backtest]], List[Backtest]]
         ] = None,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
     ):
@@ -1178,7 +1212,7 @@ class BacktestService:
                 initialization of data sources.
             show_progress (bool): Whether to show a progress bar and
                 debug for the different processing steps.
-            filter_function (
+            window_filter_function (
                 Optional[Callable[[List[Backtest], BacktestDateRange],
                 List[Backtest]]]
             ):
@@ -1195,6 +1229,20 @@ class BacktestService:
                     def filter_function(
                         backtests: List[Backtest],
                         backtest_date_range: BacktestDateRange
+                    ) -> List[Backtest]
+            final_filter_function (
+                Optional[Callable[[List[Backtest]], List[Backtest]]]
+            ):
+                A function that takes a list of Backtest objects and
+                returns a filtered list of Backtest objects. This is applied
+                after all backtest date ranges have been processed when
+                backtest_date_ranges is provided. Only the strategies from
+                the filtered backtests will be returned as the final result.
+                This allows for final filtering of strategies based on
+                their overall performance across all periods. The function
+                signature should be:
+                    def filter_function(
+                        backtests: List[Backtest]
                     ) -> List[Backtest]
         Returns:
             None
@@ -1240,7 +1288,9 @@ class BacktestService:
             backtests = []
 
             for strategy in tqdm(
-                strategies, colour="green", desc="Running backtests"
+                strategies,
+                    colour="green",
+                    desc=f"{GREEN_COLOR}Running backtests{COLOR_RESET}"
             ):
                 backtests.append(
                     self.run_vector_backtest(
@@ -1259,8 +1309,14 @@ class BacktestService:
                 )
 
             # Apply filter function if set
-            if filter_function is not None:
-                backtests = filter_function(backtests, backtest_date_range)
+            if window_filter_function is not None:
+                backtests = window_filter_function(
+                    backtests, backtest_date_range
+                )
+
+            # Apply final filter function if set
+            if final_filter_function is not None:
+                backtests = final_filter_function(backtests)
 
             if show_progress:
                 print(
@@ -1293,7 +1349,8 @@ class BacktestService:
             for backtest_date_range in tqdm(
                 backtest_date_ranges,
                 colour="green",
-                desc="Running backtests for all date ranges"
+                desc=f"{GREEN_COLOR}Running backtests "
+                     f"for all date ranges{COLOR_RESET}"
             ):
 
                 if not skip_data_sources_initialization:
@@ -1312,7 +1369,8 @@ class BacktestService:
                 for strategy in tqdm(
                     strategies,
                     colour="green",
-                    desc=f"Running backtests for {start_date} to {end_date}"
+                    desc=f"{GREEN_COLOR}Running backtests "
+                         f"for {start_date} to {end_date}{COLOR_RESET}"
                 ):
                     backtest_results.append(
                         self.run_vector_backtest(
@@ -1330,8 +1388,8 @@ class BacktestService:
 
                 # Apply filter function after each date range to determine
                 # which strategies continue to the next period
-                if filter_function is not None:
-                    backtest_results = filter_function(
+                if window_filter_function is not None:
+                    backtest_results = window_filter_function(
                         backtest_results, backtest_date_range
                     )
                     active_algorithm_ids = [
@@ -1371,6 +1429,10 @@ class BacktestService:
                         backtests_ordered_by_algorithm[algorith_id]
                     )
                 )
+
+            # Apply final filter function if set
+            if final_filter_function is not None:
+                backtests = final_filter_function(backtests)
 
             if backtest_storage_directory is not None:
                 if show_progress:
