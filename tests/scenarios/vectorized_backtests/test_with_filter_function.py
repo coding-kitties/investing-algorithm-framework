@@ -375,7 +375,7 @@ class Test(TestCase):
             risk_free_rate=0.027,
             trading_symbol="EUR",
             market="BITVAVO",
-            filter_function=self.filter_function_with_closed_trades
+            window_filter_function=self.filter_function_with_closed_trades
         )
 
         # Should have fewer backtests than strategies if filter worked
@@ -506,7 +506,7 @@ class Test(TestCase):
             risk_free_rate=0.027,
             trading_symbol="EUR",
             market="BITVAVO",
-            filter_function=self.filter_function_with_closed_trades,
+            window_filter_function=self.filter_function_with_closed_trades,
             backtest_storage_directory=os.path.join(
                 resource_directory, "temp_backtest_storage"
             )
@@ -622,7 +622,7 @@ class Test(TestCase):
             risk_free_rate=0.027,
             trading_symbol="EUR",
             market="BITVAVO",
-            filter_function=self.filter_function_with_closed_trades
+            window_filter_function=self.filter_function_with_closed_trades
         )
 
         # Verify that a filtered-out strategy has no closed trades
