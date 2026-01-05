@@ -38,7 +38,6 @@ class Test(TestCase):
         )
         end_time = time.time()
         elapsed_time = end_time - start_time
-        print(f"Test completed in {elapsed_time:.2f} seconds")
 
         backtest_metrics = backtest.get_backtest_metrics(date_range)
         backtest_run = backtest.get_backtest_run(date_range)

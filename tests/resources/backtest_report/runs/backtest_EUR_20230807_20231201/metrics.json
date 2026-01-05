@@ -1,6 +1,9 @@
 {
     "backtest_start_date": "2023-08-07T07:59:00",
     "backtest_end_date": "2023-08-07T07:59:00",
+    "backtest_date_range_name": "",
+    "trading_symbol": "",
+    "initial_unallocated": 0.0,
     "equity_curve": [],
     "final_value": 0.0,
     "total_net_gain": 0.2,

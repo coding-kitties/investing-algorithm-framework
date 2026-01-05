@@ -38,23 +38,16 @@ class TestLoadBacktests(unittest.TestCase):
         self.assertGreater(len(backtest_dirs), 0,
                           "Should find at least one backtest directory")
 
-        print(f"Found {len(backtest_dirs)} backtest directories:")
-        for dir_path in backtest_dirs:
-            print(f"  - {dir_path.name}")
-
     def test_load_all_backtests_without_errors(self):
         """
         Test loading all backtests from the directory without errors.
         """
         try:
-            print(self.backtests_path)
             backtests = load_backtests_from_directory(str(self.backtests_path))
 
             self.assertIsInstance(
                 backtests, list,"load_backtests_from_directory should return a list"
             )
-
-            print(f"Successfully loaded {len(backtests)} backtests")
 
             # Verify that we got some backtests
             self.assertGreater(len(backtests), 0,

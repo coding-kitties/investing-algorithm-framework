@@ -78,7 +78,6 @@ class Test(TestCase):
         )
         end_time = time.time()
         elapsed_time = end_time - start_time
-        print(f"Test completed in {elapsed_time:.2f} seconds")
 
         snapshots = run.get_portfolio_snapshots()
         # Check that the first two snapshots created at are the same

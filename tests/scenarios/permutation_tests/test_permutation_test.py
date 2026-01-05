@@ -273,4 +273,3 @@ class Test(TestCase):
         )
         end_time = time.time()
         elapsed_time = end_time - start_time
-        print(f"Test completed in {elapsed_time:.2f} seconds")

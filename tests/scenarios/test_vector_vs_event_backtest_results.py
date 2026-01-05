@@ -281,7 +281,6 @@ class Test(TestCase):
             market="BITVAVO"
         )
         run = vector_backtests.backtest_runs[0]
-        end_time = time.time()
 
         self.assertEqual(3, len(run.get_trades()))
         strategy.reset()

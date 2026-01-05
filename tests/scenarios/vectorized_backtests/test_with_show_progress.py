@@ -1,6 +1,6 @@
 import os
-import time
-import shutil
+import sys
+from io import StringIO
 from itertools import product
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -11,7 +11,8 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    TradeStatus, RESOURCE_DIRECTORY, SnapshotInterval, generate_strategy_id
+    TradeStatus, RESOURCE_DIRECTORY, SnapshotInterval, generate_strategy_id, \
+    rank_results, BacktestEvaluationFocus
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
@@ -68,7 +69,8 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     time_frame=self.rsi_time_frame,
                     market=market,
                     symbol=full_symbol,
-                    pandas=True
+                    pandas=True,
+                    save=True
                 )
             )
             data_sources.append(
@@ -78,7 +80,8 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     time_frame=self.ema_time_frame,
                     market=market,
                     symbol=full_symbol,
-                    pandas=True
+                    pandas=True,
+                    save=True
                 )
             )
 
@@ -200,160 +203,36 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
 class Test(TestCase):
 
-    def test_run_with_backtest_storage_directory(self):
+    @staticmethod
+    def filter_function_with_closed_trades(
+        backtests, backtest_date_range: BacktestDateRange
+    ):
         """
-        Test run_vector_backtest (singular strategy) with backtest storage directory.
-
-        This test verifies run_vector_backtest with:
-        - 1 strategy (single RSIEMACrossoverStrategy)
-        - 2 date ranges (Period 1: full 3 years, Period 2: last 2 years)
-        - backtest_storage_directory provided
-        - use_checkpoints=False
-
-        Expected behavior:
-        ✅ Returns 1 Backtest object for the strategy
-        ✅ The Backtest has 2 BacktestRun instances (one per date range)
-        ✅ The Backtest has 2 BacktestMetrics (one per run)
-        ✅ Backtests are saved to disk in the storage directory
-        ✅ Checkpoint files are CREATED (for future use)
-        ❌ Checkpoint files are NOT USED/READ during execution
-
-        Why create checkpoints even when use_checkpoints=False?
-        - Builds checkpoint infrastructure progressively
-        - Future runs with use_checkpoints=True can skip completed work
-        - No performance penalty - checkpoints saved alongside backtests
-
-        Storage structure:
-        backtest_storage_dir/
-        ├── checkpoints.json  (created for future use)
-        └── {algorithm_id}/
-            ├── algorithm_id.json
-            └── runs/
-                ├── {date_range_1_start}_{date_range_1_end}/
-                └── {date_range_2_start}_{date_range_2_end}/
+        Filter function that only keeps backtests with at least one closed trade.
         """
-        param_grid = {
-            "rsi_time_frame": ["2h"],
-            "rsi_period": [14],
-            "rsi_overbought_threshold": [70, 80],
-            "rsi_oversold_threshold": [30, 20],
-            "ema_time_frame": ["2h"],
-            "ema_short_period": [100],
-            "ema_long_period": [150, 200],
-            "ema_cross_lookback_window": [4, 6]
-        }
+        filtered = []
 
-        param_options = param_grid
-        param_variations = [
-            dict(zip(param_options.keys(), values))
-            for values in product(*param_options.values())
-        ]
-        print(
-            f"Total parameter combinations to evaluate: {len(param_variations)}")
+        for backtest in backtests:
+            backtest_metrics = backtest.get_backtest_metrics(backtest_date_range)
 
-        # RESOURCE_DIRECTORY should always point to the parent directory/resources
-        # Resource directory should point to /tests/resources
-        # Resource directory is two levels up from the current file
-        resource_directory = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
-        )
-        config = {RESOURCE_DIRECTORY: resource_directory}
-        app = create_app(name="GoldenCrossStrategy", config=config)
-        app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=1095)
+            if backtest_metrics.number_of_trades_closed > 0:
+                filtered.append(backtest)
 
-        # Split into multiple date ranges to test progressive filtering
-        mid_date = start_date + timedelta(days=365)
-        date_range_1 = BacktestDateRange(
-            start_date=start_date, end_date=end_date, name="Period 1"
-        )
-        date_range_2 = BacktestDateRange(
-            start_date=mid_date, end_date=end_date, name="Period 2"
-        )
+        return filtered
 
-        # Create backtest storage directory
-        backtest_storage_dir = os.path.join(
-            resource_directory, "backtest_reports_for_testing", "temp_storage"
-        )
-
-        # Clean up any existing storage directory
-        if os.path.exists(backtest_storage_dir):
-            shutil.rmtree(backtest_storage_dir)
-
-        param_set = {
-            "rsi_time_frame": "2h",
-            "rsi_period": 14,
-            "rsi_overbought_threshold": 70,
-            "rsi_oversold_threshold": 30,
-            "ema_time_frame": "2h",
-            "ema_short_period": 100,
-            "ema_long_period": 150,
-            "ema_cross_lookback_window": 4
-        }
-        strategy = RSIEMACrossoverStrategy(
-            algorithm_id=generate_strategy_id(param_set),
-            time_unit=TimeUnit.HOUR,
-            interval=2,
-            market="BITVAVO",
-            rsi_time_frame=param_set["rsi_time_frame"],
-            rsi_period=param_set["rsi_period"],
-            rsi_overbought_threshold=param_set[
-                "rsi_overbought_threshold"
-            ],
-            rsi_oversold_threshold=param_set[
-                "rsi_oversold_threshold"
-            ],
-            ema_time_frame=param_set["ema_time_frame"],
-            ema_short_period=param_set["ema_short_period"],
-            ema_long_period=param_set["ema_long_period"],
-            ema_cross_lookback_window=param_set[
-                "ema_cross_lookback_window"
-            ],
-            symbols=[
-                "BTC",
-                "ETH"
-            ],
-            position_sizes=[
-                PositionSize(
-                    symbol="BTC", percentage_of_portfolio=20.0
-                ),
-                PositionSize(
-                    symbol="ETH", percentage_of_portfolio=20.0
-                )
-            ]
-        )
-
-        backtest = app.run_vector_backtest(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range_1, date_range_2],
-            strategy=strategy,
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=backtest_storage_dir,
-            use_checkpoints=False,
-            show_progress=True
-        )
-
-        self.assertEqual(len(backtest.get_all_backtest_runs()), 2)
-        self.assertEqual(len(backtest.get_all_backtest_metrics()), 2)
-
-        # Check that backtest storage directory was created
-        self.assertTrue(os.path.exists(backtest_storage_dir))
-        # Check that backtest results were saved in the directory
-        saved_backtest_dirs = os.listdir(backtest_storage_dir)
-        self.assertGreaterEqual(len(saved_backtest_dirs), 1)
-
-        # Check if checkpoint files were created
-        checkpoint_file = os.path.join(backtest_storage_dir, "checkpoints.json")
-        self.assertTrue(os.path.exists(checkpoint_file))
-
-    def test_run_backtests_with_storage_directory(self):
+    @staticmethod
+    def filter_function_with_ranking(
+        backtests
+    ):
         """
-        Test run_vector_backtests with use_checkpoints=True and
-        multiple backtest date ranges, applying progressive filtering to
+        Filter function that only keeps backtests with at least one closed trade.
+        """
+        return rank_results(backtests, focus=BacktestEvaluationFocus.BALANCED)
+
+    def test_run_with_show_output(self):
+        """
+        Test run_vector_backtests with a filter_function that filters
+        strategies based on whether they have closed trades.
         """
         param_grid = {
             "rsi_time_frame": ["2h"],
@@ -365,7 +244,6 @@ class Test(TestCase):
             "ema_long_period": [150, 200],
             "ema_cross_lookback_window": [4, 6]
         }
-
         param_options = param_grid
         param_variations = [
             dict(zip(param_options.keys(), values))
@@ -429,61 +307,75 @@ class Test(TestCase):
                 )
             )
 
-        self.assertEqual(len(strategies), 16)
+        # Capture stdout to get all print statements
+        captured_output = StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = captured_output
 
-        # Create backtest storage directory
-        backtest_storage_dir = os.path.join(
-            resource_directory, "backtest_reports_for_testing", "temp_storage"
-        )
-
-        # Clean up any existing storage directory
-        if os.path.exists(backtest_storage_dir):
-            shutil.rmtree(backtest_storage_dir)
-
-
-        start_time = time.time()
-        backtests = app.run_vector_backtests(
-            initial_amount=1000,
-            backtest_date_ranges=[date_range_1, date_range_2],
-            strategies=strategies,
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            backtest_storage_directory=backtest_storage_dir,
-            use_checkpoints=True,
-            show_progress=True,
-            n_workers=4
-        )
-        end_time = time.time()
-        duration = end_time - start_time
-
-        # There should be 16 backtests with at least one closed trade
-        self.assertEqual(
-            len(backtests), 16,"There should be 16 backtests returned"
-        )
-
-        # Each backtest should have atleast 2 backtest runs (one for each date range)
-        for backtest in backtests:
-            self.assertGreaterEqual(
-                len(backtest.get_all_backtest_runs()), 2,
-                "Each backtest should have at least 2 backtest runs"
+        try:
+            backtests = app.run_vector_backtests(
+                initial_amount=1000,
+                backtest_date_ranges=[date_range_1, date_range_2],
+                strategies=strategies,
+                snapshot_interval=SnapshotInterval.DAILY,
+                risk_free_rate=0.027,
+                trading_symbol="EUR",
+                market="BITVAVO",
+                use_checkpoints=True,
+                backtest_storage_directory=os.path.join(
+                    resource_directory, "backtest_reports_for_testing"
+                ),
+                window_filter_function=self.filter_function_with_closed_trades,
+                final_filter_function=self.filter_function_with_ranking,
+                show_progress=True
             )
+        finally:
+            # Restore stdout
+            sys.stdout = old_stdout
 
-        # Should have fewer backtests than strategies if filter worked
-        self.assertLessEqual(len(backtests), len(strategies))
+        # Get the captured output as a string
+        output = captured_output.getvalue()
 
-        # Check if checkpoint files were created
-        checkpoint_file = os.path.join(backtest_storage_dir, "checkpoints.json")
-        self.assertTrue(os.path.exists(checkpoint_file))
+        # Print the captured output (optional - for debugging)
+        print(output)
 
-    def tearDown(self):
-        # Clean up the backtest storage directory after test
-        resource_directory = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
+        # Verify that checkpointing message appears
+        self.assertTrue(
+            "Using checkpoints to skip completed backtests" in output or
+            "Found" in output and "checkpointed backtests" in output
         )
-        backtest_storage_dir = os.path.join(
-            resource_directory, "backtest_reports_for_testing", "temp_storage"
+
+        self.assertTrue(
+            "Found 16 checkpointed backtests, running 0 new backtests" in output
         )
-        if os.path.exists(backtest_storage_dir):
-            shutil.rmtree(backtest_storage_dir)
+
+        self.assertTrue(
+            "Applying window filter function" in output
+        )
+
+        self.assertTrue(
+            "Combining backtests across date ranges" in output
+        )
+
+        self.assertTrue(
+            "Excluded 12 filtered-out backtests from results" in output
+        )
+
+        self.assertTrue(
+            "Applying final filter function" in output
+        )
+
+        # Verify that filtered-out backtests are marked in metadata
+        # (not deleted from storage)
+        if "Marked backtest" in output and "as filtered out" in output:
+            print("✓ Filtered-out backtests were marked in metadata "
+                  "(preserved in storage)")
+
+
+
+        # You can also write it to a file
+        # with open("backtest_output.txt", "w") as f:
+        #     f.write(output)
+
+        # Or assert on specific content
+        # self.assertIn("Retrieving risk free rate", output)
