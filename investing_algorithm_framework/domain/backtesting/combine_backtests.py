@@ -87,7 +87,7 @@ def combine_backtests(backtests):
     from .backtest import Backtest
 
     backtest = Backtest(
-        algorithm_id=backtest.algorithm_id,
+        algorithm_id=algorithm_id,
         backtest_summary=summary,
         metadata=metadata,
         risk_free_rate=risk_free_rate,

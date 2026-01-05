@@ -1074,7 +1074,7 @@ class CCXTOHLCVDataProvider(DataProvider):
         if storage_path is None:
             storage_path = self.get_storage_directory()
 
-        return CCXTOHLCVDataProvider(
+        provider = CCXTOHLCVDataProvider(
             symbol=data_source.symbol,
             time_frame=data_source.time_frame,
             market=data_source.market,
@@ -1084,6 +1084,15 @@ class CCXTOHLCVDataProvider(DataProvider):
             config=self.config,
             pandas=data_source.pandas,
         )
+        provider.data = self.data
+        provider.missing_data_point_dates = \
+            self.missing_data_point_dates
+        provider._start_date_data_source = \
+            self._start_date_data_source
+        provider._end_date_data_source = \
+            self._end_date_data_source
+        provider.data_file_path = self.data_file_path
+        return provider
 
     def get_number_of_data_points(
         self,

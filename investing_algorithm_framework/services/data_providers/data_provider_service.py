@@ -126,6 +126,72 @@ class DataProviderIndex:
 
         return best_provider
 
+    def register_data_source_and_backtest_data_provider(
+        self, data_source: DataSource, data_provider: DataProvider
+    ):
+        """
+        Register a data source and its corresponding data provider
+        in the DataProvider Index.
+
+        This method will directly register the given data provider
+        for the specified data source without checking for compatibility.
+
+        Args:
+            data_source (DataSource): The data source to register.
+            data_provider (DataProvider): The data provider to associate
+                with the data source.
+        Returns:
+            DataProvider: The registered data provider.
+        """
+        data_provider = data_provider.copy(data_source)
+        self.data_providers_lookup[data_source] = data_provider
+        symbol = data_source.symbol
+        market = data_source.market
+        time_frame = data_source.time_frame
+
+        if DataType.OHLCV.equals(data_source.data_type):
+            if symbol not in self.ohlcv_data_providers:
+                self.ohlcv_data_providers[(symbol, market)] = data_provider
+                self.ohlcv_data_providers_no_market[symbol] = data_provider
+                self.ohlcv_data_providers_with_timeframe[
+                    (symbol, market, time_frame)
+                ] = data_provider
+            else:
+                try:
+                    # If the symbol already exists, we can update the provider
+                    # has a more granular timeframe
+                    existing_provider = self.ohlcv_data_providers[
+                        (symbol, market)
+                    ]
+
+                    if existing_provider.time_frame > data_provider.time_frame:
+                        self.ohlcv_data_providers[(symbol, market)] = \
+                            data_provider
+
+                    existing_provider = self.ohlcv_data_providers_no_market[
+                        symbol
+                    ]
+
+                    if existing_provider.time_frame > data_provider.time_frame:
+                        self.ohlcv_data_providers_no_market[symbol] = \
+                            data_provider
+
+                    time_frame_key = (symbol, market, time_frame)
+                    self.ohlcv_data_providers_with_timeframe[
+                        time_frame_key
+                    ] = data_provider
+
+                except Exception:
+                    # If the existing provider does not have a time_frame
+                    # attribute, we can safely ignore this
+                    pass
+
+        elif DataType.TICKER.equals(data_source.data_type):
+            if symbol not in self.ticker_data_providers:
+                self.ticker_data_providers[symbol] = data_provider
+
+        return data_provider
+
     def register_backtest_data_source(
         self,
         data_source: DataSource,
@@ -221,6 +287,21 @@ class DataProviderIndex:
                 self.ticker_data_providers[symbol] = best_provider
 
         return best_provider
+
+    def get_data_provider(
+        self, data_source: DataSource
+    ) -> Optional[DataProvider]:
+        """
+        Get the data provider for a given data source.
+
+        Args:
+            data_source (DataSource): The data source to get
+                the data provider for.
+
+        Returns:
+            DataProvider: The data provider for the market and symbol,
+        """
+        return self.data_providers_lookup.get(data_source, None)
 
     def get(self, data_source: DataSource) -> Optional[DataProvider]:
         """
@@ -335,10 +416,27 @@ class DataProviderService:
     data_provider_index: DataProviderIndex = None
     backtest_mode = False
 
+    @staticmethod
+    def from_data_pairs(data_pairs: List[Tuple[DataSource, DataProvider]]):
+        """
+        Create a DataProviderService from a list of data source and
+        data provider pairs.
+
+        Args:
+            data_pairs (List[Tuple[DataSource, DataProvider]]): A list of
+                data source and data provider pairs.
+        Returns:
+            DataProviderService: The created DataProviderService.
+        """
+        service = DataProviderService()
+        for data_source, data_provider in data_pairs:
+            service.register_data_provider(data_source, data_provider)
+        return service
+
     def __init__(
         self,
-        configuration_service,
-        market_credential_service,
+        configuration_service=None,
+        market_credential_service=None,
         default_data_providers: List[DataProvider] = [],
     ):
         """
@@ -352,6 +450,100 @@ class DataProviderService:
         self.data_provider_index = DataProviderIndex(default_data_providers)
         self.configuration_service = configuration_service
         self.market_credential_service = market_credential_service
+
+    def initialize(self, data_sources, data_providers):
+        """
+        Initialize the DataProviderService with data sources and
+        data providers.
+
+        Args:
+            data_sources (List[DataSource]): A list of data sources to
+                index.
+            data_providers (List[DataProvider]): A list of data providers
+                to index.
+
+        Returns:
+            None
+        """
+        for data_provider in data_providers:
+            self.add_data_provider(data_provider)
+
+        self.index_data_providers(data_sources)
+
+    def register_data_source_and_backtest_data_provider(
+        self, data_source, data_provider
+    ):
+        """
+        Register a data source and its corresponding data provider
+        in the DataProvider Service.
+
+        This method will directly register the given data provider
+        for the specified data source without checking for compatibility.
+
+        Args:
+            data_source (DataSource): The data source to register.
+            data_provider (DataProvider): The data provider to associate
+                with the data source.
+        Returns:
+            DataProvider: The registered data provider.
+        """
+        return self.data_provider_index\
+            .register_data_source_and_backtest_data_provider(
+                data_source, data_provider
+            )
+
+    def get_data_sources(self, strategies) -> List[DataSource]:
+        """
+        Get all data sources for the given strategies.
+
+        Args:
+            strategies: The strategies to get the data sources for.
+
+        Returns:
+            List[DataSource]: A list of data sources for the strategies.
+        """
+        data_sources = []
+
+        for strategy in strategies:
+            data_sources.extend(strategy.get_data_sources())
+
+        return list(set(data_sources))
+
+    def get_data_providers(self, strategies) -> List[DataProvider]:
+        """
+        Get all data providers for the given strategies.
+
+        Args:
+            strategies: The strategies to get the data providers for.
+
+        Returns:
+            List[DataProvider]: A list of data providers for the strategies.
+        """
+        data_providers = []
+        data_sources = self.get_data_sources(strategies)
+
+        for data_source in data_sources:
+            data_provider = self.get(data_source)
+            if data_provider is not None:
+                data_providers.append(data_provider)
+
+        return data_providers
+
+    def get_data_provider(
+        self, data_source: DataSource
+    ) -> Optional[DataProvider]:
+        """
+        Get a registered data provider by its data source.
+
+        Args:
+            data_source (DataSource): The data source to get the
+            data provider for.
+
+        Returns:
+            Optional[DataProvider]: The registered data provider for
+              the data source, or None if not found.
+        """
+        return self.data_provider_index.get(data_source)
 
     def get(self, data_source: DataSource) -> Optional[DataProvider]:
         """
@@ -848,3 +1040,19 @@ class DataProviderService:
         """
         self.data_provider_index.reset()
         self.backtest_mode = False
+
+    def copy(self):
+        """
+        Create a copy of the DataProviderService.
+
+        Returns:
+            DataProviderService: A copy of the current service.
+        """
+        new_service = DataProviderService(
+            configuration_service=self.configuration_service,
+            market_credential_service=self.market_credential_service,
+            default_data_providers=self.default_data_providers
+        )
+        new_service.data_provider_index = self.data_provider_index
+        new_service.backtest_mode = self.backtest_mode
+        return new_service

@@ -21,8 +21,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     PortfolioConfiguration, SnapshotInterval, DataType, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured, TimeFrame, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestPermutationTest, \
-    LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, DATA_DIRECTORY, \
-    generate_backtest_summary_metrics
+    LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, DATA_DIRECTORY
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
     BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db, \
@@ -915,7 +914,6 @@ class App:
 
     def run_vector_backtests(
         self,
-        initial_amount,
         strategies: List[TradingStrategy],
         backtest_date_range: BacktestDateRange = None,
         backtest_date_ranges: List[BacktestDateRange] = None,
@@ -924,6 +922,7 @@ class App:
         skip_data_sources_initialization: bool = False,
         show_progress: bool = True,
         market: Optional[str] = None,
+        initial_amount: float = None,
         trading_symbol: Optional[str] = None,
         continue_on_error: bool = False,
         window_filter_function: Optional[
@@ -933,7 +932,10 @@ class App:
             Callable[[List[Backtest]], List[Backtest]]
         ] = None,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
-        use_checkpoints: bool = False
+        use_checkpoints: bool = False,
+        batch_size: int = 100,
+        checkpoint_batch_size: int = 50,
+        n_workers: Optional[int] = None,
     ) -> List[Backtest]:
         """
         Run vectorized backtests for a set of strategies. The provided
@@ -1029,10 +1031,53 @@ class App:
                 backtest exists, it will be loaded
                 instead of running a new backtest. This is useful for
                 long-running backtests that might take a while to complete.
+                When enabled, uses the optimized version with batching and
+                optional parallel processing.
+            batch_size (int): Number of strategies to process in each batch
+                before memory cleanup. Only used when use_checkpoints=True.
+                Default: 100. Higher values use more memory but may be faster.
+                Recommended: 50-200 for large-scale backtesting.
+            checkpoint_batch_size (int): Number of backtests to accumulate
+                before batch saving to disk. Only used when
+                use_checkpoints=True. Default: 50. Higher values reduce
+                disk I/O but use more memory.
+                Recommended: 25-100 for large-scale backtesting.
+            n_workers (Optional[int]): Number of parallel workers for
+                multi-core processing. Only used when use_checkpoints=True.
+                - None (default): Sequential processing (no parallelization)
+                - -1: Use all available CPU cores
+                - N: Use exactly N worker processes
+                Recommended: os.cpu_count() - 1 to leave one core free.
+                Note: Parallel processing provides 5-10x speedup on multi-core
+                systems but requires ~1-2GB RAM per worker.
 
         Returns:
             List[Backtest]: List of Backtest instances for each strategy
                 that was backtested.
+
+        Examples:
+            # Basic usage (sequential)
+            backtests = app.run_vector_backtests(
+                initial_amount=1000,
+                strategies=strategies,
+                backtest_date_ranges=date_ranges,
+                use_checkpoints=True,
+                backtest_storage_directory="./backtests"
+            )
+
+            # Optimized for 10,000+ strategies with parallel processing
+            import os
+            backtests = app.run_vector_backtests(
+                initial_amount=1000,
+                strategies=strategies,  # 10,000 strategies
+                backtest_date_ranges=date_ranges,
+                use_checkpoints=True,
+                backtest_storage_directory="./backtests",
+                n_workers=os.cpu_count() - 1,  # Use all but one core
+                batch_size=100,
+                checkpoint_batch_size=50,
+                show_progress=True
+            )
         """
         backtest_service = self.container.backtest_service()
 
@@ -1049,7 +1094,6 @@ class App:
             )
 
         if not skip_data_sources_initialization:
-            print("adding default data providers")
             data_provider_service = self.container.data_provider_service()
             data_provider_service.reset()
 
@@ -1063,46 +1107,55 @@ class App:
                 CCXTOHLCVDataProvider()
             )
 
-        if use_checkpoints:
-            sdsi = skip_data_sources_initialization
-            return backtest_service.run_vector_backtests_with_checkpoints(
-                strategies=strategies,
-                backtest_date_range=backtest_date_range,
-                backtest_date_ranges=backtest_date_ranges,
-                snapshot_interval=snapshot_interval,
-                risk_free_rate=risk_free_rate,
-                initial_amount=initial_amount,
-                skip_data_sources_initialization=sdsi,
-                show_progress=show_progress,
+        # Create a new portfolio configuration if initial amount,
+        # market and trading symbol are provided
+        if initial_amount is not None \
+                and market is not None \
+                and trading_symbol is not None:
+            portfolio_configuration = PortfolioConfiguration(
+                initial_balance=initial_amount,
                 market=market,
                 trading_symbol=trading_symbol,
-                continue_on_error=continue_on_error,
-                backtest_storage_directory=backtest_storage_directory,
-                window_filter_function=window_filter_function,
-                final_filter_function=final_filter_function,
             )
-        sdsi = skip_data_sources_initialization
+        else:
+            portfolio_configurations = self.get_portfolio_configurations()
+            if len(portfolio_configurations) == 0:
+                raise OperationalException(
+                    "No portfolio configurations found. Please provide "
+                    "initial_amount, market and trading_symbol or add a "
+                    "portfolio configuration to the app before running "
+                    "backtests."
+                )
+
+            portfolio_configuration = portfolio_configurations[0]
+
+            if initial_amount is not None:
+                portfolio_configuration.initial_balance = initial_amount
+
         return backtest_service.run_vector_backtests(
             strategies=strategies,
             backtest_date_range=backtest_date_range,
             backtest_date_ranges=backtest_date_ranges,
             snapshot_interval=snapshot_interval,
             risk_free_rate=risk_free_rate,
-            initial_amount=initial_amount,
-            skip_data_sources_initialization=sdsi,
+            skip_data_sources_initialization=skip_data_sources_initialization,
             show_progress=show_progress,
-            market=market,
-            trading_symbol=trading_symbol,
+            portfolio_configuration=portfolio_configuration,
             continue_on_error=continue_on_error,
+            backtest_storage_directory=backtest_storage_directory,
             window_filter_function=window_filter_function,
             final_filter_function=final_filter_function,
-            backtest_storage_directory=backtest_storage_directory,
+            batch_size=batch_size,
+            checkpoint_batch_size=checkpoint_batch_size,
+            n_workers=n_workers,
+            use_checkpoints=use_checkpoints,
         )
 
     def run_vector_backtest(
         self,
-        backtest_date_range: BacktestDateRange,
         strategy: TradingStrategy,
+        backtest_date_range: BacktestDateRange = None,
+        backtest_date_ranges: List[BacktestDateRange] = None,
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         metadata: Optional[Dict[str, str]] = None,
         risk_free_rate: Optional[float] = None,
@@ -1182,105 +1235,38 @@ class App:
         Returns:
             Backtest: Instance of Backtest
         """
-        # Initialize configuration for vectorized backtesting
-        self.initialize_backtest_config(
-            backtest_date_range=backtest_date_range,
-            snapshot_interval=snapshot_interval,
-            initial_amount=initial_amount
-        )
-
-        if use_checkpoints and backtest_storage_directory is None:
-            raise OperationalException(
-                "When using checkpoints, a backtest_storage_directory must "
-                "be provided"
-            )
-
         if not skip_data_sources_initialization:
-            self.initialize_data_sources_backtest(
-                strategy.data_sources,
-                backtest_date_range,
-                show_progress=show_progress
-            )
+            data_provider_service = self.container.data_provider_service()
+            data_provider_service.reset()
 
-        if risk_free_rate is None:
-            logger.info("No risk free rate provided, retrieving it...")
-            risk_free_rate = get_risk_free_rate_us()
-
-            if risk_free_rate is None:
-                raise OperationalException(
-                    "Could not retrieve risk free rate for backtest metrics."
-                    "Please provide a risk free rate as an argument "
-                    "when running your backtest or make sure "
-                    "you have an internet connection"
+            for data_provider_tuple in self._data_providers:
+                data_provider_service.add_data_provider(
+                    data_provider_tuple[0], priority=data_provider_tuple[1]
                 )
 
-        backtest_service = self.container.backtest_service()
-        backtest_service.validate_strategy_for_vector_backtest(strategy)
+            # Add the default data providers
+            data_provider_service.add_data_provider(
+                CCXTOHLCVDataProvider()
+            )
 
-        # Check if the backtest already exists when using checkpoints
-        if use_checkpoints and backtest_service.backtest_exists(
+        # Delegate to the backtest service which handles all the logic
+        backtest_service = self.container.backtest_service()
+        backtest = backtest_service.run_vector_backtest(
             strategy=strategy,
             backtest_date_range=backtest_date_range,
-            storage_directory=backtest_storage_directory,
-        ):
-            backtest = backtest_service\
-                .load_backtest_by_strategy_and_backtest_date_range(
-                    strategy=strategy,
-                    backtest_date_range=backtest_date_range,
-                    storage_directory=backtest_storage_directory,
-                )
-        else:
-            try:
-
-                if show_progress:
-                    start_date = backtest_date_range \
-                        .start_date.strftime('%Y-%m-%d')
-                    end_date = backtest_date_range.end_date.strftime(
-                        '%Y-%m-%d')
-                    print(
-                        f"Running backtests for {start_date} to {end_date}"
-                    )
-
-                run = backtest_service.create_vector_backtest(
-                    strategy=strategy,
-                    backtest_date_range=backtest_date_range,
-                    risk_free_rate=risk_free_rate,
-                    market=market,
-                    trading_symbol=trading_symbol,
-                    initial_amount=initial_amount
-                )
-                backtest = Backtest(
-                    algorithm_id=strategy.algorithm_id,
-                    backtest_runs=[run],
-                    risk_free_rate=risk_free_rate,
-                    backtest_summary=generate_backtest_summary_metrics(
-                        [run.backtest_metrics]
-                    )
-                )
-            except Exception as e:
-                logger.error(
-                    f"Error occurred during vector backtest for strategy "
-                    f"{strategy.strategy_id}: {str(e)}"
-                )
-
-                if continue_on_error:
-                    backtest = Backtest(
-                        algorithm_id=strategy.algorithm_id,
-                        backtest_runs=[],
-                        risk_free_rate=risk_free_rate,
-                    )
-                else:
-                    raise e
-
-        # Add the metadata to the backtest
-        if metadata is None:
-
-            if strategy.metadata is None:
-                backtest.metadata = {}
-            else:
-                backtest.metadata = strategy.metadata
-        else:
-            backtest.metadata = metadata
+            backtest_date_ranges=backtest_date_ranges,
+            snapshot_interval=snapshot_interval,
+            metadata=metadata,
+            risk_free_rate=risk_free_rate,
+            skip_data_sources_initialization=skip_data_sources_initialization,
+            initial_amount=initial_amount,
+            market=market,
+            trading_symbol=trading_symbol,
+            continue_on_error=continue_on_error,
+            backtest_storage_directory=backtest_storage_directory,
+            use_checkpoints=use_checkpoints,
+            show_progress=show_progress,
+        )
 
         return backtest
 

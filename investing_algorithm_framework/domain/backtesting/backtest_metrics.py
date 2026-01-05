@@ -371,12 +371,12 @@ class BacktestMetrics:
 
         # Parse the datetime string
         if data[1] is None or pd.isna(data[1]):
-            value = None
+            date_value = None
         else:
             # Convert the string to a datetime object
-            date = datetime.fromisoformat(data[1])
+            date_value = datetime.fromisoformat(data[1])
 
-        return (value, date)
+        return (value, date_value)
 
     @staticmethod
     def _parse_tuple_date(data) -> Tuple[float, date]:

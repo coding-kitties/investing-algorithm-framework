@@ -339,6 +339,7 @@ class BacktestRun:
                 backtest_end_date = backtest_end_date.astimezone(timezone.utc)
 
             created_at = self.created_at
+
             if created_at.tzinfo is None:
                 created_at = created_at.replace(tzinfo=timezone.utc)
             else:

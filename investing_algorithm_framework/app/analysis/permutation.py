@@ -63,7 +63,26 @@ def create_ohlcv_permutation(
     perm_index = start_index + 1
     perm_n = n_bars - perm_index
 
-    log_bars = np.log(ohlcv_pd[["Open", "High", "Low", "Close"]])
+    # Ensure all OHLCV values are positive before taking log
+    # Replace non-positive values with NaN and forward fill
+    ohlcv_cols = ["Open", "High", "Low", "Close"]
+    for col in ohlcv_cols:
+        ohlcv_pd.loc[ohlcv_pd[col] <= 0, col] = np.nan
+
+    # Forward fill NaN values to maintain data continuity
+    ohlcv_pd[ohlcv_cols] = ohlcv_pd[ohlcv_cols].ffill()
+
+    # If there are still NaN values at the start, backward fill
+    ohlcv_pd[ohlcv_cols] = ohlcv_pd[ohlcv_cols].bfill()
+
+    # If all values are still invalid, raise an error
+    if ohlcv_pd[ohlcv_cols].isna().any().any():
+        raise ValueError(
+            "OHLCV data contains invalid (zero or negative) values "
+            "that cannot be processed"
+        )
+
+    log_bars = np.log(ohlcv_pd[ohlcv_cols])
 
     # Start bar
     start_bar = log_bars.iloc[start_index].to_numpy()

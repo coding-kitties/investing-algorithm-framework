@@ -56,13 +56,28 @@ class Backtest:
     risk_free_rate: float = None
     strategy_ids: List[int] = field(default_factory=list)
 
-    def get_all_backtest_runs(self) -> List[BacktestRun]:
+    def get_all_backtest_runs(
+        self, backtest_date_ranges=None
+    ) -> List[BacktestRun]:
         """
         Retrieve all BacktestRun instances from the backtest.
+
+        Args:
+            backtest_date_ranges (List[BacktestDateRange], optional): A list of
+                date ranges to filter the backtest runs. If provided, only
 
         Returns:
             List[BacktestRun]: A list of all BacktestRun instances.
         """
+
+        if backtest_date_ranges is not None:
+            filtered_runs = []
+            for date_range in backtest_date_ranges:
+                run = self.get_backtest_run(date_range)
+                if run:
+                    filtered_runs.append(run)
+            return filtered_runs
+
         return self.backtest_runs
 
     def get_backtest_run(
@@ -178,7 +193,7 @@ class Backtest:
     @staticmethod
     def open(
         directory_path: Union[str, Path],
-        backtest_date_ranges: List[BacktestDateRange] = None
+        backtest_date_ranges: List[BacktestDateRange] = None,
     ) -> 'Backtest':
         """
         Open a backtest report from a directory and return a Backtest instance.
@@ -208,6 +223,11 @@ class Backtest:
         if not os.path.exists(directory_path):
             raise OperationalException(
                 f"The directory {directory_path} does not exist."
+            )
+
+        if not os.path.isdir(directory_path):
+            raise OperationalException(
+                f"Backtest path {directory_path} is not a directory."
             )
 
         # Load algorithm_id if available
@@ -316,14 +336,21 @@ class Backtest:
             risk_free_rate=risk_free_rate
         )
 
-    def save(self, directory_path: Union[str, Path]) -> None:
+    def save(
+        self,
+        directory_path: Union[str, Path],
+        backtest_date_ranges: List[BacktestDateRange] = None,
+    ) -> None:
         """
         Save the backtest metrics to a file in JSON format. The metrics will
         always be saved in a file named `metrics.json`
 
         Args:
             directory_path (str): The directory where the metrics
-            file will be saved.
+                file will be saved.
+            backtest_date_ranges (List[BacktestDateRange], optional): A list
+                of date ranges to filter the backtest runs. If provided, only
+                backtest runs matching these date ranges will be saved.
 
         Raises:
             OperationalException: If the directory does not exist or if
@@ -341,7 +368,12 @@ class Backtest:
             run_path = os.path.join(directory_path, "runs")
             os.makedirs(run_path, exist_ok=True)
 
-            for br in self.backtest_runs:
+            if backtest_date_ranges is not None:
+                runs = self.get_all_backtest_runs()
+            else:
+                runs = self.backtest_runs
+
+            for br in runs:
                 dir_name = br.create_directory_name()
                 destination_run_path = os.path.join(run_path, dir_name)
                 os.makedirs(destination_run_path, exist_ok=True)

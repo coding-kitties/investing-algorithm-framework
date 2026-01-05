@@ -19,7 +19,7 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     TradeStatus, generate_backtest_summary_metrics, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus, \
-    save_backtests_to_directory
+    save_backtests_to_directory, BacktestMetrics
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CCXTOHLCVDataProvider, PandasOHLCVDataProvider, \
     AWSS3StorageStateHandler
@@ -197,5 +197,6 @@ __all__ = [
     "StopLossRule",
     "TradeStopLossService",
     "TradeTakeProfitService",
-    "generate_strategy_id"
+    "generate_strategy_id",
+    "BacktestMetrics"
 ]

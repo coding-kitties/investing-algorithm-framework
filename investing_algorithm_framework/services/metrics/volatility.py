@@ -86,12 +86,33 @@ def get_annual_volatility(
     if len(df_daily) < 2:
         return 0.0
 
+    # Filter out non-positive values before calculating log returns
+    # Log returns are only valid for positive portfolio values
+    df_daily = df_daily[df_daily['total_value'] > 0]
+
+    if len(df_daily) < 2:
+        return 0.0
+
     # Calculate log returns on daily data
-    df_daily['log_return'] = np.log(df_daily['total_value'] / df_daily['total_value'].shift(1))
+    # Add a small epsilon to avoid log(0) and replace inf/nan values
+    price_ratios = df_daily['total_value'] / df_daily['total_value'].shift(1)
+
+    # Filter out invalid price ratios (zero, negative, or NaN)
+    df_daily['log_return'] = np.log(price_ratios)
+
+    # Replace inf and -inf with NaN, then drop them
+    df_daily['log_return'] = df_daily['log_return'].replace([np.inf, -np.inf], np.nan)
     df_daily = df_daily.dropna()
+
+    if len(df_daily) < 2:
+        return 0.0
 
     # Calculate daily volatility (standard deviation of daily returns)
     daily_volatility = df_daily['log_return'].std()
+
+    # Handle edge case where std might be NaN
+    if pd.isna(daily_volatility):
+        return 0.0
 
     # Annualize using trading days per year
     return daily_volatility * np.sqrt(trading_days_per_year)

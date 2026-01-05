@@ -816,3 +816,12 @@ class TradingStrategy:
             DateTime: The last run of the strategy
         """
         return self.context.last_run()
+
+    def get_data_sources(self):
+        """
+        Function to get the data sources of the strategy
+
+        Returns:
+            List[DataSource]: The data sources of the strategy
+        """
+        return self.data_sources

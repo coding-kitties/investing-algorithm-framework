@@ -4,6 +4,8 @@ from .deploy_to_aws_lambda import command as deploy_to_aws_lambda_command
 from .deploy_to_azure_function import command as \
     deploy_to_azure_function_command
 from .initialize_app import command as initialize_app_command
+from .validate_backtest_checkpoints import command as \
+    validate_backtest_checkpoints_command
 
 """
 CLI for Investing Algorithm Framework
@@ -224,3 +226,6 @@ def deploy_aws_lambda(
 cli.add_command(init)
 cli.add_command(deploy_azure_function)
 cli.add_command(deploy_aws_lambda)
+cli.add_command(
+    validate_backtest_checkpoints_command, name="validate-checkpoints"
+)
