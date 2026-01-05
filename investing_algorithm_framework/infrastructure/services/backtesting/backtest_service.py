@@ -1271,8 +1271,8 @@ class BacktestService:
                 backtest = Backtest(
                     algorithm_id=strategy.algorithm_id,
                     backtest_runs=[backtest_run],
-                    metadata=strategy.metadata \
-                        if hasattr(strategy, 'metadata') else None,
+                    metadata=strategy.metadata if hasattr(
+                        strategy, 'metadata') else None,
                     risk_free_rate=risk_free_rate
                 )
                 batch_results.append(backtest)
