@@ -1,6 +1,6 @@
-from .app import App, Algorithm, generate_strategy_id, \
+from .app import App, Algorithm, generate_algorithm_id, \
     TradingStrategy, StatelessAction, Task, AppHook, Context, \
-    add_html_report, BacktestReport, \
+    add_html_report, BacktestReport, generate_rolling_backtest_windows, \
     pretty_print_trades, pretty_print_positions, \
     pretty_print_orders, pretty_print_backtest, select_backtest_date_ranges, \
     get_equity_curve_with_drawdown_chart, \
@@ -197,6 +197,7 @@ __all__ = [
     "StopLossRule",
     "TradeStopLossService",
     "TradeTakeProfitService",
-    "generate_strategy_id",
-    "BacktestMetrics"
+    "generate_algorithm_id",
+    "BacktestMetrics",
+    "generate_rolling_backtest_windows"
 ]

@@ -14,7 +14,7 @@ from .reporting import add_html_report, \
     get_yearly_returns_bar_chart, get_equity_curve_chart, \
     get_ohlcv_data_completeness_chart, get_entry_and_exit_signals
 from .analysis import select_backtest_date_ranges, rank_results, \
-    create_weights, generate_strategy_id
+    create_weights, generate_algorithm_id, generate_rolling_backtest_windows
 
 
 __all__ = [
@@ -42,5 +42,6 @@ __all__ = [
     "create_weights",
     "get_entry_and_exit_signals",
     "get_equity_curve_chart",
-    "generate_strategy_id"
+    "generate_algorithm_id",
+    "generate_rolling_backtest_windows"
 ]

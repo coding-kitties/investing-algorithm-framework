@@ -3,7 +3,7 @@ from typing import Dict
 import json
 
 
-def generate_strategy_id(params: Dict, post_fix=None, pre_fix=None) -> str:
+def generate_algorithm_id(params: Dict, post_fix=None, pre_fix=None) -> str:
     """
     Generate a short, consistent unique id for the given params.
     The id will always be the same for the same params.

@@ -933,8 +933,8 @@ class App:
         ] = None,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
         use_checkpoints: bool = False,
-        batch_size: int = 100,
-        checkpoint_batch_size: int = 50,
+        batch_size: int = 50,
+        checkpoint_batch_size: int = 25,
         n_workers: Optional[int] = None,
     ) -> List[Backtest]:
         """

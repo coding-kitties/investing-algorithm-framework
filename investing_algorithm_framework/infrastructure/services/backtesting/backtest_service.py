@@ -16,14 +16,28 @@ from investing_algorithm_framework.domain import BacktestRun, TimeUnit, \
 from investing_algorithm_framework.services.data_providers import \
     DataProviderService
 from investing_algorithm_framework.services.metrics import \
-    create_backtest_metrics
-from investing_algorithm_framework.services.metrics import \
-    get_risk_free_rate_us
+    create_backtest_metrics, get_risk_free_rate_us
 from investing_algorithm_framework.services.portfolios import \
     PortfolioConfigurationService
 from .vector_backtest_service import VectorBacktestService
 
+
 logger = logging.getLogger(__name__)
+
+
+def _print_progress(message: str, show_progress: bool = True):
+    """
+    Print progress message with forced flush.
+
+    This ensures output is immediately visible, especially important
+    in Jupyter notebooks and long-running processes.
+
+    Args:
+        message: The message to print.
+        show_progress: Whether to actually print the message.
+    """
+    if show_progress:
+        print(message, flush=True)
 
 
 class BacktestService:
@@ -524,8 +538,8 @@ class BacktestService:
         ] = None,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
         use_checkpoints: bool = True,
-        batch_size: int = 100,
-        checkpoint_batch_size: int = 50,
+        batch_size: int = 50,
+        checkpoint_batch_size: int = 25,
         n_workers: Optional[int] = None,
     ):
         """
@@ -567,9 +581,9 @@ class BacktestService:
                 and skipped on subsequent runs. If False, all backtests will
                 run every time (default: True).
             batch_size: Number of strategies to process in
-                each batch (default: 100).
+                each batch (default: 50).
             checkpoint_batch_size: Number of backtests before batch
-                save/checkpoint (default: 50).
+                save/checkpoint (default: 25).
             n_workers: Number of parallel workers (default: None = sequential,
                 -1 = use all CPU cores, N = use N workers).
                 Recommended: os.cpu_count() - 1 to leave one core free.
@@ -600,12 +614,18 @@ class BacktestService:
         if risk_free_rate is None:
 
             if show_progress:
-                print("Retrieving risk free rate for metrics calculation ...")
+                _print_progress(
+                    "Retrieving risk free rate for metrics calculation ...",
+                    show_progress
+                )
 
             risk_free_rate = self._get_risk_free_rate()
 
             if show_progress:
-                print(f"Retrieved risk free rate of: {risk_free_rate}")
+                _print_progress(
+                    f"Retrieved risk free rate of: {risk_free_rate}",
+                    show_progress
+                )
 
         # Load checkpoint cache only if checkpointing is enabled
         checkpoint_cache = {}
@@ -651,7 +671,10 @@ class BacktestService:
 
             # Only check for checkpoints if use_checkpoints is True
             if use_checkpoints:
-                print("Using checkpoints to skip completed backtests ...")
+                _print_progress(
+                    "Using checkpoints to skip completed backtests ...",
+                    show_progress
+                )
                 checkpointed_ids = self._get_checkpointed_from_cache(
                     checkpoint_cache, backtest_date_range
                 )
@@ -662,9 +685,12 @@ class BacktestService:
                 ]
 
                 if show_progress and len(checkpointed_ids) > 0:
-                    print(f"Found {len(checkpointed_ids)} "
-                          "checkpointed backtests, "
-                          f"running {len(strategies_to_run)} new backtests")
+                    _print_progress(
+                        f"Found {len(checkpointed_ids)} "
+                        "checkpointed backtests, "
+                        f"running {len(strategies_to_run)} new backtests",
+                        show_progress
+                    )
             else:
                 # Run all strategies when checkpoints are disabled
                 strategies_to_run = active_strategies
@@ -701,10 +727,13 @@ class BacktestService:
                     ]
 
                     if show_progress:
-                        print(f"Running {len(strategies_to_run)} backtests on "
-                              f"{n_workers} workers "
-                              f"({len(strategy_batches)} batches, "
-                              f"~{worker_batch_size} strategies per worker)")
+                        _print_progress(
+                            f"Running {len(strategies_to_run)} backtests on "
+                            f"{n_workers} workers "
+                            f"({len(strategy_batches)} batches, "
+                            f"~{worker_batch_size} strategies per worker)",
+                            show_progress
+                        )
 
                     worker_args = []
 
@@ -730,6 +759,9 @@ class BacktestService:
                             )
                             for args in worker_args
                         ]
+
+                        # Track completed batches for periodic cleanup
+                        completed_count = 0
 
                         # Collect results with progress bar
                         for future in tqdm(
@@ -759,6 +791,13 @@ class BacktestService:
                                             backtest_storage_directory,
                                             checkpoint_cache
                                         )
+
+                                # Periodic garbage collection every 10 batches
+                                # to prevent memory accumulation
+                                completed_count += 1
+                                if completed_count % 10 == 0:
+                                    gc.collect()
+
                             except Exception as e:
                                 if continue_on_error:
                                     logger.error(
@@ -787,10 +826,13 @@ class BacktestService:
                     ]
 
                     if show_progress and len(strategy_batches) > 1:
-                        print(f"Processing {len(strategies_to_run)} "
-                              "strategies in "
-                              f"{len(strategy_batches)} batches "
-                              f"of ~{batch_size} strategies each")
+                        _print_progress(
+                            f"Processing {len(strategies_to_run)} "
+                            "strategies in "
+                            f"{len(strategy_batches)} batches "
+                            f"of ~{batch_size} strategies each",
+                            show_progress
+                        )
 
                     # Process each batch
                     for batch_idx, strategy_batch in enumerate(tqdm(
@@ -830,6 +872,12 @@ class BacktestService:
                                         backtest_storage_directory,
                                         checkpoint_cache
                                     )
+
+                            # Periodic garbage collection every 5 batches
+                            # to prevent memory accumulation
+                            if (batch_idx + 1) % 5 == 0:
+                                gc.collect()
+
                         except Exception as e:
                             if continue_on_error:
                                 logger.error(
@@ -875,7 +923,10 @@ class BacktestService:
             # Apply window filter function
             if window_filter_function is not None:
                 if show_progress:
-                    print("Applying window filter function ...")
+                    _print_progress(
+                        "Applying window filter function ...",
+                        show_progress
+                    )
                 filtered_backtests = window_filter_function(
                     all_backtests, backtest_date_range
                 )
@@ -952,7 +1003,10 @@ class BacktestService:
 
         # Combine backtests with the same algorithm_id across date ranges
         if show_progress:
-            print("Combining backtests across date ranges ...")
+            _print_progress(
+                "Combining backtests across date ranges ...",
+                show_progress
+            )
 
         loaded_from_storage = False
         if backtest_storage_directory is not None:
@@ -971,8 +1025,11 @@ class BacktestService:
 
             if show_progress and len(all_backtests) < len(all_backtests_raw):
                 filtered_count = len(all_backtests_raw) - len(all_backtests)
-                print(f"Excluded {filtered_count} filtered-out backtests "
-                      "from results")
+                _print_progress(
+                    f"Excluded {filtered_count} filtered-out backtests "
+                    "from results",
+                    show_progress
+                )
 
             loaded_from_storage = True
         else:
@@ -1004,7 +1061,10 @@ class BacktestService:
         # Apply final filter function
         if final_filter_function is not None:
             if show_progress:
-                print("Applying final filter function ...")
+                _print_progress(
+                    "Applying final filter function ...",
+                    show_progress
+                )
             all_backtests = final_filter_function(all_backtests)
 
         # Only save if we didn't load from storage (avoid duplicate saves)
@@ -1067,10 +1127,12 @@ class BacktestService:
             if backtest.algorithm_id not in checkpoint_cache[key]:
                 checkpoint_cache[key].append(backtest.algorithm_id)
 
-        # Write checkpoint file
+        # Write checkpoint file with forced flush to disk
         checkpoint_file = os.path.join(storage_directory, "checkpoints.json")
         with open(checkpoint_file, "w") as f:
             json.dump(checkpoint_cache, f, indent=4)
+            f.flush()
+            os.fsync(f.fileno())  # Force write to disk
 
     def _load_backtests_from_cache(
         self,
@@ -1307,8 +1369,8 @@ class BacktestService:
         use_checkpoints: bool = True,
         show_progress: bool = False,
         n_workers: Optional[int] = None,
-        batch_size: int = 100,
-        checkpoint_batch_size: int = 50,
+        batch_size: int = 50,
+        checkpoint_batch_size: int = 25,
     ) -> Backtest:
         """
         Run optimized vectorized backtest for a single strategy.
