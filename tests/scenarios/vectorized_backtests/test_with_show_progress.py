@@ -327,7 +327,10 @@ class Test(TestCase):
                 ),
                 window_filter_function=self.filter_function_with_closed_trades,
                 final_filter_function=self.filter_function_with_ranking,
-                show_progress=True
+                show_progress=True,
+                n_workers=os.cpu_count() - 1,
+                batch_size=100,  # Process 100 strategies at a time
+                checkpoint_batch_size=50,  # Save checkpoint every 50 backtests
             )
         finally:
             # Restore stdout
@@ -370,12 +373,3 @@ class Test(TestCase):
         if "Marked backtest" in output and "as filtered out" in output:
             print("✓ Filtered-out backtests were marked in metadata "
                   "(preserved in storage)")
-
-
-
-        # You can also write it to a file
-        # with open("backtest_output.txt", "w") as f:
-        #     f.write(output)
-
-        # Or assert on specific content
-        # self.assertIn("Retrieving risk free rate", output)
