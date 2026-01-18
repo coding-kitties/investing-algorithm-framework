@@ -22,7 +22,6 @@ class Test(TestCase):
     def test_with_default_params(self):
         algorithm = AlgorithmFactory.create_algorithm()
         self.assertIsInstance(algorithm, Algorithm)
-        self.assertIsNotNone(algorithm.name)
         self.assertEqual(algorithm.strategies, [])
         self.assertEqual(algorithm.tasks, [])
         self.assertEqual(algorithm.on_strategy_run_hooks, [])
@@ -30,14 +29,13 @@ class Test(TestCase):
 
     def test_with_algorithm_param(self):
         algorithm = AlgorithmFactory.create_algorithm(
-            algorithm=Algorithm(name="TestAlgorithm"),
+            algorithm=Algorithm(),
         )
         algorithm.add_strategy(CrossOverStrategyV1)
         algorithm.add_task(TestTask())
         algorithm.add_on_strategy_run_hook(TestAppHook())
 
         self.assertIsInstance(algorithm, Algorithm)
-        self.assertEqual(algorithm.name, "TestAlgorithm")
         self.assertEqual(len(algorithm.strategies), 1)
         self.assertEqual(len(algorithm.tasks), 1)
         self.assertEqual(len(algorithm.on_strategy_run_hooks), 1)
@@ -48,8 +46,9 @@ class Test(TestCase):
             strategy=CrossOverStrategyV1
         )
         self.assertIsInstance(algorithm, Algorithm)
-        self.assertEqual(algorithm.name, "CrossOverStrategyV1")
+        self.assertEqual(algorithm.algorithm_id, "CrossOverStrategyV1")
         self.assertEqual(len(algorithm.strategies), 1)
         self.assertEqual(len(algorithm.tasks), 0)
         self.assertEqual(len(algorithm.on_strategy_run_hooks), 0)
-        self.assertEqual(len(algorithm.strategies[0].data_sources), 2)
+        # CrossOverStrategyV1 has symbols=["BTC"] by default, so 1 data source
+        self.assertEqual(len(algorithm.strategies[0].data_sources), 1)

@@ -9,7 +9,7 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    TradeStatus, RESOURCE_DIRECTORY, SnapshotInterval, generate_strategy_id
+    TradeStatus, RESOURCE_DIRECTORY, SnapshotInterval, generate_algorithm_id
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
@@ -46,18 +46,10 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         self.ema_short_period = ema_short_period
         self.ema_long_period = ema_long_period
         self.ema_cross_lookback_window = ema_cross_lookback_window
+
+        # Create data sources BEFORE calling super().__init__()
         data_sources = []
-
-        super().__init__(
-            algorithm_id=algorithm_id,
-            data_sources=data_sources,
-            time_unit=time_unit,
-            interval=interval,
-            symbols=symbols,
-            position_sizes=position_sizes
-        )
-
-        for symbol in self.symbols:
+        for symbol in symbols:
             full_symbol = f"{symbol}/EUR"
             data_sources.append(
                 DataSource(
@@ -81,6 +73,15 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     save=True
                 )
             )
+
+        super().__init__(
+            algorithm_id=algorithm_id,
+            data_sources=data_sources,
+            time_unit=time_unit,
+            interval=interval,
+            symbols=symbols,
+            position_sizes=position_sizes
+        )
 
     def prepare_indicators(
         self,
@@ -327,7 +328,7 @@ class Test(TestCase):
         for param_set in param_variations:
             strategies.append(
                 RSIEMACrossoverStrategy(
-                    algorithm_id=generate_strategy_id(param_set),
+                    algorithm_id=generate_algorithm_id(params=param_set),
                     time_unit=TimeUnit.HOUR,
                     interval=2,
                     market="BITVAVO",
@@ -458,7 +459,7 @@ class Test(TestCase):
         for param_set in param_variations:
             strategies.append(
                 RSIEMACrossoverStrategy(
-                    algorithm_id=generate_strategy_id(param_set),
+                    algorithm_id=generate_algorithm_id(params=param_set),
                     time_unit=TimeUnit.HOUR,
                     interval=2,
                     market="BITVAVO",
@@ -587,7 +588,7 @@ class Test(TestCase):
         all_strategies = []
         for param_set in param_variations:
             strategy = RSIEMACrossoverStrategy(
-                algorithm_id=generate_strategy_id(param_set),
+                algorithm_id=generate_algorithm_id(params=param_set),
                 time_unit=TimeUnit.HOUR,
                 interval=2,
                 market="BITVAVO",

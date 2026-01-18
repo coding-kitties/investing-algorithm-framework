@@ -12,6 +12,7 @@ class EMACrossoverRSIFFilterStrategy(TradingStrategy):
 
     def __init__(
         self,
+        algorithm_id: str,
         symbols: list[str],
         trading_symbol: str,
         rsi_timeframe: str,
@@ -32,6 +33,7 @@ class EMACrossoverRSIFFilterStrategy(TradingStrategy):
         market: str = "BITVAVO",
         metadata: dict = None
     ):
+        self.algorithm_id = algorithm_id
         self.symbols = symbols
         self.rsi_timeframe = rsi_timeframe
         self.rsi_period = rsi_period

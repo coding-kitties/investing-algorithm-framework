@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkinvesting_algorithm_framework_docs=self.webpackChunkinvesting_algorithm_framework_docs||[]).push([[5663],{5987:a=>{a.exports=JSON.parse('{"label":"azure functions","permalink":"/investing-algorithm-framework/blog/tags/azure-functions","allTagsPath":"/investing-algorithm-framework/blog/tags","count":2}')}}]);
