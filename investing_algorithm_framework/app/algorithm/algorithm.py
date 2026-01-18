@@ -1,6 +1,5 @@
 import inspect
 import logging
-import re
 from typing import List
 
 from investing_algorithm_framework.app.app_hook import AppHook
@@ -17,8 +16,9 @@ class Algorithm:
     strategies that are executed in a specific order.
 
     Attributes:
-        _name: The name of the algorithm. It should be a string and
-            can only contain letters and numbers.
+        algorithm_id: The unique identifier of the algorithm. This id
+            should be a string and also will be used for all the
+            registered strategies within the algorithm.
         _description: The description of the algorithm. It should be a string.
         _strategies: A list of strategies that are part of the algorithm.
         _tasks: A list of tasks that are part of the algorithm.
@@ -27,8 +27,7 @@ class Algorithm:
     """
     def __init__(
         self,
-        id: str = None,
-        name: str = None,
+        algorithm_id: str = None,
         description: str = None,
         strategy=None,
         strategies=None,
@@ -37,8 +36,7 @@ class Algorithm:
         on_strategy_run_hooks=None,
         metadata=None
     ):
-        self.id = id
-        self._name = name
+        self.algorithm_id = algorithm_id
         self._context = {}
         self._description = None
 
@@ -66,51 +64,6 @@ class Algorithm:
         if on_strategy_run_hooks is not None:
             for hook in on_strategy_run_hooks:
                 self.add_on_strategy_run_hook(hook)
-
-    @staticmethod
-    def _validate_name(name):
-        """
-        Function to validate the name of the algorithm. This function
-        will check if the name of the algorithm is a string and raise
-        an exception if it is not.
-
-        Name can only contain letters, numbers
-
-        Parameters:
-            name: The name of the algorithm
-
-        Returns:
-            None
-        """
-        if not isinstance(name, str):
-            raise OperationalException(
-                "The name of the algorithm must be a string"
-            )
-
-        pattern = re.compile(r"^[a-zA-Z0-9]*$")
-
-        if not pattern.match(name):
-            raise OperationalException(
-                "The name of the algorithm can only contain" +
-                " letters and numbers"
-            )
-
-        illegal_chars = r"[\/:*?\"<>|]"
-
-        if re.search(illegal_chars, name):
-            raise OperationalException(
-                f"Illegal characters detected in algorithm: {name}. "
-                f"Illegal characters: / \\ : * ? \" < > |"
-            )
-
-    @property
-    def name(self):
-        return self._name
-
-    @name.setter
-    def name(self, name):
-        Algorithm._validate_name(name)
-        self._name = name
 
     @property
     def data_sources(self):
@@ -200,20 +153,19 @@ class Algorithm:
             else:
                 return
 
-        has_duplicates = False
+        strategy_ids = []
 
-        for i in range(len(self._strategies)):
-            for j in range(i + 1, len(self._strategies)):
-                if self._strategies[i].worker_id == strategy.worker_id:
-                    has_duplicates = True
-                    break
+        for s in self._strategies:
+            strategy_ids.append(s.strategy_id)
 
-        if has_duplicates:
+        # Check for duplicate strategy IDs
+        if strategy.strategy_id in strategy_ids:
             raise OperationalException(
                 "Can't add strategy, there already exists a strategy "
                 "with the same id in the algorithm"
             )
 
+        strategy.algorithm_id = self.algorithm_id
         self._strategies.append(strategy)
 
     def add_task(self, task):

@@ -1,26 +1,8 @@
-import re
+import inspect
+
 from .algorithm import Algorithm
-from investing_algorithm_framework.domain import OperationalException
-
-
-def validate_algorithm_name(name, illegal_chars=r"[\/:*?\"<>|]"):
-    """
-    Validate an algorithm name for illegal characters and throw an
-        exception if any are found.
-
-    Args:
-        name (str): The name to validate.
-        illegal_chars (str): A regex pattern for characters considered
-            illegal (default: r"[/:*?\"<>|]").
-
-    Raises:
-        ValueError: If illegal characters are found in the filename.
-    """
-    if re.search(illegal_chars, name):
-        raise OperationalException(
-            f"Illegal characters detected in filename: {name}. "
-            f"Illegal characters: {illegal_chars}"
-        )
+from investing_algorithm_framework.app.strategy import TradingStrategy
+from investing_algorithm_framework.domain import generate_algorithm_id
 
 
 class AlgorithmFactory:
@@ -29,28 +11,23 @@ class AlgorithmFactory:
     """
 
     @staticmethod
-    def create_algorithm_name(algorithm):
+    def _instantiate_strategy(strategy):
         """
-        Create a name for the algorithm based on its
-        strategies.
+        Instantiate a strategy if it's a class, otherwise return as-is.
 
         Args:
-            algorithm (Algorithm): Instance of Algorithm.
+            strategy: Either a TradingStrategy class or instance.
 
         Returns:
-            str: Name of the algorithm.
+            TradingStrategy instance.
         """
-        first_strategy = algorithm.strategies[0] \
-            if algorithm.strategies else None
-
-        if first_strategy is not None:
-            return f"{first_strategy.__class__.__name__}"
-
-        return "DefaultAlgorithm"
+        if inspect.isclass(strategy):
+            if issubclass(strategy, TradingStrategy):
+                return strategy()
+        return strategy
 
     @staticmethod
     def create_algorithm(
-        name=None,
         algorithm=None,
         strategy=None,
         strategies=None,
@@ -58,13 +35,19 @@ class AlgorithmFactory:
         on_strategy_run_hooks=None,
     ) -> Algorithm:
         """
-        Create an instance of the specified algorithm type.
+        Create an instance of an Algorithm with the given parameters.
+
+        If the app already has strategies, tasks, or hooks defined,
+        they will be merged with the provided ones.
+
+        If there is no algorithm id provided, an id will be generated and
+        also set to each strategy within the algorithm.
 
         Args:
-            name (str): Name of the algorithm.
             algorithm (Algorithm): Instance of Algorithm to be used.
-            strategy (TradingStrategy): Single TradingStrategy instance.
-            strategies (list): List of TradingStrategy instances.
+            strategy (TradingStrategy): Single TradingStrategy instance
+                or class.
+            strategies (list): List of TradingStrategy instances or classes.
             tasks (list): List of Task instances.
             on_strategy_run_hooks (list): List of hooks to be called
                 when a strategy is run.
@@ -72,43 +55,64 @@ class AlgorithmFactory:
         Returns:
             Algorithm: Instance of Algorithm.
         """
-        name = name
-        strategies = strategies or []
+        final_strategies = []
         tasks = tasks or []
         on_strategy_run_hooks = on_strategy_run_hooks or []
-        data_sources = []
+        algorithm_id = None
 
+        # First, process algorithm if provided
         if algorithm is not None and isinstance(algorithm, Algorithm):
-            if name is None:
-                name = algorithm.name
-
-            strategies.extend(algorithm.strategies)
+            final_strategies.extend(algorithm.strategies)
             tasks.extend(algorithm.tasks)
             on_strategy_run_hooks.extend(algorithm.on_strategy_run_hooks)
+            algorithm_id = algorithm.algorithm_id
 
-            if hasattr(algorithm, 'data_sources'):
-                data_sources.extend(algorithm.data_sources)
+        # Then, add strategies from the strategies list
+        if strategies is not None:
+            for strat in strategies:
+                # Instantiate if it's a class
+                strat = AlgorithmFactory._instantiate_strategy(strat)
+                # Avoid duplicates by checking strategy_id
+                if not any(
+                    s.strategy_id == strat.strategy_id
+                    for s in final_strategies
+                ):
+                    final_strategies.append(strat)
 
+        # Finally, add single strategy if provided and not already in list
         if strategy is not None:
-            strategies.append(strategy)
-            data_sources.extend(strategy.data_sources)
+            # Instantiate if it's a class
+            strategy = AlgorithmFactory._instantiate_strategy(strategy)
+            if not any(
+                s.strategy_id == strategy.strategy_id
+                for s in final_strategies
+            ):
+                final_strategies.append(strategy)
 
-        for strategy_entry in strategies:
-            if strategy_entry.data_sources is not None \
-                    and len(strategy_entry.data_sources):
-                data_sources.extend(strategy_entry.data_sources)
+        # Collect data sources from all strategies (avoiding duplicates)
+        data_sources = []
+        seen_data_source_ids = set()
+
+        for strategy_entry in final_strategies:
+            if strategy_entry.data_sources is not None:
+                for ds in strategy_entry.data_sources:
+                    ds_id = ds.get_identifier() \
+                        if hasattr(ds, 'get_identifier') else id(ds)
+                    if ds_id not in seen_data_source_ids:
+                        data_sources.append(ds)
+                        seen_data_source_ids.add(ds_id)
+
+        # Generate algorithm_id if not provided
+        if algorithm_id is None and len(final_strategies) > 0:
+            algorithm_id = generate_algorithm_id(
+                strategy=final_strategies[0]
+            )
 
         algorithm = Algorithm(
-            name=name,
-            strategies=strategies,
+            algorithm_id=algorithm_id,
+            strategies=final_strategies,
             tasks=tasks,
             on_strategy_run_hooks=on_strategy_run_hooks,
             data_sources=data_sources
         )
-
-        if algorithm.name is None:
-            algorithm.name = AlgorithmFactory.create_algorithm_name(algorithm)
-
-        # Validate the algorithm name
-        validate_algorithm_name(algorithm.name)
         return algorithm

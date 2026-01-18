@@ -1,4 +1,4 @@
-from .app import App, Algorithm, generate_algorithm_id, \
+from .app import App, Algorithm, \
     TradingStrategy, StatelessAction, Task, AppHook, Context, \
     add_html_report, BacktestReport, generate_rolling_backtest_windows, \
     pretty_print_trades, pretty_print_positions, \
@@ -16,7 +16,7 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     Trade, APP_MODE, AppMode, DATETIME_FORMAT, load_backtests_from_directory, \
     BacktestDateRange, convert_polars_to_pandas, BacktestRun, \
     DEFAULT_LOGGING_CONFIG, DataType, DataProvider, StopLossRule, \
-    TradeStatus, generate_backtest_summary_metrics, \
+    TradeStatus, generate_backtest_summary_metrics, generate_algorithm_id, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus, \
     save_backtests_to_directory, BacktestMetrics

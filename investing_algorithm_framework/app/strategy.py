@@ -42,7 +42,6 @@ class TradingStrategy:
     algorithm_id: str
     time_unit: TimeUnit = None
     interval: int = None
-    worker_id: str = None
     strategy_id: str = None
     decorated = None
     data_sources: List[DataSource] = []
@@ -68,7 +67,6 @@ class TradingStrategy:
         take_profits=None,
         symbols=None,
         trading_symbol=None,
-        worker_id=None,
         decorated=None
     ):
         if metadata is None:
@@ -76,23 +74,30 @@ class TradingStrategy:
 
         self.metadata = metadata
 
-        if worker_id is not None:
-            self.worker_id = worker_id
-        elif self.decorated:
-            self.worker_id = decorated.__name__
-        else:
-            self.worker_id = self.__class__.__name__
-
         if strategy_id is not None:
             self.strategy_id = strategy_id
         else:
-            self.strategy_id = self.worker_id
+            self.strategy_id = self.__class__.__name__
 
+        # Initialize algorithm_id: use provided value, fall back to class
+        # attribute if set, otherwise None
         if algorithm_id is not None:
             self.algorithm_id = algorithm_id
-
-        if "algorithm_id" in self.metadata:
+        elif "algorithm_id" in self.metadata:
             self.algorithm_id = self.metadata["algorithm_id"]
+        else:
+            # Check if class has algorithm_id defined as an actual value
+            # (not just a type hint). Type hints result in the type being
+            # returned (e.g., str, int), so we check for that.
+            class_algorithm_id = getattr(self.__class__, 'algorithm_id', None)
+
+            # If it's a type (like str, int) or None, it's just a type hint
+            # In that case, use the class name as the algorithm_id
+            if (class_algorithm_id is None
+                    or isinstance(class_algorithm_id, type)):
+                self.algorithm_id = None
+            else:
+                self.algorithm_id = class_algorithm_id
 
         if time_unit is not None:
             self.time_unit = TimeUnit.from_value(time_unit)
@@ -109,17 +114,35 @@ class TradingStrategy:
         if interval is not None:
             self.interval = interval
 
+        # Initialize data_sources as a new list per instance
+        # to avoid sharing the class-level mutable default
         if data_sources is not None:
-            self.data_sources = data_sources
+            self.data_sources = list(data_sources)
+        else:
+            # Check if class has data_sources defined, copy them
+            class_data_sources = getattr(self.__class__, 'data_sources', [])
+            self.data_sources = list(class_data_sources) \
+                if class_data_sources else []
 
         if decorated is not None:
             self.decorated = decorated
 
+        # Initialize position_sizes as a new list per instance
         if position_sizes is not None:
-            self.position_sizes = position_sizes
+            self.position_sizes = list(position_sizes)
+        else:
+            class_position_sizes = getattr(
+                self.__class__, 'position_sizes', []
+            )
+            self.position_sizes = list(class_position_sizes) \
+                if class_position_sizes else []
 
+        # Initialize symbols as a new list per instance
         if symbols is not None:
-            self.symbols = symbols
+            self.symbols = list(symbols)
+        else:
+            class_symbols = getattr(self.__class__, 'symbols', [])
+            self.symbols = list(class_symbols) if class_symbols else []
 
         if trading_symbol is not None:
             self.trading_symbol = trading_symbol
@@ -130,11 +153,21 @@ class TradingStrategy:
                 f"Interval not set for strategy instance {self.strategy_id}"
             )
 
+        # Initialize stop_losses as a new list per instance
         if stop_losses is not None:
-            self.stop_losses = stop_losses
+            self.stop_losses = list(stop_losses)
+        else:
+            class_stop_losses = getattr(self.__class__, 'stop_losses', [])
+            self.stop_losses = list(class_stop_losses) \
+                if class_stop_losses else []
 
+        # Initialize take_profits as a new list per instance
         if take_profits is not None:
-            self.take_profits = take_profits
+            self.take_profits = list(take_profits)
+        else:
+            class_take_profits = getattr(self.__class__, 'take_profits', [])
+            self.take_profits = list(class_take_profits) \
+                if class_take_profits else []
 
         # context initialization
         self._context = None
@@ -367,7 +400,7 @@ class TradingStrategy:
     @property
     def strategy_profile(self):
         return StrategyProfile(
-            strategy_id=self.worker_id,
+            strategy_id=self.strategy_id,
             interval=self.interval,
             time_unit=self.time_unit,
             data_sources=self.data_sources
@@ -825,3 +858,6 @@ class TradingStrategy:
             List[DataSource]: The data sources of the strategy
         """
         return self.data_sources
+
+    def __repr__(self):
+        return f"<TradingStrategy(strategy_id={self.strategy_id})>"

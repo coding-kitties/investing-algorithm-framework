@@ -17,8 +17,8 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     SQLALCHEMY_DATABASE_URI, OperationalException, StateHandler, \
     BACKTESTING_START_DATE, BACKTESTING_END_DATE, APP_MODE, MarketCredential, \
     AppMode, BacktestDateRange, DATABASE_DIRECTORY_NAME, DataSource, \
-    BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, Backtest, DataError, \
-    PortfolioConfiguration, SnapshotInterval, DataType, \
+    BACKTESTING_INITIAL_AMOUNT, SNAPSHOT_INTERVAL, generate_algorithm_id, \
+    PortfolioConfiguration, SnapshotInterval, DataType, Backtest, DataError, \
     PortfolioProvider, OrderExecutor, ImproperlyConfigured, TimeFrame, \
     DataProvider, INDEX_DATETIME, tqdm, BacktestPermutationTest, \
     LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, DATA_DIRECTORY
@@ -27,8 +27,7 @@ from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db, \
     PandasOHLCVDataProvider
 from investing_algorithm_framework.services import OrderBacktestService, \
-    BacktestPortfolioService, BacktestTradeOrderEvaluator, \
-    DefaultTradeOrderEvaluator, get_risk_free_rate_us
+    BacktestPortfolioService, DefaultTradeOrderEvaluator, get_risk_free_rate_us
 from .app_hook import AppHook
 from .eventloop import EventLoopService
 from .analysis import create_ohlcv_permutation
@@ -1249,6 +1248,11 @@ class App:
                 CCXTOHLCVDataProvider()
             )
 
+        if strategy.algorithm_id is None:
+            strategy.algorithm_id = generate_algorithm_id(
+                strategy=strategy,
+            )
+
         # Delegate to the backtest service which handles all the logic
         backtest_service = self.container.backtest_service()
         backtest = backtest_service.run_vector_backtest(
@@ -1272,83 +1276,176 @@ class App:
 
     def run_backtests(
         self,
-        backtest_date_ranges,
+        backtest_date_ranges: List[BacktestDateRange],
         initial_amount=None,
         strategy: Optional[TradingStrategy] = None,
+        strategies: Optional[List[TradingStrategy]] = None,
         algorithm: Optional[Algorithm] = None,
         algorithms: Optional[List[Algorithm]] = None,
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         risk_free_rate: Optional[float] = None,
+        metadata: Optional[Dict[str, str]] = None,
+        backtest_storage_directory: Optional[Union[str, Path]] = None,
+        use_checkpoints: bool = False,
+        show_progress: bool = True,
+        continue_on_error: bool = False,
+        window_filter_function: Optional[Callable] = None,
+        final_filter_function: Optional[Callable] = None,
+        batch_size: int = 50,
+        checkpoint_batch_size: int = 25,
+        market: str = None,
+        trading_symbol: str = None,
     ) -> List[Backtest]:
         """
-        Function to run multiple backtests for a list of algorithms over
-        a list of date ranges. This function will run each algorithm
-        for each date range and return a list of backtest reports.
+        Run multiple event-driven backtests for a list of algorithms over
+        multiple date ranges with optional checkpointing, batching,
+        and storage.
+
+        This method supports running backtests across multiple date ranges
+        and multiple algorithms, combining results and applying filter
+        functions.
 
         Args:
-            algorithms: List of Algorithm instances to run backtests for.
             backtest_date_ranges (List[BacktestDateRange]): List of date ranges
+                to run backtests for.
             initial_amount (float): The initial amount to start the
                 backtest with. This will be the amount of trading currency
                 that the backtest portfolio will start with.
+            strategy (TradingStrategy): Single strategy to backtest.
+            strategies (List[TradingStrategy]): List of strategies to backtest.
+            algorithm (Algorithm): Single algorithm to backtest.
+            algorithms (List[Algorithm]): List of algorithms to backtest.
             snapshot_interval (SnapshotInterval): The snapshot interval to use
-                for the backtest. This is used to determine how often the
-                portfolio snapshot should be taken during the backtest.
+                for the backtest.
             risk_free_rate (Optional[float]): The risk-free rate to use for
-                the backtest. This is used to calculate the Sharpe ratio
-                and other performance metrics. If not provided, the default
-                risk-free rate will be tried to be fetched from the
-                US Treasury website.
+                metrics calculation.
+            metadata (Optional[Dict[str, str]]): Metadata to attach to the
+                backtest reports.
+            backtest_storage_directory (Union[str, Path]): Directory to save
+                backtests to.
+            use_checkpoints (bool): Whether to use checkpointing to resume
+                interrupted backtests.
+            show_progress (bool): Whether to show progress bars.
+            continue_on_error (bool): Whether to continue on errors.
+            window_filter_function: Filter function applied after each
+                date range.
+            final_filter_function: Filter function applied at the end.
+            batch_size (int): Number of algorithms to process in each batch.
+            checkpoint_batch_size (int): Number of backtests before batch
+                save/checkpoint.
+            market (str): Market to use for portfolio configuration.
+            trading_symbol (str): Trading symbol to use for portfolio
+                configuration.
 
         Returns:
             List[Backtest]: List of Backtest instances containing the results
         """
-        backtests = []
+        if use_checkpoints and backtest_storage_directory is None:
+            raise OperationalException(
+                "When using checkpoints, a backtest_storage_directory must "
+                "be provided"
+            )
+
+        # Initialize backtest configuration and services
+        # Use first date range for initialization
+        first_date_range = backtest_date_ranges[0] \
+            if backtest_date_ranges else None
+        if first_date_range is None:
+            raise OperationalException(
+                "At least one backtest date range must be provided"
+            )
+
+        self.initialize_backtest_config(
+            backtest_date_range=first_date_range,
+            snapshot_interval=snapshot_interval,
+            initial_amount=initial_amount
+        )
+        self.initialize_storage(remove_database_if_exists=True)
+        self.initialize_backtest_services()
+        self.initialize_backtest_portfolios()
+
+        # Setup data providers (reset and add registered providers)
+        data_provider_service = self.container.data_provider_service()
+        data_provider_service.reset()
+
+        for data_provider_tuple in self._data_providers:
+            data_provider_service.add_data_provider(
+                data_provider_tuple[0], priority=data_provider_tuple[1]
+            )
+
+        # Add the default data providers
+        data_provider_service.add_data_provider(CCXTOHLCVDataProvider())
+
+        # Build list of algorithms
+        final_algorithms = []
+        algorithm_factory = self.container.algorithm_factory()
 
         if algorithms is not None:
             final_algorithms = algorithms
+        elif strategies is not None:
+            for strat in strategies:
+                alg = algorithm_factory.create_algorithm(
+                    strategy=strat,
+                    tasks=self._tasks,
+                    on_strategy_run_hooks=self._on_strategy_run_hooks,
+                )
+                final_algorithms.append(alg)
         elif strategy is not None:
-            algorithm_factory = self.container.algorithm_factory()
-            algorithm = algorithm_factory.create_algorithm(
-                strategy=strategy
+            alg = algorithm_factory.create_algorithm(
+                strategy=strategy,
+                tasks=self._tasks,
+                on_strategy_run_hooks=self._on_strategy_run_hooks,
             )
-            final_algorithms = [algorithm]
+            final_algorithms = [alg]
         elif algorithm is not None:
             final_algorithms = [algorithm]
         else:
-            raise OperationalException(
-                "No algorithms or strategy provided for backtesting"
-            )
-
-        if risk_free_rate is None:
-            logger.info("No risk free rate provided, retrieving it...")
-            risk_free_rate = get_risk_free_rate_us()
-
-            if risk_free_rate is None:
+            # Use registered strategies
+            if self._strategies:
+                for strat in self._strategies:
+                    alg = algorithm_factory.create_algorithm(
+                        strategy=strat,
+                        tasks=self._tasks,
+                        on_strategy_run_hooks=self._on_strategy_run_hooks,
+                    )
+                    final_algorithms.append(alg)
+            else:
                 raise OperationalException(
-                    "Could not retrieve risk free rate for backtest metrics."
-                    "Please provide a risk free as an argument when running "
-                    "your backtest or make sure you have an internet "
-                    "connection"
+                    "No algorithms, strategies, or strategy provided for "
+                    "backtesting"
                 )
 
-        for date_range in backtest_date_ranges:
-            for algorithm in final_algorithms:
-                backtest = self.run_backtest(
-                    backtest_date_range=date_range,
-                    initial_amount=initial_amount,
-                    algorithm=algorithm,
-                    snapshot_interval=snapshot_interval,
-                    risk_free_rate=risk_free_rate
-                )
-                backtests.append(backtest)
+        # Delegate to backtest service
+        # Note: Data source initialization is handled by the service for each
+        # date range, so we don't pre-initialize here
+        backtest_service = self.container.backtest_service()
+        backtests = backtest_service.run_backtests(
+            algorithms=final_algorithms,
+            context=self.context,
+            trade_stop_loss_service=self.container.trade_stop_loss_service(),
+            trade_take_profit_service=self.container
+            .trade_take_profit_service(),
+            backtest_date_ranges=backtest_date_ranges,
+            risk_free_rate=risk_free_rate,
+            skip_data_sources_initialization=False,
+            show_progress=show_progress,
+            continue_on_error=continue_on_error,
+            window_filter_function=window_filter_function,
+            final_filter_function=final_filter_function,
+            backtest_storage_directory=backtest_storage_directory,
+            use_checkpoints=use_checkpoints,
+            batch_size=batch_size,
+            checkpoint_batch_size=checkpoint_batch_size,
+        )
+
+        # Cleanup resources
+        self.cleanup_backtest_resources()
 
         return backtests
 
     def run_backtest(
         self,
         backtest_date_range: BacktestDateRange,
-        name: str = None,
         initial_amount=None,
         algorithm=None,
         strategy=None,
@@ -1356,15 +1453,23 @@ class App:
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         risk_free_rate: Optional[float] = None,
         metadata: Optional[Dict[str, str]] = None,
+        backtest_storage_directory: Optional[Union[str, Path]] = None,
+        use_checkpoints: bool = False,
+        show_progress: bool = True,
+        market: str = None,
+        trading_symbol: str = None,
     ) -> Backtest:
         """
-        Run a backtest for an algorithm.
+        Run an event-driven backtest for an algorithm.
+
+        This method runs an event-driven backtest where the strategy's
+        `on_run` method is called at each scheduled time step. This is
+        different from vectorized backtesting where buy/sell signals
+        are generated in a vectorized manner.
 
         Args:
             backtest_date_range: The date range to run the backtest for
                 (instance of BacktestDateRange)
-            name: The name of the backtest. This is used to identify the
-                backtest report in the output directory.
             initial_amount: The initial amount to start the backtest with.
                 This will be the amount of trading currency that the backtest
                 portfolio will start with.
@@ -1378,8 +1483,8 @@ class App:
             snapshot_interval (SnapshotInterval): The snapshot
                 interval to use for the backtest. This is used to determine
                 how often the portfolio snapshot should be taken during the
-                backtest. The default is TRADE_CLOSE, which means that the
-                portfolio snapshot will be taken at the end of each trade.
+                backtest. The default is DAILY, which means that the
+                portfolio snapshot will be taken once per day.
             risk_free_rate (Optional[float]): The risk-free rate to use for
                 the backtest. This is used to calculate the Sharpe ratio
                 and other performance metrics. If not provided, the default
@@ -1389,10 +1494,35 @@ class App:
                 backtest report. This can be used to store additional
                 information about the backtest, such as the author, version,
                 parameters or any other relevant information.
+            backtest_storage_directory (Union[str, Path]): The directory
+                to save the backtest to after it is completed. This is
+                useful for long-running backtests that might take a
+                while to complete.
+            use_checkpoints (bool): Whether to use checkpoints when running
+                the backtest. If set to True, the backtest engine will
+                first check if there already exists a backtest for the given
+                backtest date range and algorithm combination. If such a
+                backtest exists, it will be loaded instead of running a new
+                backtest. This is useful for long-running backtests.
+            show_progress (bool): Whether to show progress bars during
+                the backtest. This is useful for long-running backtests.
+            market (str): The market to use for the backtest. This is used
+                to create a portfolio configuration if no portfolio
+                configuration is provided.
+            trading_symbol (str): The trading symbol to use for the backtest.
+                This is used to create a portfolio configuration if no
+                portfolio configuration is provided.
 
         Returns:
             Backtest: Instance of Backtest
         """
+        if use_checkpoints and backtest_storage_directory is None:
+            raise OperationalException(
+                "When using checkpoints, a backtest_storage_directory must "
+                "be provided"
+            )
+
+        # Initialize backtest configuration and services
         self.initialize_backtest_config(
             backtest_date_range=backtest_date_range,
             snapshot_interval=snapshot_interval,
@@ -1402,20 +1532,8 @@ class App:
         self.initialize_backtest_services()
         self.initialize_backtest_portfolios()
 
-        if risk_free_rate is None:
-            logger.info("No risk free rate provided, retrieving it...")
-            risk_free_rate = get_risk_free_rate_us()
-
-            if risk_free_rate is None:
-                raise OperationalException(
-                    "Could not retrieve risk free rate for backtest metrics."
-                    "Please provide a risk free as an argument when running "
-                    "your backtest or make sure you have an internet "
-                    "connection"
-                )
-
+        # Create the algorithm
         algorithm = self.container.algorithm_factory().create_algorithm(
-            name=name if name else self._name,
             strategies=(
                 self._strategies if strategies is None else strategies
             ),
@@ -1424,64 +1542,37 @@ class App:
             tasks=self._tasks,
             on_strategy_run_hooks=self._on_strategy_run_hooks,
         )
+
+        # Initialize data sources for backtest
         self.initialize_data_sources_backtest(
             algorithm.data_sources, backtest_date_range
         )
+
+        # Delegate to backtest service
         backtest_service = self.container.backtest_service()
-
-        # Create backtest schedule
-        schedule = backtest_service.generate_schedule(
-            algorithm.strategies,
-            algorithm.tasks,
-            backtest_date_range.start_date,
-            backtest_date_range.end_date
-        )
-
-        # Initialize event loop
-        event_loop_service = EventLoopService(
-            configuration_service=self.container.configuration_service(),
-            portfolio_snapshot_service=self.container
-            .portfolio_snapshot_service(),
+        backtest, run_history = backtest_service.run_backtest(
+            algorithm=algorithm,
+            backtest_date_range=backtest_date_range,
             context=self.context,
-            order_service=self.container.order_service(),
-            portfolio_service=self.container.portfolio_service(),
-            data_provider_service=self.container.data_provider_service(),
-            trade_service=self.container.trade_service(),
-        )
-        trade_order_evaluator = BacktestTradeOrderEvaluator(
-            trade_service=self.container.trade_service(),
-            order_service=self.container.order_service(),
             trade_stop_loss_service=self.container.trade_stop_loss_service(),
             trade_take_profit_service=self.container
             .trade_take_profit_service(),
-            configuration_service=self.container.configuration_service()
-        )
-        event_loop_service.initialize(
-            algorithm=algorithm,
-            trade_order_evaluator=trade_order_evaluator
-        )
-        event_loop_service.start(schedule=schedule, show_progress=True)
-        self._run_history = event_loop_service.history
-
-        # Convert the current run to a backtest
-        backtest = backtest_service.create_backtest(
-            algorithm=algorithm,
-            number_of_runs=event_loop_service.total_number_of_runs,
-            backtest_date_range=backtest_date_range,
             risk_free_rate=risk_free_rate,
+            metadata=metadata,
+            backtest_storage_directory=backtest_storage_directory,
+            use_checkpoints=use_checkpoints,
+            show_progress=show_progress,
+            initial_amount=initial_amount,
+            market=market,
+            trading_symbol=trading_symbol,
         )
 
-        # Add the metadata to the backtest
-        if metadata is None:
+        # Store run history
+        self._run_history = run_history
 
-            if algorithm.metadata is not None:
-                backtest.metadata = algorithm.metadata
-            else:
-                backtest.metadata = {}
-        else:
-            backtest.metadata = metadata
-
+        # Cleanup resources
         self.cleanup_backtest_resources()
+
         return backtest
 
     def run_permutation_test(
@@ -2273,7 +2364,6 @@ class App:
         """
         algorithm_factory = self.container.algorithm_factory()
         return algorithm_factory.create_algorithm(
-            name=self._name,
             strategies=self._strategies,
             tasks=self._tasks,
             on_strategy_run_hooks=self._on_strategy_run_hooks,
