@@ -363,14 +363,14 @@ class BacktestMetrics:
         if data is None:
             return None, None
 
-        # Check if the value is NaN or None
-        if pd.isna(data[0]) or data[0] is None:
+        # Check if the value is NaN, None, or the string '<NA>'
+        if pd.isna(data[0]) or data[0] is None or data[0] == '<NA>':
             value = pd.NA
         else:
             value = float(data[0])
 
         # Parse the datetime string
-        if data[1] is None or pd.isna(data[1]):
+        if data[1] is None or pd.isna(data[1]) or data[1] == '<NA>':
             date_value = None
         else:
             # Convert the string to a datetime object
@@ -384,14 +384,14 @@ class BacktestMetrics:
         if data is None:
             return None, None
 
-        # Check if the value is
-        if pd.isna(data[0]) or data[0] is None:
+        # Check if the value is NaN, None, or the string '<NA>'
+        if pd.isna(data[0]) or data[0] is None or data[0] == '<NA>':
             value = pd.NA
         else:
             value = float(data[0])
 
         # Parse the date string
-        if data[1] is None or pd.isna(data[1]):
+        if data[1] is None or pd.isna(data[1]) or data[1] == '<NA>':
             date = None
         else:
             date = datetime.fromisoformat(data[1]).date()

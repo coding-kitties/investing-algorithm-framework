@@ -999,6 +999,33 @@ class BacktestService:
                         if alg_id not in filtered_algorithm_ids
                     ]
 
+                    # Clear filtered_out flag for backtests that passed
+                    # the filter (they may have been filtered out before)
+                    for alg_id in filtered_algorithm_ids:
+                        backtest_dir = os.path.join(
+                            backtest_storage_directory, alg_id
+                        )
+                        if os.path.exists(backtest_dir):
+                            try:
+                                backtest = Backtest.open(backtest_dir)
+                                if backtest.metadata is not None and \
+                                        backtest.metadata.get(
+                                            'filtered_out', False
+                                        ):
+                                    # Clear the filtered_out flag
+                                    backtest.metadata['filtered_out'] = False
+                                    if 'filtered_out_at_date_range' in \
+                                            backtest.metadata:
+                                        del backtest.metadata[
+                                            'filtered_out_at_date_range'
+                                        ]
+                                    backtest.save(backtest_dir)
+                            except Exception as e:
+                                logger.warning(
+                                    f"Could not clear filtered_out flag "
+                                    f"for backtest {alg_id}: {e}"
+                                )
+
                     # Mark filtered-out backtests with metadata flag
                     # This preserves them in storage for future runs
                     for alg_id in algorithms_to_mark:
@@ -1964,6 +1991,69 @@ class BacktestService:
                     ]
                     for alg_id in algorithms_to_remove:
                         del backtests_by_algorithm[alg_id]
+                else:
+                    # When using storage, update filtered_out metadata
+                    algorithms_to_mark = [
+                        alg_id for alg_id in active_algorithm_ids
+                        if alg_id not in filtered_ids
+                    ]
+
+                    # Clear filtered_out flag for backtests that passed
+                    # the filter (they may have been filtered out before)
+                    for alg_id in filtered_ids:
+                        backtest_dir = os.path.join(
+                            backtest_storage_directory, alg_id
+                        )
+                        if os.path.exists(backtest_dir):
+                            try:
+                                backtest = Backtest.open(backtest_dir)
+                                if backtest.metadata is not None and \
+                                        backtest.metadata.get(
+                                            'filtered_out', False
+                                        ):
+                                    backtest.metadata['filtered_out'] = False
+                                    if 'filtered_out_at_date_range' in \
+                                            backtest.metadata:
+                                        del backtest.metadata[
+                                            'filtered_out_at_date_range'
+                                        ]
+                                    backtest.save(backtest_dir)
+                            except Exception as e:
+                                logger.warning(
+                                    f"Could not clear filtered_out flag "
+                                    f"for backtest {alg_id}: {e}"
+                                )
+
+                    # Mark filtered-out backtests with metadata flag
+                    for alg_id in algorithms_to_mark:
+                        backtest_dir = os.path.join(
+                            backtest_storage_directory, alg_id
+                        )
+                        if os.path.exists(backtest_dir):
+                            try:
+                                backtest = Backtest.open(backtest_dir)
+                                start_date = backtest_date_range.start_date
+                                end_date = backtest_date_range.end_date
+                                date_key = (
+                                    f"{start_date.isoformat()}_"
+                                    f"{end_date.isoformat()}"
+                                )
+                                if backtest.metadata is None:
+                                    backtest.metadata = {}
+                                backtest.metadata['filtered_out'] = True
+                                backtest.metadata[
+                                    'filtered_out_at_date_range'
+                                ] = (
+                                    backtest_date_range.name
+                                    if backtest_date_range.name
+                                    else date_key
+                                )
+                                backtest.save(backtest_dir)
+                            except Exception as e:
+                                logger.warning(
+                                    f"Could not mark backtest {alg_id} "
+                                    f"as filtered: {e}"
+                                )
 
             # Clear memory
             del all_backtests
