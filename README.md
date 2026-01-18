@@ -242,7 +242,9 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             )
 
         super().__init__(
-            data_sources=data_sources, time_unit=time_unit, interval=interval
+            data_sources=data_sources, 
+            time_unit=time_unit, 
+            interval=interval
         )
 
     def _prepare_indicators(
