@@ -70,6 +70,32 @@ const sidebars = {
             ],
         },
         {
+            type: 'category',
+            label: 'Advanced Concepts',
+            items: [
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/logging-configuration',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/execution-logic',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/vector-backtesting',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/OPTIMIZATION_GUIDE',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/PARALLEL_PROCESSING_GUIDE',
+                },
+            ],
+        },
+        {
             type: "category",
             label: "Contributing Guide",
             items: [
@@ -80,16 +106,6 @@ const sidebars = {
                 {
                     type: 'doc',
                     id: 'Contributing Guide/style-guide',
-                },
-            ],
-        },
-        {
-            type: 'category',
-            label: 'Advanced Concepts',
-            items: [
-                {
-                    type: 'doc',
-                    id: 'Advanced Concepts/logging-configuration',
                 },
             ],
         },
