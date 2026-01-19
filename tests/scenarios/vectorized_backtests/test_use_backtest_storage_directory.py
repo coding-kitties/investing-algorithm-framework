@@ -488,3 +488,428 @@ class Test(TestCase):
         )
         if os.path.exists(backtest_storage_dir):
             shutil.rmtree(backtest_storage_dir)
+
+    def test_preexisting_backtests_not_included_in_new_run(self):
+        """
+        Test that pre-existing backtests in storage directory are NOT included
+        when running a new batch of strategies.
+
+        This test verifies that when a storage directory already contains
+        backtests from a previous run, a new run with different strategies:
+        - Only returns backtests for the current strategies
+        - Does NOT include backtests from the previous run in results
+        - Does NOT apply final_filter_function to pre-existing backtests
+
+        Scenario:
+        1. Run backtests for strategies A, B, C -> saves to storage
+        2. Run backtests for strategies D, E -> should NOT include A, B, C
+
+        This prevents accidentally mixing results from different optimization
+        runs that happen to share the same storage directory.
+        """
+        # RESOURCE_DIRECTORY should always point to the parent directory/resources
+        resource_directory = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
+        )
+        config = {RESOURCE_DIRECTORY: resource_directory}
+
+        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=1095)
+        mid_date = start_date + timedelta(days=365)
+
+        date_range_1 = BacktestDateRange(
+            start_date=start_date, end_date=end_date, name="Period 1"
+        )
+        date_range_2 = BacktestDateRange(
+            start_date=mid_date, end_date=end_date, name="Period 2"
+        )
+
+        # Create backtest storage directory
+        backtest_storage_dir = os.path.join(
+            resource_directory, "backtest_reports_for_testing", "temp_preexisting_storage"
+        )
+
+        # Clean up any existing storage directory
+        if os.path.exists(backtest_storage_dir):
+            shutil.rmtree(backtest_storage_dir)
+
+        # ===== FIRST RUN: Run backtests for first set of strategies =====
+        app1 = create_app(name="FirstRun", config=config)
+        app1.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
+
+        # Create first set of strategies (4 strategies)
+        first_param_grid = {
+            "rsi_time_frame": ["2h"],
+            "rsi_period": [14],
+            "rsi_overbought_threshold": [70],
+            "rsi_oversold_threshold": [30],
+            "ema_time_frame": ["2h"],
+            "ema_short_period": [100],
+            "ema_long_period": [150, 200],  # 2 variations
+            "ema_cross_lookback_window": [4, 6]  # 2 variations = 4 total
+        }
+        first_variations = [
+            dict(zip(first_param_grid.keys(), values))
+            for values in product(*first_param_grid.values())
+        ]
+
+        first_strategies = []
+        for param_set in first_variations:
+            first_strategies.append(
+                RSIEMACrossoverStrategy(
+                    algorithm_id=generate_algorithm_id(params=param_set),
+                    time_unit=TimeUnit.HOUR,
+                    interval=2,
+                    market="BITVAVO",
+                    rsi_time_frame=param_set["rsi_time_frame"],
+                    rsi_period=param_set["rsi_period"],
+                    rsi_overbought_threshold=param_set["rsi_overbought_threshold"],
+                    rsi_oversold_threshold=param_set["rsi_oversold_threshold"],
+                    ema_time_frame=param_set["ema_time_frame"],
+                    ema_short_period=param_set["ema_short_period"],
+                    ema_long_period=param_set["ema_long_period"],
+                    ema_cross_lookback_window=param_set["ema_cross_lookback_window"],
+                    symbols=["BTC", "ETH"],
+                    position_sizes=[
+                        PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
+                        PositionSize(symbol="ETH", percentage_of_portfolio=20.0)
+                    ]
+                )
+            )
+
+        self.assertEqual(len(first_strategies), 4)
+        first_algorithm_ids = set(s.algorithm_id for s in first_strategies)
+
+        # Run first batch
+        first_backtests = app1.run_vector_backtests(
+            initial_amount=1000,
+            backtest_date_ranges=[date_range_1, date_range_2],
+            strategies=first_strategies,
+            snapshot_interval=SnapshotInterval.DAILY,
+            risk_free_rate=0.027,
+            trading_symbol="EUR",
+            market="BITVAVO",
+            backtest_storage_directory=backtest_storage_dir,
+            use_checkpoints=False,
+            show_progress=True
+        )
+
+        # Verify first run results
+        self.assertEqual(len(first_backtests), 4)
+        first_result_ids = set(b.algorithm_id for b in first_backtests)
+        self.assertEqual(first_result_ids, first_algorithm_ids)
+
+        # Verify backtests were saved to storage
+        saved_dirs_after_first = set(
+            d for d in os.listdir(backtest_storage_dir)
+            if os.path.isdir(os.path.join(backtest_storage_dir, d))
+        )
+        self.assertEqual(len(saved_dirs_after_first), 4)
+
+        # ===== SECOND RUN: Run backtests for DIFFERENT set of strategies =====
+        app2 = create_app(name="SecondRun", config=config)
+        app2.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
+
+        # Create second set of strategies (different parameters = different algorithm_ids)
+        second_param_grid = {
+            "rsi_time_frame": ["2h"],
+            "rsi_period": [14],
+            "rsi_overbought_threshold": [80],  # Different from first run
+            "rsi_oversold_threshold": [20],    # Different from first run
+            "ema_time_frame": ["2h"],
+            "ema_short_period": [100],
+            "ema_long_period": [150, 200],  # 2 variations
+            "ema_cross_lookback_window": [4, 6]  # 2 variations = 4 total
+        }
+        second_variations = [
+            dict(zip(second_param_grid.keys(), values))
+            for values in product(*second_param_grid.values())
+        ]
+
+        second_strategies = []
+        for param_set in second_variations:
+            second_strategies.append(
+                RSIEMACrossoverStrategy(
+                    algorithm_id=generate_algorithm_id(params=param_set),
+                    time_unit=TimeUnit.HOUR,
+                    interval=2,
+                    market="BITVAVO",
+                    rsi_time_frame=param_set["rsi_time_frame"],
+                    rsi_period=param_set["rsi_period"],
+                    rsi_overbought_threshold=param_set["rsi_overbought_threshold"],
+                    rsi_oversold_threshold=param_set["rsi_oversold_threshold"],
+                    ema_time_frame=param_set["ema_time_frame"],
+                    ema_short_period=param_set["ema_short_period"],
+                    ema_long_period=param_set["ema_long_period"],
+                    ema_cross_lookback_window=param_set["ema_cross_lookback_window"],
+                    symbols=["BTC", "ETH"],
+                    position_sizes=[
+                        PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
+                        PositionSize(symbol="ETH", percentage_of_portfolio=20.0)
+                    ]
+                )
+            )
+
+        self.assertEqual(len(second_strategies), 4)
+        second_algorithm_ids = set(s.algorithm_id for s in second_strategies)
+
+        # Ensure the two sets of strategies are completely different
+        self.assertEqual(
+            len(first_algorithm_ids.intersection(second_algorithm_ids)), 0,
+            "First and second strategy sets should have different algorithm_ids"
+        )
+
+        # Run second batch with the same storage directory
+        second_backtests = app2.run_vector_backtests(
+            initial_amount=1000,
+            backtest_date_ranges=[date_range_1, date_range_2],
+            strategies=second_strategies,
+            snapshot_interval=SnapshotInterval.DAILY,
+            risk_free_rate=0.027,
+            trading_symbol="EUR",
+            market="BITVAVO",
+            backtest_storage_directory=backtest_storage_dir,
+            use_checkpoints=False,
+            show_progress=True
+        )
+
+        # ===== VERIFICATION =====
+        # The second run should ONLY return backtests for the second strategies
+        # It should NOT include backtests from the first run
+        self.assertEqual(
+            len(second_backtests), 4,
+            "Second run should return exactly 4 backtests (one per second strategy)"
+        )
+
+        second_result_ids = set(b.algorithm_id for b in second_backtests)
+        self.assertEqual(
+            second_result_ids, second_algorithm_ids,
+            "Second run results should only contain second strategies"
+        )
+
+        # Verify NO first strategy backtests are in second results
+        for backtest in second_backtests:
+            self.assertNotIn(
+                backtest.algorithm_id, first_algorithm_ids,
+                f"Backtest {backtest.algorithm_id} from first run should NOT "
+                "be in second run results"
+            )
+
+        # Storage should now contain 8 backtests total (4 from each run)
+        saved_dirs_after_second = set(
+            d for d in os.listdir(backtest_storage_dir)
+            if os.path.isdir(os.path.join(backtest_storage_dir, d))
+        )
+        self.assertEqual(
+            len(saved_dirs_after_second), 8,
+            "Storage should contain 8 backtest directories (4 from each run)"
+        )
+
+        # Clean up
+        if os.path.exists(backtest_storage_dir):
+            shutil.rmtree(backtest_storage_dir)
+
+    def test_preexisting_backtests_not_included_with_final_filter(self):
+        """
+        Test that pre-existing backtests are NOT included when using
+        final_filter_function.
+
+        This test verifies that when a final_filter_function is applied,
+        it only operates on backtests from the current run, NOT on
+        pre-existing backtests from the storage directory.
+
+        Scenario:
+        1. Run backtests for strategies A, B -> saves to storage
+        2. Run backtests for strategies C, D with final_filter
+        3. Final filter should ONLY see C, D - NOT A, B
+
+        This is important because:
+        - Final filter might rank/select top N strategies
+        - Including pre-existing backtests could corrupt rankings
+        - Different runs may have different selection criteria
+        """
+        resource_directory = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
+        )
+        config = {RESOURCE_DIRECTORY: resource_directory}
+
+        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=1095)
+        mid_date = start_date + timedelta(days=365)
+
+        date_range_1 = BacktestDateRange(
+            start_date=start_date, end_date=end_date, name="Period 1"
+        )
+        date_range_2 = BacktestDateRange(
+            start_date=mid_date, end_date=end_date, name="Period 2"
+        )
+
+        backtest_storage_dir = os.path.join(
+            resource_directory, "backtest_reports_for_testing", "temp_filter_preexisting"
+        )
+
+        if os.path.exists(backtest_storage_dir):
+            shutil.rmtree(backtest_storage_dir)
+
+        # ===== FIRST RUN: Create pre-existing backtests =====
+        app1 = create_app(name="FirstRun", config=config)
+        app1.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
+
+        first_param_grid = {
+            "rsi_time_frame": ["2h"],
+            "rsi_period": [14],
+            "rsi_overbought_threshold": [70],
+            "rsi_oversold_threshold": [30],
+            "ema_time_frame": ["2h"],
+            "ema_short_period": [100],
+            "ema_long_period": [150, 200],
+            "ema_cross_lookback_window": [4]
+        }
+        first_variations = [
+            dict(zip(first_param_grid.keys(), values))
+            for values in product(*first_param_grid.values())
+        ]
+
+        first_strategies = []
+        for param_set in first_variations:
+            first_strategies.append(
+                RSIEMACrossoverStrategy(
+                    algorithm_id=generate_algorithm_id(params=param_set),
+                    time_unit=TimeUnit.HOUR,
+                    interval=2,
+                    market="BITVAVO",
+                    rsi_time_frame=param_set["rsi_time_frame"],
+                    rsi_period=param_set["rsi_period"],
+                    rsi_overbought_threshold=param_set["rsi_overbought_threshold"],
+                    rsi_oversold_threshold=param_set["rsi_oversold_threshold"],
+                    ema_time_frame=param_set["ema_time_frame"],
+                    ema_short_period=param_set["ema_short_period"],
+                    ema_long_period=param_set["ema_long_period"],
+                    ema_cross_lookback_window=param_set["ema_cross_lookback_window"],
+                    symbols=["BTC", "ETH"],
+                    position_sizes=[
+                        PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
+                        PositionSize(symbol="ETH", percentage_of_portfolio=20.0)
+                    ]
+                )
+            )
+
+        self.assertEqual(len(first_strategies), 2)
+        first_algorithm_ids = set(s.algorithm_id for s in first_strategies)
+
+        first_backtests = app1.run_vector_backtests(
+            initial_amount=1000,
+            backtest_date_ranges=[date_range_1, date_range_2],
+            strategies=first_strategies,
+            snapshot_interval=SnapshotInterval.DAILY,
+            risk_free_rate=0.027,
+            trading_symbol="EUR",
+            market="BITVAVO",
+            backtest_storage_directory=backtest_storage_dir,
+            use_checkpoints=False,
+            show_progress=True
+        )
+
+        self.assertEqual(len(first_backtests), 2)
+
+        # ===== SECOND RUN: With final_filter_function =====
+        app2 = create_app(name="SecondRun", config=config)
+        app2.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
+
+        # Track which backtests the filter function sees
+        filter_seen_algorithm_ids = []
+
+        def tracking_final_filter(backtests):
+            """Filter that tracks which backtests it receives."""
+            for bt in backtests:
+                filter_seen_algorithm_ids.append(bt.algorithm_id)
+            # Return all backtests (no actual filtering)
+            return backtests
+
+        second_param_grid = {
+            "rsi_time_frame": ["2h"],
+            "rsi_period": [14],
+            "rsi_overbought_threshold": [80],  # Different
+            "rsi_oversold_threshold": [20],    # Different
+            "ema_time_frame": ["2h"],
+            "ema_short_period": [100],
+            "ema_long_period": [150, 200],
+            "ema_cross_lookback_window": [4]
+        }
+        second_variations = [
+            dict(zip(second_param_grid.keys(), values))
+            for values in product(*second_param_grid.values())
+        ]
+
+        second_strategies = []
+        for param_set in second_variations:
+            second_strategies.append(
+                RSIEMACrossoverStrategy(
+                    algorithm_id=generate_algorithm_id(params=param_set),
+                    time_unit=TimeUnit.HOUR,
+                    interval=2,
+                    market="BITVAVO",
+                    rsi_time_frame=param_set["rsi_time_frame"],
+                    rsi_period=param_set["rsi_period"],
+                    rsi_overbought_threshold=param_set["rsi_overbought_threshold"],
+                    rsi_oversold_threshold=param_set["rsi_oversold_threshold"],
+                    ema_time_frame=param_set["ema_time_frame"],
+                    ema_short_period=param_set["ema_short_period"],
+                    ema_long_period=param_set["ema_long_period"],
+                    ema_cross_lookback_window=param_set["ema_cross_lookback_window"],
+                    symbols=["BTC", "ETH"],
+                    position_sizes=[
+                        PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
+                        PositionSize(symbol="ETH", percentage_of_portfolio=20.0)
+                    ]
+                )
+            )
+
+        self.assertEqual(len(second_strategies), 2)
+        second_algorithm_ids = set(s.algorithm_id for s in second_strategies)
+
+        # Ensure sets are different
+        self.assertEqual(
+            len(first_algorithm_ids.intersection(second_algorithm_ids)), 0
+        )
+
+        second_backtests = app2.run_vector_backtests(
+            initial_amount=1000,
+            backtest_date_ranges=[date_range_1, date_range_2],
+            strategies=second_strategies,
+            snapshot_interval=SnapshotInterval.DAILY,
+            risk_free_rate=0.027,
+            trading_symbol="EUR",
+            market="BITVAVO",
+            backtest_storage_directory=backtest_storage_dir,
+            use_checkpoints=False,
+            show_progress=True,
+            final_filter_function=tracking_final_filter
+        )
+
+        # ===== VERIFICATION =====
+        # The filter should have ONLY seen the second strategies' backtests
+        filter_seen_set = set(filter_seen_algorithm_ids)
+
+        # Filter should NOT have seen first strategies
+        for alg_id in first_algorithm_ids:
+            self.assertNotIn(
+                alg_id, filter_seen_set,
+                f"Final filter saw pre-existing backtest {alg_id} from first run"
+            )
+
+        # Filter SHOULD have seen second strategies
+        for alg_id in second_algorithm_ids:
+            self.assertIn(
+                alg_id, filter_seen_set,
+                f"Final filter did not see backtest {alg_id} from current run"
+            )
+
+        # Results should only contain second strategies
+        self.assertEqual(len(second_backtests), 2)
+        result_ids = set(b.algorithm_id for b in second_backtests)
+        self.assertEqual(result_ids, second_algorithm_ids)
+
+        # Clean up
+        if os.path.exists(backtest_storage_dir):
+            shutil.rmtree(backtest_storage_dir)
