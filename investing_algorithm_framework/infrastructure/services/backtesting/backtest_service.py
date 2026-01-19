@@ -11,7 +11,7 @@ from investing_algorithm_framework.domain import BacktestRun, TimeUnit, \
     OperationalException, BacktestDateRange, Backtest, combine_backtests, \
     generate_backtest_summary_metrics, DataSource, \
     PortfolioConfiguration, tqdm, SnapshotInterval, \
-    save_backtests_to_directory, load_backtests_from_directory
+    save_backtests_to_directory
 from investing_algorithm_framework.services.data_providers import \
     DataProviderService
 from investing_algorithm_framework.services.metrics import \
@@ -279,7 +279,7 @@ class BacktestService:
                         )
                     )
             else:
-                for checkpoint in checkpoints:
+                for checkpoint in checkpointed:
                     backtests.append(
                         Backtest.open(
                             os.path.join(storage_directory, checkpoint),
@@ -665,6 +665,13 @@ class BacktestService:
                 backtest_storage_directory
             )
 
+        # Create session cache to track backtests run in this session
+        # This ensures we only load backtests from this run, not pre-existing
+        # ones in the storage directory
+        session_cache = None
+        if backtest_storage_directory is not None:
+            session_cache = self._create_session_cache()
+
         # Handle single date range case - convert to list
         # for unified processing
         if backtest_date_range is not None:
@@ -685,12 +692,6 @@ class BacktestService:
 
         # Validate algorithm IDs
         self._validate_algorithm_ids(strategies)
-
-        # Track all algorithm_ids that were actually run in this batch
-        # This is used to filter loaded backtests from storage
-        # to only include backtests from this run, not from previous runs
-        # that happen to reside in the same storage directory
-        run_algorithm_ids = set(s.algorithm_id for s in strategies)
 
         for backtest_date_range in tqdm(
             backtest_date_ranges,
@@ -723,6 +724,17 @@ class BacktestService:
                     s for s in active_strategies
                     if s.algorithm_id in missing_ids
                 ]
+
+                # Add checkpointed IDs to session cache so they're included
+                # in final loading (they were run in a previous session but
+                # are part of the current batch)
+                if session_cache is not None:
+                    for algo_id in checkpointed_ids:
+                        if algo_id in active_algorithm_ids:
+                            backtest_path = os.path.join(
+                                backtest_storage_directory, algo_id
+                            )
+                            session_cache["backtests"][algo_id] = backtest_path
 
                 if show_progress and len(checkpointed_ids) > 0:
                     _print_progress(
@@ -829,7 +841,8 @@ class BacktestService:
                                             checkpoint_batch_size,
                                             backtest_date_range,
                                             backtest_storage_directory,
-                                            checkpoint_cache
+                                            checkpoint_cache,
+                                            session_cache
                                         )
 
                                 # Periodic garbage collection every 10 batches
@@ -854,7 +867,8 @@ class BacktestService:
                             batch_buffer,
                             backtest_date_range,
                             backtest_storage_directory,
-                            checkpoint_cache
+                            checkpoint_cache,
+                            session_cache
                         )
 
                 else:
@@ -910,7 +924,8 @@ class BacktestService:
                                         checkpoint_batch_size,
                                         backtest_date_range,
                                         backtest_storage_directory,
-                                        checkpoint_cache
+                                        checkpoint_cache,
+                                        session_cache
                                     )
 
                             # Periodic garbage collection every 5 batches
@@ -934,7 +949,8 @@ class BacktestService:
                             batch_buffer,
                             backtest_date_range,
                             backtest_storage_directory,
-                            checkpoint_cache
+                            checkpoint_cache,
+                            session_cache
                         )
 
             # Store backtests in memory when no storage directory provided
@@ -992,12 +1008,19 @@ class BacktestService:
                 else:
                     # When using storage, mark filtered-out backtests
                     # with metadata flag instead of deleting them
-                    filtered_algorithm_ids = set(b.algorithm_id
-                                                 for b in filtered_backtests)
+                    filtered_algorithm_ids = set(
+                        b.algorithm_id for b in filtered_backtests)
                     algorithms_to_mark = [
                         alg_id for alg_id in active_algorithm_ids
                         if alg_id not in filtered_algorithm_ids
                     ]
+
+                    # Update session cache to only include filtered backtests
+                    if session_cache is not None:
+                        session_cache["backtests"] = {
+                            k: v for k, v in session_cache["backtests"].items()
+                            if k in filtered_algorithm_ids
+                        }
 
                     # Clear filtered_out flag for backtests that passed
                     # the filter (they may have been filtered out before)
@@ -1083,46 +1106,27 @@ class BacktestService:
 
         loaded_from_storage = False
         if backtest_storage_directory is not None:
-            # Load from disk and combine
-            all_backtests_raw = load_backtests_from_directory(
-                directory_path=backtest_storage_directory,
+            # Save session cache to disk before final loading
+            if session_cache is not None:
+                self._save_session_cache(
+                    session_cache, backtest_storage_directory
+                )
+
+            # Load ONLY from session cache - this ensures we only get
+            # backtests from this run, not pre-existing ones in the directory
+            all_backtests = self._load_backtests_from_session(
+                session_cache,
+                active_algorithm_ids_final,
                 show_progress=show_progress
             )
 
-            # Filter to only include backtests that:
-            # 1. Were actually run in this batch (in run_algorithm_ids)
-            # 2. Were not filtered out by window filter function
-            #    (in active_algorithm_ids_final)
-            # This prevents including backtests from previous runs and
-            # respects window filter decisions.
-            all_backtests = [
-                b for b in all_backtests_raw
-                if b.algorithm_id in run_algorithm_ids
-                and b.algorithm_id in active_algorithm_ids_final
-            ]
-
-            if show_progress:
-                excluded_not_in_run = len([
-                    b for b in all_backtests_raw
-                    if b.algorithm_id not in run_algorithm_ids
-                ])
-                excluded_by_window_filter = len([
-                    b for b in all_backtests_raw
-                    if b.algorithm_id in run_algorithm_ids
-                    and b.algorithm_id not in active_algorithm_ids_final
-                ])
-
-                if excluded_not_in_run > 0:
+            if show_progress and session_cache is not None:
+                total_in_session = len(session_cache.get("backtests", {}))
+                loaded_count = len(all_backtests)
+                if total_in_session > loaded_count:
                     _print_progress(
-                        f"Excluded {excluded_not_in_run} backtests from "
-                        "previous runs (not in current batch)",
-                        show_progress
-                    )
-
-                if excluded_by_window_filter > 0:
-                    _print_progress(
-                        f"Excluded {excluded_by_window_filter} backtests "
-                        "filtered out by window filter function",
+                        f"Loaded {loaded_count} backtests from session "
+                        f"({total_in_session - loaded_count} filtered out)",
                         show_progress
                     )
 
@@ -1173,6 +1177,14 @@ class BacktestService:
                 show_progress=show_progress
             )
 
+        # Cleanup session file at the end
+        if backtest_storage_directory is not None:
+            session_file = os.path.join(
+                backtest_storage_directory, "backtest_session.json"
+            )
+            if os.path.exists(session_file):
+                os.remove(session_file)
+
         return all_backtests
 
     def _load_checkpoint_cache(self, storage_directory: str) -> Dict:
@@ -1199,7 +1211,8 @@ class BacktestService:
         date_range: BacktestDateRange,
         storage_directory: str,
         checkpoint_cache: Dict,
-        show_progress: bool = False
+        show_progress: bool = False,
+        session_cache: Dict = None
     ):
         """Save a batch of backtests and update checkpoint cache."""
         if len(backtests) == 0:
@@ -1212,7 +1225,7 @@ class BacktestService:
             show_progress=show_progress
         )
 
-        # Update cache
+        # Update checkpoint cache
         key = (f"{date_range.start_date.isoformat()}_"
                f"{date_range.end_date.isoformat()}")
         if key not in checkpoint_cache:
@@ -1228,6 +1241,121 @@ class BacktestService:
             json.dump(checkpoint_cache, f, indent=4)
             f.flush()
             os.fsync(f.fileno())  # Force write to disk
+
+        # Update session cache if provided
+        if session_cache is not None:
+            self._update_session_cache(
+                backtests, storage_directory, session_cache
+            )
+
+    def _create_session_cache(self) -> Dict:
+        """
+        Create a new session cache to track backtests run in this session.
+
+        Returns:
+            Dict: Empty session cache structure
+        """
+        return {
+            "session_id": datetime.now(timezone.utc).isoformat(),
+            "backtests": {}  # algorithm_id -> backtest_path
+        }
+
+    def _update_session_cache(
+        self,
+        backtests: List[Backtest],
+        storage_directory: str,
+        session_cache: Dict
+    ):
+        """
+        Update session cache with newly saved backtests.
+
+        Args:
+            backtests: List of backtests that were saved
+            storage_directory: Directory where backtests are stored
+            session_cache: Session cache to update
+        """
+        for backtest in backtests:
+            algorithm_id = backtest.algorithm_id
+            backtest_path = os.path.join(storage_directory, algorithm_id)
+            session_cache["backtests"][algorithm_id] = backtest_path
+
+    def _save_session_cache(
+        self,
+        session_cache: Dict,
+        storage_directory: str
+    ):
+        """
+        Save session cache to disk.
+
+        Args:
+            session_cache: Session cache to save
+            storage_directory: Directory to save the session file
+        """
+        session_file = os.path.join(
+            storage_directory, "backtest_session.json"
+        )
+        with open(session_file, "w") as f:
+            json.dump(session_cache, f, indent=4)
+            f.flush()
+            os.fsync(f.fileno())
+
+    def _load_backtests_from_session(
+        self,
+        session_cache: Dict,
+        active_algorithm_ids: set = None,
+        show_progress: bool = False
+    ) -> List[Backtest]:
+        """
+        Load backtests from the current session cache.
+
+        This method efficiently loads only the backtests that were run
+        in the current session, avoiding loading pre-existing backtests
+        from the storage directory.
+
+        Args:
+            session_cache: Session cache containing backtest paths
+            active_algorithm_ids: Optional set of algorithm IDs to filter by
+                (e.g., those that passed window filters)
+            show_progress: Whether to show progress bar
+
+        Returns:
+            List[Backtest]: List of backtests from the current session
+        """
+        backtests = []
+        backtest_paths = session_cache.get("backtests", {})
+
+        # Filter by active_algorithm_ids if provided
+        if active_algorithm_ids is not None:
+            paths_to_load = {
+                alg_id: path for alg_id, path in backtest_paths.items()
+                if alg_id in active_algorithm_ids
+            }
+        else:
+            paths_to_load = backtest_paths
+
+        items = list(paths_to_load.items())
+
+        for algorithm_id, backtest_path in tqdm(
+            items,
+            colour="green",
+            desc="Loading session backtests",
+            disable=not show_progress
+        ):
+            try:
+                if os.path.exists(backtest_path):
+                    backtest = Backtest.open(backtest_path)
+                    backtests.append(backtest)
+                else:
+                    logger.warning(
+                        f"Backtest path does not exist: {backtest_path}"
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Could not load backtest {algorithm_id} "
+                    f"from {backtest_path}: {e}"
+                )
+
+        return backtests
 
     def _load_backtests_from_cache(
         self,
@@ -1324,10 +1452,19 @@ class BacktestService:
         checkpoint_batch_size: int,
         backtest_date_range: BacktestDateRange,
         backtest_storage_directory: str,
-        checkpoint_cache: Dict
+        checkpoint_cache: Dict,
+        session_cache: Dict = None
     ) -> bool:
         """
         Save batch if buffer is full and clear memory.
+
+        Args:
+            batch_buffer: List of backtests to potentially save.
+            checkpoint_batch_size: Threshold for saving.
+            backtest_date_range: The backtest date range.
+            backtest_storage_directory: Directory to save to.
+            checkpoint_cache: Checkpoint cache to update.
+            session_cache: Session cache to track backtests from this run.
 
         Returns:
             True if batch was saved, False otherwise
@@ -1338,7 +1475,8 @@ class BacktestService:
                 backtest_date_range,
                 backtest_storage_directory,
                 checkpoint_cache,
-                show_progress=False
+                show_progress=False,
+                session_cache=session_cache
             )
             batch_buffer.clear()
             gc.collect()
@@ -1350,16 +1488,27 @@ class BacktestService:
         batch_buffer: List[Backtest],
         backtest_date_range: BacktestDateRange,
         backtest_storage_directory: str,
-        checkpoint_cache: Dict
+        checkpoint_cache: Dict,
+        session_cache: Dict = None
     ):
-        """Save any remaining backtests in the buffer."""
+        """
+        Save any remaining backtests in the buffer.
+
+        Args:
+            batch_buffer: List of backtests to save.
+            backtest_date_range: The backtest date range.
+            backtest_storage_directory: Directory to save to.
+            checkpoint_cache: Checkpoint cache to update.
+            session_cache: Session cache to track backtests from this run.
+        """
         if len(batch_buffer) > 0:
             self._batch_save_and_checkpoint(
                 batch_buffer,
                 backtest_date_range,
                 backtest_storage_directory,
                 checkpoint_cache,
-                show_progress=False
+                show_progress=False,
+                session_cache=session_cache
             )
             batch_buffer.clear()
             gc.collect()
@@ -1698,6 +1847,11 @@ class BacktestService:
                 backtest_storage_directory
             )
 
+        # Create session cache to track backtests run in this session
+        session_cache = None
+        if backtest_storage_directory is not None:
+            session_cache = self._create_session_cache()
+
         # Handle single date range case - convert to list
         if backtest_date_range is not None:
             backtest_date_ranges = [backtest_date_range]
@@ -1715,13 +1869,11 @@ class BacktestService:
         algorithm_id_map = {}  # Maps id(alg) -> algorithm_id for final output
         active_algorithms = algorithms.copy()
 
-        # Track all algorithm_ids that were actually run
-        run_algorithm_ids = set()
+        # Build algorithm_id_map for tracking
         for alg in algorithms:
             alg_id = alg.algorithm_id if (
                 hasattr(alg, 'algorithm_id')
             ) else alg.id
-            run_algorithm_ids.add(alg_id)
             algorithm_id_map[id(alg)] = alg_id
 
         # Determine if this is a simple single backtest case
@@ -1766,6 +1918,16 @@ class BacktestService:
                         alg, 'algorithm_id'
                     ) else alg.id) in missing_ids
                 ]
+
+                # Add checkpointed IDs to session cache
+                if session_cache is not None:
+                    for algo_id in checkpointed_ids:
+                        if algo_id in active_algorithm_ids:
+                            backtest_path = os.path.join(
+                                backtest_storage_directory, algo_id
+                            )
+                            session_cache["backtests"][algo_id] = backtest_path
+
                 if show_progress and len(checkpointed_ids) > 0:
                     _print_progress(
                         f"Found {len(checkpointed_ids)} checkpointed "
@@ -1918,7 +2080,8 @@ class BacktestService:
                                     checkpoint_batch_size,
                                     backtest_date_range,
                                     backtest_storage_directory,
-                                    checkpoint_cache
+                                    checkpoint_cache,
+                                    session_cache
                                 )
 
                         except Exception as e:
@@ -1941,7 +2104,8 @@ class BacktestService:
                         batch_buffer,
                         backtest_date_range,
                         backtest_storage_directory,
-                        checkpoint_cache
+                        checkpoint_cache,
+                        session_cache
                     )
 
             # Store backtests in memory when no storage directory provided
@@ -1997,6 +2161,13 @@ class BacktestService:
                         alg_id for alg_id in active_algorithm_ids
                         if alg_id not in filtered_ids
                     ]
+
+                    # Update session cache to only include filtered backtests
+                    if session_cache is not None:
+                        session_cache["backtests"] = {
+                            k: v for k, v in session_cache["backtests"].items()
+                            if k in filtered_ids
+                        }
 
                     # Clear filtered_out flag for backtests that passed
                     # the filter (they may have been filtered out before)
@@ -2075,15 +2246,19 @@ class BacktestService:
 
         loaded_from_storage = False
         if backtest_storage_directory is not None:
-            all_backtests_raw = load_backtests_from_directory(
-                directory_path=backtest_storage_directory,
+            # Save session cache to disk before final loading
+            if session_cache is not None:
+                self._save_session_cache(
+                    session_cache, backtest_storage_directory
+                )
+
+            # Load ONLY from session cache - this ensures we only get
+            # backtests from this run, not pre-existing ones
+            all_backtests = self._load_backtests_from_session(
+                session_cache,
+                active_algorithm_ids_final,
                 show_progress=show_progress
             )
-            all_backtests = [
-                b for b in all_backtests_raw
-                if b.algorithm_id in run_algorithm_ids
-                and b.algorithm_id in active_algorithm_ids_final
-            ]
             loaded_from_storage = True
         else:
             combined_backtests = []
@@ -2123,6 +2298,14 @@ class BacktestService:
                 directory_path=backtest_storage_directory,
                 show_progress=show_progress
             )
+
+        # Cleanup session file at the end
+        if backtest_storage_directory is not None:
+            session_file = os.path.join(
+                backtest_storage_directory, "backtest_session.json"
+            )
+            if os.path.exists(session_file):
+                os.remove(session_file)
 
         return all_backtests
 
