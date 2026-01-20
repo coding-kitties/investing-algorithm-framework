@@ -29,20 +29,11 @@ class Test(TestCase):
     Collection of tests for backtest report operations
     """
     def setUp(self) -> None:
-        self.resource_directory = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.join(
-                            os.path.realpath(__file__),
-                            os.pardir
-                        ),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
+        # RESOURCE_DIRECTORY should always point to the parent directory/resources
+        # Resource directory should point to /tests/resources
+        # Resource directory is two levels up from the current file
+        self.resource_directory = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
         )
 
     def tearDown(self) -> None:

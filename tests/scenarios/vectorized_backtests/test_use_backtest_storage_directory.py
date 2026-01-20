@@ -249,8 +249,6 @@ class Test(TestCase):
             dict(zip(param_options.keys(), values))
             for values in product(*param_options.values())
         ]
-        print(
-            f"Total parameter combinations to evaluate: {len(param_variations)}")
 
         # RESOURCE_DIRECTORY should always point to the parent directory/resources
         # Resource directory should point to /tests/resources

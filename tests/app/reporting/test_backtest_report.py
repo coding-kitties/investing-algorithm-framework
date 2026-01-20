@@ -82,22 +82,23 @@ class Test(TestCase):
         # Check if the report was saved correctly
         self.assertTrue(os.path.exists(output_path))
 
-        # Check if the strategy directory was created
-        strategy_dir = os.path.join(output_path, "strategies")
-        self.assertTrue(os.path.exists(strategy_dir))
+        # Check if the runs directory exists
+        runs_dir = os.path.join(output_path, "runs")
+        self.assertTrue(os.path.exists(runs_dir))
 
-        # Check if the strategy.py file exists within the strategy directory
-        strategy_file_path = os.path.join(strategy_dir, "strategy_one.py")
-        self.assertTrue(os.path.exists(strategy_file_path))
-
-        # Check if the metrics JSON file exists
-        metrics_json_path = os.path.join(output_path, "metrics.json")
-        self.assertTrue(os.path.exists(metrics_json_path))
-
+        # Check if the backtest run directory exists
+        backtest_run_dir = os.path.join(
+            runs_dir, "backtest_EUR_20230807_20231201"
+        )
+        self.assertTrue(os.path.exists(backtest_run_dir))
 
         # Check if the results were saved correctly
-        self.assertTrue(os.path.exists(os.path.join(output_path, "results.json")))
-        self.assertTrue(os.path.exists(os.path.join(output_path, "strategies")))
+        self.assertTrue(
+            os.path.exists(os.path.join(backtest_run_dir, "run.json"))
+        )
+        self.assertTrue(
+            os.path.exists(os.path.join(backtest_run_dir, "metrics.json"))
+        )
 
     def test_save_with_strategies_directory(self):
         """
@@ -156,10 +157,6 @@ class Test(TestCase):
                 max_daily_drawdown=0.05
             )
         )
-        data_files = [
-            "tests/resources/market_data_sources_for_testing/OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-59_2023-12-02-00-00.csv",
-            "tests/resources/market_data_sources_for_testing/OHLCV_BTC-EUR_BINANCE_15m_2023-12-14-22-00_2023-12-25-00-00.csv",
-        ]
 
         backtest = Backtest(
             algorithm_id="alg-025",
@@ -169,21 +166,26 @@ class Test(TestCase):
         output_path = os.path.join(self.resource_dir, "backtest_report")
         backtest.save(output_path)
 
+        print(output_path)
+
         # Check if the report was saved correctly
         self.assertTrue(os.path.exists(output_path))
 
-        # Check if the strategy directory was created
-        strategy_dir = os.path.join(output_path, "strategies")
-        self.assertTrue(os.path.exists(strategy_dir))
+        # Check if the runs directory exists
+        runs_dir = os.path.join(output_path, "runs")
+        self.assertTrue(os.path.exists(runs_dir))
 
-        # Check if the strategy.py file exists within the strategy directory
-        strategy_file_path = os.path.join(strategy_dir, "strategy_one.py")
-        self.assertTrue(os.path.exists(strategy_file_path))
-
-        # Check if the metrics JSON file exists
-        metrics_json_path = os.path.join(output_path, "metrics.json")
-        self.assertTrue(os.path.exists(metrics_json_path))
+        # Check if the backtest run directory exists
+        backtest_run_dir = os.path.join(
+            runs_dir, "backtest_EUR_20230807_20231201"
+        )
+        self.assertTrue(os.path.exists(backtest_run_dir))
 
         # Check if the results were saved correctly
-        self.assertTrue(os.path.exists(os.path.join(output_path, "results.json")))
-        self.assertTrue(os.path.exists(os.path.join(output_path, "strategies")))
+        self.assertTrue(
+            os.path.exists(os.path.join(backtest_run_dir, "run.json"))
+        )
+        self.assertTrue(
+            os.path.exists(os.path.join(backtest_run_dir, "metrics.json"))
+        )
+

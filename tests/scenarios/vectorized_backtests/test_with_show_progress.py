@@ -340,9 +340,6 @@ class Test(TestCase):
         # Get the captured output as a string
         output = captured_output.getvalue()
 
-        # Print the captured output (optional - for debugging)
-        print(output)
-
         # Verify that checkpointing message appears
         self.assertTrue(
             "Using checkpoints to skip completed backtests" in output or
@@ -368,9 +365,3 @@ class Test(TestCase):
         self.assertTrue(
             "Applying final filter function" in output
         )
-
-        # Verify that filtered-out backtests are marked in metadata
-        # (not deleted from storage)
-        if "Marked backtest" in output and "as filtered out" in output:
-            print("✓ Filtered-out backtests were marked in metadata "
-                  "(preserved in storage)")
