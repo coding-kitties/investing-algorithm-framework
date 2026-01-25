@@ -155,3 +155,9 @@ bumpversion.egg-info/
 venv
 **/app_logs.log
 /resources/
+
+
+# Examples/tutorial
+examples/tutorial/data
+examples/tutorial/backtest_results
+examples/tutorial/resources
