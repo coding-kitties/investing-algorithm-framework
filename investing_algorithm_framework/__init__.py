@@ -1,15 +1,17 @@
+from .analysis import generate_rolling_backtest_windows, \
+    select_backtest_date_ranges, rank_results, create_weights, \
+    get_missing_timeseries_data_entries, fill_missing_timeseries_data
 from .app import App, Algorithm, \
     TradingStrategy, StatelessAction, Task, AppHook, Context, \
-    add_html_report, BacktestReport, generate_rolling_backtest_windows, \
+    add_html_report, BacktestReport, \
     pretty_print_trades, pretty_print_positions, \
-    pretty_print_orders, pretty_print_backtest, select_backtest_date_ranges, \
+    pretty_print_orders, pretty_print_backtest, \
     get_equity_curve_with_drawdown_chart, \
-    get_rolling_sharpe_ratio_chart, rank_results, \
-    get_monthly_returns_heatmap_chart, create_weights, \
+    get_rolling_sharpe_ratio_chart, get_monthly_returns_heatmap_chart, \
     get_yearly_returns_bar_chart, get_entry_and_exit_signals, \
     get_ohlcv_data_completeness_chart, get_equity_curve_chart
 from .domain import ApiException, combine_backtests, PositionSize, \
-    OrderType, OperationalException, OrderStatus, OrderSide, \
+    OrderType, OperationalException, OrderStatus, OrderSide, tqdm, \
     TimeUnit, TimeInterval, Order, Portfolio, Backtest, DataError, \
     Position, TimeFrame, INDEX_DATETIME, MarketCredential, TakeProfitRule, \
     PortfolioConfiguration, RESOURCE_DIRECTORY, AWS_LAMBDA_LOGGING_CONFIG, \
@@ -24,7 +26,8 @@ from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CCXTOHLCVDataProvider, PandasOHLCVDataProvider, \
     AWSS3StorageStateHandler
 from .create_app import create_app
-from .download_data import download
+from .download_data import download, download_v2, DownloadResult, \
+    create_data_storage_path
 from .services import get_annual_volatility, get_sortino_ratio, \
     get_drawdown_series, get_max_drawdown, get_equity_curve, \
     get_price_efficiency_ratio, get_sharpe_ratio, \
@@ -199,5 +202,8 @@ __all__ = [
     "TradeTakeProfitService",
     "generate_algorithm_id",
     "BacktestMetrics",
-    "generate_rolling_backtest_windows"
+    "generate_rolling_backtest_windows",
+    "tqdm",
+    "get_missing_timeseries_data_entries",
+    "fill_missing_timeseries_data"
 ]

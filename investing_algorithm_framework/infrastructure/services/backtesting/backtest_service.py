@@ -2,6 +2,9 @@ import gc
 import json
 import logging
 import os
+import numpy as np
+import pandas as pd
+import polars as pl
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -963,18 +966,31 @@ class BacktestService:
                     backtests_by_algorithm[backtest.algorithm_id]\
                         .append(backtest)
 
-            # Load checkpointed backtests if needed for
-            # filtering (only if checkpoints enabled)
+            # Load checkpointed backtests that were SKIPPED (not run in this
+            # iteration) if needed for filtering. Only load backtests that
+            # were checkpointed from a previous session, not ones that were
+            # just run and checkpointed in this session.
             if use_checkpoints and (window_filter_function is not None
                                     or final_filter_function is not None):
-                # Load only the backtests we need
-                checkpointed_backtests = self._load_backtests_from_cache(
-                    checkpoint_cache,
-                    backtest_date_range,
-                    backtest_storage_directory,
-                    active_algorithm_ids
-                )
-                all_backtests.extend(checkpointed_backtests)
+                # Get IDs of strategies that were actually run in this
+                # iteration
+                run_algorithm_ids = set(s.algorithm_id
+                                        for s in strategies_to_run)
+                # Only load backtests that were SKIPPED
+                # (checkpointed, not run)
+                skipped_algorithm_ids = [
+                    algo_id for algo_id in active_algorithm_ids
+                    if algo_id not in run_algorithm_ids
+                ]
+
+                if len(skipped_algorithm_ids) > 0:
+                    checkpointed_backtests = self._load_backtests_from_cache(
+                        checkpoint_cache,
+                        backtest_date_range,
+                        backtest_storage_directory,
+                        skipped_algorithm_ids
+                    )
+                    all_backtests.extend(checkpointed_backtests)
 
             # Apply window filter function
             if window_filter_function is not None:
@@ -2119,16 +2135,34 @@ class BacktestService:
                         backtests_by_algorithm[key] = []
                     backtests_by_algorithm[key].append(backtest)
 
-            # Load checkpointed backtests if needed for filtering
+            # Load checkpointed backtests that were SKIPPED (not run in this
+            # iteration) if needed for filtering. Only load backtests that
+            # were checkpointed from a previous session, not ones that were
+            # just run and checkpointed in this session.
             if use_checkpoints and (window_filter_function is not None
                                     or final_filter_function is not None):
-                checkpointed_backtests = self._load_backtests_from_cache(
-                    checkpoint_cache,
-                    backtest_date_range,
-                    backtest_storage_directory,
-                    active_algorithm_ids
+                # Get IDs of algorithms that were actually run in this
+                # iteration
+                run_algorithm_ids = set(
+                    (alg.algorithm_id if hasattr(alg, 'algorithm_id')
+                     else alg.id)
+                    for alg in algorithms_to_run
                 )
-                all_backtests.extend(checkpointed_backtests)
+                # Only load backtests that were SKIPPED
+                # (checkpointed, not run)
+                skipped_algorithm_ids = [
+                    algo_id for algo_id in active_algorithm_ids
+                    if algo_id not in run_algorithm_ids
+                ]
+
+                if len(skipped_algorithm_ids) > 0:
+                    checkpointed_backtests = self._load_backtests_from_cache(
+                        checkpoint_cache,
+                        backtest_date_range,
+                        backtest_storage_directory,
+                        skipped_algorithm_ids
+                    )
+                    all_backtests.extend(checkpointed_backtests)
 
             # Apply window filter function
             if window_filter_function is not None:
@@ -2403,3 +2437,131 @@ class BacktestService:
                 risk_free_rate=risk_free_rate or 0.0,
                 metadata=metadata or {}
             ), {}
+
+    def create_ohlcv_permutation(
+        self,
+        data: Union[pd.DataFrame, pl.DataFrame],
+        start_index: int = 0,
+        seed: int | None = None,
+    ) -> Union[pd.DataFrame, pl.DataFrame]:
+        """
+        Create a permuted OHLCV dataset by shuffling relative price moves.
+
+        Args:
+            data: A single OHLCV DataFrame (pandas or polars)
+                with columns ['Open', 'High', 'Low', 'Close', 'Volume'].
+                For pandas: Datetime can be either
+                index or a 'Datetime' column. For polars: Datetime
+                must be a 'Datetime' column.
+            start_index: Index at which the permutation should begin
+                (bars before remain unchanged).
+            seed: Random seed for reproducibility.
+
+        Returns:
+            DataFrame of the same type (pandas or polars) with
+                permuted OHLCV values, preserving the datetime
+                structure (index vs column) of the input.
+        """
+
+        if start_index < 0:
+            raise OperationalException("start_index must be >= 0")
+
+        if seed is None:
+            seed = np.random.randint(0, 1_000_000)
+
+        np.random.seed(seed)
+        is_polars = isinstance(data, pl.DataFrame)
+
+        # Normalize input to pandas
+        if is_polars:
+            has_datetime_col = "Datetime" in data.columns
+            ohlcv_pd = data.to_pandas().copy()
+            if has_datetime_col:
+                time_index = pd.to_datetime(ohlcv_pd["Datetime"])
+            else:
+                time_index = np.arange(len(ohlcv_pd))
+        else:
+            has_datetime_col = "Datetime" in data.columns
+            if isinstance(data.index, pd.DatetimeIndex):
+                time_index = data.index
+            elif has_datetime_col:
+                time_index = pd.to_datetime(data["Datetime"])
+            else:
+                time_index = np.arange(len(data))
+            ohlcv_pd = data.copy()
+
+        # Prepare data
+        n_bars = len(ohlcv_pd)
+        perm_index = start_index + 1
+        perm_n = n_bars - perm_index
+
+        # Ensure all OHLCV values are positive before taking log
+        # Replace non-positive values with NaN and forward fill
+        ohlcv_cols = ["Open", "High", "Low", "Close"]
+        for col in ohlcv_cols:
+            ohlcv_pd.loc[ohlcv_pd[col] <= 0, col] = np.nan
+
+        # Forward fill NaN values to maintain data continuity
+        ohlcv_pd[ohlcv_cols] = ohlcv_pd[ohlcv_cols].ffill()
+
+        # If there are still NaN values at the start, backward fill
+        ohlcv_pd[ohlcv_cols] = ohlcv_pd[ohlcv_cols].bfill()
+
+        # If all values are still invalid, raise an error
+        if ohlcv_pd[ohlcv_cols].isna().any().any():
+            raise ValueError(
+                "OHLCV data contains invalid (zero or negative) values "
+                "that cannot be processed"
+            )
+
+        log_bars = np.log(ohlcv_pd[ohlcv_cols])
+
+        # Start bar
+        start_bar = log_bars.iloc[start_index].to_numpy()
+
+        # Relative series
+        rel_open = (log_bars["Open"] - log_bars["Close"].shift()).to_numpy()
+        rel_high = (log_bars["High"] - log_bars["Open"]).to_numpy()
+        rel_low = (log_bars["Low"] - log_bars["Open"]).to_numpy()
+        rel_close = (log_bars["Close"] - log_bars["Open"]).to_numpy()
+
+        # Shuffle independently
+        idx = np.arange(perm_n)
+        rel_high = rel_high[perm_index:][np.random.permutation(idx)]
+        rel_low = rel_low[perm_index:][np.random.permutation(idx)]
+        rel_close = rel_close[perm_index:][np.random.permutation(idx)]
+        rel_open = rel_open[perm_index:][np.random.permutation(idx)]
+
+        # Build permuted OHLC
+        perm_bars = np.zeros((n_bars, 4))
+        perm_bars[:start_index] = log_bars.iloc[:start_index].to_numpy()
+        perm_bars[start_index] = start_bar
+
+        for i in range(perm_index, n_bars):
+            k = i - perm_index
+            perm_bars[i, 0] = perm_bars[i - 1, 3] + rel_open[k]   # Open
+            perm_bars[i, 1] = perm_bars[i, 0] + rel_high[k]       # High
+            perm_bars[i, 2] = perm_bars[i, 0] + rel_low[k]        # Low
+            perm_bars[i, 3] = perm_bars[i, 0] + rel_close[k]      # Close
+
+        perm_bars = np.exp(perm_bars)
+
+        # Rebuild OHLCV
+        perm_df = pd.DataFrame(
+            perm_bars,
+            columns=["Open", "High", "Low", "Close"],
+        )
+        perm_df["Volume"] = ohlcv_pd["Volume"].values
+
+        # Restore datetime structure
+        if is_polars:
+            if has_datetime_col:
+                perm_df.insert(0, "Datetime", time_index)
+            return pl.from_pandas(perm_df)
+        else:
+            if isinstance(data.index, pd.DatetimeIndex):
+                perm_df.index = time_index
+                perm_df.index.name = data.index.name or "Datetime"
+            elif has_datetime_col:
+                perm_df.insert(0, "Datetime", time_index)
+            return perm_df

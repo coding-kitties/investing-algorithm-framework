@@ -25,12 +25,11 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
     BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db, \
-    PandasOHLCVDataProvider
+    PandasOHLCVDataProvider, BacktestService
 from investing_algorithm_framework.services import OrderBacktestService, \
     BacktestPortfolioService, DefaultTradeOrderEvaluator, get_risk_free_rate_us
 from .app_hook import AppHook
 from .eventloop import EventLoopService
-from .analysis import create_ohlcv_permutation
 
 logger = logging.getLogger("investing_algorithm_framework")
 COLOR_RESET = '\033[0m'
@@ -1638,6 +1637,7 @@ class App:
                     "connection"
                 )
 
+        backtest_service = self.container.backtest_service()
         data_provider_service = self.container.data_provider_service()
         backtest = self.run_vector_backtest(
             backtest_date_range=backtest_date_range,
@@ -1690,7 +1690,8 @@ class App:
 
             for combi in original_data_combinations:
                 # Permute the data for the data source
-                permutated_data = create_ohlcv_permutation(data=combi[1])
+                permutated_data = backtest_service\
+                    .create_ohlcv_permutation(data=combi[1])
                 permutated_datasets.append((combi[0], permutated_data))
 
                 if combi[0].symbol not in permuted_datasets_ordered_by_symbol:
