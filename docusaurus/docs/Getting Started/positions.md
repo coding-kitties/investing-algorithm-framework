@@ -39,8 +39,6 @@ def apply_strategy(self, algorithm, market_data):
     for position in positions:
         print(f"Position: {position.symbol}")
         print(f"Amount: {position.amount}")
-        print(f"Entry Price: {position.entry_price}")
-        print(f"Current Value: {position.current_value}")
 ```
 
 ### Get Specific Position
@@ -48,7 +46,7 @@ def apply_strategy(self, algorithm, market_data):
 ```python
 def apply_strategy(self, algorithm, market_data):
     # Get position for specific symbol
-    btc_position = algorithm.get_position("BTC/USDT")
+    btc_position = algorithm.get_position("BTC")
     
     if btc_position:
         print(f"BTC Position: {btc_position.amount} BTC")
@@ -75,12 +73,13 @@ def analyze_position(self, position, market_data):
     
     print(f"Symbol: {symbol}")
     print(f"Amount: {amount}")
-    print(f"Entry: ${entry_price:.2f}")
-    print(f"Current: ${current_price:.2f}")
-    print(f"P&L: ${unrealized_pnl:.2f} ({pnl_percentage:.2f}%)")
 ```
 
 ## Position Management Strategies
+
+:::tip Multi-Symbol Strategy Allocation
+When trading multiple symbols simultaneously, ensure your total position size allocations don't exceed 100% of your portfolio. The framework will automatically scale orders proportionally if needed, but it's best practice to plan allocations that fit within available funds (e.g., 5 symbols × 20% = 100%).
+:::
 
 ### Profit Taking
 
@@ -141,6 +140,58 @@ class StopLossStrategy(TradingStrategy):
 ```
 
 ### Position Sizing
+
+The framework provides a `PositionSize` class to define how much capital to allocate to each symbol. You can specify either a percentage of portfolio or a fixed amount.
+
+```python
+from investing_algorithm_framework import TradingStrategy, PositionSize, TimeUnit
+
+class MultiAssetStrategy(TradingStrategy):
+    time_unit = TimeUnit.HOUR
+    interval = 2
+    symbols = ["BTC", "ETH", "SOL", "ADA", "XRP"]
+    
+    # Define position sizes for each symbol
+    position_sizes = [
+        PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
+        PositionSize(symbol="ETH", percentage_of_portfolio=20.0),
+        PositionSize(symbol="SOL", percentage_of_portfolio=20.0),
+        PositionSize(symbol="ADA", percentage_of_portfolio=20.0),
+        PositionSize(symbol="XRP", percentage_of_portfolio=20.0),
+    ]
+```
+
+#### Fixed Amount vs Percentage
+
+```python
+# Percentage-based: allocates 20% of total portfolio value
+PositionSize(symbol="BTC", percentage_of_portfolio=20.0)
+
+# Fixed amount: always allocates exactly 500 EUR
+PositionSize(symbol="ETH", fixed_amount=500.0)
+```
+
+#### Proportional Scaling
+
+When multiple buy signals fire simultaneously and the total requested allocation exceeds available funds, the framework **automatically scales all orders proportionally** to ensure fair allocation across all symbols.
+
+**Example:**
+- Portfolio: 1000 EUR available
+- 5 symbols each want 20% = 200 EUR each = 1000 EUR total
+- If only 800 EUR is available, each order is scaled to 160 EUR (80% of requested)
+
+This behavior ensures:
+- **Fair allocation**: All symbols get the same percentage reduction
+- **Predictable results**: Order of symbols doesn't affect allocation
+- **No failures**: Orders are scaled rather than rejected
+
+```python
+# If total allocation exceeds available funds, you'll see a warning:
+# "Total allocation (1000.00) exceeds available funds (800.00). 
+#  Scaling all orders by 80.00% to maintain proportional allocation."
+```
+
+#### Rebalancing Example
 
 ```python
 class PositionSizingStrategy(TradingStrategy):

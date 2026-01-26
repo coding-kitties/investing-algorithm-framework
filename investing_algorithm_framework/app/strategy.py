@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from typing import List, Dict, Any, Union
 
@@ -8,6 +9,8 @@ from investing_algorithm_framework.domain import OperationalException, \
     DataSource, OrderSide, StopLossRule, TakeProfitRule, Order, \
     INDEX_DATETIME
 from .context import Context
+
+logger = logging.getLogger(__name__)
 
 
 class TradingStrategy:
@@ -302,6 +305,11 @@ class TradingStrategy:
         buy_signals = self.generate_buy_signals(data)
         sell_signals = self.generate_sell_signals(data)
 
+        # Phase 1: Collect all pending buy orders
+        pending_buy_orders = []
+        portfolio = self.context.get_portfolio()
+        available_funds = self.context.get_unallocated()
+
         for symbol in self.symbols:
 
             if self.has_open_orders(symbol):
@@ -320,48 +328,84 @@ class TradingStrategy:
                     full_symbol = (f"{symbol}/"
                                    f"{self.context.get_trading_symbol()}")
                     price = self.context.get_latest_price(full_symbol)
-                    amount = position_size.get_size(
-                        self.context.get_portfolio(), price
-                    )
-                    order_amount = amount / price
-                    order = self.create_limit_order(
-                        target_symbol=symbol,
-                        order_side=OrderSide.BUY,
-                        amount=order_amount,
-                        price=price,
-                        execute=True,
-                        validate=True,
-                        sync=True
-                    )
+                    amount = position_size.get_size(portfolio, price)
 
-                    # Retrieve stop loss and take profit rules if any
-                    stop_loss_rule = self.get_stop_loss_rule(symbol)
-                    take_profit_rule = self.get_take_profit_rule(symbol)
+                    pending_buy_orders.append({
+                        'symbol': symbol,
+                        'full_symbol': full_symbol,
+                        'price': price,
+                        'amount': amount,
+                    })
 
-                    if stop_loss_rule is not None:
-                        trade = self.context.get_trade(
-                            order_id=order.id
-                        )
-                        self.context.add_stop_loss(
-                            trade=trade,
-                            percentage=stop_loss_rule.percentage_threshold,
-                            trailing=stop_loss_rule.trailing,
-                            sell_percentage=stop_loss_rule.sell_percentage,
-                            created_at=index_datetime
-                        )
+        # Phase 2: Scale orders proportionally if total exceeds available
+        total_required = sum(o['amount'] for o in pending_buy_orders)
 
-                    if take_profit_rule is not None:
-                        trade = self.context.get_trade(
-                            order_id=order.id
-                        )
-                        self.context.add_take_profit(
-                            trade=trade,
-                            percentage=take_profit_rule.percentage_threshold,
-                            trailing=take_profit_rule.trailing,
-                            sell_percentage=take_profit_rule.sell_percentage,
-                            created_at=index_datetime
-                        )
-            else:
+        if total_required > available_funds and total_required > 0:
+            scale_factor = available_funds / total_required
+            logger.warning(
+                f"Total allocation ({total_required:.2f}) exceeds available "
+                f"funds ({available_funds:.2f}). Scaling all orders by "
+                f"{scale_factor:.2%} to maintain proportional allocation."
+            )
+            for order in pending_buy_orders:
+                order['amount'] *= scale_factor
+
+        # Phase 3: Execute all pending buy orders
+        for order_data in pending_buy_orders:
+            symbol = order_data['symbol']
+            amount = order_data['amount']
+            price = order_data['price']
+
+            # Skip if amount is too small after scaling
+            if amount <= 0.01:
+                logger.warning(
+                    f"Skipping buy order for {symbol}: "
+                    f"amount too small after scaling ({amount:.4f})"
+                )
+                continue
+
+            order_amount = amount / price
+            order = self.create_limit_order(
+                target_symbol=symbol,
+                order_side=OrderSide.BUY,
+                amount=order_amount,
+                price=price,
+                execute=True,
+                validate=True,
+                sync=True
+            )
+
+            # Retrieve and apply stop loss and take profit rules
+            stop_loss_rule = self.get_stop_loss_rule(symbol)
+            take_profit_rule = self.get_take_profit_rule(symbol)
+
+            if stop_loss_rule is not None:
+                trade = self.context.get_trade(order_id=order.id)
+                self.context.add_stop_loss(
+                    trade=trade,
+                    percentage=stop_loss_rule.percentage_threshold,
+                    trailing=stop_loss_rule.trailing,
+                    sell_percentage=stop_loss_rule.sell_percentage,
+                    created_at=index_datetime
+                )
+
+            if take_profit_rule is not None:
+                trade = self.context.get_trade(order_id=order.id)
+                self.context.add_take_profit(
+                    trade=trade,
+                    percentage=take_profit_rule.percentage_threshold,
+                    trailing=take_profit_rule.trailing,
+                    sell_percentage=take_profit_rule.sell_percentage,
+                    created_at=index_datetime
+                )
+
+        # Phase 4: Process sell signals
+        for symbol in self.symbols:
+
+            if self.has_open_orders(symbol):
+                continue
+
+            if self.has_position(symbol):
                 # Check in the last row if there is a sell signal
                 if symbol not in sell_signals:
                     continue

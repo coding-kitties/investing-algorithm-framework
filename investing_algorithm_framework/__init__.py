@@ -1,6 +1,7 @@
 from .analysis import generate_rolling_backtest_windows, \
     select_backtest_date_ranges, rank_results, create_weights, \
-    get_missing_timeseries_data_entries, fill_missing_timeseries_data
+    get_missing_timeseries_data_entries, fill_missing_timeseries_data, \
+    create_markdown_table
 from .app import App, Algorithm, \
     TradingStrategy, StatelessAction, Task, AppHook, Context, \
     add_html_report, BacktestReport, \
@@ -205,5 +206,6 @@ __all__ = [
     "generate_rolling_backtest_windows",
     "tqdm",
     "get_missing_timeseries_data_entries",
-    "fill_missing_timeseries_data"
+    "fill_missing_timeseries_data",
+    "create_markdown_table"
 ]
