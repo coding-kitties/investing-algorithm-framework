@@ -35,19 +35,24 @@ class Test(TestCase):
         self.resource_directory = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
         )
+        self.backtest_databases_directory = os.path.join(
+            self.resource_directory, "backtest_databases"
+        )
+        self.backtest_report_directory = os.path.join(
+            self.resource_directory, "backtest_reports"
+        )
+        self.backtest_report_save_directory = os.path.join(
+            self.backtest_report_directory, "test_backtest"
+        )
 
     def tearDown(self) -> None:
         super().tearDown()
-        databases_directory = os.path.join(self.resource_directory,
-                                           "databases")
-        backtest_databases_directory = os.path.join(
-            self.resource_directory, "backtest_databases")
 
-        if os.path.exists(databases_directory):
-            shutil.rmtree(databases_directory)
+        if os.path.exists(self.backtest_databases_directory):
+            shutil.rmtree(self.backtest_databases_directory)
 
-        if os.path.exists(backtest_databases_directory):
-            shutil.rmtree(backtest_databases_directory)
+        if os.path.exists(self.backtest_report_directory):
+            shutil.rmtree(self.backtest_report_directory)
 
     def test_report_creation(self):
         app = create_app(
@@ -74,10 +79,9 @@ class Test(TestCase):
             backtest_date_range=backtest_date_range,
             risk_free_rate=0.027
         )
-        path = os.path.join(self.resource_directory, "backtest_reports/test_backtest")
-        backtest.save(path)
+        backtest.save(self.backtest_report_save_directory)
         # Check if the backtest report exists
-        self.assertTrue(os.path.isdir(path))
+        self.assertTrue(os.path.isdir(self.backtest_report_save_directory))
 
     def test_report_creation_without_strategy_identifier(self):
         app = create_app(
@@ -105,9 +109,7 @@ class Test(TestCase):
             backtest_date_range=backtest_date_range,
             risk_free_rate=0.027
         )
-        path = os.path.join(
-            self.resource_directory, "backtest_reports/test_backtest"
-        )
-        backtest.save(path)
+
+        backtest.save(self.backtest_report_save_directory)
         # Check if the backtest report exists
-        self.assertTrue(os.path.isdir(path))
+        self.assertTrue(os.path.isdir(self.backtest_report_save_directory))

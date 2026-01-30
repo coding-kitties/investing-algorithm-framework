@@ -34,8 +34,9 @@ class Test(TestBase):
             symbol="BTC/EUR",
             storage_path=os.path.join(
                 self.resource_directory,
-                "market_data_sources",
-                "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+                "test_data",
+                "ohlcv",
+                "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-08_2023-12-02-00-00.csv"
             ),
             time_frame="1h",
         ), priority=1)

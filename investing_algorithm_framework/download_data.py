@@ -2,10 +2,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from dateutil import parser
 from datetime import timezone, datetime
-import os
 import pandas
 import polars
 from typing import Union, Optional
+
 from investing_algorithm_framework.services import DataProviderService, \
     ConfigurationService, MarketCredentialService
 from investing_algorithm_framework.infrastructure import \
@@ -242,4 +242,3 @@ def download_v2(
         )
 
     return DownloadResult(data=data, path=file_path)
-

@@ -739,10 +739,16 @@ class BacktestService:
                             )
                             session_cache["backtests"][algo_id] = backtest_path
 
-                if show_progress and len(checkpointed_ids) > 0:
+                # Count how many active strategies are in the checkpoint
+                matched_checkpoint_count = len(
+                    set(active_algorithm_ids) & set(checkpointed_ids)
+                )
+
+                if show_progress:
                     _print_progress(
-                        f"Found {len(checkpointed_ids)} "
-                        "checkpointed backtests, "
+                        f"Active strategies: {len(active_algorithm_ids)}, "
+                        f"checkpoint file has: {len(checkpointed_ids)}, "
+                        f"matched: {matched_checkpoint_count}, "
                         f"running {len(strategies_to_run)} new backtests",
                         show_progress
                     )
@@ -1944,10 +1950,16 @@ class BacktestService:
                             )
                             session_cache["backtests"][algo_id] = backtest_path
 
-                if show_progress and len(checkpointed_ids) > 0:
+                # Count how many active algorithms are in the checkpoint
+                matched_checkpoint_count = len(
+                    set(active_algorithm_ids) & set(checkpointed_ids)
+                )
+
+                if show_progress:
                     _print_progress(
-                        f"Found {len(checkpointed_ids)} checkpointed "
-                        f"backtests, "
+                        f"Active algorithms: {len(active_algorithm_ids)}, "
+                        f"checkpoint file has: {len(checkpointed_ids)}, "
+                        f"matched: {matched_checkpoint_count}, "
                         f"running {len(algorithms_to_run)} new backtests",
                         show_progress
                     )

@@ -57,10 +57,19 @@ def fill_missing_timeseries_data(
 
     # Determine which dates need to be filled
     if missing_dates is not None and len(missing_dates) > 0:
-        dates_to_fill = [d for d in missing_dates if d not in df.index]
+        # Convert index to set of timestamps for proper comparison
+        existing_timestamps = set(pd.to_datetime(df.index))
+        # Deduplicate missing_dates and filter out existing dates
+        seen = set()
+        dates_to_fill = []
+        for d in missing_dates:
+            dt = pd.to_datetime(d)
+            if dt not in existing_timestamps and dt not in seen:
+                dates_to_fill.append(d)
+                seen.add(dt)
     elif start_date is not None and end_date is not None:
         dates_to_fill = get_missing_timeseries_data_entries(
-            df, start=start_date, end=end_date
+            df, start=start_date, end=end_date, freq='D'
         )
     else:
         dates_to_fill = []

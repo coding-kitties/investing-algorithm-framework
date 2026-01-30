@@ -241,8 +241,7 @@ class Test(TestCase):
         # Resource directory should point to /tests/resources
         # Resource directory is two levels up from the current file
         resource_directory = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            'resources'
+            os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
         config = {RESOURCE_DIRECTORY: resource_directory}
         app = create_app(name="GoldenCrossStrategy", config=config)
@@ -352,7 +351,7 @@ class Test(TestCase):
         # Resource directory should point to /tests/resources
         # Resource directory is two levels up from the current file
         resource_directory = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
+            os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
         config = {RESOURCE_DIRECTORY: resource_directory}
         app = create_app(name="GoldenCrossStrategy", config=config)
@@ -466,7 +465,7 @@ class Test(TestCase):
         # Resource directory should point to /tests/resources
         # Resource directory is two levels up from the current file
         resource_directory = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
+            os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
         config = {RESOURCE_DIRECTORY: resource_directory}
         app = create_app(name="GoldenCrossStrategy", config=config)

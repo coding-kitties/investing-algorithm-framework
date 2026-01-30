@@ -102,11 +102,13 @@ jobs:
         run: |
           source $VENV
           coverage run -m unittest discover -s tests
-#      #----------------------------------------------
-#      #             upload coverage stats
-#      #----------------------------------------------
-#      - name: Upload coverage
-#        uses: codecov/codecov-action@v3
-#        with:
-#          file: ./coverage.xml
-#          fail_ci_if_error: true
+          coverage xml
+      #----------------------------------------------
+      #             upload coverage stats
+      #----------------------------------------------
+      - name: Upload coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}

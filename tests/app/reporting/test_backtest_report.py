@@ -15,10 +15,7 @@ class Test(TestCase):
             os.path.join(
                 os.path.join(
                     os.path.join(
-                        os.path.join(
-                            os.path.realpath(__file__),
-                            os.pardir
-                        ),
+                        os.path.realpath(__file__),
                         os.pardir
                     ),
                     os.pardir

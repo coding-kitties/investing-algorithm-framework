@@ -207,5 +207,8 @@ __all__ = [
     "tqdm",
     "get_missing_timeseries_data_entries",
     "fill_missing_timeseries_data",
-    "create_markdown_table"
+    "create_markdown_table",
+    "download_v2",
+    "DownloadResult",
+    "create_data_storage_path"
 ]

@@ -1,4 +1,5 @@
 import json
+import os
 
 from investing_algorithm_framework import MarketCredential, \
     PortfolioConfiguration, DataSource, INDEX_DATETIME
@@ -23,6 +24,22 @@ class Test(FlaskTestBase):
     external_balances = {
         "EUR": 1000
     }
+
+    def tearDown(self) -> None:
+        super().tearDown()
+
+        database_dir = os.path.join(
+            self.resource_directory, "databases"
+        )
+
+        if os.path.exists(database_dir):
+            for root, dirs, files in os.walk(database_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+
+            os.rmdir(database_dir)
 
     def test_list_portfolios(self):
         strategy = StrategyOne()

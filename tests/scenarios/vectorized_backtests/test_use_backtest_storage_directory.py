@@ -254,7 +254,7 @@ class Test(TestCase):
         # Resource directory should point to /tests/resources
         # Resource directory is two levels up from the current file
         resource_directory = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
+            os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
         config = {RESOURCE_DIRECTORY: resource_directory}
         app = create_app(name="GoldenCrossStrategy", config=config)
@@ -375,7 +375,7 @@ class Test(TestCase):
         # Resource directory should point to /tests/resources
         # Resource directory is two levels up from the current file
         resource_directory = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
+            os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
         config = {RESOURCE_DIRECTORY: resource_directory}
         app = create_app(name="GoldenCrossStrategy", config=config)
@@ -479,7 +479,7 @@ class Test(TestCase):
     def tearDown(self):
         # Clean up the backtest storage directory after test
         resource_directory = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
+            os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
         backtest_storage_dir = os.path.join(
             resource_directory, "backtest_reports_for_testing", "temp_storage"
@@ -507,7 +507,7 @@ class Test(TestCase):
         """
         # RESOURCE_DIRECTORY should always point to the parent directory/resources
         resource_directory = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
+            os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
         config = {RESOURCE_DIRECTORY: resource_directory}
 
@@ -727,7 +727,7 @@ class Test(TestCase):
         - Different runs may have different selection criteria
         """
         resource_directory = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'resources'
+            os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
         config = {RESOURCE_DIRECTORY: resource_directory}
 

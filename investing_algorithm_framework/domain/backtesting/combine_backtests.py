@@ -29,6 +29,35 @@ def safe_weighted_mean(values, weights):
     ) / total_weight if total_weight > 0 else None
 
 
+def _compound_percentage_returns(percentages):
+    """
+    Compound percentage returns across multiple periods.
+
+    For example, if period 1 has 10% return and period 2 has 5% return,
+    the compounded return is: (1 + 0.10) * (1 + 0.05) - 1 = 15.5%
+    NOT simply 10% + 5% = 15%
+
+    Args:
+        percentages (List[float | None]): List of percentage returns
+            (as whole numbers, e.g., 10 for 10%).
+
+    Returns:
+        float | None: The compounded percentage return, or None if no
+            valid percentages.
+    """
+    valid_percentages = [p for p in percentages if p is not None]
+    if not valid_percentages:
+        return None
+
+    # Convert percentages to decimals, compound, then convert back
+    compounded = 1.0
+    for pct in valid_percentages:
+        compounded *= (1 + pct / 100)
+
+    # Convert back to percentage
+    return (compounded - 1) * 100
+
+
 def combine_backtests(backtests):
     """
     Combine multiple backtests into a single backtest by aggregating
@@ -100,156 +129,229 @@ def generate_backtest_summary_metrics(
     backtest_metrics: List[BacktestMetrics]
 ) -> BacktestSummaryMetrics:
     """
-    Combine multiple BacktestMetrics into a single BacktestMetrics
+    Combine multiple BacktestMetrics into a single BacktestSummaryMetrics
     by aggregating their results.
+
+    The aggregation logic follows these principles:
+    - Absolute values (gains, losses, growth): summed across periods
+    - Percentage returns: compounded across periods (not summed)
+    - Ratios (Sharpe, Sortino, etc.): weighted average by time period
+    - Trade-based metrics (win rate, avg trade return): weighted by trade count
+    - Max drawdown: worst (minimum) value across all periods
+    - Counts (number of trades): summed
 
     Args:
         backtest_metrics (List[BacktestMetrics]): List of BacktestMetrics
             instances to combine.
 
     Returns:
-        BacktestMetrics: A new BacktestMetrics instance representing the
-            combined results.
+        BacktestSummaryMetrics: A new BacktestSummaryMetrics instance
+            representing the combined results.
     """
+    if not backtest_metrics:
+        return BacktestSummaryMetrics()
+
+    # Filter out None metrics
+    valid_metrics = [b for b in backtest_metrics if b is not None]
+    if not valid_metrics:
+        return BacktestSummaryMetrics()
+
+    # === ABSOLUTE VALUES (summed) ===
     total_net_gain = sum(
-        b.total_net_gain for b in backtest_metrics
+        b.total_net_gain for b in valid_metrics
         if b.total_net_gain is not None
     )
-    total_net_gain_percentage = sum(
-        b.total_net_gain_percentage for b in backtest_metrics
-        if b.total_net_gain_percentage is not None
-    )
-    average_total_net_gain = safe_weighted_mean(
-        [b.total_net_gain for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
-    )
-    average_total_net_gain_percentage = safe_weighted_mean(
-        [b.total_net_gain_percentage for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
-    )
     total_loss = sum(
-        b.gross_loss for b in backtest_metrics
+        b.gross_loss for b in valid_metrics
         if b.gross_loss is not None
     )
-    total_loss_percentage = sum(
-        b.total_loss_percentage for b in backtest_metrics
-        if b.total_loss_percentage is not None
-    )
-    average_total_loss = safe_weighted_mean(
-        [b.gross_loss for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
-    )
-    average_total_loss_percentage = safe_weighted_mean(
-        [b.total_loss_percentage for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
-    )
     total_growth = sum(
-        b.total_growth for b in backtest_metrics
+        b.total_growth for b in valid_metrics
         if b.total_growth is not None
     )
-    total_growth_percentage = sum(
-        b.total_growth_percentage for b in backtest_metrics
-        if b.total_growth_percentage is not None
+
+    # === PERCENTAGE RETURNS (compounded, not summed) ===
+    # Compound returns: (1 + r1) * (1 + r2) * ... - 1
+    # For percentages stored as whole numbers (e.g., 10 for 10%)
+    total_net_gain_percentage = _compound_percentage_returns(
+        [b.total_net_gain_percentage for b in valid_metrics]
+    )
+    total_loss_percentage = _compound_percentage_returns(
+        [b.total_loss_percentage for b in valid_metrics]
+    )
+    total_growth_percentage = _compound_percentage_returns(
+        [b.total_growth_percentage for b in valid_metrics]
+    )
+
+    # === AVERAGES (weighted by time) ===
+    average_total_net_gain = safe_weighted_mean(
+        [b.total_net_gain for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
+    )
+    average_total_net_gain_percentage = safe_weighted_mean(
+        [b.total_net_gain_percentage for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
+    )
+    average_total_loss = safe_weighted_mean(
+        [b.gross_loss for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
+    )
+    average_total_loss_percentage = safe_weighted_mean(
+        [b.total_loss_percentage for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
     )
     average_growth = safe_weighted_mean(
-        [b.total_growth for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+        [b.total_growth for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
     )
     average_growth_percentage = safe_weighted_mean(
-        [b.total_growth_percentage for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+        [b.total_growth_percentage for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
     )
+
+    # === RISK-ADJUSTED RATIOS (weighted by time) ===
     cagr = safe_weighted_mean(
-        [b.cagr for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+        [b.cagr for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
     )
-    sharp_ratio = safe_weighted_mean(
-        [b.sharpe_ratio for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+    sharpe_ratio = safe_weighted_mean(
+        [b.sharpe_ratio for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
     )
     sortino_ratio = safe_weighted_mean(
-        [b.sortino_ratio for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+        [b.sortino_ratio for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
     )
     calmar_ratio = safe_weighted_mean(
-        [b.calmar_ratio for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
-    )
-    profit_factor = safe_weighted_mean(
-        [b.profit_factor for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+        [b.calmar_ratio for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
     )
     annual_volatility = safe_weighted_mean(
-        [b.annual_volatility for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+        [b.annual_volatility for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
     )
-    max_drawdown = max(
-        (b.max_drawdown for b in backtest_metrics
-         if b.max_drawdown is not None), default=None
+
+    # === PROFIT FACTOR (recalculated from totals, not averaged) ===
+    # profit_factor = total_gross_profit / total_gross_loss
+    total_gross_profit = sum(
+        b.gross_profit for b in valid_metrics
+        if hasattr(b, 'gross_profit') and b.gross_profit is not None
     )
+    total_gross_loss_abs = abs(sum(
+        b.gross_loss for b in valid_metrics
+        if b.gross_loss is not None
+    ))
+    if total_gross_loss_abs > 0:
+        profit_factor = total_gross_profit / total_gross_loss_abs
+    else:
+        # Fallback to weighted average if we can't calculate from totals
+        profit_factor = safe_weighted_mean(
+            [b.profit_factor for b in valid_metrics],
+            [b.total_number_of_days for b in valid_metrics]
+        )
+
+    # === MAX DRAWDOWN (worst value = minimum,
+    # since drawdowns are negative) ===
+    drawdowns = [b.max_drawdown for b in valid_metrics
+                 if b.max_drawdown is not None]
+    max_drawdown = min(drawdowns) if drawdowns else None
+
     max_drawdown_duration = max(
-        (b.max_drawdown_duration for b in backtest_metrics
-            if b.max_drawdown_duration is not None), default=None
+        (b.max_drawdown_duration for b in valid_metrics
+         if b.max_drawdown_duration is not None), default=None
     )
+
+    # === TRADE FREQUENCY (weighted by time) ===
     trades_per_year = safe_weighted_mean(
-        [b.trades_per_year for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+        [b.trades_per_year for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
     )
+
+    # === WIN RATE (weighted by number of closed trades, not time) ===
     win_rate = safe_weighted_mean(
-        [b.win_rate for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+        [b.win_rate for b in valid_metrics],
+        [b.number_of_trades_closed for b in valid_metrics]
     )
     current_win_rate = safe_weighted_mean(
-        [b.current_win_rate for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+        [b.current_win_rate for b in valid_metrics],
+        [b.number_of_trades_closed for b in valid_metrics]
     )
+
+    # === WIN/LOSS RATIO (weighted by number of closed trades) ===
     win_loss_ratio = safe_weighted_mean(
-        [b.win_loss_ratio for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+        [b.win_loss_ratio for b in valid_metrics],
+        [b.number_of_trades_closed for b in valid_metrics]
     )
     current_win_loss_ratio = safe_weighted_mean(
-        [b.current_win_loss_ratio for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+        [b.current_win_loss_ratio for b in valid_metrics],
+        [b.number_of_trades_closed for b in valid_metrics]
     )
+
+    # === TRADE COUNTS (summed) ===
     number_of_trades = sum(
-        b.number_of_trades for b in backtest_metrics
+        b.number_of_trades for b in valid_metrics
         if b.number_of_trades is not None
     )
     number_of_trades_closed = sum(
-        b.number_of_trades_closed for b in backtest_metrics
+        b.number_of_trades_closed for b in valid_metrics
         if b.number_of_trades_closed is not None
     )
+
+    # === EXPOSURE (weighted by time) ===
     cumulative_exposure = safe_weighted_mean(
-        [b.cumulative_exposure for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+        [b.cumulative_exposure for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
     )
     exposure_ratio = safe_weighted_mean(
-        [b.exposure_ratio for b in backtest_metrics],
-        [b.total_number_of_days for b in backtest_metrics]
+        [b.exposure_ratio for b in valid_metrics],
+        [b.total_number_of_days for b in valid_metrics]
     )
+
+    # === AVERAGE TRADE RETURN (weighted by total trades) ===
     average_trade_return = safe_weighted_mean(
-        [b.average_trade_return for b in backtest_metrics],
-        [b.number_of_trades for b in backtest_metrics]
+        [b.average_trade_return for b in valid_metrics],
+        [b.number_of_trades_closed for b in valid_metrics]
     )
     average_trade_return_percentage = safe_weighted_mean(
-        [b.average_trade_return_percentage for b in backtest_metrics],
-        [b.number_of_trades for b in backtest_metrics]
+        [b.average_trade_return_percentage for b in valid_metrics],
+        [b.number_of_trades_closed for b in valid_metrics]
     )
+
+    # === AVERAGE TRADE LOSS (weighted by losing trades) ===
+    # We need to estimate losing trade count from win_rate if not available
+    losing_trade_weights = []
+    for b in valid_metrics:
+        if b.number_of_trades_closed is not None and b.win_rate is not None:
+            losing_trades = b.number_of_trades_closed * (1 - b.win_rate / 100)
+            losing_trade_weights.append(losing_trades)
+        else:
+            losing_trade_weights.append(b.number_of_trades_closed or 0)
+
     average_trade_loss = safe_weighted_mean(
-        [b.average_trade_loss for b in backtest_metrics],
-        [b.number_of_trades for b in backtest_metrics]
+        [b.average_trade_loss for b in valid_metrics],
+        losing_trade_weights
     )
     average_trade_loss_percentage = safe_weighted_mean(
-        [b.average_trade_loss_percentage for b in backtest_metrics],
-        [b.number_of_trades for b in backtest_metrics]
+        [b.average_trade_loss_percentage for b in valid_metrics],
+        losing_trade_weights
     )
+
+    # === AVERAGE TRADE GAIN (weighted by winning trades) ===
+    winning_trade_weights = []
+    for b in valid_metrics:
+        if b.number_of_trades_closed is not None and b.win_rate is not None:
+            winning_trades = b.number_of_trades_closed * (b.win_rate / 100)
+            winning_trade_weights.append(winning_trades)
+        else:
+            winning_trade_weights.append(b.number_of_trades_closed or 0)
+
     average_trade_gain = safe_weighted_mean(
-        [b.average_trade_gain for b in backtest_metrics],
-        [b.number_of_trades for b in backtest_metrics]
+        [b.average_trade_gain for b in valid_metrics],
+        winning_trade_weights
     )
     average_trade_gain_percentage = safe_weighted_mean(
-        [b.average_trade_gain_percentage for b in backtest_metrics],
-        [b.number_of_trades for b in backtest_metrics]
+        [b.average_trade_gain_percentage for b in valid_metrics],
+        winning_trade_weights
     )
     return BacktestSummaryMetrics(
         total_net_gain=total_net_gain,
@@ -265,7 +367,7 @@ def generate_backtest_summary_metrics(
         average_growth=average_growth,
         average_growth_percentage=average_growth_percentage,
         cagr=cagr,
-        sharpe_ratio=sharp_ratio,
+        sharpe_ratio=sharpe_ratio,
         sortino_ratio=sortino_ratio,
         calmar_ratio=calmar_ratio,
         profit_factor=profit_factor,

@@ -30,6 +30,22 @@ class TestConfig(TestBase):
     }
     ATTRIBUTE_ONE = "ATTRIBUTE_ONE"
 
+    def tearDown(self) -> None:
+        super().tearDown()
+
+        database_dir = os.path.join(
+            self.resource_directory, "databases"
+        )
+
+        if os.path.exists(database_dir):
+            for root, dirs, files in os.walk(database_dir, topdown=False):
+                for name in files:
+                    os.remove(os.path.join(root, name))
+                for name in dirs:
+                    os.rmdir(os.path.join(root, name))
+
+            os.rmdir(database_dir)
+
     def test_config(self):
         self.app.set_config(self.ATTRIBUTE_ONE, TEST_VALUE)
         self.app.initialize_config()

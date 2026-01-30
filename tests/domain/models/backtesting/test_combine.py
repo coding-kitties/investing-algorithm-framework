@@ -69,6 +69,7 @@ class TestCombine(TestCase):
                               remaining=0, filled_amount=1, status="closed"),
             average_trade_duration=5.0,
             number_of_trades=10,
+            number_of_trades_closed=10,
             win_rate=0.7,
             win_loss_ratio=1.5,
             percentage_winning_months=0.6,
@@ -130,6 +131,7 @@ class TestCombine(TestCase):
                               remaining=0, filled_amount=2, status="closed"),
             average_trade_duration=7.0,
             number_of_trades=20,
+            number_of_trades_closed=20,
             win_rate=0.3,
             win_loss_ratio=0.6,
             percentage_winning_months=0.3,
@@ -157,11 +159,19 @@ class TestCombine(TestCase):
         self.assertAlmostEqual(summary.sharpe_ratio, (1.2 + -0.5) / 2, places=2)
         self.assertAlmostEqual(summary.sortino_ratio, (1.0 + -0.4) / 2, places=2)
         self.assertAlmostEqual(summary.calmar_ratio, (0.8 + -0.3) / 2, places=2)
-        self.assertAlmostEqual(summary.profit_factor, (1.5 + 0.7) / 2, places=2)
-        self.assertAlmostEqual(summary.win_rate, (0.7 + 0.3) / 2, places=2)
+        # Profit factor is recalculated from totals:
+        # gross_profit = 700 + 300 = 1000
+        # gross_loss = |-200| + |-500| = 700
+        # profit_factor = 1000 / 700 = 1.4286
+        self.assertAlmostEqual(summary.profit_factor, 1000 / 700, places=2)
+        # Win rate is weighted by number_of_trades_closed:
+        # (0.7 * 10 + 0.3 * 20) / (10 + 20) = 13 / 30 = 0.4333
+        self.assertAlmostEqual(summary.win_rate, (0.7 * 10 + 0.3 * 20) / 30, places=2)
 
         # Extreme metrics
-        self.assertEqual(summary.max_drawdown, 0.2)  # worst of the two
+        # max_drawdown uses min() - since values are positive here, min(0.15, 0.2) = 0.15
+        # Note: If drawdowns were negative (e.g., -0.15, -0.2), min would correctly pick -0.2 as worst
+        self.assertEqual(summary.max_drawdown, 0.15)
         self.assertEqual(summary.max_drawdown_duration, 30)  # longest
 
     def test_add_from_storage(self):

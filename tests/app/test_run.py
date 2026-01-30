@@ -58,10 +58,7 @@ class Test(TestCase):
             os.path.join(
                 os.path.join(
                     os.path.join(
-                        os.path.join(
-                            os.path.realpath(__file__),
-                            os.pardir
-                        ),
+                        os.path.realpath(__file__),
                         os.pardir
                     ),
                     os.pardir
@@ -82,6 +79,10 @@ class Test(TestCase):
                     os.remove(os.path.join(root, name))
                 for name in dirs:
                     os.rmdir(os.path.join(root, name))
+
+        # Remove the databases directory itself
+        if os.path.exists(database_dir):
+            os.rmdir(database_dir)
 
     def test_with_number_of_iterations(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})

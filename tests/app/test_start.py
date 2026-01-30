@@ -125,6 +125,9 @@ class Test(TestCase):
                 for name in dirs:
                     os.rmdir(os.path.join(root, name))
 
+        if os.path.exists(path):
+            os.rmdir(path)
+
     def test_default(self):
         app = create_app({
             RESOURCE_DIRECTORY: self.resource_dir

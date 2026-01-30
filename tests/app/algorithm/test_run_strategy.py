@@ -83,6 +83,9 @@ class Test(TestCase):
                 for name in dirs:
                     os.rmdir(os.path.join(root, name))
 
+        if os.path.exists(database_dir):
+            os.rmdir(database_dir)
+
     def test_with_strategy_object(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
         app.add_portfolio_provider(PortfolioProviderTest)

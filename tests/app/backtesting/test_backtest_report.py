@@ -50,6 +50,9 @@ class Test(TestCase):
                 for name in dirs:
                     os.rmdir(os.path.join(root, name))
 
+        if os.path.exists(database_dir):
+            os.rmdir(database_dir)
+
     def test_report_json_creation(self):
         """
         Test if the backtest report is created as a CSV file

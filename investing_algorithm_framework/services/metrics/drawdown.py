@@ -40,7 +40,12 @@ def get_drawdown_series(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float,
     max_value = None
 
     for value, timestamp in equity_curve:
-        if max_value is None:
+        # Skip zero or negative values to avoid division by zero
+        if value <= 0:
+            drawdown_series.append((0.0, timestamp))
+            continue
+
+        if max_value is None or max_value <= 0:
             max_value = value
         max_value = max(max_value, value)
         drawdown = (value - max_value) / max_value  # This will be <= 0
@@ -70,11 +75,31 @@ def get_max_drawdown(snapshots: List[PortfolioSnapshot]) -> float:
         return 0.0
 
     peak = equity_curve[0][0]
+
+    # Handle zero or negative starting value
+    if peak <= 0:
+        # Find first positive value as the peak
+        for equity, _ in equity_curve:
+            if equity > 0:
+                peak = equity
+                break
+        else:
+            # No positive values found
+            return 0.0
+
     max_drawdown_pct = 0.0
 
-    for equity, _  in equity_curve:
+    for equity, _ in equity_curve:
+        # Skip non-positive values
+        if equity <= 0:
+            continue
+
         if equity > peak:
             peak = equity
+
+        # Avoid division by zero (shouldn't happen now but extra safety)
+        if peak <= 0:
+            continue
 
         drawdown_pct = (equity - peak) / peak  # Will be 0 or negative
         max_drawdown_pct = min(max_drawdown_pct, drawdown_pct)
@@ -108,15 +133,27 @@ def get_max_daily_drawdown(snapshots: List[PortfolioSnapshot]) -> float:
     if daily_df.empty:
         return 0.0
 
-    peak = daily_df['total_value'].iloc[0]
+    # Filter out non-positive values
+    positive_values = daily_df[daily_df['total_value'] > 0]['total_value']
+
+    if positive_values.empty:
+        return 0.0
+
+    peak = positive_values.iloc[0]
     max_daily_drawdown_pct = 0.0
-    for equity in daily_df['total_value']:
+
+    for equity in positive_values:
         if equity > peak:
             peak = equity
 
+        # Avoid division by zero (shouldn't happen but extra safety)
+        if peak <= 0:
+            continue
+
         drawdown_pct = (equity - peak) / peak
         max_daily_drawdown_pct = min(max_daily_drawdown_pct, drawdown_pct)
-    return abs(max_daily_drawdown_pct)  # Return as positive percentage (e.g., 5.0 for a 5% drawdown)
+
+    return abs(max_daily_drawdown_pct)  # Return as positive percentage
 
 def get_max_drawdown_duration(snapshots: List[PortfolioSnapshot]) -> int:
     """

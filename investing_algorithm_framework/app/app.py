@@ -25,7 +25,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
     BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db, \
-    PandasOHLCVDataProvider, BacktestService
+    PandasOHLCVDataProvider
 from investing_algorithm_framework.services import OrderBacktestService, \
     BacktestPortfolioService, DefaultTradeOrderEvaluator, get_risk_free_rate_us
 from .app_hook import AppHook

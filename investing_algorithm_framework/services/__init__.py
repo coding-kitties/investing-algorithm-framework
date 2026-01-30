@@ -17,7 +17,7 @@ from .metrics import get_annual_volatility, get_mean_daily_return, \
     get_equity_curve, get_price_efficiency_ratio, get_sharpe_ratio, \
     get_profit_factor, get_cumulative_profit_factor_series, \
     get_rolling_profit_factor_series, get_daily_returns_std, \
-    get_cagr, get_standard_deviation_returns, \
+    get_cagr, get_standard_deviation_returns, get_mean_yearly_return, \
     get_standard_deviation_downside_returns, \
     get_total_return, get_cumulative_exposure, get_exposure_ratio, \
     get_yearly_returns, get_monthly_returns, get_best_year, \
@@ -131,5 +131,6 @@ __all__ = [
     "get_current_average_trade_return",
     "create_backtest_metrics_for_backtest",
     "TradeStopLossService",
-    "TradeTakeProfitService"
+    "TradeTakeProfitService",
+    "get_mean_yearly_return"
 ]

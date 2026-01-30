@@ -1,7 +1,7 @@
 from unittest import TestCase
 from datetime import datetime, date
 from investing_algorithm_framework.domain import Trade, BacktestMetrics
-from investing_algorithm_framework.app.analysis import combine_backtest_metrics
+from investing_algorithm_framework.analysis.ranking import combine_backtest_metrics
 
 class TestCombineMetrics(TestCase):
 
