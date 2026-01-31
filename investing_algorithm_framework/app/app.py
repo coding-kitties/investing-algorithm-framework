@@ -934,6 +934,7 @@ class App:
         batch_size: int = 50,
         checkpoint_batch_size: int = 25,
         n_workers: Optional[int] = None,
+        dynamic_position_sizing: bool = False,
     ) -> List[Backtest]:
         """
         Run vectorized backtests for a set of strategies. The provided
@@ -1147,6 +1148,7 @@ class App:
             checkpoint_batch_size=checkpoint_batch_size,
             n_workers=n_workers,
             use_checkpoints=use_checkpoints,
+            dynamic_position_sizing=dynamic_position_sizing,
         )
 
     def run_vector_backtest(
@@ -1165,6 +1167,7 @@ class App:
         backtest_storage_directory: Optional[Union[str, Path]] = None,
         use_checkpoints: bool = False,
         show_progress=False,
+        dynamic_position_sizing: bool = False,
     ) -> Backtest:
         """
         Run vectorized backtests for a strategy. The provided
@@ -1269,6 +1272,7 @@ class App:
             backtest_storage_directory=backtest_storage_directory,
             use_checkpoints=use_checkpoints,
             show_progress=show_progress,
+            dynamic_position_sizing=dynamic_position_sizing,
         )
 
         return backtest

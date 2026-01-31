@@ -55,6 +55,7 @@ class VectorBacktestService:
         backtest_date_range: BacktestDateRange,
         portfolio_configuration: PortfolioConfiguration,
         risk_free_rate: float = 0.027,
+        dynamic_position_sizing: bool = False,
     ) -> BacktestRun:
         """
         Vectorized backtest for multiple assets using strategy
@@ -63,11 +64,15 @@ class VectorBacktestService:
         Args:
             strategy: The strategy to backtest.
             backtest_date_range: The date range for the backtest.
+            portfolio_configuration: Portfolio configuration containing
+                initial balance, market, and trading symbol.
             risk_free_rate: The risk-free rate to use for the backtest
                 metrics. Default is 0.027 (2.7%).
-            initial_amount: The initial amount to use for the backtest.
-                If None, the initial amount will be taken from the first
-                portfolio configuration.
+            dynamic_position_sizing: If True, position sizes are recalculated
+                at each trade based on current portfolio value (similar to
+                event-based backtesting). If False (default), position sizes
+                are calculated once at the start based on initial portfolio
+                value. Default is False for backward compatibility.
 
         Returns:
             BacktestRun: The backtest run containing the results and metrics.
@@ -129,13 +134,24 @@ class VectorBacktestService:
             )
         ]
 
+        # Pre-compute all data needed for each symbol
+        symbol_data = {}
         for symbol in buy_signals.keys():
             full_symbol = f"{symbol}/{trading_symbol}"
+
             # find PositionSize object
             pos_size_obj = next(
                 (p for p in strategy.position_sizes if
                  p.symbol == symbol), None
             )
+
+            if pos_size_obj is None:
+                raise OperationalException(
+                    f"No position size object defined "
+                    f"for symbol {symbol}, please make sure to "
+                    f"register a PositionSize object in the strategy."
+                )
+
             # Load most granular OHLCV data for the symbol
             df = self.data_provider_service.get_ohlcv_data(
                 symbol=full_symbol,
@@ -146,7 +162,7 @@ class VectorBacktestService:
             granular_ohlcv_data_order_by_symbol[full_symbol] = df
 
             # Align signals with most granular OHLCV data
-            close = df["Close"]
+            close = df["Close"].reindex(index, method='ffill')
             buy_signal = buy_signals[symbol].reindex(index, fill_value=False)
             sell_signal = sell_signals[symbol].reindex(index, fill_value=False)
 
@@ -156,14 +172,9 @@ class VectorBacktestService:
             signal = signal.replace(0, np.nan).ffill().shift(1).fillna(0)
             signal = signal.astype(float)
 
-            if pos_size_obj is None:
-                raise OperationalException(
-                    f"No position size object defined "
-                    f"for symbol {symbol}, please make sure to "
-                    f"register a PositionSize object in the strategy."
-                )
-
-            capital_for_trade = pos_size_obj.get_size(
+            # Calculate initial capital for trade
+            # (used when dynamic_position_sizing=False)
+            initial_capital_for_trade = pos_size_obj.get_size(
                 Portfolio(
                     unallocated=portfolio_configuration.initial_balance,
                     initial_balance=portfolio_configuration.initial_balance,
@@ -171,36 +182,78 @@ class VectorBacktestService:
                     net_size=0,
                     market="BACKTEST",
                     identifier="vector_backtest"
-                ) if pos_size_obj else (initial_amount / len(buy_signals)),
-                asset_price=close.iloc[0]
+                ),
+                asset_price=close.iloc[0] if len(close) > 0 else 1.0
             )
 
-            # Trade generation
-            last_trade = None
+            symbol_data[symbol] = {
+                'full_symbol': full_symbol,
+                'pos_size_obj': pos_size_obj,
+                'close': close,
+                'signal': signal,
+                'initial_capital_for_trade': initial_capital_for_trade,
+                'last_trade': None,  # Track open trade per symbol
+            }
 
-            # Align signals with most granular OHLCV data
-            close = df["Close"].reindex(index, method='ffill')
-            buy_signal = buy_signals[symbol].reindex(index, fill_value=False)
-            sell_signal = sell_signals[symbol].reindex(index, fill_value=False)
+        # Shared portfolio state for dynamic position sizing
+        current_unallocated = initial_amount
+        total_realized_gains = 0.0
+        open_trades_value = {}  # Track value of open trades per symbol
 
-            # Loop over all timestamps in the backtest
-            for i in range(len(index)):
+        # Process all timestamps in chronological order
+        for i in range(len(index)):
+            current_date = index[i]
 
-                # 1 = buy, -1 = sell, 0 = hold
-                current_signal = signal.iloc[i]
-                current_price = float(close.iloc[i])
-                current_date = index[i]
+            # Convert the pd.Timestamp to an utc datetime object
+            if isinstance(current_date, pd.Timestamp):
+                current_date = current_date.to_pydatetime()
 
-                # Convert the pd.Timestamp to an utc datetime object
-                if isinstance(current_date, pd.Timestamp):
-                    current_date = current_date.to_pydatetime()
+            if current_date.tzinfo is None:
+                current_date = current_date.replace(tzinfo=timezone.utc)
 
-                if current_date.tzinfo is None:
-                    current_date = current_date.replace(tzinfo=timezone.utc)
+            # Process each symbol at this timestamp
+            for symbol, data in symbol_data.items():
+                current_signal = data['signal'].iloc[i]
+                current_price = float(data['close'].iloc[i])
+                pos_size_obj = data['pos_size_obj']
+                last_trade = data['last_trade']
 
                 # If we are not in a position, and we get a buy signal
                 if current_signal == 1 and last_trade is None:
+                    # Calculate capital for this trade
+                    if dynamic_position_sizing:
+                        # Calculate current portfolio value:
+                        # unallocated + value of all open trades
+                        open_trades_total = sum(open_trades_value.values())
+                        current_portfolio_value = \
+                            current_unallocated + open_trades_total
+                        capital_for_trade = pos_size_obj.get_size(
+                            Portfolio(
+                                unallocated=current_portfolio_value,
+                                initial_balance=initial_amount,
+                                trading_symbol=trading_symbol,
+                                net_size=0,
+                                market="BACKTEST",
+                                identifier="vector_backtest"
+                            ),
+                            asset_price=current_price
+                        )
+                        # Don't exceed available unallocated funds
+                        capital_for_trade = min(
+                            capital_for_trade, current_unallocated
+                        )
+                    else:
+                        capital_for_trade = data['initial_capital_for_trade']
+
+                    if capital_for_trade <= 0:
+                        continue  # Skip if no capital available
+
                     amount = float(capital_for_trade / current_price)
+
+                    # Update shared portfolio state
+                    if dynamic_position_sizing:
+                        current_unallocated -= capital_for_trade
+
                     buy_order = Order(
                         id=uuid4(),
                         target_symbol=symbol,
@@ -229,14 +282,26 @@ class VectorBacktestService:
                         status=TradeStatus.OPEN.value,
                         cost=capital_for_trade
                     )
-                    last_trade = trade
+                    data['last_trade'] = trade
                     trades.append(trade)
+
+                    # Track open trade value
+                    if dynamic_position_sizing:
+                        open_trades_value[symbol] = capital_for_trade
 
                 # If we are in a position, and we get a sell signal
                 if current_signal == -1 and last_trade is not None:
                     net_gain_val = (
                         current_price - last_trade.open_price
                     ) * last_trade.available_amount
+
+                    # Update shared portfolio state
+                    if dynamic_position_sizing:
+                        current_unallocated += last_trade.cost + net_gain_val
+                        total_realized_gains += net_gain_val
+                        if symbol in open_trades_value:
+                            del open_trades_value[symbol]
+
                     sell_order = Order(
                         id=uuid4(),
                         target_symbol=symbol,
@@ -256,12 +321,22 @@ class VectorBacktestService:
                         {
                             "orders": trade_orders,
                             "closed_at": current_date,
-                            "status": TradeStatus.CLOSED,
+                            "status": TradeStatus.CLOSED.value,
                             "updated_at": current_date,
                             "net_gain": net_gain_val
                         }
                     )
-                    last_trade = None
+                    data['last_trade'] = None
+
+            # Update open trade values at each timestamp for
+            # accurate portfolio value
+            if dynamic_position_sizing:
+                for symbol, data in symbol_data.items():
+                    if data['last_trade'] is not None:
+                        current_price = float(data['close'].iloc[i])
+                        open_trades_value[symbol] = (
+                            data['last_trade'].available_amount * current_price
+                        )
 
         unallocated = initial_amount
         total_net_gain = 0.0

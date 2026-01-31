@@ -575,6 +575,7 @@ class BacktestService:
         batch_size: int = 50,
         checkpoint_batch_size: int = 25,
         n_workers: Optional[int] = None,
+        dynamic_position_sizing: bool = False,
     ):
         """
         OPTIMIZED version: Run vectorized backtests with optional
@@ -621,6 +622,11 @@ class BacktestService:
             n_workers: Number of parallel workers (default: None = sequential,
                 -1 = use all CPU cores, N = use N workers).
                 Recommended: os.cpu_count() - 1 to leave one core free.
+            dynamic_position_sizing: If True, position sizes are recalculated
+                at each trade based on current portfolio value (similar to
+                event-based backtesting). If False (default), position sizes
+                are calculated once at the start based on initial portfolio
+                value.
 
         Returns:
             List[Backtest]: List of backtest results.
@@ -807,7 +813,8 @@ class BacktestService:
                             risk_free_rate,
                             continue_on_error,
                             self._data_provider_service.copy(),
-                            False
+                            False,
+                            dynamic_position_sizing
                         ))
 
                     # Execute batches in parallel
@@ -912,7 +919,8 @@ class BacktestService:
                             risk_free_rate,
                             continue_on_error,
                             self._data_provider_service,
-                            False  # Don't show progress for individual batches
+                            False,  # Don't show progress for individual
+                            dynamic_position_sizing
                         )
 
                         try:
@@ -1556,7 +1564,9 @@ class BacktestService:
                 snapshot_interval,
                 risk_free_rate,
                 continue_on_error,
-                data_provider_service
+                data_provider_service,
+                show_progress,
+                dynamic_position_sizing
             )
 
         Returns:
@@ -1570,7 +1580,8 @@ class BacktestService:
             risk_free_rate,
             continue_on_error,
             data_provider_service,
-            show_progress
+            show_progress,
+            dynamic_position_sizing
         ) = args
 
         vector_backtest_service = VectorBacktestService(
@@ -1595,6 +1606,7 @@ class BacktestService:
                     backtest_date_range=backtest_date_range,
                     portfolio_configuration=portfolio_configuration,
                     risk_free_rate=risk_free_rate,
+                    dynamic_position_sizing=dynamic_position_sizing,
                 )
                 backtest = Backtest(
                     algorithm_id=strategy.algorithm_id,
@@ -1637,6 +1649,7 @@ class BacktestService:
         n_workers: Optional[int] = None,
         batch_size: int = 50,
         checkpoint_batch_size: int = 25,
+        dynamic_position_sizing: bool = False,
     ) -> Backtest:
         """
         Run optimized vectorized backtest for a single strategy.
@@ -1676,6 +1689,9 @@ class BacktestService:
             n_workers: Number of parallel workers (None = sequential).
             batch_size: Number of strategies to process in each batch.
             checkpoint_batch_size: Number of backtests before batch save.
+            dynamic_position_sizing: If True, position sizes are recalculated
+                at each trade based on current portfolio value. If False
+                (default), position sizes are calculated once at the start.
 
         Returns:
             Backtest: Instance of Backtest for the single strategy.
@@ -1723,6 +1739,7 @@ class BacktestService:
             batch_size=batch_size,
             checkpoint_batch_size=checkpoint_batch_size,
             n_workers=n_workers,
+            dynamic_position_sizing=dynamic_position_sizing,
         )
 
         # Extract the single backtest result

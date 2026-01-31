@@ -30,11 +30,15 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
         # First check pending orders
         for open_order in open_orders:
             data = ohlcv_data.get(open_order.symbol)
+
+            if data is None or data.is_empty():
+                continue
+
             self._check_has_executed(open_order, data)
 
         if len(open_trades) > 0:
             for open_trade in open_trades:
-                data = ohlcv_data[open_trade.symbol]
+                data = ohlcv_data.get(open_trade.symbol)
 
                 if data is None or data.is_empty():
                     continue

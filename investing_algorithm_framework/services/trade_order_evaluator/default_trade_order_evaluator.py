@@ -31,7 +31,7 @@ class DefaultTradeOrderEvaluator(TradeOrderEvaluator):
 
         if len(open_trades) > 0:
             for open_trade in open_trades:
-                data = ohlcv_data[open_trade.symbol]
+                data = ohlcv_data.get(open_trade.symbol)
 
                 if data is None or data.is_empty():
                     continue
