@@ -31,8 +31,14 @@ backtest_range = BacktestDateRange(
     end_date=datetime(2024, 1, 1, tzinfo=timezone.utc)
 )
 
-# Run the backtest
-backtest = app.run_backtest(
+# Run an event backtest
+event_backtest = app.run_backtest(
+    backtest_date_range=backtest_range,
+    initial_amount=1000
+)
+
+# Run a vector backtest
+vector_backtest = app.run_vector_backtest(
     backtest_date_range=backtest_range,
     initial_amount=1000
 )
@@ -40,7 +46,8 @@ backtest = app.run_backtest(
 
 ## Event-Based Backtesting
 
-Event-based backtesting simulates the market environment by processing each price update sequentially, just like live trading.
+Event-based backtesting simulates the market environment by processing each price update sequentially, just like live trading, 
+based on the defined strategy interval (e.g., 1-minute, 5-minute bars).
 
 ### Running an Event-Based Backtest
 
@@ -48,7 +55,7 @@ Event-based backtesting simulates the market environment by processing each pric
 backtest = app.run_backtest(
     backtest_date_range=backtest_range,
     initial_amount=1000,
-    risk_free_rate=0.027,  # Optional: for Sharpe ratio calculation
+    risk_free_rate=0.027,  # Optional: for metrics such as Sharpe ratio calculation
 )
 ```
 
@@ -117,6 +124,39 @@ backtests = app.run_vector_backtests(
     trading_symbol="EUR"
 )
 ```
+
+## Key Differences: Vector vs Event Backtesting
+
+### Signal Timing
+- **Vector Backtest**: Signals are executed at the exact timestamp they are generated.
+- **Event Backtest**: Signals are executed at the next strategy interval boundary (e.g ., next 5-minute bar).
+- This can lead to slight differences in execution prices, especially in volatile markets.
+
+### Stop Loss and Take Profit
+- **Vector Backtest**: Does not support stop loss and take profit orders natively due to its batch processing nature.
+- **Event Backtest**: Fully supports stop loss and take profit orders as they can be evaluated in real-time.
+
+### Position Sizing
+- **Vector Backtest**: Position sizing is calculated based on the portfolio value at the time of signal generation.
+- **Event Backtest**: Position sizing is based on the portfolio value at the time of order execution, which may differ from signal generation time.
+- This can lead to different position sizes if the portfolio value changes significantly between signal generation and execution.
+
+### Data Provision
+The data provision between vector and event backtests is fundamentally different:
+
+| Aspect | Vector Backtest | Event Backtest |
+|--------|-----------------|----------------|
+| **Data Loading** | All data at once | Window at each step |
+| **Signal Computation** | On full history | On window only |
+| **Warmup Period** | Included in data | Part of window |
+| **Indicator Behavior** | Consistent throughout | Fresh computation each step |
+
+**What this means:**
+
+- **Vector backtest** loads the entire dataset upfront and computes signals on the full history. Indicators like EMA/RSI see all historical data at once.
+- **Event backtest** simulates real-time trading by providing only a sliding window of data at each step. Indicators are computed fresh on each window.
+
+With a sufficiently large `window_size` (e.g., 800 bars), both approaches should produce identical signals. However, execution timing may still differ slightly since vector backtests execute at the exact signal timestamp while event backtests execute at strategy interval boundaries.
 
 ## Analyzing Results
 
