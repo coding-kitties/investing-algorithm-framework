@@ -2,8 +2,9 @@ from .markdown import create_markdown_table
 from .backtest_data_ranges import select_backtest_date_ranges, \
     generate_rolling_backtest_windows
 from .ranking import create_weights, rank_results
-from .data import fill_missing_timeseries_data, \
-    get_missing_timeseries_data_entries
+# Import from new location for backward compatibility
+from investing_algorithm_framework.services.data_providers.data import \
+    fill_missing_timeseries_data, get_missing_timeseries_data_entries
 
 __all__ = [
     "create_markdown_table",

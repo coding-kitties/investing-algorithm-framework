@@ -22,7 +22,7 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     TradeStatus, generate_backtest_summary_metrics, generate_algorithm_id, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus, \
-    save_backtests_to_directory, BacktestMetrics
+    save_backtests_to_directory, BacktestMetrics, DATA_DIRECTORY
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CCXTOHLCVDataProvider, PandasOHLCVDataProvider, \
     AWSS3StorageStateHandler
@@ -210,5 +210,6 @@ __all__ = [
     "create_markdown_table",
     "download_v2",
     "DownloadResult",
-    "create_data_storage_path"
+    "create_data_storage_path",
+    "DATA_DIRECTORY"
 ]

@@ -950,7 +950,8 @@ class DataProviderService:
     def prepare_backtest_data(
         self,
         backtest_date_range: BacktestDateRange,
-        show_progress: bool = True
+        show_progress: bool = True,
+        fill_missing_data: bool = False,
     ):
         """
         Prepare the backtest data for all registered data providers.
@@ -960,6 +961,8 @@ class DataProviderService:
                 backtest data.
             show_progress (bool): Whether to show progress while preparing
                 the backtest data.
+            fill_missing_data (bool): If True, missing time series data
+                entries will be filled automatically.
 
         Raises:
             OperationalException: If no data providers are registered.
@@ -988,7 +991,9 @@ class DataProviderService:
                 try:
                     data_provider.prepare_backtest_data(
                         backtest_start_date=backtest_date_range.start_date,
-                        backtest_end_date=backtest_date_range.end_date
+                        backtest_end_date=backtest_date_range.end_date,
+                        fill_missing_data=fill_missing_data,
+                        show_progress=show_progress,
                     )
                 except Exception as e:
                     logger.error(
@@ -1001,7 +1006,9 @@ class DataProviderService:
                 try:
                     data_provider.prepare_backtest_data(
                         backtest_start_date=backtest_date_range.start_date,
-                        backtest_end_date=backtest_date_range.end_date
+                        backtest_end_date=backtest_date_range.end_date,
+                        fill_missing_data=fill_missing_data,
+                        show_progress=show_progress,
                     )
                 except Exception as e:
                     logger.error(

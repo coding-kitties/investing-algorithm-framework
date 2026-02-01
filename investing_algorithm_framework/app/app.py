@@ -416,7 +416,8 @@ class App:
         self,
         data_sources: List[DataSource],
         backtest_date_range: BacktestDateRange,
-        show_progress: bool = True
+        show_progress: bool = True,
+        fill_missing_data: bool = False,
     ):
         """
         Function to initialize the data sources for the app in backtest mode.
@@ -430,6 +431,9 @@ class App:
                 backtest. This should be an instance of BacktestDateRange.
             show_progress (bool): Whether to show a progress bar when
                 preparing the backtest data for each data provider.
+            fill_missing_data (bool): If True, missing time series data
+                entries will be filled automatically before preparing the
+                backtest data.
 
         Returns:
             None
@@ -464,7 +468,9 @@ class App:
 
                 data_provider.prepare_backtest_data(
                     backtest_start_date=backtest_date_range.start_date,
-                    backtest_end_date=backtest_date_range.end_date
+                    backtest_end_date=backtest_date_range.end_date,
+                    fill_missing_data=fill_missing_data,
+                    show_progress=show_progress,
                 )
         else:
             for _, data_provider in \
@@ -474,7 +480,9 @@ class App:
 
                 data_provider.prepare_backtest_data(
                     backtest_start_date=backtest_date_range.start_date,
-                    backtest_end_date=backtest_date_range.end_date
+                    backtest_end_date=backtest_date_range.end_date,
+                    fill_missing_data=fill_missing_data,
+                    show_progress=show_progress,
                 )
 
     def initialize_backtest_services(self):
@@ -935,6 +943,7 @@ class App:
         checkpoint_batch_size: int = 25,
         n_workers: Optional[int] = None,
         dynamic_position_sizing: bool = False,
+        fill_missing_data: bool = True,
     ) -> List[Backtest]:
         """
         Run vectorized backtests for a set of strategies. The provided
@@ -1149,11 +1158,12 @@ class App:
             n_workers=n_workers,
             use_checkpoints=use_checkpoints,
             dynamic_position_sizing=dynamic_position_sizing,
+            fill_missing_data=fill_missing_data,
         )
 
     def run_vector_backtest(
         self,
-        strategy: TradingStrategy,
+        strategy: TradingStrategy = None,
         backtest_date_range: BacktestDateRange = None,
         backtest_date_ranges: List[BacktestDateRange] = None,
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
@@ -1168,6 +1178,7 @@ class App:
         use_checkpoints: bool = False,
         show_progress=False,
         dynamic_position_sizing: bool = False,
+        fill_missing_data: bool = True,
     ) -> Backtest:
         """
         Run vectorized backtests for a strategy. The provided
@@ -1176,13 +1187,14 @@ class App:
         backtesting.
 
         Args:
+            strategy (TradingStrategy) (Optional): The strategy object
+                that needs to be backtested. If not provided, the first
+                registered strategy will be used.
             backtest_date_range: The date range to run the backtest for
                 (instance of BacktestDateRange)
             initial_amount: The initial amount to start the backtest with.
                 This will be the amount of trading currency that the backtest
                 portfolio will start with.
-            strategy (TradingStrategy) (Optional): The strategy object
-                that needs to be backtested.
             snapshot_interval (SnapshotInterval): The snapshot
                 interval to use for the backtest. This is used to determine
                 how often the portfolio snapshot should be taken during the
@@ -1236,6 +1248,17 @@ class App:
         Returns:
             Backtest: Instance of Backtest
         """
+        # Use registered strategy if none provided
+        if strategy is None:
+            if self._strategies and len(self._strategies) > 0:
+                strategy = self._strategies[0]
+            else:
+                raise OperationalException(
+                    "No strategy provided and no strategies registered. "
+                    "Please provide a strategy or register one with "
+                    "app.add_strategy() before running the backtest."
+                )
+
         if not skip_data_sources_initialization:
             data_provider_service = self.container.data_provider_service()
             data_provider_service.reset()
@@ -1273,6 +1296,7 @@ class App:
             use_checkpoints=use_checkpoints,
             show_progress=show_progress,
             dynamic_position_sizing=dynamic_position_sizing,
+            fill_missing_data=fill_missing_data,
         )
 
         return backtest
@@ -1298,6 +1322,7 @@ class App:
         checkpoint_batch_size: int = 25,
         market: str = None,
         trading_symbol: str = None,
+        fill_missing_data: bool = True,
     ) -> List[Backtest]:
         """
         Run multiple event-driven backtests for a list of algorithms over
@@ -1339,6 +1364,9 @@ class App:
             market (str): Market to use for portfolio configuration.
             trading_symbol (str): Trading symbol to use for portfolio
                 configuration.
+            fill_missing_data (bool): If True (default), missing time series
+                data entries will be filled automatically before running the
+                backtest.
 
         Returns:
             List[Backtest]: List of Backtest instances containing the results
@@ -1439,6 +1467,7 @@ class App:
             use_checkpoints=use_checkpoints,
             batch_size=batch_size,
             checkpoint_batch_size=checkpoint_batch_size,
+            fill_missing_data=fill_missing_data,
         )
 
         # Cleanup resources
@@ -1461,6 +1490,7 @@ class App:
         show_progress: bool = True,
         market: str = None,
         trading_symbol: str = None,
+        fill_missing_data: bool = True,
     ) -> Backtest:
         """
         Run an event-driven backtest for an algorithm.
@@ -1515,6 +1545,9 @@ class App:
             trading_symbol (str): The trading symbol to use for the backtest.
                 This is used to create a portfolio configuration if no
                 portfolio configuration is provided.
+            fill_missing_data (bool): If True (default), missing time series
+                data entries will be filled automatically before running the
+                backtest.
 
         Returns:
             Backtest: Instance of Backtest
@@ -1548,10 +1581,12 @@ class App:
 
         # Initialize data sources for backtest
         self.initialize_data_sources_backtest(
-            algorithm.data_sources, backtest_date_range
+            algorithm.data_sources, backtest_date_range,
+            fill_missing_data=fill_missing_data
         )
 
         # Delegate to backtest service
+        # Skip data sources initialization since we already did it above
         backtest_service = self.container.backtest_service()
         backtest, run_history = backtest_service.run_backtest(
             algorithm=algorithm,
@@ -1568,6 +1603,8 @@ class App:
             initial_amount=initial_amount,
             market=market,
             trading_symbol=trading_symbol,
+            fill_missing_data=fill_missing_data,
+            skip_data_sources_initialization=True,
         )
 
         # Store run history

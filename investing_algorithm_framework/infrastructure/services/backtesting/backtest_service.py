@@ -14,9 +14,10 @@ from investing_algorithm_framework.domain import BacktestRun, TimeUnit, \
     OperationalException, BacktestDateRange, Backtest, combine_backtests, \
     generate_backtest_summary_metrics, DataSource, \
     PortfolioConfiguration, tqdm, SnapshotInterval, \
-    save_backtests_to_directory
+    save_backtests_to_directory, TimeFrame
 from investing_algorithm_framework.services.data_providers import \
-    DataProviderService
+    DataProviderService, fill_missing_timeseries_data, \
+    get_missing_timeseries_data_entries
 from investing_algorithm_framework.services.metrics import \
     create_backtest_metrics, get_risk_free_rate_us
 from investing_algorithm_framework.services.portfolios import \
@@ -40,6 +41,114 @@ def _print_progress(message: str, show_progress: bool = True):
     """
     if show_progress:
         print(message, flush=True)
+
+
+def _fill_missing_data_for_data_sources(
+    data_sources: List[DataSource],
+    backtest_date_range: BacktestDateRange,
+    data_provider_service: DataProviderService,
+    show_progress: bool = True
+):
+    """
+    Fill missing time series data entries for all data sources before
+    running a backtest. This ensures that the data providers have
+    complete data for the requested backtest date range.
+
+    Args:
+        data_sources (List[DataSource]): The data sources to check and
+            fill missing data for.
+        backtest_date_range (BacktestDateRange): The date range for the
+            backtest.
+        data_provider_service (DataProviderService): The data provider
+            service to use for getting data.
+        show_progress (bool): Whether to show progress messages.
+
+    Returns:
+        None
+    """
+    if data_sources is None or len(data_sources) == 0:
+        return
+
+    # Get unique data sources
+    unique_data_sources = set(data_sources)
+
+    for data_source in unique_data_sources:
+        try:
+            # Get the data provider for this data source
+            data_provider = data_provider_service.data_provider_index\
+                .data_providers_lookup.get(data_source)
+
+            if data_provider is None:
+                continue
+
+            # Get the data from the data provider
+            if hasattr(data_provider, 'data') and \
+                    data_provider.data is not None:
+                data = data_provider.data
+
+                # Calculate the required start date considering window_size
+                if data_source.window_size is not None:
+                    required_start_date = backtest_date_range.start_date - \
+                        timedelta(
+                            minutes=TimeFrame.from_value(
+                                data_source.time_frame
+                            ).amount_of_minutes * data_source.window_size
+                        )
+                else:
+                    required_start_date = backtest_date_range.start_date
+
+                required_end_date = backtest_date_range.end_date
+
+                # Get the frequency string based on time_frame
+                time_frame = TimeFrame.from_value(data_source.time_frame)
+                freq_minutes = time_frame.amount_of_minutes
+                freq = f"{freq_minutes}min" if freq_minutes < 60 else \
+                    f"{freq_minutes // 60}h" if freq_minutes < 1440 else "D"
+
+                # Check for missing dates
+                missing_dates = get_missing_timeseries_data_entries(
+                    data,
+                    start=required_start_date,
+                    end=required_end_date,
+                    freq=freq
+                )
+
+                if len(missing_dates) > 0:
+                    if show_progress:
+                        _print_progress(
+                            f"Filling {len(missing_dates)} missing dates for "
+                            f"{data_source.identifier or data_source.symbol}",
+                            show_progress
+                        )
+
+                    # Get file path if available
+                    # (check multiple attribute names)
+                    file_path = None
+                    if hasattr(data_provider, 'data_file_path') and \
+                            data_provider.data_file_path is not None:
+                        file_path = data_provider.data_file_path
+                    elif hasattr(data_provider, 'file_path') and \
+                            data_provider.file_path is not None:
+                        file_path = data_provider.file_path
+                    elif hasattr(data_provider, 'get_data_source_file_path'):
+                        file_path = data_provider.get_data_source_file_path()
+
+                    # Fill the missing data
+                    filled_data = fill_missing_timeseries_data(
+                        data,
+                        missing_dates=missing_dates,
+                        save_to_file=file_path is not None,
+                        file_path=file_path
+                    )
+
+                    # Update the data provider's data
+                    data_provider.data = filled_data
+
+        except Exception as e:
+            logger.warning(
+                f"Could not fill missing data for data source "
+                f"{data_source.identifier or data_source.symbol}: {e}"
+            )
 
 
 class BacktestService:
@@ -509,7 +618,8 @@ class BacktestService:
         self,
         data_sources: List[DataSource],
         backtest_date_range: BacktestDateRange,
-        show_progress: bool = True
+        show_progress: bool = True,
+        fill_missing_data: bool = False
     ):
         """
         Function to initialize the data sources for the app in backtest mode.
@@ -523,6 +633,9 @@ class BacktestService:
                 backtest. This should be an instance of BacktestDateRange.
             show_progress (bool): Whether to show a progress bar when
                 preparing the backtest data for each data provider.
+            fill_missing_data (bool): If True, missing time series data
+                entries will be filled automatically before preparing the
+                backtest data.
 
         Returns:
             None
@@ -547,10 +660,13 @@ class BacktestService:
             )
 
         # Prepare the backtest data for each data provider
+        # Fill missing data is handled inside prepare_backtest_data
         for _, data_provider in data_providers:
             data_provider.prepare_backtest_data(
                 backtest_start_date=backtest_date_range.start_date,
-                backtest_end_date=backtest_date_range.end_date
+                backtest_end_date=backtest_date_range.end_date,
+                fill_missing_data=fill_missing_data,
+                show_progress=show_progress
             )
 
     def run_vector_backtests(
@@ -576,6 +692,7 @@ class BacktestService:
         checkpoint_batch_size: int = 25,
         n_workers: Optional[int] = None,
         dynamic_position_sizing: bool = False,
+        fill_missing_data: bool = True,
     ):
         """
         OPTIMIZED version: Run vectorized backtests with optional
@@ -627,6 +744,10 @@ class BacktestService:
                 event-based backtesting). If False (default), position sizes
                 are calculated once at the start based on initial portfolio
                 value.
+            fill_missing_data: If True (default), missing time series data
+                entries will be filled automatically before running the
+                backtest. This ensures data continuity and prevents errors
+                when the data source has gaps.
 
         Returns:
             List[Backtest]: List of backtest results.
@@ -712,7 +833,8 @@ class BacktestService:
                 self.initialize_data_sources_backtest(
                     data_sources,
                     backtest_date_range,
-                    show_progress=show_progress
+                    show_progress=show_progress,
+                    fill_missing_data=fill_missing_data
                 )
 
             start_date = backtest_date_range.start_date.strftime('%Y-%m-%d')
@@ -1611,6 +1733,9 @@ class BacktestService:
                 backtest = Backtest(
                     algorithm_id=strategy.algorithm_id,
                     backtest_runs=[backtest_run],
+                    backtest_summary=generate_backtest_summary_metrics(
+                        [backtest_run.backtest_metrics]
+                    ),
                     metadata=strategy.metadata if hasattr(
                         strategy, 'metadata') else None,
                     risk_free_rate=risk_free_rate
@@ -1650,6 +1775,7 @@ class BacktestService:
         batch_size: int = 50,
         checkpoint_batch_size: int = 25,
         dynamic_position_sizing: bool = False,
+        fill_missing_data: bool = True,
     ) -> Backtest:
         """
         Run optimized vectorized backtest for a single strategy.
@@ -1692,6 +1818,10 @@ class BacktestService:
             dynamic_position_sizing: If True, position sizes are recalculated
                 at each trade based on current portfolio value. If False
                 (default), position sizes are calculated once at the start.
+            fill_missing_data: If True (default), missing time series data
+                entries will be filled automatically before running the
+                backtest. This ensures data continuity and prevents errors
+                when the data source has gaps.
 
         Returns:
             Backtest: Instance of Backtest for the single strategy.
@@ -1740,6 +1870,7 @@ class BacktestService:
             checkpoint_batch_size=checkpoint_batch_size,
             n_workers=n_workers,
             dynamic_position_sizing=dynamic_position_sizing,
+            fill_missing_data=fill_missing_data,
         )
 
         # Extract the single backtest result
@@ -1807,6 +1938,7 @@ class BacktestService:
         use_checkpoints: bool = False,
         batch_size: int = 50,
         checkpoint_batch_size: int = 25,
+        fill_missing_data: bool = True,
     ) -> List[Backtest]:
         """
         Run event-driven backtests for multiple algorithms with optional
@@ -1837,6 +1969,10 @@ class BacktestService:
             batch_size: Number of algorithms to process in each batch.
             checkpoint_batch_size: Number of backtests before batch
                 save/checkpoint.
+            fill_missing_data: If True (default), missing time series data
+                entries will be filled automatically before running the
+                backtest. This ensures data continuity and prevents errors
+                when the data source has gaps.
 
         Returns:
             List[Backtest]: List of backtest results.
@@ -1930,7 +2066,8 @@ class BacktestService:
                 self.initialize_data_sources_backtest(
                     data_sources,
                     backtest_date_range,
-                    show_progress=show_progress
+                    show_progress=show_progress,
+                    fill_missing_data=fill_missing_data
                 )
 
             active_algorithm_ids = []
@@ -2389,6 +2526,7 @@ class BacktestService:
         initial_amount: float = None,
         market: str = None,
         trading_symbol: str = None,
+        fill_missing_data: bool = True,
     ) -> tuple:
         """
         Run an event-driven backtest for a single algorithm.
@@ -2417,6 +2555,10 @@ class BacktestService:
                 as algorithm already has portfolio config).
             market: Market (for compatibility).
             trading_symbol: Trading symbol (for compatibility).
+            fill_missing_data: If True (default), missing time series data
+                entries will be filled automatically before running the
+                backtest. This ensures data continuity and prevents errors
+                when the data source has gaps.
 
         Returns:
             Tuple[Backtest, Dict]: A tuple containing:
@@ -2437,6 +2579,7 @@ class BacktestService:
             continue_on_error=False,
             backtest_storage_directory=backtest_storage_directory,
             use_checkpoints=use_checkpoints,
+            fill_missing_data=fill_missing_data,
         )
 
         # Extract the single backtest result

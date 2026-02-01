@@ -208,6 +208,8 @@ class PandasOHLCVDataProvider(DataProvider):
         self,
         backtest_start_date,
         backtest_end_date,
+        fill_missing_data: bool = False,
+        show_progress: bool = False,
     ) -> None:
         """
         Prepares backtest data for a given symbol and date range.
@@ -217,6 +219,8 @@ class PandasOHLCVDataProvider(DataProvider):
                 backtest data.
             backtest_end_date (datetime): The end date for the
                 backtest data.
+            fill_missing_data (bool): If True, missing time series data
+                entries will be filled automatically.
 
         Raises:
             OperationalException: If the backtest start date is before the

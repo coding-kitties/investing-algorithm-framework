@@ -176,6 +176,8 @@ class CCXTOHLCVDataProvider(DataProvider):
         self,
         backtest_start_date,
         backtest_end_date,
+        fill_missing_data: bool = False,
+        show_progress: bool = False,
     ) -> None:
         """
         Prepares backtest data for a given symbol and date range.
@@ -185,6 +187,11 @@ class CCXTOHLCVDataProvider(DataProvider):
                 backtest data.
             backtest_end_date (datetime): The end date for the
                 backtest data.
+            fill_missing_data (bool): If True, missing time series data
+                entries will be filled automatically before creating
+                the window cache.
+            show_progress (bool): If True, print progress messages when
+                filling missing data.
 
         Raises:
             OperationalException: If the backtest start date is before the
@@ -196,6 +203,7 @@ class CCXTOHLCVDataProvider(DataProvider):
         """
         # There must be at least backtest_start_date - window_size * time_frame
         # data available to create a sliding window.
+
         if self.window_size is not None:
             required_start_date = backtest_start_date - \
                 timedelta(
@@ -235,6 +243,49 @@ class CCXTOHLCVDataProvider(DataProvider):
             self.pandas = has_pandas_flag
 
         self.data = data
+
+        # Fill missing data if requested
+        if fill_missing_data:
+            from investing_algorithm_framework.services.data_providers.data \
+                import fill_missing_timeseries_data, \
+                get_missing_timeseries_data_entries
+
+            # Get the frequency string based on time_frame
+            time_frame_obj = TimeFrame.from_value(self.time_frame)
+            freq_minutes = time_frame_obj.amount_of_minutes
+            freq = f"{freq_minutes}min" if freq_minutes < 60 else \
+                f"{freq_minutes // 60}h" if freq_minutes < 1440 else "D"
+
+            # Check for missing dates
+            missing_dates = get_missing_timeseries_data_entries(
+                self.data,
+                start=required_start_date,
+                end=backtest_end_date,
+                freq=freq
+            )
+
+            if len(missing_dates) > 0:
+                if show_progress:
+                    print(
+                        f"[DEBUG] Filling {len(missing_dates)} missing "
+                        f"dates for {self.symbol} {self.time_frame}"
+                    )
+                logger.info(
+                    f"Filling {len(missing_dates)} missing dates for "
+                    f"{self.symbol} {self.time_frame}"
+                )
+
+                # Fill the missing data
+                filled_data = fill_missing_timeseries_data(
+                    self.data,
+                    missing_dates=missing_dates,
+                    save_to_file=self.data_file_path is not None,
+                    file_path=self.data_file_path
+                )
+
+                self.data = filled_data
+                data = filled_data
+
         self._start_date_data_source = self.data["Datetime"].min()
         self._end_date_data_source = self.data["Datetime"].max()
         self.total_number_of_data_points = len(self.data)
@@ -488,33 +539,62 @@ class CCXTOHLCVDataProvider(DataProvider):
                 (pl.col("Datetime") <= backtest_end_date)
             )
         else:
-            try:
-                data = self.window_cache[backtest_index_date]
-            except KeyError:
-
+            # If window_size is set, use the precomputed window cache
+            if self.window_size is not None and len(self.window_cache) > 0:
                 try:
-                    # Return the key in the cache that is closest to the
-                    # backtest_index_date but not after it.
-                    closest_key = min(
-                        [k for k in self.window_cache.keys()
-                         if k >= backtest_index_date]
-                    )
-                    data = self.window_cache[closest_key]
-                except ValueError:
+                    data = self.window_cache[backtest_index_date]
+                except KeyError:
 
-                    if data_source is not None:
+                    try:
+                        # Return the key in the cache that is closest to the
+                        # backtest_index_date but not after it.
+                        closest_key = min(
+                            [k for k in self.window_cache.keys()
+                             if k >= backtest_index_date]
+                        )
+                        data = self.window_cache[closest_key]
+                    except ValueError:
+
+                        if data_source is not None:
+                            raise OperationalException(
+                                "No OHLCV data available for the "
+                                f"date: {backtest_index_date} "
+                                f"within the prepared backtest data "
+                                f"for data source {data_source.identifier}. "
+                            )
+
                         raise OperationalException(
                             "No OHLCV data available for the "
                             f"date: {backtest_index_date} "
                             f"within the prepared backtest data "
-                            f"for data source {data_source.identifier}. "
+                            f"for symbol {self.symbol}. "
                         )
-
+            else:
+                # No window cache and no start/end dates -
+                # return all data up to backtest_index_date
+                if self.data is None or len(self.data) == 0:
+                    ds_id = data_source.identifier \
+                        if data_source else self.symbol
                     raise OperationalException(
                         "No OHLCV data available for the "
                         f"date: {backtest_index_date} "
-                        f"within the prepared backtest data "
-                        f"for symbol {self.symbol}. "
+                        f"for data source {ds_id}. "
+                        "Data has not been loaded."
+                    )
+
+                # Filter data up to and including the backtest_index_date
+                data = self.data.filter(
+                    pl.col("Datetime") <= backtest_index_date
+                )
+
+                if len(data) == 0:
+                    ds_id = data_source.identifier \
+                        if data_source else self.symbol
+                    raise OperationalException(
+                        "No OHLCV data available for the "
+                        f"date: {backtest_index_date} "
+                        f"for data source {ds_id}. "
+                        f"Data starts at {self.data['Datetime'].min()}."
                     )
 
         if self.pandas:
