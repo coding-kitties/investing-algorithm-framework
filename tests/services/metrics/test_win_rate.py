@@ -291,8 +291,8 @@ class TestGetWinLossRatio(unittest.TestCase):
         result = get_win_loss_ratio([])
         self.assertEqual(result, 0.0)
 
-    def test_all_winning_trades_returns_zero(self):
-        """Test that all winning trades returns 0.0 (no losers to compare)."""
+    def test_all_winning_trades_returns_inf(self):
+        """Test that all winning trades returns inf (no losers to compare)."""
         trades = [
             create_trade(net_gain=100),
             create_trade(net_gain=300),
@@ -300,7 +300,7 @@ class TestGetWinLossRatio(unittest.TestCase):
 
         result = get_win_loss_ratio(trades)
 
-        self.assertEqual(result, 0.0)
+        self.assertEqual(result, float('inf'))
 
     def test_all_losing_trades_returns_zero(self):
         """Test that all losing trades returns 0.0 (no winners to compare)."""
@@ -402,8 +402,8 @@ class TestGetCurrentWinLossRatio(unittest.TestCase):
         result = get_current_win_loss_ratio([])
         self.assertEqual(result, 0.0)
 
-    def test_all_winning_trades_returns_zero(self):
-        """Test that all winning trades returns 0.0."""
+    def test_all_winning_trades_returns_inf(self):
+        """Test that all winning trades returns inf."""
         trades = [
             create_trade(net_gain=100, net_gain_absolute=100),
             create_trade(net_gain=200, net_gain_absolute=200),
@@ -411,7 +411,7 @@ class TestGetCurrentWinLossRatio(unittest.TestCase):
 
         result = get_current_win_loss_ratio(trades)
 
-        self.assertEqual(result, 0.0)
+        self.assertEqual(result, float('inf'))
 
     def test_all_losing_trades_returns_zero(self):
         """Test that all losing trades returns 0.0."""

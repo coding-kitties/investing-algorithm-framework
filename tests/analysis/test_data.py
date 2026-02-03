@@ -6,7 +6,7 @@ from datetime import datetime
 import pandas as pd
 import polars as pl
 
-from investing_algorithm_framework.analysis.data import (
+from investing_algorithm_framework.services.data_providers.data import (
     fill_missing_timeseries_data,
     get_missing_timeseries_data_entries
 )

@@ -244,6 +244,18 @@ class CCXTOHLCVDataProvider(DataProvider):
 
         self.data = data
 
+        # Check if data is empty before attempting to fill missing data
+        # fill_missing_timeseries_data cannot fill data if there's no
+        # existing data to copy from
+        if self.data is None or len(self.data) == 0:
+            raise OperationalException(
+                f"No data available for {self.symbol} in the date range "
+                f"{required_start_date} - {backtest_end_date}. "
+                f"Please ensure the data source file exists and contains "
+                f"data for this date range. Storage directory: "
+                f"{storage_directory_path}"
+            )
+
         # Fill missing data if requested
         if fill_missing_data:
             from investing_algorithm_framework.services.data_providers.data \
@@ -283,14 +295,25 @@ class CCXTOHLCVDataProvider(DataProvider):
                     file_path=self.data_file_path
                 )
 
-                self.data = filled_data
-                data = filled_data
+                if filled_data is not None:
+                    self.data = filled_data
+                    data = filled_data
+
+        # Check if data is empty before accessing min/max
+        if self.data is None or len(self.data) == 0:
+            raise OperationalException(
+                f"No data available for {self.symbol} in the date range "
+                f"{required_start_date} - {backtest_end_date}. "
+                f"Please ensure the data source file exists and contains "
+                f"data for this date range."
+            )
 
         self._start_date_data_source = self.data["Datetime"].min()
         self._end_date_data_source = self.data["Datetime"].max()
         self.total_number_of_data_points = len(self.data)
 
-        if required_start_date < self._start_date_data_source:
+        if self._start_date_data_source is not None and \
+                required_start_date < self._start_date_data_source:
             self.number_of_missing_data_points = (
                 self._start_date_data_source - required_start_date
             ).total_seconds() / (
