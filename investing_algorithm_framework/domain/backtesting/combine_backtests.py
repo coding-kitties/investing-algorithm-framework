@@ -353,6 +353,19 @@ def generate_backtest_summary_metrics(
         [b.average_trade_gain_percentage for b in valid_metrics],
         winning_trade_weights
     )
+
+    # === WINDOW COUNTS ===
+    number_of_windows = len(valid_metrics)
+    number_of_profitable_windows = sum(
+        1 for b in valid_metrics
+        if b.total_net_gain is not None and b.total_net_gain > 0
+    )
+    number_of_windows_with_trades = sum(
+        1 for b in valid_metrics
+        if b.number_of_trades_closed is not None
+        and b.number_of_trades_closed > 0
+    )
+
     return BacktestSummaryMetrics(
         total_net_gain=total_net_gain,
         total_net_gain_percentage=total_net_gain_percentage,
@@ -388,5 +401,8 @@ def generate_backtest_summary_metrics(
         average_trade_loss=average_trade_loss,
         average_trade_loss_percentage=average_trade_loss_percentage,
         average_trade_gain=average_trade_gain,
-        average_trade_gain_percentage=average_trade_gain_percentage
+        average_trade_gain_percentage=average_trade_gain_percentage,
+        number_of_windows=number_of_windows,
+        number_of_profitable_windows=number_of_profitable_windows,
+        number_of_windows_with_trades=number_of_windows_with_trades
     )

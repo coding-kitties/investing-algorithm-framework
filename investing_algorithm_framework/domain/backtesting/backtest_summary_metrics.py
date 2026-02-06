@@ -54,6 +54,11 @@ class BacktestSummaryMetrics:
         number_of_trades (int): Total number of trades executed.
         cumulative_exposure (float): Total exposure over the backtest period.
         exposure_ratio (float): Ratio of exposure to available capital.
+        number_of_windows (int): Total number of backtest windows/runs.
+        number_of_profitable_windows (int): Number of windows with positive
+            net gain.
+        number_of_windows_with_trades (int): Number of windows with at least
+            one closed trade.
     """
     total_net_gain: float = None
     total_net_gain_percentage: float = None
@@ -90,6 +95,9 @@ class BacktestSummaryMetrics:
     number_of_trades_closed: int = None
     cumulative_exposure: float = None
     exposure_ratio: float = None
+    number_of_windows: int = None
+    number_of_profitable_windows: int = None
+    number_of_windows_with_trades: int = None
 
     def to_dict(self) -> dict:
         """
@@ -134,6 +142,10 @@ class BacktestSummaryMetrics:
             "number_of_trades_closed": self.number_of_trades_closed,
             "cumulative_exposure": self.cumulative_exposure,
             "exposure_ratio": self.exposure_ratio,
+            "number_of_windows": self.number_of_windows,
+            "number_of_profitable_windows": self.number_of_profitable_windows,
+            "number_of_windows_with_trades":
+                self.number_of_windows_with_trades,
         }
 
     def save(self, file_path: str | Path) -> None:

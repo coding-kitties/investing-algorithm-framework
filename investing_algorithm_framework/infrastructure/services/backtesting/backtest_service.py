@@ -693,6 +693,7 @@ class BacktestService:
         n_workers: Optional[int] = None,
         dynamic_position_sizing: bool = False,
         fill_missing_data: bool = True,
+        iterative_summary_update: bool = False,
     ):
         """
         OPTIMIZED version: Run vectorized backtests with optional
@@ -748,6 +749,9 @@ class BacktestService:
                 entries will be filled automatically before running the
                 backtest. This ensures data continuity and prevents errors
                 when the data source has gaps.
+            iterative_summary_update: If True, update backtest_summary
+                after each window to enable window_filter_function to
+                access up-to-date summary metrics (default: False).
 
         Returns:
             List[Backtest]: List of backtest results.
@@ -1127,6 +1131,16 @@ class BacktestService:
                         skipped_algorithm_ids
                     )
                     all_backtests.extend(checkpointed_backtests)
+
+            # Iteratively update backtest_summary after each window
+            # This enables window_filter_function to access up-to-date
+            # summary metrics during filtering
+            if iterative_summary_update:
+                for backtest in all_backtests:
+                    backtest.backtest_summary = \
+                        generate_backtest_summary_metrics(
+                            backtest.get_all_backtest_metrics()
+                        )
 
             # Apply window filter function
             if window_filter_function is not None:
@@ -1939,6 +1953,7 @@ class BacktestService:
         batch_size: int = 50,
         checkpoint_batch_size: int = 25,
         fill_missing_data: bool = True,
+        iterative_summary_update: bool = False,
     ) -> List[Backtest]:
         """
         Run event-driven backtests for multiple algorithms with optional
@@ -1973,6 +1988,9 @@ class BacktestService:
                 entries will be filled automatically before running the
                 backtest. This ensures data continuity and prevents errors
                 when the data source has gaps.
+            iterative_summary_update: If True, update backtest_summary
+                after each window to enable window_filter_function to
+                access up-to-date summary metrics (default: False).
 
         Returns:
             List[Backtest]: List of backtest results.
@@ -2329,6 +2347,16 @@ class BacktestService:
                         skipped_algorithm_ids
                     )
                     all_backtests.extend(checkpointed_backtests)
+
+            # Iteratively update backtest_summary after each window
+            # This enables window_filter_function to access up-to-date
+            # summary metrics during filtering
+            if iterative_summary_update:
+                for backtest in all_backtests:
+                    backtest.backtest_summary = \
+                        generate_backtest_summary_metrics(
+                            backtest.get_all_backtest_metrics()
+                        )
 
             # Apply window filter function
             if window_filter_function is not None:

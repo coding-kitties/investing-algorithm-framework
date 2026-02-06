@@ -944,6 +944,7 @@ class App:
         n_workers: Optional[int] = None,
         dynamic_position_sizing: bool = False,
         fill_missing_data: bool = True,
+        iterative_summary_update: bool = False,
     ) -> List[Backtest]:
         """
         Run vectorized backtests for a set of strategies. The provided
@@ -1159,6 +1160,7 @@ class App:
             use_checkpoints=use_checkpoints,
             dynamic_position_sizing=dynamic_position_sizing,
             fill_missing_data=fill_missing_data,
+            iterative_summary_update=iterative_summary_update,
         )
 
     def run_vector_backtest(
@@ -1323,6 +1325,7 @@ class App:
         market: str = None,
         trading_symbol: str = None,
         fill_missing_data: bool = True,
+        iterative_summary_update: bool = False,
     ) -> List[Backtest]:
         """
         Run multiple event-driven backtests for a list of algorithms over
@@ -1468,6 +1471,7 @@ class App:
             batch_size=batch_size,
             checkpoint_batch_size=checkpoint_batch_size,
             fill_missing_data=fill_missing_data,
+            iterative_summary_update=iterative_summary_update,
         )
 
         # Cleanup resources
