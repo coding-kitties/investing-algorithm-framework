@@ -944,11 +944,10 @@ class BacktestService:
                         ))
 
                     # Execute batches in parallel
-                    with (ProcessPoolExecutor(max_workers=n_workers)
-                          as executor):
+                    with ProcessPoolExecutor(max_workers=n_workers) as ex:
                         # Submit all batch tasks
                         futures = [
-                            executor.submit(
+                            ex.submit(
                                 self._run_batch_backtest_worker, args
                             )
                             for args in worker_args
@@ -1457,6 +1456,9 @@ class BacktestService:
             session_cache: Session cache to save
             storage_directory: Directory to save the session file
         """
+        # Ensure the storage directory exists
+        os.makedirs(storage_directory, exist_ok=True)
+
         session_file = os.path.join(
             storage_directory, "backtest_session.json"
         )

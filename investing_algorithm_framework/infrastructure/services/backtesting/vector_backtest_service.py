@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
-import numpy as np
 import pandas as pd
 
 from investing_algorithm_framework.domain import BacktestDateRange, \
@@ -11,36 +10,6 @@ from investing_algorithm_framework.domain import BacktestDateRange, \
 from investing_algorithm_framework.services import DataProviderService, \
     create_backtest_metrics
 
-
-# if (
-#         portfolio_configurations is None
-#         or len(portfolio_configurations) == 0
-# ) and (
-#         initial_amount is None
-#         or trading_symbol is None
-#         or market is None
-# ):
-#     raise OperationalException(
-#         "No initial amount, trading symbol or market provided "
-#         "for the backtest and no portfolio configurations found. "
-#         "please register a portfolio configuration "
-#         "or specify the initial amount, trading symbol and "
-#         "market parameters before running a backtest."
-#     )
-#
-# if portfolio_configurations is None \
-#         or len(portfolio_configurations) == 0:
-#     portfolio_configurations = []
-#     portfolio_configurations.append(
-#         PortfolioConfiguration(
-#             identifier="vector_backtest",
-#             market=market,
-#             trading_symbol=trading_symbol,
-#             initial_balance=initial_amount
-#         )
-#     )
-#
-# portfolio_configuration = portfolio_configurations[0]
 
 class VectorBacktestService:
 
@@ -76,6 +45,14 @@ class VectorBacktestService:
 
         Returns:
             BacktestRun: The backtest run containing the results and metrics.
+
+        Note:
+            Signal generation uses a warmup window: the strategy receives
+            data starting from ``start_date - window_size * timeframe``
+            so that indicators (e.g. 100-day MA) are fully primed.
+            However, only signals on or after ``start_date`` produce
+            trades. If you need to replicate signals externally, make
+            sure to include the same warmup period in your data.
         """
         initial_amount = portfolio_configuration.initial_balance
         trading_symbol = portfolio_configuration.trading_symbol
@@ -163,14 +140,15 @@ class VectorBacktestService:
 
             # Align signals with most granular OHLCV data
             close = df["Close"].reindex(index, method='ffill')
-            buy_signal = buy_signals[symbol].reindex(index, fill_value=False)
-            sell_signal = sell_signals[symbol].reindex(index, fill_value=False)
 
-            signal = pd.Series(0, index=index)
-            signal[buy_signal] = 1
-            signal[sell_signal] = -1
-            signal = signal.replace(0, np.nan).ffill().shift(1).fillna(0)
-            signal = signal.astype(float)
+            # Use raw boolean signals directly instead of ffill
+            # state machine (which discards subsequent buy signals
+            # in the same cluster). The per-bar last_trade check
+            # already enforces one-position-at-a-time per symbol.
+            buy_signal = buy_signals[symbol].reindex(index, fill_value=False)
+            sell_signal = sell_signals[symbol].reindex(
+                index, fill_value=False
+            )
 
             # Calculate initial capital for trade
             # (used when dynamic_position_sizing=False)
@@ -190,15 +168,66 @@ class VectorBacktestService:
                 'full_symbol': full_symbol,
                 'pos_size_obj': pos_size_obj,
                 'close': close,
-                'signal': signal,
+                'buy_signal': buy_signal,
+                'sell_signal': sell_signal,
                 'initial_capital_for_trade': initial_capital_for_trade,
                 'last_trade': None,  # Track open trade per symbol
             }
 
+        # Signal event log — records every fired signal and its outcome
+        signal_events = []
+
         # Shared portfolio state for dynamic position sizing
         current_unallocated = initial_amount
         total_realized_gains = 0.0
+        total_allocated = 0.0  # Track total allocated in static mode
         open_trades_value = {}  # Track value of open trades per symbol
+
+        def _close_trade(sym, sym_data, price, date):
+            """Helper to close an open trade for a symbol."""
+            nonlocal current_unallocated, total_realized_gains, \
+                total_allocated
+
+            lt = sym_data['last_trade']
+            net_gain_val = (
+                price - lt.open_price
+            ) * lt.available_amount
+
+            # Update shared portfolio state
+            if dynamic_position_sizing:
+                current_unallocated += lt.cost + net_gain_val
+                total_realized_gains += net_gain_val
+                if sym in open_trades_value:
+                    del open_trades_value[sym]
+            else:
+                total_allocated -= lt.cost
+
+            sell_order = Order(
+                id=uuid4(),
+                target_symbol=sym,
+                trading_symbol=trading_symbol,
+                order_type=OrderType.LIMIT,
+                price=price,
+                amount=lt.available_amount,
+                status=OrderStatus.CLOSED,
+                created_at=date,
+                updated_at=date,
+                order_side=OrderSide.SELL
+            )
+            orders.append(sell_order)
+            trade_orders = lt.orders
+            trade_orders.append(sell_order)
+
+            lt.update(
+                {
+                    "orders": trade_orders,
+                    "closed_at": date,
+                    "status": TradeStatus.CLOSED.value,
+                    "updated_at": date,
+                    "net_gain": net_gain_val,
+                }
+            )
+            sym_data['last_trade'] = None
 
         # Process all timestamps in chronological order
         for i in range(len(index)):
@@ -213,13 +242,50 @@ class VectorBacktestService:
 
             # Process each symbol at this timestamp
             for symbol, data in symbol_data.items():
-                current_signal = data['signal'].iloc[i]
                 current_price = float(data['close'].iloc[i])
                 pos_size_obj = data['pos_size_obj']
                 last_trade = data['last_trade']
 
-                # If we are not in a position, and we get a buy signal
-                if current_signal == 1 and last_trade is None:
+                # Read raw boolean signals for this bar
+                is_buy = bool(data['buy_signal'].iloc[i])
+                is_sell = bool(data['sell_signal'].iloc[i])
+
+                # Issue 5: Explicit handling of simultaneous buy+sell
+                # — sell takes priority (closes existing position first)
+                if is_buy and is_sell:
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "buy",
+                        "executed": False,
+                        "reason": "sell_priority_on_conflict",
+                    })
+                    is_buy = False  # sell takes priority on conflicts
+
+                # --- SELL ---
+                if is_sell and last_trade is not None:
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "sell",
+                        "executed": True,
+                        "reason": "executed",
+                    })
+                    _close_trade(
+                        symbol, data, current_price, current_date
+                    )
+                    last_trade = data['last_trade']  # now None
+                elif is_sell and last_trade is None:
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "sell",
+                        "executed": False,
+                        "reason": "no_position_to_close",
+                    })
+
+                # --- BUY ---
+                if is_buy and last_trade is None:
                     # Calculate capital for this trade
                     if dynamic_position_sizing:
                         # Calculate current portfolio value:
@@ -245,7 +311,27 @@ class VectorBacktestService:
                     else:
                         capital_for_trade = data['initial_capital_for_trade']
 
+                        # Issue 6: Guard against exceeding total portfolio
+                        # allocation even in static position sizing mode
+                        if total_allocated + capital_for_trade \
+                                > initial_amount:
+                            signal_events.append({
+                                "date": current_date,
+                                "symbol": symbol,
+                                "signal": "buy",
+                                "executed": False,
+                                "reason": "insufficient_capital",
+                            })
+                            continue
+
                     if capital_for_trade <= 0:
+                        signal_events.append({
+                            "date": current_date,
+                            "symbol": symbol,
+                            "signal": "buy",
+                            "executed": False,
+                            "reason": "insufficient_capital",
+                        })
                         continue  # Skip if no capital available
 
                     amount = float(capital_for_trade / current_price)
@@ -253,6 +339,8 @@ class VectorBacktestService:
                     # Update shared portfolio state
                     if dynamic_position_sizing:
                         current_unallocated -= capital_for_trade
+                    else:
+                        total_allocated += capital_for_trade
 
                     buy_order = Order(
                         id=uuid4(),
@@ -284,49 +372,26 @@ class VectorBacktestService:
                     )
                     data['last_trade'] = trade
                     trades.append(trade)
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "buy",
+                        "executed": True,
+                        "reason": "executed",
+                    })
 
                     # Track open trade value
                     if dynamic_position_sizing:
                         open_trades_value[symbol] = capital_for_trade
 
-                # If we are in a position, and we get a sell signal
-                if current_signal == -1 and last_trade is not None:
-                    net_gain_val = (
-                        current_price - last_trade.open_price
-                    ) * last_trade.available_amount
-
-                    # Update shared portfolio state
-                    if dynamic_position_sizing:
-                        current_unallocated += last_trade.cost + net_gain_val
-                        total_realized_gains += net_gain_val
-                        if symbol in open_trades_value:
-                            del open_trades_value[symbol]
-
-                    sell_order = Order(
-                        id=uuid4(),
-                        target_symbol=symbol,
-                        trading_symbol=trading_symbol,
-                        order_type=OrderType.LIMIT,
-                        price=current_price,
-                        amount=last_trade.available_amount,
-                        status=OrderStatus.CLOSED,
-                        created_at=current_date,
-                        updated_at=current_date,
-                        order_side=OrderSide.SELL
-                    )
-                    orders.append(sell_order)
-                    trade_orders = last_trade.orders
-                    trade_orders.append(sell_order)
-                    last_trade.update(
-                        {
-                            "orders": trade_orders,
-                            "closed_at": current_date,
-                            "status": TradeStatus.CLOSED.value,
-                            "updated_at": current_date,
-                            "net_gain": net_gain_val
-                        }
-                    )
-                    data['last_trade'] = None
+                elif is_buy and last_trade is not None:
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "buy",
+                        "executed": False,
+                        "reason": "already_in_position",
+                    })
 
             # Update open trade values at each timestamp for
             # accurate portfolio value
@@ -395,6 +460,14 @@ class VectorBacktestService:
         number_of_trades_open = len(
             [t for t in trades if TradeStatus.OPEN.equals(t.status)]
         )
+        # Issue 8: Store raw signals for analysis
+        raw_signals = {}
+        for symbol in buy_signals.keys():
+            raw_signals[symbol] = {
+                "buy": buy_signals[symbol],
+                "sell": sell_signals[symbol],
+            }
+
         # Create a backtest run object
         run = BacktestRun(
             trading_symbol=trading_symbol,
@@ -409,14 +482,16 @@ class VectorBacktestService:
             backtest_end_date=backtest_date_range.end_date,
             backtest_date_range_name=backtest_date_range.name,
             number_of_days=(
-                backtest_date_range.end_date - backtest_date_range.end_date
+                backtest_date_range.end_date - backtest_date_range.start_date
             ).days,
             number_of_trades=len(trades),
             number_of_orders=len(orders),
             number_of_trades_closed=number_of_trades_closed,
             number_of_trades_open=number_of_trades_open,
             number_of_positions=len(unique_symbols),
-            symbols=list(buy_signals.keys())
+            symbols=list(buy_signals.keys()),
+            signals=raw_signals,
+            signal_events=signal_events,
         )
 
         # Create backtest metrics

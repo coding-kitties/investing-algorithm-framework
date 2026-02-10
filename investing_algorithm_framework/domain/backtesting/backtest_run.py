@@ -4,7 +4,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from logging import getLogger
-from typing import Union, List, Optional, Dict
+from typing import Union, List, Optional, Dict, Any
 
 from investing_algorithm_framework.domain.exceptions \
     import OperationalException
@@ -66,6 +66,28 @@ class BacktestRun:
             the backtest.
         number_of_positions (int): The total number of positions held
             during the backtest.
+        signals (Dict[str, Dict[str, Any]]): Raw buy/sell signals
+            produced by the strategy, keyed by symbol. At runtime each
+            entry contains ``{"buy": pd.Series[bool],
+            "sell": pd.Series[bool]}``.  When serialized via
+            ``to_dict()`` / ``save()``, each Series is stored as a
+            list of ISO-8601 date strings where the signal is True.
+            On ``open()`` the lists are restored as-is (not as
+            pd.Series) so you can reconstruct them if needed.
+        signal_events (List[Dict]): Chronological log of every fired
+            signal and its disposition. Each entry is a dict with keys:
+            ``date`` (datetime), ``symbol`` (str), ``signal`` ("buy" or
+            "sell"), ``executed`` (bool), and ``reason`` (str).
+            Possible reasons:
+            - ``"executed"`` — signal produced a trade action.
+            - ``"already_in_position"`` — buy signal ignored because
+              a position was already open for this symbol.
+            - ``"no_position_to_close"`` — sell signal ignored because
+              no position was open for this symbol.
+            - ``"sell_priority_on_conflict"`` — buy signal suppressed
+              because a sell signal also fired on the same bar.
+            - ``"insufficient_capital"`` — buy signal ignored because
+              there was not enough capital to open a position.
     """
     backtest_start_date: datetime
     backtest_end_date: datetime
@@ -88,6 +110,8 @@ class BacktestRun:
     backtest_date_range_name: str = None
     data_sources: List[Dict] = field(default_factory=list)
     metadata: Dict[str, str] = field(default_factory=dict)
+    signals: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    signal_events: List[Dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         """
@@ -126,6 +150,23 @@ class BacktestRun:
             "number_of_orders": self.number_of_orders,
             "number_of_positions": self.number_of_positions,
             "metadata": self.metadata,
+            "signals": {
+                symbol: {
+                    sig_type: [
+                        ensure_iso(ts)
+                        for ts, val in zip(series.index, series)
+                        if val
+                    ] if hasattr(series, 'index') else series
+                    for sig_type, series in sig_data.items()
+                }
+                for symbol, sig_data in self.signals.items()
+            },
+            "signal_events": [
+                {
+                    **evt,
+                    "date": ensure_iso(evt["date"])
+                } for evt in self.signal_events
+            ],
         }
 
     @staticmethod
@@ -264,8 +305,28 @@ class BacktestRun:
                 continue
         data["portfolio_snapshots"] = portfolio_snapshots
 
+        # Parse signals (stored as lists of ISO date strings)
+        signals = data.pop("signals", {})
+        # Keep as-is (dict of symbol -> {buy: [dates], sell: [dates]})
+
+        # Parse signal_events dates back to datetime
+        raw_events = data.pop("signal_events", [])
+        signal_events = []
+        for evt in raw_events:
+            parsed = dict(evt)
+            if isinstance(parsed.get("date"), str):
+                try:
+                    parsed["date"] = datetime.fromisoformat(
+                        parsed["date"]
+                    )
+                except (ValueError, TypeError):
+                    pass
+            signal_events.append(parsed)
+
         return BacktestRun(
             backtest_metrics=backtest_metrics,
+            signals=signals,
+            signal_events=signal_events,
             **data
         )
 
@@ -518,6 +579,55 @@ class BacktestRun:
                         take_profits.append(tp)
 
         return take_profits
+
+    def get_signal_events(
+        self,
+        symbol: str = None,
+        signal: str = None,
+        executed: bool = None,
+        reason: str = None,
+    ) -> List[Dict[str, Any]]:
+        """
+        Query the signal event log.
+
+        Args:
+            symbol (str): Filter by target symbol (e.g. "BTC").
+            signal (str): Filter by signal type ("buy" or "sell").
+            executed (bool): Filter by whether the signal was acted on.
+            reason (str): Filter by reason string (e.g.
+                "already_in_position", "insufficient_capital",
+                "executed", "no_position_to_close",
+                "sell_priority_on_conflict").
+
+        Returns:
+            List[Dict]: Matching signal events, each with keys
+                ``date``, ``symbol``, ``signal``, ``executed``,
+                ``reason``.
+        """
+        selection = self.signal_events
+
+        if symbol is not None:
+            selection = [
+                e for e in selection
+                if e["symbol"].lower() == symbol.lower()
+            ]
+
+        if signal is not None:
+            selection = [
+                e for e in selection if e["signal"] == signal
+            ]
+
+        if executed is not None:
+            selection = [
+                e for e in selection if e["executed"] == executed
+            ]
+
+        if reason is not None:
+            selection = [
+                e for e in selection if e["reason"] == reason
+            ]
+
+        return selection
 
     def get_portfolio_snapshots(
         self,
