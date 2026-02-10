@@ -38,7 +38,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        os: [ "ubuntu-latest", "macos-latest" ]
+        os: [ "ubuntu-latest", "macos-latest", "windows-latest" ]
         python-version: [ "3.10", "3.11" ]
     defaults:
       run:
@@ -100,7 +100,11 @@ jobs:
       #----------------------------------------------
       - name: Run tests
         run: |
-          source $VENV
+          if [ "$RUNNER_OS" == "Windows" ]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
           coverage run -m unittest discover -s tests
           coverage xml
       #----------------------------------------------
