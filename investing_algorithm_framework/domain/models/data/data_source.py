@@ -1,3 +1,4 @@
+import warnings
 from dataclasses import dataclass
 from datetime import datetime, timezone, timedelta
 from typing import Union
@@ -16,15 +17,21 @@ class DataSource:
     DataSource(
         symbol="BTC/EUR",
         data_type="ohlcv",
-        window_size=200,
+        warmup_window=200,
         market="BITVAVO",
         identifier="BTC/EUR_ohlcv"
     )
+
+    .. deprecated::
+        The `window_size` parameter is deprecated and will be removed in
+        release 0.8.0. Please use `warmup_window` instead.
     """
     identifier: str = None
     data_provider_identifier: str = None
     data_type: Union[DataType, str] = None
     symbol: str = None
+    warmup_window: int = None
+    # Deprecated: use warmup_window instead. Will be removed in release 0.8.0
     window_size: int = None
     time_frame: Union[TimeFrame, str] = None
     market: str = None
@@ -36,6 +43,19 @@ class DataSource:
     save: bool = False
 
     def __post_init__(self):
+        # Handle backward compatibility for window_size -> warmup_window
+        # window_size is deprecated and will be removed in release 0.8.0
+        if self.window_size is not None:
+            warnings.warn(
+                "The 'window_size' parameter is deprecated and will be "
+                "removed in release 0.8.0. Please use 'warmup_window' instead.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            # If warmup_window is not set, use window_size value
+            if self.warmup_window is None:
+                object.__setattr__(self, 'warmup_window', self.window_size)
+
         # Convert data_type and time_frame to their respective enums if needed
         if isinstance(self.data_type, str):
             object.__setattr__(self, 'data_type',
@@ -107,8 +127,8 @@ class DataSource:
             if self.market is not None:
                 identifier += f"_{self.market}"
 
-            if self.window_size is not None:
-                identifier += f"_{self.window_size}"
+            if self.warmup_window is not None:
+                identifier += f"_{self.warmup_window}"
 
             return identifier
 
@@ -133,7 +153,7 @@ class DataSource:
             f"DataSource(identifier={self.identifier}, "
             f"data_provider_identifier={self.data_provider_identifier}, "
             f"data_type={self.data_type}, symbol={self.symbol}, "
-            f"window_size={self.window_size}, time_frame={self.time_frame}, "
+            f"warmup_window={self.warmup_window}, time_frame={self.time_frame}, "
             f"market={self.market}, storage_path={self.storage_path}, "
             f"pandas={self.pandas}, date={self.date}, "
             f"start_date={self.start_date}, end_date={self.end_date}, "
@@ -152,10 +172,10 @@ class DataSource:
         """
         if DataType.OHLCV.equals(self.data_type):
 
-            if other.time_frame is None and other.window_size is None:
+            if other.time_frame is None and other.warmup_window is None:
                 return (self.data_type == other.data_type and
                         self.symbol == other.symbol)
-            elif self.time_frame is None and self.window_size is None:
+            elif self.time_frame is None and self.warmup_window is None:
                 return (self.data_type == other.data_type and
                         self.symbol == other.symbol)
 
@@ -167,7 +187,7 @@ class DataSource:
         elif DataType.CUSTOM.equals(self.data_type):
             return (self.data_type == other.data_type and
                     self.symbol == other.symbol and
-                    self.window_size == other.window_size and
+                    self.warmup_window == other.warmup_window and
                     self.time_frame == other.time_frame and
                     self.market == other.market)
 
@@ -180,11 +200,11 @@ class DataSource:
 
     def create_start_date_data(self, index_date: datetime) -> datetime:
 
-        if self.window_size is None or self.time_frame is None:
+        if self.warmup_window is None or self.time_frame is None:
             return index_date
 
         return index_date - \
-            (self.window_size * timedelta(
+            (self.warmup_window * timedelta(
                 minutes=self.time_frame.amount_of_minutes
             ))
 
@@ -216,7 +236,7 @@ class DataSource:
         total_minutes = delta.total_seconds() / 60
         data_points = total_minutes / self.time_frame.amount_of_minutes
 
-        if self.window_size is not None:
-            data_points += self.window_size
+        if self.warmup_window is not None:
+            data_points += self.warmup_window
 
         return int(data_points)

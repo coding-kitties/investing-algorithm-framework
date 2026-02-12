@@ -1246,9 +1246,28 @@ class App:
             show_progress (bool): Whether to show progress bars during
                 data source initialization. This is useful for long-running
                 initialization processes.
+            dynamic_position_sizing (bool): Whether to use dynamic position
+                sizing based on volatility or other factors. Defaults to False.
 
         Returns:
             Backtest: Instance of Backtest
+
+        Examples:
+            # Basic usage
+            backtest = app.run_vector_backtest(
+                strategy=my_strategy,
+                backtest_date_range=my_date_range,
+                initial_amount=1000
+            )
+
+            # With custom storage and checkpoints
+            backtest = app.run_vector_backtest(
+                strategy=my_strategy,
+                backtest_date_range=my_date_range,
+                initial_amount=1000,
+                use_checkpoints=True,
+                backtest_storage_directory="./backtest_results"
+            )
         """
         # Use registered strategy if none provided
         if strategy is None:
@@ -1479,6 +1498,107 @@ class App:
 
         return backtests
 
+    def get_backtest_data(
+        self,
+        strategy: TradingStrategy,
+        backtest_date_range: BacktestDateRange,
+        show_progress: bool = True,
+        fill_missing_data: bool = True,
+    ) -> Dict[str, Any]:
+        """
+        Get all data sources with their corresponding data for a given
+        strategy and backtest window.
+
+        This method retrieves the market data for all data sources defined
+        in the strategy, considering the warmup window for each data source.
+        The data is returned as a dictionary where keys are data source
+        identifiers and values are the corresponding DataFrames.
+
+        Args:
+            strategy (TradingStrategy): The strategy containing the data
+                sources to retrieve data for.
+            backtest_date_range (BacktestDateRange): The date range for
+                the backtest window.
+            show_progress (bool): Whether to show progress bars during
+                data retrieval. Defaults to True.
+            fill_missing_data (bool): If True, missing time series data
+                entries will be filled automatically. Defaults to True.
+
+        Returns:
+            Dict[str, Any]: A dictionary where keys are data source
+                identifiers (e.g., "BTC/EUR_ohlcv") and values are the
+                corresponding data (typically pandas DataFrames).
+
+        Example:
+            ```python
+            from investing_algorithm_framework import (
+                create_app, TradingStrategy, BacktestDateRange, DataSource
+            )
+            from datetime import datetime, timezone
+
+            class MyStrategy(TradingStrategy):
+                data_sources = [
+                    DataSource(
+                        identifier="btc_data",
+                        symbol="BTC/EUR",
+                        time_frame="1h",
+                        warmup_window=100,
+                        market="BITVAVO"
+                    )
+                ]
+                # ... strategy implementation
+
+            app = create_app()
+            app.add_strategy(MyStrategy)
+
+            backtest_range = BacktestDateRange(
+                start_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
+                end_date=datetime(2024, 6, 1, tzinfo=timezone.utc)
+            )
+
+            # Get all data for the strategy
+            data = app.get_backtest_data(
+                strategy=MyStrategy(),
+                backtest_date_range=backtest_range
+            )
+
+            # Access data by identifier
+            btc_df = data["btc_data"]
+            ```
+
+        Raises:
+            OperationalException: If no data sources are defined in the
+                strategy or if data cannot be retrieved for a data source.
+        """
+        # Get data sources from the strategy
+        data_sources = strategy.data_sources
+
+        if data_sources is None or len(data_sources) == 0:
+            raise OperationalException(
+                "No data sources defined in the strategy. "
+                "Please define data sources to retrieve backtest data."
+            )
+
+        # Setup backtest data providers
+        self.initialize_data_sources_backtest(
+            data_sources=data_sources,
+            backtest_date_range=backtest_date_range,
+            show_progress=show_progress,
+            fill_missing_data=fill_missing_data,
+        )
+
+        # Get the data provider service
+        data_provider_service = self.container.data_provider_service()
+
+        # Retrieve vectorized backtest data for all data sources
+        data = data_provider_service.get_vectorized_backtest_data(
+            data_sources=data_sources,
+            start_date=backtest_date_range.start_date,
+            end_date=backtest_date_range.end_date,
+        )
+
+        return data
+
     def run_backtest(
         self,
         backtest_date_range: BacktestDateRange,
@@ -1545,10 +1665,10 @@ class App:
                 the backtest. This is useful for long-running backtests.
             market (str): The market to use for the backtest. This is used
                 to create a portfolio configuration if no portfolio
-                configuration is provided.
+                configuration is provided in the strategy.
             trading_symbol (str): The trading symbol to use for the backtest.
                 This is used to create a portfolio configuration if no
-                portfolio configuration is provided.
+                portfolio configuration is provided in the strategy.
             fill_missing_data (bool): If True (default), missing time series
                 data entries will be filled automatically before running the
                 backtest.

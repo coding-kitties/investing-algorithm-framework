@@ -48,7 +48,7 @@ class VectorBacktestService:
 
         Note:
             Signal generation uses a warmup window: the strategy receives
-            data starting from ``start_date - window_size * timeframe``
+            data starting from ``start_date - warmup_window * timeframe``
             so that indicators (e.g. 100-day MA) are fully primed.
             However, only signals on or after ``start_date`` produce
             trades. If you need to replicate signals externally, make

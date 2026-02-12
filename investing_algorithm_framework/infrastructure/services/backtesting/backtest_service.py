@@ -86,13 +86,13 @@ def _fill_missing_data_for_data_sources(
                     data_provider.data is not None:
                 data = data_provider.data
 
-                # Calculate the required start date considering window_size
-                if data_source.window_size is not None:
+                # Calculate the required start date considering warmup_window
+                if data_source.warmup_window is not None:
                     required_start_date = backtest_date_range.start_date - \
                         timedelta(
                             minutes=TimeFrame.from_value(
                                 data_source.time_frame
-                            ).amount_of_minutes * data_source.window_size
+                            ).amount_of_minutes * data_source.warmup_window
                         )
                 else:
                     required_start_date = backtest_date_range.start_date

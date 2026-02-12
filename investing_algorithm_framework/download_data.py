@@ -73,7 +73,8 @@ def download(
     data_type: Union[str, DataType] = DataType.OHLCV,
     start_date: Union[datetime, str] = None,
     end_date: Union[datetime, str] = None,
-    window_size: int = 200,
+    warmup_window: int = 200,
+    window_size: int = None,  # Deprecated: use warmup_window instead
     pandas: bool = True,
     save: bool = True,
     storage_path: Union[str, Path] = None,
@@ -91,7 +92,9 @@ def download(
             download (e.g., "ohlcv", "ticker").
         start_date (str): The start date for the data download.
         end_date (str): The end date for the data download.
-        window_size (int): The size of the data window.
+        warmup_window (int): The size of the warmup window.
+        window_size (int): Deprecated. Use warmup_window instead.
+            Will be removed in release 0.8.0.
         pandas (bool): Whether to return the data as a pandas DataFrame.
         save (bool): Whether to save the downloaded data.
         storage_path (str): The directory to save the downloaded data.
@@ -99,12 +102,22 @@ def download(
             it overrides storage_path.
         time_frame (str): The time frame for the data download.
         date (str): The date for the data download.
-        window_size (int): The size of the data window.
-        pandas (bool): Whether to return the data as a pandas DataFrame.
 
     Returns:
         None
     """
+    import warnings
+
+    # Handle backward compatibility for window_size
+    if window_size is not None:
+        warnings.warn(
+            "The 'window_size' parameter is deprecated and will be "
+            "removed in release 0.8.0. Please use 'warmup_window' instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        if warmup_window == 200:  # Default value, use window_size
+            warmup_window = window_size
     configuration_service = ConfigurationService()
     market_credential_service = MarketCredentialService()
     data_provider_service = DataProviderService(
@@ -148,7 +161,7 @@ def download(
         date=date,
         start_date=start_date,
         end_date=end_date,
-        window_size=window_size,
+        warmup_window=warmup_window,
         pandas=pandas,
         save=save,
         storage_path=storage_path
@@ -172,7 +185,8 @@ def download_v2(
     data_type: Union[str, DataType] = DataType.OHLCV,
     start_date: Union[datetime, str] = None,
     end_date: Union[datetime, str] = None,
-    window_size: int = 200,
+    warmup_window: int = 200,
+    window_size: int = None,  # Deprecated: use warmup_window instead
     pandas: bool = True,
     save: bool = True,
     storage_path: Union[str, Path] = None,
@@ -191,7 +205,9 @@ def download_v2(
         start_date: Start date for data range
         end_date: End date for data range
         date: Specific date for data download
-        window_size: Size of the data window
+        warmup_window: Size of the warmup window
+        window_size: Deprecated. Use warmup_window instead.
+            Will be removed in release 0.8.0.
         pandas: Whether to return the data as a pandas DataFrame
         save: Whether to save the data to disk
         storage_path: Base directory for storing files
@@ -199,6 +215,19 @@ def download_v2(
     Returns:
         DownloadResult with .data (DataFrame) and .path (Path or None)
     """
+    import warnings
+
+    # Handle backward compatibility for window_size
+    if window_size is not None:
+        warnings.warn(
+            "The 'window_size' parameter is deprecated and will be "
+            "removed in release 0.8.0. Please use 'warmup_window' instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        if warmup_window == 200:  # Default value, use window_size
+            warmup_window = window_size
+
     # Parse dates if they are strings
     parsed_start_date = start_date
     parsed_end_date = end_date
@@ -220,7 +249,7 @@ def download_v2(
         data_type=data_type,
         start_date=start_date,
         end_date=end_date,
-        window_size=window_size,
+        warmup_window=warmup_window,
         pandas=pandas,
         save=save,
         storage_path=storage_path,

@@ -32,9 +32,11 @@ class DataProvider(ABC):
         time_frame (Optional[str]): The time frame for the data. This is
             useful for data providers that support multiple time frames.
             Example: "1m", "5m", "1h", "1d"
-        window_size (Optional[int]): The window size for the data. This is
-            useful for data providers that support multiple window sizes.
-            Example: 100, 200, 500
+        warmup_window (Optional[int]): The warmup window size for the data.
+            This is useful for data providers that support multiple window
+            sizes. Example: 100, 200, 500
+        window_size (Optional[int]): Deprecated. Use warmup_window instead.
+            Will be removed in release 0.8.0.
         storage_path (Optional[str]): The path to the storage location
             for the data. This is useful for data providers that support
             saving data to a file
@@ -84,9 +86,12 @@ class DataProvider(ABC):
                 can be set later. This is useful for data providers
                 that support multiple time frames.
                 Example: "1m", "5m", "1h", "1d"
-            window_size (int): The window size for the data. This is optional
-                and can be set later. This is useful for data providers that
-                support multiple window sizes. Example: 100, 200, 500
+            warmup_window (int): The warmup window size for the data. This is
+                optional and can be set later. This is useful for data
+                providers that support multiple window sizes.
+                Example: 100, 200, 500
+            window_size (int): Deprecated. Use warmup_window instead.
+                Will be removed in release 0.8.0.
             storage_path (str): The path to the storage location for the data.
                 This is optional and can be set later. This is useful for data
                 providers that support saving data to a file.
