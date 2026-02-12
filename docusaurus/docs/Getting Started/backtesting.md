@@ -156,7 +156,7 @@ The data provision between vector and event backtests is fundamentally different
 - **Vector backtest** loads the entire dataset upfront and computes signals on the full history. Indicators like EMA/RSI see all historical data at once.
 - **Event backtest** simulates real-time trading by providing only a sliding window of data at each step. Indicators are computed fresh on each window.
 
-With a sufficiently large `window_size` (e.g., 800 bars), both approaches should produce identical signals. However, execution timing may still differ slightly since vector backtests execute at the exact signal timestamp while event backtests execute at strategy interval boundaries.
+With a sufficiently large `warmup_window` (e.g., 800 bars), both approaches should produce identical signals. However, execution timing may still differ slightly since vector backtests execute at the exact signal timestamp while event backtests execute at strategy interval boundaries.
 
 ## Analyzing Results
 

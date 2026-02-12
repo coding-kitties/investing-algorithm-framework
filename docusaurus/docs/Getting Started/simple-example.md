@@ -117,7 +117,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     market=market,
                     symbol=full_symbol,
                     pandas=True,
-                    window_size=800
+                    warmup_window=800
                 )
             )
             data_sources.append(
@@ -128,7 +128,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     market=market,
                     symbol=full_symbol,
                     pandas=True,
-                    window_size=800
+                    warmup_window=800
                 )
             )
 
@@ -385,7 +385,7 @@ for symbol in self.symbols:
             market=market,
             symbol=full_symbol,
             pandas=True,
-            window_size=800
+            warmup_window=800
         )
     )
     data_sources.append(
@@ -396,7 +396,7 @@ for symbol in self.symbols:
             market=market,
             symbol=full_symbol,
             pandas=True,
-            window_size=800
+            warmup_window=800
         )
     )
 ```
@@ -404,7 +404,7 @@ for symbol in self.symbols:
 **Data Sources for Technical Analysis:**
 - **RSI Data Source**: OHLCV data for RSI indicator calculation
 - **EMA Data Source**: OHLCV data for moving average calculations  
-- **window_size**: 800 candles for sufficient historical data
+- **warmup_window**: 800 candles for sufficient historical data
 - **pandas**: Returns data as pandas DataFrame for easy analysis
 
 ### 6. Technical Indicators

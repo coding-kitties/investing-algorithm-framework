@@ -53,14 +53,14 @@ class MySignalStrategy(TradingStrategy):
             identifier="btc_eur_1h",
             symbol="BTC/EUR",
             time_frame="1h",
-            window_size=100,
+            warmup_window=100,
             market="BITVAVO"
         ),
         DataSource(
             identifier="eth_eur_1h", 
             symbol="ETH/EUR",
             time_frame="1h",
-            window_size=100,
+            warmup_window=100,
             market="BITVAVO"
         )
     ]
@@ -214,7 +214,7 @@ class MovingAverageCrossover(TradingStrategy):
             identifier="btc_eur_1h",
             symbol="BTC/EUR",
             time_frame="1h",
-            window_size=60,
+            warmup_window=60,
             market="BITVAVO"
         )
     ]
@@ -273,7 +273,7 @@ class RSIStrategy(TradingStrategy):
             identifier="btc_eur_4h",
             symbol="BTC/EUR",
             time_frame="4h",
-            window_size=30,
+            warmup_window=30,
             market="BITVAVO"
         )
     ]
