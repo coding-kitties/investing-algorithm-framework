@@ -161,3 +161,6 @@ venv
 examples/tutorial/data
 examples/tutorial/backtest_results
 examples/tutorial/resources
+# Squad AI team files (kept on dev branch only)
+.squad/
+.gitattributes
