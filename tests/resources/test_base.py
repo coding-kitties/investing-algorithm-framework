@@ -6,10 +6,10 @@ from unittest import TestCase
 from flask_testing import TestCase as FlaskTestCase
 
 from investing_algorithm_framework import create_app, App, \
-    TradingStrategy, TimeUnit, OrderStatus
+    TradingStrategy, TimeUnit, OrderStatus, PortfolioConfiguration, \
+    MarketCredential
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
-    ENVIRONMENT, Environment, BACKTEST_DATA_DIRECTORY_NAME, BACKTESTING_FLAG
-from investing_algorithm_framework.infrastructure import BacktestOrderExecutor
+    ENVIRONMENT, Environment, BACKTEST_DATA_DIRECTORY_NAME
 from tests.resources.stubs import OrderExecutorTest, PortfolioProviderTest
 
 logger = logging.getLogger(__name__)
@@ -146,6 +146,43 @@ class TestBase(TestCase):
                     os.rmdir(os.path.join(root, name))
 
 
+class BitvavoTestBase(TestBase):
+    """Pre-configured TestBase for BITVAVO/EUR with 1000 EUR balance."""
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="BITVAVO",
+            trading_symbol="EUR"
+        )
+    ]
+    market_credentials = [
+        MarketCredential(
+            market="BITVAVO",
+            api_key="api_key",
+            secret_key="secret_key"
+        )
+    ]
+    external_balances = {"EUR": 1000}
+
+
+class BinanceTestBase(TestBase):
+    """Pre-configured TestBase for binance/EUR with 1000 EUR balance."""
+    portfolio_configurations = [
+        PortfolioConfiguration(
+            market="binance",
+            trading_symbol="EUR",
+            initial_balance=1000,
+        )
+    ]
+    market_credentials = [
+        MarketCredential(
+            market="binance",
+            api_key="api_key",
+            secret_key="secret_key",
+        )
+    ]
+    external_balances = {"EUR": 1000}
+
+
 class FlaskTestBase(FlaskTestCase):
     portfolio_configurations = []
     market_credentials = []
@@ -178,10 +215,6 @@ class FlaskTestBase(FlaskTestCase):
 
         self.iaf_app.add_portfolio_provider(portfolio_provider)
 
-        # if self.market_data_source_service is not None:
-        #     self.app.container.market_data_source_service\
-        #         .override(self.market_data_source_service)
-
         if len(self.portfolio_configurations) > 0:
             for portfolio_configuration in self.portfolio_configurations:
                 self.iaf_app.add_portfolio_configuration(
@@ -192,17 +225,6 @@ class FlaskTestBase(FlaskTestCase):
         if len(self.market_credentials) > 0:
             for market_credential in self.market_credentials:
                 self.iaf_app.add_market_credential(market_credential)
-
-        if len(self.portfolio_configurations) > 0:
-            for portfolio_configuration in self.portfolio_configurations:
-                self.iaf_app.add_portfolio_configuration(
-                    portfolio_configuration
-                )
-
-            # Add all market credentials
-            if len(self.market_credentials) > 0:
-                for market_credential in self.market_credentials:
-                    self.iaf_app.add_market_credential(market_credential)
 
         if self.initialize:
             self.iaf_app.initialize_config()

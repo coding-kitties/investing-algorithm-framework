@@ -252,8 +252,8 @@ from investing_algorithm_framework import generate_rolling_backtest_windows
 windows = generate_rolling_backtest_windows(
     start_date=start_date,
     end_date=end_date,
-    window_size=365,
-    step_size=90
+    train_days=365,
+    step_days=90
 )
 
 for window in windows:

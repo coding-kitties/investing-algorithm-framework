@@ -104,24 +104,26 @@ class TestValidateCheckpoints(TestCase):
                 verbose=True
             )
 
-            expected_date_range_1 = f"{start_date1.isoformat()}_{end_date1.isoformat()}"
-            expected_date_range_2 = f"{start_date2.isoformat()}_{end_date2.isoformat()}"
+            expected_date_range_1 = (
+                f"{start_date1.isoformat()}_{end_date1.isoformat()}"
+            )
+            expected_date_range_2 = (
+                f"{start_date2.isoformat()}_{end_date2.isoformat()}"
+            )
 
-            assert expected_date_range_1 in checkpoints, \
-                f"Date range {expected_date_range_1} not found in checkpoints"
+            self.assertIn(expected_date_range_1, checkpoints)
+            self.assertIn(expected_date_range_2, checkpoints)
 
-            assert expected_date_range_2 in checkpoints, \
-                f"Date range {expected_date_range_2} not found in checkpoints"
-
-            assert "algo_001" in checkpoints[expected_date_range_1], \
-                "algo_001 not found in first date range"
-
-            assert "algo_002" in checkpoints[expected_date_range_2], \
-                "algo_002 not found in second date range"
-
-            assert "algo_003" in checkpoints[expected_date_range_2], \
-                "algo_003 not found in second date range"
+            self.assertIn(
+                "algo_001", checkpoints[expected_date_range_1]
+            )
+            self.assertIn(
+                "algo_002", checkpoints[expected_date_range_2]
+            )
+            self.assertIn(
+                "algo_003", checkpoints[expected_date_range_2]
+            )
 
             # Verify checkpoint file was created
             checkpoint_file = os.path.join(temp_dir, "checkpoints.json")
-            assert os.path.exists(checkpoint_file), "Checkpoint file was not created"
+            self.assertTrue(os.path.exists(checkpoint_file))

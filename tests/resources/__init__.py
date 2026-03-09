@@ -1,5 +1,5 @@
 from .test_base import TestBase, FlaskTestBase, OrderExecutorTest, \
-    PortfolioProviderTest
+    PortfolioProviderTest, BitvavoTestBase, BinanceTestBase
 from .utils import random_string
 
 __all__ = [
@@ -8,4 +8,6 @@ __all__ = [
     "FlaskTestBase",
     "OrderExecutorTest",
     "PortfolioProviderTest",
+    "BitvavoTestBase",
+    "BinanceTestBase",
 ]

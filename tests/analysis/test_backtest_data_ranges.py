@@ -1,10 +1,14 @@
 import unittest
 from datetime import datetime, timezone
 
+import pandas as pd
+
 from investing_algorithm_framework.analysis.backtest_data_ranges import (
-    generate_rolling_backtest_windows
+    generate_rolling_backtest_windows,
+    select_backtest_date_ranges
 )
-from investing_algorithm_framework.domain import BacktestDateRange
+from investing_algorithm_framework.domain import BacktestDateRange, \
+    OperationalException
 
 
 class TestGenerateRollingBacktestWindows(unittest.TestCase):
@@ -326,6 +330,151 @@ class TestGenerateRollingBacktestWindows(unittest.TestCase):
                 window["train_range"].end_date
             ).days
             self.assertEqual(gap, gap_days)
+
+    def test_returns_list_type(self):
+        """Test that the return type is always a list."""
+        start_date = datetime(2021, 1, 1, tzinfo=timezone.utc)
+        end_date = datetime(2023, 12, 31, tzinfo=timezone.utc)
+        result = generate_rolling_backtest_windows(
+            start_date=start_date, end_date=end_date,
+            train_days=365, test_days=90, step_days=90
+        )
+        self.assertIsInstance(result, list)
+
+    def test_all_dates_are_timezone_aware(self):
+        """Test that returned dates carry timezone info."""
+        start_date = datetime(2021, 1, 1, tzinfo=timezone.utc)
+        end_date = datetime(2023, 12, 31, tzinfo=timezone.utc)
+        windows = generate_rolling_backtest_windows(
+            start_date=start_date, end_date=end_date,
+            train_days=180, test_days=30, step_days=30
+        )
+        for w in windows:
+            self.assertIsNotNone(w["train_range"].start_date.tzinfo)
+            self.assertIsNotNone(w["test_range"].end_date.tzinfo)
+
+    def test_step_days_equals_one(self):
+        """Test with step_days=1 (maximum overlap)."""
+        start_date = datetime(2021, 1, 1, tzinfo=timezone.utc)
+        end_date = datetime(2021, 9, 1, tzinfo=timezone.utc)
+        windows = generate_rolling_backtest_windows(
+            start_date=start_date, end_date=end_date,
+            train_days=90, test_days=30, step_days=1
+        )
+        # Should produce many overlapping windows
+        self.assertGreater(len(windows), 100)
+
+
+class TestSelectBacktestDateRanges(unittest.TestCase):
+    """Tests for the select_backtest_date_ranges function."""
+
+    @staticmethod
+    def _make_trending_up_df():
+        """Create a DataFrame with a clear uptrend."""
+        dates = pd.date_range("2020-01-01", "2022-12-31", freq="D")
+        prices = [100 + i * 0.05 for i in range(len(dates))]
+        return pd.DataFrame({"Close": prices}, index=dates)
+
+    @staticmethod
+    def _make_mixed_df():
+        """Create a DataFrame with upturn, downturn and sideways phases."""
+        import numpy as np
+        dates = pd.date_range("2019-01-01", "2023-12-31", freq="D")
+        n = len(dates)
+        # Up first year, down second, sideways third, up again fourth+
+        prices = []
+        price = 100.0
+        for i in range(n):
+            frac = i / n
+            if frac < 0.25:
+                price += 0.3  # upturn
+            elif frac < 0.50:
+                price -= 0.25  # downturn
+            elif frac < 0.75:
+                price += 0.005 * np.sin(i * 0.5)  # sideways
+            else:
+                price += 0.15  # mild upturn
+            prices.append(price)
+        return pd.DataFrame({"Close": prices}, index=dates)
+
+    def test_returns_three_date_ranges(self):
+        """select_backtest_date_ranges should return exactly 3 ranges."""
+        df = self._make_trending_up_df()
+        result = select_backtest_date_ranges(df, window="365D")
+        self.assertEqual(len(result), 3)
+
+    def test_returns_backtest_date_range_instances(self):
+        """Each returned item should be a BacktestDateRange."""
+        df = self._make_trending_up_df()
+        result = select_backtest_date_ranges(df, window="365D")
+        for item in result:
+            self.assertIsInstance(item, BacktestDateRange)
+
+    def test_range_names(self):
+        """The three ranges should be named UpTurn, DownTurn, SideWays."""
+        df = self._make_mixed_df()
+        result = select_backtest_date_ranges(df, window="180D")
+        names = [r.name for r in result]
+        self.assertIn("UpTurn", names)
+        self.assertIn("DownTurn", names)
+        self.assertIn("SideWays", names)
+
+    def test_integer_window_parameter(self):
+        """Window can be specified as an integer (days)."""
+        df = self._make_trending_up_df()
+        result = select_backtest_date_ranges(df, window=180)
+        self.assertEqual(len(result), 3)
+
+    def test_raises_on_empty_dataframe(self):
+        """Should raise OperationalException on empty DataFrame."""
+        df = pd.DataFrame({"Close": []})
+        df.index = pd.to_datetime([])
+        with self.assertRaises(OperationalException):
+            select_backtest_date_ranges(df, window="365D")
+
+    def test_raises_when_window_too_large(self):
+        """Should raise when window exceeds available data span."""
+        dates = pd.date_range("2021-01-01", "2021-06-01", freq="D")
+        df = pd.DataFrame(
+            {"Close": range(len(dates))}, index=dates
+        )
+        with self.assertRaises(OperationalException):
+            select_backtest_date_ranges(df, window="365D")
+
+    def test_dates_are_timezone_aware(self):
+        """Returned date ranges should have timezone-aware dates."""
+        df = self._make_trending_up_df()
+        result = select_backtest_date_ranges(df, window="180D")
+        for r in result:
+            self.assertIsNotNone(r.start_date.tzinfo)
+            self.assertIsNotNone(r.end_date.tzinfo)
+
+    def test_upturn_has_positive_return(self):
+        """The upturn period should have a positive return in the data."""
+        df = self._make_mixed_df()
+        result = select_backtest_date_ranges(df, window="90D")
+        upturn = next(r for r in result if r.name == "UpTurn")
+        # The upturn window should have a rising price
+        window_df = df[
+            (df.index >= upturn.start_date.replace(tzinfo=None))
+            & (df.index <= upturn.end_date.replace(tzinfo=None))
+        ]
+        self.assertGreater(
+            window_df["Close"].iloc[-1], window_df["Close"].iloc[0]
+        )
+
+    def test_downturn_has_negative_return(self):
+        """The downturn period should have a negative return in the data."""
+        df = self._make_mixed_df()
+        result = select_backtest_date_ranges(df, window="90D")
+        downturn = next(r for r in result if r.name == "DownTurn")
+        window_df = df[
+            (df.index >= downturn.start_date.replace(tzinfo=None))
+            & (df.index <= downturn.end_date.replace(tzinfo=None))
+        ]
+        self.assertLess(
+            window_df["Close"].iloc[-1], window_df["Close"].iloc[0]
+        )
 
 
 if __name__ == "__main__":

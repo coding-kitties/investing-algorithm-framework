@@ -7,17 +7,8 @@ from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY
 class Test(TestCase):
 
     def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.realpath(__file__),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
+        self.resource_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "resources"
         )
 
     def test_add(self):

@@ -347,7 +347,8 @@ class TestDataSource(TestCase):
             "end_date",
             "storage_path",
             "date",
-            "identifier"
+            "identifier",
+            "warmup_window"
         ]
 
         self.assertEqual(set(field_names), set(expected_fields))

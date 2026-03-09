@@ -25,7 +25,7 @@ class BitvavoTradingStrategy(TradingStrategy):
     time_unit = TimeUnit.SECOND
     interval = 10
     data_sources = [
-        DataSource(data_type="OHLCV", market="bitvavo", symbol="BTC/EUR", window_size=200, time_frame="2h", identifier="BTC/EUR-ohlcv"),
+        DataSource(data_type="OHLCV", market="bitvavo", symbol="BTC/EUR", warmup_window=200, time_frame="2h", identifier="BTC/EUR-ohlcv"),
         DataSource(data_type="Ticker", market="bitvavo", symbol="BTC/EUR", identifier="BTC/EUR-ticker")
     ]
 

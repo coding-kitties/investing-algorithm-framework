@@ -36,17 +36,8 @@ class TestAppInitialize(TestCase):
     }
 
     def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.realpath(__file__),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
+        self.resource_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "resources"
         )
 
     def test_app_initialize_default(self):

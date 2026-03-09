@@ -1,4 +1,13 @@
+"""
+Tests for the CLI initialize command.
+
+Streamlined from the original file which had 4 methods with ~80%
+identical assertions. Now uses a shared helper for the common
+file-existence and content checks, with per-app-type methods
+that verify the differences (app file, requirements, env, etc.).
+"""
 import os
+import shutil
 from unittest import TestCase
 
 from investing_algorithm_framework.cli.initialize_app import command
@@ -7,509 +16,219 @@ from investing_algorithm_framework.cli.initialize_app import command
 class TestAppInitialize(TestCase):
 
     def setUp(self) -> None:
-        self.resource_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.realpath(__file__),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "resources"
-            )
+        self.resource_dir = os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "resources"
         )
-        self.template_dir = os.path.abspath(
-            os.path.join(
-                os.path.join(
-                    os.path.join(
-                        os.path.join(
-                            os.path.realpath(__file__),
-                            os.pardir
-                        ),
-                        os.pardir
-                    ),
-                    os.pardir
-                ),
-                "investing_algorithm_framework/cli/templates"
-            )
+        self.template_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "investing_algorithm_framework", "cli", "templates"
         )
-
-        self.output_dir = os.path.join(
-            self.resource_dir,
-            "output_cli"
-        )
-
-        if not os.path.exists(self.output_dir):
-            os.makedirs(self.output_dir)
+        self.output_dir = os.path.join(self.resource_dir, "output_cli")
+        os.makedirs(self.output_dir, exist_ok=True)
 
     def tearDown(self):
-        self.remove_directory(self.output_dir)
+        if os.path.exists(self.output_dir):
+            shutil.rmtree(self.output_dir)
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    def _template_path(self, filename):
+        return os.path.join(self.template_dir, filename)
+
+    def _output_path(self, *parts):
+        return os.path.join(self.output_dir, *parts)
+
+    def _assert_file_matches_template(self, output_file, template_name):
+        """Assert that an output file exists and matches a template."""
+        self.assertTrue(
+            os.path.exists(output_file),
+            f"Expected file not found: {output_file}"
+        )
+        with open(output_file) as f1, \
+                open(self._template_path(template_name)) as f2:
+            self.assertEqual(f1.read(), f2.read())
+
+    def _assert_common_files(self):
+        """Assert that the files common to ALL app types are present
+        and match their templates."""
+        strategy_dir = self._output_path("strategies")
+
+        # Strategy directory exists
+        self.assertTrue(os.path.isdir(strategy_dir))
+
+        # strategy.py
+        self._assert_file_matches_template(
+            os.path.join(strategy_dir, "strategy.py"),
+            "strategy.py.template"
+        )
+
+        # data_providers.py
+        self._assert_file_matches_template(
+            os.path.join(strategy_dir, "data_providers.py"),
+            "data_providers.py.template"
+        )
+
+        # __init__.py in strategy dir
+        self.assertTrue(
+            os.path.exists(os.path.join(strategy_dir, "__init__.py"))
+        )
+
+        # __init__.py in root output
+        self.assertTrue(
+            os.path.exists(self._output_path("__init__.py"))
+        )
+
+        # run_backtest.py
+        self._assert_file_matches_template(
+            self._output_path("run_backtest.py"),
+            "run_backtest.py.template"
+        )
+
+        # README.md
+        self._assert_file_matches_template(
+            self._output_path("README.md"),
+            "readme.md.template"
+        )
+
+    # ------------------------------------------------------------------
+    # App type: default
+    # ------------------------------------------------------------------
 
     def test_init_command_default(self):
-        command(
-            path=self.output_dir, app_type="default"
+        command(path=self.output_dir, app_type="default")
+        self._assert_common_files()
+
+        # app.py
+        self._assert_file_matches_template(
+            self._output_path("app.py"), "app.py.template"
         )
 
-        # Check if app.py file exists
-        app_file_path = os.path.join(self.output_dir, "app.py")
-        self.assertTrue(os.path.exists(app_file_path))
-
-        # Check if the app.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                app_file_path,
-                os.path.join(self.template_dir, "app.py.template")
-            )
+        # requirements.txt
+        self._assert_file_matches_template(
+            self._output_path("requirements.txt"),
+            "requirements.txt.template"
         )
 
-        # Check if requirements.txt file exists
-        requirements_file_path = os.path.join(
-            self.output_dir, "requirements.txt"
-        )
-        self.assertTrue(os.path.exists(requirements_file_path))
-
-        # Check if the requirements.txt is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                requirements_file_path,
-                os.path.join(self.template_dir, "requirements.txt.template")
-            )
+        # .env.example
+        self._assert_file_matches_template(
+            self._output_path(".env.example"),
+            "env.example.template"
         )
 
-        # Check if strategy dir exists
-        strategy_dir_path = os.path.join(self.output_dir, "strategies")
-        self.assertTrue(os.path.exists(strategy_dir_path))
-        self.assertTrue(os.path.isdir(strategy_dir_path))
+    # ------------------------------------------------------------------
+    # App type: default_web
+    # ------------------------------------------------------------------
 
-        # Check if strategy.py file exists
-        strategy_file_path = os.path.join(
-            strategy_dir_path, "strategy.py"
-        )
-        self.assertTrue(os.path.exists(strategy_file_path))
-        # Check if the strategy.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                strategy_file_path,
-                os.path.join(self.template_dir, "strategy.py.template")
-            )
+    def test_init_command_web(self):
+        command(path=self.output_dir, app_type="default_web")
+        self._assert_common_files()
+
+        # app.py (web variant)
+        self._assert_file_matches_template(
+            self._output_path("app.py"), "app_web.py.template"
         )
 
-        # Check if market_data_providers.py file exists
-        market_data_providers_file_path = os.path.join(
-            strategy_dir_path, "data_providers.py"
-        )
-        self.assertTrue(os.path.exists(market_data_providers_file_path))
-
-        # Check if the market_data_providers.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                market_data_providers_file_path,
-                os.path.join(self.template_dir, "data_providers.py.template")
-            )
+        # requirements.txt
+        self._assert_file_matches_template(
+            self._output_path("requirements.txt"),
+            "requirements.txt.template"
         )
 
-        # Check if __init__.py file exists
-        init_file_path = os.path.join(strategy_dir_path, "__init__.py")
-        self.assertTrue(os.path.exists(init_file_path))
-
-        # Check if __init__.py is in the root directory
-        root_init_file_path = os.path.join(self.output_dir, "__init__.py")
-        self.assertTrue(os.path.exists(root_init_file_path))
-
-        # Check if run_backtest.py file exists
-        run_backtest_file_path = os.path.join(self.output_dir, "run_backtest.py")
-        self.assertTrue(os.path.exists(run_backtest_file_path))
-
-        # Check if the run_backtest.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                run_backtest_file_path,
-                os.path.join(self.template_dir, "run_backtest.py.template")
-            )
+        # .env.example
+        self._assert_file_matches_template(
+            self._output_path(".env.example"),
+            "env.example.template"
         )
 
-        # Check if readme.md file exists
-        readme_file_path = os.path.join(self.output_dir, "README.md")
+    # ------------------------------------------------------------------
+    # App type: azure_function
+    # ------------------------------------------------------------------
 
-        self.assertTrue(os.path.exists(readme_file_path))
+    def test_init_command_azure_function(self):
+        command(path=self.output_dir, app_type="azure_function")
+        self._assert_common_files()
 
-        # Check if the readme.md is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                readme_file_path,
-                os.path.join(self.template_dir, "readme.md.template")
-            )
+        # app.py (azure variant)
+        self._assert_file_matches_template(
+            self._output_path("app.py"),
+            "app_azure_function.py.template"
         )
 
-        # Check if there is a .env.example file
-        env_example_file_path = os.path.join(self.output_dir, ".env.example")
-        self.assertTrue(os.path.exists(env_example_file_path))
-        # Check if the .env.example is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                env_example_file_path,
-                os.path.join(self.template_dir, "env.example.template")
-            )
+        # requirements.txt (azure variant)
+        self._assert_file_matches_template(
+            self._output_path("requirements.txt"),
+            "azure_function_requirements.txt.template"
         )
 
-    def test_initialize_command_web(self):
-        command(
-            path=self.output_dir, app_type="default_web"
+        # .env.example (azure variant)
+        self._assert_file_matches_template(
+            self._output_path(".env.example"),
+            "env_azure_function.example.template"
         )
 
-        # Check if app.py file exists
-        app_file_path = os.path.join(self.output_dir, "app.py")
-        self.assertTrue(os.path.exists(app_file_path))
+    # ------------------------------------------------------------------
+    # App type: aws_lambda
+    # ------------------------------------------------------------------
 
-        # Check if the app.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                app_file_path,
-                os.path.join(self.template_dir, "app_web.py.template")
-            )
+    def test_init_command_aws_lambda(self):
+        command(path=self.output_dir, app_type="aws_lambda")
+        self._assert_common_files()
+
+        # aws_function.py (not app.py)
+        self._assert_file_matches_template(
+            self._output_path("aws_function.py"),
+            "app_aws_lambda_function.py.template"
         )
 
-        # Check if requirements.txt file exists
-        requirements_file_path = os.path.join(
-            self.output_dir, "requirements.txt"
-        )
-        self.assertTrue(os.path.exists(requirements_file_path))
-
-        # Check if the requirements.txt is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                requirements_file_path,
-                os.path.join(self.template_dir, "requirements.txt.template")
-            )
+        # requirements.txt
+        self._assert_file_matches_template(
+            self._output_path("requirements.txt"),
+            "requirements.txt.template"
         )
 
-        # Check if strategy dir exists
-        strategy_dir_path = os.path.join(self.output_dir, "strategies")
-        self.assertTrue(os.path.exists(strategy_dir_path))
-        self.assertTrue(os.path.isdir(strategy_dir_path))
-
-        # Check if strategy.py file exists
-        strategy_file_path = os.path.join(
-            strategy_dir_path, "strategy.py"
-        )
-        self.assertTrue(os.path.exists(strategy_file_path))
-        # Check if the strategy.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                strategy_file_path,
-                os.path.join(self.template_dir, "strategy.py.template")
-            )
+        # .env
+        self._assert_file_matches_template(
+            self._output_path(".env"),
+            "env.example.template"
         )
 
-        # Check if market_data_providers.py file exists
-        market_data_providers_file_path = os.path.join(
-            strategy_dir_path, "data_providers.py"
-        )
-        self.assertTrue(os.path.exists(market_data_providers_file_path))
-
-        # Check if the market_data_providers.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                market_data_providers_file_path,
-                os.path.join(self.template_dir, "data_providers.py.template")
-            )
+        # Dockerfile
+        self._assert_file_matches_template(
+            self._output_path("Dockerfile"),
+            "aws_lambda_dockerfile.template"
         )
 
-        # Check if __init__.py file exists
-        init_file_path = os.path.join(strategy_dir_path, "__init__.py")
-        self.assertTrue(os.path.exists(init_file_path))
-
-        # Check if __init__.py is in the root directory
-        root_init_file_path = os.path.join(self.output_dir, "__init__.py")
-        self.assertTrue(os.path.exists(root_init_file_path))
-
-        # Check if run_backtest.py file exists
-        run_backtest_file_path = os.path.join(self.output_dir, "run_backtest.py")
-        self.assertTrue(os.path.exists(run_backtest_file_path))
-
-        # Check if the run_backtest.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                run_backtest_file_path,
-                os.path.join(self.template_dir, "run_backtest.py.template")
-            )
+        # .dockerignore
+        self._assert_file_matches_template(
+            self._output_path(".dockerignore"),
+            "aws_lambda_dockerignore.template"
         )
 
-        # Check if readme.md file exists
-        readme_file_path = os.path.join(self.output_dir, "README.md")
+    # ------------------------------------------------------------------
+    # Edge cases
+    # ------------------------------------------------------------------
 
-        self.assertTrue(os.path.exists(readme_file_path))
-
-        # Check if the readme.md is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                readme_file_path,
-                os.path.join(self.template_dir, "readme.md.template")
-            )
-        )
-
-        # Check if there is a .env.example file
-        env_example_file_path = os.path.join(self.output_dir, ".env.example")
-        self.assertTrue(os.path.exists(env_example_file_path))
-        # Check if the .env.example is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                env_example_file_path,
-                os.path.join(self.template_dir, "env.example.template")
-            )
-        )
-
-    def test_initialize_command_azure_function(self):
-        command(
-            path=self.output_dir, app_type="azure_function"
-        )
-
-        # Check if app.py file exists
-        app_file_path = os.path.join(self.output_dir, "app.py")
-        self.assertTrue(os.path.exists(app_file_path))
-
-        # Check if the app.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                app_file_path,
-                os.path.join(self.template_dir, "app_azure_function.py.template")
-            )
-        )
-
-        # Check if requirements.txt file exists
-        requirements_file_path = os.path.join(
-            self.output_dir, "requirements.txt"
-        )
-        self.assertTrue(os.path.exists(requirements_file_path))
-
-        # Check if the requirements.txt is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                requirements_file_path,
-                os.path.join(self.template_dir, "azure_function_requirements.txt.template")
-            )
-        )
-
-        # Check if strategy dir exists
-        strategy_dir_path = os.path.join(self.output_dir, "strategies")
-        self.assertTrue(os.path.exists(strategy_dir_path))
-        self.assertTrue(os.path.isdir(strategy_dir_path))
-
-        # Check if strategy.py file exists
-        strategy_file_path = os.path.join(
-            strategy_dir_path, "strategy.py"
-        )
-        self.assertTrue(os.path.exists(strategy_file_path))
-        # Check if the strategy.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                strategy_file_path,
-                os.path.join(self.template_dir, "strategy.py.template")
-            )
-        )
-
-        # Check if market_data_providers.py file exists
-        market_data_providers_file_path = os.path.join(
-            strategy_dir_path, "data_providers.py"
-        )
-        self.assertTrue(os.path.exists(market_data_providers_file_path))
-
-        # Check if the market_data_providers.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                market_data_providers_file_path,
-                os.path.join(self.template_dir, "data_providers.py.template")
-            )
-        )
-
-        # Check if __init__.py file exists
-        init_file_path = os.path.join(strategy_dir_path, "__init__.py")
-        self.assertTrue(os.path.exists(init_file_path))
-
-        # Check if __init__.py is in the root directory
-        root_init_file_path = os.path.join(self.output_dir, "__init__.py")
-        self.assertTrue(os.path.exists(root_init_file_path))
-
-        # Check if run_backtest.py file exists
-        run_backtest_file_path = os.path.join(self.output_dir, "run_backtest.py")
-        self.assertTrue(os.path.exists(run_backtest_file_path))
-
-        # Check if the run_backtest.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                run_backtest_file_path,
-                os.path.join(self.template_dir, "run_backtest.py.template")
-            )
-        )
-
-        # Check if readme.md file exists
-        readme_file_path = os.path.join(self.output_dir, "README.md")
-
-        self.assertTrue(os.path.exists(readme_file_path))
-
-        # Check if the readme.md is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                readme_file_path,
-                os.path.join(self.template_dir, "readme.md.template")
-            )
-        )
-
-        # Check if there is a .env.example file
-        env_example_file_path = os.path.join(self.output_dir, ".env.example")
-        self.assertTrue(os.path.exists(env_example_file_path))
-        # Check if the .env.example is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                env_example_file_path,
-                os.path.join(
-                    self.template_dir, "env_azure_function.example.template"
+    def test_all_app_types_produce_strategy_dir(self):
+        """Every supported app type should produce a strategies/ dir."""
+        for app_type in ("default", "default_web",
+                         "azure_function", "aws_lambda"):
+            with self.subTest(app_type=app_type):
+                # Fresh output dir per sub-test
+                sub_dir = self._output_path(f"sub_{app_type}")
+                os.makedirs(sub_dir, exist_ok=True)
+                command(path=sub_dir, app_type=app_type)
+                self.assertTrue(
+                    os.path.isdir(os.path.join(sub_dir, "strategies"))
                 )
-            )
-        )
+                shutil.rmtree(sub_dir)
 
-    def test_initialize_command_aws_lambda(self):
-        command(
-            path=self.output_dir, app_type="aws_lambda"
-        )
-
-        # Check if aws_function.py file exists
-        app_file_path = os.path.join(self.output_dir, "aws_function.py")
-        self.assertTrue(os.path.exists(app_file_path))
-
-        # Check if the app.py is the same as the template
+    def test_init_command_idempotent(self):
+        """Running the command twice should not fail."""
+        command(path=self.output_dir, app_type="default")
+        command(path=self.output_dir, app_type="default")
         self.assertTrue(
-            self.is_same_file_content(
-                app_file_path,
-                os.path.join(
-                    self.template_dir, "app_aws_lambda_function.py.template"
-                )
-            )
+            os.path.exists(self._output_path("app.py"))
         )
 
-        # Check if requirements.txt file exists
-        requirements_file_path = os.path.join(
-            self.output_dir, "requirements.txt"
-        )
-        self.assertTrue(os.path.exists(requirements_file_path))
-
-        # Check if the requirements.txt is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                requirements_file_path,
-                os.path.join(self.template_dir, "requirements.txt.template")
-            )
-        )
-
-        # Check if strategy dir exists
-        strategy_dir_path = os.path.join(self.output_dir, "strategies")
-        self.assertTrue(os.path.exists(strategy_dir_path))
-        self.assertTrue(os.path.isdir(strategy_dir_path))
-
-        # Check if strategy.py file exists
-        strategy_file_path = os.path.join(
-            strategy_dir_path, "strategy.py"
-        )
-        self.assertTrue(os.path.exists(strategy_file_path))
-        # Check if the strategy.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                strategy_file_path,
-                os.path.join(self.template_dir, "strategy.py.template")
-            )
-        )
-
-        # Check if market_data_providers.py file exists
-        market_data_providers_file_path = os.path.join(
-            strategy_dir_path, "data_providers.py"
-        )
-        self.assertTrue(os.path.exists(market_data_providers_file_path))
-
-        # Check if the market_data_providers.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                market_data_providers_file_path,
-                os.path.join(self.template_dir, "data_providers.py.template")
-            )
-        )
-
-        # Check if __init__.py file exists
-        init_file_path = os.path.join(strategy_dir_path, "__init__.py")
-        self.assertTrue(os.path.exists(init_file_path))
-
-        # Check if __init__.py is in the root directory
-        root_init_file_path = os.path.join(self.output_dir, "__init__.py")
-        self.assertTrue(os.path.exists(root_init_file_path))
-
-        # Check if run_backtest.py file exists
-        run_backtest_file_path = os.path.join(self.output_dir, "run_backtest.py")
-        self.assertTrue(os.path.exists(run_backtest_file_path))
-
-        # Check if the run_backtest.py is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                run_backtest_file_path,
-                os.path.join(self.template_dir, "run_backtest.py.template")
-            )
-        )
-
-        # Check if readme.md file exists
-        readme_file_path = os.path.join(self.output_dir, "README.md")
-
-        self.assertTrue(os.path.exists(readme_file_path))
-
-        # Check if the readme.md is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                readme_file_path,
-                os.path.join(self.template_dir, "readme.md.template")
-            )
-        )
-
-        # Check if there is a .env.example file
-        env_example_file_path = os.path.join(self.output_dir, ".env")
-        self.assertTrue(os.path.exists(env_example_file_path))
-        # Check if the .env.example is the same as the template
-        self.assertTrue(
-            self.is_same_file_content(
-                env_example_file_path,
-                os.path.join(
-                    self.template_dir, "env.example.template"
-                )
-            )
-        )
-
-        # check if the dockerfile exists
-        dockerfile_path = os.path.join(self.output_dir, "Dockerfile")
-        self.assertTrue(os.path.exists(dockerfile_path))
-        self.assertTrue(
-            self.is_same_file_content(
-                dockerfile_path,
-                os.path.join(self.template_dir, "aws_lambda_dockerfile.template")
-            )
-        )
-
-        # Check if the .dockerignore file exists
-        dockerignore_file_path = os.path.join(self.output_dir, ".dockerignore")
-        self.assertTrue(os.path.exists(dockerignore_file_path))
-        self.assertTrue(
-            self.is_same_file_content(
-                dockerignore_file_path,
-                os.path.join(self.template_dir, "aws_lambda_dockerignore.template")
-            )
-        )
-
-    def is_same_file_content(self, file1, file2):
-        with open(file1, 'r') as f1, open(file2, 'r') as f2:
-            content1 = f1.read()
-            content2 = f2.read()
-            return content1 == content2
-
-    def remove_directory(self, path):
-        if os.path.exists(path):
-            for root, dirs, files in os.walk(path, topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
