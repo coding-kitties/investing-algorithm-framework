@@ -44,7 +44,9 @@ class TestBacktestSaveOpen(unittest.TestCase):
         )
         self.ohlcv_csv_path = os.path.join(
             self.resource_dir,
-            "backtest_data/OHLCV_BTC-EUR_BINANCE_2h_2020-12-15-06-00_2021-01-01-00-30.csv"
+            "test_data",
+            "ohlcv",
+            "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-08_2023-12-02-00-00.csv"
         )
 
         # Test models
@@ -1473,4 +1475,3 @@ class TestBacktestSaveOpen(unittest.TestCase):
         self.assertEqual(len(backtest_set2), 2)
         self.assertIn(backtest4, backtest_set2)
         self.assertIn(backtest5, backtest_set2)
-

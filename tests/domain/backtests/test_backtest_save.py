@@ -86,7 +86,8 @@ class TestBacktestSave(TestCase):
         self.assertTrue(
             os.path.exists(os.path.join(backtest_run_dir, "run.json"))
         )
-        self.assertTrue(
+        # metrics.json is only created when backtest_metrics is provided
+        self.assertFalse(
             os.path.exists(os.path.join(backtest_run_dir, "metrics.json"))
         )
 
@@ -152,4 +153,3 @@ class TestBacktestSave(TestCase):
         self.assertTrue(
             os.path.exists(os.path.join(backtest_run_dir, "metrics.json"))
         )
-
