@@ -27,7 +27,8 @@
 #     def test_pretty_print(self):
 #         path = os.path.join(
 #             self.resource_dir,
-#             "backtest_reports_for_testing/test_algorithm_backtest_created-at_2025-04-21-21-21"
+#             "backtest_reports_for_testing",
+#             "test_algorithm_backtest_created-at_2025-04-21-21-21"
 #         )
 #         report = Backtest.open(path)
 #         pretty_print_trades(report)

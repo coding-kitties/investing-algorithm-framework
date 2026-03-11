@@ -48,7 +48,8 @@ class DataSource:
         if self.window_size is not None:
             warnings.warn(
                 "The 'window_size' parameter is deprecated and will be "
-                "removed in release 0.8.0. Please use 'warmup_window' instead.",
+                "removed in release 0.8.0. "
+                "Please use 'warmup_window' instead.",
                 DeprecationWarning,
                 stacklevel=2
             )
@@ -153,7 +154,8 @@ class DataSource:
             f"DataSource(identifier={self.identifier}, "
             f"data_provider_identifier={self.data_provider_identifier}, "
             f"data_type={self.data_type}, symbol={self.symbol}, "
-            f"warmup_window={self.warmup_window}, time_frame={self.time_frame}, "
+            f"warmup_window={self.warmup_window}, "
+            f"time_frame={self.time_frame}, "
             f"market={self.market}, storage_path={self.storage_path}, "
             f"pandas={self.pandas}, date={self.date}, "
             f"start_date={self.start_date}, end_date={self.end_date}, "

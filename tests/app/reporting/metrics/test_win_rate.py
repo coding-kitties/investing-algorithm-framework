@@ -31,7 +31,7 @@ class TestGetWinLossRatio(unittest.TestCase):
             self.create_mock_trade(100),
             self.create_mock_trade(300),
         ]
-        self.assertEqual(get_win_loss_ratio(report.get_trades()), 0.0)
+        self.assertEqual(get_win_loss_ratio(report.get_trades()), float('inf'))
 
     def test_all_losing_trades(self):
         report = MagicMock()
@@ -47,11 +47,11 @@ class TestGetWinLossRatio(unittest.TestCase):
         self.assertEqual(get_win_loss_ratio(report.get_trades()), 0.0)
 
     def test_division_by_zero_loss(self):
-        # Should not happen with realistic data, but test edge case
+        # All trades have non-negative gain, no losing trades -> inf
         report = MagicMock()
         report.get_trades.return_value = [
             self.create_mock_trade(100),
             self.create_mock_trade(200),
-            self.create_mock_trade(0),  # zero gain/loss
+            self.create_mock_trade(0),  # zero gain/loss, not counted as a loss
         ]
-        self.assertEqual(get_win_loss_ratio(report.get_trades()), 0.0)
+        self.assertEqual(get_win_loss_ratio(report.get_trades()), float('inf'))

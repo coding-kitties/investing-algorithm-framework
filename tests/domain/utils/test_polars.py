@@ -4,7 +4,7 @@ from pandas import Timestamp
 from investing_algorithm_framework import convert_polars_to_pandas
 
 class TestConvertPandasToPolars(TestCase):
-    
+
     def test_convert_pandas_to_polars(self):
         polars_df = DataFrame({
             "Datetime": ["2021-01-01", "2021-01-02", "2021-01-03"],
@@ -33,7 +33,7 @@ class TestConvertPandasToPolars(TestCase):
         self.assertEqual(set(column_names), {'Close'})
 
         # Check if the index is a datetime object
-        self.assertEqual(polars_df_converted.index.dtype, "datetime64[ns]")
+        self.assertEqual(polars_df_converted.index.dtype, "datetime64[us]")
         self.assertEqual(
             polars_df_converted.index[0], Timestamp('2021-01-01 00:00:00')
         )
