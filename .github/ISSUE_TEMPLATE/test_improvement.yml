@@ -11,9 +11,9 @@ body:
   - type: input
     id: test-file
     attributes:
-      label: Test File
-      description: Path to the affected test file.
-      placeholder: e.g. tests/app/test_backtesting.py
+      label: Test File/Directory
+      description: Path to the affected test file or directory.
+      placeholder: e.g. tests/app/test_backtesting.py or tests/app/
     validations:
       required: true
 
