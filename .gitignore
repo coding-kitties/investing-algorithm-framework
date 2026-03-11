@@ -161,6 +161,5 @@ venv
 examples/tutorial/data
 examples/tutorial/backtest_results
 examples/tutorial/resources
-# Squad: ignore volatile/generated files only (team state is tracked on dev)
-.squad/orchestration-log/
-.squad/log/
+# Squad: all squad files live on dev only
+.squad/
