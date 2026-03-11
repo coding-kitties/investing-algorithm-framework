@@ -80,7 +80,7 @@ class Test(TestCase):
             risk_free_rate=0.027
         )
         path = os.path.join(
-            self.resource_dir, "backtest_reports_for_testing/test_algorithm_backtest"
+            self.resource_dir, "backtest_reports_for_testing", "test_algorithm_backtest"
         )
         backtest.save(directory_path=path)
 

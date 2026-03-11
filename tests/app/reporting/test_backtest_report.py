@@ -65,8 +65,8 @@ class Test(TestCase):
             created_at=datetime.now(tz=timezone.utc)
         )
         data_files = [
-            "tests/resources/market_data_sources_for_testing/OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-59_2023-12-02-00-00.csv",
-            "tests/resources/market_data_sources_for_testing/OHLCV_BTC-EUR_BINANCE_15m_2023-12-14-22-00_2023-12-25-00-00.csv",
+            os.path.join("tests", "resources", "market_data_sources_for_testing", "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-59_2023-12-02-00-00.csv"),
+            os.path.join("tests", "resources", "market_data_sources_for_testing", "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14-22-00_2023-12-25-00-00.csv"),
         ]
 
         backtest = Backtest(
@@ -185,4 +185,3 @@ class Test(TestCase):
         self.assertTrue(
             os.path.exists(os.path.join(backtest_run_dir, "metrics.json"))
         )
-
