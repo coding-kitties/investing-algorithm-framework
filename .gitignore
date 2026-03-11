@@ -161,5 +161,6 @@ venv
 examples/tutorial/data
 examples/tutorial/backtest_results
 examples/tutorial/resources
-# Squad: all squad files live on dev only
+# Squad/Copilot: all dev-only files live on dev branch
 .squad/
+.copilot/
