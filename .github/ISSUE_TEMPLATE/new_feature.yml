@@ -1,0 +1,61 @@
+name: "✨ New Feature"
+description: Propose a new feature for the investing algorithm framework.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please provide as much detail as possible.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? Why is it needed?
+      placeholder: I'm frustrated when ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe the feature and how it should work.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Framework Area
+      description: Which part of the framework does this affect?
+      options:
+        - Core (app, algorithm)
+        - Backtesting
+        - Data providers
+        - Order execution
+        - Portfolio management
+        - CLI
+        - Analysis / Reporting
+        - Infrastructure / Deployment
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Have you considered any alternative approaches?
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any mockups, reference implementations, or related issues.
+    validations:
+      required: false

@@ -1,0 +1,68 @@
+name: "🔧 Test Improvement / Fix"
+description: Report a failing, flaky, or incomplete test that needs attention.
+title: "[Test Fix]: "
+labels: ["test", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us keep the test suite reliable. Describe the issue below.
+
+  - type: input
+    id: test-file
+    attributes:
+      label: Test File
+      description: Path to the affected test file.
+      placeholder: e.g. tests/app/test_backtesting.py
+    validations:
+      required: true
+
+  - type: input
+    id: test-name
+    attributes:
+      label: Test Name
+      description: Name of the specific test function (if applicable).
+      placeholder: e.g. test_backtest_with_limit_orders
+    validations:
+      required: false
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Issue Type
+      options:
+        - Failing test
+        - Flaky / intermittent failure
+        - Incorrect assertion
+        - Missing edge case coverage
+        - Performance issue
+        - Test refactor needed
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: Describe what's wrong and what the expected behavior should be.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can someone reproduce the issue?
+      placeholder: |
+        1. Run `python -m pytest tests/...`
+        2. Observe ...
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Error output, logs, or screenshots.
+    validations:
+      required: false

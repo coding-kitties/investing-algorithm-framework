@@ -1,0 +1,59 @@
+name: "🧪 New Test"
+description: Propose a new test case for the framework.
+title: "[Test]: "
+labels: ["test", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve test coverage! Please fill out the details below.
+
+  - type: input
+    id: module
+    attributes:
+      label: Module / Component
+      description: Which module or component should this test cover?
+      placeholder: e.g. app/algorithm, domain/models, services/order_service
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Test Description
+      description: Describe what the test should verify.
+      placeholder: Describe the behavior or scenario you want to test.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: test-type
+    attributes:
+      label: Test Type
+      options:
+        - Unit test
+        - Integration test
+        - End-to-end test
+        - Backtest scenario
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: What conditions must be met for this test to pass?
+      placeholder: |
+        - Given ...
+        - When ...
+        - Then ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional Context
+      description: Any additional information, links, or screenshots.
+    validations:
+      required: false
