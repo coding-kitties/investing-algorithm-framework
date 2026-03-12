@@ -102,6 +102,11 @@ jobs:
         run: |
           source $VENV
           coverage run -m unittest discover -s tests
+      - name: Generate coverage report
+        if: always()
+        continue-on-error: true
+        run: |
+          source $VENV
           coverage xml
       #----------------------------------------------
       #             upload coverage stats
