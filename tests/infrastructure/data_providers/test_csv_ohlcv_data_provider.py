@@ -34,7 +34,7 @@ class Test(TestCase):
         file_name = "OHLCV_BTC-EUR_BINANCE" \
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_provider = CSVOHLCVDataProvider(
-            storage_path=f"{self.resource_dir}/market_data_sources_for_testing/"
+            storage_path=f"{self.resource_dir}/test_data/ohlcv/"
                           f"{file_name}",
             window_size=10,
             market="binance",
@@ -65,7 +65,7 @@ class Test(TestCase):
             CSVOHLCVDataProvider(
                 storage_path=os.path.join(
                     self.resource_dir,
-                    "market_data_sources_for_testing",
+                    "test_data", "ohlcv",
                     file_name
                 ),
                 window_size=10,
@@ -85,7 +85,7 @@ class Test(TestCase):
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources_for_testing", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             window_size=10,
             market="binance",
@@ -123,7 +123,7 @@ class Test(TestCase):
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources_for_testing", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             window_size=10,
             market="binance",
@@ -167,7 +167,7 @@ class Test(TestCase):
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         csv_ohlcv_market_data_source = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources_for_testing", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             window_size=200,
             market="binance",
@@ -210,7 +210,7 @@ class Test(TestCase):
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         csv_ohlcv_market_data_source = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources_for_testing", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             window_size=200,
             market="binance",
@@ -239,7 +239,7 @@ class Test(TestCase):
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources_for_testing", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             data_provider_identifier="test",
             window_size=10,
@@ -254,7 +254,7 @@ class Test(TestCase):
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources_for_testing", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             market="test",
             symbol="BTC/EUR",
@@ -268,7 +268,7 @@ class Test(TestCase):
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources_for_testing", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             symbol="BTC/EUR",
             window_size=10,
@@ -289,7 +289,7 @@ class Test(TestCase):
         )
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources_for_testing", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             data_provider_identifier="test",
             market="binance",
@@ -345,7 +345,7 @@ class Test(TestCase):
         )
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources_for_testing", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             data_provider_identifier="test",
             market="binance",

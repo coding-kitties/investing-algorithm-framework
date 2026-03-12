@@ -23,7 +23,7 @@ class Test(TestCase):
             os.path.join(os.path.dirname(__file__), '..', '..', 'resources')
         )
         csv_file_path = os.path.join(
-            resource_directory, "market_data_sources_for_testing",
+            resource_directory, "test_data", "ohlcv",
             "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         )
 

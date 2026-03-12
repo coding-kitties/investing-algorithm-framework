@@ -170,12 +170,12 @@ class TestReadmeExample(TestCase):
         from datetime import datetime, timezone
 
         # Create the app with test resource directory
-        # Use market_data_sources_for_testing which has data from 2020-12-15,
+        # Use test_data/ohlcv which has data from 2020-12-15,
         # providing enough room for warmup_window=800 (67 days on 2h data)
         config = {
             RESOURCE_DIRECTORY: os.path.join(
                 self.resource_directory,
-                'market_data_sources_for_testing'
+                'test_data', 'ohlcv'
             )
         }
         app = create_app(name="ReadmeExampleTest", config=config)
@@ -264,12 +264,12 @@ class TestReadmeExample(TestCase):
         from datetime import datetime, timezone
 
         # Create the app with test resource directory
-        # Use market_data_sources_for_testing which has data from 2020-12-15,
+        # Use test_data/ohlcv which has data from 2020-12-15,
         # providing enough room for warmup_window=800 (67 days on 2h data)
         config = {
             RESOURCE_DIRECTORY: os.path.join(
                 self.resource_directory,
-                'market_data_sources_for_testing'
+                'test_data', 'ohlcv'
             )
         }
         app = create_app(name="ReadmeExampleTest", config=config)
