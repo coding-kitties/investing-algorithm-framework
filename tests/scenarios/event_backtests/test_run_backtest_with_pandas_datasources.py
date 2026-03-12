@@ -22,8 +22,10 @@ class Test(TestCase):
         resource_directory = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '..', '..', 'resources')
         )
-        csv_file_path = f"{resource_directory}/market_data_sources_for_testing" \
-                        "/OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        csv_file_path = os.path.join(
+            resource_directory, "market_data_sources_for_testing",
+            "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        )
 
         config = {RESOURCE_DIRECTORY: resource_directory}
         app = create_app(name="GoldenCrossStrategy", config=config)

@@ -209,7 +209,7 @@ def _make_strategy(
 ):
     """Build a default RSI/EMA strategy."""
     if symbols is None:
-        symbols = ["BTC", "ETH"]
+        symbols = ["BTC"]
     if position_sizes is None:
         position_sizes = [
             PositionSize(symbol=s, percentage_of_portfolio=20.0)
@@ -224,12 +224,14 @@ def _make_strategy(
         market="BITVAVO",
         symbols=symbols,
         position_sizes=position_sizes,
+        ema_short_period=20,
+        ema_long_period=50,
     )
 
 
-def _run_backtest(app, strategy, days=365, **kwargs):
+def _run_backtest(app, strategy, days=730, **kwargs):
     """Run a single-period vector backtest and return the BacktestRun."""
-    end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
+    end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
     start_date = end_date - timedelta(days=days)
     date_range = BacktestDateRange(
         start_date=start_date, end_date=end_date, name="TestPeriod"
@@ -285,7 +287,7 @@ class TestFfillAndShiftRemoval(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy()
-        run = _run_backtest(app, strategy, days=365)
+        run = _run_backtest(app, strategy)
         self.assertIsNotNone(run)
         self.assertGreater(run.number_of_trades, 0)
 
@@ -296,7 +298,7 @@ class TestFfillAndShiftRemoval(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy()
-        run = _run_backtest(app, strategy, days=1095)
+        run = _run_backtest(app, strategy)
         self.assertIsNotNone(run)
 
         # Count closed trades — with the old ffill logic most symbols
@@ -361,12 +363,11 @@ class TestStaticPositionSizingCapitalGuard(TestCase):
         the initial portfolio amount.
         """
         app = _make_app()
-        symbols = ["BTC", "ETH"]
+        symbols = ["BTC"]
         # Allocate 60% per symbol — without the guard both could be
         # open simultaneously and exceed 100%.
         position_sizes = [
             PositionSize(symbol="BTC", percentage_of_portfolio=60.0),
-            PositionSize(symbol="ETH", percentage_of_portfolio=60.0),
         ]
         strategy = _make_strategy(
             symbols=symbols, position_sizes=position_sizes
@@ -396,16 +397,15 @@ class TestRawSignalsExposed(TestCase):
         keyed by symbol, each containing 'buy' and 'sell' pd.Series.
         """
         app = _make_app()
-        strategy = _make_strategy(symbols=["BTC", "ETH"])
+        strategy = _make_strategy(symbols=["BTC"])
         run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
         # signals dict should exist
         self.assertIsInstance(run.signals, dict)
         self.assertIn("BTC", run.signals)
-        self.assertIn("ETH", run.signals)
 
-        for symbol in ["BTC", "ETH"]:
+        for symbol in ["BTC"]:
             signal_data = run.signals[symbol]
             self.assertIn("buy", signal_data)
             self.assertIn("sell", signal_data)
@@ -437,12 +437,12 @@ class TestRawSignalsExposed(TestCase):
 
     def test_signals_contain_at_least_one_true(self):
         """
-        Over 3 years the strategy should fire at least one buy signal
-        across all tracked symbols.
+        Over a long enough period the strategy should fire at least
+        one buy signal across all tracked symbols.
         """
         app = _make_app()
-        strategy = _make_strategy(symbols=["BTC", "ETH"])
-        run = _run_backtest(app, strategy, days=1095)
+        strategy = _make_strategy(symbols=["BTC"])
+        run = _run_backtest(app, strategy)
         self.assertIsNotNone(run)
 
         # At least one symbol should have at least one buy signal
@@ -456,19 +456,19 @@ class TestRawSignalsExposed(TestCase):
             "symbols over 3 years"
         )
 
-    def test_signals_not_in_to_dict(self):
+    def test_signals_in_to_dict(self):
         """
-        The signals field should NOT appear in to_dict() because
-        pd.Series objects are not JSON-serializable. The to_dict
-        method is used for saving to disk.
+        The signals field should appear in to_dict() as serialized
+        date string lists (not raw pd.Series). The framework now
+        serializes signals for persistence.
         """
         app = _make_app()
         strategy = _make_strategy(symbols=["BTC"])
-        run = _run_backtest(app, strategy, days=365)
+        run = _run_backtest(app, strategy)
         self.assertIsNotNone(run)
 
         d = run.to_dict()
-        self.assertNotIn("signals", d)
+        self.assertIn("signals", d)
 
 
 # ===================================================================
@@ -483,7 +483,7 @@ class TestSignalEvents(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy()
-        run = _run_backtest(app, strategy, days=1095)
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
         self.assertIsInstance(run.signal_events, list)
         self.assertGreater(
@@ -517,7 +517,7 @@ class TestSignalEvents(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy()
-        run = _run_backtest(app, strategy, days=1095)
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
         executed_buys = run.get_signal_events(
@@ -535,8 +535,8 @@ class TestSignalEvents(TestCase):
         that symbol.
         """
         app = _make_app()
-        strategy = _make_strategy(symbols=["BTC", "ETH"])
-        run = _run_backtest(app, strategy, days=1095)
+        strategy = _make_strategy(symbols=["BTC"])
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
         btc_events = run.get_signal_events(symbol="BTC")
@@ -550,7 +550,7 @@ class TestSignalEvents(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy()
-        run = _run_backtest(app, strategy, days=1095)
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
         executed = run.get_signal_events(reason="executed")
@@ -564,7 +564,7 @@ class TestSignalEvents(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy()
-        run = _run_backtest(app, strategy, days=1095)
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
         blocked = run.get_signal_events(

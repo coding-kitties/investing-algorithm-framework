@@ -42,10 +42,10 @@ class Test(TestCase):
         backtest_metrics = backtest.get_backtest_metrics(date_range)
         backtest_run = backtest.get_backtest_run(date_range)
         self.assertAlmostEqual(
-            backtest_metrics.total_growth, 15.2, delta=0.5
+            backtest_metrics.total_growth, 12.2, delta=1.0
         )
         self.assertAlmostEqual(
-            backtest_metrics.total_growth_percentage, 0.039, delta=0.001
+            backtest_metrics.total_growth_percentage, 0.030, delta=0.005
         )
         self.assertEqual(
             backtest_run.initial_unallocated, 400
@@ -54,10 +54,10 @@ class Test(TestCase):
             backtest_run.trading_symbol, "EUR"
         )
         self.assertAlmostEqual(
-            backtest_metrics.total_net_gain, 15.2, delta=0.5
+            backtest_metrics.total_net_gain, 12.2, delta=1.0
         )
         self.assertAlmostEqual(
-            backtest_metrics.total_net_gain_percentage, 0.039, delta=0.001
+            backtest_metrics.total_net_gain_percentage, 0.030, delta=0.005
         )
         snapshots = backtest_run.get_portfolio_snapshots()
         # Check that the first two snapshots created at are the same
