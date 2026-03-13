@@ -29,7 +29,7 @@ from investing_algorithm_framework import (
     create_app,
     BacktestDateRange,
     PositionSize,
-    RESOURCE_DIRECTORY,
+    RESOURCE_DIRECTORY, DATA_DIRECTORY,
     SnapshotInterval,
     generate_algorithm_id,
     TradeStatus,
@@ -196,7 +196,7 @@ def _resource_directory():
 
 def _make_app():
     """Create and configure the app used by most tests."""
-    config = {RESOURCE_DIRECTORY: _resource_directory()}
+    config = {RESOURCE_DIRECTORY: _resource_directory(), DATA_DIRECTORY: "test_data/ohlcv"}
     app = create_app(name="VectorBacktestFixTests", config=config)
     app.add_market(
         market="BITVAVO", trading_symbol="EUR", initial_balance=400

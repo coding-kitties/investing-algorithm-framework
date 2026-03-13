@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 
 from investing_algorithm_framework import create_app, BacktestDateRange, \
-    Algorithm, RESOURCE_DIRECTORY, SnapshotInterval
+    Algorithm, RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval
 from tests.resources.strategies_for_testing.strategy_v1 import \
     CrossOverStrategyV1
 
@@ -19,7 +19,7 @@ class Test(TestCase):
         resource_directory = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '..', '..', 'resources')
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(
             market="BITVAVO", trading_symbol="EUR", initial_balance=400

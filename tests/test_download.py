@@ -1,3 +1,5 @@
+import os
+import unittest
 from pathlib import Path
 from unittest import TestCase
 from datetime import datetime, timezone
@@ -8,6 +10,7 @@ from investing_algorithm_framework import download
 
 class TestDownload(TestCase):
 
+    @unittest.skipIf(os.environ.get("CI"), "Requires pre-downloaded data")
     def test_download_data_with_already_existing_data(self):
         storage_path = Path(__file__).parent / "resources" / "data"
         data = download(

@@ -8,7 +8,7 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    RESOURCE_DIRECTORY, SnapshotInterval
+    RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
@@ -228,7 +228,7 @@ class TestEventVsVectorBacktest(TestCase):
             os.path.dirname(os.path.dirname(__file__)),
             'resources'
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
 
         # Create app
         app = create_app(name="EventVsVectorTest", config=config)

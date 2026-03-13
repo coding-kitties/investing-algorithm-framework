@@ -9,7 +9,7 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, \
-    RESOURCE_DIRECTORY, PositionSize
+    RESOURCE_DIRECTORY, DATA_DIRECTORY, PositionSize
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
@@ -235,7 +235,7 @@ class Test(TestCase):
         resource_directory = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(
             market="BITVAVO", trading_symbol="EUR", initial_balance=400
