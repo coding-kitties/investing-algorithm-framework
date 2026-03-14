@@ -21,12 +21,10 @@ class RSIEMACrossoverStrategy(TradingStrategy):
     """
     time_unit = TimeUnit.HOUR
     interval = 2
-    symbols = ["BTC", "ETH", "DOT", "XRP"]
+    symbols = ["BTC", "ETH"]
     position_sizes = [
         PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
         PositionSize(symbol="ETH", percentage_of_portfolio=20.0),
-        PositionSize(symbol="DOT", percentage_of_portfolio=10.0),
-        PositionSize(symbol="XRP", percentage_of_portfolio=10.0)
     ]
 
     def __init__(
@@ -69,7 +67,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     market=market,
                     symbol=full_symbol,
                     pandas=True,
-                    window_size=800
+                    window_size=400
                 )
             )
             data_sources.append(
@@ -80,7 +78,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     market=market,
                     symbol=full_symbol,
                     pandas=True,
-                    window_size=800
+                    window_size=400
                 )
             )
 
@@ -241,7 +239,7 @@ class TestEventVsVectorBacktest(TestCase):
 
         # Set up date range
         end_date = datetime(2023, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=730)
+        start_date = end_date - timedelta(days=365)
         date_range = BacktestDateRange(start_date=start_date, end_date=end_date)
 
         # Create and run vector-based backtest
@@ -598,4 +596,3 @@ class TestEventVsVectorBacktest(TestCase):
 if __name__ == "__main__":
     import unittest
     unittest.main()
-

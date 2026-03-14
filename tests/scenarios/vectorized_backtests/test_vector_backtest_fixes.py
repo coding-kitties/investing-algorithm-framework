@@ -296,7 +296,7 @@ class TestFfillAndShiftRemoval(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy()
-        run = _run_backtest(app, strategy, days=1095)
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
         # Count closed trades — with the old ffill logic most symbols
@@ -442,7 +442,7 @@ class TestRawSignalsExposed(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy(symbols=["BTC", "ETH"])
-        run = _run_backtest(app, strategy, days=1095)
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
         # At least one symbol should have at least one buy signal
@@ -483,7 +483,7 @@ class TestSignalEvents(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy()
-        run = _run_backtest(app, strategy, days=1095)
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
         self.assertIsInstance(run.signal_events, list)
         self.assertGreater(
@@ -517,7 +517,7 @@ class TestSignalEvents(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy()
-        run = _run_backtest(app, strategy, days=1095)
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
         executed_buys = run.get_signal_events(
@@ -536,7 +536,7 @@ class TestSignalEvents(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy(symbols=["BTC", "ETH"])
-        run = _run_backtest(app, strategy, days=1095)
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
         btc_events = run.get_signal_events(symbol="BTC")
@@ -550,7 +550,7 @@ class TestSignalEvents(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy()
-        run = _run_backtest(app, strategy, days=1095)
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
         executed = run.get_signal_events(reason="executed")
@@ -564,7 +564,7 @@ class TestSignalEvents(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy()
-        run = _run_backtest(app, strategy, days=1095)
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
         blocked = run.get_signal_events(

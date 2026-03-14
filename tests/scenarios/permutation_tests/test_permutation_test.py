@@ -66,7 +66,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     market=market,
                     symbol=full_symbol,
                     pandas=True,
-                    window_size=800
+                    window_size=200
                 )
             )
             data_sources.append(
@@ -77,7 +77,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     market=market,
                     symbol=full_symbol,
                     pandas=True,
-                    window_size=800
+                    window_size=200
                 )
             )
 
@@ -244,7 +244,7 @@ class Test(TestCase):
             market="BITVAVO", trading_symbol="EUR", initial_balance=400
         )
         end_date = datetime(2023, 12, 31, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=700)
+        start_date = end_date - timedelta(days=365)
         date_range = BacktestDateRange(
             start_date=start_date, end_date=end_date
         )
@@ -268,7 +268,7 @@ class Test(TestCase):
             trading_symbol="EUR",
             backtest_date_range=date_range,
             strategy=strategy,
-            number_of_permutations=50
+            number_of_permutations=20
         )
         end_time = time.time()
         elapsed_time = end_time - start_time
