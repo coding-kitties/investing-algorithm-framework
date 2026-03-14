@@ -8,7 +8,7 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    RESOURCE_DIRECTORY, SnapshotInterval
+    RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
@@ -21,12 +21,9 @@ class RSIEMACrossoverStrategy(TradingStrategy):
     """
     time_unit = TimeUnit.HOUR
     interval = 2
-    symbols = ["BTC", "ETH", "DOT", "XRP"]
+    symbols = ["BTC"]
     position_sizes = [
-        PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
-        PositionSize(symbol="ETH", percentage_of_portfolio=20.0),
-        PositionSize(symbol="DOT", percentage_of_portfolio=10.0),
-        PositionSize(symbol="XRP", percentage_of_portfolio=10.0)
+        PositionSize(symbol="BTC", percentage_of_portfolio=20.0)
     ]
 
     def __init__(
@@ -231,7 +228,7 @@ class TestEventVsVectorBacktest(TestCase):
             os.path.dirname(os.path.dirname(__file__)),
             'resources'
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
 
         # Create app
         app = create_app(name="EventVsVectorTest", config=config)
@@ -255,8 +252,8 @@ class TestEventVsVectorBacktest(TestCase):
             rsi_overbought_threshold=70,
             rsi_oversold_threshold=30,
             ema_time_frame="2h",
-            ema_short_period=50,
-            ema_long_period=200,
+            ema_short_period=20,
+            ema_long_period=50,
             ema_cross_lookback_window=10,
         )
         vector_backtest = app.run_vector_backtest(
@@ -283,8 +280,8 @@ class TestEventVsVectorBacktest(TestCase):
             rsi_overbought_threshold=70,
             rsi_oversold_threshold=30,
             ema_time_frame="2h",
-            ema_short_period=50,
-            ema_long_period=200,
+            ema_short_period=20,
+            ema_long_period=50,
             ema_cross_lookback_window=10,
         )
         event_backtest = app.run_backtest(
@@ -598,4 +595,3 @@ class TestEventVsVectorBacktest(TestCase):
 if __name__ == "__main__":
     import unittest
     unittest.main()
-

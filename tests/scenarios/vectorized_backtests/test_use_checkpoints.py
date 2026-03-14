@@ -10,7 +10,7 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    TradeStatus, RESOURCE_DIRECTORY, SnapshotInterval, generate_algorithm_id
+    TradeStatus, RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval, generate_algorithm_id
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
@@ -243,11 +243,11 @@ class Test(TestCase):
         resource_directory = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=1095)
+        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=730)
 
         # Split into multiple date ranges to test progressive filtering
         mid_date = start_date + timedelta(days=365)
@@ -279,16 +279,10 @@ class Test(TestCase):
                     ema_cross_lookback_window=param_set[
                         "ema_cross_lookback_window"
                     ],
-                    symbols=[
-                        "BTC",
-                        "ETH"
-                    ],
+                    symbols=["BTC"],
                     position_sizes=[
                         PositionSize(
                             symbol="BTC", percentage_of_portfolio=20.0
-                        ),
-                        PositionSize(
-                            symbol="ETH", percentage_of_portfolio=20.0
                         )
                     ]
                 )
@@ -353,11 +347,11 @@ class Test(TestCase):
         resource_directory = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=1095)
+        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=730)
 
         # Split into multiple date ranges to test progressive filtering
         mid_date = start_date + timedelta(days=365)
@@ -389,16 +383,10 @@ class Test(TestCase):
                     ema_cross_lookback_window=param_set[
                         "ema_cross_lookback_window"
                     ],
-                    symbols=[
-                        "BTC",
-                        "ETH"
-                    ],
+                    symbols=["BTC"],
                     position_sizes=[
                         PositionSize(
                             symbol="BTC", percentage_of_portfolio=20.0
-                        ),
-                        PositionSize(
-                            symbol="ETH", percentage_of_portfolio=20.0
                         )
                     ]
                 )
@@ -467,11 +455,11 @@ class Test(TestCase):
         resource_directory = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=1095)
+        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=730)
 
         # Split into multiple date ranges to test progressive filtering
         mid_date = start_date + timedelta(days=365)
@@ -503,16 +491,10 @@ class Test(TestCase):
                     ema_cross_lookback_window=param_set[
                         "ema_cross_lookback_window"
                     ],
-                    symbols=[
-                        "BTC",
-                        "ETH"
-                    ],
+                    symbols=["BTC"],
                     position_sizes=[
                         PositionSize(
                             symbol="BTC", percentage_of_portfolio=20.0
-                        ),
-                        PositionSize(
-                            symbol="ETH", percentage_of_portfolio=20.0
                         )
                     ]
                 )

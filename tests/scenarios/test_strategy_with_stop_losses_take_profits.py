@@ -122,7 +122,8 @@ class Test(TestCase):
         )
         backtest = app.run_backtest(
             strategy=strategy,
-            backtest_date_range=backtest_date_range
+            backtest_date_range=backtest_date_range,
+            risk_free_rate=0.027
         )
         # Check that orders are created for buy and take profit sell
         run = backtest.get_backtest_run(backtest_date_range)
@@ -304,7 +305,8 @@ class Test(TestCase):
         )
         backtest = app.run_backtest(
             strategy=strategy,
-            backtest_date_range=backtest_date_range
+            backtest_date_range=backtest_date_range,
+            risk_free_rate=0.027
         )
         # Check that orders are created for buy and stop loss sell
         run = backtest.get_backtest_run(backtest_date_range)

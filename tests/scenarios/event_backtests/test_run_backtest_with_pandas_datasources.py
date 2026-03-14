@@ -5,7 +5,7 @@ from unittest import TestCase
 import polars as pl
 
 from investing_algorithm_framework import create_app, BacktestDateRange, \
-    Algorithm, RESOURCE_DIRECTORY, PandasOHLCVDataProvider, \
+    Algorithm, RESOURCE_DIRECTORY, DATA_DIRECTORY, PandasOHLCVDataProvider, \
     convert_polars_to_pandas
 from tests.resources.strategies_for_testing.strategy_v1 import \
     CrossOverStrategyV1
@@ -22,10 +22,12 @@ class Test(TestCase):
         resource_directory = os.path.abspath(
             os.path.join(os.path.dirname(__file__), '..', '..', 'resources')
         )
-        csv_file_path = f"{resource_directory}/market_data_sources_for_testing" \
-                        "/OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        csv_file_path = os.path.join(
+            resource_directory, "test_data", "ohlcv",
+            "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        )
 
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
         end_date = datetime(2023, 12, 2, tzinfo=timezone.utc)

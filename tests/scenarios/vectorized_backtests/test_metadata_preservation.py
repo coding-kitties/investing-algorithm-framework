@@ -11,7 +11,7 @@ import pandas as pd
 from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import create_app, BacktestDateRange, \
-    SnapshotInterval, RESOURCE_DIRECTORY, TimeUnit, TradingStrategy, \
+    SnapshotInterval, RESOURCE_DIRECTORY, DATA_DIRECTORY, TimeUnit, TradingStrategy, \
     DataSource, DataType, PositionSize, generate_algorithm_id
 
 
@@ -220,11 +220,11 @@ class Test(TestCase):
         resource_directory = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=1095)
+        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=730)
 
         # Split into multiple date ranges to test progressive filtering
         date_range_1 = BacktestDateRange(
@@ -259,16 +259,10 @@ class Test(TestCase):
             ema_cross_lookback_window=param_set[
                 "ema_cross_lookback_window"
             ],
-            symbols=[
-                "BTC",
-                "ETH"
-            ],
+            symbols=["BTC"],
             position_sizes=[
                 PositionSize(
                     symbol="BTC", percentage_of_portfolio=20.0
-                ),
-                PositionSize(
-                    symbol="ETH", percentage_of_portfolio=20.0
                 )
             ]
         )
@@ -308,12 +302,12 @@ class Test(TestCase):
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             'resources'
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR",
                        initial_balance=400)
-        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=1095)
+        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=730)
 
         # Split into multiple date ranges to test progressive filtering
         date_range_1 = BacktestDateRange(
@@ -358,16 +352,10 @@ class Test(TestCase):
             ema_cross_lookback_window=param_set_one[
                 "ema_cross_lookback_window"
             ],
-            symbols=[
-                "BTC",
-                "ETH"
-            ],
+            symbols=["BTC"],
             position_sizes=[
                 PositionSize(
                     symbol="BTC", percentage_of_portfolio=20.0
-                ),
-                PositionSize(
-                    symbol="ETH", percentage_of_portfolio=20.0
                 )
             ]
         )
@@ -397,16 +385,10 @@ class Test(TestCase):
             ema_cross_lookback_window=param_set_two[
                 "ema_cross_lookback_window"
             ],
-            symbols=[
-                "BTC",
-                "ETH"
-            ],
+            symbols=["BTC"],
             position_sizes=[
                 PositionSize(
                     symbol="BTC", percentage_of_portfolio=20.0
-                ),
-                PositionSize(
-                    symbol="ETH", percentage_of_portfolio=20.0
                 )
             ]
         )

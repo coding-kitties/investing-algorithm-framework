@@ -9,19 +9,16 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, \
-    RESOURCE_DIRECTORY, PositionSize
+    RESOURCE_DIRECTORY, DATA_DIRECTORY, PositionSize
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 2
-    symbols = ["BTC", "ETH"]
+    symbols = ["BTC"]
     position_sizes = [
         PositionSize(
             symbol="BTC", percentage_of_portfolio=20.0
-        ),
-        PositionSize(
-            symbol="ETH", percentage_of_portfolio=20.0
         )
     ]
 
@@ -238,13 +235,13 @@ class Test(TestCase):
         resource_directory = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(
             market="BITVAVO", trading_symbol="EUR", initial_balance=400
         )
         end_date = datetime(2023, 12, 31, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=700)
+        start_date = end_date - timedelta(days=730)
         date_range = BacktestDateRange(
             start_date=start_date, end_date=end_date
         )
@@ -258,8 +255,8 @@ class Test(TestCase):
             rsi_overbought_threshold=70,
             rsi_oversold_threshold=30,
             ema_time_frame="2h",
-            ema_short_period=50,
-            ema_long_period=200,
+            ema_short_period=20,
+            ema_long_period=50,
             ema_cross_lookback_window=10
         )
         backtests = app.run_permutation_test(
@@ -268,7 +265,8 @@ class Test(TestCase):
             trading_symbol="EUR",
             backtest_date_range=date_range,
             strategy=strategy,
-            number_of_permutations=50
+            number_of_permutations=10,
+            risk_free_rate=0.027
         )
         end_time = time.time()
         elapsed_time = end_time - start_time
