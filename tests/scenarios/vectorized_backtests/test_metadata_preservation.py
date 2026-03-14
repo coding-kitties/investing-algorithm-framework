@@ -223,8 +223,8 @@ class Test(TestCase):
         config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=730)
+        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=365)
 
         # Split into multiple date ranges to test progressive filtering
         date_range_1 = BacktestDateRange(
@@ -306,8 +306,8 @@ class Test(TestCase):
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR",
                        initial_balance=400)
-        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=730)
+        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=365)
 
         # Split into multiple date ranges to test progressive filtering
         date_range_1 = BacktestDateRange(

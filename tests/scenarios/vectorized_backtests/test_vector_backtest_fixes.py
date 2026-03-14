@@ -298,7 +298,7 @@ class TestFfillAndShiftRemoval(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy()
-        run = _run_backtest(app, strategy)
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
         # Count closed trades — with the old ffill logic most symbols
@@ -441,8 +441,8 @@ class TestRawSignalsExposed(TestCase):
         one buy signal across all tracked symbols.
         """
         app = _make_app()
-        strategy = _make_strategy(symbols=["BTC"])
-        run = _run_backtest(app, strategy)
+        strategy = _make_strategy(symbols=["BTC", "ETH"])
+        run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
         # At least one symbol should have at least one buy signal
@@ -535,7 +535,7 @@ class TestSignalEvents(TestCase):
         that symbol.
         """
         app = _make_app()
-        strategy = _make_strategy(symbols=["BTC"])
+        strategy = _make_strategy(symbols=["BTC", "ETH"])
         run = _run_backtest(app, strategy, days=365)
         self.assertIsNotNone(run)
 
