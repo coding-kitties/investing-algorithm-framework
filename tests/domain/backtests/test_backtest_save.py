@@ -80,7 +80,7 @@ class TestBacktestSave(TestCase):
         self.assertTrue(os.path.exists(runs_dir))
 
         backtest_run_dir = os.path.join(
-            runs_dir, "backtest_EUR_20230807_20231202"
+            runs_dir, run.create_directory_name()
         )
         self.assertTrue(os.path.exists(backtest_run_dir))
         self.assertTrue(
@@ -144,7 +144,7 @@ class TestBacktestSave(TestCase):
         self.assertTrue(os.path.exists(runs_dir))
 
         backtest_run_dir = os.path.join(
-            runs_dir, "backtest_EUR_20230807_20231202"
+            runs_dir, run.create_directory_name()
         )
         self.assertTrue(os.path.exists(backtest_run_dir))
         self.assertTrue(
