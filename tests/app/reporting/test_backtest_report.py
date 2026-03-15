@@ -1,4 +1,5 @@
 import os
+import shutil
 from datetime import datetime, timezone
 from unittest import TestCase
 
@@ -23,6 +24,11 @@ class Test(TestCase):
                 "resources"
             )
         )
+        self.output_path = os.path.join(self.resource_dir, "backtest_report")
+
+    def tearDown(self):
+        if os.path.exists(self.output_path):
+            shutil.rmtree(self.output_path)
 
     def test_save_without_algorithm(self):
         """
@@ -85,7 +91,7 @@ class Test(TestCase):
 
         # Check if the backtest run directory exists
         backtest_run_dir = os.path.join(
-            runs_dir, "backtest_EUR_20230807_20231201"
+            runs_dir, run.create_directory_name()
         )
         self.assertTrue(os.path.exists(backtest_run_dir))
 
@@ -174,7 +180,7 @@ class Test(TestCase):
 
         # Check if the backtest run directory exists
         backtest_run_dir = os.path.join(
-            runs_dir, "backtest_EUR_20230807_20231201"
+            runs_dir, results.create_directory_name()
         )
         self.assertTrue(os.path.exists(backtest_run_dir))
 
