@@ -303,7 +303,7 @@ class Test(TestCase):
                 market="BITVAVO",
                 backtest_storage_directory=checkpoint_dir,
                 use_checkpoints=True,
-                show_progress=True
+                show_progress=False
             )
 
             # There should be 4 backtests returned
@@ -411,7 +411,7 @@ class Test(TestCase):
                 market="BITVAVO",
                 backtest_storage_directory=checkpoint_dir,
                 use_checkpoints=True,
-                show_progress=True
+                show_progress=False
             )
             end_time = time.time()
             duration = end_time - start_time
@@ -519,7 +519,7 @@ class Test(TestCase):
                 market="BITVAVO",
                 backtest_storage_directory=checkpoint_dir,
                 use_checkpoints=True,
-                show_progress=True,
+                show_progress=False,
                 n_workers=4
             )
 

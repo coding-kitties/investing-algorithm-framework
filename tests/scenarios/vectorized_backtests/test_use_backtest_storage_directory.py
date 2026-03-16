@@ -327,7 +327,7 @@ class Test(TestCase):
             market="BITVAVO",
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
-            show_progress=True
+            show_progress=False
         )
 
         self.assertEqual(len(backtest.get_all_backtest_runs()), 2)
@@ -439,7 +439,7 @@ class Test(TestCase):
             market="BITVAVO",
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=True,
-            show_progress=True,
+            show_progress=False,
             n_workers=4
         )
         end_time = time.time()
@@ -576,7 +576,7 @@ class Test(TestCase):
             market="BITVAVO",
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
-            show_progress=True
+            show_progress=False
         )
 
         # Verify first run results
@@ -654,7 +654,7 @@ class Test(TestCase):
             market="BITVAVO",
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
-            show_progress=True
+            show_progress=False
         )
 
         # ===== VERIFICATION =====
@@ -790,7 +790,7 @@ class Test(TestCase):
             market="BITVAVO",
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
-            show_progress=True
+            show_progress=False
         )
 
         self.assertEqual(len(first_backtests), 2)
@@ -865,7 +865,7 @@ class Test(TestCase):
             market="BITVAVO",
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
-            show_progress=True,
+            show_progress=False,
             final_filter_function=tracking_final_filter
         )
 

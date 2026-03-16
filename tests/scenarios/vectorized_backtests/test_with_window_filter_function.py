@@ -268,7 +268,7 @@ class Test(TestCase):
                 risk_free_rate=0.027,
                 trading_symbol="EUR",
                 market="BITVAVO",
-                show_progress=True
+                show_progress=False
                 # No filter function - run it directly
             )
             backtest_metrics = individual_backtest\

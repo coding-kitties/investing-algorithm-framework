@@ -28,7 +28,7 @@ from .vector_backtest_service import VectorBacktestService
 logger = logging.getLogger(__name__)
 
 
-def _print_progress(message: str, show_progress: bool = True):
+def _print_progress(message: str, show_progress: bool = False):
     """
     Print progress message with forced flush.
 
@@ -47,7 +47,7 @@ def _fill_missing_data_for_data_sources(
     data_sources: List[DataSource],
     backtest_date_range: BacktestDateRange,
     data_provider_service: DataProviderService,
-    show_progress: bool = True
+    show_progress: bool = False
 ):
     """
     Fill missing time series data entries for all data sources before
@@ -618,7 +618,7 @@ class BacktestService:
         self,
         data_sources: List[DataSource],
         backtest_date_range: BacktestDateRange,
-        show_progress: bool = True,
+        show_progress: bool = False,
         fill_missing_data: bool = False
     ):
         """
@@ -678,7 +678,7 @@ class BacktestService:
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         risk_free_rate: Optional[float] = None,
         skip_data_sources_initialization: bool = False,
-        show_progress: bool = True,
+        show_progress: bool = False,
         continue_on_error: bool = False,
         window_filter_function: Optional[
             Callable[[List[Backtest], BacktestDateRange], List[Backtest]]
@@ -1937,7 +1937,7 @@ class BacktestService:
         backtest_date_ranges: List[BacktestDateRange] = None,
         risk_free_rate: Optional[float] = None,
         skip_data_sources_initialization: bool = False,
-        show_progress: bool = True,
+        show_progress: bool = False,
         continue_on_error: bool = False,
         window_filter_function: Optional[
             Callable[[List[Backtest], BacktestDateRange], List[Backtest]]
@@ -2547,7 +2547,7 @@ class BacktestService:
         skip_data_sources_initialization: bool = False,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
         use_checkpoints: bool = False,
-        show_progress: bool = True,
+        show_progress: bool = False,
         initial_amount: float = None,
         market: str = None,
         trading_symbol: str = None,
