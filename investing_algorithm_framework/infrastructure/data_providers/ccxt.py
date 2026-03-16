@@ -915,7 +915,7 @@ class CCXTOHLCVDataProvider(DataProvider):
 
         # Loop through all files in the data storage path
         if not os.path.isdir(storage_path):
-            logger.error(
+            logger.debug(
                 f"Storage path {storage_path} does not exist or is not a "
                 "directory."
             )

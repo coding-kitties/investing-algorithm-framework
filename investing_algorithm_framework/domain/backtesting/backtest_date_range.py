@@ -1,11 +1,8 @@
 from datetime import datetime, timezone
 from dateutil.parser import parse
-from logging import getLogger
 
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
-
-logger = getLogger("investing_algorithm_framework")
 
 
 class BacktestDateRange:
@@ -28,27 +25,18 @@ class BacktestDateRange:
             end_date = parse(end_date)
 
         if end_date is None:
-            self._end_date = datetime.now(tz=timezone.utc)
+            end_date = datetime.now(tz=timezone.utc)
 
-        # Check if start_date end end_date are utc datetime objects
-        time_zone_info = start_date.tzinfo
-
-        if time_zone_info is None or time_zone_info is not timezone.utc:
-            logger.warning(
-                "Start date must be a UTC datetime object. "
-                f"Received: {start_date}"
-            )
-            # Convert to UTC if not already
+        # Ensure start_date is UTC
+        if start_date.tzinfo is None:
+            start_date = start_date.replace(tzinfo=timezone.utc)
+        elif start_date.tzinfo is not timezone.utc:
             start_date = start_date.astimezone(timezone.utc)
 
-        time_zone_info = end_date.tzinfo
-
-        if time_zone_info is None or time_zone_info is not timezone.utc:
-            logger.warning(
-                "End date must be a UTC datetime object. "
-                f"Received: {end_date}"
-            )
-            # Convert to UTC if not already
+        # Ensure end_date is UTC
+        if end_date.tzinfo is None:
+            end_date = end_date.replace(tzinfo=timezone.utc)
+        elif end_date.tzinfo is not timezone.utc:
             end_date = end_date.astimezone(timezone.utc)
 
         self._start_date = start_date

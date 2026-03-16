@@ -29,7 +29,7 @@ class CrossOverStrategyV2(TradingStrategy):
             symbol="BTC/EUR",
             data_type="ohlcv",
             time_frame="2h",
-            window_size=200,
+            warmup_window=200,
             identifier="BTC/EUR-ohlcv-2h",
         )
     ]
