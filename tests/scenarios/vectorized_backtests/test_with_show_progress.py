@@ -216,7 +216,8 @@ class Test(TestCase):
         for backtest in backtests:
             backtest_metrics = backtest.get_backtest_metrics(backtest_date_range)
 
-            if backtest_metrics.number_of_trades_closed > 0:
+            if backtest_metrics is not None \
+                    and backtest_metrics.number_of_trades_closed > 0:
                 filtered.append(backtest)
 
         return filtered
@@ -358,4 +359,3 @@ class Test(TestCase):
         self.assertTrue(
             "Combining backtests across date ranges" in output
         )
-

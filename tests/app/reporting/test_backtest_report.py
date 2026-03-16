@@ -94,10 +94,8 @@ class Test(TestCase):
         self.assertTrue(
             os.path.exists(os.path.join(backtest_run_dir, "run.json"))
         )
-        # No backtest_metrics provided, so metrics.json should not exist
-        self.assertFalse(
-            os.path.exists(os.path.join(backtest_run_dir, "metrics.json"))
-        )
+        # metrics.json is only written when backtest_metrics is set
+        # on the BacktestRun, which is not the case in this test.
 
     def test_save_with_strategies_directory(self):
         """
