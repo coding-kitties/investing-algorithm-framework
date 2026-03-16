@@ -19,7 +19,7 @@ from investing_algorithm_framework.services.data_providers import \
     DataProviderService, fill_missing_timeseries_data, \
     get_missing_timeseries_data_entries
 from investing_algorithm_framework.services.metrics import \
-    create_backtest_metrics, get_risk_free_rate_us
+    create_backtest_metrics
 from investing_algorithm_framework.services.portfolios import \
     PortfolioConfigurationService
 from .vector_backtest_service import VectorBacktestService
@@ -1915,22 +1915,17 @@ class BacktestService:
 
     def _get_risk_free_rate(self) -> float:
         """
-        Get the risk-free rate from the configuration service.
+        Get the risk-free rate. Returns a sensible default of 0.027
+        (2.7%) to avoid external network calls during backtests.
 
         Returns:
             float: The risk-free rate.
         """
-        risk_free_rate = get_risk_free_rate_us()
-
-        if risk_free_rate is None:
-            raise OperationalException(
-                "Could not retrieve risk free rate."
-                "Please provide a risk free as an argument when running "
-                "your backtest or make sure you have an internet "
-                "connection"
-            )
-
-        return risk_free_rate
+        logger.info(
+            "No risk free rate provided, defaulting to 0.027 "
+            "(2.7%%). Provide risk_free_rate to override."
+        )
+        return 0.027
 
     def run_backtests(
         self,

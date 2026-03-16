@@ -249,33 +249,40 @@ class Backtest:
                 run_path = os.path.join(runs_dir, dir_name)
                 if os.path.isdir(run_path):
 
-                    if backtest_date_ranges is not None:
-                        temp_run = BacktestRun.open(run_path)
-                        match_found = False
+                    try:
+                        if backtest_date_ranges is not None:
+                            temp_run = BacktestRun.open(run_path)
+                            match_found = False
 
-                        for date_range in backtest_date_ranges:
-                            if (
-                                temp_run.backtest_start_date ==
-                                date_range.start_date and
-                                temp_run.backtest_end_date ==
-                                date_range.end_date
-                            ):
+                            for date_range in backtest_date_ranges:
+                                if (
+                                    temp_run.backtest_start_date ==
+                                    date_range.start_date and
+                                    temp_run.backtest_end_date ==
+                                    date_range.end_date
+                                ):
 
-                                if date_range.name is not None:
-                                    if (
-                                        temp_run.backtest_date_range_name ==
-                                        date_range.name
-                                    ):
+                                    if date_range.name is not None:
+                                        if (
+                                            temp_run
+                                            .backtest_date_range_name ==
+                                            date_range.name
+                                        ):
+                                            match_found = True
+                                            break
+                                    else:
                                         match_found = True
                                         break
-                                else:
-                                    match_found = True
-                                    break
 
-                        if not match_found:
-                            continue
+                            if not match_found:
+                                continue
 
-                    backtest_runs.append(BacktestRun.open(run_path))
+                        backtest_runs.append(BacktestRun.open(run_path))
+                    except (OperationalException, json.JSONDecodeError) as e:
+                        logger.warning(
+                            f"Skipping run at {run_path}: {e}"
+                        )
+                        continue
 
         # Load combined backtests summary
         if backtest_date_ranges is not None:

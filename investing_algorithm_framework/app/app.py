@@ -27,7 +27,7 @@ from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db, \
     PandasOHLCVDataProvider
 from investing_algorithm_framework.services import OrderBacktestService, \
-    BacktestPortfolioService, DefaultTradeOrderEvaluator, get_risk_free_rate_us
+    BacktestPortfolioService, DefaultTradeOrderEvaluator
 from .app_hook import AppHook
 from .eventloop import EventLoopService
 
@@ -1791,16 +1791,11 @@ class App:
         """
 
         if risk_free_rate is None:
-            logger.info("No risk free rate provided, retrieving it...")
-            risk_free_rate = get_risk_free_rate_us()
-
-            if risk_free_rate is None:
-                raise OperationalException(
-                    "Could not retrieve risk free rate for backtest metrics."
-                    "Please provide a risk free as an argument when running "
-                    "your backtest or make sure you have an internet "
-                    "connection"
-                )
+            logger.info(
+                "No risk free rate provided, defaulting to 0.027 "
+                "(2.7%%). Provide risk_free_rate to override."
+            )
+            risk_free_rate = 0.027
 
         backtest_service = self.container.backtest_service()
         data_provider_service = self.container.data_provider_service()
