@@ -47,7 +47,7 @@ class Test(TestCase):
             market="BITVAVO",
             symbol="BTC/EUR",
             time_frame="2h",
-            window_size=200
+            warmup_window=200
         )
         app.add_data_provider(data_provider, priority=1)
         algorithm.add_strategy(strategy)

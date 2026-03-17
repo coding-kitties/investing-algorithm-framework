@@ -59,9 +59,7 @@ class TestStandardDeviationDownside(unittest.TestCase):
         ]
         report = MagicMock()
         report.get_snapshots.return_value = snapshots
-        # Downside returns: [-0.1]
-        expected_std = np.std([-0.1], ddof=1)
-        self.assertTrue(np.isnan(expected_std) or expected_std == 0.0)
+        # Downside returns: [-0.1] — only 1 element, std(ddof=1) is undefined
         self.assertEqual(get_standard_deviation_downside_returns(report.get_snapshots()), 0.0)
 
     def test_nan_handling(self):

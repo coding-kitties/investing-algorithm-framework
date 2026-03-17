@@ -39,7 +39,7 @@ class MultiSymbolStrategy(TradingStrategy):
             symbol="BTC/EUR",
             time_frame="2h",
             market="BITVAVO",
-            window_size=100
+            warmup_window=100
         ),
         DataSource(
             identifier="ETH_data",
@@ -47,7 +47,7 @@ class MultiSymbolStrategy(TradingStrategy):
             symbol="ETH/EUR",
             time_frame="2h",
             market="BITVAVO",
-            window_size=100
+            warmup_window=100
         ),
         DataSource(
             identifier="SOL_data",
@@ -55,7 +55,7 @@ class MultiSymbolStrategy(TradingStrategy):
             symbol="SOL/EUR",
             time_frame="2h",
             market="BITVAVO",
-            window_size=100
+            warmup_window=100
         ),
         DataSource(
             identifier="ADA_data",
@@ -63,7 +63,7 @@ class MultiSymbolStrategy(TradingStrategy):
             symbol="ADA/EUR",
             time_frame="2h",
             market="BITVAVO",
-            window_size=100
+            warmup_window=100
         ),
         DataSource(
             identifier="XRP_data",
@@ -71,7 +71,7 @@ class MultiSymbolStrategy(TradingStrategy):
             symbol="XRP/EUR",
             time_frame="2h",
             market="BITVAVO",
-            window_size=100
+            warmup_window=100
         ),
     ]
 
@@ -482,4 +482,3 @@ class TestProportionalScalingWithFixedAmount(TestCase):
 if __name__ == '__main__':
     import unittest
     unittest.main()
-

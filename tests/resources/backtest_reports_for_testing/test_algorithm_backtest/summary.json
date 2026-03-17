@@ -19,7 +19,7 @@
     "average_trade_gain_percentage": null,
     "cagr": 0.0,
     "sharpe_ratio": NaN,
-    "sortino_ratio": NaN,
+    "sortino_ratio": 0.0,
     "calmar_ratio": 0.0,
     "profit_factor": 0.0,
     "annual_volatility": 0.0,

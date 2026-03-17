@@ -255,6 +255,7 @@ class FlaskTestBase(FlaskTestCase):
                         }
                     )
 
+        self.iaf_app._flask_app.testing = True
         return self.iaf_app._flask_app
 
     def tearDown(self) -> None:

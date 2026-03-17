@@ -63,7 +63,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     market=market,
                     symbol=full_symbol,
                     pandas=True,
-                    window_size=200
+                    warmup_window=200
                 )
             )
             data_sources.append(
@@ -74,7 +74,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     market=market,
                     symbol=full_symbol,
                     pandas=True,
-                    window_size=200
+                    warmup_window=200
                 )
             )
 
@@ -265,7 +265,8 @@ class Test(TestCase):
             trading_symbol="EUR",
             backtest_date_range=date_range,
             strategy=strategy,
-            number_of_permutations=20
+            number_of_permutations=20,
+            show_progress=False
         )
         end_time = time.time()
         elapsed_time = end_time - start_time

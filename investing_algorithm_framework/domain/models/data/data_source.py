@@ -57,6 +57,11 @@ class DataSource:
             if self.warmup_window is None:
                 object.__setattr__(self, 'warmup_window', self.window_size)
 
+        # Sync warmup_window back to window_size for backward compatibility
+        # so existing code reading .window_size still works
+        if self.warmup_window is not None and self.window_size is None:
+            object.__setattr__(self, 'window_size', self.warmup_window)
+
         # Convert data_type and time_frame to their respective enums if needed
         if isinstance(self.data_type, str):
             object.__setattr__(self, 'data_type',

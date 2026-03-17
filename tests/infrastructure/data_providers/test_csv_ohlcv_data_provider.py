@@ -309,7 +309,7 @@ class Test(TestCase):
         required_start_date = backtest_date_range.start_date - \
             timedelta(
                 minutes=TimeFrame.from_value(datasource.time_frame)
-                .amount_of_minutes * datasource.window_size
+                .amount_of_minutes * datasource.warmup_window
             )
 
         # Check if for an entries in the window cache a 200 window size

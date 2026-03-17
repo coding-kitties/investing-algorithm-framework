@@ -63,7 +63,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     market=market,
                     symbol=full_symbol,
                     pandas=True,
-                    window_size=400
+                    warmup_window=400
                 )
             )
             data_sources.append(
@@ -74,7 +74,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                     market=market,
                     symbol=full_symbol,
                     pandas=True,
-                    window_size=400
+                    warmup_window=400
                 )
             )
 

@@ -20,7 +20,7 @@ class FixedStopLossTakeProfitStrategy(TradingStrategy):
             symbol="BTC/EUR",
             data_type=DataType.OHLCV,
             time_frame="2h",
-            window_size=200,
+            warmup_window=200,
             market="BITVAVO",
             identifier="BTC_EUR_OHLCV",
             pandas=True
@@ -112,7 +112,7 @@ class Test(TestCase):
             symbol="BTC/EUR",
             time_frame="2h",
             market="BITVAVO",
-            window_size=200
+            warmup_window=200
         )
         app.add_data_provider(
             data_provider=csv_data_provider, priority=1
@@ -295,7 +295,7 @@ class Test(TestCase):
             symbol="BTC/EUR",
             time_frame="2h",
             market="BITVAVO",
-            window_size=200
+            warmup_window=200
         )
         app.add_data_provider(
             data_provider=csv_data_provider, priority=1

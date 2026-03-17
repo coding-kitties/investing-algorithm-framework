@@ -40,7 +40,7 @@
             "2023-12-03T00:00:00+00:00"
         ]
     ],
-    "sortino_ratio": NaN,
+    "sortino_ratio": 0.0,
     "calmar_ratio": 0.0,
     "profit_factor": 0.0,
     "annual_volatility": 0.0,
