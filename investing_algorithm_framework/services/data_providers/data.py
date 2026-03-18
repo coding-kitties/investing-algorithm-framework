@@ -162,6 +162,10 @@ def get_missing_timeseries_data_entries(
         elif freq is None:
             freq = 'D'  # Default to daily
 
+    # Normalize deprecated uppercase 'H' to lowercase 'h'
+    if isinstance(freq, str):
+        freq = freq.replace('H', 'h')
+
     expected_timestamps = pd.date_range(start=start, end=end, freq=freq)
 
     # Find missing by checking which expected timestamps are not in existing

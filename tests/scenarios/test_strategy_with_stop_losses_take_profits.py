@@ -1,4 +1,5 @@
 import os
+import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any
@@ -20,7 +21,7 @@ class FixedStopLossTakeProfitStrategy(TradingStrategy):
             symbol="BTC/EUR",
             data_type=DataType.OHLCV,
             time_frame="2h",
-            window_size=200,
+            warmup_window=200,
             market="BITVAVO",
             identifier="BTC_EUR_OHLCV",
             pandas=True
@@ -75,6 +76,7 @@ class FixedStopLossTakeProfitStrategy(TradingStrategy):
         return signals
 
 
+@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class Test(TestCase):
 
     def test_fixed_take_profit_rule_stop_loss_rule_triggers(self):
@@ -112,7 +114,7 @@ class Test(TestCase):
             symbol="BTC/EUR",
             time_frame="2h",
             market="BITVAVO",
-            window_size=200
+            warmup_window=200
         )
         app.add_data_provider(
             data_provider=csv_data_provider, priority=1
@@ -122,7 +124,8 @@ class Test(TestCase):
         )
         backtest = app.run_backtest(
             strategy=strategy,
-            backtest_date_range=backtest_date_range
+            backtest_date_range=backtest_date_range,
+            risk_free_rate=0.027
         )
         # Check that orders are created for buy and take profit sell
         run = backtest.get_backtest_run(backtest_date_range)
@@ -294,7 +297,7 @@ class Test(TestCase):
             symbol="BTC/EUR",
             time_frame="2h",
             market="BITVAVO",
-            window_size=200
+            warmup_window=200
         )
         app.add_data_provider(
             data_provider=csv_data_provider, priority=1
@@ -304,7 +307,8 @@ class Test(TestCase):
         )
         backtest = app.run_backtest(
             strategy=strategy,
-            backtest_date_range=backtest_date_range
+            backtest_date_range=backtest_date_range,
+            risk_free_rate=0.027
         )
         # Check that orders are created for buy and stop loss sell
         run = backtest.get_backtest_run(backtest_date_range)

@@ -148,6 +148,9 @@ class TradeStopLoss(BaseModel):
         Returns:
             bool - True if the stop loss has triggered, False otherwise
         """
+        if current_price is None:
+            return False
+
         if not self.active or self.sold_amount == self.sell_amount:
             return False
 

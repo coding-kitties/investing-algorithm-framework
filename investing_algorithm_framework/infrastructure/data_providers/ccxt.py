@@ -60,11 +60,14 @@ class CCXTOHLCVDataProvider(DataProvider):
         time_frame: str = None,
         market: str = None,
         window_size=None,
+        warmup_window=None,
         data_provider_identifier: str = None,
         storage_directory=None,
         pandas: bool = False,
         config=None
     ):
+        if warmup_window is not None and window_size is None:
+            window_size = warmup_window
         """
         Initialize the CCXT OHLCV Data Provider.
 
@@ -915,7 +918,7 @@ class CCXTOHLCVDataProvider(DataProvider):
 
         # Loop through all files in the data storage path
         if not os.path.isdir(storage_path):
-            logger.error(
+            logger.debug(
                 f"Storage path {storage_path} does not exist or is not a "
                 "directory."
             )
@@ -1181,7 +1184,7 @@ class CCXTOHLCVDataProvider(DataProvider):
             symbol=data_source.symbol,
             time_frame=data_source.time_frame,
             market=data_source.market,
-            window_size=data_source.window_size,
+            warmup_window=data_source.warmup_window,
             data_provider_identifier=data_source.data_provider_identifier,
             storage_directory=storage_path,
             config=self.config,

@@ -101,7 +101,10 @@ class TestValidateCheckpoints(TestCase):
 
             checkpoints = validate_and_create_checkpoints(
                 directory_path=temp_dir,
-                verbose=True
+                verbose=True,
+                verbose_output_file=os.path.join(
+                    temp_dir, "verbose_output.txt"
+                )
             )
 
             expected_date_range_1 = (
@@ -127,3 +130,13 @@ class TestValidateCheckpoints(TestCase):
             # Verify checkpoint file was created
             checkpoint_file = os.path.join(temp_dir, "checkpoints.json")
             self.assertTrue(os.path.exists(checkpoint_file))
+
+            # Verify verbose output was written to file
+            verbose_file = os.path.join(temp_dir, "verbose_output.txt")
+            self.assertTrue(os.path.exists(verbose_file))
+
+            with open(verbose_file, 'r') as f:
+                verbose_content = f.read()
+
+            self.assertIn("Scanning directory:", verbose_content)
+            self.assertIn("Checkpoint validation complete!", verbose_content)

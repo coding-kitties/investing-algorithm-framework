@@ -34,9 +34,9 @@ class Test(TestCase):
         file_name = "OHLCV_BTC-EUR_BINANCE" \
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_provider = CSVOHLCVDataProvider(
-            storage_path=f"{self.resource_dir}/market_data_sources/"
+            storage_path=f"{self.resource_dir}/test_data/ohlcv/"
                           f"{file_name}",
-            window_size=10,
+            warmup_window=10,
             market="binance",
             symbol="BTC/EUR",
             time_frame="2h"
@@ -46,7 +46,7 @@ class Test(TestCase):
             symbol="BTC/EUR",
             time_frame="2h",
             data_type="OHLCV",
-            window_size=200
+            warmup_window=200
         )
         date = datetime(
             2023, 8, 7, 8, 0, tzinfo=timezone.utc
@@ -65,10 +65,10 @@ class Test(TestCase):
             CSVOHLCVDataProvider(
                 storage_path=os.path.join(
                     self.resource_dir,
-                    "market_data_sources_for_testing",
+                    "test_data", "ohlcv",
                     file_name
                 ),
-                window_size=10,
+                warmup_window=10,
                 market="binance",
                 symbol="BTC/EUR",
                 time_frame="2h"
@@ -85,9 +85,9 @@ class Test(TestCase):
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
-            window_size=10,
+            warmup_window=10,
             market="binance",
             symbol="BTC/EUR",
             time_frame="2h"
@@ -123,9 +123,9 @@ class Test(TestCase):
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
-            window_size=10,
+            warmup_window=10,
             market="binance",
             symbol="BTC/EUR",
             time_frame="2h"
@@ -161,15 +161,15 @@ class Test(TestCase):
             symbol="BTC/EUR",
             time_frame="2h",
             data_type="OHLCV",
-            window_size=200
+            warmup_window=200
         )
         file_name = "OHLCV_BTC-EUR_BINANCE" \
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         csv_ohlcv_market_data_source = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
-            window_size=200,
+            warmup_window=200,
             market="binance",
             symbol="BTC/EUR",
             time_frame="2h"
@@ -204,15 +204,15 @@ class Test(TestCase):
             symbol="BTC/EUR",
             time_frame="2h",
             data_type="OHLCV",
-            window_size=200
+            warmup_window=200
         )
         file_name = "OHLCV_BTC-EUR_BINANCE" \
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         csv_ohlcv_market_data_source = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
-            window_size=200,
+            warmup_window=200,
             market="binance",
             symbol="BTC/EUR",
             time_frame="2h"
@@ -239,10 +239,10 @@ class Test(TestCase):
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             data_provider_identifier="test",
-            window_size=10,
+            warmup_window=10,
             market="binance",
             symbol="BTC/EUR",
             time_frame="2h",
@@ -254,11 +254,11 @@ class Test(TestCase):
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             market="test",
             symbol="BTC/EUR",
-            window_size=10,
+            warmup_window=10,
             time_frame="2h",
         )
         self.assertEqual("TEST", data_provider.market)
@@ -268,10 +268,10 @@ class Test(TestCase):
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             symbol="BTC/EUR",
-            window_size=10,
+            warmup_window=10,
             market="bitvavo",
             time_frame="2h",
         )
@@ -285,17 +285,17 @@ class Test(TestCase):
             symbol="BTC/EUR",
             time_frame="2h",
             data_type="OHLCV",
-            window_size=200
+            warmup_window=200
         )
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             data_provider_identifier="test",
             market="binance",
             symbol="BTC/EUR",
             time_frame="2h",
-            window_size=200
+            warmup_window=200
         )
         backtest_date_range = BacktestDateRange(
             start_date=datetime(2023, 8, 28, 8, 0, tzinfo=timezone.utc),
@@ -309,7 +309,7 @@ class Test(TestCase):
         required_start_date = backtest_date_range.start_date - \
             timedelta(
                 minutes=TimeFrame.from_value(datasource.time_frame)
-                .amount_of_minutes * datasource.window_size
+                .amount_of_minutes * datasource.warmup_window
             )
 
         # Check if for an entries in the window cache a 200 window size
@@ -341,17 +341,17 @@ class Test(TestCase):
             symbol="BTC/EUR",
             time_frame="2h",
             data_type="OHLCV",
-            window_size=200
+            warmup_window=200
         )
         data_provider = CSVOHLCVDataProvider(
             storage_path=os.path.join(
-                self.resource_dir, "market_data_sources", file_name
+                self.resource_dir, "test_data", "ohlcv", file_name
             ),
             data_provider_identifier="test",
             market="binance",
             symbol="BTC/EUR",
             time_frame="2h",
-            window_size=200
+            warmup_window=200
         )
         backtest_date_range = BacktestDateRange(
             start_date=datetime(2023, 8, 28, 8, 0, tzinfo=timezone.utc),

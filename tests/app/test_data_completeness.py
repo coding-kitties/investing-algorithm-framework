@@ -17,7 +17,7 @@ class TestStrategy(TradingStrategy):
             data_type="OHLCV",
             identifier="sol_1d_ohlcv_data",
             time_frame="1d",
-            window_size=200,
+            warmup_window=200,
             symbol="SOL/EUR",
             market="BITVAVO",
         )
@@ -42,7 +42,7 @@ class TestStrategyIncompleteData(TradingStrategy):
             data_type="OHLCV",
             identifier="sol_1d_incomplete_ohlcv_data",
             time_frame="1d",
-            window_size=200,
+            warmup_window=200,
             symbol="SOL/EUR",
             market="BITVAVO",
             data_provider_identifier="BITVAVO"

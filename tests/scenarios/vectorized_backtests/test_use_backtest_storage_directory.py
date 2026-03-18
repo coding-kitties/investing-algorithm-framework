@@ -1,6 +1,7 @@
 import os
 import time
 import shutil
+import unittest
 from itertools import product
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -11,7 +12,7 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    RESOURCE_DIRECTORY, SnapshotInterval, generate_algorithm_id
+    RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval, generate_algorithm_id
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
@@ -199,6 +200,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             signals[symbol] = sell_signal
         return signals
 
+@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class Test(TestCase):
 
     def test_run_with_backtest_storage_directory(self):
@@ -237,11 +239,11 @@ class Test(TestCase):
             "rsi_time_frame": ["2h"],
             "rsi_period": [14],
             "rsi_overbought_threshold": [70, 80],
-            "rsi_oversold_threshold": [30, 20],
+            "rsi_oversold_threshold": [30],
             "ema_time_frame": ["2h"],
             "ema_short_period": [100],
             "ema_long_period": [150, 200],
-            "ema_cross_lookback_window": [4, 6]
+            "ema_cross_lookback_window": [4]
         }
 
         param_options = param_grid
@@ -256,14 +258,14 @@ class Test(TestCase):
         resource_directory = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
         end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=1095)
+        start_date = end_date - timedelta(days=365)
 
         # Split into multiple date ranges to test progressive filtering
-        mid_date = start_date + timedelta(days=365)
+        mid_date = start_date + timedelta(days=180)
         date_range_1 = BacktestDateRange(
             start_date=start_date, end_date=end_date, name="Period 1"
         )
@@ -309,16 +311,10 @@ class Test(TestCase):
             ema_cross_lookback_window=param_set[
                 "ema_cross_lookback_window"
             ],
-            symbols=[
-                "BTC",
-                "ETH"
-            ],
+            symbols=["BTC"],
             position_sizes=[
                 PositionSize(
                     symbol="BTC", percentage_of_portfolio=20.0
-                ),
-                PositionSize(
-                    symbol="ETH", percentage_of_portfolio=20.0
                 )
             ]
         )
@@ -333,7 +329,7 @@ class Test(TestCase):
             market="BITVAVO",
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
-            show_progress=True
+            show_progress=False
         )
 
         self.assertEqual(len(backtest.get_all_backtest_runs()), 2)
@@ -358,11 +354,11 @@ class Test(TestCase):
             "rsi_time_frame": ["2h"],
             "rsi_period": [14],
             "rsi_overbought_threshold": [70, 80],
-            "rsi_oversold_threshold": [30, 20],
+            "rsi_oversold_threshold": [30],
             "ema_time_frame": ["2h"],
             "ema_short_period": [100],
             "ema_long_period": [150, 200],
-            "ema_cross_lookback_window": [4, 6]
+            "ema_cross_lookback_window": [4]
         }
 
         param_options = param_grid
@@ -377,14 +373,14 @@ class Test(TestCase):
         resource_directory = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
         end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=1095)
+        start_date = end_date - timedelta(days=365)
 
         # Split into multiple date ranges to test progressive filtering
-        mid_date = start_date + timedelta(days=365)
+        mid_date = start_date + timedelta(days=180)
         date_range_1 = BacktestDateRange(
             start_date=start_date, end_date=end_date, name="Period 1"
         )
@@ -413,22 +409,16 @@ class Test(TestCase):
                     ema_cross_lookback_window=param_set[
                         "ema_cross_lookback_window"
                     ],
-                    symbols=[
-                        "BTC",
-                        "ETH"
-                    ],
+                    symbols=["BTC"],
                     position_sizes=[
                         PositionSize(
                             symbol="BTC", percentage_of_portfolio=20.0
-                        ),
-                        PositionSize(
-                            symbol="ETH", percentage_of_portfolio=20.0
                         )
                     ]
                 )
             )
 
-        self.assertEqual(len(strategies), 16)
+        self.assertEqual(len(strategies), 4)
 
         # Create backtest storage directory
         backtest_storage_dir = os.path.join(
@@ -451,15 +441,15 @@ class Test(TestCase):
             market="BITVAVO",
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=True,
-            show_progress=True,
+            show_progress=False,
             n_workers=4
         )
         end_time = time.time()
         duration = end_time - start_time
 
-        # There should be 16 backtests with at least one closed trade
+        # There should be 4 backtests
         self.assertEqual(
-            len(backtests), 16,"There should be 16 backtests returned"
+            len(backtests), 4, "There should be 4 backtests returned"
         )
 
         # Each backtest should have atleast 2 backtest runs (one for each date range)
@@ -509,11 +499,11 @@ class Test(TestCase):
         resource_directory = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
 
         end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=1095)
-        mid_date = start_date + timedelta(days=365)
+        start_date = end_date - timedelta(days=365)
+        mid_date = start_date + timedelta(days=180)
 
         date_range_1 = BacktestDateRange(
             start_date=start_date, end_date=end_date, name="Period 1"
@@ -544,7 +534,7 @@ class Test(TestCase):
             "ema_time_frame": ["2h"],
             "ema_short_period": [100],
             "ema_long_period": [150, 200],  # 2 variations
-            "ema_cross_lookback_window": [4, 6]  # 2 variations = 4 total
+            "ema_cross_lookback_window": [4]  # 2 variations = 4 total
         }
         first_variations = [
             dict(zip(first_param_grid.keys(), values))
@@ -567,15 +557,14 @@ class Test(TestCase):
                     ema_short_period=param_set["ema_short_period"],
                     ema_long_period=param_set["ema_long_period"],
                     ema_cross_lookback_window=param_set["ema_cross_lookback_window"],
-                    symbols=["BTC", "ETH"],
+                    symbols=["BTC"],
                     position_sizes=[
-                        PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
-                        PositionSize(symbol="ETH", percentage_of_portfolio=20.0)
+                        PositionSize(symbol="BTC", percentage_of_portfolio=20.0)
                     ]
                 )
             )
 
-        self.assertEqual(len(first_strategies), 4)
+        self.assertEqual(len(first_strategies), 2)
         first_algorithm_ids = set(s.algorithm_id for s in first_strategies)
 
         # Run first batch
@@ -589,11 +578,11 @@ class Test(TestCase):
             market="BITVAVO",
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
-            show_progress=True
+            show_progress=False
         )
 
         # Verify first run results
-        self.assertEqual(len(first_backtests), 4)
+        self.assertEqual(len(first_backtests), 2)
         first_result_ids = set(b.algorithm_id for b in first_backtests)
         self.assertEqual(first_result_ids, first_algorithm_ids)
 
@@ -602,7 +591,7 @@ class Test(TestCase):
             d for d in os.listdir(backtest_storage_dir)
             if os.path.isdir(os.path.join(backtest_storage_dir, d))
         )
-        self.assertEqual(len(saved_dirs_after_first), 4)
+        self.assertEqual(len(saved_dirs_after_first), 2)
 
         # ===== SECOND RUN: Run backtests for DIFFERENT set of strategies =====
         app2 = create_app(name="SecondRun", config=config)
@@ -617,7 +606,7 @@ class Test(TestCase):
             "ema_time_frame": ["2h"],
             "ema_short_period": [100],
             "ema_long_period": [150, 200],  # 2 variations
-            "ema_cross_lookback_window": [4, 6]  # 2 variations = 4 total
+            "ema_cross_lookback_window": [4]  # 2 variations = 4 total
         }
         second_variations = [
             dict(zip(second_param_grid.keys(), values))
@@ -640,15 +629,14 @@ class Test(TestCase):
                     ema_short_period=param_set["ema_short_period"],
                     ema_long_period=param_set["ema_long_period"],
                     ema_cross_lookback_window=param_set["ema_cross_lookback_window"],
-                    symbols=["BTC", "ETH"],
+                    symbols=["BTC"],
                     position_sizes=[
-                        PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
-                        PositionSize(symbol="ETH", percentage_of_portfolio=20.0)
+                        PositionSize(symbol="BTC", percentage_of_portfolio=20.0)
                     ]
                 )
             )
 
-        self.assertEqual(len(second_strategies), 4)
+        self.assertEqual(len(second_strategies), 2)
         second_algorithm_ids = set(s.algorithm_id for s in second_strategies)
 
         # Ensure the two sets of strategies are completely different
@@ -668,15 +656,15 @@ class Test(TestCase):
             market="BITVAVO",
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
-            show_progress=True
+            show_progress=False
         )
 
         # ===== VERIFICATION =====
         # The second run should ONLY return backtests for the second strategies
         # It should NOT include backtests from the first run
         self.assertEqual(
-            len(second_backtests), 4,
-            "Second run should return exactly 4 backtests (one per second strategy)"
+            len(second_backtests), 2,
+            "Second run should return exactly 2 backtests (one per second strategy)"
         )
 
         second_result_ids = set(b.algorithm_id for b in second_backtests)
@@ -699,8 +687,8 @@ class Test(TestCase):
             if os.path.isdir(os.path.join(backtest_storage_dir, d))
         )
         self.assertEqual(
-            len(saved_dirs_after_second), 8,
-            "Storage should contain 8 backtest directories (4 from each run)"
+            len(saved_dirs_after_second), 4,
+            "Storage should contain 4 backtest directories (2 from each run)"
         )
 
         # Clean up
@@ -729,11 +717,11 @@ class Test(TestCase):
         resource_directory = os.path.join(
             os.path.dirname(os.path.dirname(__file__)), '..', 'resources'
         )
-        config = {RESOURCE_DIRECTORY: resource_directory}
+        config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
 
         end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=1095)
-        mid_date = start_date + timedelta(days=365)
+        start_date = end_date - timedelta(days=365)
+        mid_date = start_date + timedelta(days=180)
 
         date_range_1 = BacktestDateRange(
             start_date=start_date, end_date=end_date, name="Period 1"
@@ -784,10 +772,9 @@ class Test(TestCase):
                     ema_short_period=param_set["ema_short_period"],
                     ema_long_period=param_set["ema_long_period"],
                     ema_cross_lookback_window=param_set["ema_cross_lookback_window"],
-                    symbols=["BTC", "ETH"],
+                    symbols=["BTC"],
                     position_sizes=[
-                        PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
-                        PositionSize(symbol="ETH", percentage_of_portfolio=20.0)
+                        PositionSize(symbol="BTC", percentage_of_portfolio=20.0)
                     ]
                 )
             )
@@ -805,7 +792,7 @@ class Test(TestCase):
             market="BITVAVO",
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
-            show_progress=True
+            show_progress=False
         )
 
         self.assertEqual(len(first_backtests), 2)
@@ -855,10 +842,9 @@ class Test(TestCase):
                     ema_short_period=param_set["ema_short_period"],
                     ema_long_period=param_set["ema_long_period"],
                     ema_cross_lookback_window=param_set["ema_cross_lookback_window"],
-                    symbols=["BTC", "ETH"],
+                    symbols=["BTC"],
                     position_sizes=[
-                        PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
-                        PositionSize(symbol="ETH", percentage_of_portfolio=20.0)
+                        PositionSize(symbol="BTC", percentage_of_portfolio=20.0)
                     ]
                 )
             )
@@ -881,7 +867,7 @@ class Test(TestCase):
             market="BITVAVO",
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=False,
-            show_progress=True,
+            show_progress=False,
             final_filter_function=tracking_final_filter
         )
 

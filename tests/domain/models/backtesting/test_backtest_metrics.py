@@ -13,6 +13,9 @@ class TestBacktestMetrics(TestCase):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.dir_path = Path(self.temp_dir.name)
 
+    def tearDown(self):
+        self.temp_dir.cleanup()
+
     def test_save(self):
         backtest_metrics = BacktestMetrics(
             backtest_start_date=datetime(2020, 1, 1),

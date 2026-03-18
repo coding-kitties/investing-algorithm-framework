@@ -47,7 +47,7 @@ class TestBase(TestCase):
         config[RESOURCE_DIRECTORY] = self.resource_directory
         config[ENVIRONMENT] = Environment.TEST.value
         config[BACKTEST_DATA_DIRECTORY_NAME] = \
-            "market_data_sources_for_testing"
+            "test_data"
         self.app: App = create_app(config=config)
         portfolio_provider_lookup = self.app.container\
             .portfolio_provider_lookup()
@@ -255,6 +255,7 @@ class FlaskTestBase(FlaskTestCase):
                         }
                     )
 
+        self.iaf_app._flask_app.testing = True
         return self.iaf_app._flask_app
 
     def tearDown(self) -> None:

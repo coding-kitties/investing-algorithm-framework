@@ -3,7 +3,7 @@ from typing import List, Dict
 import polars as pl
 
 from investing_algorithm_framework.domain import OrderSide, OrderStatus, \
-    Trade, Order
+    Trade, Order, TradeStatus
 from .trade_order_evaluator import TradeOrderEvaluator
 
 
@@ -36,6 +36,12 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
 
             self._check_has_executed(open_order, data)
 
+        # Re-query open trades to include newly created trades
+        # from filled orders above (#384)
+        open_trades = self.trade_service.get_all(
+            {"status": TradeStatus.OPEN.value}
+        )
+
         if len(open_trades) > 0:
             for open_trade in open_trades:
                 data = ohlcv_data.get(open_trade.symbol)
@@ -53,6 +59,7 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
                 open_trade.update(update_data)
 
             self.trade_service.save_all(open_trades)
+
             self._check_take_profits()
             self._check_stop_losses()
 
