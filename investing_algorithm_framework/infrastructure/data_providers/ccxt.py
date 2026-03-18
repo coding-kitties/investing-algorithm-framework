@@ -1256,3 +1256,162 @@ class CCXTOHLCVDataProvider(DataProvider):
                 locally, otherwise None.
         """
         return self.data_file_path
+
+
+class CCXTTickerDataProvider(DataProvider):
+    """
+    Data provider for ticker data using the CCXT library.
+
+    Fetches real-time ticker data (bid, ask, last price, volume, etc.)
+    for a given symbol and market via CCXT's fetch_ticker API.
+
+    In backtest mode, ticker data is derived from OHLCV data
+    (handled by the DataProviderService fallback), so this provider
+    only serves live/non-backtest use cases.
+    """
+    data_type = DataType.TICKER
+    data_provider_identifier = "ccxt_ticker_data_provider"
+
+    def __init__(
+        self,
+        symbol: str = None,
+        market: str = None,
+        data_provider_identifier: str = None,
+        config=None
+    ):
+        if data_provider_identifier is None:
+            data_provider_identifier = self.data_provider_identifier
+
+        super().__init__(
+            symbol=symbol,
+            market=market,
+            data_provider_identifier=data_provider_identifier,
+            config=config
+        )
+
+    def has_data(
+        self,
+        data_source: DataSource,
+        start_date: datetime = None,
+        end_date: datetime = None,
+    ) -> bool:
+        data_type = data_source.data_type
+        market = data_source.market
+        symbol = data_source.symbol
+
+        if not DataType.TICKER.equals(data_type):
+            return False
+
+        if market is None:
+            market = "binance"
+
+        try:
+            market = market.lower()
+            exchange_class = getattr(ccxt, market)
+            exchange = exchange_class()
+            symbols = list(exchange.load_markets().keys())
+            return symbol in symbols
+        except ccxt.NetworkError:
+            return False
+        except Exception as e:
+            logger.error(e)
+            return False
+
+    def prepare_backtest_data(
+        self,
+        backtest_start_date,
+        backtest_end_date,
+        fill_missing_data: bool = False,
+        show_progress: bool = False,
+    ) -> None:
+        # Ticker backtest data is derived from OHLCV by the
+        # DataProviderService fallback — nothing to prepare here.
+        pass
+
+    def get_backtest_data(
+        self,
+        backtest_index_date: datetime,
+        backtest_start_date: datetime = None,
+        backtest_end_date: datetime = None,
+        data_source: DataSource = None,
+    ):
+        # Backtest ticker data is handled by DataProviderService
+        # falling back to OHLCV data.
+        return None
+
+    def get_data(
+        self,
+        date: datetime = None,
+        start_date: datetime = None,
+        end_date: datetime = None,
+        save: bool = False,
+    ) -> dict:
+        if self.market is None:
+            raise OperationalException(
+                "Market is not set. Please set the market "
+                "before calling get_data."
+            )
+
+        if self.symbol is None:
+            raise OperationalException(
+                "Symbol is not set. Please set the symbol "
+                "before calling get_data."
+            )
+
+        market_credential = self.get_credential(self.market)
+        exchange = CCXTOHLCVDataProvider.initialize_exchange(
+            self.market, market_credential
+        )
+        ticker = exchange.fetch_ticker(self.symbol)
+
+        return {
+            "symbol": self.symbol,
+            "market": self.market,
+            "datetime": ticker.get("datetime"),
+            "high": ticker.get("high"),
+            "low": ticker.get("low"),
+            "bid": ticker.get("bid"),
+            "ask": ticker.get("ask"),
+            "open": ticker.get("open"),
+            "close": ticker.get("close"),
+            "last": ticker.get("last"),
+            "volume": ticker.get("baseVolume"),
+        }
+
+    def copy(self, data_source: DataSource) -> "CCXTTickerDataProvider":
+        if data_source.market is None or data_source.market == "":
+            raise OperationalException(
+                "DataSource has no `market` attribute specified. "
+                "Please specify the market attribute in the data source "
+                "specification before using the CCXT ticker data provider."
+            )
+
+        if data_source.symbol is None or data_source.symbol == "":
+            raise OperationalException(
+                "DataSource has no `symbol` attribute specified. "
+                "Please specify the symbol attribute in the data source "
+                "specification before using the CCXT ticker data provider."
+            )
+
+        return CCXTTickerDataProvider(
+            symbol=data_source.symbol,
+            market=data_source.market,
+            data_provider_identifier=data_source.data_provider_identifier,
+            config=self.config,
+        )
+
+    def get_number_of_data_points(
+        self, start_date: datetime, end_date: datetime
+    ) -> int:
+        # Ticker data is a single point-in-time snapshot
+        return 1
+
+    def get_missing_data_dates(
+        self, start_date: datetime, end_date: datetime
+    ) -> list:
+        # No stored data to have gaps in
+        return []
+
+    def get_data_source_file_path(self):
+        # Ticker data is not file-based
+        return None

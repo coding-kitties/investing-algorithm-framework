@@ -12,7 +12,7 @@ from .services import AzureBlobStorageStateHandler, AWSS3StorageStateHandler, \
     BacktestService
 from .data_providers import CSVOHLCVDataProvider, get_default_data_providers, \
     get_default_ohlcv_data_providers, CCXTOHLCVDataProvider, \
-    PandasOHLCVDataProvider
+    CCXTTickerDataProvider, PandasOHLCVDataProvider
 from .order_executors import CCXTOrderExecutor, BacktestOrderExecutor
 from .portfolio_providers import CCXTPortfolioProvider
 
@@ -46,6 +46,7 @@ __all__ = [
     "get_default_ohlcv_data_providers",
     "AWSS3StorageStateHandler",
     "CCXTOHLCVDataProvider",
+    "CCXTTickerDataProvider",
     "BacktestOrderExecutor",
     "PandasOHLCVDataProvider",
     "BacktestService",
