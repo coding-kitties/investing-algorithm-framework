@@ -35,6 +35,7 @@ jobs:
           flake8 ./investing_algorithm_framework
   test:
     needs: linting
+    timeout-minutes: 25
     strategy:
       fail-fast: true
       matrix:

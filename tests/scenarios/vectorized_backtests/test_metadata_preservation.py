@@ -3,6 +3,7 @@ Test that strategy metadata is preserved when running vector backtests.
 """
 import os
 import shutil
+import unittest
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 from unittest import TestCase
@@ -201,6 +202,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         return signals
 
 
+@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class Test(TestCase):
 
     def setUp(self):

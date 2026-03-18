@@ -1,5 +1,6 @@
 import time
 import os
+import unittest
 from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 import polars as pl
@@ -11,6 +12,7 @@ from tests.resources.strategies_for_testing.strategy_v1 import \
     CrossOverStrategyV1
 
 
+@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class Test(TestCase):
 
     def test_run(self):

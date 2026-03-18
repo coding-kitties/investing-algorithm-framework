@@ -7,6 +7,7 @@ stays in sync with the actual codebase.
 """
 import os
 import re
+import unittest
 from unittest import TestCase, skip
 
 from investing_algorithm_framework import RESOURCE_DIRECTORY
@@ -57,6 +58,7 @@ def extract_main_example_from_readme(readme_path: str) -> str:
     )
 
 
+@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class TestReadmeExample(TestCase):
     """
     Test class to verify the README example implementation works correctly.

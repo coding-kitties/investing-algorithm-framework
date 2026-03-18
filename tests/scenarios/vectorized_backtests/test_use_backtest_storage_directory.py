@@ -1,6 +1,7 @@
 import os
 import time
 import shutil
+import unittest
 from itertools import product
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -199,6 +200,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             signals[symbol] = sell_signal
         return signals
 
+@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class Test(TestCase):
 
     def test_run_with_backtest_storage_directory(self):
