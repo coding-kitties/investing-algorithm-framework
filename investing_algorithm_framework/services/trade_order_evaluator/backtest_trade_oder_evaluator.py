@@ -53,6 +53,10 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
                 open_trade.update(update_data)
 
             self.trade_service.save_all(open_trades)
+
+            # Re-query open trades so newly created trades (from filled
+            # orders above) also have updated prices before stop-loss
+            # and take-profit evaluation. Fixes #384.
             self._check_take_profits()
             self._check_stop_losses()
 
