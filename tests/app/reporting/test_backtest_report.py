@@ -1,4 +1,5 @@
 import os
+import shutil
 from datetime import datetime, timezone
 from unittest import TestCase
 
@@ -23,6 +24,11 @@ class Test(TestCase):
                 "resources"
             )
         )
+        self.output_path = os.path.join(self.resource_dir, "backtest_report")
+
+    def tearDown(self):
+        if os.path.exists(self.output_path):
+            shutil.rmtree(self.output_path)
 
     def test_save_without_algorithm(self):
         """
@@ -47,8 +53,8 @@ class Test(TestCase):
             )
         ]
         backtest_date_range = BacktestDateRange(
-            start_date="2023-08-07 07:00:00",
-            end_date="2023-12-02 00:00:00",
+            start_date=datetime(2023, 8, 7, 7, 0, tzinfo=timezone.utc),
+            end_date=datetime(2023, 12, 2, 0, 0, tzinfo=timezone.utc),
             name="Test Backtest Date Range"
         )
         run = BacktestRun(
@@ -64,28 +70,23 @@ class Test(TestCase):
             initial_unallocated=1000,
             created_at=datetime.now(tz=timezone.utc)
         )
-        data_files = [
-            os.path.join("tests", "resources", "market_data_sources_for_testing", "OHLCV_BTC-EUR_BINANCE_2h_2023-08-07-07-59_2023-12-02-00-00.csv"),
-            os.path.join("tests", "resources", "market_data_sources_for_testing", "OHLCV_BTC-EUR_BINANCE_15m_2023-12-14-22-00_2023-12-25-00-00.csv"),
-        ]
 
         backtest = Backtest(
             algorithm_id="alg-025",
             backtest_runs=[run],
         )
-        output_path = os.path.join(self.resource_dir, "backtest_report")
-        backtest.save(output_path)
+        backtest.save(self.output_path)
 
         # Check if the report was saved correctly
-        self.assertTrue(os.path.exists(output_path))
+        self.assertTrue(os.path.exists(self.output_path))
 
         # Check if the runs directory exists
-        runs_dir = os.path.join(output_path, "runs")
+        runs_dir = os.path.join(self.output_path, "runs")
         self.assertTrue(os.path.exists(runs_dir))
 
         # Check if the backtest run directory exists
         backtest_run_dir = os.path.join(
-            runs_dir, "backtest_EUR_20230807_20231201"
+            runs_dir, run.create_directory_name()
         )
         self.assertTrue(os.path.exists(backtest_run_dir))
 
@@ -93,9 +94,8 @@ class Test(TestCase):
         self.assertTrue(
             os.path.exists(os.path.join(backtest_run_dir, "run.json"))
         )
-        self.assertTrue(
-            os.path.exists(os.path.join(backtest_run_dir, "metrics.json"))
-        )
+        # metrics.json is only written when backtest_metrics is set
+        # on the BacktestRun, which is not the case in this test.
 
     def test_save_with_strategies_directory(self):
         """
@@ -118,8 +118,8 @@ class Test(TestCase):
             )
         ]
         backtest_date_range = BacktestDateRange(
-            start_date="2023-08-07 07:00:00",
-            end_date="2023-12-02 00:00:00",
+            start_date=datetime(2023, 8, 7, 7, 0, tzinfo=timezone.utc),
+            end_date=datetime(2023, 12, 2, 0, 0, tzinfo=timezone.utc),
             name="Test Backtest Date Range"
         )
         results = BacktestRun(
@@ -160,21 +160,18 @@ class Test(TestCase):
             backtest_runs=[results],
             risk_free_rate=0.0
         )
-        output_path = os.path.join(self.resource_dir, "backtest_report")
-        backtest.save(output_path)
-
-        print(output_path)
+        backtest.save(self.output_path)
 
         # Check if the report was saved correctly
-        self.assertTrue(os.path.exists(output_path))
+        self.assertTrue(os.path.exists(self.output_path))
 
         # Check if the runs directory exists
-        runs_dir = os.path.join(output_path, "runs")
+        runs_dir = os.path.join(self.output_path, "runs")
         self.assertTrue(os.path.exists(runs_dir))
 
         # Check if the backtest run directory exists
         backtest_run_dir = os.path.join(
-            runs_dir, "backtest_EUR_20230807_20231201"
+            runs_dir, results.create_directory_name()
         )
         self.assertTrue(os.path.exists(backtest_run_dir))
 

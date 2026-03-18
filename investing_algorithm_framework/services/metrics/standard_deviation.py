@@ -36,6 +36,9 @@ def get_standard_deviation_downside_returns(snapshots):
     if downside_returns.empty:
         return 0.0
 
+    if len(downside_returns) < 2:
+        return 0.0
+
     # Compute standard deviation of downside returns
     downside_std = downside_returns.std(ddof=1)  # ddof=1 for sample std dev
 
@@ -80,6 +83,9 @@ def get_standard_deviation_returns(snapshots):
     if df_returns.empty:
         return 0.0
 
+    if len(df_returns) < 2:
+        return 0.0
+
     std = df_returns.std(ddof=1)  # ddof=1 for sample std dev
 
     # Handle edge cases
@@ -117,6 +123,9 @@ def get_daily_returns_std(snapshots):
     if daily_df["return"].empty:
         return 0.0
 
+    if len(daily_df["return"].dropna()) < 2:
+        return 0.0
+
     return daily_df["return"].std()
 
 
@@ -151,6 +160,9 @@ def get_downside_std_of_daily_returns(snapshots):
     negative_returns = daily_df["return"][daily_df["return"] < 0]
 
     if negative_returns.empty:
+        return 0.0
+
+    if len(negative_returns) < 2:
         return 0.0
 
     return negative_returns.std()

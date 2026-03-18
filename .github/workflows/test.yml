@@ -35,6 +35,7 @@ jobs:
           flake8 ./investing_algorithm_framework
   test:
     needs: linting
+    timeout-minutes: 25
     strategy:
       fail-fast: true
       matrix:
@@ -102,6 +103,11 @@ jobs:
         run: |
           source $VENV
           coverage run -m unittest discover -s tests
+      - name: Generate coverage report
+        if: always()
+        continue-on-error: true
+        run: |
+          source $VENV
           coverage xml
       #----------------------------------------------
       #             upload coverage stats

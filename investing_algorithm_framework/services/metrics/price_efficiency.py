@@ -53,5 +53,8 @@ def get_price_efficiency_ratio(data: DataFrame):
     sum_absolute_changes = data['Daily Change'] \
         .abs().sum()
 
+    if sum_absolute_changes == 0:
+        return 0.0
+
     # Calculate Efficiency Ratio
     return net_price_change / sum_absolute_changes

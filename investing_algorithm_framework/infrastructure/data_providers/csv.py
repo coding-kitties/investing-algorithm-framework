@@ -37,9 +37,12 @@ class CSVOHLCVDataProvider(DataProvider):
         time_frame: str,
         market: str,
         window_size=None,
+        warmup_window=None,
         data_provider_identifier: str = None,
         pandas: bool = False,
     ):
+        if warmup_window is not None and window_size is None:
+            window_size = warmup_window
         """
         Initialize the CSV Data Provider.
 
@@ -509,7 +512,7 @@ class CSVOHLCVDataProvider(DataProvider):
             symbol=data_source.symbol,
             time_frame=data_source.time_frame,
             market=data_source.market,
-            window_size=data_source.window_size,
+            warmup_window=data_source.warmup_window,
             data_provider_identifier=self.data_provider_identifier,
             pandas=data_source.pandas
         )

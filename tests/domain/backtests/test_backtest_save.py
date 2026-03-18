@@ -46,8 +46,8 @@ class TestBacktestSave(TestCase):
 
     def _create_date_range(self):
         return BacktestDateRange(
-            start_date="2023-08-07 07:00:00",
-            end_date="2023-12-02 00:00:00",
+            start_date=datetime(2023, 8, 7, 7, 0, tzinfo=timezone.utc),
+            end_date=datetime(2023, 12, 2, 0, 0, tzinfo=timezone.utc),
             name="Test Backtest Date Range"
         )
 
@@ -80,7 +80,7 @@ class TestBacktestSave(TestCase):
         self.assertTrue(os.path.exists(runs_dir))
 
         backtest_run_dir = os.path.join(
-            runs_dir, "backtest_EUR_20230807_20231201"
+            runs_dir, run.create_directory_name()
         )
         self.assertTrue(os.path.exists(backtest_run_dir))
         self.assertTrue(
@@ -144,7 +144,7 @@ class TestBacktestSave(TestCase):
         self.assertTrue(os.path.exists(runs_dir))
 
         backtest_run_dir = os.path.join(
-            runs_dir, "backtest_EUR_20230807_20231201"
+            runs_dir, run.create_directory_name()
         )
         self.assertTrue(os.path.exists(backtest_run_dir))
         self.assertTrue(

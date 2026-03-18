@@ -521,7 +521,7 @@
 #             algorithm=self.app.get_algorithm(),
 #             trade_order_evaluator=backtest_trade_order_evaluator
 #         )
-#         event_loop_service.start(schedule=schedule, show_progress=True)
+#         event_loop_service.start(schedule=schedule, show_progress=False)
 #
 #         # Check that for everyday a snapshot was created
 #         portfolio_snapshot_service = self.app.container.portfolio_snapshot_service()
@@ -630,7 +630,7 @@
 #             algorithm=self.app.get_algorithm(),
 #             trade_order_evaluator=backtest_trade_order_evaluator
 #         )
-#         event_loop_service.start(schedule=schedule, show_progress=True)
+#         event_loop_service.start(schedule=schedule, show_progress=False)
 #
 #         # Check that for everyday a snapshot was created
 #         history = event_loop_service.history
@@ -740,7 +740,7 @@
 #             algorithm=self.app.get_algorithm(),
 #             trade_order_evaluator=backtest_trade_order_evaluator
 #         )
-#         event_loop_service.start(schedule=schedule, show_progress=True)
+#         event_loop_service.start(schedule=schedule, show_progress=False)
 #
 #         # Check that for every day a snapshot was created
 #         portfolio_snapshot_service = self.app.container.portfolio_snapshot_service()

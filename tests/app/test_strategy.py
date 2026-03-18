@@ -7,7 +7,7 @@ class StrategyForTesting(TradingStrategy):
     data_sources = [
         DataSource(
             data_type=DataType.OHLCV,
-            window_size=200,
+            warmup_window=200,
             symbol="BTC/EUR",
             time_frame="2h",
             market="bitvavo"

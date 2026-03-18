@@ -48,3 +48,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 investing-algorithm-framework = "investing_algorithm_framework.cli.cli:cli"
+
+[tool.coverage.run]
+omit = ["*/dependency_injector/*"]
