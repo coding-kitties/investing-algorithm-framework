@@ -155,6 +155,9 @@ class TradeTakeProfit(BaseModel):
 
     def has_triggered(self, current_price: float = None) -> bool:
 
+        if current_price is None:
+            return False
+
         if not self.trailing:
             # Fixed take profit: trigger when price reaches take_profit_price
             return current_price >= self.take_profit_price
