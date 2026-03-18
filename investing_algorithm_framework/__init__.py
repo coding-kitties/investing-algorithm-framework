@@ -24,7 +24,8 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus, \
     save_backtests_to_directory, BacktestMetrics, DATA_DIRECTORY
 from .infrastructure import AzureBlobStorageStateHandler, \
-    CSVOHLCVDataProvider, CCXTOHLCVDataProvider, PandasOHLCVDataProvider, \
+    CSVOHLCVDataProvider, CCXTOHLCVDataProvider, CCXTTickerDataProvider, \
+    PandasOHLCVDataProvider, \
     AWSS3StorageStateHandler
 from .create_app import create_app
 from .download_data import download, download_v2, DownloadResult, \
@@ -110,6 +111,7 @@ __all__ = [
     'DataType',
     'CSVOHLCVDataProvider',
     "CCXTOHLCVDataProvider",
+    "CCXTTickerDataProvider",
     "DataProvider",
     "get_annual_volatility",
     "get_sortino_ratio",
