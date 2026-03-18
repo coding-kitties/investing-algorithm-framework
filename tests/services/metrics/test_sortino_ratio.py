@@ -152,8 +152,8 @@ class TestGetSortinoRatio(unittest.TestCase):
 
         result = get_sortino_ratio(snapshots, risk_free_rate=0.03)
 
-        # Zero downside deviation -> should return NaN
-        self.assertTrue(math.isnan(result))
+        # Zero downside deviation -> should return 0.0
+        self.assertEqual(result, 0.0)
 
     def test_sortino_ratio_constant_values(self):
         """Test with constant portfolio values."""
@@ -162,8 +162,8 @@ class TestGetSortinoRatio(unittest.TestCase):
 
         result = get_sortino_ratio(snapshots, risk_free_rate=0.03)
 
-        # Zero returns, zero downside -> should return NaN
-        self.assertTrue(math.isnan(result))
+        # Zero returns, zero downside -> should return 0.0
+        self.assertEqual(result, 0.0)
 
     def test_sortino_ratio_zero_risk_free_rate(self):
         """Test with zero risk-free rate."""

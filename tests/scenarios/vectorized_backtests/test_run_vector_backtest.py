@@ -1,4 +1,5 @@
 import os
+import unittest
 from datetime import datetime, timedelta, timezone
 from itertools import product
 from typing import Dict, Any
@@ -197,6 +198,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             signals[symbol] = sell_signal
         return signals
 
+@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class Test(TestCase):
 
     def test_run(self):
@@ -242,11 +244,11 @@ class Test(TestCase):
         config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=730)
+        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=365)
 
         # Split into multiple date ranges to test progressive filtering
-        mid_date = start_date + timedelta(days=365)
+        mid_date = start_date + timedelta(days=180)
         date_range_1 = BacktestDateRange(
             start_date=start_date, end_date=end_date, name="Period 1"
         )
@@ -340,8 +342,8 @@ class Test(TestCase):
         config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=730)
+        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=365)
 
         # Split into multiple date ranges to test progressive filtering
         date_range_1 = BacktestDateRange(

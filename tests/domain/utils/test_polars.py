@@ -32,8 +32,7 @@ class TestConvertPandasToPolars(TestCase):
         column_names = polars_df_converted.columns.tolist()
         self.assertEqual(set(column_names), {'Close'})
 
-        # Check if the index is a datetime object (accept both ns and us
-        # resolution since it depends on pandas version)
+        # Check if the index is a datetime object
         self.assertTrue(
             str(polars_df_converted.index.dtype).startswith("datetime64")
         )

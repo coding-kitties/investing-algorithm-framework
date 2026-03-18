@@ -156,7 +156,7 @@ class BacktestRun:
                         ensure_iso(ts)
                         for ts, val in zip(series.index, series)
                         if val
-                    ] if hasattr(series, 'index') else series
+                    ] if hasattr(series, 'iloc') else series
                     for sig_type, series in sig_data.items()
                 }
                 for symbol, sig_data in self.signals.items()
@@ -204,7 +204,14 @@ class BacktestRun:
 
         if os.path.isfile(run_file):
             with open(run_file, 'r') as f:
-                data = json.load(f)
+                content = f.read().strip()
+
+            if not content:
+                raise OperationalException(
+                    f"The run file {run_file} is empty."
+                )
+
+            data = json.loads(content)
         else:
             raise OperationalException(
                 f"The run file {run_file} does not exist."

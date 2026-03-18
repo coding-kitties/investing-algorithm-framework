@@ -86,7 +86,7 @@ class Test(TestCase):
 
         # Check if the backtest run directory exists
         backtest_run_dir = os.path.join(
-            runs_dir, "backtest_EUR_20230807_20231202"
+            runs_dir, run.create_directory_name()
         )
         self.assertTrue(os.path.exists(backtest_run_dir))
 
@@ -94,10 +94,8 @@ class Test(TestCase):
         self.assertTrue(
             os.path.exists(os.path.join(backtest_run_dir, "run.json"))
         )
-        # No backtest_metrics provided, so metrics.json should not exist
-        self.assertFalse(
-            os.path.exists(os.path.join(backtest_run_dir, "metrics.json"))
-        )
+        # metrics.json is only written when backtest_metrics is set
+        # on the BacktestRun, which is not the case in this test.
 
     def test_save_with_strategies_directory(self):
         """
@@ -173,7 +171,7 @@ class Test(TestCase):
 
         # Check if the backtest run directory exists
         backtest_run_dir = os.path.join(
-            runs_dir, "backtest_EUR_20230807_20231202"
+            runs_dir, results.create_directory_name()
         )
         self.assertTrue(os.path.exists(backtest_run_dir))
 

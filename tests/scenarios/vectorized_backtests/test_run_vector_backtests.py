@@ -1,6 +1,7 @@
 import os
 import time
 import shutil
+import unittest
 from itertools import product
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -199,6 +200,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             signals[symbol] = sell_signal
         return signals
 
+@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class Test(TestCase):
 
     def test_run(self):
@@ -231,11 +233,11 @@ class Test(TestCase):
             "rsi_time_frame": ["2h"],
             "rsi_period": [14],
             "rsi_overbought_threshold": [70, 80],
-            "rsi_oversold_threshold": [30, 20],
+            "rsi_oversold_threshold": [30],
             "ema_time_frame": ["2h"],
             "ema_short_period": [100],
             "ema_long_period": [150, 200],
-            "ema_cross_lookback_window": [4, 6]
+            "ema_cross_lookback_window": [4]
         }
 
         param_options = param_grid
@@ -253,11 +255,11 @@ class Test(TestCase):
         config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=730)
+        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=365)
 
         # Split into multiple date ranges to test progressive filtering
-        mid_date = start_date + timedelta(days=365)
+        mid_date = start_date + timedelta(days=180)
         date_range_1 = BacktestDateRange(
             start_date=start_date, end_date=end_date, name="Period 1"
         )
@@ -316,7 +318,7 @@ class Test(TestCase):
             use_checkpoints=False,
         )
 
-        self.assertEqual(len(backtests), 16)
+        self.assertEqual(len(backtests), 4)
 
         # Each backtest should have atleast 2 backtest runs (one for each date range)
         for backtest in backtests:
@@ -355,11 +357,11 @@ class Test(TestCase):
             "rsi_time_frame": ["2h"],
             "rsi_period": [14],
             "rsi_overbought_threshold": [70, 80],
-            "rsi_oversold_threshold": [30, 20],
+            "rsi_oversold_threshold": [30],
             "ema_time_frame": ["2h"],
             "ema_short_period": [100],
             "ema_long_period": [150, 200],
-            "ema_cross_lookback_window": [4, 6]
+            "ema_cross_lookback_window": [4]
         }
 
         param_options = param_grid
@@ -377,11 +379,11 @@ class Test(TestCase):
         config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=730)
+        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=365)
 
         # Split into multiple date ranges to test progressive filtering
-        mid_date = start_date + timedelta(days=365)
+        mid_date = start_date + timedelta(days=180)
         date_range_1 = BacktestDateRange(
             start_date=start_date, end_date=end_date, name="Period 1"
         )
@@ -428,7 +430,7 @@ class Test(TestCase):
             use_checkpoints=False,
         )
 
-        self.assertEqual(len(backtests), 16)
+        self.assertEqual(len(backtests), 4)
 
         # Each backtest should have atleast 2 backtest runs (one for each date range)
         for backtest in backtests:

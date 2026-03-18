@@ -16,7 +16,8 @@ from investing_algorithm_framework.domain import Backtest
 def validate_and_create_checkpoints(
     directory_path: str,
     output_file: str = None,
-    verbose: bool = False
+    verbose: bool = False,
+    verbose_output_file: str = None
 ) -> Dict[str, List[str]]:
     """
     Validate a directory for backtest checkpoints and create a checkpoint file.
@@ -28,6 +29,9 @@ def validate_and_create_checkpoints(
             checkpoint file. If None, will create 'checkpoints.json'
             in the directory_path.
         verbose (bool): Whether to print detailed information.
+        verbose_output_file (str, optional): Path to a file where verbose
+            output will be written. If None, verbose output is printed
+            to the console.
 
     Returns:
         Dict[str, List[str]]: Dictionary mapping date range
@@ -42,13 +46,24 @@ def validate_and_create_checkpoints(
     if output_file is None:
         output_file = os.path.join(directory_path, "checkpoints.json")
 
+    # Setup echo function: write to file or console
+    verbose_file_handle = None
+
+    if verbose_output_file is not None:
+        verbose_file_handle = open(verbose_output_file, 'w')
+
+        def echo(msg):
+            verbose_file_handle.write(msg + "\n")
+    else:
+        echo = click.echo
+
     checkpoints = {}
     valid_backtests = 0
     invalid_dirs = 0
 
     if verbose:
-        click.echo(f"Scanning directory: {directory_path}")
-        click.echo("-" * 60)
+        echo(f"Scanning directory: {directory_path}")
+        echo("-" * 60)
 
     # Scan all subdirectories in the target directory
     for item in os.listdir(directory_path):
@@ -68,7 +83,7 @@ def validate_and_create_checkpoints(
 
             if backtest.algorithm_id is None:
                 if verbose:
-                    click.echo(
+                    echo(
                         f"⚠️  Warning: {item} - No "
                         f"algorithm_id found, skipping"
                     )
@@ -94,7 +109,7 @@ def validate_and_create_checkpoints(
                         )
 
                         if verbose:
-                            click.echo(
+                            echo(
                                 f"✓ {item} - Algorithm: "
                                 f"{backtest.algorithm_id}, "
                                 f"Range: {start_date} to {end_date}"
@@ -103,14 +118,14 @@ def validate_and_create_checkpoints(
                 valid_backtests += 1
             else:
                 if verbose:
-                    click.echo(
+                    echo(
                         f"⚠️  Warning: {item} - No backtest runs found"
                     )
                 invalid_dirs += 1
 
         except Exception as e:
             if verbose:
-                click.echo(f"✗ {item} - Not a valid backtest: {str(e)}")
+                echo(f"✗ {item} - Not a valid backtest: {str(e)}")
             invalid_dirs += 1
             continue
 
@@ -124,20 +139,23 @@ def validate_and_create_checkpoints(
 
     # Print summary
     if verbose:
-        click.echo("-" * 60)
+        echo("-" * 60)
 
-    click.echo("\n✓ Checkpoint validation complete!")
-    click.echo(f"  Valid backtests found: {valid_backtests}")
-    click.echo(f"  Invalid/skipped directories: {invalid_dirs}")
-    click.echo(f"  Total date ranges: {len(checkpoints)}")
-    click.echo(f"  Checkpoint file saved to: {output_file}\n")
+    echo("\n✓ Checkpoint validation complete!")
+    echo(f"  Valid backtests found: {valid_backtests}")
+    echo(f"  Invalid/skipped directories: {invalid_dirs}")
+    echo(f"  Total date ranges: {len(checkpoints)}")
+    echo(f"  Checkpoint file saved to: {output_file}\n")
 
     if verbose and checkpoints:
-        click.echo("Date ranges found:")
+        echo("Date ranges found:")
         for date_range_key, algorithm_ids in sorted(checkpoints.items()):
-            click.echo(
+            echo(
                 f"  {date_range_key}: {len(algorithm_ids)} algorithm(s)"
             )
+
+    if verbose_file_handle is not None:
+        verbose_file_handle.close()
 
     return checkpoints
 

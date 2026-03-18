@@ -61,7 +61,7 @@ class CrossOverStrategyV1(TradingStrategy):
                     symbol=full_symbol,
                     data_type="ohlcv",
                     time_frame=self.ema_time_frame,
-                    window_size=self.trend,
+                    warmup_window=self.trend,
                     identifier=f"{full_symbol}-ohlcv-2h",
                     pandas=True
                 )

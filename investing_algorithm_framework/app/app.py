@@ -27,7 +27,7 @@ from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db, \
     PandasOHLCVDataProvider
 from investing_algorithm_framework.services import OrderBacktestService, \
-    BacktestPortfolioService, DefaultTradeOrderEvaluator, get_risk_free_rate_us
+    BacktestPortfolioService, DefaultTradeOrderEvaluator
 from .app_hook import AppHook
 from .eventloop import EventLoopService
 
@@ -416,7 +416,7 @@ class App:
         self,
         data_sources: List[DataSource],
         backtest_date_range: BacktestDateRange,
-        show_progress: bool = True,
+        show_progress: bool = False,
         fill_missing_data: bool = False,
     ):
         """
@@ -632,7 +632,9 @@ class App:
             self.initialize_services()
             self.initialize_portfolios()
 
-            if AppMode.WEB.equals(self.config[APP_MODE]):
+            if AppMode.WEB.equals(self.config[APP_MODE]) \
+                    and not (self._flask_app and self._flask_app.testing) \
+                    and number_of_iterations is None:
                 logger.info("Running web")
                 flask_thread = threading.Thread(
                     name='Web App',
@@ -782,8 +784,14 @@ class App:
             - Investing Algorithm Framework App
             - Algorithm
         """
+        # Preserve the testing flag if the flask app already exists
+        was_testing = self._flask_app.testing \
+            if self._flask_app is not None else False
         configuration_service = self.container.configuration_service()
         self._flask_app = create_flask_app(configuration_service)
+
+        if was_testing:
+            self._flask_app.testing = True
 
     def get_portfolio_configurations(self):
         portfolio_configuration_service = self.container \
@@ -827,7 +835,7 @@ class App:
         self,
         strategies: List[TradingStrategy],
         backtest_date_range: BacktestDateRange,
-        show_progress: bool = True
+        show_progress: bool = False
     ) -> Tuple[bool, Dict[str, Any]]:
         """
         Function to check the data completeness for a set of strategies
@@ -926,7 +934,7 @@ class App:
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         risk_free_rate: Optional[float] = None,
         skip_data_sources_initialization: bool = False,
-        show_progress: bool = True,
+        show_progress: bool = False,
         market: Optional[str] = None,
         initial_amount: float = None,
         trading_symbol: Optional[str] = None,
@@ -1335,7 +1343,7 @@ class App:
         metadata: Optional[Dict[str, str]] = None,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
         use_checkpoints: bool = False,
-        show_progress: bool = True,
+        show_progress: bool = False,
         continue_on_error: bool = False,
         window_filter_function: Optional[Callable] = None,
         final_filter_function: Optional[Callable] = None,
@@ -1502,7 +1510,7 @@ class App:
         self,
         strategy: TradingStrategy,
         backtest_date_range: BacktestDateRange,
-        show_progress: bool = True,
+        show_progress: bool = False,
         fill_missing_data: bool = True,
     ) -> Dict[str, Any]:
         """
@@ -1611,7 +1619,7 @@ class App:
         metadata: Optional[Dict[str, str]] = None,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
         use_checkpoints: bool = False,
-        show_progress: bool = True,
+        show_progress: bool = False,
         market: str = None,
         trading_symbol: str = None,
         fill_missing_data: bool = True,
@@ -1747,7 +1755,8 @@ class App:
         initial_amount: float = 1000.0,
         market: str = None,
         trading_symbol: str = None,
-        risk_free_rate: Optional[float] = None
+        risk_free_rate: Optional[float] = None,
+        show_progress: bool = True
     ) -> BacktestPermutationTest:
         """
         Run a permutation test for a given strategy over a specified
@@ -1781,6 +1790,8 @@ class App:
                 portfolio configuration is provided in the strategy. If not
                 provided, the first trading symbol found in the portfolio
                 configuration will be used.
+            show_progress (bool): Whether to show a progress bar during
+                the permutation test. Defaults to True.
 
         Raises:
             OperationalException: If the risk-free rate cannot be retrieved.
@@ -1791,16 +1802,11 @@ class App:
         """
 
         if risk_free_rate is None:
-            logger.info("No risk free rate provided, retrieving it...")
-            risk_free_rate = get_risk_free_rate_us()
-
-            if risk_free_rate is None:
-                raise OperationalException(
-                    "Could not retrieve risk free rate for backtest metrics."
-                    "Please provide a risk free as an argument when running "
-                    "your backtest or make sure you have an internet "
-                    "connection"
-                )
+            logger.info(
+                "No risk free rate provided, defaulting to 0.027 "
+                "(2.7%%). Provide risk_free_rate to override."
+            )
+            risk_free_rate = 0.027
 
         backtest_service = self.container.backtest_service()
         data_provider_service = self.container.data_provider_service()
@@ -1812,7 +1818,8 @@ class App:
             risk_free_rate=risk_free_rate,
             market=market,
             trading_symbol=trading_symbol,
-            use_checkpoints=False
+            use_checkpoints=False,
+            show_progress=show_progress
         )
         backtest_metrics = backtest.get_backtest_metrics(backtest_date_range)
 
@@ -1848,7 +1855,8 @@ class App:
         for _ in tqdm(
             range(number_of_permutations),
             desc="Running Permutation Test",
-            colour="green"
+            colour="green",
+            disable=not show_progress
         ):
             permutated_datasets = []
             data_provider_service.reset()
@@ -1874,7 +1882,7 @@ class App:
                     dataframe=combi[1],
                     symbol=data_source.symbol,
                     market=data_source.market,
-                    window_size=data_source.window_size,
+                    warmup_window=data_source.warmup_window,
                     time_frame=data_source.time_frame,
                     data_provider_identifier=data_source
                     .data_provider_identifier,
@@ -1896,7 +1904,8 @@ class App:
                 skip_data_sources_initialization=True,
                 market=market,
                 trading_symbol=trading_symbol,
-                use_checkpoints=False
+                use_checkpoints=False,
+                show_progress=show_progress
             )
 
             # Add the results of the permuted backtest to the main backtest

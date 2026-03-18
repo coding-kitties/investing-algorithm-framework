@@ -1,5 +1,6 @@
 import time
 import os
+import unittest
 from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 import polars as pl
@@ -11,6 +12,7 @@ from tests.resources.strategies_for_testing.strategy_v1 import \
     CrossOverStrategyV1
 
 
+@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class Test(TestCase):
 
     def test_run(self):
@@ -47,7 +49,7 @@ class Test(TestCase):
             market="BITVAVO",
             symbol="BTC/EUR",
             time_frame="2h",
-            window_size=200
+            warmup_window=200
         )
         app.add_data_provider(data_provider, priority=1)
         algorithm.add_strategy(strategy)

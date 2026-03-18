@@ -113,7 +113,7 @@ def get_rolling_sharpe_ratio(
     returns_s = daily_df['total_value'].pct_change().dropna()
 
     # Rolling Annualised Sharpe
-    rolling = returns_s.rolling(window=365)
+    rolling = returns_s.rolling(window=365, min_periods=30)
     rolling_sharpe_s = np.sqrt(365) * (
         rolling.mean() / rolling.std()
     )

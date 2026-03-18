@@ -1637,7 +1637,7 @@ class TestCreateCheckpoint(TestCase):
 
     def test_create_checkpoint_with_show_progress(self):
         """
-        Test that create_checkpoint works correctly with show_progress=True.
+        Test that create_checkpoint works correctly with show_progress=False.
         (This test just verifies it doesn't raise an exception)
         """
         date_range = BacktestDateRange(
@@ -1652,7 +1652,7 @@ class TestCreateCheckpoint(TestCase):
             backtests=backtests,
             backtest_date_range=date_range,
             storage_directory=self.temp_dir,
-            show_progress=True,
+            show_progress=False,
         )
 
         # Verify checkpoint was created

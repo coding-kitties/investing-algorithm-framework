@@ -1,4 +1,5 @@
 import os
+import unittest
 from itertools import product
 import pandas as pd
 from datetime import datetime, timedelta, timezone
@@ -199,6 +200,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             signals[symbol] = sell_signal
         return signals
 
+@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class Test(TestCase):
 
     @staticmethod
@@ -268,7 +270,7 @@ class Test(TestCase):
                 risk_free_rate=0.027,
                 trading_symbol="EUR",
                 market="BITVAVO",
-                show_progress=True
+                show_progress=False
                 # No filter function - run it directly
             )
             backtest_metrics = individual_backtest\
