@@ -8,13 +8,21 @@ jobs:
   publish-service-client-package:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
-      - name: Publish PyPi package
-        uses: code-specialist/pypi-poetry-publish@v1
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PUBLISH_REGISTRY_PASSWORD: ${{ secrets.PYPI_TOKEN }}
-          BRANCH: "main"
-          POETRY_VERSION: "1.7.1"
-          POETRY_CORE_VERSION: "1.8.1"
+          python-version: "3.12"
+
+      - name: Install Poetry
+        run: pip install poetry==1.7.1 poetry-core==1.8.1
+
+      - name: Build package
+        run: poetry build
+
+      - name: Publish to PyPI
+        run: poetry publish --username __token__ --password ${{ secrets.PYPI_TOKEN }}
