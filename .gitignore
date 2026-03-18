@@ -163,3 +163,6 @@ examples/tutorial/backtest_results
 examples/tutorial/resources
 # Squad/Copilot: all dev-only files live on dev branch
 .copilot/
+# Squad: ignore generated logs
+.squad/orchestration-log/
+.squad/log/
