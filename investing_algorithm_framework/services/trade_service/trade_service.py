@@ -295,7 +295,6 @@ class TradeService(RepositoryService):
         """
         sell_order_id = sell_order.id
         updated_at = sell_order.updated_at
-        sell_amount = sell_order.amount
         sell_price = sell_order.price
 
         for trade_data in trades:
@@ -319,7 +318,8 @@ class TradeService(RepositoryService):
             self.repository.add_order_to_trade(trade, sell_order)
 
             # Update the trade
-            net_gain = (sell_price * sell_amount) - open_price * sell_amount
+            net_gain = (sell_price * trade_data["amount"]) \
+                - open_price * trade_data["amount"]
             available_amount = available_amount - trade_data["amount"]
             trade_updated_data = {
                 "available_amount": available_amount,
@@ -434,8 +434,9 @@ class TradeService(RepositoryService):
         for metadata in order_metadatas:
             if metadata.trade_id is not None:
                 trade = self.get(metadata.trade_id)
-                cost += trade.open_price * metadata.amount
-                net_gain += (sell_price * metadata.amount) - cost
+                trade_cost = trade.open_price * metadata.amount
+                cost += trade_cost
+                net_gain += (sell_price * metadata.amount) - trade_cost
 
         position.cost -= cost
         self.position_repository.save(position)
