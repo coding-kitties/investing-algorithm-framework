@@ -295,7 +295,6 @@ class TradeService(RepositoryService):
         """
         sell_order_id = sell_order.id
         updated_at = sell_order.updated_at
-        sell_amount = sell_order.amount
         sell_price = sell_order.price
 
         for trade_data in trades:
