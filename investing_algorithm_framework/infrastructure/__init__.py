@@ -10,7 +10,8 @@ from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLOrderMetadataRepository
 from .services import AzureBlobStorageStateHandler, AWSS3StorageStateHandler, \
     BacktestService
-from .data_providers import CSVOHLCVDataProvider, get_default_data_providers, \
+from .data_providers import CSVOHLCVDataProvider, \
+    CSVTickerDataProvider, get_default_data_providers, \
     get_default_ohlcv_data_providers, CCXTOHLCVDataProvider, \
     CCXTTickerDataProvider, PandasOHLCVDataProvider
 from .order_executors import CCXTOrderExecutor, BacktestOrderExecutor
@@ -40,6 +41,7 @@ __all__ = [
     "SQLTradeStopLossRepository",
     "SQLOrderMetadataRepository",
     "CSVOHLCVDataProvider",
+    "CSVTickerDataProvider",
     "CCXTOrderExecutor",
     "CCXTPortfolioProvider",
     "get_default_data_providers",

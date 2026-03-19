@@ -24,7 +24,8 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus, \
     save_backtests_to_directory, BacktestMetrics, DATA_DIRECTORY
 from .infrastructure import AzureBlobStorageStateHandler, \
-    CSVOHLCVDataProvider, CCXTOHLCVDataProvider, CCXTTickerDataProvider, \
+    CSVOHLCVDataProvider, CSVTickerDataProvider, \
+    CCXTOHLCVDataProvider, CCXTTickerDataProvider, \
     PandasOHLCVDataProvider, \
     AWSS3StorageStateHandler
 from .create_app import create_app
@@ -110,6 +111,7 @@ __all__ = [
     'select_backtest_date_ranges',
     'DataType',
     'CSVOHLCVDataProvider',
+    'CSVTickerDataProvider',
     "CCXTOHLCVDataProvider",
     "CCXTTickerDataProvider",
     "DataProvider",
