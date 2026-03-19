@@ -147,7 +147,7 @@ class TestStrategyIntervalValidation(TestCase):
     # 7. Error message is descriptive
     # ------------------------------------------------------------------
     def test_raises_with_descriptive_error_message(self):
-        """Exception message should contain interval info AND timeframe info."""
+        """Exception message should mention interval and timeframe."""
         with self.assertRaises(OperationalException) as cm:
             _ConcreteStrategy(
                 time_unit=TimeUnit.MINUTE,
