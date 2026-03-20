@@ -161,9 +161,8 @@ venv
 examples/tutorial/data
 examples/tutorial/backtest_results
 examples/tutorial/resources
-# Squad/Copilot: all dev-only files live on dev branch
-.squad/
+# Squad/Copilot
 .copilot/
-# Squad: ignore generated logs
+# Squad: ignore generated logs (but track the rest of .squad/)
 .squad/orchestration-log/
 .squad/log/

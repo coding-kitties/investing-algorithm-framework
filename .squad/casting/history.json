@@ -1,0 +1,21 @@
+{
+  "universe_usage_history": [
+    {
+      "universe": "The Big Short",
+      "first_used": "2026-03-19T00:00:00Z",
+      "repo": "investing-algorithm-framework"
+    }
+  ],
+  "assignment_cast_snapshots": {
+    "assignment-001": {
+      "assignment_id": "assignment-001",
+      "universe": "The Big Short",
+      "date": "2026-03-19T00:00:00Z",
+      "agents": {
+        "burry": "Lead",
+        "baum": "Backend Dev",
+        "vennett": "Tester"
+      }
+    }
+  }
+}

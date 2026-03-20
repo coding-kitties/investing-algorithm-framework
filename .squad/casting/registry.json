@@ -1,0 +1,25 @@
+{
+  "agents": {
+    "burry": {
+      "persistent_name": "Burry",
+      "universe": "The Big Short",
+      "created_at": "2026-03-19T00:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "baum": {
+      "persistent_name": "Baum",
+      "universe": "The Big Short",
+      "created_at": "2026-03-19T00:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "vennett": {
+      "persistent_name": "Vennett",
+      "universe": "The Big Short",
+      "created_at": "2026-03-19T00:00:00Z",
+      "legacy_named": false,
+      "status": "active"
+    }
+  }
+}
