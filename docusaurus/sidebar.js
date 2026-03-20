@@ -61,11 +61,11 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
-                    id: 'Data/market-data-sources',
+                    id: 'Data/data-sources',
                 },
                 {
                     type: 'doc',
-                    id: 'Data/multiple-market-data-sources',
+                    id: 'Data/backtest_data',
                 },
             ],
         },

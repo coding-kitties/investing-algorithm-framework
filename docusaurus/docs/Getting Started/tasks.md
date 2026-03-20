@@ -22,7 +22,23 @@ Tasks are automated functions that run on a fixed schedule, independently of you
 
 ### Class-Based Task
 
-Subclass `Task` and implement the `run(self, context)` method:
+Subclass `Task` and implement the `run(self, context)` method. You can set the schedule using **class-level attributes** or by passing parameters to `__init__`:
+
+**Class-level attributes (recommended for simple tasks):**
+
+```python
+from investing_algorithm_framework import Task, TimeUnit
+
+class LogOpenTrades(Task):
+    time_unit = TimeUnit.MINUTE
+    interval = 15
+
+    def run(self, context):
+        for trade in context.get_open_trades():
+            print(f"[{trade.target_symbol}] net_gain={trade.net_gain}")
+```
+
+**Constructor parameters:**
 
 ```python
 from investing_algorithm_framework import Task, TimeUnit
@@ -40,6 +56,8 @@ class PortfolioLoggerTask(Task):
         open_trades = context.get_open_trades()
         print(f"Currently {len(open_trades)} open trades")
 ```
+
+Both approaches are equivalent. Class-level attributes are simpler when the schedule is fixed; constructor parameters are useful when you need dynamic configuration.
 
 ### Decorator-Based Task
 
