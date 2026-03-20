@@ -161,7 +161,6 @@ venv
 examples/tutorial/data
 examples/tutorial/backtest_results
 examples/tutorial/resources
-# Squad/Copilot
 .copilot/
 # Squad: ignore generated logs (but track the rest of .squad/)
 .squad/orchestration-log/
