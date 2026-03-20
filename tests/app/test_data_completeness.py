@@ -10,7 +10,7 @@ from investing_algorithm_framework.domain.exceptions import DataError
 from tests.resources import TestBase
 
 class TestStrategy(TradingStrategy):
-    time_unit = "MINUTE"
+    time_unit = "DAY"
     interval = 1
     data_sources = [
         DataSource(
@@ -35,7 +35,7 @@ class TestStrategy(TradingStrategy):
 
 
 class TestStrategyIncompleteData(TradingStrategy):
-    time_unit = "MINUTE"
+    time_unit = "DAY"
     interval = 1
     data_sources = [
         DataSource(

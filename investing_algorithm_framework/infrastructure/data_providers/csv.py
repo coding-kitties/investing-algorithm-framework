@@ -573,3 +573,387 @@ class CSVOHLCVDataProvider(DataProvider):
                 locally, otherwise None.
         """
         return self.storage_path
+
+
+class CSVTickerDataProvider(DataProvider):
+    """
+    Data provider for ticker data loaded from a CSV file.
+
+    The CSV file should contain OHLCV columns:
+    Datetime, Open, High, Low, Close, Volume.
+
+    Ticker dicts are derived from the OHLCV rows by mapping
+    Close to bid, ask, and last (since CSV has no live
+    order-book data).
+
+    Attributes:
+        data_type (DataType): DataType.TICKER
+        data_provider_identifier (str): Identifier for the CSV
+            ticker data provider.
+        data (polars.DataFrame): The OHLCV data loaded from the
+            CSV file.
+    """
+    data_type = DataType.TICKER
+    data_provider_identifier = "csv_ticker_data_provider"
+
+    def __init__(
+        self,
+        storage_path: str,
+        symbol: str,
+        market: str,
+        data_provider_identifier: str = None,
+    ):
+        """
+        Initialize the CSV Ticker Data Provider.
+
+        Args:
+            storage_path (str): Path to the CSV file.
+            symbol (str): The symbol for the data
+                (e.g. "BTC/EUR").
+            market (str): The market for the data
+                (e.g. "BINANCE").
+            data_provider_identifier (str, optional):
+                Custom identifier. Defaults to None.
+        """
+        if data_provider_identifier is None:
+            data_provider_identifier = self.data_provider_identifier
+
+        super().__init__(
+            symbol=symbol,
+            market=market,
+            storage_path=storage_path,
+            data_provider_identifier=data_provider_identifier,
+            data_type=DataType.TICKER.value,
+        )
+        self._start_date_data_source = None
+        self._end_date_data_source = None
+        self._columns = [
+            "Datetime", "Open", "High", "Low", "Close", "Volume"
+        ]
+        self._backtest_data = {}
+        self._load_data(self.storage_path)
+
+    def has_data(
+        self,
+        data_source: DataSource,
+        start_date: datetime = None,
+        end_date: datetime = None,
+    ) -> bool:
+        """
+        Check if this provider can serve the given data source.
+
+        Args:
+            data_source (DataSource): The data source to check.
+            start_date (datetime, optional): The start date.
+            end_date (datetime, optional): The end date.
+
+        Returns:
+            bool: True if this provider matches the request.
+        """
+        if not DataType.TICKER.equals(data_source.data_type):
+            return False
+
+        if data_source.symbol != self.symbol:
+            return False
+
+        if data_source.market != self.market:
+            return False
+
+        if start_date is not None \
+                and start_date < self._start_date_data_source:
+            return False
+
+        if end_date is not None \
+                and end_date > self._end_date_data_source:
+            return False
+
+        return True
+
+    def get_data(
+        self,
+        date: datetime = None,
+        start_date: datetime = None,
+        end_date: datetime = None,
+        save: bool = False,
+    ) -> dict:
+        """
+        Get ticker data for a specific date.
+
+        Looks up the row in the CSV data whose Datetime is
+        closest to (but not after) the given date and returns
+        a ticker dict matching the CCXTTickerDataProvider
+        format.
+
+        Args:
+            date (datetime, optional): The target date.
+            start_date (datetime, optional): Not used for
+                ticker lookups.
+            end_date (datetime, optional): Falls back to
+                this if date is None.
+            save (bool, optional): Not used.
+
+        Returns:
+            dict: Ticker dict with keys: symbol, market,
+                datetime, high, low, bid, ask, open, close,
+                last, volume.
+        """
+        lookup_date = date or end_date
+
+        if lookup_date is None:
+            lookup_date = datetime.now(tz=timezone.utc)
+
+        return self._row_to_ticker(
+            self._find_closest_row(self.data, lookup_date)
+        )
+
+    def prepare_backtest_data(
+        self,
+        backtest_start_date,
+        backtest_end_date,
+        fill_missing_data: bool = False,
+        show_progress: bool = False,
+    ) -> None:
+        """
+        Prepare backtest data by indexing rows for fast lookup.
+
+        Args:
+            backtest_start_date (datetime): Start of the
+                backtest range.
+            backtest_end_date (datetime): End of the
+                backtest range.
+            fill_missing_data (bool): Unused.
+            show_progress (bool): Unused.
+        """
+        if backtest_start_date < self._start_date_data_source:
+            raise OperationalException(
+                f"Backtest start date "
+                f"{backtest_start_date} is before the "
+                f"start date "
+                f"{self._start_date_data_source}"
+            )
+
+        if backtest_end_date > self._end_date_data_source:
+            raise OperationalException(
+                f"Backtest end date "
+                f"{backtest_end_date} is after the "
+                f"end date "
+                f"{self._end_date_data_source}"
+            )
+
+        filtered = self.data.filter(
+            (pl.col("Datetime") >= backtest_start_date)
+            & (pl.col("Datetime") <= backtest_end_date)
+        )
+        self._backtest_data = {}
+
+        for row in filtered.iter_rows(named=True):
+            self._backtest_data[row["Datetime"]] = row
+
+    def get_backtest_data(
+        self,
+        backtest_index_date: datetime,
+        backtest_start_date: datetime = None,
+        backtest_end_date: datetime = None,
+        data_source: DataSource = None,
+    ) -> dict:
+        """
+        Get ticker data for a specific backtest index date.
+
+        Args:
+            backtest_index_date (datetime): The date to
+                look up.
+            backtest_start_date (datetime, optional): Not
+                used directly.
+            backtest_end_date (datetime, optional): Not
+                used directly.
+            data_source (DataSource, optional): Used for
+                error messages.
+
+        Returns:
+            dict: Ticker dict for the given date.
+        """
+        if backtest_index_date in self._backtest_data:
+            return self._row_to_ticker(
+                self._backtest_data[backtest_index_date]
+            )
+
+        # Find the closest date that is <= backtest_index_date
+        candidates = [
+            k for k in self._backtest_data.keys()
+            if k <= backtest_index_date
+        ]
+
+        if not candidates:
+            if data_source is not None:
+                raise OperationalException(
+                    "No ticker data available for "
+                    f"date: {backtest_index_date} "
+                    "within the prepared backtest "
+                    f"data for data source "
+                    f"{data_source.identifier}."
+                )
+
+            raise OperationalException(
+                "No ticker data available for "
+                f"date: {backtest_index_date} "
+                "within the prepared backtest data."
+            )
+
+        closest = max(candidates)
+        return self._row_to_ticker(
+            self._backtest_data[closest]
+        )
+
+    def copy(
+        self, data_source: DataSource
+    ) -> "CSVTickerDataProvider":
+        """
+        Create a copy with a different data source.
+
+        Args:
+            data_source (DataSource): The new data source.
+
+        Returns:
+            CSVTickerDataProvider: A new instance.
+        """
+        storage_path = data_source.storage_path
+
+        if storage_path is None:
+            storage_path = self.storage_path
+
+        return CSVTickerDataProvider(
+            storage_path=storage_path,
+            symbol=data_source.symbol,
+            market=data_source.market,
+            data_provider_identifier=(
+                self.data_provider_identifier
+            ),
+        )
+
+    def get_number_of_data_points(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> int:
+        """
+        Returns the number of data points between the
+        given dates.
+        """
+        available = [
+            d for d in self.data["Datetime"].to_list()
+            if start_date <= d <= end_date
+        ]
+        return len(available)
+
+    def get_missing_data_dates(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+    ) -> list:
+        """
+        Ticker data has no gap tracking — returns empty.
+        """
+        return []
+
+    def get_data_source_file_path(
+        self,
+    ) -> Union[str, None]:
+        """
+        Get the file path of the data source.
+        """
+        return self.storage_path
+
+    def _load_data(self, storage_path: str) -> None:
+        """
+        Load CSV data into a polars DataFrame.
+
+        Args:
+            storage_path (str): Path to the CSV file.
+        """
+        df = pl.read_csv(storage_path)
+
+        if not all(
+            col in df.columns for col in self._columns
+        ):
+            missing = [
+                c for c in self._columns
+                if c not in df.columns
+            ]
+            raise OperationalException(
+                f"CSV file {storage_path} does not "
+                f"contain all required columns. "
+                f"Missing columns: {missing}"
+            )
+
+        self.data = pl.read_csv(
+            storage_path,
+            schema_overrides={
+                "Datetime": pl.Datetime
+            },
+            low_memory=True,
+        ).with_columns(
+            pl.col("Datetime").cast(
+                pl.Datetime(
+                    time_unit="ms", time_zone="UTC"
+                )
+            )
+        )
+
+        first_row = self.data.head(1)
+        last_row = self.data.tail(1)
+        self._start_date_data_source = \
+            first_row["Datetime"][0]
+        self._end_date_data_source = \
+            last_row["Datetime"][0]
+
+    @staticmethod
+    def _find_closest_row(
+        data: pl.DataFrame, target_date: datetime
+    ) -> dict:
+        """
+        Find the row closest to target_date (not after it).
+
+        Args:
+            data (pl.DataFrame): The data to search.
+            target_date (datetime): The target date.
+
+        Returns:
+            dict: The matching row as a dict.
+        """
+        filtered = data.filter(
+            pl.col("Datetime") <= target_date
+        )
+
+        if filtered.is_empty():
+            # Fall back to the first available row
+            return data.head(1).to_dicts()[0]
+
+        return filtered.tail(1).to_dicts()[0]
+
+    def _row_to_ticker(self, row: dict) -> dict:
+        """
+        Convert an OHLCV row dict to a ticker dict.
+
+        Close is used for bid, ask, and last since CSV
+        data has no live order-book information.
+
+        Args:
+            row (dict): An OHLCV row.
+
+        Returns:
+            dict: Ticker dict.
+        """
+        close = row["Close"]
+        return {
+            "symbol": self.symbol,
+            "market": self.market,
+            "datetime": row["Datetime"],
+            "high": row["High"],
+            "low": row["Low"],
+            "bid": close,
+            "ask": close,
+            "open": row["Open"],
+            "close": close,
+            "last": close,
+            "volume": row["Volume"],
+        }

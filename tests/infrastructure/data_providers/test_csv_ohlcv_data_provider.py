@@ -35,7 +35,7 @@ class Test(TestCase):
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         data_provider = CSVOHLCVDataProvider(
             storage_path=f"{self.resource_dir}/test_data/ohlcv/"
-                          f"{file_name}",
+                         f"{file_name}",
             warmup_window=10,
             market="binance",
             symbol="BTC/EUR",
@@ -143,7 +143,6 @@ class Test(TestCase):
             )
         )
 
-
     def test_correct_data_source_start_date_and_end_date(self):
         pass
 
@@ -155,13 +154,6 @@ class Test(TestCase):
         """
         start_date = datetime(
             2023, 8, 7, 8, 0, tzinfo=timezone.utc
-        )
-        data_source = DataSource(
-            market="binance",
-            symbol="BTC/EUR",
-            time_frame="2h",
-            data_type="OHLCV",
-            warmup_window=200
         )
         file_name = "OHLCV_BTC-EUR_BINANCE" \
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
@@ -184,7 +176,10 @@ class Test(TestCase):
             start_date.strftime(DATETIME_FORMAT),
             first_date.strftime(DATETIME_FORMAT)
         )
-        end_date = start_date + timedelta(minutes=TimeFrame.TWO_HOUR.amount_of_minutes * (len(data) - 1))
+        end_date = start_date + timedelta(
+            minutes=TimeFrame.TWO_HOUR.amount_of_minutes
+            * (len(data) - 1)
+        )
         self.assertEqual(
             last_date.strftime(DATETIME_FORMAT),
             end_date.strftime(DATETIME_FORMAT),
@@ -198,13 +193,6 @@ class Test(TestCase):
         """
         end_date = datetime(
             2023, 8, 31, 8, 0, tzinfo=timezone.utc
-        )
-        data_source = DataSource(
-            market="binance",
-            symbol="BTC/EUR",
-            time_frame="2h",
-            data_type="OHLCV",
-            warmup_window=200
         )
         file_name = "OHLCV_BTC-EUR_BINANCE" \
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
@@ -249,6 +237,280 @@ class Test(TestCase):
         )
         self.assertEqual("test", data_provider.data_provider_identifier)
 
+    def test_has_data_wrong_symbol(self):
+        """Provider with BTC/EUR should not match ETH/EUR."""
+        file_name = "OHLCV_BTC-EUR_BINANCE" \
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        data_provider = CSVOHLCVDataProvider(
+            storage_path=os.path.join(
+                self.resource_dir, "test_data", "ohlcv", file_name
+            ),
+            warmup_window=10,
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h"
+        )
+        data_source = DataSource(
+            market="binance",
+            symbol="ETH/EUR",
+            time_frame="2h",
+            data_type="OHLCV"
+        )
+        self.assertFalse(
+            data_provider.has_data(
+                data_source,
+                start_date=datetime(
+                    2023, 8, 8, 7, 59, tzinfo=timezone.utc
+                ),
+                end_date=datetime(
+                    2023, 12, 2, 0, 0, tzinfo=timezone.utc
+                )
+            )
+        )
+
+    def test_has_data_wrong_market(self):
+        """Provider with binance should not match bitvavo."""
+        file_name = "OHLCV_BTC-EUR_BINANCE" \
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        data_provider = CSVOHLCVDataProvider(
+            storage_path=os.path.join(
+                self.resource_dir, "test_data", "ohlcv", file_name
+            ),
+            warmup_window=10,
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h"
+        )
+        data_source = DataSource(
+            market="bitvavo",
+            symbol="BTC/EUR",
+            time_frame="2h",
+            data_type="OHLCV"
+        )
+        self.assertFalse(
+            data_provider.has_data(
+                data_source,
+                start_date=datetime(
+                    2023, 8, 8, 7, 59, tzinfo=timezone.utc
+                ),
+                end_date=datetime(
+                    2023, 12, 2, 0, 0, tzinfo=timezone.utc
+                )
+            )
+        )
+
+    def test_has_data_wrong_time_frame(self):
+        """Provider with 2h should not match 1h."""
+        file_name = "OHLCV_BTC-EUR_BINANCE" \
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        data_provider = CSVOHLCVDataProvider(
+            storage_path=os.path.join(
+                self.resource_dir, "test_data", "ohlcv", file_name
+            ),
+            warmup_window=10,
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h"
+        )
+        data_source = DataSource(
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="1h",
+            data_type="OHLCV"
+        )
+        self.assertFalse(
+            data_provider.has_data(
+                data_source,
+                start_date=datetime(
+                    2023, 8, 8, 7, 59, tzinfo=timezone.utc
+                ),
+                end_date=datetime(
+                    2023, 12, 2, 0, 0, tzinfo=timezone.utc
+                )
+            )
+        )
+
+    def test_has_data_no_dates(self):
+        """has_data without start_date or end_date returns False."""
+        file_name = "OHLCV_BTC-EUR_BINANCE" \
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        data_provider = CSVOHLCVDataProvider(
+            storage_path=os.path.join(
+                self.resource_dir, "test_data", "ohlcv", file_name
+            ),
+            warmup_window=10,
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h"
+        )
+        data_source = DataSource(
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h",
+            data_type="OHLCV"
+        )
+        self.assertFalse(data_provider.has_data(data_source))
+
+    def test_has_data_end_date_after_data_range(self):
+        """end_date beyond data source range returns False."""
+        file_name = "OHLCV_BTC-EUR_BINANCE" \
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        data_provider = CSVOHLCVDataProvider(
+            storage_path=os.path.join(
+                self.resource_dir, "test_data", "ohlcv", file_name
+            ),
+            warmup_window=10,
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h"
+        )
+        data_source = DataSource(
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h",
+            data_type="OHLCV"
+        )
+        self.assertFalse(
+            data_provider.has_data(
+                data_source,
+                start_date=datetime(
+                    2023, 8, 8, 7, 59, tzinfo=timezone.utc
+                ),
+                end_date=datetime(
+                    2024, 1, 1, 0, 0, tzinfo=timezone.utc
+                )
+            )
+        )
+
+    def test_has_data_with_window_size(self):
+        """has_data with window_size on DataSource works correctly."""
+        file_name = "OHLCV_BTC-EUR_BINANCE" \
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        data_provider = CSVOHLCVDataProvider(
+            storage_path=os.path.join(
+                self.resource_dir, "test_data", "ohlcv", file_name
+            ),
+            warmup_window=10,
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h"
+        )
+        data_source = DataSource(
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h",
+            data_type="OHLCV",
+            warmup_window=50
+        )
+        # End date well within range, window_size fits
+        self.assertTrue(
+            data_provider.has_data(
+                data_source,
+                start_date=datetime(
+                    2023, 9, 1, 0, 0, tzinfo=timezone.utc
+                ),
+                end_date=datetime(
+                    2023, 11, 1, 0, 0, tzinfo=timezone.utc
+                )
+            )
+        )
+
+    def test_prepare_backtest_data(self):
+        """prepare_backtest_data populates the window_cache."""
+        file_name = "OHLCV_BTC-EUR_BINANCE" \
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        data_provider = CSVOHLCVDataProvider(
+            storage_path=os.path.join(
+                self.resource_dir, "test_data", "ohlcv", file_name
+            ),
+            warmup_window=10,
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h"
+        )
+        start = datetime(2023, 9, 1, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2023, 10, 1, 0, 0, tzinfo=timezone.utc)
+        data_provider.prepare_backtest_data(
+            backtest_start_date=start,
+            backtest_end_date=end
+        )
+        self.assertGreater(len(data_provider.window_cache), 0)
+
+    def test_prepare_backtest_data_invalid_start(self):
+        """Start before data range raises OperationalException."""
+        file_name = "OHLCV_BTC-EUR_BINANCE" \
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        data_provider = CSVOHLCVDataProvider(
+            storage_path=os.path.join(
+                self.resource_dir, "test_data", "ohlcv", file_name
+            ),
+            warmup_window=10,
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h"
+        )
+        with self.assertRaises(OperationalException):
+            data_provider.prepare_backtest_data(
+                backtest_start_date=datetime(
+                    2020, 1, 1, 0, 0, tzinfo=timezone.utc
+                ),
+                backtest_end_date=datetime(
+                    2023, 10, 1, 0, 0, tzinfo=timezone.utc
+                )
+            )
+
+    def test_prepare_backtest_data_invalid_end(self):
+        """End after data range raises OperationalException."""
+        file_name = "OHLCV_BTC-EUR_BINANCE" \
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        data_provider = CSVOHLCVDataProvider(
+            storage_path=os.path.join(
+                self.resource_dir, "test_data", "ohlcv", file_name
+            ),
+            warmup_window=10,
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h"
+        )
+        with self.assertRaises(OperationalException):
+            data_provider.prepare_backtest_data(
+                backtest_start_date=datetime(
+                    2023, 9, 1, 0, 0, tzinfo=timezone.utc
+                ),
+                backtest_end_date=datetime(
+                    2025, 1, 1, 0, 0, tzinfo=timezone.utc
+                )
+            )
+
+    def test_get_backtest_data(self):
+        """After prepare, get_backtest_data returns valid DataFrame."""
+        file_name = "OHLCV_BTC-EUR_BINANCE" \
+                    "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
+        data_provider = CSVOHLCVDataProvider(
+            storage_path=os.path.join(
+                self.resource_dir, "test_data", "ohlcv", file_name
+            ),
+            warmup_window=10,
+            market="binance",
+            symbol="BTC/EUR",
+            time_frame="2h"
+        )
+        start = datetime(2023, 9, 1, 0, 0, tzinfo=timezone.utc)
+        end = datetime(2023, 10, 1, 0, 0, tzinfo=timezone.utc)
+        data_provider.prepare_backtest_data(
+            backtest_start_date=start,
+            backtest_end_date=end
+        )
+        # Pick a date in the middle of the range
+        mid = datetime(2023, 9, 15, 0, 0, tzinfo=timezone.utc)
+        df = data_provider.get_backtest_data(
+            backtest_index_date=mid
+        )
+        self.assertIsNotNone(df)
+        self.assertGreater(len(df), 0)
+        self.assertIn("Datetime", df.columns)
+        self.assertIn("Close", df.columns)
+
     def test_get_market(self):
         file_name = "OHLCV_BTC-EUR_BINANCE" \
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
@@ -277,7 +539,7 @@ class Test(TestCase):
         )
         self.assertEqual("BTC/EUR", data_provider.symbol)
 
-    def test_prepare_backtest_data(self):
+    def test_prepare_backtest_data_original(self):
         file_name = "OHLCV_BTC-EUR_BINANCE" \
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         datasource = DataSource(
@@ -333,7 +595,7 @@ class Test(TestCase):
                 required_start_date
             )
 
-    def test_get_backtest_data(self):
+    def test_get_backtest_data_original(self):
         file_name = "OHLCV_BTC-EUR_BINANCE" \
                     "_2h_2023-08-07-07-59_2023-12-02-00-00.csv"
         datasource = DataSource(

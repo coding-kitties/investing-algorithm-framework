@@ -6,7 +6,7 @@ import pandas as pd
 
 from investing_algorithm_framework.domain import OperationalException, \
     Position, PositionSize, TimeUnit, StrategyProfile, Trade, \
-    DataSource, OrderSide, StopLossRule, TakeProfitRule, Order, \
+    DataSource, DataType, OrderSide, StopLossRule, TakeProfitRule, Order, \
     INDEX_DATETIME
 from .context import Context
 
@@ -155,6 +155,32 @@ class TradingStrategy:
             raise OperationalException(
                 f"Interval not set for strategy instance {self.strategy_id}"
             )
+
+        # Check if scheduling interval is faster than the smallest
+        # OHLCV data source timeframe
+        ohlcv_timeframes = [
+            ds.time_frame.amount_of_minutes
+            for ds in self.data_sources
+            if ds.time_frame is not None
+            and DataType.OHLCV.equals(ds.data_type)
+        ]
+
+        if ohlcv_timeframes:
+            scheduling_interval = \
+                self.time_unit.amount_of_minutes * self.interval
+            smallest_timeframe = min(ohlcv_timeframes)
+
+            if scheduling_interval < smallest_timeframe:
+                raise OperationalException(
+                    f"Strategy '{self.strategy_id}' scheduling interval "
+                    f"({self.interval} {self.time_unit.value.lower()}"
+                    f"{'s' if self.interval > 1 else ''}"
+                    f" = {scheduling_interval} min) is faster than "
+                    f"the smallest OHLCV data source timeframe "
+                    f"({smallest_timeframe} min). The strategy would "
+                    f"run without new data. Increase the scheduling "
+                    f"interval or use a smaller data timeframe."
+                )
 
         # Initialize stop_losses as a new list per instance
         if stop_losses is not None:

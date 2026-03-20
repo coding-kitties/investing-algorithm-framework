@@ -2124,11 +2124,10 @@ class App:
 
         has_duplicates = False
 
-        for i in range(len(self._strategies)):
-            for j in range(i + 1, len(self._strategies)):
-                if self._strategies[i].worker_id == strategy.worker_id:
-                    has_duplicates = True
-                    break
+        for existing_strategy in self._strategies:
+            if existing_strategy.strategy_id == strategy.strategy_id:
+                has_duplicates = True
+                break
 
         if has_duplicates:
             raise OperationalException(
