@@ -1,0 +1,10 @@
+{
+  "assignments": [
+    {
+      "assignment_id": "init-2026-03-29",
+      "universe": "silicon-valley",
+      "timestamp": "2026-03-29T00:00:00Z",
+      "agents": ["Gilfoyle", "Richard", "Dinesh"]
+    }
+  ]
+}
