@@ -21,4 +21,7 @@ def get_equity_curve(
         total_size = snapshot.total_value
         series.append((total_size, timestamp))
 
+    # Sort by timestamp to ensure chronological order
+    series.sort(key=lambda x: x[1])
+
     return series
