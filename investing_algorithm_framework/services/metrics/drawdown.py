@@ -109,16 +109,17 @@ def get_max_drawdown(snapshots: List[PortfolioSnapshot]) -> float:
 
 def get_max_daily_drawdown(snapshots: List[PortfolioSnapshot]) -> float:
     """
-    Calculate the maximum daily drawdown of the portfolio as a percentage from the peak.
+    Calculate the worst single-day decline of the portfolio as a percentage.
 
-    This is the largest drop in equity (in percentage) from a peak to a trough
-    during the backtest period, calculated on a daily basis.
+    This is the largest day-over-day percentage drop in equity,
+    NOT the peak-to-trough drawdown (use get_max_drawdown for that).
 
     Args:
         snapshots (List[PortfolioSnapshot]): List of portfolio snapshots
 
     Returns:
-        float: The maximum daily drawdown as a negative percentage (e.g., -5.0 for a 5% drawdown).
+        float: The maximum single-day drawdown as a positive percentage
+            (e.g., 0.05 for a 5% single-day decline).
     """
     # Create DataFrame from snapshots
     data = [(s.created_at, s.total_value) for s in snapshots]
@@ -136,36 +137,31 @@ def get_max_daily_drawdown(snapshots: List[PortfolioSnapshot]) -> float:
     # Filter out non-positive values
     positive_values = daily_df[daily_df['total_value'] > 0]['total_value']
 
-    if positive_values.empty:
+    if positive_values.empty or len(positive_values) < 2:
         return 0.0
 
-    peak = positive_values.iloc[0]
-    max_daily_drawdown_pct = 0.0
+    # Compute day-over-day returns; the worst single-day decline
+    # is the most negative return (ignore positive returns)
+    daily_returns = positive_values.pct_change().dropna()
+    negative_returns = daily_returns[daily_returns < 0]
 
-    for equity in positive_values:
-        if equity > peak:
-            peak = equity
+    if negative_returns.empty:
+        return 0.0
 
-        # Avoid division by zero (shouldn't happen but extra safety)
-        if peak <= 0:
-            continue
-
-        drawdown_pct = (equity - peak) / peak
-        max_daily_drawdown_pct = min(max_daily_drawdown_pct, drawdown_pct)
-
-    return abs(max_daily_drawdown_pct)  # Return as positive percentage
+    return abs(negative_returns.min())
 
 def get_max_drawdown_duration(snapshots: List[PortfolioSnapshot]) -> int:
     """
     Calculate the maximum duration of drawdown in days.
 
-    This is the longest period where the portfolio equity was below its peak.
+    This is the longest period (in calendar days) where the portfolio
+    equity was below its peak.
 
     Args:
         snapshots (List[PortfolioSnapshot]): List of portfolio snapshots
 
     Returns:
-        int: The maximum drawdown duration in days.
+        int: The maximum drawdown duration in calendar days.
     """
     equity_curve = get_equity_curve(snapshots)
     if not equity_curve:
@@ -173,17 +169,26 @@ def get_max_drawdown_duration(snapshots: List[PortfolioSnapshot]) -> int:
 
     peak = equity_curve[0][0]
     max_duration = 0
-    current_duration = 0
+    drawdown_start = None
 
-    for equity, _ in equity_curve:
+    for equity, timestamp in equity_curve:
         if equity < peak:
-            current_duration += 1
+            # Entering or continuing a drawdown
+            if drawdown_start is None:
+                drawdown_start = timestamp
         else:
-            max_duration = max(max_duration, current_duration)
-            current_duration = 0
-            peak = equity  # Reset peak to current equity
+            # Recovered to or above the peak
+            if drawdown_start is not None:
+                elapsed = (timestamp - drawdown_start).days
+                max_duration = max(max_duration, elapsed)
+                drawdown_start = None
+            peak = equity
 
-    max_duration = max(max_duration, current_duration)  # Final check
+    # If still in drawdown at the end of the series
+    if drawdown_start is not None and len(equity_curve) > 0:
+        last_timestamp = equity_curve[-1][1]
+        elapsed = (last_timestamp - drawdown_start).days
+        max_duration = max(max_duration, elapsed)
 
     return max_duration
 
