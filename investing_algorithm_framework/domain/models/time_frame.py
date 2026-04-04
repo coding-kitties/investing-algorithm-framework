@@ -10,12 +10,16 @@ class TimeFrame(Enum):
     FIVE_MINUTE = "5m"
     TEN_MINUTE = "10m"
     FIFTEEN_MINUTE = "15m"
+    TWENTY_MINUTE = "20m"
     THIRTY_MINUTE = "30m"
     ONE_HOUR = "1h"
     TWO_HOUR = "2h"
     FOUR_HOUR = "4h"
+    SIX_HOUR = "6h"
+    EIGHT_HOUR = "8h"
     TWELVE_HOUR = "12h"
     ONE_DAY = "1d"
+    THREE_DAY = "3d"
     ONE_WEEK = "1W"
     ONE_MONTH = "1M"
     ONE_YEAR = "1Y"
@@ -36,7 +40,16 @@ class TimeFrame(Enum):
                     if value == entry.value.replace("H", "h"):
                         return entry
 
-                # For hour timeframes compare with and without H
+                # For hour timeframes compare with and without h
+                if "h" in entry.value:
+
+                    if value == entry.value:
+                        return entry
+
+                    if value == entry.value.replace("h", "H"):
+                        return entry
+
+                # For day timeframes compare with and without D
                 if "d" in entry.value:
 
                     if value == entry.value:
@@ -100,6 +113,9 @@ class TimeFrame(Enum):
         if self.equals(TimeFrame.FIFTEEN_MINUTE):
             return 15
 
+        if self.equals(TimeFrame.TWENTY_MINUTE):
+            return 20
+
         if self.equals(TimeFrame.THIRTY_MINUTE):
             return 30
 
@@ -112,11 +128,20 @@ class TimeFrame(Enum):
         if self.equals(TimeFrame.FOUR_HOUR):
             return 240
 
+        if self.equals(TimeFrame.SIX_HOUR):
+            return 360
+
+        if self.equals(TimeFrame.EIGHT_HOUR):
+            return 480
+
         if self.equals(TimeFrame.TWELVE_HOUR):
             return 720
 
         if self.equals(TimeFrame.ONE_DAY):
             return 1440
+
+        if self.equals(TimeFrame.THREE_DAY):
+            return 4320
 
         if self.equals(TimeFrame.ONE_WEEK):
             return 10080
