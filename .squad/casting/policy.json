@@ -1,6 +1,0 @@
-{
-  "version": 1,
-  "universe_allowlist": ["silicon-valley"],
-  "max_capacity": 10,
-  "overflow_strategy": "diegetic-expansion"
-}
