@@ -513,15 +513,25 @@ class VectorBacktestService:
         """
         granularity_order = {
             TimeFrame.ONE_MINUTE: 1,
+            TimeFrame.TWO_MINUTE: 2,
+            TimeFrame.THREE_MINUTE: 3,
+            TimeFrame.FOUR_MINUTE: 4,
             TimeFrame.FIVE_MINUTE: 5,
+            TimeFrame.TEN_MINUTE: 10,
             TimeFrame.FIFTEEN_MINUTE: 15,
+            TimeFrame.TWENTY_MINUTE: 20,
+            TimeFrame.THIRTY_MINUTE: 30,
             TimeFrame.ONE_HOUR: 60,
             TimeFrame.TWO_HOUR: 120,
             TimeFrame.FOUR_HOUR: 240,
+            TimeFrame.SIX_HOUR: 360,
+            TimeFrame.EIGHT_HOUR: 480,
             TimeFrame.TWELVE_HOUR: 720,
             TimeFrame.ONE_DAY: 1440,
+            TimeFrame.THREE_DAY: 4320,
             TimeFrame.ONE_WEEK: 10080,
-            TimeFrame.ONE_MONTH: 43200
+            TimeFrame.ONE_MONTH: 43200,
+            TimeFrame.ONE_YEAR: 525600,
         }
 
         most_granular = None
