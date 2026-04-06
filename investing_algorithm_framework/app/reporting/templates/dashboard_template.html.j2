@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }}</title>
+<style>
+{{ css }}
+</style>
+</head>
+<body>
+
+{# ── Top controls ─────────────────────────────────────────────── #}
+<div class="top-controls">
+  <button class="finterion-tab" onclick="showPage('finterion')">
+    <span class="logo-dark">Finterion</span>
+    <span class="logo-light">Finterion</span>
+  </button>
+  <button class="theme-toggle" onclick="toggleTheme()">&#9788;</button>
+</div>
+
+{# ── Sidebar ──────────────────────────────────────────────────── #}
+<nav class="sidebar">
+  <div class="sidebar-title">{{ title }}</div>
+  <div class="sb-item active" data-page="overview"
+       onclick="showPage('overview')">
+    <span class="sb-dot overview-dot"></span>Overview
+  </div>
+  <div class="sb-item" data-page="windows"
+       onclick="showPage('windows')">
+    <span class="sb-dot" style="background:var(--accent)"></span>Windows
+  </div>
+  {% if not is_single %}
+  <div class="sb-item" data-page="compare"
+       onclick="showPage('compare')" id="sb-compare" style="display:none">
+    <span class="sb-dot" style="background:var(--amber)"></span>Compare
+  </div>
+  {% endif %}
+  <div class="sb-divider"></div>
+  <div class="sb-label">Strategies</div>
+  {% for s in strategies %}
+  <div class="sb-item" data-page="{{ s.id }}"
+       onclick="showPage('{{ s.id }}')">
+    <span class="sb-dot" style="background:{{ s.color }}"></span>{{ s.name }}
+  </div>
+  {% endfor %}
+</nav>
+
+{# ── Main Content ─────────────────────────────────────────────── #}
+<div class="main">
+
+{# ━━ Overview page ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #}
+<div class="page active" id="page-overview">
+  <h2 class="page-title">
+    {{ title }}
+    {% if not is_single %}
+    <select id="overview-window-select" class="view-select"
+            onchange="onOverviewWindowChange(this.value)">
+      <option value="summary">All Windows</option>
+    </select>
+    {% endif %}
+  </h2>
+
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">Strategies</div>
+      <div class="kpi-value">{{ strategies | length }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Backtest Windows</div>
+      <div class="kpi-value">{{ windows_meta | length }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Best CAGR</div>
+      <div class="kpi-value" style="color:var(--green)">{{ best_cagr.v | pct }}</div>
+      <div class="kpi-sub">{{ best_cagr.n }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Best Sharpe</div>
+      <div class="kpi-value" style="color:var(--accent)">{{ best_sharpe.v | ratio }}</div>
+      <div class="kpi-sub">{{ best_sharpe.n }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Best Sortino</div>
+      <div class="kpi-value" style="color:var(--accent)">{{ best_sortino.v | ratio }}</div>
+      <div class="kpi-sub">{{ best_sortino.n }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Best Calmar</div>
+      <div class="kpi-value" style="color:var(--accent)">{{ best_calmar.v | ratio }}</div>
+      <div class="kpi-sub">{{ best_calmar.n }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Best Win Rate</div>
+      <div class="kpi-value" style="color:var(--green)">{{ best_win_rate.v | abs_pct }}</div>
+      <div class="kpi-sub">{{ best_win_rate.n }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Lowest Max DD</div>
+      <div class="kpi-value" style="color:var(--amber)">{{ lowest_dd.v | abs_pct }}</div>
+      <div class="kpi-sub">{{ lowest_dd.n }}</div>
+    </div>
+  </div>
+
+  {# Strategy ranking table #}
+  <div class="chart-card">
+    <div class="chart-title" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      Strategy Ranking
+      <select id="ranking-limit" class="view-select" onchange="onRankingLimitChange(this.value)">
+        <option value="5">Top 5</option>
+        <option value="10">Top 10</option>
+        <option value="20">Top 20</option>
+        <option value="50">Top 50</option>
+        <option value="0" selected>All</option>
+      </select>
+      <span id="ranking-count" style="font-size:12px;color:var(--dim);font-weight:normal"></span>
+    </div>
+    <div class="table-wrap">
+      <table class="comp-table" id="comp-table">
+        <thead>
+          <tr>
+            {% if not is_single %}
+            <th class="check-col">
+              <input type="checkbox" class="strat-checkbox"
+                     id="select-all-strats" onclick="toggleAllStrats(this)">
+            </th>
+            {% endif %}
+            <th class="sticky-col">Strategy</th>
+            <th data-col="_n_windows">Windows <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="cagr">CAGR <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="sharpe_ratio">Sharpe <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="sortino_ratio">Sortino <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="calmar_ratio">Calmar <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="max_drawdown">Max DD <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="profit_factor">Profit Factor <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="win_rate">Win Rate <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="trades_per_year">Trades/yr <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="total_net_gain_percentage">Net Gain % <span class="sort-arrow">&#9650;</span></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div id="ranking-pagination" style="display:none;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);font-size:12px;color:var(--dim)">
+      <span id="ranking-page-info"></span>
+      <div style="display:flex;gap:6px">
+        <button class="view-select" id="ranking-prev" onclick="rankingPagePrev()" style="cursor:pointer;padding:4px 10px">&laquo; Prev</button>
+        <button class="view-select" id="ranking-next" onclick="rankingPageNext()" style="cursor:pointer;padding:4px 10px">Next &raquo;</button>
+      </div>
+    </div>
+  </div>
+
+  {# Equity canvas #}
+  <div class="chart-card" id="overview-eq-card">
+    <div class="chart-title">Equity Curves (Normalized %)</div>
+    <div class="chart-wrap" id="overview-eq-wrap">
+      <canvas id="c-overview-eq"></canvas>
+      <div class="tooltip" id="tt-overview-eq"></div>
+    </div>
+  </div>
+
+  {# 2×2 metric comparison grid (multi-strategy only) #}
+  {% if not is_single %}
+  <div class="grid-2x2">
+    <div class="chart-card">
+      <div class="chart-title">CAGR</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-cagr"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Sharpe Ratio</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-sharpe"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Max Drawdown</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-dd"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Win Rate</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-wr"></canvas></div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ━━ Windows page ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #}
+<div class="page" id="page-windows" style="display:none">
+  <h2 class="page-title">Backtest Window Analysis</h2>
+
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Windows</div>
+      <div class="kpi-value">{{ windows_meta | length }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Strategies</div>
+      <div class="kpi-value">{{ strategies | length }}</div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-title">All Backtest Windows</div>
+    <div class="table-wrap">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th>Window</th><th>Start</th><th>End</th>
+            <th>Days</th><th>Strategies</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for w in windows_meta %}
+          <tr>
+            <td>{{ w.label }}</td><td>{{ w.start }}</td>
+            <td>{{ w.end }}</td><td>{{ w.days }}</td>
+            <td>{{ w.n_strategies }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{# ━━ Per-strategy pages ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #}
+{% for s in strategies %}
+{% set i = loop.index0 %}
+{% set sm = s.summary or {} %}
+{% set rl = s.runLabels or [] %}
+<div class="page" id="page-{{ s.id }}" style="display:none">
+  <h2 class="page-title">
+    <span class="sb-dot" style="background:{{ s.color }};width:12px;height:12px"></span>
+    {{ s.name }}
+  </h2>
+
+  <div class="nav-tabs">
+    <div class="tab active" onclick="switchTab('{{ s.id }}','summary')">Summary</div>
+    <div class="tab" onclick="switchTab('{{ s.id }}','runs')">Runs</div>
+    <div class="tab" onclick="switchTab('{{ s.id }}','performance')">Performance</div>
+  </div>
+
+  {# Run selector pills #}
+  <div class="run-selector" id="run-sel-{{ s.id }}">
+    <button class="run-pill active" data-strat="{{ i }}"
+            data-run="summary"
+            onclick="selectStratRun({{ i }},'summary')">&Sigma; Summary</button>
+    {% for rn, lab in rl %}
+    {% set mapped = s.runNameMap.get(rn, '') %}
+    <button class="run-pill" data-strat="{{ i }}"
+            data-run="{{ mapped }}"
+            onclick="selectStratRun({{ i }},'{{ mapped }}')">{{ lab }}</button>
+    {% endfor %}
+  </div>
+
+  {# ── Summary tab ── #}
+  <div class="tab-panel active" id="{{ s.id }}-summary">
+    <div id="{{ s.id }}-summary-content">
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">CAGR</div>
+          <div class="kpi-value">{{ sm.get('cagr') | pct }}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Sharpe</div>
+          <div class="kpi-value">{{ sm.get('sharpe_ratio') | ratio }}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Sortino</div>
+          <div class="kpi-value">{{ sm.get('sortino_ratio') | ratio }}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Max DD</div>
+          <div class="kpi-value" style="color:var(--red)">{{ sm.get('max_drawdown') | abs_pct }}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Profit Factor</div>
+          <div class="kpi-value">{{ sm.get('profit_factor') | ratio }}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Win Rate</div>
+          <div class="kpi-value">{{ sm.get('win_rate') | abs_pct }}</div></div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Calmar</div>
+          <div class="kpi-value">{{ sm.get('calmar_ratio') | ratio }}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Trades/yr</div>
+          <div class="kpi-value">{{ sm.get('trades_per_year') | ratio }}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Volatility</div>
+          <div class="kpi-value">{{ sm.get('annual_volatility') | abs_pct }}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Win/Loss</div>
+          <div class="kpi-value">{{ sm.get('win_loss_ratio') | ratio }}</div></div>
+        <div class="kpi-card"><div class="kpi-label">DD Duration</div>
+          <div class="kpi-value">{{ (sm.get('max_drawdown_duration', 0) or 0) | int }}d</div></div>
+        <div class="kpi-card"><div class="kpi-label">Exposure</div>
+          <div class="kpi-value">{{ sm.get('exposure_ratio') | abs_pct }}</div></div>
+      </div>
+      <div class="kpi-row">
+        <div class="kpi-card"><div class="kpi-label">Windows</div>
+          <div class="kpi-value">{{ sm.get('number_of_windows', rl | length) }}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Profitable</div>
+          <div class="kpi-value" style="color:var(--green)">{{ sm.get('number_of_profitable_windows', 0) }}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Total Net Gain</div>
+          <div class="kpi-value">{{ sm.get('total_net_gain_percentage') | pct }}</div></div>
+        <div class="kpi-card"><div class="kpi-label">Runs</div>
+          <div class="kpi-value">{{ rl | length }}</div></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">End-of-Backtest (Last Run)</div>
+        <div id="{{ s.id }}-eob-kpis"></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Runs tab ── #}
+  <div class="tab-panel" id="{{ s.id }}-runs" style="display:none">
+    <div class="chart-card">
+      <div class="chart-title">Backtest Runs</div>
+      <div class="table-wrap">
+        <table class="comp-table">
+          <thead>
+            <tr><th>Run</th><th>Return</th><th>Sharpe</th><th>Max DD</th><th>Trades</th></tr>
+          </thead>
+          <tbody>
+            {% for _, lab in rl %}
+            <tr><td>{{ lab }}</td><td></td><td></td><td></td><td></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Equity Overlay (Runs)</div>
+      <div class="chart-wrap">
+        <canvas id="c-{{ s.id }}-eq"></canvas>
+        <div class="tooltip" id="tt-{{ s.id }}-eq"></div>
+      </div>
+    </div>
+  </div>
+
+  {# ── Performance tab ── #}
+  <div class="tab-panel" id="{{ s.id }}-performance" style="display:none">
+    <div class="chart-card">
+      <div class="chart-title" id="ht-title-{{ s.id }}">Monthly Returns (Best Run)</div>
+      <div id="heatmap-{{ s.id }}"></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title" id="yr-title-{{ s.id }}">Yearly Returns (Best Run)</div>
+      <div class="chart-wrap chart-sm">
+        <canvas id="c-{{ s.id }}-yearly"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+{# ━━ Compare page (multi-strategy only) ━━━━━━━━━━━━━━━━━━━━━━━ #}
+{% if not is_single %}
+<div class="page" id="page-compare" style="display:none">
+  <h2 class="page-title">Strategy Comparison</h2>
+  <div id="compare-kpis"></div>
+  <div class="chart-card">
+    <div class="chart-title">Equity Curves</div>
+    <div class="chart-wrap">
+      <canvas id="c-compare-eq"></canvas>
+      <div class="tooltip" id="tt-compare-eq"></div>
+    </div>
+  </div>
+  <div class="compare-grid">
+    <div class="chart-card">
+      <div class="chart-title">CAGR</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-cagr"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Sharpe Ratio</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-sharpe"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Max Drawdown</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-dd"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Win Rate</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-wr"></canvas></div>
+    </div>
+  </div>
+  <div id="compare-table-container"></div>
+  <div id="compare-monthly"></div>
+  <div id="compare-yearly"></div>
+</div>
+{% endif %}
+
+{# ━━ Finterion sponsor page ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #}
+<div class="page" id="page-finterion" style="display:none">
+  <div class="chart-card">
+    <h3><span class="dot" style="background:var(--accent)"></span> What is Finterion?</h3>
+    <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.65;max-width:680px">
+      Finterion is a platform where algorithm developers can publish and sell
+      their trading bots to investors. Once your strategy is performing well in
+      backtests, you can deploy it on Finterion so that subscribers can allocate
+      capital to your algorithm &mdash; and you earn fees on assets under
+      management.
+    </p>
+    <a class="finterion-cta" href="https://finterion.com" target="_blank"
+       rel="noopener noreferrer">&#9733; Visit Finterion &rarr;</a>
+  </div>
+  <div class="chart-card" style="margin-top:1.25rem">
+    <h3><span class="dot" style="background:var(--green)"></span> How to Publish</h3>
+    <div class="finterion-steps">
+      <div class="finterion-step">
+        <div class="step-num">1</div>
+        <h4>Install the Plugin</h4>
+        <p>pip install finterion-investing-algorithm-framework</p>
+      </div>
+      <div class="finterion-step">
+        <div class="step-num">2</div>
+        <h4>Get Your API Key</h4>
+        <p>Sign up on Finterion and grab the API key from the developer dashboard.</p>
+      </div>
+      <div class="finterion-step">
+        <div class="step-num">3</div>
+        <h4>Register Components</h4>
+        <p>Add the order executor, portfolio provider, and ping action.</p>
+      </div>
+      <div class="finterion-step">
+        <div class="step-num">4</div>
+        <h4>Deploy &amp; Earn</h4>
+        <p>Deploy your algorithm. Investors can subscribe and allocate capital.</p>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top:1.5rem;text-align:center">
+    <a class="finterion-cta" href="https://finterion.com" target="_blank"
+       rel="noopener noreferrer">&#9733; Get Started on Finterion &rarr;</a>
+  </div>
+</div>
+
+  {# Footer #}
+  <div class="gen-note">
+    Generated by <a href="#">BacktestDashboard</a>
+    &middot; {{ strat_names }}
+    &middot; Sponsored by
+    <a href="https://finterion.com" target="_blank"
+       rel="noopener noreferrer">Finterion</a>
+  </div>
+</div>{# /main #}
+
+<script>
+// ===== DATA =====
+const IS_SINGLE = {{ is_single | tojson }};
+const WINDOWS_META = {{ windows_meta | tojson }};
+const STRATEGIES = {{ strategies | tojson }};
+const RUN_DATA = {{ run_data | tojson }};
+const RUN_LABELS = {{ run_labels | tojson }};
+// ===== STATIC JS =====
+{{ js }}
+</script>
+
+<button class="compare-btn" id="compare-btn"
+        onclick="openCompare()">&#9881; Compare Selected</button>
+</body>
+</html>

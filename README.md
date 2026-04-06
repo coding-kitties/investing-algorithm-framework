@@ -1,10 +1,10 @@
 <div align="center">
   <h1>⚡ Investing Algorithm Framework</h1>
-  
+
   <p style="font-size: 18px; font-weight: 600; margin: 15px 0;">
     🚀 <b>Build. Backtest. Deploy.</b> Quantitative Trading Strategies at Scale
   </p>
-  
+
   <p style="font-size: 14px; color: #666; margin-bottom: 25px;">
     The fastest way to go from trading idea to production-ready trading bot
   </p>
@@ -47,10 +47,10 @@
 
 Stop wasting time on boilerplate. The **Investing Algorithm Framework** handles all the heavy lifting:
 
-✨ **From Idea to Production** — Write your strategy once, deploy everywhere  
-📊 **Accurate Backtesting** — Event-driven and vectorized engines for realistic results  
-⚡ **Lightning Fast** — Optimized for speed and efficiency  
-🔧 **Extensible** — Connect any exchange, broker, or data source  
+✨ **From Idea to Production** — Write your strategy once, deploy everywhere
+📊 **Accurate Backtesting** — Event-driven and vectorized engines for realistic results
+⚡ **Lightning Fast** — Optimized for speed and efficiency
+🔧 **Extensible** — Connect any exchange, broker, or data source
 📈 **Production Ready** — Built for real money trading
 
 ## Sponsors
@@ -126,8 +126,8 @@ This creates:
 
 ## 📈 Example: A Simple Trading Bot
 The following example trading bot implements a simple moving average strategy.
-The strategy will use data from bitvavo exchange and will calculate 
-the 20, 50 and 100 period exponential moving averages (EMA) and the 
+The strategy will use data from bitvavo exchange and will calculate
+the 20, 50 and 100 period exponential moving averages (EMA) and the
 14 period relative strength index (RSI).
 
 > This example uses [PyIndicators](https://github.com/coding-kitties/pyindicators) for technical analysis.
@@ -242,8 +242,8 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             )
 
         super().__init__(
-            data_sources=data_sources, 
-            time_unit=time_unit, 
+            data_sources=data_sources,
+            time_unit=time_unit,
             interval=interval
         )
 
@@ -253,7 +253,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         ema_data
     ):
         """
-        Helper function to prepare the indicators 
+        Helper function to prepare the indicators
         for the strategy. The indicators are calculated
         using the pyindicators library: https://github.com/coding-kitties/PyIndicators
         """
@@ -404,6 +404,27 @@ if __name__ == "__main__":
     report.show(backtest_date_range=backtest_range, browser=True)
 ```
 
+### 📊 Opening Backtest Reports
+
+You can open and view previously saved backtest reports directly from disk:
+
+```python
+from investing_algorithm_framework import BacktestReport
+
+# Load all backtests from a directory (recursively finds all saved backtests)
+report = BacktestReport.open(directory_path="path/to/saved/backtests")
+report.show()  # Opens in browser (or renders inline in Jupyter)
+
+# Compare multiple backtests side by side
+report = BacktestReport.open(
+    backtests=[backtest_a, backtest_b, backtest_c]
+)
+report.show()
+
+# Save the report as a self-contained HTML file
+report.save("my_report.html")
+```
+
 > You can find more examples [here](./examples) folder.
 
 ## 📚 Documentation
@@ -437,7 +458,7 @@ python -m unittest tests.services.test_trade_service.TestTradeService
 
 🚨 **Use at Your Own Risk**
 
-If you use this framework for your investments, **do not risk money which you are afraid to lose** until you have a clear understanding of how the framework works. 
+If you use this framework for your investments, **do not risk money which you are afraid to lose** until you have a clear understanding of how the framework works.
 
 **BEFORE YOU START USING MONEY WITH THE FRAMEWORK:**
 - ✅ Test your strategies thoroughly with backtesting
@@ -492,8 +513,8 @@ If you discover a bug in the framework, please [search our issue tracker](https:
 
 <div align="center">
   <p>
-    <a href="https://github.com/coding-kitties/investing-algorithm-framework/stargazers">⭐ Star us on GitHub</a> · 
-    <a href="https://discord.gg/dQsRmGZP">💬 Join Discord</a> · 
+    <a href="https://github.com/coding-kitties/investing-algorithm-framework/stargazers">⭐ Star us on GitHub</a> ·
+    <a href="https://discord.gg/dQsRmGZP">💬 Join Discord</a> ·
     <a href="https://github.com/coding-kitties/investing-algorithm-framework/issues/new">🐛 Report Bug</a>
   </p>
 </div>

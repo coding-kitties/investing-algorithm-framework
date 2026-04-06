@@ -1,349 +1,483 @@
-import logging
 import os
-from pathlib import Path
 import webbrowser
-from dataclasses import dataclass
-from dataclasses import field
+import logging
+from dataclasses import dataclass, field
 from typing import List, Union
+from pathlib import Path
 
-import pandas as pd
-from IPython import get_ipython
-from IPython.display import display, HTML
 from jinja2 import Environment, FileSystemLoader
 
-from investing_algorithm_framework.domain import TimeFrame, Backtest, \
-    OperationalException, BacktestDateRange
-from .charts import get_equity_curve_with_drawdown_chart, \
-    get_rolling_sharpe_ratio_chart, get_monthly_returns_heatmap_chart, \
-    get_yearly_returns_bar_chart, get_ohlcv_data_completeness_chart
-from .tables import create_html_time_metrics_table, \
-    create_html_trade_metrics_table, create_html_key_metrics_table, \
-    create_html_trades_table
+from investing_algorithm_framework.domain import (
+    Backtest, OperationalException
+)
 
 logger = logging.getLogger("investing_algorithm_framework")
 
+STRATEGY_COLORS = [
+    "#22d3ee", "#10b981", "#f59e0b", "#a78bfa", "#ef4444",
+    "#ec4899", "#3b82f6", "#14b8a6",
+]
 
-def get_symbol_from_file_name(file_name: str) -> str:
-    """
-    Extract the symbol from the file name.
-
-    Args:
-        file_name (str): The file name from which to extract the symbol.
-
-    Returns:
-        str: The extracted symbol.
-    """
-    # Assuming the file name format is "symbol_timeframe.csv"
-    return file_name.split('_')[0].upper()
-
-def get_market_from_file_name(file_name: str) -> str:
-    """
-    Extract the market from the file name.
-
-    Args:
-        file_name (str): The file name from which to extract the market.
-
-    Returns:
-        str: The extracted market.
-    """
-    # Assuming the file name format is "symbol_market_timeframe.csv"
-    parts = file_name.split('_')
-    if len(parts) < 2:
-        raise ValueError("File name does not contain a valid market.")
-    return parts[1].upper()
+_TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 
 
-def get_time_frame_from_file_name(file_name: str) -> TimeFrame:
-    """
-    Extract the time frame from the file name.
+def _read_template(filename):
+    with open(os.path.join(_TEMPLATE_DIR, filename), 'r') as f:
+        return f.read()
 
-    Args:
-        file_name (str): The file name from which to extract the time frame.
 
-    Returns:
-        TimeFrame: The extracted time frame.
-    """
-    parts = file_name.split('_')
+def _filter_pct(v):
+    """Format as signed percentage: 0.15 → '+15.0%', None → 'N/A'."""
+    if v is None:
+        return 'N/A'
+    return f"+{v * 100:.1f}%" if v >= 0 else f"{v * 100:.1f}%"
 
-    if len(parts) < 3:
-        raise ValueError(
-            "File name does not contain a valid time frame."
-        )
-    time_frame_str = parts[3]
 
-    try:
-        return TimeFrame.from_string(time_frame_str)
-    except ValueError:
-        raise ValueError(
-            f"Could not extract time frame from file name: {file_path}. "
-            f"Expected format 'OHLCV_<SYMBOL>_<MARKET>_<TIME_FRAME>_<START_DATE>_<END_DATE>.csv', "
-            f"got '{time_frame_str}'."
-        )
+def _filter_ratio(v):
+    """Format as ratio: 1.234 → '1.23', None → 'N/A'."""
+    if v is None:
+        return 'N/A'
+    return f"{v:.2f}"
+
+
+def _filter_abs_pct(v):
+    """Format as absolute percentage: -0.15 → '15.0%', None → 'N/A'."""
+    if v is None:
+        return 'N/A'
+    return f"{abs(v) * 100:.1f}%"
+
+
+def _fmt_date(dt):
+    if isinstance(dt, str):
+        return dt
+    return dt.strftime('%Y-%m-%d')
 
 
 @dataclass
 class BacktestReport:
-    """
-    A class to represent a backtest report. The backtest report contains
-    the results of a backtest, including metrics and an HTML report. Also,
-    it stores the path to the used strategy directory, which can be used to
-    load the strategy code later.
-
-    Attributes:
-        html_report (str): The HTML report content.
-        html_report_path (str): The file path where the HTML report is saved.
-        metrics (dict): A dictionary containing various metrics from the backtest.
-        results (BacktestResult): An instance of BacktestResult containing
-            the results of the backtest.
-        risk_free_rate (float): The risk-free rate used in the backtest.
-        strategy_path (str): The path to the strategy directory used in the
-            backtest.
-    """
-    backtest: Backtest = None
+    backtests: List[Backtest] = field(default_factory=list)
     html_report: str = None
     html_report_path: str = None
+    # Backward compat with old API (backtest: Backtest)
+    backtest: object = None
 
-    def show(
-        self,
-        backtest_date_range: BacktestDateRange,
-        browser: bool = False
-    ):
-        """
-        Display the HTML report in a Jupyter notebook cell.
-        """
+    def __post_init__(self):
+        # Handle single Backtest passed as first positional arg:
+        #   BacktestReport(backtest)
+        if self.backtests and not isinstance(self.backtests, list):
+            self.backtests = [self.backtests]
+        # Handle backward compat: backtest=single or backtest=[list]
+        if self.backtest is not None and not self.backtests:
+            if isinstance(self.backtest, list):
+                self.backtests = self.backtest
+            else:
+                self.backtests = [self.backtest]
+            self.backtest = None
 
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def show(self, backtest_date_range=None, browser=False):
         if not self.html_report:
-            # If the HTML report is not created, create it
-            self._create_html_report(backtest_date_range)
+            self.html_report = self._build_html()
 
-        # Save the html report to a tmp location
         path = "/tmp/backtest_report.html"
-        with open(path, "w") as html_file:
-            html_file.write(self.html_report)
+        with open(path, "w") as f:
+            f.write(self.html_report)
 
-        if browser:
-            webbrowser.open(f"file://{path}")
+        try:
+            from IPython import get_ipython
+            shell = get_ipython().__class__.__name__
+            if shell == 'ZMQInteractiveShell':
+                from IPython.display import display, HTML
+                display(HTML(self.html_report))
+                if not browser:
+                    return
+        except (NameError, ImportError):
+            pass
 
-        def in_jupyter_notebook():
-            try:
-                shell = get_ipython().__class__.__name__
-                return shell == 'ZMQInteractiveShell'
-            except (NameError, ImportError):
-                return False
+        webbrowser.open(f"file://{path}")
 
-        if in_jupyter_notebook():
-            display(HTML(self.html_report))
-        else:
-            webbrowser.open(f"file://{path}")
-
-    def _create_html_report(self, backtest_date_range: BacktestDateRange):
-        """
-        Create an HTML report from the backtest metrics and results.
-
-        This method generates various charts and tables from the backtest
-        metrics and results, and renders them into an HTML template using
-        Jinja2.
-
-        Raises:
-            OperationalException: If no backtests are available to
-                create a report.
-
-        Returns:
-            None
-        """
-        # Get the first backtest
-        if not self.backtest:
-            raise OperationalException(
-                "No backtest available to create a report."
-            )
-
-
-        metrics = self.backtest.get_backtest_metrics(backtest_date_range)
-        run = self.backtest.get_backtest_run(backtest_date_range)
-        # Create plots
-        equity_with_drawdown_fig = get_equity_curve_with_drawdown_chart(
-            metrics.equity_curve, metrics.drawdown_series
-        )
-        equity_with_drawdown_plot_html = equity_with_drawdown_fig.to_html(
-            full_html=False, include_plotlyjs='cdn',
-            config={'responsive': True}, default_width="90%"
-        )
-        rolling_sharpe_ratio_fig = get_rolling_sharpe_ratio_chart(
-            metrics.rolling_sharpe_ratio
-        )
-        rolling_sharpe_ratio_plot_html = rolling_sharpe_ratio_fig.to_html(
-            full_html=False, include_plotlyjs='cdn',
-            config={'responsive': True}, default_width="90%"
-        )
-        monthly_returns_heatmap_fig = get_monthly_returns_heatmap_chart(
-            metrics.monthly_returns
-        )
-        monthly_returns_heatmap_html = monthly_returns_heatmap_fig.to_html(
-            full_html=False, include_plotlyjs='cdn',
-            config={'responsive': True}
-        )
-        yearly_returns_histogram_fig = get_yearly_returns_bar_chart(
-            metrics.yearly_returns
-        )
-        yearly_returns_histogram_html = yearly_returns_histogram_fig.to_html(
-            full_html=False, include_plotlyjs='cdn',
-            config={'responsive': True}
-        )
-
-        # Create OHLCV data completeness charts
-        data_files = []
-        ohlcv_data_completeness_charts_html = ""
-
-        for file in data_files:
-            try:
-                if file.endswith('.csv'):
-                    df = pd.read_csv(file, parse_dates=['Datetime'])
-                    file_name = os.path.basename(file)
-                    symbol = get_symbol_from_file_name(file_name)
-                    market = get_market_from_file_name(file_name)
-                    time_frame = get_time_frame_from_file_name(file_name)
-                    title = f"OHLCV Data Completeness for {market} - {symbol} - {time_frame.value}"
-                    ohlcv_data_completeness_chart_html = \
-                        get_ohlcv_data_completeness_chart(
-                            df,
-                            timeframe=time_frame.value,
-                            windowsize=200,
-                            title=title
-                        )
-
-                    ohlcv_data_completeness_charts_html += (
-                        '<div class="ohlcv-data-completeness-chart">'
-                        f'{ohlcv_data_completeness_chart_html}'
-                        '</div>'
-                    )
-
-            except Exception as e:
-                logger.warning(
-                    "Error creating OHLCV data completeness " +
-                    f"chart for {file}: {e}"
-                )
-                continue
-
-        # Create HTML tables
-        key_metrics_table_html = create_html_key_metrics_table(
-            metrics, run
-        )
-        trades_metrics_table_html = create_html_trade_metrics_table(
-            metrics, run
-        )
-        time_metrics_table_html = create_html_time_metrics_table(
-            metrics, run
-        )
-        trades_table_html = create_html_trades_table(run)
-
-        # Jinja2 environment setup
-        template_dir = os.path.join(os.path.dirname(__file__), 'templates')
-        env = Environment(loader=FileSystemLoader(template_dir))
-        template = env.get_template('report_template.html.j2')
-
-        # Render template with variables
-        html_rendered = template.render(
-            report=run,
-            equity_with_drawdown_plot_html=equity_with_drawdown_plot_html,
-            rolling_sharpe_ratio_plot_html=rolling_sharpe_ratio_plot_html,
-            monthly_returns_heatmap_html=monthly_returns_heatmap_html,
-            yearly_returns_histogram_html=yearly_returns_histogram_html,
-            key_metrics_table_html=key_metrics_table_html,
-            trades_metrics_table_html=trades_metrics_table_html,
-            time_metrics_table_html=time_metrics_table_html,
-            trades_table_html=trades_table_html,
-            data_completeness_charts_html=ohlcv_data_completeness_charts_html
-        )
-        self.html_report = html_rendered
+    def save(self, path):
+        if not self.html_report:
+            self.html_report = self._build_html()
+        with open(path, "w") as f:
+            f.write(self.html_report)
 
     @staticmethod
-    def _load_backtest(backtest_path: str) -> Backtest:
-        """
-        Load the backtest from a give path
-        and return an instance of Backtest.
-
-        Args:
-            backtest_path (str): The path to the backtest directory.
-
-        Returns:
-            Backtest: An instance of Backtest loaded from the
-                backtest directory.
-        """
-        return Backtest.open(backtest_path)
-
-    @staticmethod
-    def _is_backtest(backtest_path: Union[str, Path]) -> bool:
-        """
-        Check if the given path is a valid backtest report directory.
-
-        Args:
-            backtest_path (Union[str, Path]): The path to check.
-
-        Returns:
-            bool: True if the path is a valid backtest report directory,
-                False otherwise.
-        """
+    def _is_backtest(backtest_path):
         return (
-            os.path.exists(backtest_path) and
-            os.path.isdir(backtest_path) and
-            os.path.isfile(os.path.join(backtest_path, "results.json"))
-            and os.path.isfile(os.path.join(backtest_path, "metrics.json"))
+            os.path.exists(backtest_path)
+            and os.path.isdir(backtest_path)
+            and os.path.isfile(os.path.join(backtest_path, "algorithm_id.json"))
+            and os.path.isdir(os.path.join(backtest_path, "runs"))
         )
 
     @staticmethod
     def open(
-        backtests: List[Backtest] = [],
-        directory_path=None
+        backtests: List[Backtest] = None,
+        directory_path=None,
     ) -> "BacktestReport":
-        """
-        Open the backtest report from a file.
+        loaded = []
 
-        Args:
-            backtests (List[Backtest], optional): A list of Backtest instances
-                to include in the report. If provided, it will use these
-                backtests as part of the report.
-            directory_path (str, optional): The directory path from
-                which the reports will be loaded.
-
-        Returns:
-            BacktestReport: An instance of BacktestReport loaded from the file.
-
-        Raises:
-            OperationalException: If the backtest path is not a valid backtest
-                report directory.
-        """
-        loaded_backtests = []
+        if backtests is None:
+            backtests = []
 
         if directory_path is not None:
-            # Check if the directory is a valid backtest report directory
             if BacktestReport._is_backtest(directory_path):
-                backtests.append(
-                    Backtest.open(directory_path)
-                )
+                loaded.append(Backtest.open(directory_path))
             else:
-                # Loop over all subdirectories
                 for root, dirs, _ in os.walk(directory_path):
                     for dir_name in dirs:
-                        subdir_path = os.path.join(root, dir_name)
-                        if BacktestReport._is_backtest(subdir_path):
-                            loaded_backtests.append(
-                                Backtest.open(directory_path=subdir_path)
-                            )
+                        subdir = os.path.join(root, dir_name)
+                        if BacktestReport._is_backtest(subdir):
+                            loaded.append(Backtest.open(subdir))
 
-        if len(backtests) > 0:
+        for bt in backtests:
+            if not isinstance(bt, Backtest):
+                raise OperationalException(
+                    "Provided backtest is not a valid Backtest instance."
+                )
+            loaded.append(bt)
 
-            for backtest in backtests:
-                if not isinstance(backtest, Backtest):
-                    raise OperationalException(
-                        "The provided backtest is not a valid Backtest instance."
-                    )
-
-            # Add the backtests to the backtests list
-            loaded_backtests.extend(backtests)
-
-        if len(loaded_backtests) == 0:
+        if not loaded:
             raise OperationalException(
-                f"The directory {directory_path} is not a valid backtest report."
+                f"No valid backtests found at {directory_path}."
             )
 
-        return BacktestReport(backtest=loaded_backtests)
+        return BacktestReport(backtests=loaded)
+
+    # ------------------------------------------------------------------
+    # Full HTML assembly
+    # ------------------------------------------------------------------
+
+    def _build_html(self):
+        if not self.backtests:
+            raise OperationalException("No backtests available.")
+
+        css = _read_template('dashboard.css')
+        js = _read_template('dashboard.js')
+
+        is_single = len(self.backtests) == 1
+        strategies = self._build_strategies_data()
+        run_data = self._build_run_data()
+        windows_meta = self._build_windows_meta()
+        run_labels = self._build_run_labels()
+
+        # Pre-compute overview KPIs
+        best_cagr = {'v': None, 'n': ''}
+        best_sharpe = {'v': None, 'n': ''}
+        best_sortino = {'v': None, 'n': ''}
+        best_calmar = {'v': None, 'n': ''}
+        best_win_rate = {'v': None, 'n': ''}
+        lowest_dd = {'v': None, 'n': ''}
+        for s in strategies:
+            sm = s.get('summary', {})
+            c = sm.get('cagr')
+            sh = sm.get('sharpe_ratio')
+            so = sm.get('sortino_ratio')
+            ca = sm.get('calmar_ratio')
+            wr = sm.get('win_rate')
+            dd = sm.get('max_drawdown')
+            if c is not None and (
+                best_cagr['v'] is None or c > best_cagr['v']
+            ):
+                best_cagr = {'v': c, 'n': s['name']}
+            if sh is not None and (
+                best_sharpe['v'] is None or sh > best_sharpe['v']
+            ):
+                best_sharpe = {'v': sh, 'n': s['name']}
+            if so is not None and (
+                best_sortino['v'] is None or so > best_sortino['v']
+            ):
+                best_sortino = {'v': so, 'n': s['name']}
+            if ca is not None and (
+                best_calmar['v'] is None or ca > best_calmar['v']
+            ):
+                best_calmar = {'v': ca, 'n': s['name']}
+            if wr is not None and (
+                best_win_rate['v'] is None or wr > best_win_rate['v']
+            ):
+                best_win_rate = {'v': wr, 'n': s['name']}
+            if dd is not None and (
+                lowest_dd['v'] is None or dd < lowest_dd['v']
+            ):
+                lowest_dd = {'v': dd, 'n': s['name']}
+
+        strat_names = ' \u00b7 '.join(s['name'] for s in strategies)
+        title = 'Backtest Report' if is_single else 'Strategy Comparison'
+
+        env = Environment(
+            loader=FileSystemLoader(_TEMPLATE_DIR),
+            autoescape=False,
+        )
+        env.filters['pct'] = _filter_pct
+        env.filters['ratio'] = _filter_ratio
+        env.filters['abs_pct'] = _filter_abs_pct
+        template = env.get_template('dashboard_template.html.j2')
+
+        return template.render(
+            title=title,
+            css=css,
+            js=js,
+            is_single=is_single,
+            strategies=strategies,
+            run_data=run_data,
+            windows_meta=windows_meta,
+            run_labels=run_labels,
+            strat_names=strat_names,
+            best_cagr=best_cagr,
+            best_sharpe=best_sharpe,
+            best_sortino=best_sortino,
+            best_calmar=best_calmar,
+            best_win_rate=best_win_rate,
+            lowest_dd=lowest_dd,
+        )
+
+    # ------------------------------------------------------------------
+    # Data transformation  (Python Backtest → JS data structures)
+    # ------------------------------------------------------------------
+
+    def _build_strategies_data(self):
+        strategies = []
+
+        for i, bt in enumerate(self.backtests):
+            color = STRATEGY_COLORS[i % len(STRATEGY_COLORS)]
+            runs = bt.get_all_backtest_runs()
+
+            # Summary metrics
+            summary_dict = {}
+            if bt.backtest_summary is not None:
+                summary_dict = bt.backtest_summary.to_dict()
+
+            # Representative equity curve (first run, as % growth)
+            rep_eq = []
+            if runs:
+                first_metrics = runs[0].backtest_metrics
+                if first_metrics and first_metrics.equity_curve:
+                    ec = first_metrics.equity_curve
+                    initial = ec[0][0] if ec else 1
+                    if initial == 0:
+                        initial = 1
+                    rep_eq = [
+                        [(v / initial - 1) * 100, _fmt_date(d)]
+                        for v, d in ec
+                    ]
+
+            # Run IDs / mappings / labels
+            run_ids, run_name_map, run_labels_list = [], {}, []
+            for j, run in enumerate(runs):
+                rid = f"run-{i}-{j}"
+                run_ids.append(rid)
+                name = run.backtest_date_range_name or f"run_{j}"
+                ts = getattr(run, 'trading_symbol', 'EUR') or 'EUR'
+                label = (
+                    f"{ts} {_fmt_date(run.backtest_start_date)} "
+                    f"\u2192 {_fmt_date(run.backtest_end_date)}"
+                )
+                run_name_map[name] = rid
+                run_labels_list.append([name, label])
+
+            algo_name = bt.algorithm_id or f"strategy_{i}"
+            if len(algo_name) > 8:
+                algo_name = algo_name[:8]
+
+            strategies.append({
+                'id': f'strat-{i}',
+                'name': algo_name,
+                'color': color,
+                'summary': summary_dict,
+                'repEQ': rep_eq,
+                'runIds': run_ids,
+                'runNameMap': run_name_map,
+                'runLabels': run_labels_list,
+            })
+
+        return strategies
+
+    def _build_run_data(self):
+        run_data = {}
+
+        for i, bt in enumerate(self.backtests):
+            runs = bt.get_all_backtest_runs()
+
+            for j, run in enumerate(runs):
+                rid = f"run-{i}-{j}"
+                m = run.backtest_metrics
+                ts = getattr(run, 'trading_symbol', 'EUR') or 'EUR'
+                label = (
+                    f"{ts} {_fmt_date(run.backtest_start_date)} "
+                    f"\u2192 {_fmt_date(run.backtest_end_date)}"
+                )
+
+                # Equity curve → % growth
+                eq, initial = [], 1
+                if m and m.equity_curve:
+                    initial = m.equity_curve[0][0] or 1
+                    eq = [
+                        [(v / initial - 1) * 100, _fmt_date(d)]
+                        for v, d in m.equity_curve
+                    ]
+
+                # Drawdown series
+                dd = []
+                if m and m.drawdown_series:
+                    dd = [
+                        [v * 100 if abs(v) < 1 else v, _fmt_date(d)]
+                        for v, d in m.drawdown_series
+                    ]
+
+                # Rolling Sharpe
+                rs = []
+                if m and m.rolling_sharpe_ratio:
+                    rs = [
+                        [v, _fmt_date(d)]
+                        for v, d in m.rolling_sharpe_ratio
+                    ]
+
+                # Monthly returns
+                mr = []
+                if m and m.monthly_returns:
+                    mr = [
+                        [v, _fmt_date(d)]
+                        for v, d in m.monthly_returns
+                    ]
+
+                # Yearly returns
+                yr = []
+                if m and m.yearly_returns:
+                    yr = [
+                        [v, str(d.year) if hasattr(d, 'year') else str(d)]
+                        for v, d in m.yearly_returns
+                    ]
+
+                # Monthly heatmap  {year: {month: pct}}
+                heatmap = {}
+                if m and m.monthly_returns:
+                    for v, d in m.monthly_returns:
+                        y = d.year if hasattr(d, 'year') else int(str(d)[:4])
+                        mo = d.month if hasattr(d, 'month') else int(str(d)[5:7])
+                        heatmap.setdefault(y, {})[mo] = round(
+                            v * 100 if abs(v) < 1 else v, 2
+                        )
+
+                # Trades
+                trades_list, sym_stats = [], {}
+                if run.trades:
+                    for idx_t, t in enumerate(run.trades):
+                        sym = getattr(t, 'target_symbol', '') or ''
+                        cost = getattr(t, 'cost', 0) or 0
+                        ng = getattr(t, 'net_gain', 0) or 0
+                        cp = 0
+                        if hasattr(t, 'closed_prices') and t.closed_prices:
+                            cp = t.closed_prices[-1]
+                        elif hasattr(t, 'last_reported_price'):
+                            cp = t.last_reported_price or 0
+                        pct = (ng / cost * 100) if cost else 0
+                        trades_list.append({
+                            'id': idx_t,
+                            'sym': sym,
+                            'opened': _fmt_date(t.opened_at) if t.opened_at else '',
+                            'closed': _fmt_date(t.closed_at) if t.closed_at else '',
+                            'open_price': round(getattr(t, 'open_price', 0) or 0, 2),
+                            'close_price': round(cp, 2),
+                            'cost': round(cost, 2),
+                            'net_gain': round(ng, 2),
+                            'pct': round(pct, 2),
+                        })
+                        sym_stats.setdefault(sym, {'count': 0, 'gain': 0})
+                        sym_stats[sym]['count'] += 1
+                        sym_stats[sym]['gain'] = round(
+                            sym_stats[sym]['gain'] + ng, 2
+                        )
+
+                # Scalar metrics
+                metrics_dict = {}
+                if m:
+                    for attr in (
+                        'cagr', 'sharpe_ratio', 'sortino_ratio',
+                        'calmar_ratio', 'profit_factor',
+                        'annual_volatility', 'max_drawdown',
+                        'max_drawdown_duration', 'trades_per_year',
+                        'win_rate', 'current_win_rate',
+                        'win_loss_ratio', 'current_win_loss_ratio',
+                        'number_of_trades', 'number_of_trades_closed',
+                        'cumulative_exposure', 'exposure_ratio',
+                        'total_net_gain', 'total_net_gain_percentage',
+                        'total_growth', 'total_growth_percentage',
+                        'total_loss', 'average_trade_return',
+                        'average_trade_return_percentage',
+                        'average_trade_loss',
+                        'average_trade_loss_percentage',
+                        'average_trade_gain',
+                        'average_trade_gain_percentage',
+                        'max_drawdown_absolute', 'max_daily_drawdown',
+                    ):
+                        metrics_dict[attr] = getattr(m, attr, None)
+
+                # Snapshot
+                snapshot = {}
+                if run.portfolio_snapshots:
+                    last = run.portfolio_snapshots[-1]
+                    tv = getattr(last, 'total_value', 0) or 0
+                    snapshot = {
+                        'equity': tv,
+                        'unallocated': getattr(last, 'unallocated', 0) or 0,
+                        'net_profit': getattr(last, 'total_net_gain', 0) or 0,
+                        'growth': round(
+                            (tv / initial - 1) * 100, 2
+                        ) if initial else 0,
+                    }
+
+                run_data[rid] = {
+                    'label': label,
+                    'EQ': eq,
+                    'DD': dd,
+                    'CR': eq,
+                    'RS': rs,
+                    'MR': mr,
+                    'YR': yr,
+                    'MONTHLY_HEATMAP': heatmap,
+                    'TRADES': trades_list,
+                    'SYM_STATS': sym_stats,
+                    'metrics': metrics_dict,
+                    'snapshot': snapshot,
+                }
+
+        return run_data
+
+    def _build_windows_meta(self):
+        windows = {}
+        for bt in self.backtests:
+            for run in bt.get_all_backtest_runs():
+                name = run.backtest_date_range_name or ''
+                if name not in windows:
+                    ts = getattr(run, 'trading_symbol', 'EUR') or 'EUR'
+                    s = _fmt_date(run.backtest_start_date)
+                    e = _fmt_date(run.backtest_end_date)
+                    days = (
+                        run.backtest_end_date - run.backtest_start_date
+                    ).days
+                    windows[name] = {
+                        'label': f"{ts} {s} \u2192 {e}",
+                        'start': s,
+                        'end': e,
+                        'days': days,
+                        'n_strategies': 0,
+                    }
+                windows[name]['n_strategies'] += 1
+        return list(windows.values())
+
+    def _build_run_labels(self):
+        labels, seen = [], set()
+        for bt in self.backtests:
+            for run in bt.get_all_backtest_runs():
+                name = run.backtest_date_range_name or ''
+                if name not in seen:
+                    ts = getattr(run, 'trading_symbol', 'EUR') or 'EUR'
+                    s = _fmt_date(run.backtest_start_date)
+                    e = _fmt_date(run.backtest_end_date)
+                    labels.append([name, f"{ts} {s} \u2192 {e}"])
+                    seen.add(name)
+        return labels

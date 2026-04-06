@@ -43,6 +43,10 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Getting Started/backtest-reports',
+                },
+                {
+                    type: 'doc',
                     id: 'Getting Started/deployment',
                 },
             ],
