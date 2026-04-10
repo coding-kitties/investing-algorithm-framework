@@ -37,23 +37,23 @@ def _make_backtest(algorithm_id="test_algo", n_runs=1, with_metrics=True):
                 backtest_start_date=start,
                 backtest_end_date=end,
                 equity_curve=[
-                    (start, 1000),
-                    (end, 1200),
+                    (1000, start),
+                    (1200, end),
                 ],
                 drawdown_series=[
-                    (start, 0),
-                    (end, -0.05),
+                    (0, start),
+                    (-0.05, end),
                 ],
                 rolling_sharpe_ratio=[
-                    (start, 1.0),
-                    (end, 1.5),
+                    (1.0, start),
+                    (1.5, end),
                 ],
                 monthly_returns=[
-                    (datetime(2023, 1, 31, tzinfo=timezone.utc), 0.03),
-                    (datetime(2023, 2, 28, tzinfo=timezone.utc), 0.02),
+                    (0.03, datetime(2023, 1, 31, tzinfo=timezone.utc)),
+                    (0.02, datetime(2023, 2, 28, tzinfo=timezone.utc)),
                 ],
                 yearly_returns=[
-                    (datetime(2023, 12, 31, tzinfo=timezone.utc), 0.20),
+                    (0.20, datetime(2023, 12, 31, tzinfo=timezone.utc)),
                 ],
                 total_net_gain=200,
                 total_net_gain_percentage=0.20,
