@@ -37,7 +37,8 @@ from .metrics import get_annual_volatility, get_mean_daily_return, \
     get_positive_trades, get_negative_trades, get_number_of_trades, \
     get_current_win_rate, get_current_average_trade_return, \
     get_current_average_trade_loss, get_current_average_trade_duration, \
-    get_current_average_trade_gain, create_backtest_metrics_for_backtest
+    get_current_average_trade_gain, create_backtest_metrics_for_backtest, \
+    recalculate_backtests
 
 __all__ = [
     "get_mean_daily_return",
@@ -130,6 +131,7 @@ __all__ = [
     "get_current_average_trade_gain",
     "get_current_average_trade_return",
     "create_backtest_metrics_for_backtest",
+    "recalculate_backtests",
     "TradeStopLossService",
     "TradeTakeProfitService",
     "get_mean_yearly_return"

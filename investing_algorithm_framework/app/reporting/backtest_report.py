@@ -1,8 +1,10 @@
 import os
+import csv
 import webbrowser
 import logging
 from dataclasses import dataclass, field
 from typing import List, Union
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
@@ -17,6 +19,16 @@ STRATEGY_COLORS = [
     "#22d3ee", "#10b981", "#f59e0b", "#a78bfa", "#ef4444",
     "#ec4899", "#3b82f6", "#14b8a6",
 ]
+
+BENCHMARK_COLORS = [
+    '#94a3b8', '#cbd5e1', '#64748b', '#475569', '#e2e8f0',
+]
+DCA_COLORS = [
+    '#a78bfa', '#c4b5fd', '#7c3aed', '#6d28d9', '#ddd6fe',
+]
+RISK_FREE_COLOR = '#22d3ee'       # cyan-400
+EQUAL_WEIGHT_COLOR = '#fb923c'    # orange-400
+DEFAULT_RISK_FREE_RATE = 0.04     # 4% annual
 
 _TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 
@@ -58,6 +70,7 @@ class BacktestReport:
     backtests: List[Backtest] = field(default_factory=list)
     html_report: str = None
     html_report_path: str = None
+    directory_path: str = None
     # Backward compat with old API (backtest: Backtest)
     backtest: object = None
 
@@ -146,7 +159,10 @@ class BacktestReport:
                 f"No valid backtests found at {directory_path}."
             )
 
-        return BacktestReport(backtests=loaded)
+        return BacktestReport(
+            backtests=loaded,
+            directory_path=directory_path,
+        )
 
     # ------------------------------------------------------------------
     # Full HTML assembly
@@ -233,6 +249,7 @@ class BacktestReport:
             best_calmar=best_calmar,
             best_win_rate=best_win_rate,
             lowest_dd=lowest_dd,
+            benchmarks=self._build_benchmarks_data(),
         )
 
     # ------------------------------------------------------------------
@@ -400,6 +417,7 @@ class BacktestReport:
                         'calmar_ratio', 'profit_factor',
                         'annual_volatility', 'max_drawdown',
                         'max_drawdown_duration', 'trades_per_year',
+                        'trades_per_week', 'trades_per_month',
                         'win_rate', 'current_win_rate',
                         'win_loss_ratio', 'current_win_loss_ratio',
                         'number_of_trades', 'number_of_trades_closed',
@@ -413,6 +431,9 @@ class BacktestReport:
                         'average_trade_gain',
                         'average_trade_gain_percentage',
                         'max_drawdown_absolute', 'max_daily_drawdown',
+                        'average_trade_duration',
+                        'average_win_duration',
+                        'average_loss_duration',
                     ):
                         metrics_dict[attr] = getattr(m, attr, None)
 
@@ -481,3 +502,327 @@ class BacktestReport:
                     labels.append([name, f"{ts} {s} \u2192 {e}"])
                     seen.add(name)
         return labels
+
+    # ------------------------------------------------------------------
+    # Benchmarks  (CSV files from benchmarks/ directory)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _load_benchmark_csv(filepath):
+        """Read a benchmark CSV and return sorted list of (date_str, close)."""
+        rows = []
+        with open(filepath, 'r', newline='') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                date_str = row.get('date', '').strip()
+                close = row.get('close', '').strip()
+                if not date_str or not close:
+                    continue
+                try:
+                    close_val = float(close)
+                except ValueError:
+                    continue
+                rows.append((date_str, close_val))
+        rows.sort(key=lambda r: r[0])
+        return rows
+
+    @staticmethod
+    def _compute_dca_equity(dates, price_map):
+        """Compute a monthly DCA equity curve.
+
+        Simulates investing a fixed amount (1 unit) on the first
+        available trading day of each calendar month.  Returns a list
+        of ``[pct_return, date_str]`` pairs where *pct_return* is
+        ``(portfolio_value / total_invested - 1) * 100``.
+        """
+        if len(dates) < 2:
+            return []
+
+        invest_amount = 1.0
+        total_invested = 0.0
+        total_units = 0.0
+        current_month = None
+        eq = []
+
+        for d in dates:
+            month_key = d[:7]  # 'YYYY-MM'
+            if month_key != current_month:
+                current_month = month_key
+                price = price_map[d]
+                if price > 0:
+                    total_units += invest_amount / price
+                    total_invested += invest_amount
+
+            price = price_map[d]
+            portfolio_value = total_units * price
+            if total_invested > 0:
+                pct_return = (portfolio_value / total_invested - 1) * 100
+            else:
+                pct_return = 0.0
+            eq.append([pct_return, d])
+
+        return eq
+
+    def _build_benchmarks_data(self):
+        """Build benchmark data for JS: normalized % equity per window."""
+
+        # Collect all window date ranges
+        windows = {}
+        for bt in self.backtests:
+            for run in bt.get_all_backtest_runs():
+                name = run.backtest_date_range_name or ''
+                if name not in windows:
+                    windows[name] = {
+                        'start': _fmt_date(run.backtest_start_date),
+                        'end': _fmt_date(run.backtest_end_date),
+                    }
+
+        # ---- CSV-based benchmarks (buy-and-hold + DCA) ----
+        benchmarks = []
+        # Collect all price maps for equal-weight basket later
+        all_price_maps = []
+
+        bench_dir = None
+        if self.directory_path:
+            bench_dir = os.path.join(self.directory_path, 'benchmarks')
+            if not os.path.isdir(bench_dir):
+                bench_dir = None
+
+        if bench_dir:
+            csv_files = sorted([
+                f for f in os.listdir(bench_dir)
+                if f.lower().endswith('.csv')
+            ])
+
+            for idx, filename in enumerate(csv_files):
+                filepath = os.path.join(bench_dir, filename)
+                raw = self._load_benchmark_csv(filepath)
+                if not raw:
+                    continue
+
+                name = os.path.splitext(filename)[0].replace('_', '/')
+                color = BENCHMARK_COLORS[idx % len(BENCHMARK_COLORS)]
+
+                # Build a date→close lookup
+                price_map = {d: c for d, c in raw}
+                all_price_maps.append(price_map)
+
+                # Normalized equity curve for "summary" (full date range)
+                all_dates = sorted(price_map.keys())
+                if not all_dates:
+                    continue
+                first_close = price_map[all_dates[0]]
+                if first_close == 0:
+                    first_close = 1
+                summary_eq = [
+                    [(price_map[d] / first_close - 1) * 100, d]
+                    for d in all_dates
+                ]
+
+                # Per-window equity (normalized to window start)
+                window_eqs = {}
+                for wname, winfo in windows.items():
+                    w_start, w_end = winfo['start'], winfo['end']
+                    w_dates = [
+                        d for d in all_dates if w_start <= d <= w_end
+                    ]
+                    if len(w_dates) < 2:
+                        continue
+                    w_first = price_map[w_dates[0]]
+                    if w_first == 0:
+                        w_first = 1
+                    window_eqs[wname] = [
+                        [(price_map[d] / w_first - 1) * 100, d]
+                        for d in w_dates
+                    ]
+
+                # Compute simple CAGR from full range
+                if len(all_dates) >= 2:
+                    start_p = price_map[all_dates[0]]
+                    end_p = price_map[all_dates[-1]]
+                    days = (
+                        datetime.strptime(all_dates[-1], '%Y-%m-%d')
+                        - datetime.strptime(all_dates[0], '%Y-%m-%d')
+                    ).days
+                    years = days / 365.25 if days > 0 else 1
+                    if start_p > 0:
+                        cagr = (end_p / start_p) ** (1 / years) - 1
+                    else:
+                        cagr = 0
+                else:
+                    cagr = 0
+
+                benchmarks.append({
+                    'name': name,
+                    'color': color,
+                    'summaryEQ': summary_eq,
+                    'windowEQ': window_eqs,
+                    'cagr': round(cagr, 4),
+                    'lineStyle': 'dashed',
+                })
+
+                # --- DCA benchmark for the same asset ---
+                dca_color = DCA_COLORS[idx % len(DCA_COLORS)]
+
+                dca_summary = self._compute_dca_equity(all_dates, price_map)
+
+                dca_window_eqs = {}
+                for wname, winfo in windows.items():
+                    w_start, w_end = winfo['start'], winfo['end']
+                    w_dates = [
+                        d for d in all_dates if w_start <= d <= w_end
+                    ]
+                    if len(w_dates) < 2:
+                        continue
+                    dca_window_eqs[wname] = self._compute_dca_equity(
+                        w_dates, price_map
+                    )
+
+                # Approximate DCA CAGR
+                if dca_summary and len(dca_summary) >= 2:
+                    final_ret = dca_summary[-1][0] / 100  # fractional
+                    first_d = dca_summary[0][1]
+                    last_d = dca_summary[-1][1]
+                    dca_days = (
+                        datetime.strptime(last_d, '%Y-%m-%d')
+                        - datetime.strptime(first_d, '%Y-%m-%d')
+                    ).days
+                    dca_years = dca_days / 365.25 if dca_days > 0 else 1
+                    if final_ret > -1:
+                        dca_cagr = (1 + final_ret) ** (1 / dca_years) - 1
+                    else:
+                        dca_cagr = -1
+                else:
+                    dca_cagr = 0
+
+                benchmarks.append({
+                    'name': name + ' DCA',
+                    'color': dca_color,
+                    'summaryEQ': dca_summary,
+                    'windowEQ': dca_window_eqs,
+                    'cagr': round(dca_cagr, 4),
+                    'lineStyle': 'dotted',
+                })
+
+        # ---- Equal-weight basket (average of all CSV benchmarks) ----
+        if len(all_price_maps) >= 2:
+            benchmarks.extend(
+                self._build_equal_weight_basket(
+                    all_price_maps, windows
+                )
+            )
+
+        # ---- Risk-free rate (always generated) ----
+        benchmarks.extend(
+            self._build_risk_free_benchmark(windows)
+        )
+
+        return benchmarks
+
+    def _build_risk_free_benchmark(self, windows):
+        """Generate a risk-free rate compounding line from window dates."""
+        rate = DEFAULT_RISK_FREE_RATE
+
+        # Collect the full date range across all windows
+        all_starts, all_ends = [], []
+        for winfo in windows.values():
+            all_starts.append(winfo['start'])
+            all_ends.append(winfo['end'])
+
+        if not all_starts:
+            return []
+
+        global_start = min(all_starts)
+        global_end = max(all_ends)
+
+        def _compound_eq(start_str, end_str):
+            """Build daily compounding equity from start to end."""
+            start_dt = datetime.strptime(start_str, '%Y-%m-%d')
+            end_dt = datetime.strptime(end_str, '%Y-%m-%d')
+            total_days = (end_dt - start_dt).days
+            if total_days <= 0:
+                return []
+            daily_rate = (1 + rate) ** (1 / 365.25) - 1
+            eq = []
+            for day_offset in range(total_days + 1):
+                dt = start_dt + timedelta(days=day_offset)
+                pct = ((1 + daily_rate) ** day_offset - 1) * 100
+                eq.append([round(pct, 4), dt.strftime('%Y-%m-%d')])
+            return eq
+
+        summary_eq = _compound_eq(global_start, global_end)
+
+        window_eqs = {}
+        for wname, winfo in windows.items():
+            weq = _compound_eq(winfo['start'], winfo['end'])
+            if len(weq) >= 2:
+                window_eqs[wname] = weq
+
+        return [{
+            'name': f'Risk-Free {rate:.0%}',
+            'color': RISK_FREE_COLOR,
+            'summaryEQ': summary_eq,
+            'windowEQ': window_eqs,
+            'cagr': round(rate, 4),
+            'lineStyle': 'dotted',
+        }]
+
+    @staticmethod
+    def _build_equal_weight_basket(price_maps, windows):
+        """Generate an equal-weight benchmark from multiple price maps."""
+        # Find all dates common to every asset
+        date_sets = [set(pm.keys()) for pm in price_maps]
+        common_dates = sorted(set.intersection(*date_sets))
+        if len(common_dates) < 2:
+            return []
+
+        n = len(price_maps)
+
+        def _basket_eq(dates):
+            """Normalize each asset to 1.0 on first date, average them."""
+            first_prices = [pm[dates[0]] or 1 for pm in price_maps]
+            eq = []
+            for d in dates:
+                total = 0
+                for i, pm in enumerate(price_maps):
+                    fp = first_prices[i] if first_prices[i] != 0 else 1
+                    total += pm[d] / fp
+                avg_growth = (total / n - 1) * 100
+                eq.append([round(avg_growth, 4), d])
+            return eq
+
+        summary_eq = _basket_eq(common_dates)
+
+        window_eqs = {}
+        for wname, winfo in windows.items():
+            w_dates = [
+                d for d in common_dates
+                if winfo['start'] <= d <= winfo['end']
+            ]
+            if len(w_dates) < 2:
+                continue
+            window_eqs[wname] = _basket_eq(w_dates)
+
+        # CAGR from summary
+        if len(summary_eq) >= 2:
+            final_ret = summary_eq[-1][0] / 100
+            days = (
+                datetime.strptime(common_dates[-1], '%Y-%m-%d')
+                - datetime.strptime(common_dates[0], '%Y-%m-%d')
+            ).days
+            years = days / 365.25 if days > 0 else 1
+            if final_ret > -1:
+                basket_cagr = (1 + final_ret) ** (1 / years) - 1
+            else:
+                basket_cagr = -1
+        else:
+            basket_cagr = 0
+
+        return [{
+            'name': 'Equal-Weight Basket',
+            'color': EQUAL_WEIGHT_COLOR,
+            'summaryEQ': summary_eq,
+            'windowEQ': window_eqs,
+            'cagr': round(basket_cagr, 4),
+            'lineStyle': 'dashed',
+        }]

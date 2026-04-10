@@ -3,6 +3,8 @@ from logging import getLogger
 
 from investing_algorithm_framework.domain import BacktestMetrics, \
     BacktestRun, OperationalException, Backtest, BacktestDateRange
+from investing_algorithm_framework.domain.backtesting.combine_backtests \
+    import generate_backtest_summary_metrics
 from .cagr import get_cagr
 from .calmar_ratio import get_calmar_ratio
 from .drawdown import get_drawdown_series, get_max_drawdown, \
@@ -10,7 +12,8 @@ from .drawdown import get_drawdown_series, get_max_drawdown, \
     get_max_drawdown_duration
 from .equity_curve import get_equity_curve
 from .exposure import get_exposure_ratio, get_cumulative_exposure, \
-    get_trades_per_year, get_trades_per_day
+    get_trades_per_year, get_trades_per_day, get_trades_per_week, \
+    get_trades_per_month
 from .profit_factor import get_profit_factor, get_gross_loss, get_gross_profit
 from .returns import get_monthly_returns, get_yearly_returns, \
     get_worst_year, get_best_year, get_best_month, get_worst_month, \
@@ -31,7 +34,8 @@ from .trades import get_average_trade_duration, get_average_trade_size, \
     get_worst_trade, get_best_trade, get_average_trade_gain, \
     get_average_trade_loss, get_median_trade_return, \
     get_current_average_trade_gain, get_current_average_trade_return, \
-    get_current_average_trade_duration, get_current_average_trade_loss
+    get_current_average_trade_duration, get_current_average_trade_loss, \
+    get_average_win_duration, get_average_loss_duration
 
 logger = getLogger("investing_algorithm_framework")
 
@@ -75,6 +79,52 @@ def create_backtest_metrics_for_backtest(
 
     backtest.backtest_runs = backtest_runs
     return backtest
+
+
+def recalculate_backtests(
+    backtests: List[Backtest],
+    risk_free_rate: float = None,
+    metrics: List[str] = None,
+) -> List[Backtest]:
+    """
+    Recalculate all metrics for a set of backtests. For each backtest,
+    this recomputes per-run metrics from the raw portfolio snapshots and
+    trades, then regenerates the summary metrics from the updated
+    per-run metrics.
+
+    Args:
+        backtests (List[Backtest]): The backtests to recalculate.
+        risk_free_rate (float, optional): The risk-free rate to use.
+            If None, uses each backtest's own risk_free_rate (falling
+            back to 0.0 if not set).
+        metrics (List[str], optional): List of metric names to compute.
+            If None, a default set of metrics will be computed.
+
+    Returns:
+        List[Backtest]: The same backtest objects with all per-run
+            metrics and summary metrics recalculated.
+    """
+    for backtest in backtests:
+        rfr = risk_free_rate if risk_free_rate is not None \
+            else (backtest.risk_free_rate or 0.0)
+
+        # Recalculate per-run metrics
+        for run in backtest.get_all_backtest_runs():
+            run.backtest_metrics = create_backtest_metrics(
+                run, rfr, metrics
+            )
+
+        # Regenerate summary from updated run metrics
+        all_metrics = [
+            run.backtest_metrics
+            for run in backtest.get_all_backtest_runs()
+            if run.backtest_metrics is not None
+        ]
+        backtest.backtest_summary = generate_backtest_summary_metrics(
+            all_metrics
+        )
+
+    return backtests
 
 
 def create_backtest_metrics(
@@ -315,6 +365,8 @@ def create_backtest_metrics(
     safe_set("number_of_trades_closed", get_number_of_closed_trades, backtest_run.trades)
     safe_set("number_of_trades_opened", get_number_of_open_trades, backtest_run.trades)
     safe_set("average_trade_duration", get_average_trade_duration, backtest_run.trades)
+    safe_set("average_win_duration", get_average_win_duration, backtest_run.trades)
+    safe_set("average_loss_duration", get_average_loss_duration, backtest_run.trades)
     safe_set("average_trade_size", get_average_trade_size, backtest_run.trades)
     safe_set("equity_curve", get_equity_curve, backtest_run.portfolio_snapshots)
     safe_set("final_value", get_final_value, backtest_run.portfolio_snapshots)
@@ -333,6 +385,8 @@ def create_backtest_metrics(
     safe_set("max_daily_drawdown", get_max_daily_drawdown, backtest_run.portfolio_snapshots)
     safe_set("max_drawdown_duration", get_max_drawdown_duration, backtest_run.portfolio_snapshots)
     safe_set("trades_per_year", get_trades_per_year, backtest_run.trades, backtest_run.backtest_start_date, backtest_run.backtest_end_date)
+    safe_set("trades_per_week", get_trades_per_week, backtest_run.trades, backtest_run.backtest_start_date, backtest_run.backtest_end_date)
+    safe_set("trades_per_month", get_trades_per_month, backtest_run.trades, backtest_run.backtest_start_date, backtest_run.backtest_end_date)
     safe_set("trades_per_day", get_trades_per_day, backtest_run.trades, backtest_run.backtest_start_date, backtest_run.backtest_end_date)
     safe_set("exposure_ratio", get_exposure_ratio, backtest_run.trades, backtest_run.backtest_start_date, backtest_run.backtest_end_date)
     safe_set("cumulative_exposure", get_cumulative_exposure, backtest_run.trades, backtest_run.backtest_start_date, backtest_run.backtest_end_date)

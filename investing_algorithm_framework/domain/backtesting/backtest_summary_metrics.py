@@ -87,6 +87,8 @@ class BacktestSummaryMetrics:
     max_drawdown: float = None
     max_drawdown_duration: int = None
     trades_per_year: float = None
+    trades_per_month: float = None
+    trades_per_week: float = None
     win_rate: float = None
     current_win_rate: float = None
     win_loss_ratio: float = None
@@ -134,6 +136,8 @@ class BacktestSummaryMetrics:
             "max_drawdown": self.max_drawdown,
             "max_drawdown_duration": self.max_drawdown_duration,
             "trades_per_year": self.trades_per_year,
+            "trades_per_month": self.trades_per_month,
+            "trades_per_week": self.trades_per_week,
             "win_rate": self.win_rate,
             "current_win_rate": self.current_win_rate,
             "win_loss_ratio": self.win_loss_ratio,

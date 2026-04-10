@@ -58,10 +58,13 @@
             onchange="onOverviewWindowChange(this.value)">
       <option value="summary">All Windows</option>
     </select>
+    <button class="view-select" onclick="openStrategyModal()" id="strat-select-btn" style="cursor:pointer">
+      Strategies <span id="strat-select-count" style="font-weight:700;color:var(--accent)"></span>
+    </button>
     {% endif %}
   </h2>
 
-  <div class="kpi-row">
+  <div class="kpi-row" id="overview-kpi-row">
     <div class="kpi-card">
       <div class="kpi-label">Strategies</div>
       <div class="kpi-value">{{ strategies | length }}</div>
@@ -70,85 +73,52 @@
       <div class="kpi-label">Backtest Windows</div>
       <div class="kpi-value">{{ windows_meta | length }}</div>
     </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Best CAGR</div>
-      <div class="kpi-value" style="color:var(--green)">{{ best_cagr.v | pct }}</div>
-      <div class="kpi-sub">{{ best_cagr.n }}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Best Sharpe</div>
-      <div class="kpi-value" style="color:var(--accent)">{{ best_sharpe.v | ratio }}</div>
-      <div class="kpi-sub">{{ best_sharpe.n }}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Best Sortino</div>
-      <div class="kpi-value" style="color:var(--accent)">{{ best_sortino.v | ratio }}</div>
-      <div class="kpi-sub">{{ best_sortino.n }}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Best Calmar</div>
-      <div class="kpi-value" style="color:var(--accent)">{{ best_calmar.v | ratio }}</div>
-      <div class="kpi-sub">{{ best_calmar.n }}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Best Win Rate</div>
-      <div class="kpi-value" style="color:var(--green)">{{ best_win_rate.v | abs_pct }}</div>
-      <div class="kpi-sub">{{ best_win_rate.n }}</div>
-    </div>
-    <div class="kpi-card">
-      <div class="kpi-label">Lowest Max DD</div>
-      <div class="kpi-value" style="color:var(--amber)">{{ lowest_dd.v | abs_pct }}</div>
-      <div class="kpi-sub">{{ lowest_dd.n }}</div>
-    </div>
   </div>
 
-  {# Strategy ranking table #}
+  {# Benchmark Insights (right under KPIs) #}
+  {% if benchmarks and not is_single %}
+  <div class="chart-card" id="bench-insights-card">
+    <div class="chart-title">Benchmark Insights <span id="benchmark-chips"></span></div>
+    <div id="bench-insights"></div>
+  </div>
+  {% endif %}
+
+  {# Window Coverage (collapsed by default) #}
+  {% if not is_single %}
+  <div id="overview-window-coverage"></div>
+  {% endif %}
+
+  {# Key Metrics ranking table #}
   <div class="chart-card">
-    <div class="chart-title" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-      Strategy Ranking
-      <select id="ranking-limit" class="view-select" onchange="onRankingLimitChange(this.value)">
-        <option value="5">Top 5</option>
-        <option value="10">Top 10</option>
-        <option value="20">Top 20</option>
-        <option value="50">Top 50</option>
-        <option value="0" selected>All</option>
-      </select>
+    <div class="chart-title">
+      Key Metrics
       <span id="ranking-count" style="font-size:12px;color:var(--dim);font-weight:normal"></span>
     </div>
     <div class="table-wrap">
       <table class="comp-table" id="comp-table">
         <thead>
           <tr>
-            {% if not is_single %}
-            <th class="check-col">
-              <input type="checkbox" class="strat-checkbox"
-                     id="select-all-strats" onclick="toggleAllStrats(this)">
-            </th>
-            {% endif %}
             <th class="sticky-col">Strategy</th>
-            <th data-col="_n_windows">Windows <span class="sort-arrow">&#9650;</span></th>
             <th data-col="cagr">CAGR <span class="sort-arrow">&#9650;</span></th>
             <th data-col="sharpe_ratio">Sharpe <span class="sort-arrow">&#9650;</span></th>
             <th data-col="sortino_ratio">Sortino <span class="sort-arrow">&#9650;</span></th>
             <th data-col="calmar_ratio">Calmar <span class="sort-arrow">&#9650;</span></th>
             <th data-col="max_drawdown">Max DD <span class="sort-arrow">&#9650;</span></th>
-            <th data-col="profit_factor">Profit Factor <span class="sort-arrow">&#9650;</span></th>
-            <th data-col="win_rate">Win Rate <span class="sort-arrow">&#9650;</span></th>
-            <th data-col="trades_per_year">Trades/yr <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="annual_volatility">Volatility <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="recovery_factor">Recovery <span class="sort-arrow">&#9650;</span></th>
             <th data-col="total_net_gain_percentage">Net Gain % <span class="sort-arrow">&#9650;</span></th>
           </tr>
         </thead>
         <tbody></tbody>
       </table>
     </div>
-    <div id="ranking-pagination" style="display:none;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid var(--border);font-size:12px;color:var(--dim)">
-      <span id="ranking-page-info"></span>
-      <div style="display:flex;gap:6px">
-        <button class="view-select" id="ranking-prev" onclick="rankingPagePrev()" style="cursor:pointer;padding:4px 10px">&laquo; Prev</button>
-        <button class="view-select" id="ranking-next" onclick="rankingPageNext()" style="cursor:pointer;padding:4px 10px">Next &raquo;</button>
-      </div>
-    </div>
   </div>
+
+  {# Trading Activity Ranking (overview) #}
+  <div id="overview-trading-activity"></div>
+
+  {# Return Scenarios (overview) #}
+  <div id="overview-return-scenarios"></div>
 
   {# Equity canvas #}
   <div class="chart-card" id="overview-eq-card">
@@ -157,11 +127,48 @@
       <canvas id="c-overview-eq"></canvas>
       <div class="tooltip" id="tt-overview-eq"></div>
     </div>
+    <div id="equity-legend" class="eq-legend"></div>
   </div>
 
-  {# 2×2 metric comparison grid (multi-strategy only) #}
+  {# Drawdown over time (multi-strategy only) #}
+  {% if not is_single %}
+  <div class="chart-card">
+    <div class="chart-title">Drawdown Over Time</div>
+    <div class="chart-wrap" id="overview-dd-wrap">
+      <canvas id="c-overview-dd"></canvas>
+      <div class="tooltip" id="tt-overview-dd"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Return Distribution + Correlation Matrix side-by-side #}
   {% if not is_single %}
   <div class="grid-2x2">
+    <div class="chart-card">
+      <div class="chart-title">Return Distribution (per Window)</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-return-dist"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Correlation Matrix</div>
+      <div id="corr-matrix" class="corr-container"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Rolling Sharpe (multi-strategy only) #}
+  {% if not is_single %}
+  <div class="chart-card">
+    <div class="chart-title">Rolling Sharpe Ratio</div>
+    <div class="chart-wrap" id="overview-rsharpe-wrap">
+      <canvas id="c-overview-rsharpe"></canvas>
+      <div class="tooltip" id="tt-overview-rsharpe"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# 2×3 metric comparison grid (multi-strategy only) #}
+  {% if not is_single %}
+  <div class="grid-2x3">
     <div class="chart-card">
       <div class="chart-title">CAGR</div>
       <div class="chart-wrap chart-sm"><canvas id="c-cmp-cagr"></canvas></div>
@@ -171,12 +178,24 @@
       <div class="chart-wrap chart-sm"><canvas id="c-cmp-sharpe"></canvas></div>
     </div>
     <div class="chart-card">
+      <div class="chart-title">Sortino Ratio</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-sortino"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Calmar Ratio</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-calmar"></canvas></div>
+    </div>
+    <div class="chart-card">
       <div class="chart-title">Max Drawdown</div>
       <div class="chart-wrap chart-sm"><canvas id="c-cmp-dd"></canvas></div>
     </div>
     <div class="chart-card">
       <div class="chart-title">Win Rate</div>
       <div class="chart-wrap chart-sm"><canvas id="c-cmp-wr"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Profit Factor</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-pf"></canvas></div>
     </div>
   </div>
   {% endif %}
@@ -219,6 +238,9 @@
       </table>
     </div>
   </div>
+
+  {# Window Coverage (on windows page, expanded by default) #}
+  <div id="windows-page-coverage"></div>
 </div>
 
 {# ━━ Per-strategy pages ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #}
@@ -292,6 +314,7 @@
         <div class="kpi-card"><div class="kpi-label">Runs</div>
           <div class="kpi-value">{{ rl | length }}</div></div>
       </div>
+      <div id="{{ s.id }}-trading-activity"></div>
       <div class="chart-card">
         <div class="chart-title">End-of-Backtest (Last Run)</div>
         <div id="{{ s.id }}-eob-kpis"></div>
@@ -344,16 +367,46 @@
 {# ━━ Compare page (multi-strategy only) ━━━━━━━━━━━━━━━━━━━━━━━ #}
 {% if not is_single %}
 <div class="page" id="page-compare" style="display:none">
-  <h2 class="page-title">Strategy Comparison</h2>
-  <div id="compare-kpis"></div>
+  <h2 class="page-title">Strategy Comparison
+    <select id="compare-window-select" class="view-select"
+            onchange="onCompareWindowChange(this.value)">
+      <option value="summary">All Windows</option>
+    </select>
+  </h2>
+
+  {# Key Metrics ranking (same style as overview) #}
+  <div id="compare-key-metrics"></div>
+
+  {# Trading Activity ranking (same style as overview) #}
+  <div id="compare-trading-activity"></div>
+
+  {# Return Scenarios #}
+  <div id="compare-return-scenarios"></div>
+
+  {# Return/Growth Distribution #}
+  <div id="compare-return-distribution"></div>
+
+  {# Equity + legend #}
   <div class="chart-card">
     <div class="chart-title">Equity Curves</div>
     <div class="chart-wrap">
       <canvas id="c-compare-eq"></canvas>
       <div class="tooltip" id="tt-compare-eq"></div>
     </div>
+    <div id="compare-eq-legend" class="eq-legend"></div>
   </div>
-  <div class="compare-grid">
+
+  {# Drawdown overlay #}
+  <div class="chart-card">
+    <div class="chart-title">Drawdown Over Time</div>
+    <div class="chart-wrap" id="compare-dd-wrap">
+      <canvas id="c-compare-dd-time"></canvas>
+      <div class="tooltip" id="tt-compare-dd-time"></div>
+    </div>
+  </div>
+
+  {# 2×3 metric bar grid #}
+  <div class="grid-2x3">
     <div class="chart-card">
       <div class="chart-title">CAGR</div>
       <div class="chart-wrap chart-sm"><canvas id="c-compare-cagr"></canvas></div>
@@ -363,6 +416,14 @@
       <div class="chart-wrap chart-sm"><canvas id="c-compare-sharpe"></canvas></div>
     </div>
     <div class="chart-card">
+      <div class="chart-title">Sortino Ratio</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-sortino"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Calmar Ratio</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-calmar"></canvas></div>
+    </div>
+    <div class="chart-card">
       <div class="chart-title">Max Drawdown</div>
       <div class="chart-wrap chart-sm"><canvas id="c-compare-dd"></canvas></div>
     </div>
@@ -370,9 +431,34 @@
       <div class="chart-title">Win Rate</div>
       <div class="chart-wrap chart-sm"><canvas id="c-compare-wr"></canvas></div>
     </div>
+    <div class="chart-card">
+      <div class="chart-title">Profit Factor</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-pf"></canvas></div>
+    </div>
   </div>
+
+  {# Return distribution + Correlation matrix #}
+  <div class="grid-2x2">
+    <div class="chart-card">
+      <div class="chart-title">Return Distribution (per Window)</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-dist"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Correlation Matrix</div>
+      <div id="compare-corr-matrix" class="corr-container"></div>
+    </div>
+  </div>
+
+  {# Rolling Sharpe #}
+  <div class="chart-card">
+    <div class="chart-title">Rolling Sharpe Ratio</div>
+    <div class="chart-wrap" id="compare-rsharpe-wrap">
+      <canvas id="c-compare-rsharpe"></canvas>
+      <div class="tooltip" id="tt-compare-rsharpe"></div>
+    </div>
+  </div>
+
   <div id="compare-table-container"></div>
-  <div id="compare-monthly"></div>
   <div id="compare-yearly"></div>
 </div>
 {% endif %}
@@ -439,11 +525,45 @@ const WINDOWS_META = {{ windows_meta | tojson }};
 const STRATEGIES = {{ strategies | tojson }};
 const RUN_DATA = {{ run_data | tojson }};
 const RUN_LABELS = {{ run_labels | tojson }};
+const BENCHMARKS = {{ benchmarks | tojson }};
 // ===== STATIC JS =====
 {{ js }}
 </script>
 
 <button class="compare-btn" id="compare-btn"
         onclick="openCompare()">&#9881; Compare Selected</button>
+
+{# Strategy selection modal #}
+{% if not is_single %}
+<div class="modal-overlay" id="strat-modal-overlay" onclick="closeStrategyModal()">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <span class="modal-title">Select Strategies</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:0.72rem;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:4px">
+          <input type="checkbox" id="modal-select-all" onclick="modalToggleAll(this)"> All
+        </label>
+        <button class="modal-close" onclick="closeStrategyModal()">&times;</button>
+      </div>
+    </div>
+    <div class="modal-body" id="strat-modal-body"></div>
+    <div class="modal-footer">
+      <span id="modal-selected-count" style="font-size:0.72rem;color:var(--text-secondary)"></span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <select id="modal-page-size" class="view-select" onchange="modalPageSizeChange(this.value)" style="font-size:0.7rem;padding:3px 6px">
+          <option value="10">10 rows</option>
+          <option value="25" selected>25 rows</option>
+          <option value="50">50 rows</option>
+          <option value="0">All</option>
+        </select>
+        <button class="view-select" id="modal-prev" onclick="modalPagePrev()" style="cursor:pointer;padding:3px 8px;font-size:0.7rem">&laquo;</button>
+        <span id="modal-page-info" style="font-size:0.68rem;color:var(--text-secondary);white-space:nowrap"></span>
+        <button class="view-select" id="modal-next" onclick="modalPageNext()" style="cursor:pointer;padding:3px 8px;font-size:0.7rem">&raquo;</button>
+        <button class="view-select" onclick="closeStrategyModal()" style="cursor:pointer;padding:6px 16px">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
 </body>
 </html>

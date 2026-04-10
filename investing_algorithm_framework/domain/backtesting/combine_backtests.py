@@ -266,6 +266,12 @@ def generate_backtest_summary_metrics(
         [b.trades_per_year for b in valid_metrics],
         [b.total_number_of_days for b in valid_metrics]
     )
+    trades_per_month = (
+        trades_per_year / 12 if trades_per_year is not None else None
+    )
+    trades_per_week = (
+        trades_per_year / 52 if trades_per_year is not None else None
+    )
 
     # === WIN RATE (weighted by number of closed trades, not time) ===
     win_rate = safe_weighted_mean(
@@ -388,6 +394,8 @@ def generate_backtest_summary_metrics(
         max_drawdown=max_drawdown,
         max_drawdown_duration=max_drawdown_duration,
         trades_per_year=trades_per_year,
+        trades_per_month=trades_per_month,
+        trades_per_week=trades_per_week,
         win_rate=win_rate,
         current_win_rate=current_win_rate,
         win_loss_ratio=win_loss_ratio,

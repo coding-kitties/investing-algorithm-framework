@@ -45,10 +45,11 @@ report.show()
 ```
 
 This generates a multi-strategy comparison dashboard with:
-- Strategy ranking table (sortable by CAGR, Sharpe, Max DD, etc.)
+- Strategy ranking tables (Key Metrics, Trading Activity)
+- Return Scenarios projections (Good/Average/Bad/Very Bad Year)
 - Normalized equity curves overlay
 - Per-strategy detail pages with Summary, Runs, and Performance tabs
-- Compare mode for selected strategies
+- Compare mode with monthly return distribution (Rows/Heatmap × Returns/Growth toggles)
 
 ### From Saved Backtests on Disk
 
@@ -59,7 +60,7 @@ report = BacktestReport.open(directory_path="./my_backtests")
 report.show()
 ```
 
-The `open()` method recursively finds all valid backtest directories (containing `results.json` and `metrics.json`) and loads them into a single report.
+The `open()` method recursively finds all valid backtest directories (containing `algorithm_id.json` and a `runs/` folder) and loads them into a single report.
 
 You can also combine disk and in-memory backtests:
 
@@ -70,6 +71,49 @@ report = BacktestReport.open(
 )
 report.show()
 ```
+
+## Recalculating Metrics
+
+When metric calculations are updated in a newer framework version, previously saved backtests may have stale metrics. Use `recalculate_backtests` to recompute all per-run and summary metrics from the raw portfolio snapshots and trades:
+
+```python
+from investing_algorithm_framework import BacktestReport, recalculate_backtests
+
+report = BacktestReport.open(directory_path="./my_backtests")
+
+# Recalculate all metrics for all backtests
+recalculate_backtests(report.backtests)
+
+report.show()
+```
+
+You can specify a custom risk-free rate (otherwise each backtest's stored rate is used):
+
+```python
+recalculate_backtests(report.backtests, risk_free_rate=0.04)
+```
+
+Or limit which metrics are recomputed:
+
+```python
+recalculate_backtests(
+    report.backtests,
+    metrics=["cagr", "sharpe_ratio", "max_drawdown", "win_rate"]
+)
+```
+
+`recalculate_backtests` works on any list of `Backtest` objects, not just those loaded from disk:
+
+```python
+from investing_algorithm_framework import recalculate_backtests
+
+backtests = [backtest_a, backtest_b, backtest_c]
+recalculate_backtests(backtests, risk_free_rate=0.027)
+```
+
+For each backtest, the function:
+1. Recomputes per-run `BacktestMetrics` from raw `portfolio_snapshots` and `trades`
+2. Regenerates `BacktestSummaryMetrics` by aggregating the updated per-run metrics
 
 ## Saving Reports
 
@@ -96,27 +140,38 @@ report.show(browser=True)  # Also opens in the browser
 ## Dashboard Features
 
 ### Overview Page
-- **KPI cards**: Strategies count, backtest windows, best CAGR, best Sharpe, lowest max drawdown
-- **Backtest windows table**: Date ranges, duration, number of strategies per window
-- **Strategy ranking table**: Sortable by any metric, with best-in-class highlighting
-- **Equity curves**: Normalized percentage growth overlay for all strategies
+- **KPI cards**: Best CAGR, best Sharpe, lowest max drawdown (with dual values when a window is selected)
+- **Window Coverage**: Strategy × window matrix showing data coverage
+- **Key Metrics table**: Sortable ranking with CAGR, Sharpe, Sortino, Calmar, Max DD, Volatility, Recovery Factor, Net Gain %
+- **Trading Activity table**: Profit Factor, Win Rate, Trades/yr, Trades/mo, Trades/wk, # Trades, Avg Return, Avg Duration
+- **Return Scenarios**: Good/Average/Bad/Very Bad Year projections based on CAGR ± volatility
+- **Equity curves**: Normalized percentage growth overlay
+- **Collapsible cards**: All chart sections can be collapsed/expanded
 
 ### Strategy Pages
 Each strategy gets a dedicated page with three tabs:
 
 | Tab | Contents |
 |-----|----------|
-| **Summary** | Full KPI grid (CAGR, Sharpe, Sortino, Calmar, Max DD, Profit Factor, Win Rate, Volatility, etc.) |
+| **Summary** | Full KPI grid (CAGR, Sharpe, Sortino, Calmar, Max DD, Profit Factor, Win Rate, Volatility, Recovery Factor, etc.) |
 | **Runs** | Backtest run comparison table, equity overlay across runs |
-| **Performance** | Monthly returns heatmap, yearly returns bar chart |
+| **Performance** | Monthly returns heatmap, yearly returns bar chart, return distribution |
 
 Use the run selector pills to switch between summary view and individual backtest runs.
 
 ### Compare Mode (Multi-Strategy)
-Select strategies via checkboxes in the ranking table, then click **Compare Selected** to see:
-- Side-by-side equity curves
-- Metric bar charts (CAGR, Sharpe, Max DD, Win Rate)
-- Monthly and yearly return comparisons
+Open the strategy selection modal to pick strategies for comparison. You can set a challenger strategy for highlighting. The compare page includes:
+- **Key Metrics** and **Trading Activity** ranking tables
+- **Return Scenarios** projections
+- **Monthly Returns** with four view modes (Returns/Growth × Rows/Heatmap), plus a year filter
+- Side-by-side equity curves and drawdown overlays
+- Metric bar charts (CAGR, Sharpe, Sortino, Calmar, Max DD, Win Rate, Profit Factor)
+- Return distribution histograms and correlation matrix
+- Rolling Sharpe ratio chart
+- Yearly returns bar charts
+
+### Sticky Navigation
+The page title bar with the window selector stays visible as you scroll.
 
 ### Dark / Light Theme
 Toggle between dark and light mode using the sun icon in the top-right corner.
@@ -126,7 +181,7 @@ Toggle between dark and light mode using the sun icon in the top-right corner.
 ```python
 from datetime import datetime, timezone
 from investing_algorithm_framework import (
-    create_app, BacktestDateRange, BacktestReport
+    create_app, BacktestDateRange, BacktestReport, recalculate_backtests
 )
 
 app = create_app()
@@ -153,6 +208,9 @@ backtests = app.run_vector_backtests(
     backtest_storage_directory="./backtests"
 )
 
+# Optional: recalculate metrics with updated calculations
+recalculate_backtests(backtests, risk_free_rate=0.04)
+
 # Generate and save the comparison report
 report = BacktestReport(backtests=backtests)
 report.save("comparison_report.html")
@@ -170,3 +228,15 @@ report.show(browser=True)
 | `BacktestReport.open(directory_path=..., backtests=[...])` | Load backtests from disk and/or combine with in-memory backtests |
 | `report.show(browser=False)` | Display the report. In Jupyter: renders inline. Otherwise: opens browser. Set `browser=True` to force browser. |
 | `report.save(path)` | Save the report as a self-contained HTML file |
+
+### `recalculate_backtests`
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `backtests` | `List[Backtest]` | The backtests to recalculate (mutated in place and returned) |
+| `risk_free_rate` | `float`, optional | Override risk-free rate. If `None`, uses each backtest's stored rate (falls back to `0.0`) |
+| `metrics` | `List[str]`, optional | Specific metrics to compute. If `None`, computes all default metrics |
+
+**Returns:** `List[Backtest]` — the same backtest objects with updated metrics.
+
+Recalculates all per-run `BacktestMetrics` from raw portfolio snapshots and trades, then regenerates `BacktestSummaryMetrics` for each backtest.
