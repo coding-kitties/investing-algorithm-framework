@@ -56,7 +56,7 @@ from .services import get_annual_volatility, get_sortino_ratio, \
     get_current_average_trade_loss, get_negative_trades, \
     get_positive_trades, get_number_of_trades, get_current_win_rate, \
     get_current_win_loss_ratio, create_backtest_metrics_for_backtest, \
-    TradeTakeProfitService, TradeStopLossService
+    recalculate_backtests, TradeTakeProfitService, TradeStopLossService
 
 
 __all__ = [
@@ -201,6 +201,7 @@ __all__ = [
     "save_backtests_to_directory",
     "DataError",
     "create_backtest_metrics_for_backtest",
+    "recalculate_backtests",
     "TakeProfitRule",
     "StopLossRule",
     "TradeStopLossService",

@@ -87,6 +87,8 @@ class BacktestSummaryMetrics:
     max_drawdown: float = None
     max_drawdown_duration: int = None
     trades_per_year: float = None
+    trades_per_month: float = None
+    trades_per_week: float = None
     win_rate: float = None
     current_win_rate: float = None
     win_loss_ratio: float = None
@@ -98,6 +100,13 @@ class BacktestSummaryMetrics:
     number_of_windows: int = None
     number_of_profitable_windows: int = None
     number_of_windows_with_trades: int = None
+    var_95: float = None
+    cvar_95: float = None
+    average_trade_duration: float = None
+    average_win_duration: float = None
+    average_loss_duration: float = None
+    max_consecutive_wins: int = None
+    max_consecutive_losses: int = None
 
     def to_dict(self) -> dict:
         """
@@ -134,6 +143,8 @@ class BacktestSummaryMetrics:
             "max_drawdown": self.max_drawdown,
             "max_drawdown_duration": self.max_drawdown_duration,
             "trades_per_year": self.trades_per_year,
+            "trades_per_month": self.trades_per_month,
+            "trades_per_week": self.trades_per_week,
             "win_rate": self.win_rate,
             "current_win_rate": self.current_win_rate,
             "win_loss_ratio": self.win_loss_ratio,
@@ -146,6 +157,13 @@ class BacktestSummaryMetrics:
             "number_of_profitable_windows": self.number_of_profitable_windows,
             "number_of_windows_with_trades":
                 self.number_of_windows_with_trades,
+            "average_trade_duration": self.average_trade_duration,
+            "average_win_duration": self.average_win_duration,
+            "average_loss_duration": self.average_loss_duration,
+            "var_95": self.var_95,
+            "cvar_95": self.cvar_95,
+            "max_consecutive_wins": self.max_consecutive_wins,
+            "max_consecutive_losses": self.max_consecutive_losses,
         }
 
     def save(self, file_path: str | Path) -> None:

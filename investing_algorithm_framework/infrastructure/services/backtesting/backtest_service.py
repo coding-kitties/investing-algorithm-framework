@@ -543,7 +543,9 @@ class BacktestService:
             backtest_runs=[run],
             backtest_summary=generate_backtest_summary_metrics(
                 [backtest_metrics]
-            )
+            ),
+            parameters=algorithm.get_parameters()
+            if hasattr(algorithm, 'get_parameters') else {}
         )
 
     def backtest_exists(
@@ -1754,7 +1756,9 @@ class BacktestService:
                     ),
                     metadata=strategy.metadata if hasattr(
                         strategy, 'metadata') else None,
-                    risk_free_rate=risk_free_rate
+                    risk_free_rate=risk_free_rate,
+                    parameters=strategy.get_parameters()
+                    if hasattr(strategy, 'get_parameters') else {}
                 )
                 batch_results.append(backtest)
 

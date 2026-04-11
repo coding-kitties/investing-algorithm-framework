@@ -27,6 +27,7 @@ class MockTrade:
 
     def __init__(self, net_gain: float, closed_at: datetime = None):
         self.net_gain = net_gain
+        self.net_gain_absolute = net_gain
         self.closed_at = closed_at or datetime.now(timezone.utc)
 
 
@@ -630,4 +631,3 @@ class TestGrossProfitLossConsistency(TestCase):
         # Sum of absolute non-zero gains
         expected_total = 100 + 50 + 200 + 75
         self.assertEqual(gross_profit + gross_loss, expected_total)
-

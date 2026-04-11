@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }}</title>
+<style>
+{{ css }}
+</style>
+</head>
+<body>
+
+{# ── Top controls ─────────────────────────────────────────────── #}
+<div class="top-controls">
+  <button class="finterion-tab" onclick="showPage('finterion')">
+    <img class="logo-dark" src="data:image/png;base64,{{ logo_dark_b64 }}" alt="Finterion" height="22">
+    <img class="logo-light" src="data:image/png;base64,{{ logo_light_b64 }}" alt="Finterion" height="22">
+  </button>
+  <button class="save-btn" onclick="saveReport()" title="Save report as HTML">&#128190; Save</button>
+  <button class="theme-toggle" onclick="toggleTheme()">&#9788;</button>
+</div>
+
+{# ── Sidebar ──────────────────────────────────────────────────── #}
+<nav class="sidebar">
+  <div class="sidebar-title">{{ title }}</div>
+  <div class="sb-item active" data-page="overview"
+       onclick="showPage('overview')">
+    <span class="sb-dot overview-dot"></span>Overview
+  </div>
+  <div class="sb-item" data-page="windows"
+       onclick="showPage('windows')">
+    <span class="sb-dot" style="background:var(--accent)"></span>Windows
+  </div>
+  {% if not is_single %}
+  <div class="sb-item" data-page="compare"
+       onclick="showPage('compare')" id="sb-compare" style="display:none">
+    <span class="sb-dot" style="background:var(--amber)"></span>Compare
+  </div>
+  {% endif %}
+  <div class="sb-divider"></div>
+  <div class="sb-label">Strategies</div>
+  {% for s in strategies %}
+  <div class="sb-item" data-page="{{ s.id }}"
+       onclick="showPage('{{ s.id }}')">
+    <span class="sb-dot" style="background:{{ s.color }}"></span>{{ s.name }}
+  </div>
+  {% endfor %}
+</nav>
+
+{# ── Main Content ─────────────────────────────────────────────── #}
+<div class="main">
+
+{# ━━ Overview page ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #}
+<div class="page active" id="page-overview">
+  <h2 class="page-title">
+    Overview
+    {% if not is_single %}
+    <select id="overview-window-select" class="view-select"
+            onchange="onOverviewWindowChange(this.value)">
+      <option value="summary">All Windows</option>
+    </select>
+    <button class="view-select" onclick="openStrategyModal()" id="strat-select-btn" style="cursor:pointer">
+      Strategies <span id="strat-select-count" style="font-weight:700;color:var(--accent)"></span>
+    </button>
+    {% endif %}
+  </h2>
+
+  <div class="kpi-row" id="overview-kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">Strategies</div>
+      <div class="kpi-value">{{ strategies | length }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Backtest Windows</div>
+      <div class="kpi-value">{{ windows_meta | length }}</div>
+    </div>
+  </div>
+
+  {# Benchmark Insights (right under KPIs) #}
+  {% if benchmarks and not is_single %}
+  <div class="chart-card" id="bench-insights-card">
+    <div class="chart-title">Benchmark Insights <span id="benchmark-chips"></span></div>
+    <div id="bench-insights"></div>
+  </div>
+  {% endif %}
+
+  {# Window Coverage (collapsed by default) #}
+  {% if not is_single %}
+  <div id="overview-window-coverage"></div>
+  {% endif %}
+
+  {# Key Metrics ranking table #}
+  <div class="chart-card">
+    <div class="chart-title">
+      Key Metrics
+      <span id="ranking-count" style="font-size:12px;color:var(--dim);font-weight:normal"></span>
+    </div>
+    <div class="table-wrap">
+      <table class="comp-table" id="comp-table">
+        <thead>
+          <tr>
+            <th class="sticky-col">Strategy</th>
+            <th data-col="cagr">CAGR <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="sharpe_ratio">Sharpe <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="sortino_ratio">Sortino <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="calmar_ratio">Calmar <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="max_drawdown">Max DD <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="annual_volatility">Volatility <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="recovery_factor">Recovery <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="total_net_gain_percentage">Net Gain % <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="var_95">VaR 95% <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="cvar_95">CVaR 95% <span class="sort-arrow">&#9650;</span></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  {# Trading Activity Ranking (overview) #}
+  <div id="overview-trading-activity"></div>
+
+  {# Return Scenarios (overview) #}
+  <div id="overview-return-scenarios"></div>
+
+  {# Equity canvas #}
+  <div class="chart-card" id="overview-eq-card">
+    <div class="chart-title">Equity Curves (Normalized %)</div>
+    <div class="chart-wrap" id="overview-eq-wrap">
+      <canvas id="c-overview-eq"></canvas>
+      <div class="tooltip" id="tt-overview-eq"></div>
+    </div>
+    <div id="equity-legend" class="eq-legend"></div>
+  </div>
+
+  {# Drawdown over time (multi-strategy only) #}
+  {% if not is_single %}
+  <div class="chart-card">
+    <div class="chart-title">Drawdown Over Time</div>
+    <div class="chart-wrap" id="overview-dd-wrap">
+      <canvas id="c-overview-dd"></canvas>
+      <div class="tooltip" id="tt-overview-dd"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Risk-Return Scatter (multi-strategy only) #}
+  {% if not is_single %}
+  <div class="chart-card">
+    <div class="chart-title">Risk-Return Scatter</div>
+    <div class="chart-wrap">
+      <canvas id="c-overview-scatter"></canvas>
+      <div class="tooltip" id="tt-overview-scatter"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Return Distribution + Correlation Matrix side-by-side #}
+  {% if not is_single %}
+  <div class="grid-2x2">
+    <div class="chart-card">
+      <div class="chart-title">Return Distribution (per Window)</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-return-dist"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Correlation Matrix</div>
+      <div id="corr-matrix" class="corr-container"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Rolling Sharpe (multi-strategy only) #}
+  {% if not is_single %}
+  <div class="chart-card">
+    <div class="chart-title">Rolling Sharpe Ratio</div>
+    <div class="chart-wrap" id="overview-rsharpe-wrap">
+      <canvas id="c-overview-rsharpe"></canvas>
+      <div class="tooltip" id="tt-overview-rsharpe"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Rolling Returns (multi-strategy only) #}
+  {% if not is_single %}
+  <div class="chart-card">
+    <div class="chart-title">Rolling 12-Month Returns
+      <select id="overview-rolling-ret-period" class="view-select" style="font-size:0.7rem;margin-left:8px"
+              onchange="drawRollingReturns('overview')">
+        <option value="12">12-Month</option>
+        <option value="6">6-Month</option>
+        <option value="3">3-Month</option>
+      </select>
+    </div>
+    <div class="chart-wrap" id="overview-rolling-ret-wrap">
+      <canvas id="c-overview-rolling-ret"></canvas>
+      <div class="tooltip" id="tt-overview-rolling-ret"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# 2×3 metric comparison grid (multi-strategy only) #}
+  {% if not is_single %}
+  <div class="grid-2x3">
+    <div class="chart-card">
+      <div class="chart-title">CAGR</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-cagr"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Sharpe Ratio</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-sharpe"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Sortino Ratio</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-sortino"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Calmar Ratio</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-calmar"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Max Drawdown</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-dd"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Win Rate</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-wr"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Profit Factor</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-cmp-pf"></canvas></div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+{# ━━ Windows page ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #}
+<div class="page" id="page-windows" style="display:none">
+  <h2 class="page-title">
+    Backtest Window Analysis
+    {% if not is_single %}
+    <button class="view-select" onclick="openStrategyModal()" style="cursor:pointer">
+      Strategies <span class="strat-select-count-mirror" style="font-weight:700;color:var(--accent)"></span>
+    </button>
+    {% endif %}
+  </h2>
+
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="kpi-label">Total Windows</div>
+      <div class="kpi-value">{{ windows_meta | length }}</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Strategies</div>
+      <div class="kpi-value">{{ strategies | length }}</div>
+    </div>
+  </div>
+
+  <div class="chart-card">
+    <div class="chart-title">All Backtest Windows</div>
+    <div class="table-wrap">
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th>Window</th><th>Start</th><th>End</th>
+            <th>Days</th><th>Strategies</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for w in windows_meta %}
+          <tr>
+            <td>{{ w.label }}</td><td>{{ w.start }}</td>
+            <td>{{ w.end }}</td><td>{{ w.days }}</td>
+            <td>{{ w.n_strategies }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {# Window Coverage (on windows page, expanded by default) #}
+  <div id="windows-page-coverage"></div>
+</div>
+
+{# ━━ Per-strategy pages ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #}
+{% for s in strategies %}
+{% set i = loop.index0 %}
+{% set sm = s.summary or {} %}
+{% set rl = s.runLabels or [] %}
+<div class="page" id="page-{{ s.id }}" style="display:none">
+  <h2 class="page-title">
+    <span class="sb-dot" style="background:{{ s.color }};width:12px;height:12px"></span>
+    {{ s.name }}
+    {% if rl | length > 1 %}
+    <select class="view-select strat-window-select" data-strat="{{ i }}"
+            onchange="onStratWindowChange({{ i }}, this.value)">
+      <option value="summary">&Sigma; All Windows</option>
+      {% for rn, lab in rl %}
+      {% set mapped = s.runNameMap.get(rn, '') %}
+      <option value="{{ mapped }}">{{ lab }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+  </h2>
+
+  {# KPI cards (dynamically rebuilt) #}
+  <div id="{{ s.id }}-summary-content"></div>
+
+  {# Strategy Parameters #}
+  <div id="{{ s.id }}-parameters"></div>
+
+  {# Runs table (collapsed by default) #}
+  {% if rl | length > 1 %}
+  <div class="chart-card collapsed">
+    <div class="chart-title">Backtest Runs</div>
+    <div class="table-wrap">
+      <table class="comp-table" id="strat-runs-table-{{ i }}">
+        <thead>
+          <tr><th>Run</th><th>Return</th><th>Sharpe</th><th>Max DD</th><th>Trades</th></tr>
+        </thead>
+        <tbody>
+          {% for rn, lab in rl %}
+          {% set mapped = s.runNameMap.get(rn, '') %}
+          <tr data-run="{{ mapped }}"><td>{{ lab }}</td><td></td><td></td><td></td><td></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Portfolio Summary (visible when a run is selected) #}
+  <div id="{{ s.id }}-portfolio-summary"></div>
+
+  {# Trading Activity #}
+  <div id="{{ s.id }}-trading-activity"></div>
+
+  {# Equity Overlay (all runs) #}
+  <div class="chart-card">
+    <div class="chart-title" id="eq-title-{{ s.id }}">Equity Curves (All Runs)</div>
+    <div class="chart-wrap">
+      <canvas id="c-{{ s.id }}-eq"></canvas>
+      <div class="tooltip" id="tt-{{ s.id }}-eq"></div>
+    </div>
+  </div>
+
+  {# Rolling Sharpe Ratio #}
+  <div class="chart-card">
+    <div class="chart-title" id="rs-title-{{ s.id }}">Rolling Sharpe Ratio (All Runs)</div>
+    <div class="chart-wrap">
+      <canvas id="c-{{ s.id }}-rsharpe"></canvas>
+      <div class="tooltip" id="tt-{{ s.id }}-rsharpe"></div>
+    </div>
+  </div>
+
+  {# Drawdown #}
+  <div class="chart-card">
+    <div class="chart-title" id="dd-title-{{ s.id }}">Drawdown (All Runs)</div>
+    <div class="chart-wrap">
+      <canvas id="c-{{ s.id }}-dd"></canvas>
+      <div class="tooltip" id="tt-{{ s.id }}-dd"></div>
+    </div>
+  </div>
+
+  {# Monthly Returns (dynamic: heatmap / rows, returns / growth) #}
+  <div id="{{ s.id }}-monthly-returns"></div>
+
+  {# Yearly Returns (dynamic with bar chart) #}
+  <div id="{{ s.id }}-yearly-returns"></div>
+
+  {# Return Scenarios (Annual) #}
+  <div id="{{ s.id }}-return-scenarios"></div>
+
+</div>
+{% endfor %}
+
+{# ━━ Compare page (multi-strategy only) ━━━━━━━━━━━━━━━━━━━━━━━ #}
+{% if not is_single %}
+<div class="page" id="page-compare" style="display:none">
+  <h2 class="page-title">Strategy Comparison
+    <select id="compare-window-select" class="view-select"
+            onchange="onCompareWindowChange(this.value)">
+      <option value="summary">All Windows</option>
+    </select>
+  </h2>
+
+  {# Key Metrics ranking (same style as overview) #}
+  <div id="compare-key-metrics"></div>
+
+  {# Parameters Comparison #}
+  <div id="compare-parameters"></div>
+
+  {# Trading Activity ranking (same style as overview) #}
+  <div id="compare-trading-activity"></div>
+
+  {# Return Scenarios #}
+  <div id="compare-return-scenarios"></div>
+
+  {# Return/Growth Distribution #}
+  <div id="compare-return-distribution"></div>
+
+  {# Equity + legend #}
+  <div class="chart-card">
+    <div class="chart-title">Equity Curves</div>
+    <div class="chart-wrap">
+      <canvas id="c-compare-eq"></canvas>
+      <div class="tooltip" id="tt-compare-eq"></div>
+    </div>
+    <div id="compare-eq-legend" class="eq-legend"></div>
+  </div>
+
+  {# Drawdown overlay #}
+  <div class="chart-card">
+    <div class="chart-title">Drawdown Over Time</div>
+    <div class="chart-wrap" id="compare-dd-wrap">
+      <canvas id="c-compare-dd-time"></canvas>
+      <div class="tooltip" id="tt-compare-dd-time"></div>
+    </div>
+  </div>
+
+  {# 2×3 metric bar grid #}
+  <div class="grid-2x3">
+    <div class="chart-card">
+      <div class="chart-title">CAGR</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-cagr"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Sharpe Ratio</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-sharpe"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Sortino Ratio</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-sortino"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Calmar Ratio</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-calmar"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Max Drawdown</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-dd"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Win Rate</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-wr"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Profit Factor</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-pf"></canvas></div>
+    </div>
+  </div>
+
+  {# Return distribution + Correlation matrix #}
+  <div class="grid-2x2">
+    <div class="chart-card">
+      <div class="chart-title">Return Distribution (per Window)</div>
+      <div class="chart-wrap chart-sm"><canvas id="c-compare-dist"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Correlation Matrix</div>
+      <div id="compare-corr-matrix" class="corr-container"></div>
+    </div>
+  </div>
+
+  {# Rolling Sharpe #}
+  <div class="chart-card">
+    <div class="chart-title">Rolling Sharpe Ratio</div>
+    <div class="chart-wrap" id="compare-rsharpe-wrap">
+      <canvas id="c-compare-rsharpe"></canvas>
+      <div class="tooltip" id="tt-compare-rsharpe"></div>
+    </div>
+  </div>
+
+  {# Risk-Return Scatter #}
+  <div class="chart-card">
+    <div class="chart-title">Risk-Return Scatter</div>
+    <div class="chart-wrap">
+      <canvas id="c-compare-scatter"></canvas>
+      <div class="tooltip" id="tt-compare-scatter"></div>
+    </div>
+  </div>
+
+  {# Rolling Returns #}
+  <div class="chart-card">
+    <div class="chart-title">Rolling 12-Month Returns
+      <select id="compare-rolling-ret-period" class="view-select" style="font-size:0.7rem;margin-left:8px"
+              onchange="drawRollingReturns('compare')">
+        <option value="12">12-Month</option>
+        <option value="6">6-Month</option>
+        <option value="3">3-Month</option>
+      </select>
+    </div>
+    <div class="chart-wrap" id="compare-rolling-ret-wrap">
+      <canvas id="c-compare-rolling-ret"></canvas>
+      <div class="tooltip" id="tt-compare-rolling-ret"></div>
+    </div>
+  </div>
+
+  {# Relative Performance #}
+  <div class="chart-card">
+    <div class="chart-title">Relative Performance (vs First Selected)</div>
+    <div class="chart-wrap">
+      <canvas id="c-compare-relative"></canvas>
+      <div class="tooltip" id="tt-compare-relative"></div>
+    </div>
+  </div>
+
+  <div id="compare-table-container"></div>
+  <div id="compare-yearly"></div>
+</div>
+{% endif %}
+
+{# ━━ Finterion Marketplace page ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #}
+<div class="page" id="page-finterion" style="display:none">
+
+  {# Hero #}
+  <div class="fin-hero">
+    <div class="fin-hero-logo">
+      <img class="hero-logo-dark" src="data:image/png;base64,{{ logo_dark_b64 }}" alt="Finterion" height="38">
+      <img class="hero-logo-light" src="data:image/png;base64,{{ logo_light_b64 }}" alt="Finterion" height="38">
+    </div>
+    <h2 class="fin-hero-title">Finterion Marketplace</h2>
+    <p class="fin-hero-sub">
+      Monetize your trading strategy.
+      Publish your algorithm on Finterion and let investors subscribe to it.
+    </p>
+    <a class="finterion-cta" href="https://finterion.com" target="_blank"
+       rel="noopener noreferrer">Get Started &rarr;</a>
+  </div>
+
+  {# Features #}
+  <div class="fin-features">
+    <div class="fin-feature">
+      <div class="fin-feature-icon">&#128200;</div>
+      <h4>Prove Performance</h4>
+      <p>Use this framework to backtest your strategy across multiple windows and build a verified track record.</p>
+    </div>
+    <div class="fin-feature">
+      <div class="fin-feature-icon">&#127760;</div>
+      <h4>Reach Investors</h4>
+      <p>List your algorithm on the Finterion marketplace where investors browse and subscribe to strategies.</p>
+    </div>
+    <div class="fin-feature">
+      <div class="fin-feature-icon">&#128176;</div>
+      <h4>Monetize</h4>
+      <p>Set your own usage terms. Investors subscribe to your algorithm and you earn on your own conditions.</p>
+    </div>
+  </div>
+
+  {# How it works #}
+  <div class="chart-card" style="margin-top:1.5rem">
+    <div class="chart-title">How to Publish Your Strategy</div>
+    <div class="fin-timeline">
+      <div class="fin-tl-step">
+        <div class="step-num">1</div>
+        <div class="fin-tl-content">
+          <h4>Install the Plugin</h4>
+          <code>pip install finterion-investing-algorithm-framework</code>
+        </div>
+      </div>
+      <div class="fin-tl-step">
+        <div class="step-num">2</div>
+        <div class="fin-tl-content">
+          <h4>Get Your API Key</h4>
+          <p>Sign up at <a href="https://finterion.com" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">finterion.com</a> and grab the API key from your developer dashboard.</p>
+        </div>
+      </div>
+      <div class="fin-tl-step">
+        <div class="step-num">3</div>
+        <div class="fin-tl-content">
+          <h4>Register Components</h4>
+          <p>Add the Finterion order executor, portfolio provider, and ping action to your algorithm.</p>
+        </div>
+      </div>
+      <div class="fin-tl-step">
+        <div class="step-num">4</div>
+        <div class="fin-tl-content">
+          <h4>Deploy &amp; Monetize</h4>
+          <p>Deploy your algorithm, set your usage terms, and start earning when investors subscribe.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# Bottom CTA #}
+  <div class="fin-bottom-cta">
+    <p>Ready to monetize your trading algorithm?</p>
+    <a class="finterion-cta" href="https://finterion.com" target="_blank"
+       rel="noopener noreferrer">Visit Finterion Marketplace &rarr;</a>
+  </div>
+</div>
+
+  {# Footer #}
+  <div class="gen-note">
+    Generated by <a href="#">BacktestDashboard</a>
+    &middot; {{ strat_names }}
+    &middot; Sponsored by
+    <a href="https://finterion.com" target="_blank"
+       rel="noopener noreferrer">Finterion</a>
+  </div>
+</div>{# /main #}
+
+<script>
+// ===== DATA =====
+const IS_SINGLE = {{ is_single | tojson }};
+const WINDOWS_META = {{ windows_meta | tojson }};
+const STRATEGIES = {{ strategies | tojson }};
+const RUN_DATA = {{ run_data | tojson }};
+const RUN_LABELS = {{ run_labels | tojson }};
+const BENCHMARKS = {{ benchmarks | tojson }};
+// ===== STATIC JS =====
+{{ js }}
+</script>
+
+<button class="compare-btn" id="compare-btn"
+        onclick="openCompare()">&#9881; Compare Selected</button>
+
+{# Strategy selection modal #}
+{% if not is_single %}
+<div class="modal-overlay" id="strat-modal-overlay" onclick="closeStrategyModal()">
+  <div class="modal-content" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="modal-title">Select Strategies</span>
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-modal-tab="metrics" onclick="switchModalTab('metrics')">Metrics</button>
+          <button class="modal-tab" data-modal-tab="parameters" onclick="switchModalTab('parameters')">Parameters</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <label style="font-size:0.72rem;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:4px">
+          <input type="checkbox" id="modal-select-all" onclick="modalToggleAll(this)"> All
+        </label>
+        <button class="modal-close" onclick="closeStrategyModal()">&times;</button>
+      </div>
+    </div>
+    <div class="modal-body" id="strat-modal-body"></div>
+    <div class="modal-body" id="strat-modal-params-body" style="display:none"></div>
+    <div class="modal-footer">
+      <span id="modal-selected-count" style="font-size:0.72rem;color:var(--text-secondary)"></span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <select id="modal-page-size" class="view-select" onchange="modalPageSizeChange(this.value)" style="font-size:0.7rem;padding:3px 6px">
+          <option value="10">10 rows</option>
+          <option value="25" selected>25 rows</option>
+          <option value="50">50 rows</option>
+          <option value="0">All</option>
+        </select>
+        <button class="view-select" id="modal-prev" onclick="modalPagePrev()" style="cursor:pointer;padding:3px 8px;font-size:0.7rem">&laquo;</button>
+        <span id="modal-page-info" style="font-size:0.68rem;color:var(--text-secondary);white-space:nowrap"></span>
+        <button class="view-select" id="modal-next" onclick="modalPageNext()" style="cursor:pointer;padding:3px 8px;font-size:0.7rem">&raquo;</button>
+        <button class="view-select" onclick="closeStrategyModal()" style="cursor:pointer;padding:6px 16px">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+</body>
+</html>

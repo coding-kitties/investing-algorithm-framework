@@ -204,6 +204,43 @@ class TradingStrategy:
         self.stop_loss_rules_lookup = {}
         self.take_profit_rules_lookup = {}
         self.position_sizes_lookup = {}
+        self._parameters = {}
+
+    def set_parameters(self, params: dict) -> None:
+        """
+        Store strategy parameters for saving alongside backtest results.
+        Only JSON-serializable values (str, int, float, bool, None, list,
+        dict) are kept; non-serializable values are silently dropped.
+
+        Args:
+            params (dict): A dictionary of parameter names to values.
+        """
+        _JSON_TYPES = (str, int, float, bool, type(None))
+
+        def _is_serializable(v):
+            if isinstance(v, _JSON_TYPES):
+                return True
+            if isinstance(v, (list, tuple)):
+                return all(_is_serializable(x) for x in v)
+            if isinstance(v, dict):
+                return all(
+                    isinstance(k, str) and _is_serializable(val)
+                    for k, val in v.items()
+                )
+            return False
+
+        self._parameters = {
+            k: v for k, v in params.items() if _is_serializable(v)
+        }
+
+    def get_parameters(self) -> dict:
+        """
+        Return the stored strategy parameters.
+
+        Returns:
+            dict: The strategy parameters dictionary.
+        """
+        return dict(self._parameters)
 
     def generate_buy_signals(
         self, data: Dict[str, Any]
