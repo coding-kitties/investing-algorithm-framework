@@ -174,6 +174,8 @@ class BacktestMetrics:
     max_daily_drawdown: float = 0.0
     max_drawdown_duration: int = 0
     trades_per_year: float = 0.0
+    trades_per_week: float = 0.0
+    trades_per_month: float = 0.0
     trade_per_day: float = 0.0
     exposure_ratio: float = 0.0
     cumulative_exposure: float = 0.0
@@ -184,6 +186,8 @@ class BacktestMetrics:
     number_of_negative_trades: int = 0
     percentage_negative_trades: float = 0.0
     average_trade_duration: float = 0.0
+    average_win_duration: float = 0.0
+    average_loss_duration: float = 0.0
     average_trade_size: float = 0.0
     average_trade_loss: float = 0.0
     average_trade_loss_percentage: float = 0.0
@@ -218,6 +222,10 @@ class BacktestMetrics:
     worst_month: Tuple[float, datetime] = None
     worst_year: Tuple[float, date] = None
     total_number_of_days: int = None
+    var_95: float = 0.0
+    cvar_95: float = 0.0
+    max_consecutive_wins: int = 0
+    max_consecutive_losses: int = 0
     metadata: Dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -277,6 +285,8 @@ class BacktestMetrics:
             "max_daily_drawdown": self.max_daily_drawdown,
             "max_drawdown_duration": self.max_drawdown_duration,
             "trades_per_year": self.trades_per_year,
+            "trades_per_week": self.trades_per_week,
+            "trades_per_month": self.trades_per_month,
             "trade_per_day": self.trade_per_day,
             "exposure_ratio": self.exposure_ratio,
             "cumulative_exposure": self.cumulative_exposure,
@@ -301,6 +311,8 @@ class BacktestMetrics:
             "worst_trade": self.worst_trade.to_dict()
                 if self.worst_trade else None,
             "average_trade_duration": self.average_trade_duration,
+            "average_win_duration": self.average_win_duration,
+            "average_loss_duration": self.average_loss_duration,
             "average_trade_size": self.average_trade_size,
             "number_of_trades": self.number_of_trades,
             "number_of_trades_closed": self.number_of_trades_closed,
@@ -319,7 +331,11 @@ class BacktestMetrics:
             "best_month": self.best_month,
             "best_year": self.best_year,
             "worst_month": self.worst_month,
-            "worst_year": self.worst_year
+            "worst_year": self.worst_year,
+            "var_95": self.var_95,
+            "cvar_95": self.cvar_95,
+            "max_consecutive_wins": self.max_consecutive_wins,
+            "max_consecutive_losses": self.max_consecutive_losses,
         }
 
     def save(self, file_path: str | Path) -> None:

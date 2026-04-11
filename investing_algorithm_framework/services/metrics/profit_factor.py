@@ -113,15 +113,8 @@ def get_profit_factor(trades: List[Trade]) -> float:
                Returns float('inf') if there are no losses,
                and 0.0 if there are no profits and losses.
     """
-    gross_profit = 0.0
-    gross_loss = 0.0
-
-    for trade in trades:
-        profit = trade.net_gain
-        if profit > 0:
-            gross_profit += profit
-        elif profit < 0:
-            gross_loss += abs(profit)
+    gross_profit = get_gross_profit(trades)
+    gross_loss = get_gross_loss(trades)
 
     if gross_loss == 0:
         return float('inf') if gross_profit > 0 else 0.0
@@ -132,9 +125,10 @@ def get_profit_factor(trades: List[Trade]) -> float:
 def get_gross_profit(trades: List[Trade]) -> float:
     """
     Function to calculate the total gross profit from a list of trades.
+    Uses net_gain_absolute to include unrealized P&L from open positions.
 
     Args:
-        trades (List[Trade]): List of closed trades from the backtest report.
+        trades (List[Trade]): List of trades from the backtest report.
 
     Returns:
         float: The total gross profit from the trades.
@@ -142,17 +136,19 @@ def get_gross_profit(trades: List[Trade]) -> float:
 
     gross_profit = 0.0
     for trade in trades:
-        if trade.net_gain > 0:
-            gross_profit += trade.net_gain
+        gain = trade.net_gain_absolute
+        if gain > 0:
+            gross_profit += gain
     return gross_profit
 
 
 def get_gross_loss(trades: List[Trade]) -> float:
     """
     Function to calculate the total gross loss from a list of trades.
+    Uses net_gain_absolute to include unrealized P&L from open positions.
 
     Args:
-        trades (List[Trade]): List of closed trades from the backtest report.
+        trades (List[Trade]): List of trades from the backtest report.
 
     Returns:
         float: The total gross loss from the trades.
@@ -160,6 +156,7 @@ def get_gross_loss(trades: List[Trade]) -> float:
 
     gross_loss = 0.0
     for trade in trades:
-        if trade.net_gain < 0:
-            gross_loss += abs(trade.net_gain)
+        gain = trade.net_gain_absolute
+        if gain < 0:
+            gross_loss += abs(gain)
     return gross_loss

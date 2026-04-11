@@ -55,6 +55,7 @@ class Backtest:
     metadata: Dict[str, str] = field(default_factory=dict)
     risk_free_rate: float = None
     strategy_ids: List[int] = field(default_factory=list)
+    parameters: Dict = field(default_factory=dict)
 
     def get_all_backtest_runs(
         self, backtest_date_ranges=None
@@ -187,7 +188,8 @@ class Backtest:
             "metadata": self.metadata,
             "risk_free_rate": self.risk_free_rate,
             "strategy_ids": self.strategy_ids,
-            "algorithm_id": self.algorithm_id
+            "algorithm_id": self.algorithm_id,
+            "parameters": self.parameters
         }
 
     @staticmethod
@@ -219,6 +221,7 @@ class Backtest:
         permutation_metrics = []
         metadata = {}
         risk_free_rate = None
+        parameters = {}
 
         if not os.path.exists(directory_path):
             raise OperationalException(
@@ -334,13 +337,25 @@ class Backtest:
                     logger.error(f"Error decoding risk-free rate JSON: {e}")
                     risk_free_rate = None
 
+        # Load parameters if available
+        params_file = os.path.join(directory_path, "parameters.json")
+
+        if os.path.isfile(params_file):
+            with open(params_file, 'r') as f:
+                try:
+                    parameters = json.load(f)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Error decoding parameters JSON: {e}")
+                    parameters = {}
+
         return Backtest(
             algorithm_id=algorithm_id,
             backtest_runs=backtest_runs,
             backtest_summary=backtest_summary_metrics,
             backtest_permutation_tests=permutation_metrics,
             metadata=metadata,
-            risk_free_rate=risk_free_rate
+            risk_free_rate=risk_free_rate,
+            parameters=parameters
         )
 
     def save(
@@ -409,6 +424,12 @@ class Backtest:
             meta_file = os.path.join(directory_path, "metadata.json")
             with open(meta_file, 'w') as f:
                 json.dump(self.metadata, f, indent=4)
+
+        # Save parameters if available
+        if self.parameters:
+            params_file = os.path.join(directory_path, "parameters.json")
+            with open(params_file, 'w') as f:
+                json.dump(self.parameters, f, indent=4)
 
         # Save risk-free rate if available
         if self.risk_free_rate is not None:
@@ -487,6 +508,9 @@ class Backtest:
 
         # Merge metadata
         merged.metadata = {**self.metadata, **other.metadata}
+
+        # Merge parameters
+        merged.parameters = {**self.parameters, **other.parameters}
 
         if self.risk_free_rate is None:
             merged.risk_free_rate = other.risk_free_rate

@@ -471,3 +471,89 @@ def get_worst_trade(trades: List[Trade]) -> Trade:
         return None
 
     return min(trades, key=lambda t: t.net_gain)
+
+
+def get_average_win_duration(trades: List[Trade]) -> float:
+    """
+    Calculate the average duration of winning (positive net_gain)
+    closed trades in hours.
+    """
+    if not trades:
+        return 0.0
+
+    total, count = 0.0, 0
+    for t in trades:
+        if TradeStatus.CLOSED.equals(t.status) and t.net_gain > 0:
+            total += (t.closed_at - t.opened_at).total_seconds() / 3600
+            count += 1
+    return total / count if count > 0 else 0.0
+
+
+def get_average_loss_duration(trades: List[Trade]) -> float:
+    """
+    Calculate the average duration of losing (negative net_gain)
+    closed trades in hours.
+    """
+    if not trades:
+        return 0.0
+
+    total, count = 0.0, 0
+    for t in trades:
+        if TradeStatus.CLOSED.equals(t.status) and t.net_gain <= 0:
+            total += (t.closed_at - t.opened_at).total_seconds() / 3600
+            count += 1
+    return total / count if count > 0 else 0.0
+
+
+def get_max_consecutive_wins(trades: List[Trade]) -> int:
+    """
+    Calculate the maximum number of consecutive winning trades.
+
+    Args:
+        trades: List of Trade objects.
+
+    Returns:
+        int: The longest winning streak.
+    """
+    if not trades:
+        return 0
+
+    closed = sorted(
+        [t for t in trades if TradeStatus.CLOSED.equals(t.status)],
+        key=lambda t: t.closed_at
+    )
+    max_streak, streak = 0, 0
+    for t in closed:
+        if t.net_gain_absolute > 0:
+            streak += 1
+            max_streak = max(max_streak, streak)
+        else:
+            streak = 0
+    return max_streak
+
+
+def get_max_consecutive_losses(trades: List[Trade]) -> int:
+    """
+    Calculate the maximum number of consecutive losing trades.
+
+    Args:
+        trades: List of Trade objects.
+
+    Returns:
+        int: The longest losing streak.
+    """
+    if not trades:
+        return 0
+
+    closed = sorted(
+        [t for t in trades if TradeStatus.CLOSED.equals(t.status)],
+        key=lambda t: t.closed_at
+    )
+    max_streak, streak = 0, 0
+    for t in closed:
+        if t.net_gain_absolute <= 0:
+            streak += 1
+            max_streak = max(max_streak, streak)
+        else:
+            streak = 0
+    return max_streak

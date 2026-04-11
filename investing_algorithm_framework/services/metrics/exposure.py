@@ -208,3 +208,37 @@ def get_trades_per_year(
         return 0.0
 
     return len(trades) / total_years
+
+
+def get_trades_per_week(
+    trades: List[Trade], start_date: datetime, end_date: datetime
+) -> float:
+    """
+    Calculates the average number of trades per week during the
+    backtest period.
+    """
+    if not trades:
+        return 0.0
+
+    total_weeks = (end_date - start_date).days / 7
+    if total_weeks <= 0:
+        return 0.0
+
+    return len(trades) / total_weeks
+
+
+def get_trades_per_month(
+    trades: List[Trade], start_date: datetime, end_date: datetime
+) -> float:
+    """
+    Calculates the average number of trades per month during the
+    backtest period.
+    """
+    if not trades:
+        return 0.0
+
+    total_months = (end_date - start_date).days / 30.44
+    if total_months <= 0:
+        return 0.0
+
+    return len(trades) / total_months

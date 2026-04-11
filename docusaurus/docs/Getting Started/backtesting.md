@@ -46,7 +46,7 @@ vector_backtest = app.run_vector_backtest(
 
 ## Event-Based Backtesting
 
-Event-based backtesting simulates the market environment by processing each price update sequentially, just like live trading, 
+Event-based backtesting simulates the market environment by processing each price update sequentially, just like live trading,
 based on the defined strategy interval (e.g., 1-minute, 5-minute bars).
 
 ### Running an Event-Based Backtest
@@ -167,9 +167,23 @@ Generate a visual report of your backtest:
 ```python
 from investing_algorithm_framework import BacktestReport
 
+# Single strategy
 report = BacktestReport(backtest)
 report.show(browser=True)  # Opens in your default browser
+
+# Multi-strategy comparison
+report = BacktestReport(backtests=[backtest_a, backtest_b])
+report.show()
+
+# Load from saved backtests on disk
+report = BacktestReport.open(directory_path="./my_backtests")
+report.show()
+
+# Save as a self-contained HTML file
+report.save("comparison_report.html")
 ```
+
+See [Backtest Reports](/docs/Getting%20Started/backtest-reports) for full documentation on the dashboard features, compare mode, and API reference.
 
 ### Accessing Metrics
 
@@ -281,4 +295,3 @@ backtests = app.run_vector_backtests(
 - Learn about [Vector Backtesting](/docs/Advanced%20Concepts/vector-backtesting) for advanced optimization
 - Explore [Performance Optimization](/docs/Advanced%20Concepts/OPTIMIZATION_GUIDE) for large-scale testing
 - Check out [Parallel Processing](/docs/Advanced%20Concepts/PARALLEL_PROCESSING_GUIDE) for multi-core utilization
-
