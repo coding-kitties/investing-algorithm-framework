@@ -222,6 +222,10 @@ class BacktestMetrics:
     worst_month: Tuple[float, datetime] = None
     worst_year: Tuple[float, date] = None
     total_number_of_days: int = None
+    var_95: float = 0.0
+    cvar_95: float = 0.0
+    max_consecutive_wins: int = 0
+    max_consecutive_losses: int = 0
     metadata: Dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self):
@@ -327,7 +331,11 @@ class BacktestMetrics:
             "best_month": self.best_month,
             "best_year": self.best_year,
             "worst_month": self.worst_month,
-            "worst_year": self.worst_year
+            "worst_year": self.worst_year,
+            "var_95": self.var_95,
+            "cvar_95": self.cvar_95,
+            "max_consecutive_wins": self.max_consecutive_wins,
+            "max_consecutive_losses": self.max_consecutive_losses,
         }
 
     def save(self, file_path: str | Path) -> None:

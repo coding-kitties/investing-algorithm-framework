@@ -1,3 +1,15 @@
+function saveReport() {
+  const name = prompt('Save report as:', 'backtest_report.html');
+  if (!name) return;
+  const filename = name.endsWith('.html') ? name : name + '.html';
+  const blob = new Blob(['\ufeff' + document.documentElement.outerHTML], { type: 'text/html;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
 const SYM_COLORS = {
   BTC:'#f7931a', ETH:'#627eea', XRP:'#00aae4', SOL:'#9945ff',
   ADA:'#0033ad', DOT:'#e6007a', LTC:'#bfbbbb', BCH:'#8dc351',
@@ -12,6 +24,8 @@ const COMP_COLS = [
   ['Volatility','annual_volatility','pct_abs','min'],
   ['Recovery','recovery_factor','ratio','max'],
   ['Net Gain %','total_net_gain_percentage','pct','max'],
+  ['VaR 95%','var_95','pct','min'],
+  ['CVaR 95%','cvar_95','pct','min'],
 ];
 
 const TRADING_COLS = [
@@ -22,7 +36,11 @@ const TRADING_COLS = [
   ['Trades/wk','trades_per_week','ratio','neutral'],
   ['# Trades','number_of_trades','int','neutral'],
   ['Avg Return','average_trade_return_percentage','pct','max'],
+  ['Median Return','median_trade_return_percentage','pct','max'],
   ['Avg Duration','average_trade_duration','ratio','neutral'],
+  ['Win Streak','max_consecutive_wins','int','max'],
+  ['Loss Streak','max_consecutive_losses','int','min'],
+  ['% Win Months','percentage_winning_months','pct_abs','max'],
 ];
 
 // Windows column offset removed – window info now in its own component
@@ -139,10 +157,11 @@ function buildTradingActivity(containerId, metricsGetter) {
 // ===== WINDOW COVERAGE COMPONENT =====
 function rebuildWindowCoverage() {
   var el = document.getElementById('overview-window-coverage');
-  if (!el) return;
+  var el2 = document.getElementById('windows-page-coverage');
+  if (!el && !el2) return;
 
   var totalWindows = RUN_LABELS.length;
-  if (totalWindows === 0) { el.innerHTML = ''; return; }
+  if (totalWindows === 0) { if (el) el.innerHTML = ''; if (el2) el2.innerHTML = ''; return; }
 
   // Determine which strategies to show
   var indices = selectedForCompare.size > 0
@@ -233,7 +252,12 @@ function rebuildWindowCoverage() {
 
   html += '</div>'; // end grid
   html += '</div>'; // end chart-card
-  el.innerHTML = html;
+  if (el) el.innerHTML = html;
+
+  // Windows page gets the same content but expanded by default
+  if (el2) {
+    el2.innerHTML = html.replace('chart-card collapsed', 'chart-card');
+  }
   initCollapseButtons();
 }
 
@@ -1228,12 +1252,42 @@ function drawStrategyEquity(stratIdx) {
   const pad = { t:15, r:60, b:30, l:10 };
   const cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
   const colors = [strat.color, COL.green, COL.amber, COL.purple, COL.red, COL.accent];
-  let gMin=Infinity, gMax=-Infinity;
-  strat.runIds.forEach(rid => {
-    const rd = RUN_DATA[rid]; if (!rd) return;
-    rd.EQ.forEach(d => { if(d[0]<gMin) gMin=d[0]; if(d[0]>gMax) gMax=d[0]; });
+
+  // Determine which runs to draw
+  const selRun = stratSelectedRun[stratIdx];
+  let runIds;
+  if (selRun && selRun !== 'summary') {
+    runIds = [selRun];
+  } else {
+    runIds = strat.runIds;
+  }
+
+  // Update equity title
+  const eqTitle = document.getElementById('eq-title-strat-'+stratIdx);
+  if (eqTitle) {
+    if (selRun && selRun !== 'summary' && RUN_DATA[selRun]) {
+      eqTitle.textContent = 'Equity Curve \u2013 Normalized % (' + (RUN_DATA[selRun].label || selRun) + ')';
+    } else {
+      eqTitle.textContent = 'Equity Curves \u2013 Normalized % (All Runs)';
+    }
+  }
+
+  // Normalize equity to percentage growth from start
+  const normSeries = [];
+  runIds.forEach((rid, ci) => {
+    const rd = RUN_DATA[rid]; if (!rd || !rd.EQ || rd.EQ.length<2) return;
+    const eq = rd.EQ;
+    const start = eq[0][0];
+    const norm = (start && start !== 0)
+      ? eq.map(d => [(d[0]/start - 1)*100, d[1]])
+      : eq;
+    normSeries.push({ data: norm, color: colors[ci%colors.length], rid: rid });
   });
-  if (!isFinite(gMin)) return;
+
+  if (normSeries.length === 0) return;
+
+  let gMin=0, gMax=0;
+  normSeries.forEach(s => s.data.forEach(d => { if(d[0]<gMin) gMin=d[0]; if(d[0]>gMax) gMax=d[0]; }));
   if (gMin===gMax) { gMin-=1; gMax+=1; }
   const range = gMax-gMin;
   ctx.strokeStyle = COL.border; ctx.lineWidth = 1;
@@ -1241,17 +1295,17 @@ function drawStrategyEquity(stratIdx) {
   for (let i=0;i<=5;i++) {
     const y = pad.t+ch-(i/5)*ch; const val = gMin+(i/5)*range;
     ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
-    ctx.fillText('\u20AC'+val.toFixed(0), w-pad.r+55, y+3.5);
+    ctx.fillText(val.toFixed(1)+'%', w-pad.r+55, y+3.5);
   }
-  strat.runIds.forEach((rid, ci) => {
-    const rd = RUN_DATA[rid]; if (!rd || !rd.EQ || rd.EQ.length<2) return;
-    const eq = rd.EQ; const color = colors[ci%colors.length];
-    if (ci===0) {
+  const showDates = normSeries.length === 1;
+  normSeries.forEach((s, ci) => {
+    const eq = s.data;
+    if (showDates && ci===0) {
       ctx.textAlign = 'center'; ctx.fillStyle = COL.dim;
       const li = Math.max(1,Math.floor(eq.length/6));
       for (let i=0;i<eq.length;i+=li) { const x=pad.l+(i/(eq.length-1))*cw; ctx.fillText(eq[i][1], x, h-5); }
     }
-    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.strokeStyle = s.color; ctx.lineWidth = 2; ctx.lineJoin = 'round';
     for (let i=0;i<eq.length;i++) {
       const x=pad.l+(i/(eq.length-1))*cw;
       const y=pad.t+ch-((eq[i][0]-gMin)/range)*ch;
@@ -1259,6 +1313,166 @@ function drawStrategyEquity(stratIdx) {
     }
     ctx.stroke();
   });
+}
+
+// ===== STRATEGY ROLLING SHARPE (per-page, multi-run overlay) =====
+function drawStrategyRollingSharpe(stratIdx) {
+  const strat = STRATEGIES[stratIdx];
+  if (!strat) return;
+  const id = 'c-strat-'+stratIdx+'-rsharpe';
+  const r = resizeCanvas(id);
+  if (!r) return;
+  const { ctx, w, h } = r;
+  const pad = { t:15, r:60, b:30, l:10 };
+  const cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
+  const colors = [strat.color, COL.green, COL.amber, COL.purple, COL.red, COL.accent];
+
+  const selRun = stratSelectedRun[stratIdx];
+  let runIds = (selRun && selRun !== 'summary') ? [selRun] : strat.runIds;
+
+  const rsTitle = document.getElementById('rs-title-strat-'+stratIdx);
+  if (rsTitle) {
+    if (selRun && selRun !== 'summary' && RUN_DATA[selRun]) {
+      rsTitle.textContent = 'Rolling Sharpe Ratio (' + (RUN_DATA[selRun].label || selRun) + ')';
+    } else {
+      rsTitle.textContent = 'Rolling Sharpe Ratio (All Runs)';
+    }
+  }
+
+  const rsSeries = [];
+  runIds.forEach((rid, ci) => {
+    const rd = RUN_DATA[rid]; if (!rd || !rd.RS || rd.RS.length < 2) return;
+    rsSeries.push({ data: rd.RS, color: colors[ci % colors.length], rid: rid });
+  });
+  if (rsSeries.length === 0) return;
+
+  let gMin = Infinity, gMax = -Infinity;
+  rsSeries.forEach(s => s.data.forEach(d => {
+    if (d[0] != null && !isNaN(d[0])) { if (d[0] < gMin) gMin = d[0]; if (d[0] > gMax) gMax = d[0]; }
+  }));
+  if (!isFinite(gMin)) return;
+  if (gMin === gMax) { gMin -= 1; gMax += 1; }
+  const range = gMax - gMin;
+
+  ctx.strokeStyle = COL.border; ctx.lineWidth = 1;
+  ctx.font = '10px JetBrains Mono, monospace'; ctx.fillStyle = COL.dim; ctx.textAlign = 'right';
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.t + ch - (i/5)*ch; const val = gMin + (i/5)*range;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w-pad.r, y); ctx.stroke();
+    ctx.fillText(val.toFixed(2), w-pad.r+50, y+3.5);
+  }
+  if (gMin < 0 && gMax > 0) {
+    const zeroY = pad.t + ch - ((0 - gMin)/range)*ch;
+    ctx.strokeStyle = COL.dim; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(pad.l, zeroY); ctx.lineTo(w-pad.r, zeroY); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  const showDates = rsSeries.length === 1;
+  rsSeries.forEach((s, ci) => {
+    const rs = s.data;
+    if (showDates && ci === 0) {
+      ctx.textAlign = 'center'; ctx.fillStyle = COL.dim;
+      const li = Math.max(1, Math.floor(rs.length/6));
+      for (let i = 0; i < rs.length; i += li) { const x = pad.l+(i/(rs.length-1))*cw; ctx.fillText(rs[i][1], x, h-5); }
+    }
+    ctx.beginPath(); ctx.strokeStyle = s.color; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    let started = false;
+    for (let i = 0; i < rs.length; i++) {
+      if (rs[i][0] == null || isNaN(rs[i][0])) continue;
+      const x = pad.l+(i/(rs.length-1))*cw;
+      const y = pad.t+ch-((rs[i][0]-gMin)/range)*ch;
+      if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  });
+
+  const canvas = document.getElementById(id);
+  if (canvas) {
+    let longestRS = rsSeries[0].data;
+    rsSeries.forEach(s => { if (s.data.length > longestRS.length) longestRS = s.data; });
+    canvas._chartData = { data: longestRS, pad, cw, ch, mn: gMin, range, color: COL.amber, opts: { decimals: 2 }, type: 'line' };
+  }
+}
+
+// ===== STRATEGY DRAWDOWN (per-page, multi-run overlay) =====
+function drawStrategyDrawdown(stratIdx) {
+  const strat = STRATEGIES[stratIdx];
+  if (!strat) return;
+  const id = 'c-strat-'+stratIdx+'-dd';
+  const r = resizeCanvas(id);
+  if (!r) return;
+  const { ctx, w, h } = r;
+  const pad = { t:15, r:60, b:30, l:10 };
+  const cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
+  const colors = [strat.color, COL.green, COL.amber, COL.purple, COL.red, COL.accent];
+
+  const selRun = stratSelectedRun[stratIdx];
+  let runIds = (selRun && selRun !== 'summary') ? [selRun] : strat.runIds;
+
+  const ddTitle = document.getElementById('dd-title-strat-'+stratIdx);
+  if (ddTitle) {
+    if (selRun && selRun !== 'summary' && RUN_DATA[selRun]) {
+      ddTitle.textContent = 'Drawdown (' + (RUN_DATA[selRun].label || selRun) + ')';
+    } else {
+      ddTitle.textContent = 'Drawdown (All Runs)';
+    }
+  }
+
+  const ddSeries = [];
+  runIds.forEach((rid, ci) => {
+    const rd = RUN_DATA[rid]; if (!rd || !rd.DD || rd.DD.length < 2) return;
+    ddSeries.push({ data: rd.DD, color: colors[ci % colors.length], rid: rid });
+  });
+  if (ddSeries.length === 0) return;
+
+  let gMin = 0;
+  ddSeries.forEach(s => s.data.forEach(d => { if (d[0] < gMin) gMin = d[0]; }));
+  if (gMin >= 0) gMin = -1;
+  const range = 0 - gMin;
+
+  ctx.strokeStyle = COL.border; ctx.lineWidth = 1;
+  ctx.font = '10px JetBrains Mono, monospace'; ctx.fillStyle = COL.dim; ctx.textAlign = 'right';
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (i/4)*ch; const val = 0 - (i/4)*range;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w-pad.r, y); ctx.stroke();
+    ctx.fillText(val.toFixed(1)+'%', w-pad.r+50, y+3.5);
+  }
+
+  const showDates = ddSeries.length === 1;
+  ddSeries.forEach((s, ci) => {
+    const dd = s.data;
+    if (showDates && ci === 0) {
+      let longestDD = dd;
+      ctx.textAlign = 'center'; ctx.fillStyle = COL.dim;
+      const li = Math.max(1, Math.floor(longestDD.length/6));
+      for (let i = 0; i < longestDD.length; i += li) { const x = pad.l+(i/(longestDD.length-1))*cw; ctx.fillText(longestDD[i][1], x, h-5); }
+    }
+    // Fill area
+    ctx.beginPath();
+    for (let i = 0; i < dd.length; i++) {
+      const x = pad.l+(i/(dd.length-1))*cw;
+      const y = pad.t+((0-dd[i][0])/range)*ch;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.lineTo(pad.l+cw, pad.t); ctx.lineTo(pad.l, pad.t); ctx.closePath();
+    ctx.fillStyle = s.color + '15'; ctx.fill();
+    // Stroke line
+    ctx.beginPath(); ctx.strokeStyle = s.color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+    for (let i = 0; i < dd.length; i++) {
+      const x = pad.l+(i/(dd.length-1))*cw;
+      const y = pad.t+((0-dd[i][0])/range)*ch;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  });
+
+  const canvas = document.getElementById(id);
+  if (canvas) {
+    let longestDD = ddSeries[0].data;
+    ddSeries.forEach(s => { if (s.data.length > longestDD.length) longestDD = s.data; });
+    canvas._chartData = { data: longestDD, pad, cw, ch, mn: gMin, range, mx: 0, color: COL.red, type: 'area' };
+  }
 }
 
 // ===== REBUILD (multi mode dynamic) =====
@@ -1513,6 +1727,8 @@ function onRunViewChange(value) {
   drawReturnDistribution();
   buildCorrelationMatrix();
   drawMultiRollingSharpe();
+  drawRiskReturnScatter('c-overview-scatter');
+  drawRollingReturns('overview');
   setupTooltip('c-overview-eq', 'tt-overview-eq');
   setupTooltip('c-overview-dd', 'tt-overview-dd');
   setupTooltip('c-overview-rsharpe', 'tt-overview-rsharpe');
@@ -1531,12 +1747,21 @@ function onRunViewChange(value) {
 // ===== RUN SELECTION (per-strategy drill-down) =====
 const stratSelectedRun = {};
 
-function selectStratRun(stratIdx, runId) {
+function onStratWindowChange(stratIdx, runId) {
   stratSelectedRun[stratIdx] = runId;
-  const pills = document.querySelectorAll('#run-sel-strat-' + stratIdx + ' .run-pill');
-  pills.forEach(p => p.classList.toggle('active', p.dataset.run === runId));
   updateStratSummary(stratIdx);
   updateStratPerformance(stratIdx);
+  drawStrategyEquity(stratIdx);
+  drawStrategyRollingSharpe(stratIdx);
+  drawStrategyDrawdown(stratIdx);
+  setupTooltip('c-strat-'+stratIdx+'-eq', 'tt-strat-'+stratIdx+'-eq');
+  setupTooltip('c-strat-'+stratIdx+'-rsharpe', 'tt-strat-'+stratIdx+'-rsharpe');
+  setupTooltip('c-strat-'+stratIdx+'-dd', 'tt-strat-'+stratIdx+'-dd');
+  initCollapseButtons();
+}
+
+function selectStratRun(stratIdx, runId) {
+  onStratWindowChange(stratIdx, runId);
 }
 
 function kpiCard(label, value, color, sub) {
@@ -1554,8 +1779,24 @@ function updateStratSummary(stratIdx) {
   const strat = STRATEGIES[stratIdx];
   const runId = stratSelectedRun[stratIdx] || 'summary';
 
+  // Resolve the run data and metrics
+  let m, rd;
   if (runId === 'summary') {
-    const m = strat.summary;
+    m = strat.summary;
+    // Find best run for EOB snapshot
+    let bestRid = strat.runIds[0], bestLen = 0;
+    strat.runIds.forEach(function(r) { const d = RUN_DATA[r]; if (d && d.EQ && d.EQ.length > bestLen) { bestLen = d.EQ.length; bestRid = r; } });
+    rd = RUN_DATA[bestRid];
+  } else {
+    rd = RUN_DATA[runId];
+    m = (rd && rd.metrics) ? rd.metrics : strat.summary;
+  }
+
+  // Derive trades_per_month/week if missing
+  if (m.trades_per_month == null && m.trades_per_year != null) m.trades_per_month = m.trades_per_year / 12;
+  if (m.trades_per_week == null && m.trades_per_year != null) m.trades_per_week = m.trades_per_year / 52;
+
+  if (runId === 'summary') {
     container.innerHTML = '<div class="kpi-row">'
       + kpiCard('CAGR', fmtVal(m.cagr,'pct'), 'var(--green)')
       + kpiCard('Sharpe', fmtVal(m.sharpe_ratio,'ratio'), 'var(--accent)')
@@ -1576,85 +1817,445 @@ function updateStratSummary(stratIdx) {
       + kpiCard('Total Net Gain', fmtVal(m.total_net_gain_percentage,'pct'))
       + kpiCard('Runs', String(strat.runIds.length))
       + '</div>';
-    // End-of-backtest KPIs from best/last run
-    const eobEl = document.getElementById(sid + '-eob-kpis');
-    if (eobEl) {
-      let bestRid = strat.runIds[0], bestLen = 0;
-      strat.runIds.forEach(function(r) { const d = RUN_DATA[r]; if (d && d.EQ && d.EQ.length > bestLen) { bestLen = d.EQ.length; bestRid = r; } });
-      const sn = RUN_DATA[bestRid]?.snapshot || {};
-      eobEl.innerHTML = '<div class="kpi-row">'
-        + kpiCard('Equity', '€' + (sn.equity||0).toFixed(2), 'var(--accent)')
-        + kpiCard('Net Profit', '€' + (sn.net_profit||0).toFixed(2), (sn.net_profit||0) >= 0 ? 'var(--green)' : 'var(--red)')
-        + kpiCard('Growth', fmtVal(sn.growth,'pct'), 'var(--green)')
-        + kpiCard('Holdings', '€' + (sn.holdings||0).toFixed(2))
-        + kpiCard('Unrealized', '€' + (sn.unrealized||0).toFixed(2))
-        + kpiCard('Fees', '€' + (sn.fees||0).toFixed(2), 'var(--amber)')
-        + kpiCard('Volume', '€' + (sn.volume||0).toFixed(2))
-        + '</div>';
-    }
-    buildTradingActivity(sid + '-trading-activity', function() { return strat.summary; });
   } else {
-    const eq = rd.EQ;
-    const finalVal = eq.length > 0 ? eq[eq.length-1][0] : 0;
-    const initVal = eq.length > 0 ? eq[0][0] : 1000;
-    const netGain = finalVal - initVal;
+    var sm = strat.summary;
     container.innerHTML = '<div class="kpi-row">'
-      + kpiCard('Final Value', '€' + finalVal.toFixed(2), 'var(--accent)', 'from €' + Math.round(initVal))
-      + kpiCard('Total Return', fmtVal(m.total_net_gain_percentage,'pct'), 'var(--green)', '€' + netGain.toFixed(2))
-      + kpiCard('CAGR', fmtVal(m.cagr,'pct'), 'var(--green)')
-      + kpiCard('Sharpe', fmtVal(m.sharpe_ratio,'ratio'), 'var(--accent)')
-      + kpiCard('Sortino', fmtVal(m.sortino_ratio,'ratio'), 'var(--accent)')
-      + kpiCard('Max DD', fmtVal(m.max_drawdown,'pct_abs'), 'var(--red)')
-      + kpiCard('Profit Factor', fmtVal(m.profit_factor,'ratio'), 'var(--green)')
-      + kpiCard('Win Rate', fmtVal(m.win_rate,'pct_abs'))
+      + kpiCard('CAGR', fmtVal(sm.cagr,'pct'), 'var(--green)', 'Run: ' + fmtVal(m.cagr,'pct'))
+      + kpiCard('Sharpe', fmtVal(sm.sharpe_ratio,'ratio'), 'var(--accent)', 'Run: ' + fmtVal(m.sharpe_ratio,'ratio'))
+      + kpiCard('Sortino', fmtVal(sm.sortino_ratio,'ratio'), 'var(--accent)', 'Run: ' + fmtVal(m.sortino_ratio,'ratio'))
+      + kpiCard('Max DD', fmtVal(sm.max_drawdown,'pct_abs'), 'var(--red)', 'Run: ' + fmtVal(m.max_drawdown,'pct_abs'))
+      + kpiCard('Profit Factor', fmtVal(sm.profit_factor,'ratio'), 'var(--green)', 'Run: ' + fmtVal(m.profit_factor,'ratio'))
+      + kpiCard('Win Rate', fmtVal(sm.win_rate,'pct_abs'), null, 'Run: ' + fmtVal(m.win_rate,'pct_abs'))
       + '</div><div class="kpi-row">'
-      + kpiCard('Calmar', fmtVal(m.calmar_ratio,'ratio'), 'var(--accent)')
-      + kpiCard('Trades/yr', fmtVal(m.trades_per_year,'ratio'))
-      + kpiCard('Volatility', fmtVal(m.annual_volatility,'pct_abs'))
-      + kpiCard('Win/Loss', fmtVal(m.win_loss_ratio,'ratio'))
-      + kpiCard('DD Duration', m.max_drawdown_duration != null ? Math.round(m.max_drawdown_duration) + 'd' : '—')
-      + kpiCard('Exposure', fmtVal(m.exposure_ratio,'pct_abs'))
+      + kpiCard('Calmar', fmtVal(sm.calmar_ratio,'ratio'), 'var(--accent)', 'Run: ' + fmtVal(m.calmar_ratio,'ratio'))
+      + kpiCard('Trades/yr', fmtVal(sm.trades_per_year,'ratio'), null, 'Run: ' + fmtVal(m.trades_per_year,'ratio'))
+      + kpiCard('Volatility', fmtVal(sm.annual_volatility,'pct_abs'), null, 'Run: ' + fmtVal(m.annual_volatility,'pct_abs'))
+      + kpiCard('Win/Loss', fmtVal(sm.win_loss_ratio,'ratio'), null, 'Run: ' + fmtVal(m.win_loss_ratio,'ratio'))
+      + kpiCard('DD Duration', sm.max_drawdown_duration != null ? Math.round(sm.max_drawdown_duration) + 'd' : '\u2014', null, 'Run: ' + (m.max_drawdown_duration != null ? Math.round(m.max_drawdown_duration) + 'd' : '\u2014'))
+      + kpiCard('Exposure', fmtVal(sm.exposure_ratio,'pct_abs'), null, 'Run: ' + fmtVal(m.exposure_ratio,'pct_abs'))
       + '</div>';
-    // End-of-backtest KPIs for the selected run
-    const eobEl = document.getElementById(sid + '-eob-kpis');
-    if (eobEl) {
-      const sn = rd.snapshot || {};
-      eobEl.innerHTML = '<div class="kpi-row">'
-        + kpiCard('Equity', '€' + (sn.equity||0).toFixed(2), 'var(--accent)')
-        + kpiCard('Net Profit', '€' + (sn.net_profit||0).toFixed(2), (sn.net_profit||0) >= 0 ? 'var(--green)' : 'var(--red)')
-        + kpiCard('Growth', fmtVal(sn.growth,'pct'), 'var(--green)')
-        + kpiCard('Holdings', '€' + (sn.holdings||0).toFixed(2))
-        + kpiCard('Unrealized', '€' + (sn.unrealized||0).toFixed(2))
-        + kpiCard('Fees', '€' + (sn.fees||0).toFixed(2), 'var(--amber)')
-        + kpiCard('Volume', '€' + (sn.volume||0).toFixed(2))
-        + '</div>';
+  }
+
+  // Portfolio Summary (only when a specific run is selected)
+  const psEl = document.getElementById(sid + '-portfolio-summary');
+  if (psEl) {
+    var sn = (rd && rd.snapshot) ? rd.snapshot : null;
+    if (runId !== 'summary' && sn && sn.initial_value != null) {
+      var startVal = sn.initial_value;
+      var endVal = sn.final_value || 0;
+      var netGain = sn.net_gain || 0;
+      var growth = sn.growth || 0;
+      var gainColor = netGain >= 0 ? 'var(--green)' : 'var(--red)';
+      var gp = (m && m.gross_profit != null) ? m.gross_profit : null;
+      var gl = (m && m.gross_loss != null) ? m.gross_loss : null;
+      var unalloc = sn.unallocated || 0;
+      var allocated = endVal - unalloc;
+      psEl.innerHTML = '<div class="chart-card">'
+        + '<div class="chart-title">Portfolio Summary</div>'
+        + '<div class="kpi-row">'
+        + kpiCard('Start Value', '\u20AC' + startVal.toFixed(2))
+        + kpiCard('End Value', '\u20AC' + endVal.toFixed(2), 'var(--accent)')
+        + kpiCard('Net Gain', (netGain >= 0 ? '+' : '') + '\u20AC' + netGain.toFixed(2), gainColor)
+        + kpiCard('Growth', (growth >= 0 ? '+' : '') + growth.toFixed(2) + '%', gainColor)
+        + (gp != null ? kpiCard('Gross Profit', '\u20AC' + gp.toFixed(2), 'var(--green)') : '')
+        + (gl != null ? kpiCard('Gross Loss', '\u20AC' + gl.toFixed(2), 'var(--red)') : '')
+        + kpiCard('Allocated', '\u20AC' + allocated.toFixed(2))
+        + kpiCard('Unallocated', '\u20AC' + unalloc.toFixed(2))
+        + '</div></div>';
+    } else {
+      psEl.innerHTML = '';
     }
-    buildTradingActivity(sid + '-trading-activity', function() { return rd.metrics; });
+  }
+
+  buildTradingActivity(sid + '-trading-activity', function() { return m; });
+}
+
+// Per-strategy monthly/yearly toggle state (per strategy index)
+var stratMonthlyData = {};    // stratIdx -> 'returns' | 'growth'
+var stratMonthlyDisplay = {}; // stratIdx -> 'rows' | 'heatmap'
+var stratMonthlyYear = {};    // stratIdx -> 'all' | year string
+
+function updateStratPerformance(stratIdx) {
+  buildStratMonthlyReturns(stratIdx);
+  buildStratYearlyReturns(stratIdx);
+  buildStratReturnScenarios(stratIdx);
+}
+
+function buildStratMonthlyReturns(stratIdx) {
+  var sid = 'strat-' + stratIdx;
+  var el = document.getElementById(sid + '-monthly-returns');
+  if (!el) return;
+  var strat = STRATEGIES[stratIdx];
+  var runId = stratSelectedRun[stratIdx] || 'summary';
+  var rd;
+  if (runId === 'summary') {
+    var bestRid = strat.runIds[0], bestLen = 0;
+    strat.runIds.forEach(function(r) { var d = RUN_DATA[r]; if (d && d.EQ && d.EQ.length > bestLen) { bestLen = d.EQ.length; bestRid = r; } });
+    rd = RUN_DATA[bestRid];
+  } else {
+    rd = RUN_DATA[runId];
+  }
+  var hm = (rd && rd.MONTHLY_HEATMAP) ? rd.MONTHLY_HEATMAP : {};
+
+  var MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var allYears = Object.keys(hm).sort();
+  if (allYears.length === 0) { el.innerHTML = ''; return; }
+
+  // Init per-strategy state if needed
+  if (!stratMonthlyData[stratIdx]) stratMonthlyData[stratIdx] = 'returns';
+  if (!stratMonthlyDisplay[stratIdx]) stratMonthlyDisplay[stratIdx] = 'heatmap';
+  if (!stratMonthlyYear[stratIdx]) stratMonthlyYear[stratIdx] = 'all';
+
+  var dataMode = stratMonthlyData[stratIdx];
+  var dispMode = stratMonthlyDisplay[stratIdx];
+  var yearFilter = stratMonthlyYear[stratIdx];
+  var filteredYears = yearFilter === 'all' ? allYears : allYears.filter(function(y){ return y === yearFilter; });
+  var isGrowth = dataMode === 'growth';
+  var isHeatmap = dispMode === 'heatmap';
+
+  var title = (isGrowth ? 'Cumulative Growth' : 'Monthly Returns') + (isHeatmap ? ' (Heatmap)' : '');
+  if (rd && rd.label && runId !== 'summary') title += ' \u2013 ' + rd.label;
+
+  var html = '<div class="chart-card">';
+  html += '<div class="chart-title">';
+  html += '<span>' + title + '</span>';
+  html += '<span style="display:flex;gap:0.4rem;align-items:center">';
+
+  // Year filter
+  if (allYears.length > 1) {
+    html += '<select class="view-select" onchange="stratMonthlyYear['+stratIdx+']=this.value;buildStratMonthlyReturns('+stratIdx+')">';
+    html += '<option value="all"' + (yearFilter === 'all' ? ' selected' : '') + '>All Years</option>';
+    allYears.forEach(function(y) {
+      html += '<option value="'+y+'"' + (yearFilter === y ? ' selected' : '') + '>'+y+'</option>';
+    });
+    html += '</select>';
+  }
+
+  // Data toggle
+  [['returns','Returns'],['growth','Growth']].forEach(function(m) {
+    var active = dataMode === m[0];
+    html += '<button class="view-select" style="cursor:pointer;font-size:0.65rem;padding:2px 8px;'
+      + (active ? 'background:var(--accent);color:#fff;border-color:var(--accent)' : '')
+      + '" onclick="stratMonthlyData['+stratIdx+']=\''+m[0]+'\';buildStratMonthlyReturns('+stratIdx+')">'+m[1]+'</button>';
+  });
+
+  html += '<span style="color:var(--border);font-size:0.7rem">|</span>';
+
+  // Display toggle
+  [['rows','Rows'],['heatmap','Heatmap']].forEach(function(m) {
+    var active = dispMode === m[0];
+    html += '<button class="view-select" style="cursor:pointer;font-size:0.65rem;padding:2px 8px;'
+      + (active ? 'background:var(--accent);color:#fff;border-color:var(--accent)' : '')
+      + '" onclick="stratMonthlyDisplay['+stratIdx+']=\''+m[0]+'\';buildStratMonthlyReturns('+stratIdx+')">'+m[1]+'</button>';
+  });
+  html += '</span></div>';
+
+  // Cumulative growth base
+  var cumVal = 100;
+  if (isGrowth && yearFilter !== 'all') {
+    for (var yi = 0; yi < allYears.length; yi++) {
+      if (allYears[yi] === yearFilter) break;
+      var preY = allYears[yi];
+      for (var pmi = 1; pmi <= 12; pmi++) {
+        var pv = (hm[preY] && hm[preY][String(pmi)] != null) ? hm[preY][String(pmi)] : 0;
+        cumVal *= (1 + pv / 100);
+      }
+    }
+  }
+
+  function fmtReturnCell(v, bgTint) {
+    if (v == null) return '<td>\u2014</td>';
+    var color = v >= 0 ? 'var(--green)' : 'var(--red)';
+    var style = '';
+    if (bgTint) {
+      var intensity = Math.min(Math.abs(v) / 10, 1);
+      var bg = v >= 0 ? 'rgba(34,197,94,' + (intensity * 0.2) + ')' : 'rgba(239,68,68,' + (intensity * 0.2) + ')';
+      style = ' style="background:'+bg+'"';
+    }
+    return '<td'+style+'><span style="color:'+color+'">' + (v >= 0 ? '+' : '') + v.toFixed(1) + '%</span></td>';
+  }
+
+  function fmtGrowthCell(val, bgTint) {
+    if (val == null) return '<td>\u2014</td>';
+    var gain = val - 100;
+    var color = gain >= 0 ? 'var(--green)' : 'var(--red)';
+    var style = '';
+    if (bgTint) {
+      var intensity = Math.min(Math.abs(gain) / 50, 1);
+      var bg = gain >= 0 ? 'rgba(34,197,94,' + (intensity * 0.15) + ')' : 'rgba(239,68,68,' + (intensity * 0.15) + ')';
+      style = ' style="background:'+bg+'"';
+    }
+    return '<td'+style+'><span style="color:'+color+';font-weight:500">' + val.toFixed(1) + '</span> <span style="font-size:0.6rem;color:var(--text-secondary)">(' + (gain >= 0 ? '+' : '') + gain.toFixed(1) + '%)</span></td>';
+  }
+
+  if (!isHeatmap) {
+    // === ROWS: months as rows, single strategy ===
+    html += '<div class="table-wrap"><table class="comp-table" style="font-size:0.7rem"><thead><tr>';
+    html += '<th class="sticky-col">Period</th><th>' + (isGrowth ? 'Growth' : 'Return') + '</th>';
+    html += '</tr></thead><tbody>';
+
+    filteredYears.forEach(function(y) {
+      // Year summary row
+      if (isGrowth) {
+        var peekCum = cumVal;
+        for (var pmi2 = 1; pmi2 <= 12; pmi2++) {
+          var v2 = (hm[y] && hm[y][String(pmi2)] != null) ? hm[y][String(pmi2)] : 0;
+          peekCum *= (1 + v2 / 100);
+        }
+        var gain = peekCum - 100;
+        var color = gain >= 0 ? 'var(--green)' : 'var(--red)';
+        html += '<tr style="background:var(--surface2);font-weight:600"><td class="sticky-col" style="background:var(--surface2)">' + y + ' End</td>';
+        html += '<td style="font-weight:600"><span style="color:'+color+'">' + peekCum.toFixed(1) + '</span></td></tr>';
+      } else {
+        var yearTotal = 0;
+        var hmY = hm[y] || {};
+        for (var mi = 1; mi <= 12; mi++) yearTotal += hmY[String(mi)] || 0;
+        var color = yearTotal >= 0 ? 'var(--green)' : 'var(--red)';
+        html += '<tr style="background:var(--surface2);font-weight:600"><td class="sticky-col" style="background:var(--surface2)">' + y + ' Total</td>';
+        html += '<td style="font-weight:600"><span style="color:'+color+'">' + (yearTotal >= 0 ? '+' : '') + yearTotal.toFixed(1) + '%</span></td></tr>';
+      }
+
+      // Monthly rows
+      for (var mi = 1; mi <= 12; mi++) {
+        var v = (hm[y] && hm[y][String(mi)] != null) ? hm[y][String(mi)] : null;
+        if (v == null) { if (isGrowth) { /* skip */ } continue; }
+
+        if (isGrowth) cumVal *= (1 + v / 100);
+
+        html += '<tr><td class="sticky-col" style="padding-left:1.5rem;color:var(--text-secondary)">' + MONTHS[mi-1] + ' ' + y + '</td>';
+        html += isGrowth ? fmtGrowthCell(cumVal, true) : fmtReturnCell(v, true);
+        html += '</tr>';
+      }
+    });
+    html += '</tbody></table></div>';
+  } else {
+    // === HEATMAP: months as columns, years as rows ===
+    var stratCum = isGrowth ? cumVal : 0;
+
+    html += '<table class="heatmap-table"><thead><tr><th></th>';
+    MONTHS.forEach(function(m){ html += '<th>'+m+'</th>'; });
+    html += '<th>Year</th></tr></thead><tbody>';
+
+    filteredYears.forEach(function(y) {
+      html += '<tr><th>'+y+'</th>';
+      if (isGrowth) {
+        for (var mi = 1; mi <= 12; mi++) {
+          var v = (hm[y] && hm[y][String(mi)] != null) ? hm[y][String(mi)] : undefined;
+          if (v !== undefined) {
+            stratCum *= (1 + v / 100);
+            var gain = stratCum - 100;
+            var cls = gain > 20 ? 'hm-strong-pos' : gain > 0 ? 'hm-pos' : gain < -10 ? 'hm-strong-neg' : gain < 0 ? 'hm-neg' : 'hm-zero';
+            html += '<td class="'+cls+'">'+stratCum.toFixed(0)+'</td>';
+          } else {
+            html += '<td class="hm-zero">&mdash;</td>';
+          }
+        }
+        var yearGain = stratCum - 100;
+        var ycls = yearGain > 0 ? 'hm-pos' : yearGain < 0 ? 'hm-neg' : 'hm-zero';
+        html += '<td class="'+ycls+'" style="font-weight:600">' + stratCum.toFixed(0) + '</td></tr>';
+      } else {
+        var yTotal = 0;
+        for (var mi = 1; mi <= 12; mi++) {
+          var v = (hm[y] && hm[y][String(mi)] != null) ? hm[y][String(mi)] : undefined;
+          if (v !== undefined) {
+            yTotal += v;
+            var cls = 'hm-zero';
+            if (v > 10) cls = 'hm-strong-pos';
+            else if (v > 0) cls = 'hm-pos';
+            else if (v < -3) cls = 'hm-strong-neg';
+            else if (v < 0) cls = 'hm-neg';
+            html += '<td class="'+cls+'">'+(v>0?'+':'')+v.toFixed(1)+'%</td>';
+          } else {
+            html += '<td class="hm-zero">&mdash;</td>';
+          }
+        }
+        var ycls = yTotal > 0 ? 'hm-pos' : yTotal < 0 ? 'hm-neg' : 'hm-zero';
+        html += '<td class="'+ycls+'" style="font-weight:600">'+(yTotal>0?'+':'')+yTotal.toFixed(1)+'%</td></tr>';
+      }
+    });
+    html += '</tbody></table>';
+  }
+
+  html += '</div>';
+  el.innerHTML = html;
+  initCollapseButtons();
+}
+
+// Per-strategy yearly toggle state
+var stratYearlyData = {};    // stratIdx -> 'returns' | 'growth'
+var stratYearlyDisplay = {}; // stratIdx -> 'bar' | 'table'
+
+function buildStratYearlyReturns(stratIdx) {
+  var sid = 'strat-' + stratIdx;
+  var el = document.getElementById(sid + '-yearly-returns');
+  if (!el) return;
+  var strat = STRATEGIES[stratIdx];
+  var runId = stratSelectedRun[stratIdx] || 'summary';
+  var rd;
+  if (runId === 'summary') {
+    var bestRid = strat.runIds[0], bestLen = 0;
+    strat.runIds.forEach(function(r) { var d = RUN_DATA[r]; if (d && d.EQ && d.EQ.length > bestLen) { bestLen = d.EQ.length; bestRid = r; } });
+    rd = RUN_DATA[bestRid];
+  } else {
+    rd = RUN_DATA[runId];
+  }
+  if (!rd || !rd.YR || rd.YR.length === 0) { el.innerHTML = ''; return; }
+
+  // Init per-strategy state if needed
+  if (!stratYearlyData[stratIdx]) stratYearlyData[stratIdx] = 'returns';
+  if (!stratYearlyDisplay[stratIdx]) stratYearlyDisplay[stratIdx] = 'bar';
+
+  var dataMode = stratYearlyData[stratIdx];
+  var dispMode = stratYearlyDisplay[stratIdx];
+  var isGrowth = dataMode === 'growth';
+  var isTable = dispMode === 'table';
+
+  var titleSuffix = '';
+  if (runId !== 'summary' && rd && rd.label) titleSuffix = ' \u2013 ' + rd.label;
+  var title = (isGrowth ? 'Cumulative Growth (Yearly)' : 'Yearly Returns') + titleSuffix;
+
+  var html = '<div class="chart-card">';
+  html += '<div class="chart-title">';
+  html += '<span>' + title + '</span>';
+  html += '<span style="display:flex;gap:0.4rem;align-items:center">';
+
+  // Data toggle
+  [['returns','Returns'],['growth','Growth']].forEach(function(m) {
+    var active = dataMode === m[0];
+    html += '<button class="view-select" style="cursor:pointer;font-size:0.65rem;padding:2px 8px;'
+      + (active ? 'background:var(--accent);color:#fff;border-color:var(--accent)' : '')
+      + '" onclick="stratYearlyData['+stratIdx+']=\''+m[0]+'\';buildStratYearlyReturns('+stratIdx+')">'+m[1]+'</button>';
+  });
+
+  html += '<span style="color:var(--border);font-size:0.7rem">|</span>';
+
+  // Display toggle
+  [['bar','Bar Chart'],['table','Table']].forEach(function(m) {
+    var active = dispMode === m[0];
+    html += '<button class="view-select" style="cursor:pointer;font-size:0.65rem;padding:2px 8px;'
+      + (active ? 'background:var(--accent);color:#fff;border-color:var(--accent)' : '')
+      + '" onclick="stratYearlyDisplay['+stratIdx+']=\''+m[0]+'\';buildStratYearlyReturns('+stratIdx+')">'+m[1]+'</button>';
+  });
+  html += '</span></div>';
+
+  var yr = rd.YR; // [[pct, yearLabel], ...]
+
+  if (isTable) {
+    html += '<div class="table-wrap"><table class="comp-table" style="font-size:0.7rem"><thead><tr>';
+    html += '<th class="sticky-col">Year</th><th>' + (isGrowth ? 'Growth' : 'Return') + '</th>';
+    html += '</tr></thead><tbody>';
+
+    var cumVal = 100;
+    yr.forEach(function(d) {
+      var pct = d[0], label = d[1];
+      if (isGrowth) {
+        cumVal *= (1 + pct / 100);
+        var gain = cumVal - 100;
+        var color = gain >= 0 ? 'var(--green)' : 'var(--red)';
+        var intensity = Math.min(Math.abs(gain) / 50, 1);
+        var bg = gain >= 0 ? 'rgba(34,197,94,' + (intensity * 0.15) + ')' : 'rgba(239,68,68,' + (intensity * 0.15) + ')';
+        html += '<tr><td class="sticky-col">' + label + '</td>';
+        html += '<td style="background:'+bg+'"><span style="color:'+color+';font-weight:500">' + cumVal.toFixed(1) + '</span>';
+        html += ' <span style="font-size:0.6rem;color:var(--text-secondary)">(' + (gain >= 0 ? '+' : '') + gain.toFixed(1) + '%)</span></td></tr>';
+      } else {
+        var color = pct >= 0 ? 'var(--green)' : 'var(--red)';
+        var intensity = Math.min(Math.abs(pct) / 30, 1);
+        var bg = pct >= 0 ? 'rgba(34,197,94,' + (intensity * 0.2) + ')' : 'rgba(239,68,68,' + (intensity * 0.2) + ')';
+        html += '<tr><td class="sticky-col">' + label + '</td>';
+        html += '<td style="background:'+bg+'"><span style="color:'+color+'">' + (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%</span></td></tr>';
+      }
+    });
+    html += '</tbody></table></div>';
+    html += '</div>';
+    el.innerHTML = html;
+    initCollapseButtons();
+  } else {
+    // Bar chart mode
+    var barData;
+    if (isGrowth) {
+      var cumVal = 100;
+      barData = yr.map(function(d) {
+        cumVal *= (1 + d[0] / 100);
+        return [cumVal - 100, d[1]];
+      });
+    } else {
+      barData = yr;
+    }
+    html += '<div class="chart-wrap chart-sm"><canvas id="c-' + sid + '-yearly"></canvas></div>';
+    html += '</div>';
+    el.innerHTML = html;
+    initCollapseButtons();
+    requestAnimationFrame(function() {
+      drawBarChart('c-' + sid + '-yearly', barData);
+    });
   }
 }
 
-function updateStratPerformance(stratIdx) {
+function buildStratReturnScenarios(stratIdx) {
   const sid = 'strat-' + stratIdx;
+  const el = document.getElementById(sid + '-return-scenarios');
+  if (!el) return;
   const strat = STRATEGIES[stratIdx];
+  const sm = strat.summary;
+  const cagr = sm.cagr;
+  const vol = sm.annual_volatility;
+  const hasBoth = cagr != null && vol != null;
+  const good = hasBoth ? (cagr + vol) * 100 : null;
+  const avg = cagr != null ? cagr * 100 : null;
+  const bad = hasBoth ? (cagr - vol) * 100 : null;
+  const vbad = hasBoth ? (cagr - 2 * vol) * 100 : null;
+
+  function fmtScenario(v) {
+    if (v == null) return '\u2014';
+    var color = v >= 0 ? 'var(--green)' : 'var(--red)';
+    return '<span style="color:' + color + '">' + (v >= 0 ? '+' : '') + v.toFixed(1) + '%</span>';
+  }
+
+  // Also show per-run scenarios if a window is selected
   const runId = stratSelectedRun[stratIdx] || 'summary';
-  let rd, titleSuffix;
-  if (runId === 'summary') {
-    let bestRid = strat.runIds[0], bestLen = 0;
-    strat.runIds.forEach(function(r) { const d = RUN_DATA[r]; if (d && d.EQ && d.EQ.length > bestLen) { bestLen = d.EQ.length; bestRid = r; } });
-    rd = RUN_DATA[bestRid];
-    titleSuffix = 'Best Run';
-  } else {
-    rd = RUN_DATA[runId];
-    titleSuffix = rd ? rd.label : runId;
+  let runRow = '';
+  if (runId !== 'summary') {
+    const rd = RUN_DATA[runId];
+    const rm = (rd && rd.metrics) ? rd.metrics : null;
+    if (rm) {
+      const rc = rm.cagr, rv = rm.annual_volatility;
+      const rh = rc != null && rv != null;
+      runRow = '<tr style="opacity:0.7">';
+      runRow += '<td class="sticky-col" style="font-size:0.75rem">' + (rd.label || runId) + '</td>';
+      runRow += '<td>' + fmtVal(rc, 'pct') + '</td>';
+      runRow += '<td>' + fmtVal(rv, 'pct_abs') + '</td>';
+      runRow += '<td>' + fmtScenario(rh ? (rc + rv) * 100 : null) + '</td>';
+      runRow += '<td>' + fmtScenario(rc != null ? rc * 100 : null) + '</td>';
+      runRow += '<td>' + fmtScenario(rh ? (rc - rv) * 100 : null) + '</td>';
+      runRow += '<td>' + fmtScenario(rh ? (rc - 2 * rv) * 100 : null) + '</td>';
+      runRow += '</tr>';
+    }
   }
-  const htTitle = document.getElementById('ht-title-' + sid);
-  const yrTitle = document.getElementById('yr-title-' + sid);
-  if (htTitle) htTitle.textContent = 'Monthly Returns (' + titleSuffix + ')';
-  if (yrTitle) yrTitle.textContent = 'Yearly Returns (' + titleSuffix + ')';
-  if (rd) {
-    buildHeatmap('heatmap-' + sid, rd.MONTHLY_HEATMAP);
-    drawBarChart('c-' + sid + '-yearly', rd.YR);
-  }
+
+  let html = '<div class="chart-card">';
+  html += '<div class="chart-title">Return Scenarios (Annual)</div>';
+  html += '<div class="table-wrap"><table class="comp-table"><thead><tr>';
+  html += '<th class="sticky-col"></th>';
+  html += '<th>CAGR</th>';
+  html += '<th>Volatility</th>';
+  html += '<th style="color:var(--green)">Good Year</th>';
+  html += '<th>Average Year</th>';
+  html += '<th style="color:var(--amber)">Bad Year</th>';
+  html += '<th style="color:var(--red)">Very Bad Year (2\u03C3)</th>';
+  html += '</tr></thead><tbody>';
+  html += '<tr>';
+  html += '<td class="sticky-col"><span class="sb-dot" style="background:'+strat.color+'"></span>Summary</td>';
+  html += '<td>' + fmtVal(cagr, 'pct') + '</td>';
+  html += '<td>' + fmtVal(vol, 'pct_abs') + '</td>';
+  html += '<td>' + fmtScenario(good) + '</td>';
+  html += '<td>' + fmtScenario(avg) + '</td>';
+  html += '<td>' + fmtScenario(bad) + '</td>';
+  html += '<td>' + fmtScenario(vbad) + '</td>';
+  html += '</tr>';
+  html += runRow;
+  html += '</tbody></table></div></div>';
+  el.innerHTML = html;
+  initCollapseButtons();
 }
 
 // ===== TABLE SORTING (multi mode) =====
@@ -1714,14 +2315,14 @@ function toggleCollapse(btn) {
   if (card) card.classList.toggle('collapsed');
 }
 function initCollapseButtons() {
-  var titles = document.querySelectorAll('#page-overview .chart-card > .chart-title');
+  var titles = document.querySelectorAll('.chart-card > .chart-title');
   titles.forEach(function(t) {
     if (t.querySelector('.collapse-btn')) return;
     var btn = document.createElement('button');
     btn.className = 'collapse-btn';
     btn.title = 'Collapse / Expand';
     btn.innerHTML = '&#9650;';
-    btn.onclick = function(e) { e.stopPropagation(); toggleCollapse(this); };
+    btn.setAttribute('onclick', 'event.stopPropagation();toggleCollapse(this)');
     t.appendChild(btn);
   });
 }
@@ -1797,6 +2398,8 @@ function updateCompareUI() {
     drawMultiRollingSharpe();
     rebuildOverviewTradingActivity();
     rebuildReturnScenarios();
+    drawRiskReturnScatter('c-overview-scatter');
+    drawRollingReturns('overview');
     setupTooltip('c-overview-eq', 'tt-overview-eq');
     setupTooltip('c-overview-dd', 'tt-overview-dd');
     setupTooltip('c-overview-rsharpe', 'tt-overview-rsharpe');
@@ -1816,9 +2419,19 @@ function openStrategyModal() {
 }
 
 function closeStrategyModal() {
+  // Auto-apply parameter filters if any are active
+  var hasActiveFilters = Object.keys(paramFilters).some(function(k) {
+    var f = paramFilters[k];
+    return (f.selected && f.selected.size > 0) || f.min != null || f.max != null;
+  });
+  if (hasActiveFilters) {
+    applyParamFiltersQuiet();
+  }
   var overlay = document.getElementById('strat-modal-overlay');
   if (overlay) overlay.classList.remove('open');
   document.removeEventListener('keydown', modalEscHandler);
+  updateCompareUI();
+  rebuildOverviewKPIs();
 }
 
 function modalEscHandler(e) { if (e.key === 'Escape') closeStrategyModal(); }
@@ -1994,6 +2607,15 @@ function syncModalCount() {
     if (n === 0 || n === total) btn.innerHTML = 'All Strategies (' + total + ')';
     else btn.innerHTML = n + ' Strategies <span style="font-weight:700;color:var(--accent)">/ ' + total + '</span>';
   }
+  // Update all mirror strategy-select buttons (e.g. windows page)
+  document.querySelectorAll('.strat-select-count-mirror').forEach(function(el) {
+    el.textContent = (n > 0 && n < total) ? '/ ' + total : '';
+    var mirrorBtn = el.parentElement;
+    if (mirrorBtn && mirrorBtn.classList.contains('view-select')) {
+      var label = (n === 0 || n === total) ? 'All Strategies (' + total + ')' : n + ' Strategies ';
+      mirrorBtn.innerHTML = label + '<span class="strat-select-count-mirror" style="font-weight:700;color:var(--accent)">' + ((n > 0 && n < total) ? '/ ' + total : '') + '</span>';
+    }
+  });
 }
 
 function modalToggleChallenger(idx, event) {
@@ -2051,6 +2673,210 @@ function modalToggleAll(el) {
   updateCompareUI();
 }
 
+// ===== MODAL TABS: METRICS / PARAMETERS =====
+var currentModalTab = 'metrics';
+var paramFilters = {}; // { paramKey: { type:'discrete'|'range', selected:Set, min:number, max:number } }
+
+function switchModalTab(tab) {
+  currentModalTab = tab;
+  var metricsBody = document.getElementById('strat-modal-body');
+  var paramsBody = document.getElementById('strat-modal-params-body');
+  var footer = document.querySelector('.modal-footer');
+  document.querySelectorAll('.modal-tab').forEach(function(t) {
+    t.classList.toggle('active', t.dataset.modalTab === tab);
+  });
+  if (tab === 'metrics') {
+    if (metricsBody) metricsBody.style.display = '';
+    if (paramsBody) paramsBody.style.display = 'none';
+  } else {
+    if (metricsBody) metricsBody.style.display = 'none';
+    if (paramsBody) paramsBody.style.display = '';
+    rebuildModalParams();
+  }
+}
+
+function rebuildModalParams() {
+  var body = document.getElementById('strat-modal-params-body');
+  if (!body) return;
+
+  // Collect all parameter keys and their unique values across strategies
+  var paramInfo = {}; // { key: { values: Set, allNumeric: bool } }
+  STRATEGIES.forEach(function(s) {
+    var p = s.parameters;
+    if (!p) return;
+    Object.keys(p).forEach(function(key) {
+      if (!paramInfo[key]) paramInfo[key] = { values: new Set(), allNumeric: true };
+      var v = p[key];
+      var display = (typeof v === 'object' && v !== null) ? JSON.stringify(v) : String(v);
+      paramInfo[key].values.add(display);
+      if (typeof v !== 'number') paramInfo[key].allNumeric = false;
+    });
+  });
+
+  var keys = Object.keys(paramInfo).sort();
+  if (keys.length === 0) {
+    body.innerHTML = '<div style="padding:2rem;text-align:center;color:var(--text-dim);font-size:0.8rem">No strategy parameters found.</div>';
+    return;
+  }
+
+  // Count matching strategies
+  var matchCount = countParamFilterMatches();
+
+  var html = '<div class="param-filter-actions">';
+  html += '<button class="param-filter-apply" onclick="applyParamFilters()">Select ' + matchCount + ' matching</button>';
+  html += '<button class="param-filter-reset" onclick="resetParamFilters()">Reset filters</button>';
+  html += '<span style="margin-left:auto;font-size:0.72rem;color:var(--text-dim)">' + matchCount + ' of ' + STRATEGIES.length + ' strategies match</span>';
+  html += '</div>';
+
+  keys.forEach(function(key) {
+    var info = paramInfo[key];
+    var vals = Array.from(info.values).sort();
+    var filter = paramFilters[key];
+
+    html += '<div class="param-filter-row">';
+    html += '<div class="param-filter-label">' + key + '</div>';
+    html += '<div class="param-filter-controls">';
+
+    if (info.allNumeric && vals.length > 2) {
+      // Numeric range filter
+      var nums = [];
+      STRATEGIES.forEach(function(s) {
+        if (s.parameters && s.parameters[key] != null) nums.push(s.parameters[key]);
+      });
+      var minVal = Math.min.apply(null, nums);
+      var maxVal = Math.max.apply(null, nums);
+      var curMin = (filter && filter.min != null) ? filter.min : '';
+      var curMax = (filter && filter.max != null) ? filter.max : '';
+
+      html += '<div class="param-filter-range">';
+      html += '<span>min</span><input type="number" step="any" placeholder="' + minVal + '" value="' + curMin + '" data-param="' + key + '" data-bound="min" onchange="onParamRangeChange(this)">';
+      html += '<span>&ndash;</span>';
+      html += '<span>max</span><input type="number" step="any" placeholder="' + maxVal + '" value="' + curMax + '" data-param="' + key + '" data-bound="max" onchange="onParamRangeChange(this)">';
+      html += '</div>';
+
+      // Also show chip values
+      html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-left:8px">';
+      vals.forEach(function(v) {
+        var isSelected = filter && filter.selected && filter.selected.has(v);
+        html += '<span class="param-filter-chip' + (isSelected ? ' selected' : '') + '" data-param="' + key + '" data-value="' + v + '" onclick="toggleParamChip(this)">' + v + '</span>';
+      });
+      html += '</div>';
+    } else {
+      // Discrete chip filter
+      vals.forEach(function(v) {
+        var isSelected = filter && filter.selected && filter.selected.has(v);
+        html += '<span class="param-filter-chip' + (isSelected ? ' selected' : '') + '" data-param="' + key + '" data-value="' + v + '" onclick="toggleParamChip(this)">' + v + '</span>';
+      });
+    }
+
+    html += '</div></div>';
+  });
+
+  body.innerHTML = html;
+}
+
+function toggleParamChip(el) {
+  var key = el.dataset.param;
+  var val = el.dataset.value;
+  if (!paramFilters[key]) paramFilters[key] = { selected: new Set(), min: null, max: null };
+  var filter = paramFilters[key];
+  if (filter.selected.has(val)) {
+    filter.selected.delete(val);
+    el.classList.remove('selected');
+  } else {
+    filter.selected.add(val);
+    el.classList.add('selected');
+  }
+  // Clear range if chips are used
+  filter.min = null;
+  filter.max = null;
+  updateParamFilterCount();
+}
+
+function onParamRangeChange(input) {
+  var key = input.dataset.param;
+  var bound = input.dataset.bound;
+  if (!paramFilters[key]) paramFilters[key] = { selected: new Set(), min: null, max: null };
+  var val = input.value !== '' ? parseFloat(input.value) : null;
+  paramFilters[key][bound] = val;
+  // Clear chip selection when range is used
+  paramFilters[key].selected = new Set();
+  // Re-render to update chip states
+  rebuildModalParams();
+}
+
+function countParamFilterMatches() {
+  var count = 0;
+  STRATEGIES.forEach(function(s) {
+    if (strategyMatchesParamFilters(s)) count++;
+  });
+  return count;
+}
+
+function strategyMatchesParamFilters(s) {
+  var params = s.parameters || {};
+  var keys = Object.keys(paramFilters);
+  for (var i = 0; i < keys.length; i++) {
+    var key = keys[i];
+    var filter = paramFilters[key];
+    var hasChips = filter.selected && filter.selected.size > 0;
+    var hasRange = filter.min != null || filter.max != null;
+    if (!hasChips && !hasRange) continue; // No filter active for this key
+
+    var val = params[key];
+    if (val === undefined) return false; // Strategy doesn't have this param
+
+    if (hasChips) {
+      var display = (typeof val === 'object' && val !== null) ? JSON.stringify(val) : String(val);
+      if (!filter.selected.has(display)) return false;
+    }
+
+    if (hasRange) {
+      if (typeof val !== 'number') return false;
+      if (filter.min != null && val < filter.min) return false;
+      if (filter.max != null && val > filter.max) return false;
+    }
+  }
+  return true;
+}
+
+function updateParamFilterCount() {
+  var count = countParamFilterMatches();
+  var actions = document.querySelector('.param-filter-actions');
+  if (actions) {
+    var applyBtn = actions.querySelector('.param-filter-apply');
+    if (applyBtn) applyBtn.textContent = 'Select ' + count + ' matching';
+    var info = actions.querySelector('span');
+    if (info) info.textContent = count + ' of ' + STRATEGIES.length + ' strategies match';
+  }
+}
+
+function applyParamFilters() {
+  selectedForCompare.clear();
+  STRATEGIES.forEach(function(s, i) {
+    if (strategyMatchesParamFilters(s)) selectedForCompare.add(i);
+  });
+  syncModalCount();
+  syncMainTableCheckboxes();
+  rebuildStrategyModal();
+  updateCompareUI();
+  switchModalTab('metrics');
+}
+
+function applyParamFiltersQuiet() {
+  selectedForCompare.clear();
+  STRATEGIES.forEach(function(s, i) {
+    if (strategyMatchesParamFilters(s)) selectedForCompare.add(i);
+  });
+  syncModalCount();
+  syncMainTableCheckboxes();
+}
+
+function resetParamFilters() {
+  paramFilters = {};
+  rebuildModalParams();
+}
+
 function openCompare() {
   if (selectedForCompare.size < 2) return;
   buildComparePage();
@@ -2062,6 +2888,9 @@ function buildComparePage() {
 
   // Key Metrics ranking table (overview style)
   buildCompareKeyMetrics(indices);
+
+  // Parameters Comparison
+  buildCompareParameters();
 
   // Trading Activity ranking table (overview style)
   buildCompareTradingActivityRanking(indices);
@@ -2515,6 +3344,15 @@ function drawCompareExtras() {
 
   // Rolling Sharpe
   drawCompareRollingSharpe(indices);
+
+  // Risk-Return Scatter
+  drawRiskReturnScatter('c-compare-scatter');
+
+  // Rolling Returns
+  drawRollingReturns('compare');
+
+  // Relative Performance
+  drawRelativePerformance();
 
   // Draw yearly bar charts
   indices.forEach(i => {
@@ -3366,6 +4204,7 @@ function drawPageCharts(pageId) {
     drawCompareEquity();
     drawCompareMetricBars();
     drawCompareExtras();
+    buildCompareParameters();
     setupTooltip('c-compare-eq', 'tt-compare-eq');
     setupTooltip('c-compare-dd-time', 'tt-compare-dd-time');
     setupTooltip('c-compare-rsharpe', 'tt-compare-rsharpe');
@@ -3386,6 +4225,8 @@ function drawPageCharts(pageId) {
       drawMultiRollingSharpe();
       rebuildOverviewTradingActivity();
       rebuildReturnScenarios();
+      drawRiskReturnScatter('c-overview-scatter');
+      drawRollingReturns('overview');
       setupTooltip('c-overview-eq', 'tt-overview-eq');
       setupTooltip('c-overview-dd', 'tt-overview-dd');
       setupTooltip('c-overview-rsharpe', 'tt-overview-rsharpe');
@@ -3414,36 +4255,430 @@ function drawPageCharts(pageId) {
     setupTooltip('c-'+pageId+'-rsharpe', 'tt-'+pageId+'-rsharpe');
     setupTooltip('c-'+pageId+'-dd2', 'tt-'+pageId+'-dd2');
   } else {
-    // Multi mode: strategy page
+    // Multi mode: strategy page (unified, no tabs)
     const match = pageId.match(/^strat-(\d+)$/);
     if (!match) return;
     const idx = parseInt(match[1]);
     const strat = STRATEGIES[idx];
     if (!strat) return;
+    updateStratSummary(idx);
+    updateStratPerformance(idx);
     drawStrategyEquity(idx);
-    if (strat.runIds.length > 0) {
-      const selRun = stratSelectedRun[idx];
-      let targetRid;
-      if (selRun && selRun !== 'summary' && RUN_DATA[selRun]) {
-        targetRid = selRun;
-      } else {
-        targetRid = strat.runIds[0];
-        let bestLen = 0;
-        strat.runIds.forEach(function(r) { const d = RUN_DATA[r]; if (d && d.EQ && d.EQ.length > bestLen) { bestLen = d.EQ.length; targetRid = r; } });
-      }
-      const rd = RUN_DATA[targetRid];
-      if (rd) {
-        const titleSuffix = (!selRun || selRun === 'summary') ? 'Best Run' : (rd.label || targetRid);
-        const htTitle = document.getElementById('ht-title-' + pageId);
-        const yrTitle = document.getElementById('yr-title-' + pageId);
-        if (htTitle) htTitle.textContent = 'Monthly Returns (' + titleSuffix + ')';
-        if (yrTitle) yrTitle.textContent = 'Yearly Returns (' + titleSuffix + ')';
-        buildHeatmap('heatmap-'+pageId, rd.MONTHLY_HEATMAP);
-        drawBarChart('c-'+pageId+'-yearly', rd.YR);
-      }
-    }
+    drawStrategyRollingSharpe(idx);
+    drawStrategyDrawdown(idx);
+    populateStratRunsTable(idx);
+    buildStratParameters(idx);
     setupTooltip('c-'+pageId+'-eq', 'tt-'+pageId+'-eq');
+    setupTooltip('c-'+pageId+'-rsharpe', 'tt-'+pageId+'-rsharpe');
+    setupTooltip('c-'+pageId+'-dd', 'tt-'+pageId+'-dd');
+    initCollapseButtons();
   }
+}
+
+// ===== POPULATE RUNS TAB CELLS =====
+function populateRunsTabs() {
+  STRATEGIES.forEach((s, idx) => {
+    populateStratRunsTable(idx);
+  });
+}
+
+function populateStratRunsTable(stratIdx) {
+  const s = STRATEGIES[stratIdx];
+  if (!s) return;
+  const table = document.querySelector('#strat-runs-table-'+stratIdx+' tbody');
+  if (!table) return;
+  const rows = table.querySelectorAll('tr');
+  s.runIds.forEach((rid, j) => {
+    if (j >= rows.length) return;
+    const rd = RUN_DATA[rid];
+    if (!rd || !rd.metrics) return;
+    const m = rd.metrics;
+    const cells = rows[j].querySelectorAll('td');
+    // cells: [Run label, Return, Sharpe, Max DD, Trades]
+    if (cells.length >= 5) {
+      cells[1].textContent = m.total_net_gain_percentage != null ? (m.total_net_gain_percentage * 100).toFixed(1) + '%' : '—';
+      cells[2].textContent = m.sharpe_ratio != null ? m.sharpe_ratio.toFixed(2) : '—';
+      cells[3].textContent = m.max_drawdown != null ? (Math.abs(m.max_drawdown) * 100).toFixed(1) + '%' : '—';
+      cells[4].textContent = m.number_of_trades != null ? m.number_of_trades : '—';
+    }
+  });
+}
+
+// ===== RISK-RETURN SCATTER =====
+function drawRiskReturnScatter(canvasId) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const r = resizeCanvas(canvasId);
+  if (!r) return;
+  const { ctx, w, h } = r;
+  const pad = { t:25, r:60, b:40, l:60 };
+  const cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
+
+  const visibleIndices = canvasId.includes('compare')
+    ? Array.from(selectedForCompare).sort((a,b) => a-b)
+    : (selectedForCompare.size > 0
+        ? Array.from(selectedForCompare).sort((a,b) => a-b)
+        : STRATEGIES.map((_,i) => i));
+
+  // Collect data points
+  const pts = [];
+  visibleIndices.forEach(i => {
+    const m = getViewMetrics(i);
+    const vol = m.annual_volatility != null ? Math.abs(m.annual_volatility) * 100 : null;
+    const cagr = STRATEGIES[i].summary.cagr != null ? STRATEGIES[i].summary.cagr * 100 : null;
+    if (vol != null && cagr != null) {
+      pts.push({ i, vol, cagr, color: STRATEGIES[i].color, name: STRATEGIES[i].name });
+    }
+  });
+
+  if (pts.length < 1) {
+    ctx.font = '12px JetBrains Mono, monospace'; ctx.fillStyle = COL.dim; ctx.textAlign = 'center';
+    ctx.fillText('No data available', w/2, h/2);
+    return;
+  }
+
+  const vols = pts.map(p => p.vol), cagrs = pts.map(p => p.cagr);
+  let xMin = Math.min(...vols)*0.8, xMax = Math.max(...vols)*1.2;
+  let yMin = Math.min(...cagrs, 0), yMax = Math.max(...cagrs)*1.2;
+  if (xMin === xMax) { xMin -= 1; xMax += 1; }
+  if (yMin === yMax) { yMin -= 1; yMax += 1; }
+  const xRange = xMax - xMin, yRange = yMax - yMin;
+
+  // Grid
+  ctx.strokeStyle = COL.border; ctx.lineWidth = 1;
+  ctx.font = '10px JetBrains Mono, monospace'; ctx.fillStyle = COL.dim;
+  ctx.textAlign = 'right';
+  for (let i = 0; i <= 5; i++) {
+    const y = pad.t + ch - (i/5)*ch;
+    const val = yMin + (i/5)*yRange;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w-pad.r, y); ctx.stroke();
+    ctx.fillText(val.toFixed(1)+'%', pad.l-5, y+3.5);
+  }
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= 5; i++) {
+    const x = pad.l + (i/5)*cw;
+    const val = xMin + (i/5)*xRange;
+    ctx.beginPath(); ctx.moveTo(x, pad.t); ctx.lineTo(x, pad.t+ch); ctx.stroke();
+    ctx.fillText(val.toFixed(1)+'%', x, h-pad.b+15);
+  }
+
+  // Axis labels
+  ctx.font = '11px JetBrains Mono, monospace'; ctx.fillStyle = COL.text;
+  ctx.textAlign = 'center';
+  ctx.fillText('Volatility', pad.l + cw/2, h-5);
+  ctx.save(); ctx.translate(12, pad.t + ch/2); ctx.rotate(-Math.PI/2);
+  ctx.fillText('CAGR', 0, 0); ctx.restore();
+
+  // Zero line
+  if (yMin < 0 && yMax > 0) {
+    const zy = pad.t + ch - ((0-yMin)/yRange)*ch;
+    ctx.strokeStyle = COL.dim; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(pad.l, zy); ctx.lineTo(w-pad.r, zy); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Plot dots
+  pts.forEach(p => {
+    const x = pad.l + ((p.vol-xMin)/xRange)*cw;
+    const y = pad.t + ch - ((p.cagr-yMin)/yRange)*ch;
+    ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI*2);
+    ctx.fillStyle = p.color; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+    // Label
+    ctx.font = '10px JetBrains Mono, monospace'; ctx.fillStyle = COL.text;
+    ctx.textAlign = 'center';
+    ctx.fillText(p.name, x, y-12);
+  });
+
+  canvas._chartData = { pts, pad, cw, ch, xMin, xRange, yMin, yRange, type:'scatter' };
+}
+
+// ===== ROLLING RETURNS =====
+function drawRollingReturns(page) {
+  const prefix = page === 'compare' ? 'compare' : 'overview';
+  const canvas = document.getElementById('c-'+prefix+'-rolling-ret');
+  if (!canvas) return;
+  const wrap = canvas.parentElement;
+
+  const periodSel = document.getElementById(prefix+'-rolling-ret-period');
+  const months = periodSel ? parseInt(periodSel.value) : 12;
+
+  // Update title
+  const card = canvas.closest('.chart-card');
+  if (card) {
+    const title = card.querySelector('.chart-title');
+    if (title) {
+      const selHTML = title.querySelector('select');
+      const selOuter = selHTML ? selHTML.outerHTML : '';
+      title.innerHTML = 'Rolling '+months+'-Month Returns ' + selOuter;
+    }
+  }
+
+  let placeholder = wrap.querySelector('.eq-placeholder');
+  if (selectedRunView === 'summary') {
+    const r2 = resizeCanvas('c-'+prefix+'-rolling-ret');
+    if (r2) { r2.ctx.clearRect(0, 0, r2.w, r2.h); }
+    if (!placeholder) {
+      placeholder = document.createElement('div');
+      placeholder.className = 'eq-placeholder';
+      placeholder.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px;pointer-events:none;';
+      wrap.style.position = 'relative';
+      wrap.appendChild(placeholder);
+    }
+    placeholder.textContent = 'Select a backtest window to view rolling returns';
+    placeholder.style.display = 'flex';
+    wrap.style.height = '80px';
+    return;
+  }
+  if (placeholder) placeholder.style.display = 'none';
+  wrap.style.height = '';
+
+  const visibleIndices = page === 'compare'
+    ? Array.from(selectedForCompare).sort((a,b) => a-b)
+    : (selectedForCompare.size > 0
+        ? Array.from(selectedForCompare).sort((a,b) => a-b)
+        : STRATEGIES.map((_,i) => i));
+
+  const r = resizeCanvas('c-'+prefix+'-rolling-ret');
+  if (!r) return;
+  const { ctx, w, h } = r;
+  const pad = { t:15, r:60, b:30, l:10 };
+  const cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
+
+  // Compute rolling returns from monthly returns
+  const allSeries = [];
+  visibleIndices.forEach(i => {
+    const rd = getViewRunData(i);
+    if (!rd || !rd.MR || rd.MR.length < months) return;
+    const mr = rd.MR;
+    const rolling = [];
+    for (let j = months; j <= mr.length; j++) {
+      let compounded = 1;
+      for (let k = j - months; k < j; k++) {
+        compounded *= (1 + mr[k][0]);
+      }
+      rolling.push([(compounded - 1) * 100, mr[j-1][1]]);
+    }
+    allSeries.push({ data: rolling, color: STRATEGIES[i].color, name: STRATEGIES[i].name, isChal: challengerIdx === i });
+  });
+
+  // Need at least 2 rolling data points to draw a meaningful line
+  const maxPts = allSeries.reduce((mx, s) => Math.max(mx, s.data.length), 0);
+  if (allSeries.length === 0 || maxPts < 2) {
+    ctx.font = '12px JetBrains Mono, monospace'; ctx.fillStyle = COL.dim; ctx.textAlign = 'center';
+    const hint = months > 3 ? '  Try a shorter period.' : '';
+    ctx.fillText('Window too short for ' + months + '-month rolling returns.' + hint, w/2, h/2);
+    return;
+  }
+
+  let gMin = 0, gMax = 0;
+  allSeries.forEach(s => s.data.forEach(d => { if (d[0]<gMin) gMin=d[0]; if (d[0]>gMax) gMax=d[0]; }));
+  if (gMin === gMax) { gMin -= 1; gMax += 1; }
+  const range = gMax - gMin;
+
+  // Grid
+  ctx.strokeStyle = COL.border; ctx.lineWidth = 1;
+  ctx.font = '10px JetBrains Mono, monospace'; ctx.fillStyle = COL.dim; ctx.textAlign = 'right';
+  for (let i=0;i<=5;i++) {
+    const y = pad.t+ch-(i/5)*ch;
+    const val = gMin+(i/5)*range;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+    ctx.fillText(val.toFixed(0)+'%', w-pad.r+50, y+3.5);
+  }
+  if (gMin<0 && gMax>0) {
+    const zeroY = pad.t+ch-((0-gMin)/range)*ch;
+    ctx.strokeStyle = COL.dim; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(pad.l,zeroY); ctx.lineTo(w-pad.r,zeroY); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Sort: challenger on top
+  const sorted = [...allSeries].sort((a,b) => (a.isChal?1:0)-(b.isChal?1:0));
+  sorted.forEach((s, ci) => {
+    if (ci===0 && s.data.length>1) {
+      ctx.textAlign = 'center'; ctx.fillStyle = COL.dim;
+      const li = Math.max(1, Math.floor(s.data.length/6));
+      for (let i=0;i<s.data.length;i+=li) { const x=pad.l+(i/(s.data.length-1))*cw; ctx.fillText(s.data[i][1], x, h-5); }
+    }
+    ctx.beginPath(); ctx.strokeStyle = s.color;
+    ctx.lineWidth = s.isChal ? 3.5 : 2; ctx.lineJoin = 'round';
+    s.data.forEach((d, di) => {
+      const x = pad.l + (di/(s.data.length-1))*cw;
+      const y = pad.t + ch - ((d[0]-gMin)/range)*ch;
+      di===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  });
+}
+
+// ===== RELATIVE PERFORMANCE (compare page only) =====
+function drawRelativePerformance() {
+  const canvas = document.getElementById('c-compare-relative');
+  if (!canvas) return;
+  const wrap = canvas.parentElement;
+
+  let placeholder = wrap.querySelector('.eq-placeholder');
+  if (selectedRunView === 'summary') {
+    const r2 = resizeCanvas('c-compare-relative');
+    if (r2) { r2.ctx.clearRect(0, 0, r2.w, r2.h); }
+    if (!placeholder) {
+      placeholder = document.createElement('div');
+      placeholder.className = 'eq-placeholder';
+      placeholder.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:var(--dim);font-size:13px;pointer-events:none;';
+      wrap.style.position = 'relative';
+      wrap.appendChild(placeholder);
+    }
+    placeholder.textContent = 'Select a backtest window to view relative performance';
+    placeholder.style.display = 'flex';
+    wrap.style.height = '80px';
+    return;
+  }
+  if (placeholder) placeholder.style.display = 'none';
+  wrap.style.height = '';
+
+  const indices = Array.from(selectedForCompare).sort((a,b) => a-b);
+  if (indices.length < 2) return;
+
+  // Base: first selected strategy
+  const baseEq = getViewEquity(indices[0]);
+  if (!baseEq || baseEq.length < 2) return;
+
+  const r = resizeCanvas('c-compare-relative');
+  if (!r) return;
+  const { ctx, w, h } = r;
+  const pad = { t:15, r:60, b:30, l:10 };
+  const cw = w-pad.l-pad.r, ch = h-pad.t-pad.b;
+
+  // Calculate relative: (stratEq / baseEq - 1) * 100
+  const allLines = [];
+  indices.slice(1).forEach(i => {
+    const eq = getViewEquity(i);
+    if (!eq || eq.length < 2) return;
+    const len = Math.min(eq.length, baseEq.length);
+    const rel = [];
+    for (let j = 0; j < len; j++) {
+      const base = baseEq[j][0] !== 0 ? baseEq[j][0] : 1;
+      // Normalize: both start at 0%, so use (1+eq/100)/(1+base/100) - 1
+      const eqVal = 1 + eq[j][0]/100;
+      const baseVal = 1 + base/100;
+      rel.push([(eqVal/baseVal - 1) * 100, eq[j][1]]);
+    }
+    allLines.push({ data: rel, color: STRATEGIES[i].color, name: STRATEGIES[i].name, isChal: challengerIdx === i });
+  });
+
+  if (allLines.length === 0) return;
+
+  let gMin=0, gMax=0;
+  allLines.forEach(l => l.data.forEach(d => { if(d[0]<gMin) gMin=d[0]; if(d[0]>gMax) gMax=d[0]; }));
+  if (gMin===gMax) { gMin-=1; gMax+=1; }
+  const range = gMax-gMin;
+
+  ctx.strokeStyle = COL.border; ctx.lineWidth = 1;
+  ctx.font = '10px JetBrains Mono, monospace'; ctx.fillStyle = COL.dim; ctx.textAlign = 'right';
+  for (let i=0;i<=5;i++) {
+    const y = pad.t+ch-(i/5)*ch;
+    const val = gMin+(i/5)*range;
+    ctx.beginPath(); ctx.moveTo(pad.l,y); ctx.lineTo(w-pad.r,y); ctx.stroke();
+    ctx.fillText(val.toFixed(1)+'%', w-pad.r+50, y+3.5);
+  }
+  // Zero line
+  if (gMin<0 && gMax>0) {
+    const zeroY = pad.t+ch-((0-gMin)/range)*ch;
+    ctx.strokeStyle = COL.dim; ctx.setLineDash([4,4]);
+    ctx.beginPath(); ctx.moveTo(pad.l,zeroY); ctx.lineTo(w-pad.r,zeroY); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.textAlign = 'center'; ctx.fillStyle = COL.dim;
+  if (allLines[0].data.length > 1) {
+    const li = Math.max(1, Math.floor(allLines[0].data.length/6));
+    for (let i=0;i<allLines[0].data.length;i+=li) { const x=pad.l+(i/(allLines[0].data.length-1))*cw; ctx.fillText(allLines[0].data[i][1], x, h-5); }
+  }
+  allLines.forEach(l => {
+    ctx.beginPath(); ctx.strokeStyle = l.color;
+    ctx.lineWidth = l.isChal ? 3.5 : 2; ctx.lineJoin = 'round';
+    l.data.forEach((d, di) => {
+      const x = pad.l + (di/(l.data.length-1))*cw;
+      const y = pad.t + ch - ((d[0]-gMin)/range)*ch;
+      di===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.stroke();
+  });
+  // Label base strategy
+  ctx.font = '11px JetBrains Mono, monospace'; ctx.fillStyle = COL.dim; ctx.textAlign = 'left';
+  ctx.fillText('vs ' + STRATEGIES[indices[0]].name, pad.l+5, pad.t+12);
+}
+
+// ===== STRATEGY PARAMETERS =====
+
+function buildStratParameters(stratIdx) {
+  var sid = 'strat-' + stratIdx;
+  var el = document.getElementById(sid + '-parameters');
+  if (!el) return;
+  var params = STRATEGIES[stratIdx].parameters;
+  if (!params || Object.keys(params).length === 0) { el.innerHTML = ''; return; }
+  var html = '<div class="chart-card">';
+  html += '<div class="chart-title">Strategy Parameters</div>';
+  html += '<div class="table-wrap"><table class="comp-table params-table"><thead><tr><th>Parameter</th><th>Value</th></tr></thead><tbody>';
+  var keys = Object.keys(params).sort();
+  for (var k = 0; k < keys.length; k++) {
+    var key = keys[k];
+    var val = params[key];
+    if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
+    html += '<tr><td>' + key + '</td><td>' + String(val) + '</td></tr>';
+  }
+  html += '</tbody></table></div></div>';
+  el.innerHTML = html;
+}
+
+function buildCompareParameters() {
+  var el = document.getElementById('compare-parameters');
+  if (!el) return;
+  // Collect all parameter keys across all strategies
+  var allKeys = {};
+  var hasAny = false;
+  var indices = selectedForCompare.size > 0
+    ? Array.from(selectedForCompare).sort(function(a,b){return a-b;})
+    : STRATEGIES.map(function(_, i) { return i; });
+  for (var i = 0; i < indices.length; i++) {
+    var params = STRATEGIES[indices[i]].parameters;
+    if (params && Object.keys(params).length > 0) {
+      hasAny = true;
+      var ks = Object.keys(params);
+      for (var j = 0; j < ks.length; j++) allKeys[ks[j]] = true;
+    }
+  }
+  if (!hasAny) { el.innerHTML = ''; return; }
+  var sortedKeys = Object.keys(allKeys).sort();
+  var html = '<div class="chart-card">';
+  html += '<div class="chart-title">Parameters Comparison</div>';
+  html += '<div class="table-wrap"><table class="comp-table params-table"><thead><tr><th>Parameter</th>';
+  for (var i = 0; i < indices.length; i++) {
+    html += '<th><span class="sb-dot" style="background:' + STRATEGIES[indices[i]].color + '"></span> ' + STRATEGIES[indices[i]].name + '</th>';
+  }
+  html += '</tr></thead><tbody>';
+  for (var k = 0; k < sortedKeys.length; k++) {
+    var key = sortedKeys[k];
+    html += '<tr><td>' + key + '</td>';
+    // Check if all values are the same
+    var vals = [];
+    for (var i = 0; i < indices.length; i++) {
+      var p = STRATEGIES[indices[i]].parameters || {};
+      var v = p[key];
+      if (v === undefined) v = '—';
+      else if (typeof v === 'object' && v !== null) v = JSON.stringify(v);
+      else v = String(v);
+      vals.push(v);
+    }
+    var allSame = vals.every(function(v) { return v === vals[0]; });
+    for (var i = 0; i < vals.length; i++) {
+      var style = '';
+      if (!allSame && vals[i] !== '—') style = ' style="color:var(--accent);font-weight:600"';
+      html += '<td' + style + '>' + vals[i] + '</td>';
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table></div></div>';
+  el.innerHTML = html;
 }
 
 // ===== INIT =====
@@ -3455,6 +4690,7 @@ rebuildOverviewTradingActivity();
 rebuildReturnScenarios();
 initCollapseButtons();
 syncModalCount();
+populateRunsTabs();
 drawPageCharts('overview');
 let resizeTimer;
 window.addEventListener('resize', () => {

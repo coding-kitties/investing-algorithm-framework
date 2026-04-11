@@ -100,6 +100,13 @@ class BacktestSummaryMetrics:
     number_of_windows: int = None
     number_of_profitable_windows: int = None
     number_of_windows_with_trades: int = None
+    var_95: float = None
+    cvar_95: float = None
+    average_trade_duration: float = None
+    average_win_duration: float = None
+    average_loss_duration: float = None
+    max_consecutive_wins: int = None
+    max_consecutive_losses: int = None
 
     def to_dict(self) -> dict:
         """
@@ -150,6 +157,13 @@ class BacktestSummaryMetrics:
             "number_of_profitable_windows": self.number_of_profitable_windows,
             "number_of_windows_with_trades":
                 self.number_of_windows_with_trades,
+            "average_trade_duration": self.average_trade_duration,
+            "average_win_duration": self.average_win_duration,
+            "average_loss_duration": self.average_loss_duration,
+            "var_95": self.var_95,
+            "cvar_95": self.cvar_95,
+            "max_consecutive_wins": self.max_consecutive_wins,
+            "max_consecutive_losses": self.max_consecutive_losses,
         }
 
     def save(self, file_path: str | Path) -> None:

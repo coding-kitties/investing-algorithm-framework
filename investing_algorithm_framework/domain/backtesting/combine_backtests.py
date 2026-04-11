@@ -108,6 +108,12 @@ def combine_backtests(backtests):
         if backtest.metadata:
             metadata.update(backtest.metadata)
 
+    # Merge all parameters dictionaries
+    parameters = {}
+    for backtest in backtests:
+        if backtest.parameters:
+            parameters.update(backtest.parameters)
+
     # Get the first risk-free rate
     for backtest in backtests:
         if backtest.risk_free_rate is not None:
@@ -120,7 +126,8 @@ def combine_backtests(backtests):
         backtest_summary=summary,
         metadata=metadata,
         risk_free_rate=risk_free_rate,
-        backtest_runs=backtest_runs
+        backtest_runs=backtest_runs,
+        parameters=parameters
     )
     return backtest
 
@@ -372,6 +379,66 @@ def generate_backtest_summary_metrics(
         and b.number_of_trades_closed > 0
     )
 
+    # === VaR / CVaR (weighted by time) ===
+    var_95_values = [
+        b.var_95 for b in valid_metrics
+        if hasattr(b, 'var_95') and isinstance(
+            getattr(b, 'var_95', None), (int, float)
+        )
+    ]
+    var_95_weights = [
+        b.total_number_of_days for b in valid_metrics
+        if hasattr(b, 'var_95') and isinstance(
+            getattr(b, 'var_95', None), (int, float)
+        )
+    ]
+    var_95 = safe_weighted_mean(var_95_values, var_95_weights)
+
+    cvar_95_values = [
+        b.cvar_95 for b in valid_metrics
+        if hasattr(b, 'cvar_95') and isinstance(
+            getattr(b, 'cvar_95', None), (int, float)
+        )
+    ]
+    cvar_95_weights = [
+        b.total_number_of_days for b in valid_metrics
+        if hasattr(b, 'cvar_95') and isinstance(
+            getattr(b, 'cvar_95', None), (int, float)
+        )
+    ]
+    cvar_95 = safe_weighted_mean(cvar_95_values, cvar_95_weights)
+
+    # === TRADE DURATIONS (weighted by number of closed trades) ===
+    average_trade_duration = safe_weighted_mean(
+        [b.average_trade_duration for b in valid_metrics],
+        [b.number_of_trades_closed for b in valid_metrics]
+    )
+    average_win_duration = safe_weighted_mean(
+        [b.average_win_duration for b in valid_metrics],
+        [b.number_of_trades_closed for b in valid_metrics]
+    )
+    average_loss_duration = safe_weighted_mean(
+        [b.average_loss_duration for b in valid_metrics],
+        [b.number_of_trades_closed for b in valid_metrics]
+    )
+
+    # === CONSECUTIVE STREAKS (worst/best across all windows) ===
+    consecutive_wins = [
+        b.max_consecutive_wins for b in valid_metrics
+        if b.max_consecutive_wins is not None
+        and isinstance(b.max_consecutive_wins, (int, float))
+    ]
+    max_consecutive_wins = max(consecutive_wins) if consecutive_wins else None
+
+    consecutive_losses = [
+        b.max_consecutive_losses for b in valid_metrics
+        if b.max_consecutive_losses is not None
+        and isinstance(b.max_consecutive_losses, (int, float))
+    ]
+    max_consecutive_losses = max(
+        consecutive_losses
+    ) if consecutive_losses else None
+
     return BacktestSummaryMetrics(
         total_net_gain=total_net_gain,
         total_net_gain_percentage=total_net_gain_percentage,
@@ -412,5 +479,12 @@ def generate_backtest_summary_metrics(
         average_trade_gain_percentage=average_trade_gain_percentage,
         number_of_windows=number_of_windows,
         number_of_profitable_windows=number_of_profitable_windows,
-        number_of_windows_with_trades=number_of_windows_with_trades
+        number_of_windows_with_trades=number_of_windows_with_trades,
+        var_95=var_95,
+        cvar_95=cvar_95,
+        average_trade_duration=average_trade_duration,
+        average_win_duration=average_win_duration,
+        average_loss_duration=average_loss_duration,
+        max_consecutive_wins=max_consecutive_wins,
+        max_consecutive_losses=max_consecutive_losses,
     )

@@ -35,7 +35,10 @@ from .trades import get_average_trade_duration, get_average_trade_size, \
     get_average_trade_loss, get_median_trade_return, \
     get_current_average_trade_gain, get_current_average_trade_return, \
     get_current_average_trade_duration, get_current_average_trade_loss, \
-    get_average_win_duration, get_average_loss_duration
+    get_average_win_duration, get_average_loss_duration, \
+    get_max_consecutive_wins, get_max_consecutive_losses
+from .value_at_risk import get_value_at_risk, \
+    get_conditional_value_at_risk
 
 logger = getLogger("investing_algorithm_framework")
 
@@ -174,6 +177,8 @@ def create_backtest_metrics(
             "max_daily_drawdown",
             "max_drawdown_duration",
             "trades_per_year",
+            "trades_per_week",
+            "trades_per_month",
             "trade_per_day",
             "exposure_ratio",
             "cumulative_exposure",
@@ -184,6 +189,8 @@ def create_backtest_metrics(
             "number_of_negative_trades",
             "percentage_negative_trades",
             "average_trade_duration",
+            "average_win_duration",
+            "average_loss_duration",
             "average_trade_size",
             "average_trade_loss",
             "average_trade_loss_percentage",
@@ -214,6 +221,12 @@ def create_backtest_metrics(
             "current_average_trade_return",
             "current_average_trade_duration",
             "current_average_trade_loss",
+            "var_95",
+            "cvar_95",
+            "max_consecutive_wins",
+            "max_consecutive_losses",
+            "gross_profit",
+            "gross_loss",
         ]
 
     backtest_metrics = BacktestMetrics(
@@ -409,4 +422,8 @@ def create_backtest_metrics(
     safe_set("gross_profit", get_gross_profit, backtest_run.trades)
     safe_set("cumulative_return_series", get_cumulative_return_series, backtest_run.portfolio_snapshots)
     safe_set("cumulative_return", get_cumulative_return, backtest_run.portfolio_snapshots)
+    safe_set("var_95", get_value_at_risk, backtest_run.portfolio_snapshots, 0.95)
+    safe_set("cvar_95", get_conditional_value_at_risk, backtest_run.portfolio_snapshots, 0.95)
+    safe_set("max_consecutive_wins", get_max_consecutive_wins, backtest_run.trades)
+    safe_set("max_consecutive_losses", get_max_consecutive_losses, backtest_run.trades)
     return backtest_metrics

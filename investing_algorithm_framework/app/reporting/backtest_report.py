@@ -1,5 +1,6 @@
 import os
 import csv
+import base64
 import webbrowser
 import logging
 from dataclasses import dataclass, field
@@ -36,6 +37,18 @@ _TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 def _read_template(filename):
     with open(os.path.join(_TEMPLATE_DIR, filename), 'r') as f:
         return f.read()
+
+
+def _read_logo_base64(filename):
+    logo_dir = os.path.join(
+        os.path.dirname(__file__), '..', '..', 'domain',
+        'backtesting', 'templates'
+    )
+    path = os.path.join(logo_dir, filename)
+    if not os.path.exists(path):
+        return ''
+    with open(path, 'rb') as f:
+        return base64.b64encode(f.read()).decode('ascii')
 
 
 def _filter_pct(v):
@@ -174,6 +187,8 @@ class BacktestReport:
 
         css = _read_template('dashboard.css')
         js = _read_template('dashboard.js')
+        logo_dark_b64 = _read_logo_base64('finterion-dark.png')
+        logo_light_b64 = _read_logo_base64('finterion-light.png')
 
         is_single = len(self.backtests) == 1
         strategies = self._build_strategies_data()
@@ -237,6 +252,8 @@ class BacktestReport:
             title=title,
             css=css,
             js=js,
+            logo_dark_b64=logo_dark_b64,
+            logo_light_b64=logo_light_b64,
             is_single=is_single,
             strategies=strategies,
             run_data=run_data,
@@ -309,6 +326,7 @@ class BacktestReport:
                 'runIds': run_ids,
                 'runNameMap': run_name_map,
                 'runLabels': run_labels_list,
+                'parameters': bt.parameters or {},
             })
 
         return strategies
@@ -434,21 +452,64 @@ class BacktestReport:
                         'average_trade_duration',
                         'average_win_duration',
                         'average_loss_duration',
+                        'final_value',
+                        'gross_profit', 'gross_loss',
+                        'percentage_winning_months',
+                        'percentage_winning_years',
+                        'median_trade_return',
+                        'median_trade_return_percentage',
+                        'number_of_positive_trades',
+                        'number_of_negative_trades',
+                        'percentage_positive_trades',
+                        'percentage_negative_trades',
+                        'average_monthly_return',
+                        'var_95', 'cvar_95',
+                        'max_consecutive_wins',
+                        'max_consecutive_losses',
                     ):
                         metrics_dict[attr] = getattr(m, attr, None)
 
-                # Snapshot
+                    # Serialize tuple metrics (value, date)
+                    for tattr in (
+                        'best_month', 'worst_month',
+                        'best_year', 'worst_year',
+                    ):
+                        tval = getattr(m, tattr, None)
+                        if tval and tval[0] is not None:
+                            metrics_dict[tattr] = {
+                                'value': tval[0],
+                                'date': _fmt_date(tval[1]) if tval[1]
+                                else None,
+                            }
+
+                # Snapshot: raw portfolio values for Portfolio Summary
                 snapshot = {}
                 if run.portfolio_snapshots:
+                    first = run.portfolio_snapshots[0]
                     last = run.portfolio_snapshots[-1]
-                    tv = getattr(last, 'total_value', 0) or 0
+                    first_val = getattr(first, 'total_value', 0) or 0
+                    last_val = getattr(last, 'total_value', 0) or 0
+                    net_gain_raw = last_val - first_val
+                    growth_pct = round(
+                        (last_val / first_val - 1) * 100, 2
+                    ) if first_val else 0
                     snapshot = {
-                        'equity': tv,
-                        'unallocated': getattr(last, 'unallocated', 0) or 0,
-                        'net_profit': getattr(last, 'total_net_gain', 0) or 0,
-                        'growth': round(
-                            (tv / initial - 1) * 100, 2
-                        ) if initial else 0,
+                        'initial_value': round(first_val, 2),
+                        'final_value': round(last_val, 2),
+                        'net_gain': round(net_gain_raw, 2),
+                        'growth': growth_pct,
+                        'unallocated': round(
+                            getattr(last, 'unallocated', 0) or 0, 2
+                        ),
+                        'total_net_gain': round(
+                            getattr(last, 'total_net_gain', 0) or 0, 2
+                        ),
+                        'total_revenue': round(
+                            getattr(last, 'total_revenue', 0) or 0, 2
+                        ),
+                        'total_cost': round(
+                            getattr(last, 'total_cost', 0) or 0, 2
+                        ),
                     }
 
                 run_data[rid] = {

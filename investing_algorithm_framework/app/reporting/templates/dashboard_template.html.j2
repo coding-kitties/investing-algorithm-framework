@@ -13,9 +13,10 @@
 {# ── Top controls ─────────────────────────────────────────────── #}
 <div class="top-controls">
   <button class="finterion-tab" onclick="showPage('finterion')">
-    <span class="logo-dark">Finterion</span>
-    <span class="logo-light">Finterion</span>
+    <img class="logo-dark" src="data:image/png;base64,{{ logo_dark_b64 }}" alt="Finterion" height="22">
+    <img class="logo-light" src="data:image/png;base64,{{ logo_light_b64 }}" alt="Finterion" height="22">
   </button>
+  <button class="save-btn" onclick="saveReport()" title="Save report as HTML">&#128190; Save</button>
   <button class="theme-toggle" onclick="toggleTheme()">&#9788;</button>
 </div>
 
@@ -52,7 +53,7 @@
 {# ━━ Overview page ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #}
 <div class="page active" id="page-overview">
   <h2 class="page-title">
-    {{ title }}
+    Overview
     {% if not is_single %}
     <select id="overview-window-select" class="view-select"
             onchange="onOverviewWindowChange(this.value)">
@@ -107,6 +108,8 @@
             <th data-col="annual_volatility">Volatility <span class="sort-arrow">&#9650;</span></th>
             <th data-col="recovery_factor">Recovery <span class="sort-arrow">&#9650;</span></th>
             <th data-col="total_net_gain_percentage">Net Gain % <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="var_95">VaR 95% <span class="sort-arrow">&#9650;</span></th>
+            <th data-col="cvar_95">CVaR 95% <span class="sort-arrow">&#9650;</span></th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -141,6 +144,17 @@
   </div>
   {% endif %}
 
+  {# Risk-Return Scatter (multi-strategy only) #}
+  {% if not is_single %}
+  <div class="chart-card">
+    <div class="chart-title">Risk-Return Scatter</div>
+    <div class="chart-wrap">
+      <canvas id="c-overview-scatter"></canvas>
+      <div class="tooltip" id="tt-overview-scatter"></div>
+    </div>
+  </div>
+  {% endif %}
+
   {# Return Distribution + Correlation Matrix side-by-side #}
   {% if not is_single %}
   <div class="grid-2x2">
@@ -162,6 +176,24 @@
     <div class="chart-wrap" id="overview-rsharpe-wrap">
       <canvas id="c-overview-rsharpe"></canvas>
       <div class="tooltip" id="tt-overview-rsharpe"></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Rolling Returns (multi-strategy only) #}
+  {% if not is_single %}
+  <div class="chart-card">
+    <div class="chart-title">Rolling 12-Month Returns
+      <select id="overview-rolling-ret-period" class="view-select" style="font-size:0.7rem;margin-left:8px"
+              onchange="drawRollingReturns('overview')">
+        <option value="12">12-Month</option>
+        <option value="6">6-Month</option>
+        <option value="3">3-Month</option>
+      </select>
+    </div>
+    <div class="chart-wrap" id="overview-rolling-ret-wrap">
+      <canvas id="c-overview-rolling-ret"></canvas>
+      <div class="tooltip" id="tt-overview-rolling-ret"></div>
     </div>
   </div>
   {% endif %}
@@ -203,7 +235,14 @@
 
 {# ━━ Windows page ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #}
 <div class="page" id="page-windows" style="display:none">
-  <h2 class="page-title">Backtest Window Analysis</h2>
+  <h2 class="page-title">
+    Backtest Window Analysis
+    {% if not is_single %}
+    <button class="view-select" onclick="openStrategyModal()" style="cursor:pointer">
+      Strategies <span class="strat-select-count-mirror" style="font-weight:700;color:var(--accent)"></span>
+    </button>
+    {% endif %}
+  </h2>
 
   <div class="kpi-row">
     <div class="kpi-card">
@@ -252,115 +291,86 @@
   <h2 class="page-title">
     <span class="sb-dot" style="background:{{ s.color }};width:12px;height:12px"></span>
     {{ s.name }}
+    {% if rl | length > 1 %}
+    <select class="view-select strat-window-select" data-strat="{{ i }}"
+            onchange="onStratWindowChange({{ i }}, this.value)">
+      <option value="summary">&Sigma; All Windows</option>
+      {% for rn, lab in rl %}
+      {% set mapped = s.runNameMap.get(rn, '') %}
+      <option value="{{ mapped }}">{{ lab }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
   </h2>
 
-  <div class="nav-tabs">
-    <div class="tab active" onclick="switchTab('{{ s.id }}','summary')">Summary</div>
-    <div class="tab" onclick="switchTab('{{ s.id }}','runs')">Runs</div>
-    <div class="tab" onclick="switchTab('{{ s.id }}','performance')">Performance</div>
-  </div>
+  {# KPI cards (dynamically rebuilt) #}
+  <div id="{{ s.id }}-summary-content"></div>
 
-  {# Run selector pills #}
-  <div class="run-selector" id="run-sel-{{ s.id }}">
-    <button class="run-pill active" data-strat="{{ i }}"
-            data-run="summary"
-            onclick="selectStratRun({{ i }},'summary')">&Sigma; Summary</button>
-    {% for rn, lab in rl %}
-    {% set mapped = s.runNameMap.get(rn, '') %}
-    <button class="run-pill" data-strat="{{ i }}"
-            data-run="{{ mapped }}"
-            onclick="selectStratRun({{ i }},'{{ mapped }}')">{{ lab }}</button>
-    {% endfor %}
-  </div>
+  {# Strategy Parameters #}
+  <div id="{{ s.id }}-parameters"></div>
 
-  {# ── Summary tab ── #}
-  <div class="tab-panel active" id="{{ s.id }}-summary">
-    <div id="{{ s.id }}-summary-content">
-      <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-label">CAGR</div>
-          <div class="kpi-value">{{ sm.get('cagr') | pct }}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Sharpe</div>
-          <div class="kpi-value">{{ sm.get('sharpe_ratio') | ratio }}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Sortino</div>
-          <div class="kpi-value">{{ sm.get('sortino_ratio') | ratio }}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Max DD</div>
-          <div class="kpi-value" style="color:var(--red)">{{ sm.get('max_drawdown') | abs_pct }}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Profit Factor</div>
-          <div class="kpi-value">{{ sm.get('profit_factor') | ratio }}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Win Rate</div>
-          <div class="kpi-value">{{ sm.get('win_rate') | abs_pct }}</div></div>
-      </div>
-      <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-label">Calmar</div>
-          <div class="kpi-value">{{ sm.get('calmar_ratio') | ratio }}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Trades/yr</div>
-          <div class="kpi-value">{{ sm.get('trades_per_year') | ratio }}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Volatility</div>
-          <div class="kpi-value">{{ sm.get('annual_volatility') | abs_pct }}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Win/Loss</div>
-          <div class="kpi-value">{{ sm.get('win_loss_ratio') | ratio }}</div></div>
-        <div class="kpi-card"><div class="kpi-label">DD Duration</div>
-          <div class="kpi-value">{{ (sm.get('max_drawdown_duration', 0) or 0) | int }}d</div></div>
-        <div class="kpi-card"><div class="kpi-label">Exposure</div>
-          <div class="kpi-value">{{ sm.get('exposure_ratio') | abs_pct }}</div></div>
-      </div>
-      <div class="kpi-row">
-        <div class="kpi-card"><div class="kpi-label">Windows</div>
-          <div class="kpi-value">{{ sm.get('number_of_windows', rl | length) }}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Profitable</div>
-          <div class="kpi-value" style="color:var(--green)">{{ sm.get('number_of_profitable_windows', 0) }}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Total Net Gain</div>
-          <div class="kpi-value">{{ sm.get('total_net_gain_percentage') | pct }}</div></div>
-        <div class="kpi-card"><div class="kpi-label">Runs</div>
-          <div class="kpi-value">{{ rl | length }}</div></div>
-      </div>
-      <div id="{{ s.id }}-trading-activity"></div>
-      <div class="chart-card">
-        <div class="chart-title">End-of-Backtest (Last Run)</div>
-        <div id="{{ s.id }}-eob-kpis"></div>
-      </div>
+  {# Runs table (collapsed by default) #}
+  {% if rl | length > 1 %}
+  <div class="chart-card collapsed">
+    <div class="chart-title">Backtest Runs</div>
+    <div class="table-wrap">
+      <table class="comp-table" id="strat-runs-table-{{ i }}">
+        <thead>
+          <tr><th>Run</th><th>Return</th><th>Sharpe</th><th>Max DD</th><th>Trades</th></tr>
+        </thead>
+        <tbody>
+          {% for rn, lab in rl %}
+          {% set mapped = s.runNameMap.get(rn, '') %}
+          <tr data-run="{{ mapped }}"><td>{{ lab }}</td><td></td><td></td><td></td><td></td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {# Portfolio Summary (visible when a run is selected) #}
+  <div id="{{ s.id }}-portfolio-summary"></div>
+
+  {# Trading Activity #}
+  <div id="{{ s.id }}-trading-activity"></div>
+
+  {# Equity Overlay (all runs) #}
+  <div class="chart-card">
+    <div class="chart-title" id="eq-title-{{ s.id }}">Equity Curves (All Runs)</div>
+    <div class="chart-wrap">
+      <canvas id="c-{{ s.id }}-eq"></canvas>
+      <div class="tooltip" id="tt-{{ s.id }}-eq"></div>
     </div>
   </div>
 
-  {# ── Runs tab ── #}
-  <div class="tab-panel" id="{{ s.id }}-runs" style="display:none">
-    <div class="chart-card">
-      <div class="chart-title">Backtest Runs</div>
-      <div class="table-wrap">
-        <table class="comp-table">
-          <thead>
-            <tr><th>Run</th><th>Return</th><th>Sharpe</th><th>Max DD</th><th>Trades</th></tr>
-          </thead>
-          <tbody>
-            {% for _, lab in rl %}
-            <tr><td>{{ lab }}</td><td></td><td></td><td></td><td></td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-title">Equity Overlay (Runs)</div>
-      <div class="chart-wrap">
-        <canvas id="c-{{ s.id }}-eq"></canvas>
-        <div class="tooltip" id="tt-{{ s.id }}-eq"></div>
-      </div>
+  {# Rolling Sharpe Ratio #}
+  <div class="chart-card">
+    <div class="chart-title" id="rs-title-{{ s.id }}">Rolling Sharpe Ratio (All Runs)</div>
+    <div class="chart-wrap">
+      <canvas id="c-{{ s.id }}-rsharpe"></canvas>
+      <div class="tooltip" id="tt-{{ s.id }}-rsharpe"></div>
     </div>
   </div>
 
-  {# ── Performance tab ── #}
-  <div class="tab-panel" id="{{ s.id }}-performance" style="display:none">
-    <div class="chart-card">
-      <div class="chart-title" id="ht-title-{{ s.id }}">Monthly Returns (Best Run)</div>
-      <div id="heatmap-{{ s.id }}"></div>
-    </div>
-    <div class="chart-card">
-      <div class="chart-title" id="yr-title-{{ s.id }}">Yearly Returns (Best Run)</div>
-      <div class="chart-wrap chart-sm">
-        <canvas id="c-{{ s.id }}-yearly"></canvas>
-      </div>
+  {# Drawdown #}
+  <div class="chart-card">
+    <div class="chart-title" id="dd-title-{{ s.id }}">Drawdown (All Runs)</div>
+    <div class="chart-wrap">
+      <canvas id="c-{{ s.id }}-dd"></canvas>
+      <div class="tooltip" id="tt-{{ s.id }}-dd"></div>
     </div>
   </div>
+
+  {# Monthly Returns (dynamic: heatmap / rows, returns / growth) #}
+  <div id="{{ s.id }}-monthly-returns"></div>
+
+  {# Yearly Returns (dynamic with bar chart) #}
+  <div id="{{ s.id }}-yearly-returns"></div>
+
+  {# Return Scenarios (Annual) #}
+  <div id="{{ s.id }}-return-scenarios"></div>
+
 </div>
 {% endfor %}
 
@@ -376,6 +386,9 @@
 
   {# Key Metrics ranking (same style as overview) #}
   <div id="compare-key-metrics"></div>
+
+  {# Parameters Comparison #}
+  <div id="compare-parameters"></div>
 
   {# Trading Activity ranking (same style as overview) #}
   <div id="compare-trading-activity"></div>
@@ -458,53 +471,122 @@
     </div>
   </div>
 
+  {# Risk-Return Scatter #}
+  <div class="chart-card">
+    <div class="chart-title">Risk-Return Scatter</div>
+    <div class="chart-wrap">
+      <canvas id="c-compare-scatter"></canvas>
+      <div class="tooltip" id="tt-compare-scatter"></div>
+    </div>
+  </div>
+
+  {# Rolling Returns #}
+  <div class="chart-card">
+    <div class="chart-title">Rolling 12-Month Returns
+      <select id="compare-rolling-ret-period" class="view-select" style="font-size:0.7rem;margin-left:8px"
+              onchange="drawRollingReturns('compare')">
+        <option value="12">12-Month</option>
+        <option value="6">6-Month</option>
+        <option value="3">3-Month</option>
+      </select>
+    </div>
+    <div class="chart-wrap" id="compare-rolling-ret-wrap">
+      <canvas id="c-compare-rolling-ret"></canvas>
+      <div class="tooltip" id="tt-compare-rolling-ret"></div>
+    </div>
+  </div>
+
+  {# Relative Performance #}
+  <div class="chart-card">
+    <div class="chart-title">Relative Performance (vs First Selected)</div>
+    <div class="chart-wrap">
+      <canvas id="c-compare-relative"></canvas>
+      <div class="tooltip" id="tt-compare-relative"></div>
+    </div>
+  </div>
+
   <div id="compare-table-container"></div>
   <div id="compare-yearly"></div>
 </div>
 {% endif %}
 
-{# ━━ Finterion sponsor page ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #}
+{# ━━ Finterion Marketplace page ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ #}
 <div class="page" id="page-finterion" style="display:none">
-  <div class="chart-card">
-    <h3><span class="dot" style="background:var(--accent)"></span> What is Finterion?</h3>
-    <p style="font-size:0.85rem;color:var(--text-secondary);line-height:1.65;max-width:680px">
-      Finterion is a platform where algorithm developers can publish and sell
-      their trading bots to investors. Once your strategy is performing well in
-      backtests, you can deploy it on Finterion so that subscribers can allocate
-      capital to your algorithm &mdash; and you earn fees on assets under
-      management.
+
+  {# Hero #}
+  <div class="fin-hero">
+    <div class="fin-hero-logo">
+      <img class="hero-logo-dark" src="data:image/png;base64,{{ logo_dark_b64 }}" alt="Finterion" height="38">
+      <img class="hero-logo-light" src="data:image/png;base64,{{ logo_light_b64 }}" alt="Finterion" height="38">
+    </div>
+    <h2 class="fin-hero-title">Finterion Marketplace</h2>
+    <p class="fin-hero-sub">
+      Monetize your trading strategy.
+      Publish your algorithm on Finterion and let investors subscribe to it.
     </p>
     <a class="finterion-cta" href="https://finterion.com" target="_blank"
-       rel="noopener noreferrer">&#9733; Visit Finterion &rarr;</a>
+       rel="noopener noreferrer">Get Started &rarr;</a>
   </div>
-  <div class="chart-card" style="margin-top:1.25rem">
-    <h3><span class="dot" style="background:var(--green)"></span> How to Publish</h3>
-    <div class="finterion-steps">
-      <div class="finterion-step">
+
+  {# Features #}
+  <div class="fin-features">
+    <div class="fin-feature">
+      <div class="fin-feature-icon">&#128200;</div>
+      <h4>Prove Performance</h4>
+      <p>Use this framework to backtest your strategy across multiple windows and build a verified track record.</p>
+    </div>
+    <div class="fin-feature">
+      <div class="fin-feature-icon">&#127760;</div>
+      <h4>Reach Investors</h4>
+      <p>List your algorithm on the Finterion marketplace where investors browse and subscribe to strategies.</p>
+    </div>
+    <div class="fin-feature">
+      <div class="fin-feature-icon">&#128176;</div>
+      <h4>Monetize</h4>
+      <p>Set your own usage terms. Investors subscribe to your algorithm and you earn on your own conditions.</p>
+    </div>
+  </div>
+
+  {# How it works #}
+  <div class="chart-card" style="margin-top:1.5rem">
+    <div class="chart-title">How to Publish Your Strategy</div>
+    <div class="fin-timeline">
+      <div class="fin-tl-step">
         <div class="step-num">1</div>
-        <h4>Install the Plugin</h4>
-        <p>pip install finterion-investing-algorithm-framework</p>
+        <div class="fin-tl-content">
+          <h4>Install the Plugin</h4>
+          <code>pip install finterion-investing-algorithm-framework</code>
+        </div>
       </div>
-      <div class="finterion-step">
+      <div class="fin-tl-step">
         <div class="step-num">2</div>
-        <h4>Get Your API Key</h4>
-        <p>Sign up on Finterion and grab the API key from the developer dashboard.</p>
+        <div class="fin-tl-content">
+          <h4>Get Your API Key</h4>
+          <p>Sign up at <a href="https://finterion.com" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">finterion.com</a> and grab the API key from your developer dashboard.</p>
+        </div>
       </div>
-      <div class="finterion-step">
+      <div class="fin-tl-step">
         <div class="step-num">3</div>
-        <h4>Register Components</h4>
-        <p>Add the order executor, portfolio provider, and ping action.</p>
+        <div class="fin-tl-content">
+          <h4>Register Components</h4>
+          <p>Add the Finterion order executor, portfolio provider, and ping action to your algorithm.</p>
+        </div>
       </div>
-      <div class="finterion-step">
+      <div class="fin-tl-step">
         <div class="step-num">4</div>
-        <h4>Deploy &amp; Earn</h4>
-        <p>Deploy your algorithm. Investors can subscribe and allocate capital.</p>
+        <div class="fin-tl-content">
+          <h4>Deploy &amp; Monetize</h4>
+          <p>Deploy your algorithm, set your usage terms, and start earning when investors subscribe.</p>
+        </div>
       </div>
     </div>
   </div>
-  <div style="margin-top:1.5rem;text-align:center">
+
+  {# Bottom CTA #}
+  <div class="fin-bottom-cta">
+    <p>Ready to monetize your trading algorithm?</p>
     <a class="finterion-cta" href="https://finterion.com" target="_blank"
-       rel="noopener noreferrer">&#9733; Get Started on Finterion &rarr;</a>
+       rel="noopener noreferrer">Visit Finterion Marketplace &rarr;</a>
   </div>
 </div>
 
@@ -538,7 +620,13 @@ const BENCHMARKS = {{ benchmarks | tojson }};
 <div class="modal-overlay" id="strat-modal-overlay" onclick="closeStrategyModal()">
   <div class="modal-content" onclick="event.stopPropagation()">
     <div class="modal-header">
-      <span class="modal-title">Select Strategies</span>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span class="modal-title">Select Strategies</span>
+        <div class="modal-tabs">
+          <button class="modal-tab active" data-modal-tab="metrics" onclick="switchModalTab('metrics')">Metrics</button>
+          <button class="modal-tab" data-modal-tab="parameters" onclick="switchModalTab('parameters')">Parameters</button>
+        </div>
+      </div>
       <div style="display:flex;align-items:center;gap:8px">
         <label style="font-size:0.72rem;color:var(--text-secondary);cursor:pointer;display:flex;align-items:center;gap:4px">
           <input type="checkbox" id="modal-select-all" onclick="modalToggleAll(this)"> All
@@ -547,6 +635,7 @@ const BENCHMARKS = {{ benchmarks | tojson }};
       </div>
     </div>
     <div class="modal-body" id="strat-modal-body"></div>
+    <div class="modal-body" id="strat-modal-params-body" style="display:none"></div>
     <div class="modal-footer">
       <span id="modal-selected-count" style="font-size:0.72rem;color:var(--text-secondary)"></span>
       <div style="display:flex;align-items:center;gap:8px">

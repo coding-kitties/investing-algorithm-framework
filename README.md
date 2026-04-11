@@ -1,127 +1,100 @@
-<div align="center">
-  <h1>Investing Algorithm Framework</h1>
+<h1 align="center">
+    Investing Algorithm Framework
+</h1>
 
-  <p style="font-size: 18px; font-weight: 600; margin: 15px 0;">
-    Create trading strategies. Compare them side by side. Pick the best one.
-  </p>
+<p align="center">
+  <i align="center">Create trading strategies. Compare them side by side. Pick the best one. 🚀</i>
+</p>
 
-  <!-- Quick Links -->
-  <div style="margin: 20px 0;">
-    <a target="_blank" href="https://coding-kitties.github.io/investing-algorithm-framework/">
-      <img src="https://img.shields.io/badge/📖_Documentation-blue?style=for-the-badge">
-    </a>
-    &nbsp;
-    <a href="https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/installation">
-      <img src="https://img.shields.io/badge/🚀_Quick_Start-green?style=for-the-badge">
-    </a>
-  </div>
-
-  <!-- Badges -->
-  <div style="margin-bottom: 20px;">
-    <a target="_blank" href="https://discord.gg/dQsRmGZP"><img src="https://img.shields.io/discord/1345358169777635410.svg?color=7289da&label=Discord&logo=discord&style=flat-square" alt="Discord"></a>
-    &nbsp;
-    <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml"><img src="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml/badge.svg?style=flat-square" alt="Tests"></a>
-    &nbsp;
-    <a href="https://pypi.org/project/investing-algorithm-framework/"><img src="https://img.shields.io/pypi/v/investing-algorithm-framework.svg?style=flat-square" alt="PyPI"></a>
-    &nbsp;
-    <a href="https://pepy.tech/project/investing-algorithm-framework"><img src="https://pepy.tech/badge/investing-algorithm-framework/month?style=flat-square" alt="Downloads"></a>
-    &nbsp;
-    <a href="https://github.com/coding-kitties/investing-algorithm-framework/stargazers"><img src="https://img.shields.io/github/stars/coding-kitties/investing-algorithm-framework?style=flat-square" alt="Stars"></a>
-  </div>
-
-  <img src="static/showcase.svg" alt="Investing Algorithm Framework" style="height: 400px; max-width: 100%; margin: 30px 0;">
-
-  > ⭐ **If you like this project, please consider [starring](https://github.com/coding-kitties/investing-algorithm-framework) it!**
-
+<h4 align="center">
+  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=master&label=tests&style=flat-square" alt="tests" style="height: 20px;">
+  </a>
+  <a href="https://pypi.org/project/investing-algorithm-framework/">
+    <img src="https://img.shields.io/pypi/v/investing-algorithm-framework.svg?style=flat-square" alt="pypi" style="height: 20px;">
+  </a>
+  <a href="https://pepy.tech/project/investing-algorithm-framework">
+    <img src="https://pepy.tech/badge/investing-algorithm-framework/month?style=flat-square" alt="downloads" style="height: 20px;">
+  </a>
+  <a href="https://opensource.org/licenses/Apache-2.0">
+    <img src="https://img.shields.io/badge/apache%202.0-blue.svg?style=flat-square&label=license" alt="license" style="height: 20px;">
+  </a>
   <br>
+  <a href="https://discord.gg/dQsRmGZP">
+    <img src="https://img.shields.io/badge/discord-7289da.svg?style=flat-square&logo=discord" alt="discord" style="height: 20px;">
+  </a>
+  <a href="https://www.reddit.com/r/InvestingBots/">
+    <img src="https://img.shields.io/badge/reddit-FF4500.svg?style=flat-square&logo=reddit&logoColor=white" alt="reddit" style="height: 20px;">
+  </a>
+  <a href="https://github.com/coding-kitties/investing-algorithm-framework/stargazers">
+    <img src="https://img.shields.io/github/stars/coding-kitties/investing-algorithm-framework?style=flat-square" alt="stars" style="height: 20px;">
+  </a>
+</h4>
 
-  <table>
-    <tbody>
-      <tr>
-        <td align="center" style="border: none;">
-          <sub><b>Sponsored by</b></sub>
-          <br><br>
-          <a href="https://www.finterion.com/" target="_blank">
-            <picture>
-              <source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png">
-              <source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png">
-              <img src="static/sponsors/finterion-light.png" alt="Finterion" width="180">
-            </picture>
-          </a>
-          <br>
-          <sub>Marketplace for trading bots</sub>
-        </td>
-      </tr>
-    </tbody>
-  </table>
+<p align="center">
+    <img src="static/showcase.svg" alt="dashboard" style="max-width: 100%;">
+</p>
 
-</div>
+<p align="center">
+  <sub><b>Sponsored by</b></sub>
+  <br>
+  <a href="https://www.finterion.com/" target="_blank">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png">
+      <source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png">
+      <img src="static/sponsors/finterion-light.png" alt="Finterion" width="200">
+    </picture>
+  </a>
+  <br>
+  <sub>Marketplace for trading bots</sub>
+</p>
 
----
+## Introduction
 
-## Why This Framework?
+`Investing Algorithm Framework` is a Python framework for creating, backtesting, and deploying trading strategies.
 
 Most quant frameworks stop at "here's your backtest result." You get a number, maybe a chart, and then you're on your own figuring out which strategy is actually better.
 
-**Investing Algorithm Framework** is built around the full loop: **create strategies → backtest them → compare them in a single report → deploy the winner.**
+This framework is built around the full loop: **create strategies → backtest them → compare them in a single report → deploy the winner.** It generates a self-contained HTML dashboard that lets you rank, filter, and visually compare every strategy you've tested — all in one view, no notebooks required.
 
-The framework generates a **self-contained HTML dashboard** that lets you rank, filter, and visually compare every strategy you've tested — all in one view, no notebooks required.
+<details open>
+<summary>
+ Features
+</summary> <br>
 
----
+- 📊 **30+ Metrics** — CAGR, Sharpe, Sortino, Calmar, VaR, CVaR, Max DD, Recovery & more
+- ⚔️ **Multi-Strategy Comparison** — Rank, filter & compare strategies in a single interactive report
+- 🪟 **Multi-Window Robustness** — Test across different time periods with window coverage analysis
+- 📈 **Equity & Drawdown Charts** — Overlay equity curves, rolling Sharpe, drawdown & return distributions
+- 🗓️ **Monthly Heatmaps & Yearly Returns** — Calendar heatmap per strategy with return/growth toggles
+- 🎯 **Return Scenario Projections** — Good, average, bad & very bad year projections from backtest data
+- 📉 **Benchmark Comparison** — Beat-rate analysis vs Buy & Hold, DCA, risk-free & custom benchmarks
+- 📄 **One-Click HTML Report** — Self-contained file, no server, dark & light theme, shareable
+- 🚀 **Build → Backtest → Deploy** — Local dev, cloud deploy (AWS / Azure), or monetize on Finterion
 
-## The Backtest Report Dashboard
+</details>
 
-Every backtest produces a **single HTML file** you can open in any browser, share with teammates, or archive. No server, no dependencies, no Jupyter required.
+## Usage
 
-### Overview Page — See All Strategies at a Glance
+To get started, install the framework and scaffold a new project:
 
-- **KPI cards** — Portfolio value, total return, best CAGR, best Sharpe, lowest max drawdown across all strategies
-- **Key Metrics ranking table** — CAGR, Sharpe, Sortino, max drawdown, volatility, recovery factor — sortable, with the best value in each column highlighted
-- **Trading Activity ranking table** — Total trades, win rate, profit factor, avg win/loss duration, trades per year/month/week
-- **Return Scenarios table** — Projected returns for good, average, bad, and very bad years based on historical performance
-- **Equity curve chart** — Overlay all strategy equity curves on a single chart; click any strategy to toggle it on/off
-- **Metric bar charts** — Side-by-side comparison of CAGR, Sharpe, max drawdown, win rate, and more
-- **Monthly returns heatmap** — Per-strategy calendar heatmap of monthly returns, with year filter
-- **Return/growth distribution** — Monthly and yearly return histograms for each strategy
-- **Window coverage matrix** — See which strategies cover which backtest time windows, with comparability stats
+```bash
+pip install investing-algorithm-framework
 
-### Compare Page — Deep Dive into Selected Strategies
+# Generate project structure
+investing-algorithm-framework init
 
-- **Strategy selection modal** — Click to pick which strategies to compare; sort by any metric, paginate large sets
-- **Filtered equity curves** — Only the selected strategies are shown
-- **Filtered metric charts** — Bar charts update to reflect your selection
-- **Filtered ranking tables** — Key Metrics, Trading Activity, and Return Scenarios tables all respect your selection
-- **Collapsible cards** — Collapse any section to focus on what matters
-
-### How It Works
-
-```python
-from investing_algorithm_framework import BacktestReport
-
-# After running backtests
-report = BacktestReport(backtest)
-report.show()  # Opens dashboard in your browser
-
-# Or load previously saved backtests from disk
-report = BacktestReport.open(directory_path="path/to/backtests")
-report.show()
-
-# Compare multiple strategies side by side
-report = BacktestReport.open(backtests=[backtest_a, backtest_b, backtest_c])
-report.show()
-
-# Save as a self-contained HTML file
-report.save("my_report.html")
-
-# Recalculate metrics after framework updates
-from investing_algorithm_framework import recalculate_backtests
-recalculate_backtests(report.backtests)
-report.show()
+# Or for cloud deployment
+investing-algorithm-framework init --type aws_lambda
+investing-algorithm-framework init --type azure_function
 ```
 
----
+The [documentation](https://coding-kitties.github.io/investing-algorithm-framework/) provides guides and API reference. The [quick start](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/installation) will walk you through your first strategy.
 
-## Creating Strategies
+<details>
+<summary>
+  Creating a Strategy
+</summary> <br>
 
 The framework is designed around the `TradingStrategy` class. You define **what data** your strategy needs and **when to buy or sell** — the framework handles execution, position management, and reporting.
 
@@ -141,7 +114,6 @@ class MyStrategy(TradingStrategy):
             ohlcv = market_data[f"{pair}-ohlcv-2h"]
             price = ohlcv["Close"].iloc[-1]
 
-            # Your buy/sell logic here
             if self.should_buy(ohlcv) and not context.has_position(symbol):
                 context.create_limit_order(
                     target_symbol=symbol,
@@ -161,24 +133,44 @@ class MyStrategy(TradingStrategy):
 
 Create as many strategy variants as you want — different parameters, different indicators, different symbols — then backtest them all and compare in a single report.
 
-### Scaffold a New Project
+</details>
 
-```bash
-pip install investing-algorithm-framework
+<details>
+<summary>
+  Backtest Report Dashboard
+</summary> <br>
 
-# Generate project structure
-investing-algorithm-framework init
+Every backtest produces a **single HTML file** you can open in any browser, share with teammates, or archive. No server, no dependencies, no Jupyter required.
 
-# Or for cloud deployment
-investing-algorithm-framework init --type aws_lambda
-investing-algorithm-framework init --type azure_function
+```python
+from investing_algorithm_framework import BacktestReport
+
+# After running backtests
+report = BacktestReport(backtest)
+report.show()  # Opens dashboard in your browser
+
+# Or load previously saved backtests from disk
+report = BacktestReport.open(directory_path="path/to/backtests")
+report.show()
+
+# Compare multiple strategies side by side
+report = BacktestReport.open(backtests=[backtest_a, backtest_b, backtest_c])
+report.show()
+
+# Save as a self-contained HTML file
+report.save("my_report.html")
 ```
 
-This creates an `app.py` entry point and a `strategy.py` file you can start editing immediately.
+**Overview page** — KPI cards, key metrics ranking table, trading activity, return scenarios, equity curves, metric bar charts, monthly returns heatmap, return distributions, and window coverage matrix.
 
----
+**Strategy pages** — Deep dive into each strategy with per-run equity curves, rolling Sharpe, drawdown, monthly/yearly returns, and portfolio summary.
 
-## Features
+</details>
+
+<details open>
+<summary>
+ Capabilities
+</summary> <br>
 
 | | |
 |---|---|
@@ -191,6 +183,8 @@ This creates an `app.py` entry point and a `strategy.py` file you can start edit
 | **Cloud Deployment** | Deploy to AWS Lambda, Azure Functions, or run as a web service |
 | **Market Data** | OHLCV, tickers, custom data — Polars and Pandas native |
 | **Extensible** | Custom data providers, order executors, and strategy classes |
+
+</details>
 
 ## Plugins
 
@@ -210,11 +204,12 @@ poetry install
 python -m unittest discover -s tests
 ```
 
-## Risk Disclaimer
+## Resources
 
-If you use this framework for real trading, **do not risk money you are afraid to lose.** Test thoroughly with backtesting first. Start small. We assume no responsibility for your investment results.
-
----
+- **[Documentation](https://coding-kitties.github.io/investing-algorithm-framework/)** — Guides and API reference
+- **[Quick Start](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/installation)** — Get up and running
+- **[Discord](https://discord.gg/dQsRmGZP)** — Chat and support
+- **[Reddit](https://www.reddit.com/r/InvestingBots/)** — Strategy discussion
 
 ## Contributing
 
@@ -222,28 +217,16 @@ If you use this framework for real trading, **do not risk money you are afraid t
 - Read the [Contributing Guide](https://coding-kitties.github.io/investing-algorithm-framework/Contributing%20Guide/contributing)
 - PRs go against the `develop` branch
 
-## Community
+## Risk Disclaimer
 
-* [Discord](https://discord.gg/dQsRmGZP) — Chat and support
-* [Reddit](https://www.reddit.com/r/InvestingBots/) — Strategy discussion
-* [Documentation](https://coding-kitties.github.io/investing-algorithm-framework/) — Guides and API reference
+If you use this framework for real trading, **do not risk money you are afraid to lose.** Test thoroughly with backtesting first. Start small. We assume no responsibility for your investment results.
 
----
+## Acknowledgements
 
-## 🏆 Acknowledgements
+We want to thank all contributors to this project. A full list can be found in [AUTHORS.md](https://github.com/coding-kitties/investing-algorithm-framework/blob/master/AUTHORS.md).
 
-We want to thank all contributors to this project. A full list can be found in [AUTHORS.md](https://github.com/coding-kitties/investing-algorithm-framework/blob/master/AUTHORS.md)
+## Sponsor
 
-### Report Issues
+<a href="https://www.finterion.com/" target="_blank"><picture><source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png"><source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png"><img src="static/sponsors/finterion-light.png" alt="Finterion" width="180"></picture></a>
 
-If you discover a bug in the framework, please [search our issue tracker](https://github.com/coding-kitties/investing-algorithm-framework/issues?q=is%3Aissue) first. If it hasn't been reported, please [create a new issue](https://github.com/coding-kitties/investing-algorithm-framework/issues/new).
-
----
-
-<div align="center">
-  <p>
-    <a href="https://github.com/coding-kitties/investing-algorithm-framework/stargazers">⭐ Star us on GitHub</a> ·
-    <a href="https://discord.gg/dQsRmGZP">💬 Join Discord</a> ·
-    <a href="https://github.com/coding-kitties/investing-algorithm-framework/issues/new">🐛 Report Bug</a>
-  </p>
-</div>
+**[Finterion](https://www.finterion.com/)** — Marketplace for trading bots. Monetize your strategies by publishing them on Finterion.
