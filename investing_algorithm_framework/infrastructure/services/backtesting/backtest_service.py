@@ -544,8 +544,8 @@ class BacktestService:
             backtest_summary=generate_backtest_summary_metrics(
                 [backtest_metrics]
             ),
-            parameters=strategy.get_parameters()
-            if hasattr(strategy, 'get_parameters') else {}
+            parameters=algorithm.get_parameters()
+            if hasattr(algorithm, 'get_parameters') else {}
         )
 
     def backtest_exists(
