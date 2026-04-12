@@ -1,0 +1,9 @@
+{
+    "fast_period": 12,
+    "slow_period": 50,
+    "trend_period": 100,
+    "stop_loss_pct": 5.0,
+    "position_size_pct": 20,
+    "symbols": ["BTC/EUR"],
+    "use_ema": true
+}
