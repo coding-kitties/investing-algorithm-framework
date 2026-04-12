@@ -86,7 +86,10 @@ def _per_window_table(bt):
     runs = bt.get_all_backtest_runs()
     if not runs:
         return "No runs available."
-    header = "| Window | CAGR | Sharpe | Sortino | Max DD | Win Rate | Trades |"
+    header = (
+        "| Window | CAGR | Sharpe | Sortino"
+        " | Max DD | Win Rate | Trades |"
+    )
     sep = "|--------|------|--------|---------|--------|----------|--------|"
     rows = [header, sep]
     for run in runs:
@@ -98,7 +101,7 @@ def _per_window_table(bt):
                 f"| {_fmt_pct(m.cagr)} "
                 f"| {_fmt_dec(m.sharpe_ratio)} "
                 f"| {_fmt_dec(m.sortino_ratio)} "
-                f"| {_fmt_pct(abs(m.max_drawdown) if m.max_drawdown else None)} "
+                f"| {_fmt_pct(abs(m.max_drawdown) if m.max_drawdown else None)} "  # noqa: E501
                 f"| {_fmt_pct(m.win_rate)} "
                 f"| {m.number_of_trades or 0} |"
             )
@@ -135,8 +138,8 @@ def _trading_activity_table(backtests):
             f"| {_fmt_dec(getattr(s, 'trades_per_month', None))} "
             f"| {_fmt_dec(tpw)} "
             f"| {getattr(s, 'number_of_trades', None) or 0} "
-            f"| {_fmt_pct(getattr(s, 'average_trade_return_percentage', None))} "
-            f"| {_fmt_pct(getattr(s, 'median_trade_return_percentage', None))} "
+            f"| {_fmt_pct(getattr(s, 'average_trade_return_percentage', None))} "  # noqa: E501
+            f"| {_fmt_pct(getattr(s, 'median_trade_return_percentage', None))} "  # noqa: E501
             f"| {_fmt_dec(getattr(s, 'average_trade_duration', None))} "
             f"| {getattr(s, 'max_consecutive_wins', None) or 0} "
             f"| {getattr(s, 'max_consecutive_losses', None) or 0} "
@@ -215,8 +218,14 @@ def _full_analysis(backtests):
         trades = _top_trades(bt, 5)
         if trades:
             md += "### Top Trades\n\n"
-            md += "| Symbol | Opened | Closed | Return % | Net Gain | Window |\n"
-            md += "|--------|--------|--------|----------|----------|--------|\n"
+            md += (
+                "| Symbol | Opened | Closed"
+                " | Return % | Net Gain | Window |\n"
+            )
+            md += (
+                "|--------|--------|--------"
+                "|----------|----------|--------|\n"
+            )
             for t in trades:
                 md += (
                     f"| {t['symbol']} | {t['opened']} | {t['closed']} "
@@ -667,7 +676,6 @@ def _symbol_breakdown(bt):
     for run in bt.get_all_backtest_runs():
         for t in (run.trades or []):
             sym = getattr(t, 'target_symbol', '') or '—'
-            cost = getattr(t, 'cost', 0) or 0
             ng = getattr(t, 'net_gain', 0) or 0
             entry = sym_stats.setdefault(sym, {
                 'count': 0, 'gain': 0.0, 'wins': 0, 'losses': 0
@@ -738,10 +746,18 @@ def _return_scenarios(bt):
     md += f"- Max Drawdown: {_fmt_pct(s.max_drawdown)}\n"
     md += f"- VaR 95%: {_fmt_pct(getattr(s, 'var_95', None))}\n"
     md += f"- CVaR 95%: {_fmt_pct(getattr(s, 'cvar_95', None))}\n"
-    md += f"- % Winning Months: {_fmt_pct(getattr(s, 'percentage_winning_months', None))}\n"
-    md += f"- % Winning Years: {_fmt_pct(getattr(s, 'percentage_winning_years', None))}\n"
-    md += f"- Max Consecutive Wins: {getattr(s, 'max_consecutive_wins', '—')}\n"
-    md += f"- Max Consecutive Losses: {getattr(s, 'max_consecutive_losses', '—')}\n"
+    win_mo = _fmt_pct(
+        getattr(s, 'percentage_winning_months', None)
+    )
+    win_yr = _fmt_pct(
+        getattr(s, 'percentage_winning_years', None)
+    )
+    md += f"- % Winning Months: {win_mo}\n"
+    md += f"- % Winning Years: {win_yr}\n"
+    cons_w = getattr(s, 'max_consecutive_wins', '—')
+    cons_l = getattr(s, 'max_consecutive_losses', '—')
+    md += f"- Max Consecutive Wins: {cons_w}\n"
+    md += f"- Max Consecutive Losses: {cons_l}\n"
 
     return md
 
@@ -809,7 +825,6 @@ def _window_coverage(backtests):
     for bt in backtests:
         for run in bt.get_all_backtest_runs():
             name = run.backtest_date_range_name or "—"
-            ts = getattr(run, 'trading_symbol', 'EUR') or 'EUR'
             start = _fmt_date(run.backtest_start_date)
             end = _fmt_date(run.backtest_end_date)
             days = 0
@@ -1239,9 +1254,10 @@ class BacktestMCPServer:
             {
                 "name": "get_symbol_breakdown",
                 "description": (
-                    "Get per-symbol trade breakdown for a strategy — "
-                    "how many trades per symbol, net gain, win rate. "
-                    "Useful for understanding concentration and diversification."
+                    "Get per-symbol trade breakdown for a "
+                    "strategy — how many trades per symbol, "
+                    "net gain, win rate. Useful for "
+                    "understanding concentration."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -1383,10 +1399,13 @@ class BacktestMCPServer:
                             "description": (
                                 "Strategy selections as {strategy_id: tag} "
                                 "where tag is 'keep', 'maybe', or 'reject'. "
-                                "E.g. {'my_strategy': 'keep', 'other': 'reject'}. "
-                                "When a user clicks 'Apply Selection' on this "
-                                "note, the dashboard filters to show only "
-                                "these strategies."
+                                "E.g. {'my_strategy': 'keep', "
+                                "'other': 'reject'}. "
+                                "When a user clicks "
+                                "'Apply Selection' on this "
+                                "note, the dashboard filters "
+                                "to show only these "
+                                "strategies."
                             ),
                         },
                     },
@@ -1494,7 +1513,10 @@ class BacktestMCPServer:
                             "description": (
                                 "Array of conditions, each with metric, "
                                 "operator (>, <, >=, <=, ==), and value. "
-                                "E.g. [{\"metric\":\"sharpe_ratio\",\"operator\":\">\",\"value\":1.0}]"
+                                "E.g. [{\"metric\":"
+                                "\"sharpe_ratio\","
+                                "\"operator\":\">\","
+                                "\"value\":1.0}]"
                             ),
                             "items": {
                                 "type": "object",
@@ -1553,7 +1575,7 @@ class BacktestMCPServer:
                         f"| {_fmt_pct(s.cagr)} "
                         f"| {_fmt_dec(s.sharpe_ratio)} "
                         f"| {_fmt_dec(s.sortino_ratio)} "
-                        f"| {_fmt_pct(abs(s.max_drawdown) if s.max_drawdown else None)} "
+                        f"| {_fmt_pct(abs(s.max_drawdown) if s.max_drawdown else None)} "  # noqa: E501
                         f"| {_fmt_pct(s.win_rate)} "
                         f"| {_fmt_dec(s.profit_factor)} "
                         f"| {_fmt_dec(s.trades_per_year, 0)} "
@@ -1571,7 +1593,11 @@ class BacktestMCPServer:
             sid = arguments.get("strategy_id", "")
             bt = self._bt_map.get(sid)
             if not bt:
-                return f"Strategy '{sid}' not found. Available: {list(self._bt_map.keys())}"
+                avail = list(self._bt_map.keys())
+                return (
+                    f"Strategy '{sid}' not found."
+                    f" Available: {avail}"
+                )
             md = f"# {bt.algorithm_id}\n\n"
             if bt.parameters:
                 params = ", ".join(
@@ -1585,8 +1611,16 @@ class BacktestMCPServer:
             trades = _top_trades(bt, 10)
             if trades:
                 md += "## Top Trades\n\n"
-                md += "| Symbol | Opened | Closed | Return % | Net Gain | Window |\n"
-                md += "|--------|--------|--------|----------|----------|--------|\n"
+                md += (
+                    "| Symbol | Opened | Closed"
+                    " | Return % | Net Gain"
+                    " | Window |\n"
+                )
+                md += (
+                    "|--------|--------|--------"
+                    "|----------|----------"
+                    "|--------|\n"
+                )
                 for t in trades:
                     md += (
                         f"| {t['symbol']} | {t['opened']} | {t['closed']} "
@@ -1666,8 +1700,16 @@ class BacktestMCPServer:
             if not trades:
                 return "No trades found."
             md = f"# Trades for {sid}\n\n"
-            md += "| Symbol | Opened | Closed | Return % | Net Gain | Window |\n"
-            md += "|--------|--------|--------|----------|----------|--------|\n"
+            md += (
+                "| Symbol | Opened | Closed"
+                " | Return % | Net Gain"
+                " | Window |\n"
+            )
+            md += (
+                "|--------|--------|--------"
+                "|----------|----------"
+                "|--------|\n"
+            )
             for t in trades:
                 md += (
                     f"| {t['symbol']} | {t['opened']} | {t['closed']} "
@@ -1801,14 +1843,25 @@ class BacktestMCPServer:
             sid = arguments.get("strategy_id", "")
             bt = self._bt_map.get(sid)
             if not bt:
-                return f"Strategy '{sid}' not found. Available: {list(self._bt_map.keys())}"
-            return f"# Symbol Breakdown — {sid}\n\n" + _symbol_breakdown(bt)
+                avail = list(self._bt_map.keys())
+                return (
+                    f"Strategy '{sid}' not found."
+                    f" Available: {avail}"
+                )
+            return (
+                f"# Symbol Breakdown — {sid}\n\n"
+                + _symbol_breakdown(bt)
+            )
 
         elif name == "get_return_scenarios":
             sid = arguments.get("strategy_id", "")
             bt = self._bt_map.get(sid)
             if not bt:
-                return f"Strategy '{sid}' not found. Available: {list(self._bt_map.keys())}"
+                avail = list(self._bt_map.keys())
+                return (
+                    f"Strategy '{sid}' not found."
+                    f" Available: {avail}"
+                )
             return f"# Return Scenarios — {sid}\n\n" + _return_scenarios(bt)
 
         elif name == "get_correlation_matrix":
@@ -2000,7 +2053,11 @@ class BacktestMCPServer:
             matched = _filter_strategies(self._backtests, conditions)
             if not matched:
                 return "No strategies match all conditions."
-            md = f"# Filtered Strategies ({len(matched)} of {len(self._backtests)})\n\n"
+            total = len(self._backtests)
+            md = (
+                f"# Filtered Strategies"
+                f" ({len(matched)} of {total})\n\n"
+            )
             md += "**Conditions:** "
             md += ", ".join(
                 f"{c['metric']} {c['operator']} {c['value']}"
@@ -2023,7 +2080,7 @@ class BacktestMCPServer:
                         f"| {_fmt_pct(s.cagr)} "
                         f"| {_fmt_dec(s.sharpe_ratio)} "
                         f"| {_fmt_dec(s.sortino_ratio)} "
-                        f"| {_fmt_pct(abs(s.max_drawdown) if s.max_drawdown else None)} "
+                        f"| {_fmt_pct(abs(s.max_drawdown) if s.max_drawdown else None)} "  # noqa: E501
                         f"| {_fmt_pct(s.win_rate)} "
                         f"| {_fmt_dec(s.profit_factor)} |\n"
                     )
