@@ -38,7 +38,7 @@ from .backtesting import BacktestRun, BacktestSummaryMetrics, \
     BacktestDateRange, Backtest, BacktestMetrics, combine_backtests, \
     BacktestPermutationTest, BacktestEvaluationFocus, \
     generate_backtest_summary_metrics, load_backtests_from_directory, \
-    save_backtests_to_directory
+    save_backtests_to_directory, retag_backtests
 from .algorithm_id import generate_algorithm_id
 
 __all__ = [
@@ -148,5 +148,6 @@ __all__ = [
     'StopLossRule',
     "load_backtests_from_directory",
     "save_backtests_to_directory",
+    "retag_backtests",
     "generate_algorithm_id",
 ]

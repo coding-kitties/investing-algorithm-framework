@@ -6,7 +6,6 @@ import logging
 from dataclasses import dataclass, field
 from typing import List, Union
 from datetime import datetime, timedelta
-from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader
 
@@ -86,6 +85,9 @@ class BacktestReport:
     directory_path: str = None
     # Backward compat with old API (backtest: Backtest)
     backtest: object = None
+    _source_tags: List[str] = field(
+        default_factory=list, repr=False
+    )
 
     def __post_init__(self):
         # Handle single Backtest passed as first positional arg:
@@ -136,46 +138,75 @@ class BacktestReport:
         return (
             os.path.exists(backtest_path)
             and os.path.isdir(backtest_path)
-            and os.path.isfile(os.path.join(backtest_path, "algorithm_id.json"))
+            and os.path.isfile(
+                os.path.join(backtest_path, "algorithm_id.json")
+            )
             and os.path.isdir(os.path.join(backtest_path, "runs"))
         )
 
     @staticmethod
     def open(
         backtests: List[Backtest] = None,
-        directory_path=None,
+        directory_path: Union[str, List[str], None] = None,
     ) -> "BacktestReport":
         loaded = []
+        source_tags = []
 
         if backtests is None:
             backtests = []
 
+        # Normalize directory_path to a list
         if directory_path is not None:
-            if BacktestReport._is_backtest(directory_path):
-                loaded.append(Backtest.open(directory_path))
+            if isinstance(directory_path, str):
+                dir_paths = [directory_path]
             else:
-                for root, dirs, _ in os.walk(directory_path):
+                dir_paths = list(directory_path)
+        else:
+            dir_paths = []
+
+        for dp in dir_paths:
+            tag = os.path.basename(os.path.normpath(dp))
+            if BacktestReport._is_backtest(dp):
+                loaded.append(Backtest.open(dp))
+                source_tags.append(tag)
+            else:
+                for root, dirs, _ in os.walk(dp):
                     for dir_name in dirs:
-                        subdir = os.path.join(root, dir_name)
-                        if BacktestReport._is_backtest(subdir):
-                            loaded.append(Backtest.open(subdir))
+                        subdir = os.path.join(
+                            root, dir_name
+                        )
+                        if BacktestReport._is_backtest(
+                            subdir
+                        ):
+                            loaded.append(
+                                Backtest.open(subdir)
+                            )
+                            source_tags.append(tag)
 
         for bt in backtests:
             if not isinstance(bt, Backtest):
                 raise OperationalException(
-                    "Provided backtest is not a valid Backtest instance."
+                    "Provided backtest is not a "
+                    "valid Backtest instance."
                 )
             loaded.append(bt)
+            source_tags.append('')
 
         if not loaded:
             raise OperationalException(
-                f"No valid backtests found at {directory_path}."
+                f"No valid backtests found "
+                f"at {directory_path}."
             )
 
-        return BacktestReport(
+        # Keep first dir for backward compat
+        first_dir = dir_paths[0] if dir_paths else None
+
+        report = BacktestReport(
             backtests=loaded,
-            directory_path=directory_path,
+            directory_path=first_dir,
         )
+        report._source_tags = source_tags
+        return report
 
     # ------------------------------------------------------------------
     # Full HTML assembly
@@ -317,10 +348,16 @@ class BacktestReport:
             if len(algo_name) > 8:
                 algo_name = algo_name[:8]
 
+            # Prefer persisted bt.tag, fall back to directory tag
+            tag = getattr(bt, 'tag', None) or ''
+            if not tag and i < len(self._source_tags):
+                tag = self._source_tags[i]
+
             strategies.append({
                 'id': f'strat-{i}',
                 'name': algo_name,
                 'color': color,
+                'tag': tag,
                 'summary': summary_dict,
                 'repEQ': rep_eq,
                 'runIds': run_ids,
@@ -391,8 +428,10 @@ class BacktestReport:
                 heatmap = {}
                 if m and m.monthly_returns:
                     for v, d in m.monthly_returns:
-                        y = d.year if hasattr(d, 'year') else int(str(d)[:4])
-                        mo = d.month if hasattr(d, 'month') else int(str(d)[5:7])
+                        y = d.year if hasattr(d, 'year') \
+                            else int(str(d)[:4])
+                        mo = d.month if hasattr(d, 'month') \
+                            else int(str(d)[5:7])
                         heatmap.setdefault(y, {})[mo] = round(
                             v * 100 if abs(v) < 1 else v, 2
                         )
@@ -410,12 +449,16 @@ class BacktestReport:
                         elif hasattr(t, 'last_reported_price'):
                             cp = t.last_reported_price or 0
                         pct = (ng / cost * 100) if cost else 0
+                        op_dt = t.opened_at
+                        cl_dt = t.closed_at
                         trades_list.append({
                             'id': idx_t,
                             'sym': sym,
-                            'opened': _fmt_date(t.opened_at) if t.opened_at else '',
-                            'closed': _fmt_date(t.closed_at) if t.closed_at else '',
-                            'open_price': round(getattr(t, 'open_price', 0) or 0, 2),
+                            'opened': _fmt_date(op_dt) if op_dt else '',
+                            'closed': _fmt_date(cl_dt) if cl_dt else '',
+                            'open_price': round(
+                                getattr(t, 'open_price', 0) or 0, 2
+                            ),
                             'close_price': round(cp, 2),
                             'cost': round(cost, 2),
                             'net_gain': round(ng, 2),
