@@ -229,3 +229,22 @@ cli.add_command(deploy_aws_lambda)
 cli.add_command(
     validate_backtest_checkpoints_command, name="validate-checkpoints"
 )
+
+
+@click.command()
+@click.option(
+    '--directory', '-d',
+    required=True,
+    help='Path to the backtest batch directory'
+)
+def mcp(directory):
+    """Start the MCP server for AI-powered backtest analysis.
+
+    This lets GitHub Copilot, Claude, and other LLMs query your
+    backtest data directly in VS Code.
+    """
+    from .mcp_server import main as mcp_main
+    mcp_main(directory=directory)
+
+
+cli.add_command(mcp)

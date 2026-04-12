@@ -17,6 +17,7 @@
     <img class="logo-light" src="data:image/png;base64,{{ logo_light_b64 }}" alt="Finterion" height="22">
   </button>
   <button class="save-btn" onclick="saveReport()" title="Save report as HTML">&#128190; Save</button>
+  <button class="notes-toggle-btn" onclick="toggleNotesPane()" title="Report Builder">&#128203;</button>
   <button class="theme-toggle" onclick="toggleTheme()">&#9788;</button>
 </div>
 
@@ -99,6 +100,7 @@
       <table class="comp-table" id="comp-table">
         <thead>
           <tr>
+            <th class="shortlist-col" title="Shortlist">&#9733;</th>
             <th class="sticky-col">Strategy</th>
             <th data-col="cagr">CAGR <span class="sort-arrow">&#9650;</span></th>
             <th data-col="sharpe_ratio">Sharpe <span class="sort-arrow">&#9650;</span></th>
@@ -654,5 +656,73 @@ const BENCHMARKS = {{ benchmarks | tojson }};
   </div>
 </div>
 {% endif %}
+
+{# ── Report Builder Pane ───────────────────────────────────────── #}
+<div class="notes-pane" id="notes-pane">
+  <div class="notes-header">
+    <div class="notes-tabs">
+      <button class="notes-tab active" data-notes-tab="notes" onclick="switchNotesTab('notes')">&#128221; Notes</button>
+      <button class="notes-tab" data-notes-tab="export" onclick="switchNotesTab('export')">&#128196; Export</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button class="notes-expand-btn" id="notes-expand-btn" onclick="toggleNotesPaneExpand()" title="Expand panel">
+        <svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+      </button>
+      <button class="notes-close" onclick="toggleNotesPane()" title="Close">&times;</button>
+    </div>
+  </div>
+
+  {# Notes panel — list + detail rendered by JS #}
+  <div class="notes-panel active" id="notes-panel-notes">
+    <div class="notes-actions">
+      <button class="notes-action-btn" onclick="newNote()" style="flex:1">+ New Note</button>
+    </div>
+    <div class="notes-list" id="notes-list"></div>
+    <div class="notes-empty" id="notes-empty">
+      <div style="font-size:1.5rem;margin-bottom:0.5rem">&#128221;</div>
+      <div>No analysis notes yet</div>
+      <div style="font-size:0.68rem;color:var(--text-dim);margin-top:0.25rem">Create a note to document your analysis with markdown, strategy selections, and snapshots</div>
+    </div>
+  </div>
+
+  {# Export panel #}
+  <div class="notes-panel" id="notes-panel-export">
+    <div class="export-panel">
+      <div class="export-section">
+        <div class="export-section-title">Report Summary</div>
+        <div id="export-summary" class="export-summary">Create notes to see the summary here.</div>
+      </div>
+      <div class="export-section">
+        <div class="export-section-title">Analysis Notes</div>
+        <div id="export-notes" class="export-content"></div>
+      </div>
+      <div class="export-actions">
+        <button class="export-btn" onclick="exportReportMarkdown()">&#128196; Copy as Markdown</button>
+        <button class="export-btn secondary" onclick="saveReport()">&#128190; Save HTML Report</button>
+      </div>
+
+      <div class="ai-section">
+        <div class="ai-section-header">
+          <span class="ai-icon">&#129302;</span>
+          <span class="ai-section-title">AI Analysis</span>
+        </div>
+        <div class="ai-section-desc">
+          Export all strategy data, metrics, per-window breakdowns, and trade data
+          as structured text. Paste into GitHub Copilot Chat, ChatGPT, or Claude for
+          AI-powered analysis, strategy selection, and recommendations.
+        </div>
+        <button class="export-btn ai-btn" id="ai-copy-btn" onclick="copyAIAnalysisData()">
+          &#129302; Copy All Data for AI Analysis
+        </button>
+        <div class="ai-tip">
+          <strong>Tip:</strong> Use with the MCP server for deeper integration — Copilot
+          can then query your backtest data directly in VS Code.
+          <code>pip install investing-algorithm-framework[mcp]</code>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>

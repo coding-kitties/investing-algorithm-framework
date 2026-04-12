@@ -2317,13 +2317,24 @@ function toggleCollapse(btn) {
 function initCollapseButtons() {
   var titles = document.querySelectorAll('.chart-card > .chart-title');
   titles.forEach(function(t) {
-    if (t.querySelector('.collapse-btn')) return;
-    var btn = document.createElement('button');
-    btn.className = 'collapse-btn';
-    btn.title = 'Collapse / Expand';
-    btn.innerHTML = '&#9650;';
-    btn.setAttribute('onclick', 'event.stopPropagation();toggleCollapse(this)');
-    t.appendChild(btn);
+    // Collapse button
+    if (!t.querySelector('.collapse-btn')) {
+      var btn = document.createElement('button');
+      btn.className = 'collapse-btn';
+      btn.title = 'Collapse / Expand';
+      btn.innerHTML = '&#9650;';
+      btn.setAttribute('onclick', 'event.stopPropagation();toggleCollapse(this)');
+      t.appendChild(btn);
+    }
+    // Capture button (📷)
+    if (!t.querySelector('.capture-btn')) {
+      var cap = document.createElement('button');
+      cap.className = 'capture-btn';
+      cap.title = 'Capture to Note';
+      cap.innerHTML = '&#128247;';
+      cap.setAttribute('onclick', 'event.stopPropagation();captureCard(this.closest(".chart-card"))');
+      t.insertBefore(cap, t.querySelector('.collapse-btn'));
+    }
   });
 }
 
@@ -4681,6 +4692,1002 @@ function buildCompareParameters() {
   el.innerHTML = html;
 }
 
+// ===== REPORT BUILDER =====
+
+/** Persistent state — embedded into HTML on Save */
+var notes = [];           // [{ id, title, markdown, selections:{stratIdx:'keep'|'maybe'|'reject'}, snapshots:[{id,type,data,title}], createdAt, updatedAt }]
+var noteIdCounter = 0;
+var snapshotIdCounter = 0;
+var activeNoteId = null;  // currently viewed/edited note
+var noteEditMode = false; // editing markdown
+
+// Backward compat: migrate old shortlist/findings into a note
+function _migrateOldData(data) {
+  var oldSl = data.shortlist || {};
+  var oldFd = data.findings || [];
+  if (Object.keys(oldSl).length === 0 && oldFd.length === 0) return;
+  var id = ++noteIdCounter;
+  var md = '# Migrated Analysis\n\n';
+  // Findings as markdown
+  oldFd.forEach(function(f) {
+    if (f.text && f.text.trim()) {
+      md += '**' + (f.pageName || f.page || '') + ':** ' + f.text.trim() + '\n\n';
+    }
+  });
+  // Selections
+  var sels = {};
+  Object.keys(oldSl).forEach(function(k) { sels[k] = oldSl[k].tag; });
+  // Snapshots
+  var snaps = [];
+  oldFd.forEach(function(f) {
+    if (f.snapshot) {
+      snaps.push({ id: ++snapshotIdCounter, type: f.snapshot.type, data: f.snapshot.data, title: f.snapshot.title });
+    }
+  });
+  notes.push({
+    id: id, title: 'Migrated Analysis', markdown: md,
+    selections: sels, snapshots: snaps,
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+  });
+}
+
+// Load saved data
+(function loadSavedReportData() {
+  var el = document.getElementById('saved-report-data');
+  if (!el) return;
+  try {
+    var data = JSON.parse(el.textContent);
+    if (data.notes) {
+      notes = data.notes;
+      noteIdCounter = data.noteIdCounter || 0;
+      snapshotIdCounter = data.snapshotIdCounter || 0;
+    } else {
+      // Old format — migrate
+      _migrateOldData(data);
+    }
+  } catch(e) {}
+})();
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Simple Markdown → HTML renderer ──
+function renderMarkdown(md, noteCtx) {
+  // noteCtx: optional note object for resolving ![[snap:ID]] references
+  if (!md) return '';
+  var html = escHtml(md);
+  // Code blocks (``` ... ```)
+  html = html.replace(/```([\s\S]*?)```/g, function(m, code) {
+    return '<pre class="md-code-block"><code>' + code.trim() + '</code></pre>';
+  });
+  // Inline code
+  html = html.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');
+  // Headers
+  html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
+  html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+  html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+  html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+  // Bold + italic
+  html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+  // Unordered lists
+  html = html.replace(/^- (.+)$/gm, '<li>$1</li>');
+  html = html.replace(/(<li>[\s\S]*?<\/li>)/g, '<ul>$1</ul>');
+  html = html.replace(/<\/ul>\s*<ul>/g, '');
+  // Ordered lists
+  html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+  // Horizontal rules
+  html = html.replace(/^---$/gm, '<hr>');
+  // Blockquotes
+  html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+  html = html.replace(/<\/blockquote>\s*<blockquote>/g, '<br>');
+  // Tables
+  html = html.replace(/^\|(.+)\|$/gm, function(match, content) {
+    var cells = content.split('|').map(function(c) { return c.trim(); });
+    if (cells.every(function(c) { return /^[-:]+$/.test(c); })) return '<!--sep-->';
+    return '<tr>' + cells.map(function(c) { return '<td>' + c + '</td>'; }).join('') + '</tr>';
+  });
+  html = html.replace(/((?:<tr>[\s\S]*?<\/tr>\s*)+)/g, function(block) {
+    block = block.replace(/<!--sep-->\s*/g, '');
+    // Make first row header
+    block = block.replace(/<tr>([\s\S]*?)<\/tr>/, function(r, inner) {
+      return '<tr>' + inner.replace(/<td>/g, '<th>').replace(/<\/td>/g, '</th>') + '</tr>';
+    });
+    return '<table class="md-table">' + block + '</table>';
+  });
+  // Paragraphs (double newline)
+  html = html.replace(/\n\n+/g, '</p><p>');
+  html = '<p>' + html + '</p>';
+  // Clean empty paragraphs
+  html = html.replace(/<p>\s*<\/p>/g, '');
+  html = html.replace(/<p>\s*(<h[1-4]>)/g, '$1');
+  html = html.replace(/(<\/h[1-4]>)\s*<\/p>/g, '$1');
+  html = html.replace(/<p>\s*(<pre)/g, '$1');
+  html = html.replace(/(<\/pre>)\s*<\/p>/g, '$1');
+  html = html.replace(/<p>\s*(<ul>)/g, '$1');
+  html = html.replace(/(<\/ul>)\s*<\/p>/g, '$1');
+  html = html.replace(/<p>\s*(<table)/g, '$1');
+  html = html.replace(/(<\/table>)\s*<\/p>/g, '$1');
+  html = html.replace(/<p>\s*(<hr>)/g, '$1');
+  html = html.replace(/(<hr>)\s*<\/p>/g, '$1');
+  html = html.replace(/<p>\s*(<blockquote>)/g, '$1');
+  html = html.replace(/(<\/blockquote>)\s*<\/p>/g, '$1');
+  // Inline snapshot references: ![[snap:ID]]
+  html = html.replace(/!\[\[snap:(\d+)\]\]/g, function(match, snapId) {
+    snapId = Number(snapId);
+    if (!noteCtx) return '<span class="md-snap-missing">[snapshot ' + snapId + ']</span>';
+    var snap = null;
+    for (var i = 0; i < noteCtx.snapshots.length; i++) {
+      if (noteCtx.snapshots[i].id === snapId) { snap = noteCtx.snapshots[i]; break; }
+    }
+    if (!snap) return '<span class="md-snap-missing">[snapshot ' + snapId + ' not found]</span>';
+    var out = '<div class="md-snap-inline" data-snap-id="' + snapId + '">';
+    out += '<div class="md-snap-caption">&#128247; ' + escHtml(snap.title) + '</div>';
+    if (snap.type === 'image') {
+      out += '<img src="' + snap.data + '" class="md-snap-inline-img" alt="' + escHtml(snap.title) + '">';
+    } else if (snap.type === 'table') {
+      out += '<div class="md-snap-inline-table">' + snap.data + '</div>';
+    } else {
+      out += '<div class="md-snap-inline-text">' + escHtml(snap.data) + '</div>';
+    }
+    out += '</div>';
+    return out;
+  });
+  // Clean paragraphs around inline snapshots
+  html = html.replace(/<p>\s*(<div class="md-snap-inline")/g, '$1');
+  html = html.replace(/(<\/div>)\s*<\/p>/g, '$1');
+  return html;
+}
+
+// ── Pane toggle & tabs ──
+
+function toggleNotesPane() {
+  var pane = document.getElementById('notes-pane');
+  var btn = document.querySelector('.notes-toggle-btn');
+  var isOpen = pane.classList.toggle('open');
+  document.body.classList.toggle('notes-open', isOpen);
+  if (btn) btn.classList.toggle('active', isOpen);
+  if (!isOpen) {
+    pane.classList.remove('expanded');
+    document.body.classList.remove('notes-expanded');
+    updateExpandBtnIcon(false);
+  }
+  setTimeout(function() { drawPageCharts(currentPage); }, 300);
+}
+
+function toggleNotesPaneExpand() {
+  var pane = document.getElementById('notes-pane');
+  var expanded = pane.classList.toggle('expanded');
+  document.body.classList.toggle('notes-expanded', expanded);
+  updateExpandBtnIcon(expanded);
+  setTimeout(function() { drawPageCharts(currentPage); }, 300);
+}
+
+function updateExpandBtnIcon(expanded) {
+  var btn = document.getElementById('notes-expand-btn');
+  if (!btn) return;
+  if (expanded) {
+    btn.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="4 14 4 20 10 20"/><polyline points="20 10 20 4 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+    btn.title = 'Collapse panel';
+  } else {
+    btn.innerHTML = '<svg viewBox="0 0 24 24"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
+    btn.title = 'Expand panel';
+  }
+}
+
+function switchNotesTab(tab) {
+  document.querySelectorAll('.notes-tab').forEach(function(t) {
+    t.classList.toggle('active', t.getAttribute('data-notes-tab') === tab);
+  });
+  document.querySelectorAll('.notes-panel').forEach(function(p) {
+    p.classList.toggle('active', p.id === 'notes-panel-' + tab);
+  });
+  if (tab === 'notes') renderNotesList();
+  if (tab === 'export') rebuildExport();
+}
+
+// ── Note CRUD ──
+
+function createNote(title, markdown, selections, snapshots) {
+  var id = ++noteIdCounter;
+  var note = {
+    id: id,
+    title: title || 'Untitled Note',
+    markdown: markdown || '',
+    selections: selections || {},
+    snapshots: snapshots || [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  notes.unshift(note);
+  return note;
+}
+
+function getNote(id) {
+  return notes.find(function(n) { return n.id === id; });
+}
+
+function updateNote(id, updates) {
+  var note = getNote(id);
+  if (!note) return;
+  if (updates.title !== undefined) note.title = updates.title;
+  if (updates.markdown !== undefined) note.markdown = updates.markdown;
+  if (updates.selections !== undefined) note.selections = updates.selections;
+  if (updates.snapshots !== undefined) note.snapshots = updates.snapshots;
+  note.updatedAt = new Date().toISOString();
+}
+
+function deleteNote(id) {
+  notes = notes.filter(function(n) { return n.id !== id; });
+  if (activeNoteId === id) {
+    activeNoteId = null;
+    noteEditMode = false;
+    renderNotesList();
+  }
+}
+
+function addSnapshotToNote(noteId, snapshot) {
+  var note = getNote(noteId);
+  if (!note) return;
+  snapshot.id = ++snapshotIdCounter;
+  note.snapshots.push(snapshot);
+  note.updatedAt = new Date().toISOString();
+}
+
+function setNoteSelection(noteId, stratIdx, tag) {
+  var note = getNote(noteId);
+  if (!note) return;
+  stratIdx = Number(stratIdx);
+  if (tag) {
+    note.selections[stratIdx] = tag;
+  } else {
+    delete note.selections[stratIdx];
+  }
+  note.updatedAt = new Date().toISOString();
+}
+
+function cycleNoteSelection(noteId, stratIdx) {
+  var note = getNote(noteId);
+  if (!note) return;
+  stratIdx = Number(stratIdx);
+  var current = note.selections[stratIdx];
+  var next;
+  if (!current) next = 'keep';
+  else if (current === 'keep') next = 'maybe';
+  else if (current === 'maybe') next = 'reject';
+  else next = null;
+  if (next) note.selections[stratIdx] = next;
+  else delete note.selections[stratIdx];
+  note.updatedAt = new Date().toISOString();
+}
+
+// ── Ranking table star integration ──
+
+function getActiveNote() {
+  if (activeNoteId) return getNote(activeNoteId);
+  return null;
+}
+
+function ensureActiveNote() {
+  var note = getActiveNote();
+  if (!note && notes.length > 0) {
+    activeNoteId = notes[0].id;
+    return notes[0];
+  }
+  if (!note) {
+    note = createNote('Analysis Notes');
+    activeNoteId = note.id;
+  }
+  return note;
+}
+
+function getShortlistTag(stratIdx) {
+  var note = getActiveNote();
+  if (!note) return null;
+  return note.selections[stratIdx] || null;
+}
+
+function cycleShortlistTag(idx) {
+  var note = ensureActiveNote();
+  cycleNoteSelection(note.id, idx);
+  rebuildRankingTable();
+  if (activeNoteId) renderNoteDetail(activeNoteId);
+}
+
+// Override ranking table to inject star cells
+var _origRebuildRankingTable = rebuildRankingTable;
+rebuildRankingTable = function() {
+  _origRebuildRankingTable();
+  var tbody = document.querySelector('#comp-table tbody');
+  if (!tbody) return;
+  var rows = tbody.querySelectorAll('tr');
+  rows.forEach(function(row) {
+    var nameCell = row.querySelector('.sticky-col');
+    if (!nameCell) return;
+    var match = (nameCell.getAttribute('onclick') || '').match(/strat-(\d+)/);
+    if (!match) return;
+    var idx = Number(match[1]);
+    var tag = getShortlistTag(idx);
+    var starClass = 'sl-star' + (tag ? ' ' + tag : '');
+    var starChar = tag ? '&#9733;' : '&#9734;';
+    var td = document.createElement('td');
+    td.className = 'shortlist-col';
+    td.innerHTML = '<span class="' + starClass + '" onclick="event.stopPropagation();cycleShortlistTag(' + idx + ')">' + starChar + '</span>';
+    row.insertBefore(td, row.firstChild);
+  });
+};
+
+// ── Capture card to note ──
+
+function captureCard(card) {
+  if (!card) return;
+  var titleEl = card.querySelector('.chart-title');
+  var title = titleEl ? titleEl.childNodes[0].textContent.trim() : 'Snapshot';
+
+  var canvases = card.querySelectorAll('canvas');
+  for (var i = 0; i < canvases.length; i++) {
+    var c = canvases[i];
+    if (c.width > 0 && c.height > 0) {
+      try {
+        var dataUrl = c.toDataURL('image/png', 0.85);
+        if (dataUrl && dataUrl.length > 100) {
+          addCaptureToActiveNote({ type: 'image', data: dataUrl, title: title });
+          return;
+        }
+      } catch(e) { /* tainted canvas */ }
+    }
+  }
+
+  var table = card.querySelector('table');
+  if (table) {
+    var clone = table.cloneNode(true);
+    clone.querySelectorAll('.sl-star, .shortlist-col, .capture-btn, .collapse-btn, input, button, .sort-arrow').forEach(function(el) { el.remove(); });
+    clone.querySelectorAll('th.shortlist-col, td.shortlist-col').forEach(function(el) { el.remove(); });
+    var tableHtml = clone.outerHTML;
+    if (tableHtml.length > 50) {
+      addCaptureToActiveNote({ type: 'table', data: tableHtml, title: title });
+      return;
+    }
+  }
+
+  var richContent = card.querySelector('.corr-container, .heatmap-table, .table-wrap, .kpi-row, .bench-insights, .return-scenarios-grid');
+  if (richContent) {
+    var clone2 = richContent.cloneNode(true);
+    clone2.querySelectorAll('.capture-btn, .collapse-btn, input, button').forEach(function(el) { el.remove(); });
+    var richHtml = clone2.outerHTML;
+    if (richHtml.length > 50) {
+      addCaptureToActiveNote({ type: 'table', data: richHtml, title: title });
+      return;
+    }
+  }
+
+  var allContent = [];
+  for (var j = 0; j < card.children.length; j++) {
+    var ch = card.children[j];
+    if (ch.classList.contains('chart-title')) continue;
+    var cloneCh = ch.cloneNode(true);
+    cloneCh.querySelectorAll('.capture-btn, .collapse-btn, input, button, canvas').forEach(function(el) { el.remove(); });
+    var chHtml = cloneCh.innerHTML.trim();
+    if (chHtml) allContent.push(chHtml);
+  }
+  if (allContent.join('').length > 20) {
+    addCaptureToActiveNote({ type: 'table', data: '<div>' + allContent.join('') + '</div>', title: title });
+    return;
+  }
+  addCaptureToActiveNote({ type: 'text', data: 'Captured from: ' + title, title: title });
+}
+
+function addCaptureToActiveNote(snapshot) {
+  var note = ensureActiveNote();
+  addSnapshotToNote(note.id, snapshot);
+  // Auto-insert reference into markdown
+  var snapId = snapshot.id;
+  var ref = '\n![[snap:' + snapId + ']]\n';
+  // If editor is open, insert at cursor; otherwise append
+  var editor = document.getElementById('note-md-editor');
+  if (editor && noteEditMode) {
+    var pos = editor.selectionStart || editor.value.length;
+    var before = editor.value.substring(0, pos);
+    var after = editor.value.substring(pos);
+    var prefix = before.endsWith('\n') || before === '' ? '' : '\n';
+    editor.value = before + prefix + '![[snap:' + snapId + ']]' + '\n' + after;
+    editor.focus();
+    updateNote(note.id, { markdown: editor.value });
+  } else {
+    note.markdown = (note.markdown || '').trimEnd() + ref;
+  }
+  var pane = document.getElementById('notes-pane');
+  if (!pane.classList.contains('open')) toggleNotesPane();
+  switchNotesTab('notes');
+  renderNoteDetail(note.id);
+  flashCaptureConfirm();
+}
+
+function flashCaptureConfirm() {
+  var toast = document.createElement('div');
+  toast.className = 'capture-toast';
+  toast.innerHTML = '&#10003; Captured to Note';
+  document.body.appendChild(toast);
+  setTimeout(function() { toast.classList.add('visible'); }, 10);
+  setTimeout(function() { toast.classList.remove('visible'); }, 1800);
+  setTimeout(function() { toast.remove(); }, 2100);
+}
+
+// ── Apply Selection — filters dashboard to note's strategies ──
+
+function applyNoteSelection(noteId) {
+  var note = getNote(noteId);
+  if (!note) return;
+  var selKeys = Object.keys(note.selections);
+  if (selKeys.length === 0) {
+    selectedForCompare.clear();
+  } else {
+    selectedForCompare.clear();
+    selKeys.forEach(function(k) {
+      selectedForCompare.add(Number(k));
+    });
+  }
+  document.querySelectorAll('.strat-checkbox[data-strat-idx]').forEach(function(cb) {
+    cb.checked = selectedForCompare.has(Number(cb.getAttribute('data-strat-idx')));
+  });
+  var selectAll = document.getElementById('strat-select-all-cb');
+  if (selectAll) selectAll.checked = selectedForCompare.size === STRATEGIES.length;
+  updateCompareUI();
+  var btn = document.querySelector('.note-apply-btn');
+  if (btn) {
+    var orig = btn.innerHTML;
+    btn.innerHTML = '&#10003; Applied!';
+    btn.style.background = 'var(--green)';
+    btn.style.color = '#000';
+    setTimeout(function() { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; }, 2000);
+  }
+}
+
+function clearNoteSelection() {
+  selectedForCompare.clear();
+  document.querySelectorAll('.strat-checkbox[data-strat-idx]').forEach(function(cb) { cb.checked = false; });
+  var selectAll = document.getElementById('strat-select-all-cb');
+  if (selectAll) selectAll.checked = false;
+  updateCompareUI();
+}
+
+// ── Notes list view ──
+
+function renderNotesList() {
+  var list = document.getElementById('notes-list');
+  var empty = document.getElementById('notes-empty');
+  if (!list) return;
+
+  if (notes.length === 0) {
+    list.innerHTML = '';
+    if (empty) empty.classList.remove('hidden');
+    return;
+  }
+  if (empty) empty.classList.add('hidden');
+
+  var html = '';
+  notes.forEach(function(note) {
+    var d = new Date(note.updatedAt || note.createdAt);
+    var timeStr = d.toLocaleDateString('en-US', {month:'short', day:'numeric'}) + ' ' +
+                  d.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'});
+    var selCount = Object.keys(note.selections).length;
+    var snapCount = note.snapshots.length;
+    var keepCount = 0, maybeCount = 0, rejectCount = 0;
+    Object.values(note.selections).forEach(function(tag) {
+      if (tag === 'keep') keepCount++;
+      else if (tag === 'maybe') maybeCount++;
+      else if (tag === 'reject') rejectCount++;
+    });
+
+    var isActive = note.id === activeNoteId;
+    html += '<div class="note-card' + (isActive ? ' active' : '') + '" onclick="openNote(' + note.id + ')">';
+    html += '<div class="note-card-header">';
+    html += '<div class="note-card-title">' + escHtml(note.title) + '</div>';
+    html += '<div class="note-card-actions">';
+    html += '<button class="note-card-btn delete" onclick="event.stopPropagation();deleteNote(' + note.id + ');renderNotesList()" title="Delete">&#128465;</button>';
+    html += '</div></div>';
+    html += '<div class="note-card-meta">';
+    html += '<span class="note-card-time">' + timeStr + '</span>';
+    if (selCount > 0) {
+      html += '<span class="note-badge">';
+      if (keepCount > 0) html += '<span class="note-badge-dot keep"></span>' + keepCount;
+      if (maybeCount > 0) html += '<span class="note-badge-dot maybe"></span>' + maybeCount;
+      if (rejectCount > 0) html += '<span class="note-badge-dot reject"></span>' + rejectCount;
+      html += '</span>';
+    }
+    if (snapCount > 0) html += '<span class="note-badge">&#128247; ' + snapCount + '</span>';
+    html += '</div>';
+    var preview = (note.markdown || '').replace(/^#+\s*/gm, '').replace(/\*\*/g, '').trim();
+    if (preview.length > 80) preview = preview.substring(0, 80) + '...';
+    if (preview) html += '<div class="note-card-preview">' + escHtml(preview) + '</div>';
+    html += '</div>';
+  });
+  list.innerHTML = html;
+}
+
+function openNote(id) {
+  activeNoteId = id;
+  noteEditMode = false;
+  renderNoteDetail(id);
+}
+
+// ── Note detail view ──
+
+function renderNoteDetail(id) {
+  var note = getNote(id);
+  if (!note) { renderNotesList(); return; }
+  activeNoteId = id;
+
+  var list = document.getElementById('notes-list');
+  var empty = document.getElementById('notes-empty');
+  if (empty) empty.classList.add('hidden');
+
+  var html = '';
+  html += '<div class="note-detail-header">';
+  html += '<button class="note-back-btn" onclick="activeNoteId=null;noteEditMode=false;renderNotesList()">&#8592; Notes</button>';
+  html += '<div class="note-detail-actions">';
+  html += '<button class="note-edit-btn" onclick="toggleNoteEdit(' + id + ')">' + (noteEditMode ? '&#128065; View' : '&#9998; Edit') + '</button>';
+  html += '<button class="note-apply-btn" onclick="applyNoteSelection(' + id + ')" title="Apply this note\'s strategy selection to the dashboard">';
+  html += '&#9654; Apply Selection';
+  var selCount = Object.keys(note.selections).length;
+  if (selCount > 0) html += ' (' + selCount + ')';
+  html += '</button>';
+  html += '</div></div>';
+
+  if (noteEditMode) {
+    html += '<input class="note-title-input" id="note-title-input" value="' + escHtml(note.title) + '" onblur="updateNote(' + id + ',{title:this.value})" placeholder="Note title...">';
+  } else {
+    html += '<div class="note-detail-title">' + escHtml(note.title) + '</div>';
+  }
+
+  // Selections summary
+  if (Object.keys(note.selections).length > 0) {
+    html += '<div class="note-selections">';
+    html += '<div class="note-section-label">Strategy Selection</div>';
+    var groups = { keep: [], maybe: [], reject: [] };
+    Object.keys(note.selections).forEach(function(k) {
+      var idx = Number(k);
+      var tag = note.selections[k];
+      var s = STRATEGIES[idx];
+      if (s && groups[tag]) groups[tag].push({ idx: idx, name: s.name });
+    });
+    ['keep', 'maybe', 'reject'].forEach(function(tag) {
+      if (groups[tag].length === 0) return;
+      var icon = tag === 'keep' ? '&#10003;' : tag === 'maybe' ? '&#63;' : '&#10007;';
+      html += '<div class="note-sel-group ' + tag + '">';
+      html += '<span class="note-sel-label">' + icon + ' ' + tag.charAt(0).toUpperCase() + tag.slice(1) + '</span> ';
+      groups[tag].forEach(function(s) {
+        html += '<span class="note-sel-chip ' + tag + '" onclick="showPage(\'strat-' + s.idx + '\')">' + escHtml(s.name) + '</span>';
+        if (noteEditMode) {
+          html += '<button class="note-sel-remove" onclick="event.stopPropagation();setNoteSelection(' + id + ',' + s.idx + ',null);renderNoteDetail(' + id + ')">&#215;</button>';
+        }
+      });
+      html += '</div>';
+    });
+    if (noteEditMode) {
+      html += '<div class="note-sel-add">';
+      html += '<select id="note-add-strat-select" class="view-select" style="font-size:0.7rem">';
+      html += '<option value="">+ Add strategy...</option>';
+      STRATEGIES.forEach(function(s, i) {
+        if (!note.selections[i]) html += '<option value="' + i + '">' + escHtml(s.name) + '</option>';
+      });
+      html += '</select>';
+      html += '<select class="view-select" style="font-size:0.7rem;width:70px" id="note-add-strat-tag">';
+      html += '<option value="keep">Keep</option><option value="maybe">Maybe</option><option value="reject">Reject</option>';
+      html += '</select>';
+      html += '<button class="notes-action-btn" onclick="var sel=document.getElementById(\'note-add-strat-select\');var tag=document.getElementById(\'note-add-strat-tag\').value;if(sel.value)setNoteSelection(' + id + ',sel.value,tag);renderNoteDetail(' + id + ');rebuildRankingTable()">Add</button>';
+      html += '</div>';
+    }
+    html += '</div>';
+  } else if (noteEditMode) {
+    html += '<div class="note-selections">';
+    html += '<div class="note-section-label">Strategy Selection</div>';
+    html += '<div class="note-sel-add">';
+    html += '<select id="note-add-strat-select" class="view-select" style="font-size:0.7rem">';
+    html += '<option value="">+ Add strategy...</option>';
+    STRATEGIES.forEach(function(s, i) {
+      html += '<option value="' + i + '">' + escHtml(s.name) + '</option>';
+    });
+    html += '</select>';
+    html += '<select class="view-select" style="font-size:0.7rem;width:70px" id="note-add-strat-tag">';
+    html += '<option value="keep">Keep</option><option value="maybe">Maybe</option><option value="reject">Reject</option>';
+    html += '</select>';
+    html += '<button class="notes-action-btn" onclick="var sel=document.getElementById(\'note-add-strat-select\');var tag=document.getElementById(\'note-add-strat-tag\').value;if(sel.value)setNoteSelection(' + id + ',sel.value,tag);renderNoteDetail(' + id + ');rebuildRankingTable()">Add</button>';
+    html += '</div></div>';
+  }
+
+  // Markdown content
+  html += '<div class="note-content">';
+  if (noteEditMode) {
+    html += '<textarea class="note-md-editor" id="note-md-editor" placeholder="Write your analysis in markdown...\n\nTip: Drag snapshots here or click Insert to embed them inline."'
+         + ' onblur="updateNote(' + id + ',{markdown:this.value})">'
+         + escHtml(note.markdown) + '</textarea>';
+    html += '<div class="note-editor-hint">Use <code>![[snap:ID]]</code> to embed snapshots inline. Drag or click Insert below.</div>';
+  } else {
+    var rendered = renderMarkdown(note.markdown, note);
+    html += '<div class="note-md-rendered">' + (rendered || '<span class="note-placeholder">No content yet. Click Edit to start writing.</span>') + '</div>';
+  }
+  html += '</div>';
+
+  // Snapshots — in view mode, skip ones already rendered inline
+  var inlineIds = {};
+  if (!noteEditMode) {
+    var refRegex = /!\[\[snap:(\d+)\]\]/g;
+    var refMatch;
+    while ((refMatch = refRegex.exec(note.markdown || '')) !== null) {
+      inlineIds[Number(refMatch[1])] = true;
+    }
+  }
+  var unreferenced = note.snapshots.filter(function(s) { return !inlineIds[s.id]; });
+
+  if (note.snapshots.length > 0) {
+    html += '<div class="note-snapshots">';
+    html += '<div class="note-section-label">';
+    if (noteEditMode) {
+      html += 'Snapshots (' + note.snapshots.length + ') — drag or insert into markdown';
+    } else if (unreferenced.length < note.snapshots.length) {
+      var inlineCount = note.snapshots.length - unreferenced.length;
+      html += 'Snapshots (' + note.snapshots.length + ' total, ' + inlineCount + ' embedded above)';
+    } else {
+      html += 'Snapshots (' + note.snapshots.length + ')';
+    }
+    html += '</div>';
+    var snapsToShow = noteEditMode ? note.snapshots : unreferenced;
+    snapsToShow.forEach(function(snap) {
+      html += '<div class="note-snap-card" draggable="' + (noteEditMode ? 'true' : 'false') + '" data-snap-id="' + snap.id + '">';
+      html += '<div class="note-snap-header">';
+      html += '<span class="note-snap-title">&#128247; ' + escHtml(snap.title) + '</span>';
+      html += '<div class="note-snap-actions">';
+      if (noteEditMode) {
+        html += '<button class="note-snap-insert-btn" onclick="event.stopPropagation();insertSnapRef(' + snap.id + ')" title="Insert into markdown">&#8629; Insert</button>';
+        html += '<button class="note-card-btn delete" onclick="event.stopPropagation();removeSnapshot(' + id + ',' + snap.id + ')" title="Delete">&#128465;</button>';
+      }
+      html += '</div></div>';
+      if (snap.type === 'image') {
+        html += '<img src="' + snap.data + '" class="note-snap-img" alt="' + escHtml(snap.title) + '">';
+      } else if (snap.type === 'table') {
+        html += '<div class="note-snap-table">' + snap.data + '</div>';
+      } else {
+        html += '<div class="note-snap-text">' + escHtml(snap.data) + '</div>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+
+  list.innerHTML = html;
+
+  // Wire up drag-and-drop for snapshots → editor
+  if (noteEditMode) {
+    var editor = document.getElementById('note-md-editor');
+    if (editor) {
+      editor.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        editor.classList.add('note-md-editor-dragover');
+      });
+      editor.addEventListener('dragleave', function() {
+        editor.classList.remove('note-md-editor-dragover');
+      });
+      editor.addEventListener('drop', function(e) {
+        e.preventDefault();
+        editor.classList.remove('note-md-editor-dragover');
+        var snapId = e.dataTransfer.getData('text/snap-id');
+        if (!snapId) return;
+        var ref = '![[snap:' + snapId + ']]';
+        // Insert at drop position (approximate via cursor)
+        var pos = editor.selectionStart || editor.value.length;
+        // Find nearest newline for clean insertion
+        var before = editor.value.substring(0, pos);
+        var after = editor.value.substring(pos);
+        var prefix = before.endsWith('\\n') || before === '' ? '' : '\\n';
+        var suffix = after.startsWith('\\n') || after === '' ? '' : '\\n';
+        editor.value = before + prefix + ref + suffix + after;
+        editor.focus();
+        var newPos = before.length + prefix.length + ref.length;
+        editor.selectionStart = newPos;
+        editor.selectionEnd = newPos;
+        updateNote(activeNoteId, { markdown: editor.value });
+      });
+    }
+    // Make snap cards draggable
+    list.querySelectorAll('.note-snap-card[draggable="true"]').forEach(function(card) {
+      card.addEventListener('dragstart', function(e) {
+        e.dataTransfer.setData('text/snap-id', card.getAttribute('data-snap-id'));
+        e.dataTransfer.effectAllowed = 'copy';
+        card.classList.add('note-snap-dragging');
+      });
+      card.addEventListener('dragend', function() {
+        card.classList.remove('note-snap-dragging');
+      });
+    });
+  }
+}
+
+function insertSnapRef(snapId) {
+  var editor = document.getElementById('note-md-editor');
+  if (!editor) return;
+  var ref = '![[snap:' + snapId + ']]';
+  var pos = editor.selectionStart || editor.value.length;
+  var before = editor.value.substring(0, pos);
+  var after = editor.value.substring(pos);
+  var prefix = before.endsWith('\n') || before === '' ? '' : '\n';
+  var suffix = after.startsWith('\n') || after === '' ? '' : '\n';
+  editor.value = before + prefix + ref + suffix + after;
+  editor.focus();
+  var newPos = before.length + prefix.length + ref.length;
+  editor.selectionStart = newPos;
+  editor.selectionEnd = newPos;
+  updateNote(activeNoteId, { markdown: editor.value });
+}
+
+function removeSnapshot(noteId, snapId) {
+  var note = getNote(noteId);
+  if (!note) return;
+  note.snapshots = note.snapshots.filter(function(s) { return s.id !== snapId; });
+  // Also remove references from markdown
+  note.markdown = (note.markdown || '').replace(new RegExp('!\\[\\[snap:' + snapId + '\\]\\]\\n?', 'g'), '');
+  note.updatedAt = new Date().toISOString();
+  renderNoteDetail(noteId);
+}
+
+function toggleNoteEdit(id) {
+  if (noteEditMode) {
+    var editor = document.getElementById('note-md-editor');
+    if (editor) updateNote(id, { markdown: editor.value });
+    var titleInput = document.getElementById('note-title-input');
+    if (titleInput) updateNote(id, { title: titleInput.value });
+  }
+  noteEditMode = !noteEditMode;
+  renderNoteDetail(id);
+  if (noteEditMode) {
+    var ed = document.getElementById('note-md-editor');
+    if (ed) { ed.focus(); ed.selectionStart = ed.value.length; }
+  }
+}
+
+function newNote() {
+  var note = createNote('New Analysis');
+  activeNoteId = note.id;
+  noteEditMode = true;
+  renderNoteDetail(note.id);
+  var titleInput = document.getElementById('note-title-input');
+  if (titleInput) { titleInput.focus(); titleInput.select(); }
+}
+
+// ── Export tab ──
+
+function rebuildExport() {
+  buildExportSummary();
+  buildExportNotes();
+}
+
+function buildExportSummary() {
+  var el = document.getElementById('export-summary');
+  if (!el) return;
+  el.innerHTML = '<strong>' + STRATEGIES.length + '</strong> strategies analyzed across '
+    + '<strong>' + WINDOWS_META.length + '</strong> backtest windows. '
+    + '<strong>' + notes.length + '</strong> analysis note(s) created.';
+}
+
+function buildExportNotes() {
+  var el = document.getElementById('export-notes');
+  if (!el) return;
+  if (notes.length === 0) {
+    el.innerHTML = '<div style="color:var(--text-dim);font-size:0.72rem">No notes created yet.</div>';
+    return;
+  }
+  var html = '';
+  notes.forEach(function(note) {
+    html += '<div class="export-note-card">';
+    html += '<div class="export-note-title">' + escHtml(note.title) + '</div>';
+    var selKeys = Object.keys(note.selections);
+    if (selKeys.length > 0) {
+      html += '<div class="export-note-selections">';
+      selKeys.forEach(function(k) {
+        var idx = Number(k);
+        var s = STRATEGIES[idx];
+        var tag = note.selections[k];
+        if (s) {
+          html += '<span class="export-strat-badge ' + tag + '">' + tag.charAt(0).toUpperCase() + tag.slice(1) + '</span>';
+          html += '<span class="export-strat-name" style="margin-right:8px">' + escHtml(s.name) + '</span>';
+        }
+      });
+      html += '</div>';
+    }
+    var rendered = renderMarkdown(note.markdown, note);
+    if (rendered) html += '<div class="export-note-content">' + rendered + '</div>';
+    // Only show snapshots not already embedded inline
+    var exportInlineIds = {};
+    var exportRefRegex = /!\[\[snap:(\d+)\]\]/g;
+    var exportRefMatch;
+    while ((exportRefMatch = exportRefRegex.exec(note.markdown || '')) !== null) {
+      exportInlineIds[Number(exportRefMatch[1])] = true;
+    }
+    note.snapshots.filter(function(s) { return !exportInlineIds[s.id]; }).forEach(function(snap) {
+      html += '<div class="export-snap-label">&#128247; ' + escHtml(snap.title) + '</div>';
+      if (snap.type === 'image') {
+        html += '<img src="' + snap.data + '" class="export-snap-thumb" alt="' + escHtml(snap.title) + '">';
+      }
+    });
+    html += '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function exportReportMarkdown() {
+  var md = '# Backtest Analysis Report\n\n';
+  md += '**Date:** ' + new Date().toLocaleDateString('en-US', {year:'numeric',month:'long',day:'numeric'}) + '\n';
+  md += '**Strategies Analyzed:** ' + STRATEGIES.length + '\n';
+  md += '**Backtest Windows:** ' + WINDOWS_META.length + '\n\n';
+
+  notes.forEach(function(note) {
+    md += '## ' + note.title + '\n\n';
+    var selKeys = Object.keys(note.selections);
+    if (selKeys.length > 0) {
+      md += '### Strategy Selection\n\n';
+      ['keep', 'maybe', 'reject'].forEach(function(tag) {
+        var tagged = selKeys.filter(function(k) { return note.selections[k] === tag; });
+        if (tagged.length === 0) return;
+        var label = tag === 'keep' ? '✅ Keep' : tag === 'maybe' ? '❓ Maybe' : '❌ Reject';
+        md += '**' + label + ':** ';
+        md += tagged.map(function(k) {
+          var s = STRATEGIES[Number(k)];
+          return s ? s.name : k;
+        }).join(', ') + '\n\n';
+      });
+    }
+    if (note.markdown.trim()) md += note.markdown.trim() + '\n\n';
+    note.snapshots.forEach(function(snap) {
+      md += '📷 _' + snap.title + '_\n\n';
+    });
+    md += '---\n\n';
+  });
+
+  navigator.clipboard.writeText(md).then(function() {
+    var btn = document.querySelector('.export-btn');
+    if (btn) {
+      var orig = btn.innerHTML;
+      btn.innerHTML = '&#10003; Copied!';
+      btn.style.background = 'var(--green)';
+      setTimeout(function() { btn.innerHTML = orig; btn.style.background = ''; }, 2000);
+    }
+  });
+}
+
+// ── AI Analysis Data Export ──
+
+function generateAIAnalysisData() {
+  var md = '# Backtest Data Export for AI Analysis\n\n';
+  md += 'You are analyzing backtest results for quantitative trading strategies.\n';
+  md += 'Below is the complete dataset. Analyze the strategies, identify the best candidates,\n';
+  md += 'flag any concerns, and write a detailed analysis.\n\n';
+
+  md += '## Overview\n\n';
+  md += '- **Number of Strategies:** ' + STRATEGIES.length + '\n';
+  md += '- **Number of Backtest Windows:** ' + WINDOWS_META.length + '\n\n';
+
+  md += '## Backtest Windows\n\n';
+  md += '| Window | Start | End | Days |\n';
+  md += '|--------|-------|-----|------|\n';
+  WINDOWS_META.forEach(function(w) {
+    md += '| ' + (w.name || '—') + ' | ' + (w.start || '—') + ' | ' + (w.end || '—') + ' | ' + (w.days || '—') + ' |\n';
+  });
+  md += '\n';
+
+  md += '## Strategy Ranking (Summary Metrics)\n\n';
+  md += '| # | Strategy | CAGR | Sharpe | Sortino | Calmar | Max DD | Volatility | Win Rate | Profit Factor | Trades/Yr | Net Gain % | VaR 95% | CVaR 95% |\n';
+  md += '|---|----------|------|--------|---------|--------|--------|------------|----------|---------------|-----------|------------|---------|----------|\n';
+  STRATEGIES.forEach(function(s, i) {
+    var m = getViewMetrics(i);
+    md += '| ' + (i+1) + ' | ' + s.name;
+    md += ' | ' + _aiFmt(m.cagr, 'pct') + ' | ' + _aiFmt(m.sharpe_ratio, 'dec2');
+    md += ' | ' + _aiFmt(m.sortino_ratio, 'dec2') + ' | ' + _aiFmt(m.calmar_ratio, 'dec2');
+    md += ' | ' + _aiFmt(m.max_drawdown, 'pctAbs') + ' | ' + _aiFmt(m.annual_volatility, 'pct');
+    md += ' | ' + _aiFmt(m.win_rate, 'pct') + ' | ' + _aiFmt(m.profit_factor, 'dec2');
+    md += ' | ' + _aiFmt(m.trades_per_year, 'dec1') + ' | ' + _aiFmt(m.total_net_gain_percentage, 'pct');
+    md += ' | ' + _aiFmt(m.var_95, 'pct') + ' | ' + _aiFmt(m.cvar_95, 'pct') + ' |\n';
+  });
+  md += '\n';
+
+  md += '## Detailed Strategy Data\n\n';
+  STRATEGIES.forEach(function(s, i) {
+    var m = getViewMetrics(i);
+    md += '### ' + s.name + '\n\n';
+    if (s.parameters && Object.keys(s.parameters).length > 0) {
+      md += '**Parameters:** ' + Object.keys(s.parameters).map(function(k) { return k + '=' + s.parameters[k]; }).join(', ') + '\n\n';
+    }
+    md += '**Performance:** CAGR: ' + _aiFmt(m.cagr,'pct') + ', Net Gain: ' + _aiFmt(m.total_net_gain_percentage,'pct') + ', Sharpe: ' + _aiFmt(m.sharpe_ratio,'dec2') + ', Sortino: ' + _aiFmt(m.sortino_ratio,'dec2') + '\n';
+    md += '**Risk:** Max DD: ' + _aiFmt(m.max_drawdown,'pctAbs') + ', Volatility: ' + _aiFmt(m.annual_volatility,'pct') + ', VaR 95%: ' + _aiFmt(m.var_95,'pct') + '\n';
+    md += '**Trading:** Win Rate: ' + _aiFmt(m.win_rate,'pct') + ', Trades/Yr: ' + _aiFmt(m.trades_per_year,'dec1') + ', Avg Return: ' + _aiFmt(m.average_trade_return_percentage,'pct') + '\n\n';
+
+    if (s.runIds && s.runIds.length > 1) {
+      md += '**Per-Window:**\n\n| Window | CAGR | Sharpe | Max DD | Win Rate | Trades |\n|--------|------|--------|--------|----------|--------|\n';
+      s.runIds.forEach(function(rid, j) {
+        var rd = RUN_DATA[rid];
+        if (!rd) return;
+        var rm = rd.metrics || {};
+        var lbl = (s.runLabels && s.runLabels[j]) ? s.runLabels[j][0] : ('run_' + j);
+        md += '| ' + lbl + ' | ' + _aiFmt(rm.cagr,'pct') + ' | ' + _aiFmt(rm.sharpe_ratio,'dec2') + ' | ' + _aiFmt(rm.max_drawdown,'pctAbs') + ' | ' + _aiFmt(rm.win_rate,'pct') + ' | ' + (rm.number_of_trades||'—') + ' |\n';
+      });
+      md += '\n';
+    }
+  });
+
+  if (notes.length > 0) {
+    md += '## Existing Analysis Notes\n\n';
+    notes.forEach(function(note) {
+      md += '### ' + note.title + '\n\n';
+      var selKeys = Object.keys(note.selections);
+      if (selKeys.length > 0) {
+        md += '**Selections:** ';
+        selKeys.forEach(function(k) {
+          var s = STRATEGIES[Number(k)];
+          md += (s ? s.name : k) + '=' + note.selections[k] + ' ';
+        });
+        md += '\n\n';
+      }
+      if (note.markdown.trim()) md += note.markdown.trim() + '\n\n';
+    });
+  }
+
+  md += '---\n\nPlease analyze and provide:\n1. **Top 3 strategies** and why\n2. **Risk concerns** per strategy\n3. **Strategies to avoid** and why\n4. **Window consistency** analysis\n5. **Parameter sensitivity** observations\n6. **Overall recommendation** with confidence level\n';
+  return md;
+}
+
+function _aiFmt(v, kind) {
+  if (v == null || v === undefined) return '—';
+  if (kind === 'pct') return (v * 100).toFixed(2) + '%';
+  if (kind === 'pctAbs') return (Math.abs(v) * 100).toFixed(2) + '%';
+  if (kind === 'dec2') return Number(v).toFixed(2);
+  if (kind === 'dec1') return Number(v).toFixed(1);
+  return String(v);
+}
+
+function copyAIAnalysisData() {
+  var md = generateAIAnalysisData();
+  navigator.clipboard.writeText(md).then(function() {
+    var btn = document.getElementById('ai-copy-btn');
+    if (btn) {
+      var orig = btn.innerHTML;
+      btn.innerHTML = '&#10003; Copied! Paste into Copilot Chat';
+      btn.style.background = 'var(--green)';
+      btn.style.color = '#000';
+      setTimeout(function() { btn.innerHTML = orig; btn.style.background = ''; btn.style.color = ''; }, 3000);
+    }
+  });
+}
+
+// ── Persistence ──
+
+function flushNoteEditors() {
+  var editor = document.getElementById('note-md-editor');
+  if (editor && activeNoteId) updateNote(activeNoteId, { markdown: editor.value });
+  var titleInput = document.getElementById('note-title-input');
+  if (titleInput && activeNoteId) updateNote(activeNoteId, { title: titleInput.value });
+}
+
+var _origSaveReport = saveReport;
+saveReport = function() {
+  flushNoteEditors();
+  var dataEl = document.getElementById('saved-report-data');
+  if (!dataEl) {
+    dataEl = document.createElement('script');
+    dataEl.id = 'saved-report-data';
+    dataEl.type = 'application/json';
+    document.body.appendChild(dataEl);
+  }
+  dataEl.textContent = JSON.stringify({
+    notes: notes,
+    noteIdCounter: noteIdCounter,
+    snapshotIdCounter: snapshotIdCounter
+  });
+  _origSaveReport();
+};
+
 // ===== INIT =====
 buildBenchmarkChips();
 rebuildWindowCoverage();
@@ -4692,6 +5699,7 @@ initCollapseButtons();
 syncModalCount();
 populateRunsTabs();
 drawPageCharts('overview');
+renderNotesList();
 let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
