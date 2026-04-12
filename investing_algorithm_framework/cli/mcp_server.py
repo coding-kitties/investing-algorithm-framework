@@ -33,13 +33,18 @@ from typing import Optional
 
 
 def _load_backtests(directory: str):
-    """Load and recalculate backtests from a directory."""
+    """Load and recalculate backtests from directory(ies)."""
     from investing_algorithm_framework import (
         BacktestReport, recalculate_backtests,
     )
-    report = BacktestReport.open(directory_path=directory)
+    # Support comma-separated directories
+    dirs = [d.strip() for d in directory.split(',') if d.strip()]
+    if len(dirs) == 1:
+        report = BacktestReport.open(directory_path=dirs[0])
+    else:
+        report = BacktestReport.open(directory_path=dirs)
     recalculate_backtests(report.backtests)
-    return report.backtests
+    return report.backtests, report._source_tags
 
 
 def _fmt_pct(v):
@@ -110,28 +115,47 @@ def _per_window_table(bt):
     return "\n".join(rows)
 
 
-def _trading_activity_table(backtests):
-    """Markdown table of trading-activity metrics for every strategy."""
+def _trading_activity_table(backtests, tags=None):
+    """Markdown table of trading-activity metrics."""
+    has_tags = tags and any(tags.values())
+    tag_hdr = "| Batch " if has_tags else ""
+    tag_sep = "|-------" if has_tags else ""
     header = (
-        "| Strategy | Profit Factor | Win Rate | Trades/yr | Trades/mo "
-        "| Trades/wk | # Trades | Avg Return | Median Return "
-        "| Avg Duration | Win Streak | Loss Streak | % Win Months |"
+        "| Strategy " + tag_hdr
+        + "| Profit Factor | Win Rate"
+        " | Trades/yr | Trades/mo "
+        "| Trades/wk | # Trades"
+        " | Avg Return | Median Return "
+        "| Avg Duration | Win Streak"
+        " | Loss Streak | % Win Months |"
     )
     sep = (
-        "|----------|---------------|----------|-----------|----------"
-        "|-----------|----------|------------|---------------"
-        "|--------------|------------|-------------|--------------|"
+        "|----------" + tag_sep
+        + "|---------------|----------"
+        "|-----------|----------"
+        "|-----------|----------"
+        "|------------|---------------"
+        "|--------------|------------"
+        "|-------------|--------------|"
     )
     rows = [header, sep]
     for bt in backtests:
         s = bt.backtest_summary
+        tag_col = ""
+        if has_tags:
+            t = (tags or {}).get(bt.algorithm_id, '')
+            tag_col = f"| {t} "
         if not s:
-            rows.append(f"| {bt.algorithm_id} |" + " — |" * 12)
+            rows.append(
+                f"| {bt.algorithm_id} "
+                f"{tag_col}|" + " — |" * 12
+            )
             continue
         tpy = getattr(s, "trades_per_year", None)
         tpw = (tpy / 52) if tpy is not None else None
         rows.append(
             f"| {bt.algorithm_id} "
+            f"{tag_col}"
             f"| {_fmt_dec(getattr(s, 'profit_factor', None))} "
             f"| {_fmt_pct(getattr(s, 'win_rate', None))} "
             f"| {_fmt_dec(tpy)} "
@@ -148,8 +172,11 @@ def _trading_activity_table(backtests):
     return "\n".join(rows)
 
 
-def _ranking_table(backtests, metric="sharpe_ratio", ascending=False):
+def _ranking_table(
+    backtests, metric="sharpe_ratio", ascending=False, tags=None
+):
     """Rank strategies by a metric across all windows (summary)."""
+    has_tags = tags and any(tags.values())
     entries = []
     for bt in backtests:
         s = bt.backtest_summary
@@ -162,12 +189,24 @@ def _ranking_table(backtests, metric="sharpe_ratio", ascending=False):
         key=lambda x: (x["value"] is None, x["value"] or 0),
         reverse=not ascending,
     )
-    header = f"| Rank | Strategy | {metric} |"
-    sep = "|------|----------|" + "-" * (len(metric) + 2) + "|"
+    tag_hdr = "| Batch " if has_tags else ""
+    tag_sep = "|-------" if has_tags else ""
+    header = f"| Rank | Strategy {tag_hdr}| {metric} |"
+    sep = (
+        "|------|----------"
+        + tag_sep
+        + "|" + "-" * (len(metric) + 2) + "|"
+    )
     rows = [header, sep]
     for i, e in enumerate(entries):
         v = _fmt_dec(e["value"]) if e["value"] is not None else "—"
-        rows.append(f"| {i + 1} | {e['algorithm_id']} | {v} |")
+        tag_col = ""
+        if has_tags:
+            t = (tags or {}).get(e["algorithm_id"], '')
+            tag_col = f"| {t} "
+        rows.append(
+            f"| {i + 1} | {e['algorithm_id']} {tag_col}| {v} |"
+        )
     return "\n".join(rows)
 
 
@@ -191,8 +230,9 @@ def _top_trades(bt, n=10):
     return all_trades[:n]
 
 
-def _full_analysis(backtests):
+def _full_analysis(backtests, tags=None):
     """Generate a complete analysis markdown document."""
+    has_tags = tags and any(tags.values())
     md = "# Backtest Analysis Data\n\n"
     md += f"**Strategies:** {len(backtests)}\n"
     windows = set()
@@ -203,11 +243,17 @@ def _full_analysis(backtests):
 
     # Ranking table
     md += "## Strategy Ranking (by Sharpe Ratio)\n\n"
-    md += _ranking_table(backtests, "sharpe_ratio") + "\n\n"
+    md += _ranking_table(
+        backtests, "sharpe_ratio", tags=tags
+    ) + "\n\n"
 
     # Per strategy
     for bt in backtests:
         md += f"## {bt.algorithm_id}\n\n"
+        if has_tags:
+            t = (tags or {}).get(bt.algorithm_id, '')
+            if t:
+                md += f"**Batch:** {t}\n\n"
         if bt.parameters:
             params = ", ".join(f"{k}={v}" for k, v in bt.parameters.items())
             md += f"**Parameters:** {params}\n\n"
@@ -944,13 +990,22 @@ class BacktestMCPServer:
         self.directory = directory
         self._backtests = None
         self._bt_map = {}
+        self._bt_tags = {}
 
     def _ensure_loaded(self):
         if self._backtests is None:
-            self._backtests = _load_backtests(self.directory)
+            backtests, tags = _load_backtests(self.directory)
+            self._backtests = backtests
             self._bt_map = {
-                bt.algorithm_id: bt for bt in self._backtests
+                bt.algorithm_id: bt
+                for bt in self._backtests
             }
+            for i, bt in enumerate(self._backtests):
+                # Prefer persisted bt.tag, fall back to dir tag
+                tag = getattr(bt, 'tag', None) or ''
+                if not tag:
+                    tag = tags[i] if i < len(tags) else ''
+                self._bt_tags[bt.algorithm_id] = tag
 
     def _get_tools(self):
         return [
@@ -1550,28 +1605,54 @@ class BacktestMCPServer:
         self._ensure_loaded()
 
         if name == "list_strategies":
+            has_tags = any(self._bt_tags.values())
             lines = ["# Strategies Overview\n"]
-            lines.append(
-                "| Strategy | CAGR | Sharpe | Sortino | Max DD "
-                "| Win Rate | Profit Factor | Trades/Yr | Parameters |"
-            )
-            lines.append(
-                "|----------|------|--------|---------|--------"
-                "|----------|---------------|-----------|------------|"
-            )
+            if has_tags:
+                lines.append(
+                    "| Strategy | Batch | CAGR | Sharpe"
+                    " | Sortino | Max DD "
+                    "| Win Rate | Profit Factor"
+                    " | Trades/Yr | Parameters |"
+                )
+                lines.append(
+                    "|----------|-------|------|-------"
+                    "|---------|--------"
+                    "|----------|---------------"
+                    "|-----------|------------|"
+                )
+            else:
+                lines.append(
+                    "| Strategy | CAGR | Sharpe"
+                    " | Sortino | Max DD "
+                    "| Win Rate | Profit Factor"
+                    " | Trades/Yr | Parameters |"
+                )
+                lines.append(
+                    "|----------|------|-------"
+                    "|---------|--------"
+                    "|----------|---------------"
+                    "|-----------|------------|"
+                )
             for bt in self._backtests:
                 s = bt.backtest_summary
+                tag = self._bt_tags.get(
+                    bt.algorithm_id, ''
+                )
                 params = ""
                 if bt.parameters:
                     params = ", ".join(
                         f"{k}={v}"
-                        for k, v in list(bt.parameters.items())[:3]
+                        for k, v in list(
+                            bt.parameters.items()
+                        )[:3]
                     )
                     if len(bt.parameters) > 3:
                         params += ", ..."
+                tag_col = f"| {tag} " if has_tags else ""
                 if s:
                     lines.append(
                         f"| {bt.algorithm_id} "
+                        f"{tag_col}"
                         f"| {_fmt_pct(s.cagr)} "
                         f"| {_fmt_dec(s.sharpe_ratio)} "
                         f"| {_fmt_dec(s.sortino_ratio)} "
@@ -1584,6 +1665,7 @@ class BacktestMCPServer:
                 else:
                     lines.append(
                         f"| {bt.algorithm_id} "
+                        f"{tag_col}"
                         "| — | — | — | — | — | — | — "
                         f"| {params} |"
                     )
@@ -1599,6 +1681,9 @@ class BacktestMCPServer:
                     f" Available: {avail}"
                 )
             md = f"# {bt.algorithm_id}\n\n"
+            tag = self._bt_tags.get(bt.algorithm_id, '')
+            if tag:
+                md += f"**Batch:** {tag}\n\n"
             if bt.parameters:
                 params = ", ".join(
                     f"{k}={v}" for k, v in bt.parameters.items()
@@ -1633,7 +1718,8 @@ class BacktestMCPServer:
             metric = arguments.get("metric", "sharpe_ratio")
             ascending = arguments.get("ascending", False)
             return _ranking_table(
-                self._backtests, metric, ascending
+                self._backtests, metric, ascending,
+                tags=self._bt_tags,
             )
 
         elif name == "compare_strategies":
@@ -1685,10 +1771,14 @@ class BacktestMCPServer:
             return md
 
         elif name == "get_full_analysis":
-            return _full_analysis(self._backtests)
+            return _full_analysis(
+                self._backtests, tags=self._bt_tags
+            )
 
         elif name == "get_trading_activity":
-            return _trading_activity_table(self._backtests)
+            return _trading_activity_table(
+                self._backtests, tags=self._bt_tags
+            )
 
         elif name == "get_trades":
             sid = arguments.get("strategy_id", "")

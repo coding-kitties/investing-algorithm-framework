@@ -40,12 +40,50 @@
   {% endif %}
   <div class="sb-divider"></div>
   <div class="sb-label">Strategies</div>
-  {% for s in strategies %}
-  <div class="sb-item" data-page="{{ s.id }}"
-       onclick="showPage('{{ s.id }}')">
-    <span class="sb-dot" style="background:{{ s.color }}"></span>{{ s.name }}
-  </div>
-  {% endfor %}
+  {% set tags_used = strategies | selectattr('tag') | map(attribute='tag') | unique | list %}
+  {% if tags_used | length > 0 %}
+    {% for tag in tags_used %}
+    <div class="sb-tag-group">
+      <div class="sb-tag-toggle" onclick="toggleSbTag(this)">
+        <span class="sb-tag-arrow">&#9660;</span>
+        <span class="tag-badge">{{ tag }}</span>
+        <span style="font-size:0.6rem;color:var(--text-dim)">({{ strategies | selectattr('tag', 'equalto', tag) | list | length }})</span>
+      </div>
+      <div class="sb-tag-children" style="max-height:2000px">
+        {% for s in strategies %}
+        {% if s.tag == tag %}
+        <div class="sb-item" data-page="{{ s.id }}" data-strat-idx="{{ loop.index0 }}">
+          <input type="checkbox" class="sb-cb" data-idx="{{ loop.index0 }}" onclick="event.stopPropagation();toggleSbStrat({{ loop.index0 }},this.checked)" title="Include in comparison">
+          <span class="sb-dot" style="background:{{ s.color }}"></span>
+          <span class="sb-name" onclick="showPage('{{ s.id }}')">{{ s.name }}</span>
+          <button class="sb-chal-btn" data-idx="{{ loop.index0 }}" onclick="event.stopPropagation();toggleSbChallenger({{ loop.index0 }})" title="Set as challenger">&#9873;</button>
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    {% set untagged = strategies | rejectattr('tag') | list %}
+    {% if untagged | length > 0 %}
+    {% for s in untagged %}
+    <div class="sb-item" data-page="{{ s.id }}" data-strat-idx="{{ loop.index0 }}">
+      <input type="checkbox" class="sb-cb" data-idx="{{ loop.index0 }}" onclick="event.stopPropagation();toggleSbStrat({{ loop.index0 }},this.checked)" title="Include in comparison">
+      <span class="sb-dot" style="background:{{ s.color }}"></span>
+      <span class="sb-name" onclick="showPage('{{ s.id }}')">{{ s.name }}</span>
+      <button class="sb-chal-btn" data-idx="{{ loop.index0 }}" onclick="event.stopPropagation();toggleSbChallenger({{ loop.index0 }})" title="Set as challenger">&#9873;</button>
+    </div>
+    {% endfor %}
+    {% endif %}
+  {% else %}
+    {% for s in strategies %}
+    <div class="sb-item" data-page="{{ s.id }}" data-strat-idx="{{ loop.index0 }}">
+      <input type="checkbox" class="sb-cb" data-idx="{{ loop.index0 }}" onclick="event.stopPropagation();toggleSbStrat({{ loop.index0 }},this.checked)" title="Include in comparison">
+      <span class="sb-dot" style="background:{{ s.color }}"></span>
+      <span class="sb-name" onclick="showPage('{{ s.id }}')">{{ s.name }}</span>
+      <button class="sb-chal-btn" data-idx="{{ loop.index0 }}" onclick="event.stopPropagation();toggleSbChallenger({{ loop.index0 }})" title="Set as challenger">&#9873;</button>
+    </div>
+    {% endfor %}
+  {% endif %}
 </nav>
 
 {# ── Main Content ─────────────────────────────────────────────── #}
@@ -292,7 +330,7 @@
 <div class="page" id="page-{{ s.id }}" style="display:none">
   <h2 class="page-title">
     <span class="sb-dot" style="background:{{ s.color }};width:12px;height:12px"></span>
-    {{ s.name }}
+    {{ s.name }}{% if s.tag %} <span class="tag-badge">{{ s.tag }}</span>{% endif %}
     {% if rl | length > 1 %}
     <select class="view-select strat-window-select" data-strat="{{ i }}"
             onchange="onStratWindowChange({{ i }}, this.value)">

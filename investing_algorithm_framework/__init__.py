@@ -22,7 +22,8 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     TradeStatus, generate_backtest_summary_metrics, generate_algorithm_id, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus, \
-    save_backtests_to_directory, BacktestMetrics, DATA_DIRECTORY
+    save_backtests_to_directory, BacktestMetrics, DATA_DIRECTORY, \
+    retag_backtests
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, \
     CCXTOHLCVDataProvider, CCXTTickerDataProvider, \
@@ -199,6 +200,7 @@ __all__ = [
     "BacktestRun",
     "load_backtests_from_directory",
     "save_backtests_to_directory",
+    "retag_backtests",
     "DataError",
     "create_backtest_metrics_for_backtest",
     "recalculate_backtests",

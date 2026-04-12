@@ -56,6 +56,7 @@ class Backtest:
     risk_free_rate: float = None
     strategy_ids: List[int] = field(default_factory=list)
     parameters: Dict = field(default_factory=dict)
+    tag: str = None
 
     def get_all_backtest_runs(
         self, backtest_date_ranges=None
@@ -189,7 +190,8 @@ class Backtest:
             "risk_free_rate": self.risk_free_rate,
             "strategy_ids": self.strategy_ids,
             "algorithm_id": self.algorithm_id,
-            "parameters": self.parameters
+            "parameters": self.parameters,
+            "tag": self.tag,
         }
 
     @staticmethod
@@ -348,6 +350,20 @@ class Backtest:
                     logger.error(f"Error decoding parameters JSON: {e}")
                     parameters = {}
 
+        # Load tag if available
+        tag = None
+        tag_file = os.path.join(directory_path, "tag.json")
+
+        if os.path.isfile(tag_file):
+            with open(tag_file, 'r') as f:
+                try:
+                    tag = json.load(f).get('tag', None)
+                except json.JSONDecodeError as e:
+                    logger.error(
+                        f"Error decoding tag JSON: {e}"
+                    )
+                    tag = None
+
         return Backtest(
             algorithm_id=algorithm_id,
             backtest_runs=backtest_runs,
@@ -355,7 +371,8 @@ class Backtest:
             backtest_permutation_tests=permutation_metrics,
             metadata=metadata,
             risk_free_rate=risk_free_rate,
-            parameters=parameters
+            parameters=parameters,
+            tag=tag,
         )
 
     def save(
@@ -458,6 +475,12 @@ class Backtest:
                 json.dump(
                     {'algorithm_id': self.algorithm_id}, f, indent=4
                 )
+
+        # Save tag if available
+        if self.tag is not None:
+            tag_file = os.path.join(directory_path, "tag.json")
+            with open(tag_file, 'w') as f:
+                json.dump({'tag': self.tag}, f, indent=4)
 
         # Save the permutation tests if available
         if self.backtest_permutation_tests:

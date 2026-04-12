@@ -545,7 +545,10 @@ class BacktestService:
                 [backtest_metrics]
             ),
             parameters=algorithm.get_parameters()
-            if hasattr(algorithm, 'get_parameters') else {}
+            if hasattr(algorithm, 'get_parameters') else {},
+            tag=algorithm.metadata.get('tag') if hasattr(
+                algorithm, 'metadata') and algorithm.metadata
+            else None,
         )
 
     def backtest_exists(
@@ -1758,7 +1761,10 @@ class BacktestService:
                         strategy, 'metadata') else None,
                     risk_free_rate=risk_free_rate,
                     parameters=strategy.get_parameters()
-                    if hasattr(strategy, 'get_parameters') else {}
+                    if hasattr(strategy, 'get_parameters') else {},
+                    tag=strategy.metadata.get('tag') if hasattr(
+                        strategy, 'metadata') and strategy.metadata
+                    else None,
                 )
                 batch_results.append(backtest)
 
@@ -1782,6 +1788,7 @@ class BacktestService:
         portfolio_configuration: PortfolioConfiguration = None,
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         metadata: Optional[Dict[str, str]] = None,
+        tag: Optional[str] = None,
         risk_free_rate: Optional[float] = None,
         skip_data_sources_initialization: bool = False,
         initial_amount: float = None,
@@ -1906,6 +1913,15 @@ class BacktestService:
                     backtest.metadata = strategy.metadata
                 else:
                     backtest.metadata = {}
+
+            # Set tag: explicit param > strategy metadata > None
+            if tag is not None:
+                backtest.tag = tag
+            elif backtest.tag is None:
+                if (hasattr(strategy, 'metadata')
+                        and strategy.metadata
+                        and 'tag' in strategy.metadata):
+                    backtest.tag = strategy.metadata['tag']
 
             return backtest
         else:

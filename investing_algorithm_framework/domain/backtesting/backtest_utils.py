@@ -1,8 +1,9 @@
+import json
 import os
 from logging import getLogger
 from pathlib import Path
 from random import Random
-from typing import List, Union, Callable
+from typing import List, Union, Callable, Optional
 
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
@@ -96,6 +97,104 @@ def save_backtests_to_directory(
             backtest_date_ranges=[backtest_date_range]
             if backtest_date_range else None
         )
+
+
+def retag_backtests(
+    tag: str,
+    directory_path: Optional[Union[str, Path]] = None,
+    strategy_id: Optional[str] = None,
+) -> int:
+    """
+    Retag backtests with a new tag value.
+
+    Supports two modes:
+    - **By directory**: provide ``directory_path`` to retag every
+      backtest found in that directory (or a single backtest if the
+      path itself is a backtest directory).
+    - **By strategy_id**: provide both ``directory_path`` *and*
+      ``strategy_id`` to retag only the backtest whose
+      ``algorithm_id`` matches.
+
+    The tag is written to ``tag.json`` inside each matching backtest
+    directory so it persists across subsequent loads.
+
+    Args:
+        tag: The new tag string to assign.
+        directory_path: Path to a directory containing backtests, or
+            the path to a single backtest directory.
+        strategy_id: When given together with ``directory_path``,
+            only the backtest with this ``algorithm_id`` is retagged.
+
+    Returns:
+        int: The number of backtests that were retagged.
+
+    Raises:
+        OperationalException: If neither ``directory_path`` nor
+            ``strategy_id`` is provided, or if the directory does
+            not exist.
+    """
+    if directory_path is None:
+        raise OperationalException(
+            "directory_path is required for retag_backtests."
+        )
+
+    directory_path = str(directory_path)
+
+    if not os.path.isdir(directory_path):
+        raise OperationalException(
+            f"Directory {directory_path} does not exist."
+        )
+
+    count = 0
+
+    # Check if directory_path itself is a single backtest
+    if _is_backtest_dir(directory_path):
+        if _retag_single(directory_path, tag, strategy_id):
+            count += 1
+        return count
+
+    # Walk sub-directories looking for backtest dirs
+    for name in os.listdir(directory_path):
+        sub = os.path.join(directory_path, name)
+        if os.path.isdir(sub) and _is_backtest_dir(sub):
+            if _retag_single(sub, tag, strategy_id):
+                count += 1
+
+    return count
+
+
+def _is_backtest_dir(path: str) -> bool:
+    """Return True if *path* looks like a saved backtest."""
+    return (
+        os.path.isfile(os.path.join(path, "algorithm_id.json"))
+        and os.path.isdir(os.path.join(path, "runs"))
+    )
+
+
+def _retag_single(
+    backtest_dir: str, tag: str, strategy_id: Optional[str]
+) -> bool:
+    """Write ``tag.json`` into *backtest_dir*.
+
+    If *strategy_id* is given, only write when the backtest's
+    algorithm_id matches.  Returns True when a write happened.
+    """
+    if strategy_id is not None:
+        id_file = os.path.join(backtest_dir, "algorithm_id.json")
+        if not os.path.isfile(id_file):
+            return False
+        try:
+            with open(id_file, 'r') as f:
+                aid = json.load(f).get('algorithm_id')
+        except (json.JSONDecodeError, OSError):
+            return False
+        if aid != strategy_id:
+            return False
+
+    tag_file = os.path.join(backtest_dir, "tag.json")
+    with open(tag_file, 'w') as f:
+        json.dump({'tag': tag}, f, indent=4)
+    return True
 
 
 def load_backtests_from_directory(
