@@ -63,6 +63,7 @@ class Trade(BaseModel):
         filled_amount,
         status,
         net_gain=0,
+        total_fees=0,
         last_reported_price=None,
         last_reported_price_datetime=None,
         high_water_mark=None,
@@ -85,6 +86,7 @@ class Trade(BaseModel):
         self.remaining = remaining
         self.filled_amount = filled_amount
         self.net_gain = net_gain
+        self.total_fees = total_fees or 0
         self.last_reported_price = last_reported_price
         self.last_reported_price_datetime = last_reported_price_datetime
         self.high_water_mark = high_water_mark

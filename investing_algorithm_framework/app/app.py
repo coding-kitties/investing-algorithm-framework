@@ -2165,7 +2165,9 @@ class App:
         trading_symbol,
         api_key=None,
         secret_key=None,
-        initial_balance=None
+        initial_balance=None,
+        fee_percentage=0.0,
+        slippage_percentage=0.0,
     ):
         """
         Function to add a market to the app. This function is a utility
@@ -2178,6 +2180,12 @@ class App:
             api_key: API key for the market
             secret_key: Secret key for the market
             initial_balance: Initial balance for the market
+            fee_percentage: Default fee percentage for all trades
+                on this market (e.g. 0.1 for 0.1%). Can be overridden
+                per-symbol via TradingCost on the strategy.
+            slippage_percentage: Default slippage percentage for all
+                trades on this market (e.g. 0.05 for 0.05%). Can be
+                overridden per-symbol via TradingCost on the strategy.
 
         Returns:
             None
@@ -2186,7 +2194,9 @@ class App:
         portfolio_configuration = PortfolioConfiguration(
             market=market,
             trading_symbol=trading_symbol,
-            initial_balance=initial_balance
+            initial_balance=initial_balance,
+            fee_percentage=fee_percentage,
+            slippage_percentage=slippage_percentage,
         )
 
         self.add_portfolio_configuration(portfolio_configuration)

@@ -176,7 +176,7 @@ class OrderService(RepositoryService):
         if OrderSide.SELL.equals(order_side):
             # Create order metadata if there is a key in the data
             # for trades, stop_losses or take_profits
-            self.trade_service.create_order_metadata_with_trade_context(
+            self.trade_service.create_trade_allocations(
                 sell_order=order,
                 trades=trades,
                 stop_losses=stop_losses,

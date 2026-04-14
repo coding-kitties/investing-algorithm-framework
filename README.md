@@ -99,36 +99,118 @@ The [documentation](https://coding-kitties.github.io/investing-algorithm-framewo
 The framework is designed around the `TradingStrategy` class. You define **what data** your strategy needs and **when to buy or sell** — the framework handles execution, position management, and reporting.
 
 ```python
+from typing import Dict, Any
+
+import pandas as pd
+from pyindicators import ema, rsi, crossover, crossunder
+
 from investing_algorithm_framework import (
-    TradingStrategy, TimeUnit, Context, OrderSide
+    TradingStrategy, DataSource, TimeUnit, DataType,
+    PositionSize, ScalingRule, StopLossRule,
 )
 
-class MyStrategy(TradingStrategy):
+
+class RSIEMACrossoverStrategy(TradingStrategy):
+    """
+    EMA crossover + RSI filter strategy with position scaling and stop losses.
+
+    Buy when RSI is oversold AND a recent EMA crossover occurred.
+    Sell when RSI is overbought AND a recent EMA crossunder occurred.
+    Scale into winners, trail a stop loss, and let the framework handle the rest.
+    """
     time_unit = TimeUnit.HOUR
     interval = 2
-    symbol_pairs = ["BTC/EUR"]
+    symbols = ["BTC", "ETH"]
+    data_sources = [
+        DataSource(
+            identifier="BTC_ohlcv", symbol="BTC/EUR",
+            data_type=DataType.OHLCV, time_frame="2h",
+            market="BITVAVO", pandas=True, warmup_window=100,
+        ),
+        DataSource(
+            identifier="ETH_ohlcv", symbol="ETH/EUR",
+            data_type=DataType.OHLCV, time_frame="2h",
+            market="BITVAVO", pandas=True, warmup_window=100,
+        ),
+    ]
 
-    def apply_strategy(self, context: Context, market_data):
-        for pair in self.symbol_pairs:
-            symbol = pair.split("/")[0]
-            ohlcv = market_data[f"{pair}-ohlcv-2h"]
-            price = ohlcv["Close"].iloc[-1]
+    # Risk management
+    position_sizes = [
+        PositionSize(symbol="BTC", percentage_of_portfolio=20),
+        PositionSize(symbol="ETH", percentage_of_portfolio=20),
+    ]
+    scaling_rules = [
+        ScalingRule(
+            symbol="BTC", max_entries=3,
+            scale_in_percentage=[50, 25], cooldown_in_bars=5,
+        ),
+        ScalingRule(
+            symbol="ETH", max_entries=3,
+            scale_in_percentage=[50, 25], cooldown_in_bars=5,
+        ),
+    ]
+    stop_losses = [
+        StopLossRule(
+            symbol="BTC", percentage_threshold=5,
+            sell_percentage=100, trailing=True,
+        ),
+        StopLossRule(
+            symbol="ETH", percentage_threshold=5,
+            sell_percentage=100, trailing=True,
+        ),
+    ]
 
-            if self.should_buy(ohlcv) and not context.has_position(symbol):
-                context.create_limit_order(
-                    target_symbol=symbol,
-                    order_side=OrderSide.BUY,
-                    price=price,
-                    percentage_of_portfolio=25,
-                )
+    def generate_buy_signals(
+        self, data: Dict[str, Any]
+    ) -> Dict[str, pd.Series]:
+        signals = {}
 
-            if self.should_sell(ohlcv) and context.has_position(symbol):
-                context.create_limit_order(
-                    target_symbol=symbol,
-                    order_side=OrderSide.SELL,
-                    price=price,
-                    percentage_of_portfolio=100,
-                )
+        for symbol in self.symbols:
+            df = data[f"{symbol}_ohlcv"]
+            ema_short = ema(df, period=12, source_column="Close",
+                           result_column="ema_short")
+            ema_long = ema(ema_short, period=26, source_column="Close",
+                          result_column="ema_long")
+            ema_cross = crossover(ema_long,
+                                  first_column="ema_short",
+                                  second_column="ema_long",
+                                  result_column="ema_crossover")
+            rsi_data = rsi(df, period=14, source_column="Close",
+                          result_column="rsi")
+
+            rsi_oversold = rsi_data["rsi"] < 30
+            recent_crossover = (
+                ema_cross["ema_crossover"].rolling(window=10).max() > 0
+            )
+            signals[symbol] = (rsi_oversold & recent_crossover).fillna(False)
+
+        return signals
+
+    def generate_sell_signals(
+        self, data: Dict[str, Any]
+    ) -> Dict[str, pd.Series]:
+        signals = {}
+
+        for symbol in self.symbols:
+            df = data[f"{symbol}_ohlcv"]
+            ema_short = ema(df, period=12, source_column="Close",
+                           result_column="ema_short")
+            ema_long = ema(ema_short, period=26, source_column="Close",
+                          result_column="ema_long")
+            ema_cross = crossunder(ema_long,
+                                   first_column="ema_short",
+                                   second_column="ema_long",
+                                   result_column="ema_crossunder")
+            rsi_data = rsi(df, period=14, source_column="Close",
+                          result_column="rsi")
+
+            rsi_overbought = rsi_data["rsi"] >= 70
+            recent_crossunder = (
+                ema_cross["ema_crossunder"].rolling(window=10).max() > 0
+            )
+            signals[symbol] = (rsi_overbought & recent_crossunder).fillna(False)
+
+        return signals
 ```
 
 Create as many strategy variants as you want — different parameters, different indicators, different symbols — then backtest them all and compare in a single report.

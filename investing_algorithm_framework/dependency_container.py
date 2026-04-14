@@ -6,7 +6,7 @@ from investing_algorithm_framework.infrastructure import SQLOrderRepository, \
     SQLPositionRepository, SQLPortfolioRepository, BacktestService, \
     SQLPortfolioSnapshotRepository, SQLTradeRepository, \
     SQLPositionSnapshotRepository, SQLTradeStopLossRepository, \
-    SQLTradeTakeProfitRepository, SQLOrderMetadataRepository
+    SQLTradeTakeProfitRepository, SQLTradeAllocationRepository
 from investing_algorithm_framework.services import OrderService, \
     PositionService, PortfolioService, PortfolioConfigurationService, \
     ConfigurationService, PortfolioSnapshotService, \
@@ -38,7 +38,9 @@ class DependencyContainer(containers.DeclarativeContainer):
     order_executor_lookup = providers.ThreadSafeSingleton(
         OrderExecutorLookup
     )
-    order_metadata_repository = providers.Factory(SQLOrderMetadataRepository)
+    trade_allocation_repository = providers.Factory(
+        SQLTradeAllocationRepository
+    )
     position_repository = providers.Factory(SQLPositionRepository)
     portfolio_provider_lookup = providers.ThreadSafeSingleton(
         PortfolioProviderLookup,
@@ -86,7 +88,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         trade_repository=trade_repository,
         portfolio_repository=portfolio_repository,
         position_repository=position_repository,
-        order_metadata_repository=order_metadata_repository,
+        trade_allocation_repository=trade_allocation_repository,
     )
     trade_take_profit_service = providers.Factory(
         TradeTakeProfitService,

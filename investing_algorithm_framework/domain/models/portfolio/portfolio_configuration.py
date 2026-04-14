@@ -31,6 +31,8 @@ class PortfolioConfiguration(BaseModel):
         track_from=None,
         identifier=None,
         initial_balance=None,
+        fee_percentage=0.0,
+        slippage_percentage=0.0,
     ):
         self._market = market
 
@@ -41,6 +43,8 @@ class PortfolioConfiguration(BaseModel):
         self._trading_symbol = trading_symbol.upper()
         self._identifier = identifier
         self._initial_balance = initial_balance
+        self._fee_percentage = fee_percentage or 0.0
+        self._slippage_percentage = slippage_percentage or 0.0
 
         if self.identifier is None:
             self._identifier = market.upper()
@@ -78,6 +82,14 @@ class PortfolioConfiguration(BaseModel):
     @property
     def initial_balance(self):
         return self._initial_balance
+
+    @property
+    def fee_percentage(self):
+        return self._fee_percentage
+
+    @property
+    def slippage_percentage(self):
+        return self._slippage_percentage
 
     @property
     def has_initial_balance(self):

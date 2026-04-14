@@ -49,8 +49,8 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     order_fee_currency = Column(String, default=None)
     order_fee_rate = Column(Float, default=None)
     sell_order_metadata_id = Column(Integer, ForeignKey('orders.id'))
-    order_metadata = relationship(
-        'SQLOrderMetadata', back_populates='order'
+    trade_allocations = relationship(
+        'SQLTradeAllocation', back_populates='order'
     )
 
     def update(self, data):
