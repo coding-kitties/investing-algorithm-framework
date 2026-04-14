@@ -253,4 +253,3 @@ class TestRunBacktests(BacktestTestBase):
             risk_free_rate=0.027
         )
         self.assertEqual(3, len(reports))
-
