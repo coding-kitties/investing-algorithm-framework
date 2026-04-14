@@ -2521,6 +2521,31 @@ function modalPageNext() {
   if ((modalPage + 1) * ps < total) { modalPage++; rebuildStrategyModal(); }
 }
 
+function modalSelectTopN(n) {
+  // Get visible indices sorted by current modal sort column
+  var indices = getVisibleIndices();
+  if (modalSortCol) {
+    indices.sort(function(a,b) {
+      var ma = STRATEGIES[a].summary, mb = STRATEGIES[b].summary;
+      var va = getModalMetricVal(ma, modalSortCol);
+      var vb = getModalMetricVal(mb, modalSortCol);
+      if (modalSortCol === 'max_drawdown' || modalSortCol === 'annual_volatility') {
+        va = va != null ? Math.abs(va) : null;
+        vb = vb != null ? Math.abs(vb) : null;
+      }
+      if (va == null) va = modalSortAsc ? Infinity : -Infinity;
+      if (vb == null) vb = modalSortAsc ? Infinity : -Infinity;
+      return modalSortAsc ? va - vb : vb - va;
+    });
+  }
+  var topN = indices.slice(0, n);
+  topN.forEach(function(i) { selectedForCompare.add(i); });
+  rebuildStrategyModal();
+  syncModalCount();
+  syncMainTableCheckboxes();
+  updateCompareUI();
+}
+
 function getModalMetricVal(m, key) {
   var v = key === 'cagr' ? m.cagr : m[key];
   if (key === 'recovery_factor' && v == null && m.total_net_gain_percentage != null && m.max_drawdown != null && Math.abs(m.max_drawdown) > 0) {
@@ -3002,7 +3027,8 @@ function buildComparePage() {
     let html = '<div class="chart-card">';
     html += '<div class="chart-title">Yearly Returns</div>';
     indices.forEach(i => {
-      html += '<div style="margin-bottom:1.25rem"><div style="font-size:0.72rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.5rem;display:flex;align-items:center;gap:0.3rem"><span class="sb-dot" style="background:'+STRATEGIES[i].color+'"></span>'+STRATEGIES[i].name+(STRATEGIES[i].tag ? ' <span class="tag-badge">'+STRATEGIES[i].tag+'</span>' : '')+'</div><div class="chart-wrap chart-sm"><canvas id="c-compare-yearly-'+i+'"></canvas></div></div>';
+      var isChalYr = challengerIdx === i;
+      html += '<div style="margin-bottom:1.25rem'+(isChalYr ? ';border-left:3px solid var(--accent);padding-left:0.5rem' : '')+'"><div style="font-size:0.72rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.5rem;display:flex;align-items:center;gap:0.3rem"><span class="sb-dot" style="background:'+STRATEGIES[i].color+'"></span>'+(isChalYr ? '\u2691 ' : '')+STRATEGIES[i].name+(STRATEGIES[i].tag ? ' <span class="tag-badge">'+STRATEGIES[i].tag+'</span>' : '')+'</div><div class="chart-wrap chart-sm"><canvas id="c-compare-yearly-'+i+'"></canvas></div></div>';
     });
     html += '</div>';
     yrEl.innerHTML = html;
@@ -3271,7 +3297,8 @@ function buildCompareMonthlyReturns(indices) {
     html += '<div class="table-wrap"><table class="comp-table" style="font-size:0.7rem"><thead><tr>';
     html += '<th class="sticky-col">Period</th>';
     indices.forEach(function(i) {
-      html += '<th><span class="sb-dot" style="background:'+STRATEGIES[i].color+'"></span> '+STRATEGIES[i].name+(STRATEGIES[i].tag ? ' <span class="tag-badge">'+STRATEGIES[i].tag+'</span>' : '')+'</th>';
+      var isChal = challengerIdx === i;
+      html += '<th' + (isChal ? ' class="challenger-col"' : '') + '><span class="sb-dot" style="background:'+STRATEGIES[i].color+'"></span> '+(isChal ? '\u2691 ' : '')+STRATEGIES[i].name+(STRATEGIES[i].tag ? ' <span class="tag-badge">'+STRATEGIES[i].tag+'</span>' : '')+'</th>';
     });
     html += '</tr></thead><tbody>';
 
@@ -3357,8 +3384,9 @@ function buildCompareMonthlyReturns(indices) {
         }
       }
 
-      html += '<div style="margin-bottom:1rem"><div style="font-size:0.72rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.4rem;display:flex;align-items:center;gap:0.3rem">';
-      html += '<span class="sb-dot" style="background:'+strat.color+'"></span>'+strat.name+(strat.tag ? ' <span class="tag-badge">'+strat.tag+'</span>' : '')+'</div>';
+      var isChalHm = challengerIdx === i;
+      html += '<div style="margin-bottom:1rem'+(isChalHm ? ';border-left:3px solid var(--accent);padding-left:0.5rem' : '')+'"><div style="font-size:0.72rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.4rem;display:flex;align-items:center;gap:0.3rem">';
+      html += '<span class="sb-dot" style="background:'+strat.color+'"></span>'+(isChalHm ? '\u2691 ' : '')+strat.name+(strat.tag ? ' <span class="tag-badge">'+strat.tag+'</span>' : '')+'</div>';
       html += '<table class="heatmap-table"><thead><tr><th></th>';
       MONTHS.forEach(function(m){ html += '<th>'+m+'</th>'; });
       html += '<th>Year</th></tr></thead><tbody>';
@@ -3422,7 +3450,8 @@ function drawCompareExtras() {
     } else {
       let html = '';
       indices.forEach(i => {
-        html += '<span class="eq-legend-item"><span class="eq-legend-swatch" style="background:'+STRATEGIES[i].color+'"></span>'+STRATEGIES[i].name+'</span>';
+        const isChal = challengerIdx === i;
+        html += '<span class="eq-legend-item"><span class="eq-legend-swatch" style="background:'+STRATEGIES[i].color+(isChal?';height:4px':'')+'"></span>'+(isChal ? '\u2691 ' : '')+STRATEGIES[i].name+'</span>';
       });
       legEl.innerHTML = html;
     }
@@ -3485,7 +3514,7 @@ function drawCompareDrawdown(indices) {
     const s = STRATEGIES[si];
     const rd = getViewRunData(si);
     if (rd && rd.DD && rd.DD.length > 1) {
-      ddSeries.push({ dd: rd.DD, color: s.color, name: s.name });
+      ddSeries.push({ dd: rd.DD, color: s.color, name: s.name, isChal: challengerIdx === si });
     }
   });
 
@@ -3520,7 +3549,9 @@ function drawCompareDrawdown(indices) {
     ctx.fillText(longestDD[i][1], x, h-5);
   }
 
-  ddSeries.forEach(item => {
+  // Draw non-challenger lines first, then challenger on top
+  const sortedDD = [...ddSeries].sort((a,b) => (a.isChal?1:0)-(b.isChal?1:0));
+  sortedDD.forEach(item => {
     const dd = item.dd;
     ctx.beginPath();
     for (let i = 0; i < dd.length; i++) {
@@ -3530,13 +3561,24 @@ function drawCompareDrawdown(indices) {
     }
     ctx.lineTo(pad.l+cw, pad.t); ctx.lineTo(pad.l, pad.t); ctx.closePath();
     ctx.fillStyle = item.color + '15'; ctx.fill();
-    ctx.beginPath(); ctx.strokeStyle = item.color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.strokeStyle = item.color; ctx.lineWidth = item.isChal ? 3 : 1.5; ctx.lineJoin = 'round';
     for (let i = 0; i < dd.length; i++) {
       const x = pad.l + (i/(dd.length-1))*cw;
       const y = pad.t + ((0 - dd[i][0])/range)*ch;
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
+    if (item.isChal) {
+      ctx.save();
+      ctx.beginPath(); ctx.strokeStyle = item.color+'40'; ctx.lineWidth = 7; ctx.lineJoin = 'round';
+      for (let i = 0; i < dd.length; i++) {
+        const x = pad.l + (i/(dd.length-1))*cw;
+        const y = pad.t + ((0 - dd[i][0])/range)*ch;
+        i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
   });
 
   canvas._chartData = { data: longestDD, pad, cw, ch, mn: gMin, range, mx: 0, color: COL.red, type: 'area' };
@@ -3714,7 +3756,7 @@ function drawCompareRollingSharpe(indices) {
     const s = STRATEGIES[si];
     const rd = getViewRunData(si);
     if (rd && rd.RS && rd.RS.length > 1) {
-      rsSeries.push({ rs: rd.RS, color: s.color, name: s.name });
+      rsSeries.push({ rs: rd.RS, color: s.color, name: s.name, isChal: challengerIdx === si });
     }
   });
 
@@ -3766,9 +3808,11 @@ function drawCompareRollingSharpe(indices) {
     ctx.fillText(longestRS[i][1], x, h-5);
   }
 
-  rsSeries.forEach(item => {
+  // Draw non-challenger lines first, then challenger on top
+  const sortedRS = [...rsSeries].sort((a,b) => (a.isChal?1:0)-(b.isChal?1:0));
+  sortedRS.forEach(item => {
     const rs = item.rs;
-    ctx.beginPath(); ctx.strokeStyle = item.color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.strokeStyle = item.color; ctx.lineWidth = item.isChal ? 3 : 1.5; ctx.lineJoin = 'round';
     let started = false;
     for (let i = 0; i < rs.length; i++) {
       if (rs[i][0] == null || isNaN(rs[i][0])) continue;
@@ -3777,6 +3821,19 @@ function drawCompareRollingSharpe(indices) {
       if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
     }
     ctx.stroke();
+    if (item.isChal) {
+      ctx.save();
+      ctx.beginPath(); ctx.strokeStyle = item.color+'40'; ctx.lineWidth = 7; ctx.lineJoin = 'round';
+      started = false;
+      for (let i = 0; i < rs.length; i++) {
+        if (rs[i][0] == null || isNaN(rs[i][0])) continue;
+        const x = pad.l + (i/(rs.length-1))*cw;
+        const y = pad.t + ch - ((rs[i][0]-gMin)/range)*ch;
+        if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
   });
 
   canvas._chartData = { data: longestRS, pad, cw, ch, mn: gMin, range, color: COL.amber, opts: { decimals: 2 }, type: 'line' };
@@ -4265,32 +4322,56 @@ function drawCompareEquity() {
     ctx.beginPath(); ctx.moveTo(pad.l,zeroY); ctx.lineTo(w-pad.r,zeroY); ctx.stroke();
     ctx.setLineDash([]);
   }
-  indices.forEach((si, ci) => {
-    const eq = getViewEquity(si); if (!eq || eq.length<2) return;
-    if (ci===0) {
+  const eqItems = indices.map(si => ({ si, eq: getViewEquity(si), color: STRATEGIES[si].color, isChal: challengerIdx === si }));
+  // Draw non-challenger lines first, then challenger on top
+  const sortedEqItems = [...eqItems].sort((a,b) => (a.isChal?1:0)-(b.isChal?1:0));
+  let labelsDrawn = false;
+  sortedEqItems.forEach(item => {
+    const eq = item.eq; if (!eq || eq.length<2) return;
+    if (!labelsDrawn) {
       ctx.textAlign = 'center'; ctx.fillStyle = COL.dim;
       const li = Math.max(1,Math.floor(eq.length/6));
       for (let i=0;i<eq.length;i+=li) { const x=pad.l+(i/(eq.length-1))*cw; ctx.fillText(eq[i][1], x, h-5); }
+      labelsDrawn = true;
     }
-    ctx.beginPath(); ctx.strokeStyle = STRATEGIES[si].color; ctx.lineWidth = 2; ctx.lineJoin = 'round';
+    ctx.beginPath(); ctx.strokeStyle = item.color;
+    ctx.lineWidth = item.isChal ? 3.5 : 2;
+    ctx.lineJoin = 'round';
     for (let i=0;i<eq.length;i++) {
       const x=pad.l+(i/(eq.length-1))*cw;
       const y=pad.t+ch-((eq[i][0]-gMin)/range)*ch;
       i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
     }
     ctx.stroke();
+    if (item.isChal) {
+      ctx.save();
+      ctx.beginPath(); ctx.strokeStyle = item.color+'40'; ctx.lineWidth = 8; ctx.lineJoin = 'round';
+      for (let i=0;i<eq.length;i++) {
+        const x=pad.l+(i/(eq.length-1))*cw;
+        const y=pad.t+ch-((eq[i][0]-gMin)/range)*ch;
+        i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+      ctx.restore();
+      const lastX = pad.l + cw;
+      const lastY = pad.t+ch-((eq[eq.length-1][0]-gMin)/range)*ch;
+      ctx.fillStyle = item.color; ctx.font = '12px Inter, sans-serif'; ctx.textAlign = 'left';
+      ctx.fillText('\u2691', lastX + 4, lastY + 1);
+      ctx.font = '10px JetBrains Mono, monospace';
+    }
   });
 }
 
 function drawCompareMetricBars() {
   const indices = Array.from(selectedForCompare).sort((a,b) => a-b);
-  drawHorizontalBars('c-compare-cagr', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:(m.cagr||0)*100, color:STRATEGIES[i].color, formatted:((m.cagr||0)*100).toFixed(1)+'%' }; }), METRIC_ZONES.cagr);
-  drawHorizontalBars('c-compare-sharpe', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:m.sharpe_ratio||0, color:STRATEGIES[i].color, formatted:(m.sharpe_ratio||0).toFixed(2) }; }), METRIC_ZONES.sharpe);
-  drawHorizontalBars('c-compare-sortino', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:m.sortino_ratio||0, color:STRATEGIES[i].color, formatted:(m.sortino_ratio||0).toFixed(2) }; }), METRIC_ZONES.sortino);
-  drawHorizontalBars('c-compare-calmar', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:m.calmar_ratio||0, color:STRATEGIES[i].color, formatted:(m.calmar_ratio||0).toFixed(2) }; }), METRIC_ZONES.calmar);
-  drawHorizontalBars('c-compare-dd', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:Math.abs(m.max_drawdown||0)*100, color:STRATEGIES[i].color, formatted:(Math.abs(m.max_drawdown||0)*100).toFixed(1)+'%' }; }), METRIC_ZONES.dd);
-  drawHorizontalBars('c-compare-wr', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:(m.win_rate||0)*100, color:STRATEGIES[i].color, formatted:((m.win_rate||0)*100).toFixed(1)+'%' }; }), METRIC_ZONES.wr);
-  drawHorizontalBars('c-compare-pf', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:m.profit_factor||0, color:STRATEGIES[i].color, formatted:(m.profit_factor||0).toFixed(2) }; }), METRIC_ZONES.pf);
+  const _chal = (i) => challengerIdx === i;
+  drawHorizontalBars('c-compare-cagr', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:(m.cagr||0)*100, color:STRATEGIES[i].color, formatted:((m.cagr||0)*100).toFixed(1)+'%', isChallenger:_chal(i) }; }), METRIC_ZONES.cagr);
+  drawHorizontalBars('c-compare-sharpe', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:m.sharpe_ratio||0, color:STRATEGIES[i].color, formatted:(m.sharpe_ratio||0).toFixed(2), isChallenger:_chal(i) }; }), METRIC_ZONES.sharpe);
+  drawHorizontalBars('c-compare-sortino', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:m.sortino_ratio||0, color:STRATEGIES[i].color, formatted:(m.sortino_ratio||0).toFixed(2), isChallenger:_chal(i) }; }), METRIC_ZONES.sortino);
+  drawHorizontalBars('c-compare-calmar', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:m.calmar_ratio||0, color:STRATEGIES[i].color, formatted:(m.calmar_ratio||0).toFixed(2), isChallenger:_chal(i) }; }), METRIC_ZONES.calmar);
+  drawHorizontalBars('c-compare-dd', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:Math.abs(m.max_drawdown||0)*100, color:STRATEGIES[i].color, formatted:(Math.abs(m.max_drawdown||0)*100).toFixed(1)+'%', isChallenger:_chal(i) }; }), METRIC_ZONES.dd);
+  drawHorizontalBars('c-compare-wr', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:(m.win_rate||0)*100, color:STRATEGIES[i].color, formatted:((m.win_rate||0)*100).toFixed(1)+'%', isChallenger:_chal(i) }; }), METRIC_ZONES.wr);
+  drawHorizontalBars('c-compare-pf', indices.map(i => { const m=getViewMetrics(i); return { name:STRATEGIES[i].name, value:m.profit_factor||0, color:STRATEGIES[i].color, formatted:(m.profit_factor||0).toFixed(2), isChallenger:_chal(i) }; }), METRIC_ZONES.pf);
 }
 
 // ===== DRAW PAGE CHARTS =====
@@ -4472,18 +4553,32 @@ function drawRiskReturnScatter(canvasId) {
     ctx.setLineDash([]);
   }
 
-  // Plot dots
+  // Plot dots — draw non-challengers first, then challenger on top
+  var chalPt = null;
   pts.forEach(p => {
+    if (challengerIdx === p.i) { chalPt = p; return; }
     const x = pad.l + ((p.vol-xMin)/xRange)*cw;
     const y = pad.t + ch - ((p.cagr-yMin)/yRange)*ch;
     ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI*2);
     ctx.fillStyle = p.color; ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-    // Label
     ctx.font = '10px JetBrains Mono, monospace'; ctx.fillStyle = COL.text;
     ctx.textAlign = 'center';
     ctx.fillText(p.name, x, y-12);
   });
+  if (chalPt) {
+    const cx = pad.l + ((chalPt.vol-xMin)/xRange)*cw;
+    const cy = pad.t + ch - ((chalPt.cagr-yMin)/yRange)*ch;
+    ctx.save();
+    ctx.shadowColor = chalPt.color; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI*2);
+    ctx.fillStyle = chalPt.color; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();
+    ctx.restore();
+    ctx.font = 'bold 10px JetBrains Mono, monospace'; ctx.fillStyle = COL.text;
+    ctx.textAlign = 'center';
+    ctx.fillText('\u2691 ' + chalPt.name, cx, cy-15);
+  }
 
   canvas._chartData = { pts, pad, cw, ch, xMin, xRange, yMin, yRange, type:'scatter' };
 }
@@ -4748,7 +4843,8 @@ function buildCompareParameters() {
   html += '<div class="chart-title">Parameters Comparison</div>';
   html += '<div class="table-wrap"><table class="comp-table params-table"><thead><tr><th>Parameter</th>';
   for (var i = 0; i < indices.length; i++) {
-    html += '<th><span class="sb-dot" style="background:' + STRATEGIES[indices[i]].color + '"></span> ' + STRATEGIES[indices[i]].name + (STRATEGIES[indices[i]].tag ? ' <span class="tag-badge">' + STRATEGIES[indices[i]].tag + '</span>' : '') + '</th>';
+    var isChal = challengerIdx === indices[i];
+    html += '<th' + (isChal ? ' class="challenger-col"' : '') + '><span class="sb-dot" style="background:' + STRATEGIES[indices[i]].color + '"></span> ' + (isChal ? '\u2691 ' : '') + STRATEGIES[indices[i]].name + (STRATEGIES[indices[i]].tag ? ' <span class="tag-badge">' + STRATEGIES[indices[i]].tag + '</span>' : '') + '</th>';
   }
   html += '</tr></thead><tbody>';
   for (var k = 0; k < sortedKeys.length; k++) {
@@ -4766,8 +4862,12 @@ function buildCompareParameters() {
     }
     var allSame = vals.every(function(v) { return v === vals[0]; });
     for (var i = 0; i < vals.length; i++) {
+      var chalTd = challengerIdx === indices[i];
       var style = '';
-      if (!allSame && vals[i] !== '—') style = ' style="color:var(--accent);font-weight:600"';
+      var styles = [];
+      if (!allSame && vals[i] !== '—') styles.push('color:var(--accent);font-weight:600');
+      if (chalTd) styles.push('background:rgba(59,130,246,0.07)');
+      if (styles.length) style = ' style="' + styles.join(';') + '"';
       html += '<td' + style + '>' + vals[i] + '</td>';
     }
     html += '</tr>';
@@ -4818,7 +4918,7 @@ function _migrateOldData(data) {
 // Load saved data
 (function loadSavedReportData() {
   var el = document.getElementById('saved-report-data');
-  if (!el) return;
+  if (!el || !el.textContent.trim()) return;
   try {
     var data = JSON.parse(el.textContent);
     if (data.notes) {
@@ -5031,6 +5131,22 @@ function setNoteSelection(noteId, stratIdx, tag) {
     delete note.selections[stratIdx];
   }
   note.updatedAt = new Date().toISOString();
+}
+
+function filterNoteStratOptions(noteId) {
+  var input = document.getElementById('note-strat-filter');
+  var sel = document.getElementById('note-add-strat-select');
+  if (!input || !sel) return;
+  var note = getNote(noteId);
+  var q = input.value.toLowerCase();
+  var html = '<option value="">+ Add strategy...</option>';
+  STRATEGIES.forEach(function(s, i) {
+    if (note && note.selections[i]) return;
+    var haystack = (s.name + ' ' + (s.tag || '')).toLowerCase();
+    if (q && haystack.indexOf(q) === -1) return;
+    html += '<option value="' + i + '">' + escHtml(s.name) + (s.tag ? ' [' + escHtml(s.tag) + ']' : '') + '</option>';
+  });
+  sel.innerHTML = html;
 }
 
 function cycleNoteSelection(noteId, stratIdx) {
@@ -5353,10 +5469,11 @@ function renderNoteDetail(id) {
     });
     if (noteEditMode) {
       html += '<div class="note-sel-add">';
+      html += '<input id="note-strat-filter" class="view-select" style="font-size:0.7rem;width:120px" type="text" placeholder="Filter name/batch..." oninput="filterNoteStratOptions(' + id + ')">';
       html += '<select id="note-add-strat-select" class="view-select" style="font-size:0.7rem">';
       html += '<option value="">+ Add strategy...</option>';
       STRATEGIES.forEach(function(s, i) {
-        if (!note.selections[i]) html += '<option value="' + i + '">' + escHtml(s.name) + '</option>';
+        if (!note.selections[i]) html += '<option value="' + i + '">' + escHtml(s.name) + (s.tag ? ' [' + escHtml(s.tag) + ']' : '') + '</option>';
       });
       html += '</select>';
       html += '<select class="view-select" style="font-size:0.7rem;width:70px" id="note-add-strat-tag">';
@@ -5370,10 +5487,11 @@ function renderNoteDetail(id) {
     html += '<div class="note-selections">';
     html += '<div class="note-section-label">Strategy Selection</div>';
     html += '<div class="note-sel-add">';
+    html += '<input id="note-strat-filter" class="view-select" style="font-size:0.7rem;width:120px" type="text" placeholder="Filter name/batch..." oninput="filterNoteStratOptions(' + id + ')">';
     html += '<select id="note-add-strat-select" class="view-select" style="font-size:0.7rem">';
     html += '<option value="">+ Add strategy...</option>';
     STRATEGIES.forEach(function(s, i) {
-      html += '<option value="' + i + '">' + escHtml(s.name) + '</option>';
+      html += '<option value="' + i + '">' + escHtml(s.name) + (s.tag ? ' [' + escHtml(s.tag) + ']' : '') + '</option>';
     });
     html += '</select>';
     html += '<select class="view-select" style="font-size:0.7rem;width:70px" id="note-add-strat-tag">';
@@ -5770,6 +5888,14 @@ saveReport = function() {
     snapshotIdCounter: snapshotIdCounter
   });
   _origSaveReport();
+  // Re-render notes panel after save to ensure UI consistency.
+  // The save process (prompt, blur events, focus changes) can leave
+  // the notes panel in an inconsistent state.
+  if (activeNoteId) {
+    renderNoteDetail(activeNoteId);
+  } else {
+    renderNotesList();
+  }
 };
 
 // ===== INIT =====

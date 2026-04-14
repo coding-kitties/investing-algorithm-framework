@@ -74,6 +74,7 @@ body { font-family:'Inter',-apple-system,sans-serif; background:var(--bg); color
 .challenger-btn.active { background:var(--accent); color:#fff; border-color:var(--accent); }
 .challenger-row { background:rgba(34,211,238,0.06) !important; }
 .challenger-row td { border-bottom:1px solid var(--accent) !important; }
+.challenger-col { background:rgba(34,211,238,0.06) !important; border-bottom:2px solid var(--accent) !important; }
 .sb-challenger { margin-left:auto; font-size:11px; color:var(--accent); }
 .sb-item .sb-cb { width:13px; height:13px; accent-color:var(--accent); cursor:pointer; flex-shrink:0; margin:0; }
 .sb-item .sb-chal-btn { background:none; border:1px solid var(--border); border-radius:3px; cursor:pointer; font-size:11px; color:var(--text-dim); padding:0 3px; margin-left:auto; line-height:1.2; transition:all 0.15s; flex-shrink:0; }

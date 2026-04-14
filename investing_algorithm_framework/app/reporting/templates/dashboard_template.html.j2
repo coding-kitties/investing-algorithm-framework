@@ -44,12 +44,12 @@
   {% if tags_used | length > 0 %}
     {% for tag in tags_used %}
     <div class="sb-tag-group">
-      <div class="sb-tag-toggle" onclick="toggleSbTag(this)">
+      <div class="sb-tag-toggle collapsed" onclick="toggleSbTag(this)">
         <span class="sb-tag-arrow">&#9660;</span>
         <span class="tag-badge">{{ tag }}</span>
         <span style="font-size:0.6rem;color:var(--text-dim)">({{ strategies | selectattr('tag', 'equalto', tag) | list | length }})</span>
       </div>
-      <div class="sb-tag-children" style="max-height:2000px">
+      <div class="sb-tag-children collapsed">
         {% for s in strategies %}
         {% if s.tag == tag %}
         <div class="sb-item" data-page="{{ s.id }}" data-strat-idx="{{ loop.index0 }}">
@@ -640,6 +640,10 @@
   </div>
 </div>{# /main #}
 
+{# Placeholder for persisted notes data — MUST appear before main <script>
+   so loadSavedReportData() can find it during script execution #}
+<script id="saved-report-data" type="application/json"></script>
+
 <script>
 // ===== DATA =====
 const IS_SINGLE = {{ is_single | tojson }};
@@ -679,6 +683,11 @@ const BENCHMARKS = {{ benchmarks | tojson }};
     <div class="modal-footer">
       <span id="modal-selected-count" style="font-size:0.72rem;color:var(--text-secondary)"></span>
       <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:0.65rem;color:var(--text-dim)">Top:</span>
+        <button class="view-select" onclick="modalSelectTopN(5)" style="cursor:pointer;padding:3px 8px;font-size:0.7rem" title="Select top 5 by current sort">5</button>
+        <button class="view-select" onclick="modalSelectTopN(10)" style="cursor:pointer;padding:3px 8px;font-size:0.7rem" title="Select top 10 by current sort">10</button>
+        <button class="view-select" onclick="modalSelectTopN(25)" style="cursor:pointer;padding:3px 8px;font-size:0.7rem" title="Select top 25 by current sort">25</button>
+        <span style="border-left:1px solid var(--border);height:16px"></span>
         <select id="modal-page-size" class="view-select" onchange="modalPageSizeChange(this.value)" style="font-size:0.7rem;padding:3px 6px">
           <option value="10">10 rows</option>
           <option value="25" selected>25 rows</option>
@@ -756,6 +765,43 @@ const BENCHMARKS = {{ benchmarks | tojson }};
           <strong>Tip:</strong> Use with the MCP server for deeper integration — Copilot
           can then query your backtest data directly in VS Code.
           <code>pip install investing-algorithm-framework[mcp]</code>
+        </div>
+
+        <div class="ai-section" style="margin-top:1rem">
+          <div class="ai-section-header">
+            <span class="ai-icon">&#9881;</span>
+            <span class="ai-section-title">MCP Server Setup</span>
+          </div>
+          <div class="ai-section-desc">
+            The MCP server exposes all backtest data as tools an LLM can call.
+            Start it from a terminal pointing at your backtest directory:
+          </div>
+          <div style="background:var(--surface2);border-radius:6px;padding:0.6rem 0.8rem;margin:0.5rem 0;font-family:'JetBrains Mono',monospace;font-size:0.68rem;line-height:1.6;overflow-x:auto;white-space:pre;color:var(--text-secondary)">
+<span style="color:var(--text-dim)"># Single directory</span>
+iaf mcp -d /path/to/your/batch
+
+<span style="color:var(--text-dim)"># Multiple directories</span>
+iaf mcp -d batch_one -d batch_two
+
+<span style="color:var(--text-dim)"># Or without the CLI installed</span>
+python -m investing_algorithm_framework.cli.mcp_server -d /path/to/batch</div>
+          <div class="ai-section-desc" style="margin-top:0.4rem">
+            Then configure VS Code (<code>.vscode/settings.json</code>):
+          </div>
+          <div style="background:var(--surface2);border-radius:6px;padding:0.6rem 0.8rem;margin:0.5rem 0;font-family:'JetBrains Mono',monospace;font-size:0.68rem;line-height:1.6;overflow-x:auto;white-space:pre;color:var(--text-secondary)">{
+  "mcp": {
+    "servers": {
+      "backtest-analysis": {
+        "command": "iaf",
+        "args": ["mcp", "-d", "batch_one", "-d", "batch_two"]
+      }
+    }
+  }
+}</div>
+          <div class="ai-section-desc" style="margin-top:0.4rem;font-size:0.65rem;color:var(--text-dim)">
+            Once running, Copilot Chat (or any MCP client) can list strategies, compare metrics,
+            pull equity curves, create notes, and more — 23 tools in total.
+          </div>
         </div>
       </div>
     </div>

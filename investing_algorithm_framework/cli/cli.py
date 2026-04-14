@@ -235,7 +235,8 @@ cli.add_command(
 @click.option(
     '--directory', '-d',
     required=True,
-    help='Path to the backtest batch directory'
+    multiple=True,
+    help='Path to a backtest batch directory (can be repeated)'
 )
 def mcp(directory):
     """Start the MCP server for AI-powered backtest analysis.
@@ -244,7 +245,8 @@ def mcp(directory):
     backtest data directly in VS Code.
     """
     from .mcp_server import main as mcp_main
-    mcp_main(directory=directory)
+    dirs = list(directory)
+    mcp_main(directory=dirs if len(dirs) > 1 else dirs[0])
 
 
 cli.add_command(mcp)
