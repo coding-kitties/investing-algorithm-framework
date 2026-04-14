@@ -35,6 +35,7 @@ def create_data_storage_path(
     end_date: datetime,
     storage_path: str,
     data_type: str = "ohlcv",
+    filename: str = None,
 ) -> Path:
     """
     Create the file path where data would be stored.
@@ -50,10 +51,17 @@ def create_data_storage_path(
         end_date: End date of the data
         storage_path: Base directory for storing files
         data_type: Type of data (default: "ohlcv")
+        filename: Custom filename for the CSV file. If provided,
+            this overrides the auto-generated filename.
 
     Returns:
         Path: The full file path where data would be stored.
     """
+    if filename is not None:
+        if not filename.endswith('.csv'):
+            filename = f"{filename}.csv"
+        return Path(storage_path) / filename
+
     datetime_format = "%Y-%m-%d-%H-%M"
     symbol_formatted = symbol.upper().replace('/', '-')
     start_date_str = start_date.strftime(datetime_format)
@@ -79,6 +87,7 @@ def download(
     save: bool = True,
     storage_path: Union[str, Path] = None,
     save_to: Union[str, Path] = None,
+    filename: str = None,
 ) -> Union[pandas.DataFrame, polars.DataFrame]:
     """
     Download market data from the specified source. This function
@@ -100,6 +109,10 @@ def download(
         storage_path (str): The directory to save the downloaded data.
         save_to (str): The path to save the downloaded data. If provided,
             it overrides storage_path.
+        filename (str): Custom filename for the saved CSV file. If
+            provided, overrides the auto-generated filename. The .csv
+            extension is appended if not present. Requires storage_path
+            to be set.
         time_frame (str): The time frame for the data download.
         date (str): The date for the data download.
 
@@ -153,6 +166,10 @@ def download(
             and (end_date.tzinfo is None or end_date.tzinfo != timezone.utc):
         raise OperationalException("End date must be a UTC datetime object")
 
+    # When a custom filename is provided, disable internal saving
+    # and handle it ourselves after download
+    internal_save = save and filename is None
+
     data_source = DataSource(
         symbol=symbol,
         market=market,
@@ -163,18 +180,34 @@ def download(
         end_date=end_date,
         warmup_window=warmup_window,
         pandas=pandas,
-        save=save,
+        save=internal_save,
         storage_path=storage_path
     )
     data_provider_service.index_data_providers(
         data_sources=[data_source]
     )
-    return data_provider_service.get_data(
+    data = data_provider_service.get_data(
         data_source=data_source,
         date=date,
         start_date=start_date,
         end_date=end_date,
     )
+
+    # Save with custom filename if provided
+    if save and filename is not None and storage_path is not None:
+        if not filename.endswith('.csv'):
+            filename = f"{filename}.csv"
+
+        storage_dir = Path(storage_path)
+        storage_dir.mkdir(parents=True, exist_ok=True)
+        file_path = storage_dir / filename
+
+        if isinstance(data, polars.DataFrame):
+            data.write_csv(str(file_path))
+        elif isinstance(data, pandas.DataFrame):
+            data.to_csv(str(file_path))
+
+    return data
 
 
 def download_v2(
@@ -190,6 +223,7 @@ def download_v2(
     pandas: bool = True,
     save: bool = True,
     storage_path: Union[str, Path] = None,
+    filename: str = None,
 ) -> DownloadResult:
     """
     Download market data and return both the DataFrame and file path.
@@ -211,6 +245,9 @@ def download_v2(
         pandas: Whether to return the data as a pandas DataFrame
         save: Whether to save the data to disk
         storage_path: Base directory for storing files
+        filename: Custom filename for the saved CSV file. If provided,
+            overrides the auto-generated filename. The .csv extension
+            is appended if not present. Requires storage_path to be set.
 
     Returns:
         DownloadResult with .data (DataFrame) and .path (Path or None)
@@ -253,6 +290,7 @@ def download_v2(
         pandas=pandas,
         save=save,
         storage_path=storage_path,
+        filename=filename,
     )
 
     # Determine the file path if data was saved
@@ -268,6 +306,7 @@ def download_v2(
             end_date=parsed_end_date,
             storage_path=str(storage_path),
             data_type=data_type_str,
+            filename=filename,
         )
 
     return DownloadResult(data=data, path=file_path)

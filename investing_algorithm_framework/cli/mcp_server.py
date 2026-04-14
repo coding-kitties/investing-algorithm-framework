@@ -5,12 +5,16 @@ Exposes backtest data to LLMs (GitHub Copilot, Claude, ChatGPT)
 via the Model Context Protocol.
 
 Usage:
-    # Standalone
+    # Standalone (single directory)
     python -m investing_algorithm_framework.cli.mcp_server \
-        --directory examples/batch_one
+        -d examples/batch_one
+
+    # Multiple directories
+    python -m investing_algorithm_framework.cli.mcp_server \
+        -d examples/batch_one -d examples/batch_two
 
     # Via CLI
-    investing-algorithm-framework mcp --directory examples/batch_one
+    investing-algorithm-framework mcp -d examples/batch_one
 
 Configure in VS Code (.vscode/mcp.json):
     {
@@ -19,7 +23,8 @@ Configure in VS Code (.vscode/mcp.json):
           "command": "python",
           "args": [
             "-m", "investing_algorithm_framework.cli.mcp_server",
-            "--directory", "examples/batch_one"
+            "-d", "examples/batch_one",
+            "-d", "examples/batch_two"
           ]
         }
       }
@@ -29,16 +34,22 @@ import sys
 import json
 import os
 import argparse
-from typing import Optional
+from typing import Optional, List, Union
 
 
-def _load_backtests(directory: str):
+def _load_backtests(directory: Union[str, List[str]]):
     """Load and recalculate backtests from directory(ies)."""
     from investing_algorithm_framework import (
         BacktestReport, recalculate_backtests,
     )
-    # Support comma-separated directories
-    dirs = [d.strip() for d in directory.split(',') if d.strip()]
+
+    # Normalize to a list of directories
+    if isinstance(directory, str):
+        # Support comma-separated directories for backward compatibility
+        dirs = [d.strip() for d in directory.split(',') if d.strip()]
+    else:
+        dirs = [d.strip() for d in directory if d.strip()]
+
     if len(dirs) == 1:
         report = BacktestReport.open(directory_path=dirs[0])
     else:
@@ -986,7 +997,7 @@ def _filter_strategies(backtests, conditions):
 class BacktestMCPServer:
     """Minimal MCP server using stdio transport (JSON-RPC 2.0)."""
 
-    def __init__(self, directory: str):
+    def __init__(self, directory: Union[str, List[str]]):
         self.directory = directory
         self._backtests = None
         self._bt_map = {}
@@ -2270,19 +2281,28 @@ class BacktestMCPServer:
                 break
 
 
-def main(directory: Optional[str] = None):
+def main(directory: Optional[Union[str, List[str]]] = None):
     """Entry point for the MCP server."""
     parser = argparse.ArgumentParser(
         description="Backtest Analysis MCP Server"
     )
     parser.add_argument(
         "--directory", "-d",
+        action="append",
         required=directory is None,
-        default=directory,
-        help="Path to the backtest directory (batch folder)",
+        default=None,
+        help=(
+            "Path to a backtest directory (batch folder). "
+            "Can be specified multiple times for multiple directories."
+        ),
     )
     args = parser.parse_args()
-    server = BacktestMCPServer(args.directory)
+    dirs = args.directory or ([directory] if isinstance(directory, str) else directory) or []
+
+    if len(dirs) == 1:
+        server = BacktestMCPServer(dirs[0])
+    else:
+        server = BacktestMCPServer(dirs)
     server.run()
 
 
