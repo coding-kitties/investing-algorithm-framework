@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float
+from sqlalchemy import Column, BigInteger, Sequence, String, DateTime, Double
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.domain import Trade, TradeStatus
@@ -45,7 +45,7 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
     """
 
     __tablename__ = "trades"
-    id = Column(Integer, primary_key=True, unique=True)
+    id = Column(BigInteger, Sequence("trades_id_seq"), primary_key=True, unique=True)
     orders = relationship(
         'SQLOrder',
         secondary=order_trade_association,
@@ -56,16 +56,16 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
     trading_symbol = Column(String)
     closed_at = Column(DateTime, default=None)
     opened_at = Column(DateTime, default=None)
-    open_price = Column(Float, default=None)
-    amount = Column(Float, default=None)
-    available_amount = Column(Float, default=None)
-    filled_amount = Column(Float, default=None)
-    remaining = Column(Float, default=None)
-    net_gain = Column(Float, default=0)
-    cost = Column(Float, default=0)
-    last_reported_price = Column(Float, default=None)
+    open_price = Column(Double, default=None)
+    amount = Column(Double, default=None)
+    available_amount = Column(Double, default=None)
+    filled_amount = Column(Double, default=None)
+    remaining = Column(Double, default=None)
+    net_gain = Column(Double, default=0)
+    cost = Column(Double, default=0)
+    last_reported_price = Column(Double, default=None)
     last_reported_price_datetime = Column(DateTime, default=None)
-    high_water_mark = Column(Float, default=None)
+    high_water_mark = Column(Double, default=None)
     high_water_mark_datetime = Column(DateTime, default=None)
     updated_at = Column(DateTime, default=None)
     status = Column(String, default=TradeStatus.CREATED.value)

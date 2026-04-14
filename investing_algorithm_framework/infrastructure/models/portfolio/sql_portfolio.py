@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean
+from sqlalchemy import Column, BigInteger, Sequence, String, DateTime, \
+    Double, Boolean
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm import validates
@@ -13,17 +14,17 @@ from investing_algorithm_framework.infrastructure.models.model_extension \
 
 class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
     __tablename__ = "portfolios"
-    id = Column(Integer, primary_key=True)
+    id = Column(BigInteger, Sequence("portfolios_id_seq"), primary_key=True)
     identifier = Column(String, nullable=False, unique=True)
     trading_symbol = Column(String, nullable=False)
-    realized = Column(Float, nullable=False, default=0)
-    total_revenue = Column(Float, nullable=False, default=0)
-    total_cost = Column(Float, nullable=False, default=0)
-    total_net_gain = Column(Float, nullable=False, default=0)
-    total_trade_volume = Column(Float, nullable=False, default=0)
-    net_size = Column(Float, nullable=False, default=0)
-    unallocated = Column(Float, nullable=False, default=0)
-    initial_balance = Column(Float, nullable=True)
+    realized = Column(Double, nullable=False, default=0)
+    total_revenue = Column(Double, nullable=False, default=0)
+    total_cost = Column(Double, nullable=False, default=0)
+    total_net_gain = Column(Double, nullable=False, default=0)
+    total_trade_volume = Column(Double, nullable=False, default=0)
+    net_size = Column(Double, nullable=False, default=0)
+    unallocated = Column(Double, nullable=False, default=0)
+    initial_balance = Column(Double, nullable=True)
     market = Column(String, nullable=False)
     positions = relationship(
         "SQLPosition",

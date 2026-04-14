@@ -166,7 +166,7 @@ class AWSS3StorageStateHandler(StateHandler):
 
             # Add write permission to database file
             db_file = os.path.join(
-                target_directory, "databases", "prod-database.sqlite3"
+                target_directory, "databases", "prod-database.duckdb"
             )
             if os.path.exists(db_file):
                 os.chmod(

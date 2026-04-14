@@ -246,15 +246,15 @@ class App:
 
         if Environment.TEST.equals(config[ENVIRONMENT]):
             configuration_service.add_value(
-                DATABASE_NAME, "test-database.sqlite3"
+                DATABASE_NAME, "test-database.duckdb"
             )
         elif Environment.PROD.equals(config[ENVIRONMENT]):
             configuration_service.add_value(
-                DATABASE_NAME, "prod-database.sqlite3"
+                DATABASE_NAME, "prod-database.duckdb"
             )
         else:
             configuration_service.add_value(
-                DATABASE_NAME, "dev-database.sqlite3"
+                DATABASE_NAME, "dev-database.duckdb"
             )
 
         resource_dir = config[RESOURCE_DIRECTORY]
@@ -267,7 +267,7 @@ class App:
 
         if SQLALCHEMY_DATABASE_URI not in config \
                 or config[SQLALCHEMY_DATABASE_URI] is None:
-            path = "sqlite:///" + os.path.join(
+            path = "duckdb:///" + os.path.join(
                 configuration_service.config[DATABASE_DIRECTORY_PATH],
                 configuration_service.config[DATABASE_NAME]
             )
@@ -303,7 +303,7 @@ class App:
             ENVIRONMENT: Environment.BACKTEST.value,
             BACKTESTING_START_DATE: backtest_date_range.start_date,
             BACKTESTING_END_DATE: backtest_date_range.end_date,
-            DATABASE_NAME: "backtest-database.sqlite3",
+            DATABASE_NAME: "backtest-database.duckdb",
             DATABASE_DIRECTORY_NAME: "backtest_databases",
             DATABASE_DIRECTORY_PATH: os.path.join(
                 self.resource_directory_path,
@@ -359,7 +359,7 @@ class App:
                 os.remove(database_path)
 
         # Create the sqlalchemy database uri
-        path = f"sqlite:///{database_path}"
+        path = f"duckdb:///{database_path}"
         self.set_config(SQLALCHEMY_DATABASE_URI, path)
 
         # Setup sql if needed

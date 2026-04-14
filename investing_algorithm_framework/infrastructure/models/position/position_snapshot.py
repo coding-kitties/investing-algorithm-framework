@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Float
+from sqlalchemy import Column, BigInteger, Sequence, String, ForeignKey, \
+    Double
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.domain import PositionSnapshot
@@ -11,12 +12,12 @@ class SQLPositionSnapshot(
     SQLBaseModel, PositionSnapshot, SQLAlchemyModelExtension
 ):
     __tablename__ = "position_snapshots"
-    id = Column(Integer, primary_key=True, unique=True)
+    id = Column(BigInteger, Sequence("position_snapshots_id_seq"), primary_key=True, unique=True)
     symbol = Column(String)
-    amount = Column(Float)
-    cost = Column(Float)
+    amount = Column(Double)
+    cost = Column(Double)
     portfolio_snapshot_id = Column(
-        Integer, ForeignKey('portfolio_snapshots.id')
+        BigInteger, ForeignKey('portfolio_snapshots.id')
     )
     portfolio_snapshot = relationship(
         "SQLPortfolioSnapshot", back_populates="position_snapshots"

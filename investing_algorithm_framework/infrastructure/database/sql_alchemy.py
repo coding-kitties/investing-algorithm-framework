@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy import create_engine, StaticPool
+from sqlalchemy import create_engine
 from sqlalchemy import inspect
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
@@ -22,8 +22,7 @@ class SQLAlchemyAdapter:
         global Session
         engine = create_engine(
             app.config[SQLALCHEMY_DATABASE_URI],
-            connect_args={'check_same_thread': False},
-            poolclass=StaticPool
+            connect_args={"config": {"TimeZone": "UTC"}},
         )
         Session.configure(bind=engine)
 
@@ -49,7 +48,7 @@ def create_all_tables():
 
 
 from sqlalchemy import event
-from sqlalchemy.orm import mapper
+from sqlalchemy.orm import Mapper
 from datetime import timezone
 
 def clear_db(db_uri):
@@ -65,7 +64,10 @@ def clear_db(db_uri):
     """
     # Drop all tables before deleting file
     try:
-        engine = create_engine(db_uri)
+        engine = create_engine(
+            db_uri,
+            connect_args={"config": {"TimeZone": "UTC"}},
+        )
         inspector = inspect(engine)
         if inspector.get_table_names():
             logger.info("Dropping all tables in backtest database")
@@ -80,14 +82,16 @@ def clear_db(db_uri):
     #     pass  # ignore if not needed
 
 
-@event.listens_for(mapper, "load")
+@event.listens_for(Mapper, "load")
 def attach_utc_timezone_on_load(target, context):
     """
     For each model instance loaded from the database,
     this function will check if one of the following attributes are
     present: created_at, updated_at, closed_at, opened_at, triggered_at.
-    If so, it will check if these datetime
-    attributes are timezone-naive and, if so, will set them to UTC.
+    If so, it will ensure these datetime attributes are UTC timezone-aware.
+
+    - If timezone-naive: attach UTC directly.
+    - If timezone-aware but not UTC: convert to UTC.
 
     Its documented in the contributing guide (https://coding-kitties.github
     .io/investing-algorithm-framework/Contributing%20Guide/contributing)
@@ -100,28 +104,18 @@ def attach_utc_timezone_on_load(target, context):
     Returns:
         None
     """
-    # This will apply to every model instance loaded from the DB
-    if hasattr(target, "created_at"):
-        dt = getattr(target, "created_at")
-        if dt and dt.tzinfo is None:
-            target.created_at = dt.replace(tzinfo=timezone.utc)
-
-    if hasattr(target, "updated_at"):
-        dt = getattr(target, "updated_at")
-        if dt and dt.tzinfo is None:
-            target.updated_at = dt.replace(tzinfo=timezone.utc)
-
-    if hasattr(target, "closed_at"):
-        dt = getattr(target, "closed_at")
-        if dt and dt.tzinfo is None:
-            target.closed_at = dt.replace(tzinfo=timezone.utc)
-
-    if hasattr(target, "opened_at"):
-        dt = getattr(target, "opened_at")
-        if dt and dt.tzinfo is None:
-            target.opened_at = dt.replace(tzinfo=timezone.utc)
-
-    if hasattr(target, "triggered_at"):
-        dt = getattr(target, "triggered_at")
-        if dt and dt.tzinfo is None:
-            target.triggered_at = dt.replace(tzinfo=timezone.utc)
+    for attr in (
+        "created_at", "updated_at", "closed_at", "opened_at", "triggered_at"
+    ):
+        if hasattr(target, attr):
+            dt = getattr(target, attr)
+            if dt is not None:
+                if dt.tzinfo is None:
+                    setattr(target, attr, dt.replace(tzinfo=timezone.utc))
+                elif dt.tzinfo is not timezone.utc:
+                    # Normalize any tz (including pytz.UTC) to
+                    # datetime.timezone.utc for consistency.
+                    setattr(
+                        target, attr,
+                        dt.astimezone(timezone.utc)
+                    )

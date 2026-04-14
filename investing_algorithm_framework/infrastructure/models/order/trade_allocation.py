@@ -1,6 +1,6 @@
 import logging
 
-from sqlalchemy import Column, Integer, ForeignKey, Float
+from sqlalchemy import Column, BigInteger, Sequence, ForeignKey, Double
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.infrastructure.database import SQLBaseModel
@@ -49,19 +49,19 @@ class SQLTradeAllocation(SQLBaseModel, SQLAlchemyModelExtension):
             reversal can simply subtract it without re-derivation.
     """
     __tablename__ = "trade_allocations"
-    id = Column(Integer, primary_key=True, unique=True)
-    order_id = Column(Integer, ForeignKey('orders.id'))
+    id = Column(BigInteger, Sequence("trade_allocations_id_seq"), primary_key=True, unique=True)
+    order_id = Column(BigInteger, ForeignKey('orders.id'))
     order = relationship('SQLOrder', back_populates='trade_allocations')
-    trade_id = Column(Integer)
-    stop_loss_id = Column(Integer)
-    take_profit_id = Column(Integer)
-    amount = Column(Float)
-    amount_pending = Column(Float)
-    open_price = Column(Float, default=0)
-    close_price = Column(Float, default=0)
-    buy_fee = Column(Float, default=0)
-    sell_fee = Column(Float, default=0)
-    net_gain_contribution = Column(Float, default=0)
+    trade_id = Column(BigInteger)
+    stop_loss_id = Column(BigInteger)
+    take_profit_id = Column(BigInteger)
+    amount = Column(Double)
+    amount_pending = Column(Double)
+    open_price = Column(Double, default=0)
+    close_price = Column(Double, default=0)
+    buy_fee = Column(Double, default=0)
+    sell_fee = Column(Double, default=0)
+    net_gain_contribution = Column(Double, default=0)
 
     def __init__(
         self,

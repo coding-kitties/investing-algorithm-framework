@@ -73,7 +73,7 @@ class TestConfig(TestBase):
         )
         self.assertIsNotNone(self.app.config[DATABASE_NAME])
         self.assertEqual(
-            "prod-database.sqlite3", self.app.config[DATABASE_NAME]
+            "prod-database.duckdb", self.app.config[DATABASE_NAME]
         )
         self.assertIsNotNone(self.app.config[DATABASE_DIRECTORY_NAME])
         database_directory_path = os.path.join(

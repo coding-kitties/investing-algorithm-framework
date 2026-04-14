@@ -1,7 +1,8 @@
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float
+from sqlalchemy import Column, BigInteger, Sequence, String, DateTime, \
+    ForeignKey, Double
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.domain import OrderType, \
@@ -24,8 +25,8 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     SQLOrder model based on the Order domain model.
     """
     __tablename__ = "orders"
-    id = Column(Integer, primary_key=True, unique=True)
-    external_id = Column(Integer)
+    id = Column(BigInteger, Sequence("orders_id_seq"), primary_key=True, unique=True)
+    external_id = Column(String)
     target_symbol = Column(String)
     trading_symbol = Column(String)
     order_side = Column(String, nullable=False, default=OrderSide.BUY.value)
@@ -33,22 +34,22 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     trades = relationship(
         'SQLTrade', secondary=order_trade_association, back_populates='orders'
     )
-    price = Column(Float)
-    amount = Column(Float)
-    remaining = Column(Float, default=None)
-    filled = Column(Float, default=None)
-    cost = Column(Float, default=0)
+    price = Column(Double)
+    amount = Column(Double)
+    remaining = Column(Double, default=None)
+    filled = Column(Double, default=None)
+    cost = Column(Double, default=0)
     status = Column(String, default=OrderStatus.CREATED.value)
-    position_id = Column(Integer, ForeignKey('positions.id'))
+    position_id = Column(BigInteger, ForeignKey('positions.id'))
     position = relationship("SQLPosition", back_populates="orders")
     created_at = Column(DateTime(timezone=True), default=utcnow)
     updated_at = Column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
-    order_fee = Column(Float, default=None)
+    order_fee = Column(Double, default=None)
     order_fee_currency = Column(String, default=None)
-    order_fee_rate = Column(Float, default=None)
-    sell_order_metadata_id = Column(Integer, ForeignKey('orders.id'))
+    order_fee_rate = Column(Double, default=None)
+    sell_order_metadata_id = Column(BigInteger, ForeignKey('orders.id'))
     trade_allocations = relationship(
         'SQLTradeAllocation', back_populates='order'
     )

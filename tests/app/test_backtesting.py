@@ -116,7 +116,7 @@ class TestBacktestInitialConfig(BacktestTestBase):
         self.assertEqual(run.trading_symbol, "USDT")
         database_uri = app.config[SQLALCHEMY_DATABASE_URI]
         self.assertIsNotNone(database_uri)
-        self.assertTrue(database_uri.endswith("backtest-database.sqlite3"))
+        self.assertTrue(database_uri.endswith("backtest-database.duckdb"))
 
     def test_backtest_with_initial_balance(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})
@@ -149,7 +149,7 @@ class TestBacktestInitialConfig(BacktestTestBase):
         self.assertEqual(run.trading_symbol, "USDT")
         database_uri = app.config[SQLALCHEMY_DATABASE_URI]
         self.assertIsNotNone(database_uri)
-        self.assertTrue(database_uri.endswith("backtest-database.sqlite3"))
+        self.assertTrue(database_uri.endswith("backtest-database.duckdb"))
 
 
 # ---------------------------------------------------------------------------

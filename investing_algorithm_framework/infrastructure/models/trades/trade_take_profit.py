@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean, \
-    DateTime
+from sqlalchemy import Column, BigInteger, Sequence, String, Double, \
+    ForeignKey, Boolean, DateTime
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.domain import TradeTakeProfit
@@ -34,20 +34,20 @@ class SQLTradeTakeProfit(
     """
 
     __tablename__ = "trade_take_profits"
-    id = Column(Integer, primary_key=True, unique=True)
-    trade_id = Column(Integer, ForeignKey('trades.id'))
+    id = Column(BigInteger, Sequence("trade_take_profits_id_seq"), primary_key=True, unique=True)
+    trade_id = Column(BigInteger, ForeignKey('trades.id'))
     trade = relationship('SQLTrade', back_populates='take_profits')
     trailing = Column(Boolean)
-    percentage = Column(Float)
-    sell_percentage = Column(Float)
-    open_price = Column(Float)
-    high_water_mark = Column(Float)
+    percentage = Column(Double)
+    sell_percentage = Column(Double)
+    open_price = Column(Double)
+    high_water_mark = Column(Double)
     high_water_mark_date = Column(String)
     sell_prices = Column(String)
-    take_profit_price = Column(Float)
-    sell_amount = Column(Float)
+    take_profit_price = Column(Double)
+    sell_amount = Column(Double)
     sell_dates = Column(String)
-    sold_amount = Column(Float)
+    sold_amount = Column(Double)
     active = Column(Boolean)
     triggered = Column(Boolean, default=False)
     triggered_at = Column(DateTime, default=None)

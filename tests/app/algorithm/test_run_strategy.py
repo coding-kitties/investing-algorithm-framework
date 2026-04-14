@@ -73,6 +73,23 @@ class Test(TestCase):
     def tearDown(self) -> None:
         super().tearDown()
         # Delete the resources database directory
+        from sqlalchemy.orm import close_all_sessions
+        from investing_algorithm_framework.infrastructure.database import \
+            Session
+
+        try:
+            close_all_sessions()
+        except Exception:
+            pass
+
+        try:
+            engine = Session.kw.get('bind')
+            if engine is not None:
+                engine.dispose()
+        except Exception:
+            pass
+
+        Session.configure(bind=None)
 
         database_dir = os.path.join(self.resource_dir, "databases")
 
