@@ -69,7 +69,9 @@ class ScalingRule:
         if isinstance(scale_in_percentage, (int, float)):
             self._scale_in_percentages = [float(scale_in_percentage)]
         else:
-            self._scale_in_percentages = [float(v) for v in scale_in_percentage]
+            self._scale_in_percentages = [
+                float(v) for v in scale_in_percentage
+            ]
 
         if isinstance(scale_out_percentage, (int, float)):
             self._scale_out_percentages = [float(scale_out_percentage)]

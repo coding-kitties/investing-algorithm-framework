@@ -1,12 +1,14 @@
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.domain import OrderType, \
     OrderSide, Order, OrderStatus
-from investing_algorithm_framework.infrastructure.database import SQLBaseModel
+from investing_algorithm_framework.infrastructure.database import (
+    SQLBaseModel, SqliteDecimal
+)
 from investing_algorithm_framework.infrastructure.models.model_extension \
     import SQLAlchemyModelExtension
 from investing_algorithm_framework.infrastructure.models.\
@@ -33,11 +35,11 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     trades = relationship(
         'SQLTrade', secondary=order_trade_association, back_populates='orders'
     )
-    price = Column(Float)
-    amount = Column(Float)
-    remaining = Column(Float, default=None)
-    filled = Column(Float, default=None)
-    cost = Column(Float, default=0)
+    price = Column(SqliteDecimal())
+    amount = Column(SqliteDecimal())
+    remaining = Column(SqliteDecimal(), default=None)
+    filled = Column(SqliteDecimal(), default=None)
+    cost = Column(SqliteDecimal(), default=0)
     status = Column(String, default=OrderStatus.CREATED.value)
     position_id = Column(Integer, ForeignKey('positions.id'))
     position = relationship("SQLPosition", back_populates="orders")
@@ -45,9 +47,9 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     updated_at = Column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
     )
-    order_fee = Column(Float, default=None)
+    order_fee = Column(SqliteDecimal(), default=None)
     order_fee_currency = Column(String, default=None)
-    order_fee_rate = Column(Float, default=None)
+    order_fee_rate = Column(SqliteDecimal(), default=None)
     sell_order_metadata_id = Column(Integer, ForeignKey('orders.id'))
     trade_allocations = relationship(
         'SQLTradeAllocation', back_populates='order'

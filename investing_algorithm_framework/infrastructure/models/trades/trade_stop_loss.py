@@ -1,9 +1,11 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Boolean, \
+from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, \
     DateTime
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.domain import TradeStopLoss
-from investing_algorithm_framework.infrastructure.database import SQLBaseModel
+from investing_algorithm_framework.infrastructure.database import (
+    SQLBaseModel, SqliteDecimal
+)
 from investing_algorithm_framework.infrastructure.models.model_extension \
     import SQLAlchemyModelExtension
 
@@ -42,16 +44,16 @@ class SQLTradeStopLoss(TradeStopLoss, SQLBaseModel, SQLAlchemyModelExtension):
     trade_id = Column(Integer, ForeignKey('trades.id'))
     trade = relationship('SQLTrade', back_populates='stop_losses')
     trailing = Column(Boolean)
-    percentage = Column(Float)
-    sell_percentage = Column(Float)
-    open_price = Column(Float)
-    high_water_mark = Column(Float)
+    percentage = Column(SqliteDecimal())
+    sell_percentage = Column(SqliteDecimal())
+    open_price = Column(SqliteDecimal())
+    high_water_mark = Column(SqliteDecimal())
     high_water_mark_date = Column(String)
-    stop_loss_price = Column(Float)
+    stop_loss_price = Column(SqliteDecimal())
     sell_prices = Column(String)
     sell_dates = Column(String)
-    sell_amount = Column(Float)
-    sold_amount = Column(Float)
+    sell_amount = Column(SqliteDecimal())
+    sold_amount = Column(SqliteDecimal())
     active = Column(Boolean)
     triggered = Column(Boolean, default=False)
     triggered_at = Column(DateTime, default=None)

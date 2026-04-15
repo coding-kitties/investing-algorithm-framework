@@ -1,4 +1,5 @@
 import os
+import shutil
 from unittest import TestCase
 
 from typing import Dict, Any
@@ -105,28 +106,10 @@ class Test(TestCase):
         )
 
     def tearDown(self):
-        paths = [
-            os.path.join(
-                self.resource_dir, "databases"
-            ),
-            os.path.join(
-                self.resource_dir, "backtest_databases"
-            )
-        ]
-
-        for path in paths:
-            self._remove_directory(path)
-
-    def _remove_directory(self, path):
-        if os.path.exists(path):
-            for root, dirs, files in os.walk(path, topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
-
-        if os.path.exists(path):
-            os.rmdir(path)
+        for subdir in ("databases", "backtest_databases"):
+            path = os.path.join(self.resource_dir, subdir)
+            if os.path.exists(path):
+                shutil.rmtree(path, ignore_errors=True)
 
     def test_default(self):
         app = create_app({
