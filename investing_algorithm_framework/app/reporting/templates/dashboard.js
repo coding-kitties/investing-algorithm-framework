@@ -6058,6 +6058,7 @@ var tradesHeaders = [
   {key: 'open_price', label: 'Open Price', align: 'right'},
   {key: 'close_price', label: 'Close Price', align: 'right'},
   {key: 'cost', label: 'Cost', align: 'right'},
+  {key: 'total_fees', label: 'Fees', align: 'right'},
   {key: 'net_gain', label: 'Net Gain', align: 'right', colorFn: function(r) { return r.net_gain >= 0 ? 'var(--green)' : 'var(--red)'; }},
   {key: 'pct', label: 'Return %', align: 'right', colorFn: function(r) { return r.pct >= 0 ? 'var(--green)' : 'var(--red)'; }},
 ];
@@ -6071,6 +6072,8 @@ var ordersHeaders = [
   {key: 'amount', label: 'Amount', align: 'right'},
   {key: 'filled', label: 'Filled', align: 'right'},
   {key: 'cost', label: 'Cost', align: 'right'},
+  {key: 'fee', label: 'Fee', align: 'right'},
+  {key: 'fee_rate', label: 'Fee Rate', align: 'right'},
   {key: 'created', label: 'Created'},
   {key: 'updated', label: 'Updated'},
 ];

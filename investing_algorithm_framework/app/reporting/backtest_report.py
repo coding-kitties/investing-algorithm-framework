@@ -462,6 +462,7 @@ class BacktestReport:
                         pct = (ng / cost * 100) if cost else 0
                         op_dt = t.opened_at
                         cl_dt = t.closed_at
+                        total_fees = getattr(t, 'total_fees', 0) or 0
                         trades_list.append({
                             'id': idx_t,
                             'sym': sym,
@@ -472,6 +473,7 @@ class BacktestReport:
                             ),
                             'close_price': round(cp, 2),
                             'cost': round(cost, 2),
+                            'total_fees': round(total_fees, 4),
                             'net_gain': round(ng, 2),
                             'pct': round(pct, 2),
                         })
@@ -576,6 +578,13 @@ class BacktestReport:
                     for o in run.orders:
                         o_dt = getattr(o, 'created_at', None)
                         u_dt = getattr(o, 'updated_at', None)
+                        o_fee = getattr(o, 'order_fee', None)
+                        if o_fee is None:
+                            o_fee = getattr(o, 'fee', 0)
+                        o_fee = o_fee or 0
+                        o_fee_rate = getattr(
+                            o, 'order_fee_rate', 0
+                        ) or 0
                         orders_list.append({
                             'sym': getattr(o, 'target_symbol', '')
                             or '',
@@ -597,6 +606,10 @@ class BacktestReport:
                             'cost': round(
                                 (getattr(o, 'amount', 0) or 0)
                                 * (getattr(o, 'price', 0) or 0), 2
+                            ),
+                            'fee': round(float(o_fee), 4),
+                            'fee_rate': round(
+                                float(o_fee_rate), 4
                             ),
                             'created': _fmt_date(o_dt)
                             if o_dt else '',
