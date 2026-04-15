@@ -1025,11 +1025,28 @@ class BacktestMCPServer:
                 "description": (
                     "List all backtest strategies with their key summary "
                     "metrics (CAGR, Sharpe, Max DD, Win Rate, etc.). "
-                    "Use this first to get an overview."
+                    "Use this first to get an overview. "
+                    "Optionally filter by strategy_ids or tag."
                 ),
                 "inputSchema": {
                     "type": "object",
-                    "properties": {},
+                    "properties": {
+                        "strategy_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "Optional: filter to specific "
+                                "strategy algorithm_ids."
+                            ),
+                        },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
+                            ),
+                        },
+                    },
                 },
             },
             {
@@ -1052,12 +1069,28 @@ class BacktestMCPServer:
             {
                 "name": "rank_strategies",
                 "description": (
-                    "Rank all strategies by a specific metric. "
-                    "Useful for finding the best/worst performers."
+                    "Rank strategies by a specific metric. "
+                    "Useful for finding the best/worst performers. "
+                    "Optionally filter by strategy_ids or tag."
                 ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
+                        "strategy_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "Optional: filter to specific "
+                                "strategy algorithm_ids."
+                            ),
+                        },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
+                            ),
+                        },
                         "metric": {
                             "type": "string",
                             "description": (
@@ -1104,26 +1137,60 @@ class BacktestMCPServer:
                 "description": (
                     "Get a complete analysis document with all strategies, "
                     "metrics, rankings, per-window breakdowns and top trades. "
-                    "Use this for comprehensive analysis."
+                    "Use this for comprehensive analysis. "
+                    "Optionally filter by strategy_ids or tag."
                 ),
                 "inputSchema": {
                     "type": "object",
-                    "properties": {},
+                    "properties": {
+                        "strategy_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "Optional: filter to specific "
+                                "strategy algorithm_ids."
+                            ),
+                        },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
+                            ),
+                        },
+                    },
                 },
             },
             {
                 "name": "get_trading_activity",
                 "description": (
-                    "Get a Trading Activity table for all strategies with "
+                    "Get a Trading Activity table with "
                     "12 trading metrics: Profit Factor, Win Rate, "
                     "Trades/yr, Trades/mo, Trades/wk, # Trades, "
                     "Avg Return, Median Return, Avg Duration, Win Streak, "
                     "Loss Streak, % Win Months. Matches the dashboard "
-                    "Trading Activity view exactly."
+                    "Trading Activity view exactly. "
+                    "Optionally filter by strategy_ids or tag."
                 ),
                 "inputSchema": {
                     "type": "object",
-                    "properties": {},
+                    "properties": {
+                        "strategy_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "Optional: filter to specific "
+                                "strategy algorithm_ids."
+                            ),
+                        },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
+                            ),
+                        },
+                    },
                 },
             },
             {
@@ -1156,7 +1223,7 @@ class BacktestMCPServer:
                     "for a stacked multi-strategy comparison. Sampled to "
                     "~50 points. Shows date, value, and cumulative "
                     "growth %. Use window to filter by a specific "
-                    "backtest window."
+                    "backtest window. Use tag to filter by batch."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -1177,6 +1244,13 @@ class BacktestMCPServer:
                                 "strategy_id, not both."
                             ),
                         },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
+                            ),
+                        },
                         "window": {
                             "type": "string",
                             "description": (
@@ -1192,7 +1266,7 @@ class BacktestMCPServer:
                     "Get drawdown time-series for one or more strategies "
                     "(how far below peak at each point). Use strategy_id "
                     "for one, or strategy_ids for a stacked comparison. "
-                    "Sampled to ~50 pts."
+                    "Sampled to ~50 pts. Use tag to filter by batch."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -1212,6 +1286,13 @@ class BacktestMCPServer:
                                 "stacked comparison."
                             ),
                         },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
+                            ),
+                        },
                         "window": {
                             "type": "string",
                             "description": "Optional: specific window name",
@@ -1225,7 +1306,8 @@ class BacktestMCPServer:
                     "Get monthly returns heatmap for one or more "
                     "strategies. Use strategy_id for one, or "
                     "strategy_ids for sequential tables per strategy. "
-                    "Great for seasonality analysis."
+                    "Great for seasonality analysis. "
+                    "Use tag to filter by batch."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -1245,6 +1327,13 @@ class BacktestMCPServer:
                                 "comparison."
                             ),
                         },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
+                            ),
+                        },
                         "window": {
                             "type": "string",
                             "description": "Optional: specific window name",
@@ -1257,7 +1346,7 @@ class BacktestMCPServer:
                 "description": (
                     "Get yearly returns for one or more strategies. "
                     "Use strategy_id for one, or strategy_ids for a "
-                    "stacked comparison table."
+                    "stacked comparison table. Use tag to filter by batch."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -1275,6 +1364,13 @@ class BacktestMCPServer:
                             "description": (
                                 "Multiple strategy algorithm_ids for a "
                                 "stacked comparison."
+                            ),
+                        },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
                             ),
                         },
                         "window": {
@@ -1290,7 +1386,8 @@ class BacktestMCPServer:
                     "Get rolling Sharpe ratio time-series for one or more "
                     "strategies. Use strategy_id for one, or strategy_ids "
                     "for a stacked comparison. Shows how risk-adjusted "
-                    "performance evolves over time."
+                    "performance evolves over time. "
+                    "Use tag to filter by batch."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -1308,6 +1405,13 @@ class BacktestMCPServer:
                             "description": (
                                 "Multiple strategy algorithm_ids for a "
                                 "stacked comparison."
+                            ),
+                        },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
                             ),
                         },
                         "window": {
@@ -1358,11 +1462,27 @@ class BacktestMCPServer:
                 "description": (
                     "Get cross-strategy return correlation matrix. "
                     "Shows how correlated different strategies are — "
-                    "useful for portfolio construction."
+                    "useful for portfolio construction. "
+                    "Optionally filter by strategy_ids or tag."
                 ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
+                        "strategy_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "Optional: filter to specific "
+                                "strategy algorithm_ids."
+                            ),
+                        },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
+                            ),
+                        },
                         "window": {
                             "type": "string",
                             "description": (
@@ -1377,11 +1497,28 @@ class BacktestMCPServer:
                 "name": "get_window_coverage",
                 "description": (
                     "Get a summary of all backtest windows — dates, "
-                    "duration, and how many strategies ran in each."
+                    "duration, and how many strategies ran in each. "
+                    "Optionally filter by strategy_ids or tag."
                 ),
                 "inputSchema": {
                     "type": "object",
-                    "properties": {},
+                    "properties": {
+                        "strategy_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "Optional: filter to specific "
+                                "strategy algorithm_ids."
+                            ),
+                        },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
+                            ),
+                        },
+                    },
                 },
             },
             {
@@ -1390,7 +1527,8 @@ class BacktestMCPServer:
                     "Get portfolio value snapshots for one or more "
                     "strategies — initial value, final value, net gain, "
                     "and growth per window. Use strategy_id for one, or "
-                    "strategy_ids for a stacked comparison."
+                    "strategy_ids for a stacked comparison. "
+                    "Use tag to filter by batch."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -1408,6 +1546,13 @@ class BacktestMCPServer:
                             "description": (
                                 "Multiple strategy algorithm_ids for a "
                                 "stacked comparison."
+                            ),
+                        },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
                             ),
                         },
                         "window": {
@@ -1569,11 +1714,29 @@ class BacktestMCPServer:
                 "description": (
                     "Filter strategies by metric conditions. "
                     "Returns strategies matching ALL conditions. "
-                    "Example: Sharpe > 1.0 AND Max DD < 0.15"
+                    "Example: Sharpe > 1.0 AND Max DD < 0.15. "
+                    "Optionally pre-filter by strategy_ids or tag."
                 ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
+                        "strategy_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "Optional: filter to specific "
+                                "strategy algorithm_ids "
+                                "before applying conditions."
+                            ),
+                        },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name "
+                                "before applying conditions."
+                            ),
+                        },
                         "conditions": {
                             "type": "array",
                             "description": (
@@ -1612,10 +1775,43 @@ class BacktestMCPServer:
             },
         ]
 
+    def _resolve_backtests(self, arguments):
+        """Filter backtests by strategy_ids and/or tag."""
+        backtests = self._backtests
+        tag = arguments.get("tag")
+        if tag:
+            backtests = [
+                bt for bt in backtests
+                if self._bt_tags.get(bt.algorithm_id) == tag
+            ]
+        sids = arguments.get("strategy_ids")
+        if sids:
+            sid_set = set(sids)
+            backtests = [
+                bt for bt in backtests
+                if bt.algorithm_id in sid_set
+            ]
+        return backtests
+
+    def _resolve_sids(self, arguments):
+        """Resolve strategy_ids from strategy_id, strategy_ids, or tag."""
+        sids = arguments.get("strategy_ids") or []
+        sid = arguments.get("strategy_id", "")
+        tag = arguments.get("tag")
+        if tag and not sids and not sid:
+            sids = [
+                bt.algorithm_id for bt in self._backtests
+                if self._bt_tags.get(bt.algorithm_id) == tag
+            ]
+        if sid and not sids:
+            sids = [sid]
+        return sids
+
     def _handle_tool_call(self, name, arguments):
         self._ensure_loaded()
 
         if name == "list_strategies":
+            backtests = self._resolve_backtests(arguments)
             has_tags = any(self._bt_tags.values())
             lines = ["# Strategies Overview\n"]
             if has_tags:
@@ -1644,7 +1840,7 @@ class BacktestMCPServer:
                     "|----------|---------------"
                     "|-----------|------------|"
                 )
-            for bt in self._backtests:
+            for bt in backtests:
                 s = bt.backtest_summary
                 tag = self._bt_tags.get(
                     bt.algorithm_id, ''
@@ -1726,10 +1922,11 @@ class BacktestMCPServer:
             return md
 
         elif name == "rank_strategies":
+            backtests = self._resolve_backtests(arguments)
             metric = arguments.get("metric", "sharpe_ratio")
             ascending = arguments.get("ascending", False)
             return _ranking_table(
-                self._backtests, metric, ascending,
+                backtests, metric, ascending,
                 tags=self._bt_tags,
             )
 
@@ -1782,13 +1979,15 @@ class BacktestMCPServer:
             return md
 
         elif name == "get_full_analysis":
+            backtests = self._resolve_backtests(arguments)
             return _full_analysis(
-                self._backtests, tags=self._bt_tags
+                backtests, tags=self._bt_tags
             )
 
         elif name == "get_trading_activity":
+            backtests = self._resolve_backtests(arguments)
             return _trading_activity_table(
-                self._backtests, tags=self._bt_tags
+                backtests, tags=self._bt_tags
             )
 
         elif name == "get_trades":
@@ -1821,12 +2020,9 @@ class BacktestMCPServer:
 
         elif name == "get_equity_curve":
             window = arguments.get("window")
-            sids = arguments.get("strategy_ids") or []
-            sid = arguments.get("strategy_id", "")
-            if sid and not sids:
-                sids = [sid]
+            sids = self._resolve_sids(arguments)
             if not sids:
-                return "Provide strategy_id or strategy_ids."
+                return "Provide strategy_id, strategy_ids, or tag."
             missing = [s for s in sids if s not in self._bt_map]
             if missing:
                 return (
@@ -1846,12 +2042,9 @@ class BacktestMCPServer:
 
         elif name == "get_drawdown_series":
             window = arguments.get("window")
-            sids = arguments.get("strategy_ids") or []
-            sid = arguments.get("strategy_id", "")
-            if sid and not sids:
-                sids = [sid]
+            sids = self._resolve_sids(arguments)
             if not sids:
-                return "Provide strategy_id or strategy_ids."
+                return "Provide strategy_id, strategy_ids, or tag."
             missing = [s for s in sids if s not in self._bt_map]
             if missing:
                 return (
@@ -1870,12 +2063,9 @@ class BacktestMCPServer:
 
         elif name == "get_monthly_returns":
             window = arguments.get("window")
-            sids = arguments.get("strategy_ids") or []
-            sid = arguments.get("strategy_id", "")
-            if sid and not sids:
-                sids = [sid]
+            sids = self._resolve_sids(arguments)
             if not sids:
-                return "Provide strategy_id or strategy_ids."
+                return "Provide strategy_id, strategy_ids, or tag."
             missing = [s for s in sids if s not in self._bt_map]
             if missing:
                 return (
@@ -1894,12 +2084,9 @@ class BacktestMCPServer:
 
         elif name == "get_yearly_returns":
             window = arguments.get("window")
-            sids = arguments.get("strategy_ids") or []
-            sid = arguments.get("strategy_id", "")
-            if sid and not sids:
-                sids = [sid]
+            sids = self._resolve_sids(arguments)
             if not sids:
-                return "Provide strategy_id or strategy_ids."
+                return "Provide strategy_id, strategy_ids, or tag."
             missing = [s for s in sids if s not in self._bt_map]
             if missing:
                 return (
@@ -1918,12 +2105,9 @@ class BacktestMCPServer:
 
         elif name == "get_rolling_sharpe":
             window = arguments.get("window")
-            sids = arguments.get("strategy_ids") or []
-            sid = arguments.get("strategy_id", "")
-            if sid and not sids:
-                sids = [sid]
+            sids = self._resolve_sids(arguments)
             if not sids:
-                return "Provide strategy_id or strategy_ids."
+                return "Provide strategy_id, strategy_ids, or tag."
             missing = [s for s in sids if s not in self._bt_map]
             if missing:
                 return (
@@ -1966,24 +2150,23 @@ class BacktestMCPServer:
             return f"# Return Scenarios — {sid}\n\n" + _return_scenarios(bt)
 
         elif name == "get_correlation_matrix":
+            backtests = self._resolve_backtests(arguments)
             window = arguments.get("window")
             return "# Correlation Matrix\n\n" + _correlation_matrix(
-                self._backtests, window=window
+                backtests, window=window
             )
 
         elif name == "get_window_coverage":
+            backtests = self._resolve_backtests(arguments)
             return "# Window Coverage\n\n" + _window_coverage(
-                self._backtests
+                backtests
             )
 
         elif name == "get_portfolio_snapshots":
             window = arguments.get("window")
-            sids = arguments.get("strategy_ids") or []
-            sid = arguments.get("strategy_id", "")
-            if sid and not sids:
-                sids = [sid]
+            sids = self._resolve_sids(arguments)
             if not sids:
-                return "Provide strategy_id or strategy_ids."
+                return "Provide strategy_id, strategy_ids, or tag."
             missing = [s for s in sids if s not in self._bt_map]
             if missing:
                 return (
@@ -2148,13 +2331,14 @@ class BacktestMCPServer:
             return f"Note {note_id} deleted."
 
         elif name == "filter_strategies":
+            backtests = self._resolve_backtests(arguments)
             conditions = arguments.get("conditions", [])
             if not conditions:
                 return "No conditions provided."
-            matched = _filter_strategies(self._backtests, conditions)
+            matched = _filter_strategies(backtests, conditions)
             if not matched:
                 return "No strategies match all conditions."
-            total = len(self._backtests)
+            total = len(backtests)
             md = (
                 f"# Filtered Strategies"
                 f" ({len(matched)} of {total})\n\n"
