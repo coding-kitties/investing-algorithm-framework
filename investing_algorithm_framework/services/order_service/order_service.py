@@ -176,7 +176,7 @@ class OrderService(RepositoryService):
         if OrderSide.SELL.equals(order_side):
             # Create order metadata if there is a key in the data
             # for trades, stop_losses or take_profits
-            self.trade_service.create_order_metadata_with_trade_context(
+            self.trade_service.create_trade_allocations(
                 sell_order=order,
                 trades=trades,
                 stop_losses=stop_losses,
@@ -285,6 +285,12 @@ class OrderService(RepositoryService):
         order.set_status(external_order.get_status())
         order.set_filled(external_order.get_filled())
         order.set_remaining(external_order.get_remaining())
+
+        # Copy the actual execution price back from the exchange
+        # response so that slippage is captured correctly.
+        if external_order.get_price() is not None:
+            order.set_price(external_order.get_price())
+
         config = self.configuration_service.config
         order.updated_at = config[INDEX_DATETIME]
         return order
@@ -426,6 +432,16 @@ class OrderService(RepositoryService):
             external_order = portfolio_provider.get_order(
                 portfolio, order, market_credential
             )
+
+            if external_order is None:
+                logger.warning(
+                    f"External order not found for order "
+                    f"{order.get_id()} with external id "
+                    f"{order.get_external_id()} at market "
+                    f"{portfolio.market}. Skipping sync."
+                )
+                continue
+
             self.update(order.id, external_order.to_dict())
 
     def _create_position_if_not_exists(self, symbol, portfolio):
@@ -550,6 +566,33 @@ class OrderService(RepositoryService):
             }
         )
 
+        # If the exchange modified the order amount (e.g. partial
+        # fill rounding), reconcile the reserved balance.
+        if current_order.amount != previous_order.amount:
+            difference = current_order.amount - previous_order.amount
+            cost_adjustment = difference * current_order.get_price()
+            self.portfolio_repository.update(
+                portfolio.id,
+                {
+                    "unallocated":
+                        portfolio.get_unallocated() - cost_adjustment
+                }
+            )
+            trading_symbol_position = self.position_service.find(
+                {
+                    "symbol": portfolio.trading_symbol,
+                    "portfolio": portfolio.id
+                }
+            )
+            self.position_service.update(
+                trading_symbol_position.id,
+                {
+                    "amount":
+                        trading_symbol_position.get_amount()
+                        - cost_adjustment
+                }
+            )
+
         self.trade_service.update_trade_with_buy_order(
             filled_difference, current_order
         )
@@ -626,24 +669,20 @@ class OrderService(RepositoryService):
             filled_difference, current_order
         )
 
-    def _sync_with_buy_order_cancelled(self, order):
+    def _restore_buy_order_balance(self, order):
+        """Shared logic: restore reserved balance when a BUY order is
+        cancelled, expired, rejected, or failed."""
         remaining = order.get_amount() - order.get_filled()
         size = remaining * order.get_price()
 
-        # Add the remaining amount to the portfolio
         portfolio = self.portfolio_repository.find(
-            {
-                "position": order.position_id
-            }
+            {"position": order.position_id}
         )
         self.portfolio_repository.update(
             portfolio.id,
-            {
-                "unallocated": portfolio.get_unallocated() + size
-            }
+            {"unallocated": portfolio.get_unallocated() + size}
         )
 
-        # Add the remaining amount to the trading symbol position
         trading_symbol_position = self.position_service.find(
             {
                 "symbol": portfolio.trading_symbol,
@@ -652,158 +691,44 @@ class OrderService(RepositoryService):
         )
         self.position_service.update(
             trading_symbol_position.id,
-            {
-                "amount": trading_symbol_position.get_amount() + remaining
-            }
+            {"amount": trading_symbol_position.get_amount() + size}
         )
+
+    def _restore_sell_order_position(self, order):
+        """Shared logic: restore locked position when a SELL order is
+        cancelled, expired, rejected, or failed."""
+        remaining = order.get_amount() - order.get_filled()
+
+        position = self.position_service.get(order.position_id)
+        self.position_service.update(
+            position.id,
+            {"amount": position.get_amount() + remaining}
+        )
+        self.trade_service.update_trade_with_removed_sell_order(order)
+
+    def _sync_with_buy_order_cancelled(self, order):
+        self._restore_buy_order_balance(order)
 
     def _sync_with_sell_order_cancelled(self, order):
-        remaining = order.get_amount() - order.get_filled()
-
-        # Add the remaining back to the position
-        position = self.position_service.get(order.position_id)
-        self.position_service.update(
-            position.id,
-            {
-                "amount": position.get_amount() + remaining
-            }
-        )
-        self.trade_service.update_trade_with_removed_sell_order(order)
+        self._restore_sell_order_position(order)
 
     def _sync_with_buy_order_failed(self, order):
-        remaining = order.get_amount() - order.get_filled()
-        size = remaining * order.get_price()
-
-        # Add the remaining amount to the portfolio
-        portfolio = self.portfolio_repository.find(
-            {
-                "position": order.position_id
-            }
-        )
-        self.portfolio_repository.update(
-            portfolio.id,
-            {
-                "unallocated": portfolio.get_unallocated() + size
-            }
-        )
-
-        # Add the remaining amount to the trading symbol position
-        trading_symbol_position = self.position_service.find(
-            {
-                "symbol": portfolio.trading_symbol,
-                "portfolio": portfolio.id
-            }
-        )
-        self.position_service.update(
-            trading_symbol_position.id,
-            {
-                "amount": trading_symbol_position.get_amount() + remaining
-            }
-        )
+        self._restore_buy_order_balance(order)
 
     def _sync_with_sell_order_failed(self, order):
-        remaining = order.get_amount() - order.get_filled()
-
-        # Add the remaining back to the position
-        position = self.position_service.get(order.position_id)
-        self.position_service.update(
-            position.id,
-            {
-                "amount": position.get_amount() + remaining
-            }
-        )
-
-        self.trade_service.update_trade_with_removed_sell_order(order)
+        self._restore_sell_order_position(order)
 
     def _sync_with_buy_order_expired(self, order):
-        remaining = order.get_amount() - order.get_filled()
-        size = remaining * order.get_price()
-
-        # Add the remaining amount to the portfolio
-        portfolio = self.portfolio_repository.find(
-            {
-                "position": order.position_id
-            }
-        )
-        self.portfolio_repository.update(
-            portfolio.id,
-            {
-                "unallocated": portfolio.get_unallocated() + size
-            }
-        )
-
-        # Add the remaining amount to the trading symbol position
-        trading_symbol_position = self.position_service.find(
-            {
-                "symbol": portfolio.trading_symbol,
-                "portfolio": portfolio.id
-            }
-        )
-        self.position_service.update(
-            trading_symbol_position.id,
-            {
-                "amount": trading_symbol_position.get_amount() + remaining
-            }
-        )
+        self._restore_buy_order_balance(order)
 
     def _sync_with_sell_order_expired(self, order):
-        remaining = order.get_amount() - order.get_filled()
-
-        # Add the remaining back to the position
-        position = self.position_service.get(order.position_id)
-        self.position_service.update(
-            position.id,
-            {
-                "amount": position.get_amount() + remaining
-            }
-        )
-
-        self.trade_service.update_trade_with_removed_sell_order(order)
+        self._restore_sell_order_position(order)
 
     def _sync_with_buy_order_rejected(self, order):
-        remaining = order.get_amount() - order.get_filled()
-        size = remaining * order.get_price()
-
-        # Add the remaining amount to the portfolio
-        portfolio = self.portfolio_repository.find(
-            {
-                "position": order.position_id
-            }
-        )
-        self.portfolio_repository.update(
-            portfolio.id,
-            {
-                "unallocated": portfolio.get_unallocated() + size
-            }
-        )
-
-        # Add the remaining amount to the trading symbol position
-        trading_symbol_position = self.position_service.find(
-            {
-                "symbol": portfolio.trading_symbol,
-                "portfolio": portfolio.id
-            }
-        )
-        self.position_service.update(
-            trading_symbol_position.id,
-            {
-                "amount": trading_symbol_position.get_amount() + remaining
-            }
-        )
+        self._restore_buy_order_balance(order)
 
     def _sync_with_sell_order_rejected(self, order):
-        remaining = order.get_amount() - order.get_filled()
-
-        # Add the remaining back to the position
-        position = self.position_service.get(order.position_id)
-        self.position_service.update(
-            position.id,
-            {
-                "amount": position.get_amount() + remaining
-            }
-        )
-
-        self.trade_service.update_trade_with_removed_sell_order(order)
+        self._restore_sell_order_position(order)
 
     def _create_order_id(self):
         """

@@ -7,7 +7,7 @@ class TestTradeServiceNetGain(TestBase):
     """
     Regression tests for portfolio net_gain accumulation bug (#397).
 
-    Bug 1 (PRIMARY): In create_order_metadata_with_trade_context, the
+    Bug 1 (PRIMARY): In create_trade_allocations, the
     ``cost`` variable accumulated across loop iterations and was
     subtracted fully on each iteration, understating
     portfolio.total_net_gain when a sell order closed multiple trades.

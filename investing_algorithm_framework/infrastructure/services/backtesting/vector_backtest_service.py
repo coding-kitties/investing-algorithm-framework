@@ -6,7 +6,7 @@ import pandas as pd
 from investing_algorithm_framework.domain import BacktestDateRange, \
     BacktestRun, Portfolio, TimeFrame, PortfolioConfiguration, \
     PortfolioSnapshot, OperationalException, Order, OrderType, OrderStatus, \
-    OrderSide, Trade, TradeStatus, DataType
+    OrderSide, Trade, TradeStatus, DataType, TradingCost
 from investing_algorithm_framework.services import DataProviderService, \
     create_backtest_metrics
 
@@ -71,6 +71,13 @@ class VectorBacktestService:
         buy_signals = strategy.generate_buy_signals(data)
         sell_signals = strategy.generate_sell_signals(data)
 
+        # Generate optional scale-in/scale-out signals
+        scale_in_signals = strategy.generate_scale_in_signals(data)
+        scale_out_signals = strategy.generate_scale_out_signals(data)
+
+        if scale_in_signals is None:
+            scale_in_signals = buy_signals
+
         # Build master index (union of all indices in signal dict)
         index = pd.Index([])
 
@@ -92,6 +99,13 @@ class VectorBacktestService:
                        for k, v in buy_signals.items()}
         sell_signals = {k: v[v.index >= backtest_date_range.start_date]
                         for k, v in sell_signals.items()}
+        scale_in_signals = {k: v[v.index >= backtest_date_range.start_date]
+                            for k, v in scale_in_signals.items()}
+        if scale_out_signals is not None:
+            scale_out_signals = {
+                k: v[v.index >= backtest_date_range.start_date]
+                for k, v in scale_out_signals.items()
+            }
 
         index = index.union(most_granular_ohlcv_data.index)
         index = index.sort_values()
@@ -150,6 +164,35 @@ class VectorBacktestService:
                 index, fill_value=False
             )
 
+            # Align scale-in / scale-out signals
+            si_signal = scale_in_signals[symbol].reindex(
+                index, fill_value=False
+            ) if symbol in scale_in_signals else pd.Series(
+                False, index=index
+            )
+            so_signal = pd.Series(False, index=index)
+            if (scale_out_signals is not None
+                    and symbol in scale_out_signals):
+                so_signal = scale_out_signals[symbol].reindex(
+                    index, fill_value=False
+                )
+
+            # Find the ScalingRule for this symbol, if any
+            scaling_rule = None
+            if hasattr(strategy, 'scaling_rules') and strategy.scaling_rules:
+                scaling_rule = next(
+                    (sr for sr in strategy.scaling_rules
+                     if sr.symbol == symbol),
+                    None
+                )
+
+            # Resolve TradingCost for this symbol
+            trading_cost = TradingCost.resolve(
+                symbol,
+                getattr(strategy, 'trading_costs', None),
+                portfolio_configuration,
+            )
+
             # Calculate initial capital for trade
             # (used when dynamic_position_sizing=False)
             initial_capital_for_trade = pos_size_obj.get_size(
@@ -170,8 +213,16 @@ class VectorBacktestService:
                 'close': close,
                 'buy_signal': buy_signal,
                 'sell_signal': sell_signal,
+                'scale_in_signal': si_signal,
+                'scale_out_signal': so_signal,
+                'scaling_rule': scaling_rule,
+                'trading_cost': trading_cost,
                 'initial_capital_for_trade': initial_capital_for_trade,
                 'last_trade': None,  # Track open trade per symbol
+                'open_trades': [],   # All open trades for this symbol
+                'cooldown_remaining': 0,  # Bars remaining in cooldown
+                'scale_out_count': 0,     # Number of scale-outs done
+                'entry_count': 0,         # Number of entries so far
             }
 
         # Signal event log — records every fired signal and its outcome
@@ -189,9 +240,11 @@ class VectorBacktestService:
                 total_allocated
 
             lt = sym_data['last_trade']
-            net_gain_val = (
-                price - lt.open_price
-            ) * lt.available_amount
+            tc = sym_data['trading_cost']
+            sell_fill = tc.get_sell_fill_price(price)
+            gross = sell_fill * lt.available_amount
+            sell_fee = tc.get_fee(gross)
+            net_gain_val = gross - sell_fee - lt.cost
 
             # Update shared portfolio state
             if dynamic_position_sizing:
@@ -207,17 +260,22 @@ class VectorBacktestService:
                 target_symbol=sym,
                 trading_symbol=trading_symbol,
                 order_type=OrderType.LIMIT,
-                price=price,
+                price=sell_fill,
                 amount=lt.available_amount,
                 status=OrderStatus.CLOSED,
                 created_at=date,
                 updated_at=date,
-                order_side=OrderSide.SELL
+                order_side=OrderSide.SELL,
+                order_fee=sell_fee,
+                order_fee_rate=tc.fee_percentage / 100
+                if tc.fee_percentage else None,
+                slippage=price - sell_fill,
             )
             orders.append(sell_order)
             trade_orders = lt.orders
             trade_orders.append(sell_order)
 
+            lt_total_fees = (lt.total_fees or 0) + sell_fee
             lt.update(
                 {
                     "orders": trade_orders,
@@ -225,9 +283,218 @@ class VectorBacktestService:
                     "status": TradeStatus.CLOSED.value,
                     "updated_at": date,
                     "net_gain": net_gain_val,
+                    "total_fees": lt_total_fees,
                 }
             )
             sym_data['last_trade'] = None
+            # Close all open trades when fully exiting
+            for ot in sym_data['open_trades']:
+                if ot.id != lt.id and TradeStatus.OPEN.equals(ot.status):
+                    ot_gross = ot.available_amount * sell_fill
+                    ot_sell_fee = tc.get_fee(ot_gross)
+                    ot_gain = ot_gross - ot_sell_fee - ot.cost
+                    sell_o = Order(
+                        id=uuid4(),
+                        target_symbol=sym,
+                        trading_symbol=trading_symbol,
+                        order_type=OrderType.LIMIT,
+                        price=sell_fill,
+                        amount=ot.available_amount,
+                        status=OrderStatus.CLOSED,
+                        created_at=date,
+                        updated_at=date,
+                        order_side=OrderSide.SELL,
+                        order_fee=ot_sell_fee,
+                        order_fee_rate=tc.fee_percentage / 100
+                        if tc.fee_percentage else None,
+                        slippage=price - sell_fill,
+                    )
+                    orders.append(sell_o)
+                    ot_orders = ot.orders
+                    ot_orders.append(sell_o)
+                    ot_total_fees = (ot.total_fees or 0) + ot_sell_fee
+                    ot.update({
+                        "orders": ot_orders,
+                        "closed_at": date,
+                        "status": TradeStatus.CLOSED.value,
+                        "updated_at": date,
+                        "net_gain": ot_gain,
+                        "total_fees": ot_total_fees,
+                    })
+                    if dynamic_position_sizing:
+                        current_unallocated += ot.cost + ot_gain
+                        total_realized_gains += ot_gain
+                    else:
+                        total_allocated -= ot.cost
+            sym_data['open_trades'] = []
+            sym_data['entry_count'] = 0
+            sym_data['scale_out_count'] = 0
+
+        def _open_trade(sym, sym_data, price, date, capital):
+            """Helper to open a new trade for a symbol."""
+            nonlocal current_unallocated, total_allocated
+
+            tc = sym_data['trading_cost']
+            fill_price = tc.get_buy_fill_price(price)
+
+            # Fee comes out of capital; remainder buys the asset
+            buy_fee = tc.get_fee(capital)
+            net_capital = capital - buy_fee
+
+            if net_capital <= 0:
+                return None
+
+            amount = float(net_capital / fill_price)
+
+            if dynamic_position_sizing:
+                current_unallocated -= capital
+            else:
+                total_allocated += capital
+
+            buy_order = Order(
+                id=uuid4(),
+                target_symbol=sym,
+                trading_symbol=trading_symbol,
+                order_type=OrderType.LIMIT,
+                price=fill_price,
+                amount=amount,
+                status=OrderStatus.CLOSED,
+                created_at=date,
+                updated_at=date,
+                order_side=OrderSide.BUY,
+                order_fee=buy_fee,
+                order_fee_rate=tc.fee_percentage / 100
+                if tc.fee_percentage else None,
+                slippage=fill_price - price,
+            )
+            orders.append(buy_order)
+            trade = Trade(
+                id=uuid4(),
+                orders=[buy_order],
+                target_symbol=sym,
+                trading_symbol=trading_symbol,
+                available_amount=amount,
+                remaining=0,
+                filled_amount=amount,
+                open_price=fill_price,
+                opened_at=date,
+                closed_at=None,
+                amount=amount,
+                status=TradeStatus.OPEN.value,
+                cost=net_capital,
+                total_fees=buy_fee,
+            )
+            sym_data['last_trade'] = trade
+            sym_data['open_trades'].append(trade)
+            sym_data['entry_count'] += 1
+            trades.append(trade)
+
+            if dynamic_position_sizing:
+                open_trades_value[sym] = \
+                    open_trades_value.get(sym, 0) + net_capital
+
+            return trade
+
+        def _get_capital_for_trade(sym_data, price, pct_of_base=100):
+            """Calculate capital for a trade, respecting portfolio limits."""
+            pos_size_obj = sym_data['pos_size_obj']
+            if dynamic_position_sizing:
+                open_total = sum(open_trades_value.values())
+                portfolio_value = current_unallocated + open_total
+                base = pos_size_obj.get_size(
+                    Portfolio(
+                        unallocated=portfolio_value,
+                        initial_balance=initial_amount,
+                        trading_symbol=trading_symbol,
+                        net_size=0,
+                        market="BACKTEST",
+                        identifier="vector_backtest"
+                    ),
+                    asset_price=price
+                )
+                capital = base * pct_of_base / 100
+                return min(capital, current_unallocated)
+            else:
+                base = sym_data['initial_capital_for_trade']
+                capital = base * pct_of_base / 100
+                if total_allocated + capital > initial_amount:
+                    return 0
+                return capital
+
+        def _partial_close(sym, sym_data, price, date, sell_pct):
+            """Partial close of the most recent open trade."""
+            nonlocal current_unallocated, total_realized_gains, \
+                total_allocated
+
+            lt = sym_data['last_trade']
+            if lt is None:
+                return
+
+            tc = sym_data['trading_cost']
+            sell_amount = lt.available_amount * sell_pct / 100
+            if sell_amount <= 0:
+                return
+
+            sell_fill = tc.get_sell_fill_price(price)
+
+            # Proportional cost (fraction of total cost)
+            sell_cost = lt.cost * (sell_amount / lt.available_amount)
+            gross = sell_amount * sell_fill
+            sell_fee = tc.get_fee(gross)
+            net_gain_val = gross - sell_fee - sell_cost
+
+            if dynamic_position_sizing:
+                current_unallocated += sell_cost + net_gain_val
+                total_realized_gains += net_gain_val
+                if sym in open_trades_value:
+                    open_trades_value[sym] = max(
+                        0, open_trades_value[sym] - sell_cost
+                    )
+            else:
+                total_allocated -= sell_cost
+
+            sell_order = Order(
+                id=uuid4(),
+                target_symbol=sym,
+                trading_symbol=trading_symbol,
+                order_type=OrderType.LIMIT,
+                price=sell_fill,
+                amount=sell_amount,
+                status=OrderStatus.CLOSED,
+                created_at=date,
+                updated_at=date,
+                order_side=OrderSide.SELL,
+                order_fee=sell_fee,
+                order_fee_rate=tc.fee_percentage / 100
+                if tc.fee_percentage else None,
+                slippage=price - sell_fill,
+            )
+            orders.append(sell_order)
+            trade_orders = lt.orders
+            trade_orders.append(sell_order)
+            new_available = lt.available_amount - sell_amount
+            new_cost = lt.cost - sell_cost
+            old_net = lt.net_gain if lt.net_gain else 0.0
+            lt_total_fees = (lt.total_fees or 0) + sell_fee
+            update_dict = {
+                "orders": trade_orders,
+                "available_amount": new_available,
+                "cost": new_cost,
+                "net_gain": old_net + net_gain_val,
+                "total_fees": lt_total_fees,
+                "updated_at": date,
+            }
+            if new_available <= 0:
+                update_dict["closed_at"] = date
+                update_dict["status"] = TradeStatus.CLOSED.value
+                sym_data['open_trades'] = [
+                    t for t in sym_data['open_trades'] if t.id != lt.id
+                ]
+                sym_data['last_trade'] = (
+                    sym_data['open_trades'][-1]
+                    if sym_data['open_trades'] else None
+                )
+            lt.update(update_dict)
 
         # Process all timestamps in chronological order
         for i in range(len(index)):
@@ -243,27 +510,24 @@ class VectorBacktestService:
             # Process each symbol at this timestamp
             for symbol, data in symbol_data.items():
                 current_price = float(data['close'].iloc[i])
-                pos_size_obj = data['pos_size_obj']
                 last_trade = data['last_trade']
+                scaling_rule = data['scaling_rule']
+                has_position = last_trade is not None
+
+                # Tick down cooldown
+                if data['cooldown_remaining'] > 0:
+                    data['cooldown_remaining'] -= 1
+
+                in_cooldown = data['cooldown_remaining'] > 0
 
                 # Read raw boolean signals for this bar
                 is_buy = bool(data['buy_signal'].iloc[i])
                 is_sell = bool(data['sell_signal'].iloc[i])
+                is_scale_in = bool(data['scale_in_signal'].iloc[i])
+                is_scale_out = bool(data['scale_out_signal'].iloc[i])
 
-                # Issue 5: Explicit handling of simultaneous buy+sell
-                # — sell takes priority (closes existing position first)
-                if is_buy and is_sell:
-                    signal_events.append({
-                        "date": current_date,
-                        "symbol": symbol,
-                        "signal": "buy",
-                        "executed": False,
-                        "reason": "sell_priority_on_conflict",
-                    })
-                    is_buy = False  # sell takes priority on conflicts
-
-                # --- SELL ---
-                if is_sell and last_trade is not None:
+                # ---- SELL always takes priority ----
+                if is_sell and has_position and not in_cooldown:
                     signal_events.append({
                         "date": current_date,
                         "symbol": symbol,
@@ -274,8 +538,17 @@ class VectorBacktestService:
                     _close_trade(
                         symbol, data, current_price, current_date
                     )
-                    last_trade = data['last_trade']  # now None
-                elif is_sell and last_trade is None:
+                    last_trade = data['last_trade']
+                    has_position = False
+                    if scaling_rule and scaling_rule.cooldown_in_bars > 0:
+                        data['cooldown_remaining'] = \
+                            scaling_rule.cooldown_in_bars
+                        in_cooldown = True
+                    # Reset is_buy if sell also fired on same bar
+                    is_buy = False
+                    is_scale_in = False
+                    is_scale_out = False
+                elif is_sell and not has_position:
                     signal_events.append({
                         "date": current_date,
                         "symbol": symbol,
@@ -283,48 +556,44 @@ class VectorBacktestService:
                         "executed": False,
                         "reason": "no_position_to_close",
                     })
+                elif is_sell and in_cooldown:
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "sell",
+                        "executed": False,
+                        "reason": "in_cooldown",
+                    })
 
-                # --- BUY ---
-                if is_buy and last_trade is None:
-                    # Calculate capital for this trade
-                    if dynamic_position_sizing:
-                        # Calculate current portfolio value:
-                        # unallocated + value of all open trades
-                        open_trades_total = sum(open_trades_value.values())
-                        current_portfolio_value = \
-                            current_unallocated + open_trades_total
-                        capital_for_trade = pos_size_obj.get_size(
-                            Portfolio(
-                                unallocated=current_portfolio_value,
-                                initial_balance=initial_amount,
-                                trading_symbol=trading_symbol,
-                                net_size=0,
-                                market="BACKTEST",
-                                identifier="vector_backtest"
-                            ),
-                            asset_price=current_price
-                        )
-                        # Don't exceed available unallocated funds
-                        capital_for_trade = min(
-                            capital_for_trade, current_unallocated
-                        )
-                    else:
-                        capital_for_trade = data['initial_capital_for_trade']
+                # ---- SCALE-OUT (partial close) ----
+                if (is_scale_out and has_position
+                        and scaling_rule is not None and not in_cooldown):
+                    so_idx = data['scale_out_count']
+                    pct = scaling_rule.get_scale_out_percentage(so_idx)
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "scale_out",
+                        "executed": True,
+                        "reason": "executed",
+                    })
+                    _partial_close(
+                        symbol, data, current_price, current_date, pct
+                    )
+                    data['scale_out_count'] += 1
+                    last_trade = data['last_trade']
+                    has_position = last_trade is not None
+                    if scaling_rule.cooldown_in_bars > 0:
+                        data['cooldown_remaining'] = \
+                            scaling_rule.cooldown_in_bars
+                        in_cooldown = True
 
-                        # Issue 6: Guard against exceeding total portfolio
-                        # allocation even in static position sizing mode
-                        if total_allocated + capital_for_trade \
-                                > initial_amount:
-                            signal_events.append({
-                                "date": current_date,
-                                "symbol": symbol,
-                                "signal": "buy",
-                                "executed": False,
-                                "reason": "insufficient_capital",
-                            })
-                            continue
-
-                    if capital_for_trade <= 0:
+                # ---- BUY (new entry) ----
+                if is_buy and not has_position and not in_cooldown:
+                    capital = _get_capital_for_trade(
+                        data, current_price, 100
+                    )
+                    if capital <= 0:
                         signal_events.append({
                             "date": current_date,
                             "symbol": symbol,
@@ -332,75 +601,97 @@ class VectorBacktestService:
                             "executed": False,
                             "reason": "insufficient_capital",
                         })
-                        continue  # Skip if no capital available
-
-                    amount = float(capital_for_trade / current_price)
-
-                    # Update shared portfolio state
-                    if dynamic_position_sizing:
-                        current_unallocated -= capital_for_trade
                     else:
-                        total_allocated += capital_for_trade
-
-                    buy_order = Order(
-                        id=uuid4(),
-                        target_symbol=symbol,
-                        trading_symbol=trading_symbol,
-                        order_type=OrderType.LIMIT,
-                        price=current_price,
-                        amount=amount,
-                        status=OrderStatus.CLOSED,
-                        created_at=current_date,
-                        updated_at=current_date,
-                        order_side=OrderSide.BUY
-                    )
-                    orders.append(buy_order)
-                    trade = Trade(
-                        id=uuid4(),
-                        orders=[buy_order],
-                        target_symbol=symbol,
-                        trading_symbol=trading_symbol,
-                        available_amount=amount,
-                        remaining=0,
-                        filled_amount=amount,
-                        open_price=current_price,
-                        opened_at=current_date,
-                        closed_at=None,
-                        amount=amount,
-                        status=TradeStatus.OPEN.value,
-                        cost=capital_for_trade
-                    )
-                    data['last_trade'] = trade
-                    trades.append(trade)
-                    signal_events.append({
-                        "date": current_date,
-                        "symbol": symbol,
-                        "signal": "buy",
-                        "executed": True,
-                        "reason": "executed",
-                    })
-
-                    # Track open trade value
-                    if dynamic_position_sizing:
-                        open_trades_value[symbol] = capital_for_trade
-
-                elif is_buy and last_trade is not None:
+                        _open_trade(
+                            symbol, data, current_price,
+                            current_date, capital
+                        )
+                        signal_events.append({
+                            "date": current_date,
+                            "symbol": symbol,
+                            "signal": "buy",
+                            "executed": True,
+                            "reason": "executed",
+                        })
+                        if scaling_rule and \
+                                scaling_rule.cooldown_in_bars > 0:
+                            data['cooldown_remaining'] = \
+                                scaling_rule.cooldown_in_bars
+                            in_cooldown = True
+                elif is_buy and has_position and not in_cooldown:
+                    # Possible scale-in via buy signal (if no separate
+                    # scale_in_signals provided, buy = scale_in)
+                    if scaling_rule is not None:
+                        is_scale_in = True  # treat as scale-in below
+                    else:
+                        signal_events.append({
+                            "date": current_date,
+                            "symbol": symbol,
+                            "signal": "buy",
+                            "executed": False,
+                            "reason": "already_in_position",
+                        })
+                elif is_buy and in_cooldown:
                     signal_events.append({
                         "date": current_date,
                         "symbol": symbol,
                         "signal": "buy",
                         "executed": False,
-                        "reason": "already_in_position",
+                        "reason": "in_cooldown",
                     })
+
+                # ---- SCALE-IN (add to position) ----
+                if (is_scale_in and has_position
+                        and scaling_rule is not None and not in_cooldown):
+                    entry_count = data['entry_count']
+                    if entry_count >= scaling_rule.max_entries:
+                        signal_events.append({
+                            "date": current_date,
+                            "symbol": symbol,
+                            "signal": "scale_in",
+                            "executed": False,
+                            "reason": "max_entries_reached",
+                        })
+                    else:
+                        si_idx = entry_count - 1  # 0-indexed scale-in
+                        pct = scaling_rule.get_scale_in_percentage(si_idx)
+                        capital = _get_capital_for_trade(
+                            data, current_price, pct
+                        )
+                        if capital <= 0:
+                            signal_events.append({
+                                "date": current_date,
+                                "symbol": symbol,
+                                "signal": "scale_in",
+                                "executed": False,
+                                "reason": "insufficient_capital",
+                            })
+                        else:
+                            _open_trade(
+                                symbol, data, current_price,
+                                current_date, capital
+                            )
+                            signal_events.append({
+                                "date": current_date,
+                                "symbol": symbol,
+                                "signal": "scale_in",
+                                "executed": True,
+                                "reason": "executed",
+                            })
+                            if scaling_rule.cooldown_in_bars > 0:
+                                data['cooldown_remaining'] = \
+                                    scaling_rule.cooldown_in_bars
 
             # Update open trade values at each timestamp for
             # accurate portfolio value
             if dynamic_position_sizing:
                 for symbol, data in symbol_data.items():
-                    if data['last_trade'] is not None:
+                    if data['open_trades']:
                         current_price = float(data['close'].iloc[i])
-                        open_trades_value[symbol] = (
-                            data['last_trade'].available_amount * current_price
+                        open_trades_value[symbol] = sum(
+                            t.available_amount * current_price
+                            for t in data['open_trades']
+                            if TradeStatus.OPEN.equals(t.status)
                         )
 
         unallocated = initial_amount
@@ -467,6 +758,13 @@ class VectorBacktestService:
                 "buy": buy_signals[symbol],
                 "sell": sell_signals[symbol],
             }
+
+            if scale_in_signals and symbol in scale_in_signals:
+                raw_signals[symbol]["scale_in"] = scale_in_signals[symbol]
+
+            if scale_out_signals and symbol in scale_out_signals:
+                raw_signals[symbol]["scale_out"] = \
+                    scale_out_signals[symbol]
 
         # Create a backtest run object
         run = BacktestRun(

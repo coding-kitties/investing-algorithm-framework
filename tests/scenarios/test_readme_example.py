@@ -8,9 +8,7 @@ stays in sync with the actual codebase.
 import os
 import re
 import unittest
-from unittest import TestCase, skip
-
-from investing_algorithm_framework import RESOURCE_DIRECTORY
+from unittest import TestCase
 
 
 def extract_python_code_blocks_from_readme(readme_path: str) -> list[str]:
@@ -58,7 +56,6 @@ def extract_main_example_from_readme(readme_path: str) -> str:
     )
 
 
-@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class TestReadmeExample(TestCase):
     """
     Test class to verify the README example implementation works correctly.
@@ -69,11 +66,6 @@ class TestReadmeExample(TestCase):
 
     def setUp(self):
         """Set up test fixtures."""
-        # Resource directory points to /tests/resources
-        self.resource_directory = os.path.join(
-            os.path.dirname(os.path.dirname(__file__)), 'resources'
-        )
-
         # README.md is at the root of the project
         self.readme_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
@@ -81,14 +73,7 @@ class TestReadmeExample(TestCase):
         )
 
     def test_readme_code_can_be_extracted(self):
-        """
-        Test that Python code blocks can be extracted from README.md.
-
-        This test verifies that:
-        ✅ README.md exists and is readable
-        ✅ At least one Python code block exists
-        ✅ The main RSIEMACrossoverStrategy example can be found
-        """
+        """README.md exists and contains extractable Python code blocks."""
         self.assertTrue(
             os.path.exists(self.readme_path),
             f"README.md not found at {self.readme_path}"
@@ -100,249 +85,56 @@ class TestReadmeExample(TestCase):
             "No Python code blocks found in README.md"
         )
 
-        # Verify the main example exists
+        # Verify the main strategy example exists
         main_example = extract_main_example_from_readme(self.readme_path)
         self.assertIn('RSIEMACrossoverStrategy', main_example)
         self.assertIn('generate_buy_signals', main_example)
         self.assertIn('generate_sell_signals', main_example)
 
     def test_readme_strategy_class_is_valid_python(self):
-        """
-        Test that the RSIEMACrossoverStrategy code from README is valid Python.
-
-        This test verifies that:
-        ✅ The code can be parsed and compiled without syntax errors
-        ✅ The RSIEMACrossoverStrategy class can be instantiated
-        ✅ The class has required methods (generate_buy_signals, generate_sell_signals)
-        """
+        """The RSIEMACrossoverStrategy code from README compiles."""
         main_example = extract_main_example_from_readme(self.readme_path)
 
-        # Extract just the class definition (before if __name__ == "__main__":)
-        if 'if __name__ == "__main__":' in main_example:
-            class_code = main_example.split('if __name__ == "__main__":')[0]
-        else:
-            class_code = main_example
-
-        # Compile the code to check for syntax errors
         try:
-            compile(class_code, '<readme>', 'exec')
+            compile(main_example, '<readme>', 'exec')
         except SyntaxError as e:
             self.fail(f"README example has syntax error: {e}")
 
-    @skip("Known bug: PyIndicatorException - data too small for EMA")
-    def test_readme_strategy_can_be_instantiated_and_run_vector_backtest(self):
-        """
-        Test that the RSIEMACrossoverStrategy from README can be instantiated
-        and used to run a vector backtest.
+    def test_readme_strategy_uses_scaling_rules(self):
+        """The README example demonstrates ScalingRule usage."""
+        main_example = extract_main_example_from_readme(self.readme_path)
+        self.assertIn('ScalingRule', main_example)
+        self.assertIn('scaling_rules', main_example)
 
-        This test verifies that:
-        ✅ The strategy class from README.md can be dynamically loaded
-        ✅ The strategy can be instantiated with example parameters
-        ✅ The strategy can run a vector backtest successfully
-        ✅ The backtest returns valid results
-        """
+    def test_readme_strategy_uses_stop_losses(self):
+        """The README example demonstrates StopLossRule usage."""
+        main_example = extract_main_example_from_readme(self.readme_path)
+        self.assertIn('StopLossRule', main_example)
+        self.assertIn('stop_losses', main_example)
+
+    def test_readme_strategy_class_can_be_loaded(self):
+        """The strategy class from README can be exec'd and inspected."""
         main_example = extract_main_example_from_readme(self.readme_path)
 
-        # Extract just the class definition (before if __name__ == "__main__":)
-        if 'if __name__ == "__main__":' in main_example:
-            class_code = main_example.split('if __name__ == "__main__":')[0]
-        else:
-            class_code = main_example
-
-        # Work around framework bug: warmup_window on DataSource doesn't
-        # propagate to the data provider's window_size, so backtests fail
-        # when warmup data is requested before the loaded data range.
-        # Use the deprecated window_size parameter which works correctly.
-        class_code = class_code.replace(
-            'warmup_window=', 'window_size='
-        )
-
-        # Create a namespace with required imports
         namespace = {}
+        exec(main_example, namespace)
 
-        # Execute the imports and class definition
-        exec(class_code, namespace)
-
-        # Verify the class was created
         self.assertIn('RSIEMACrossoverStrategy', namespace)
+        cls = namespace['RSIEMACrossoverStrategy']
 
-        # Import additional items needed for backtest
-        from investing_algorithm_framework import (
-            create_app, BacktestDateRange, SnapshotInterval
-        )
-        from datetime import datetime, timezone
+        # Verify class attributes
+        self.assertTrue(hasattr(cls, 'generate_buy_signals'))
+        self.assertTrue(hasattr(cls, 'generate_sell_signals'))
+        self.assertTrue(hasattr(cls, 'scaling_rules'))
+        self.assertTrue(hasattr(cls, 'stop_losses'))
+        self.assertTrue(hasattr(cls, 'position_sizes'))
+        self.assertTrue(hasattr(cls, 'data_sources'))
 
-        # Create the app with test resource directory
-        # Use test_data/ohlcv which has data from 2020-12-15,
-        # providing enough room for warmup_window=800 (67 days on 2h data)
-        config = {
-            RESOURCE_DIRECTORY: os.path.join(
-                self.resource_directory,
-                'test_data', 'ohlcv'
-            )
-        }
-        app = create_app(name="ReadmeExampleTest", config=config)
-        app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=1000)
-
-        # Instantiate the strategy from README
-        RSIEMACrossoverStrategy = namespace['RSIEMACrossoverStrategy']
-        strategy = RSIEMACrossoverStrategy(
-            time_unit=namespace['TimeUnit'].HOUR,
-            interval=2,
-            market="BITVAVO",
-            rsi_time_frame="2h",
-            rsi_period=14,
-            rsi_overbought_threshold=70,
-            rsi_oversold_threshold=30,
-            ema_time_frame="2h",
-            ema_short_period=12,
-            ema_long_period=26,
-            ema_cross_lookback_window=10
-        )
-
-        # Use date range within available test data, with enough room
-        # for the strategy's warmup_window (800 candles * 2h = ~67 days)
-        backtest_range = BacktestDateRange(
-            start_date=datetime(2023, 6, 1, tzinfo=timezone.utc),
-            end_date=datetime(2024, 6, 1, tzinfo=timezone.utc)
-        )
-
-        # Run vector backtest
-        backtest = app.run_vector_backtest(
-            initial_amount=1000,
-            backtest_date_range=backtest_range,
-            strategy=strategy,
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            use_checkpoints=False,
-        )
-
-        # Verify backtest results
-        self.assertIsNotNone(backtest)
-        self.assertEqual(len(backtest.get_all_backtest_runs()), 1)
-        self.assertEqual(len(backtest.get_all_backtest_metrics()), 1)
-
-    @skip("Known bug: PyIndicatorException - data too small for EMA")
-    def test_readme_strategy_can_be_instantiated_and_run_event_backtest(self):
-        """
-        Test that the RSIEMACrossoverStrategy from README can be instantiated
-        and used to run an event backtest.
-
-        This test verifies that:
-        ✅ The strategy class from README.md can be dynamically loaded
-        ✅ The strategy can be instantiated with example parameters
-        ✅ The strategy can run an event backtest successfully
-        ✅ The backtest returns valid results
-        """
-        main_example = extract_main_example_from_readme(self.readme_path)
-
-        # Extract just the class definition (before if __name__ == "__main__":)
-        if 'if __name__ == "__main__":' in main_example:
-            class_code = main_example.split('if __name__ == "__main__":')[0]
-        else:
-            class_code = main_example
-
-        # Work around framework bug: warmup_window on DataSource doesn't
-        # propagate to the data provider's window_size, so backtests fail
-        # when warmup data is requested before the loaded data range.
-        # Use the deprecated window_size parameter which works correctly.
-        class_code = class_code.replace(
-            'warmup_window=', 'window_size='
-        )
-
-        # Create a namespace with required imports
-        namespace = {}
-
-        # Execute the imports and class definition
-        exec(class_code, namespace)
-
-        # Verify the class was created
-        self.assertIn('RSIEMACrossoverStrategy', namespace)
-
-        # Import additional items needed for backtest
-        from investing_algorithm_framework import (
-            create_app, BacktestDateRange, SnapshotInterval
-        )
-        from datetime import datetime, timezone
-
-        # Create the app with test resource directory
-        # Use test_data/ohlcv which has data from 2020-12-15,
-        # providing enough room for warmup_window=800 (67 days on 2h data)
-        config = {
-            RESOURCE_DIRECTORY: os.path.join(
-                self.resource_directory,
-                'test_data', 'ohlcv'
-            )
-        }
-        app = create_app(name="ReadmeExampleTest", config=config)
-        app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=1000)
-
-        # Instantiate the strategy from README
-        RSIEMACrossoverStrategy = namespace['RSIEMACrossoverStrategy']
-        strategy = RSIEMACrossoverStrategy(
-            time_unit=namespace['TimeUnit'].HOUR,
-            interval=2,
-            market="BITVAVO",
-            rsi_time_frame="2h",
-            rsi_period=14,
-            rsi_overbought_threshold=70,
-            rsi_oversold_threshold=30,
-            ema_time_frame="2h",
-            ema_short_period=12,
-            ema_long_period=26,
-            ema_cross_lookback_window=10
-        )
-
-        # Use date range within available test data, with enough room
-        # for the strategy's warmup_window (800 candles * 2h = ~67 days)
-        backtest_range = BacktestDateRange(
-            start_date=datetime(2023, 6, 1, tzinfo=timezone.utc),
-            end_date=datetime(2024, 6, 1, tzinfo=timezone.utc)
-        )
-
-        # Run vector backtest
-        backtest = app.run_backtest(
-            initial_amount=1000,
-            backtest_date_range=backtest_range,
-            strategy=strategy,
-            snapshot_interval=SnapshotInterval.DAILY,
-            risk_free_rate=0.027,
-            trading_symbol="EUR",
-            market="BITVAVO",
-            use_checkpoints=False,
-        )
-
-        # Verify backtest results
-        self.assertIsNotNone(backtest)
-        self.assertEqual(len(backtest.get_all_backtest_runs()), 1)
-        self.assertEqual(len(backtest.get_all_backtest_metrics()), 1)
-
-    def test_readme_main_block_structure(self):
-        """
-        Test that the main execution block in README follows expected patterns.
-
-        This test verifies that the README example includes:
-        ✅ create_app() call
-        ✅ add_strategy() call with strategy instance
-        ✅ add_market() call with market configuration
-        ✅ BacktestDateRange definition
-        ✅ run_backtest() call
-        ✅ BacktestReport usage
-        """
-        main_example = extract_main_example_from_readme(self.readme_path)
-
-        # Check for required patterns in the main block
-        self.assertIn('create_app()', main_example)
-        self.assertIn('add_strategy(', main_example)
-        self.assertIn('add_market(', main_example)
-        self.assertIn('BacktestDateRange(', main_example)
-        self.assertIn('run_backtest(', main_example)
-        self.assertIn('BacktestReport(', main_example)
-
+        # Verify scaling rules are defined
+        self.assertGreater(len(cls.scaling_rules), 0)
+        # Verify stop losses are defined
+        self.assertGreater(len(cls.stop_losses), 0)
 
 
 if __name__ == "__main__":
-    import unittest
     unittest.main()

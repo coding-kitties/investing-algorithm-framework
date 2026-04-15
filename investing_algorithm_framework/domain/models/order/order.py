@@ -40,6 +40,7 @@ class Order(BaseModel):
         order_fee=None,
         order_fee_currency=None,
         order_fee_rate=None,
+        slippage=None,
         id=None,
         metadata=None,
     ):
@@ -84,6 +85,7 @@ class Order(BaseModel):
         self.order_fee = order_fee
         self.order_fee_currency = order_fee_currency
         self.order_fee_rate = order_fee_rate
+        self.slippage = slippage
         self.id = id
         self.cost = cost
         self.metadata = metadata if metadata is not None else {}
@@ -260,6 +262,7 @@ class Order(BaseModel):
             "order_fee_currency": self.order_fee_currency,
             "order_fee_rate": self.order_fee_rate,
             "order_fee": self.order_fee,
+            "slippage": self.slippage,
             "metadata": self.metadata if hasattr(self, 'metadata') else {},
         }
 
@@ -301,6 +304,7 @@ class Order(BaseModel):
             order_fee=data.get("order_fee", None),
             order_fee_currency=data.get("order_fee_currency", None),
             order_fee_rate=data.get("order_fee_rate", None),
+            slippage=data.get("slippage", None),
             metadata=data.get("metadata", {}),
         )
         return order

@@ -11,7 +11,8 @@ from .trade import Trade, TradeStatus, TradeStopLoss, TradeTakeProfit
 from .snapshot_interval import SnapshotInterval
 from .event import Event
 from .data import DataSource, DataType
-from .risk_rules import TakeProfitRule, StopLossRule
+from .risk_rules import TakeProfitRule, StopLossRule, ScalingRule, \
+    TradingCost
 
 __all__ = [
     "OrderStatus",
@@ -40,6 +41,8 @@ __all__ = [
     "SnapshotInterval",
     "Event",
     "PositionSize",
+    "ScalingRule",
     "StopLossRule",
     "TakeProfitRule",
+    "TradingCost",
 ]

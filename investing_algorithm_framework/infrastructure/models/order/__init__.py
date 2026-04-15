@@ -1,4 +1,4 @@
 from .order import SQLOrder
-from .order_metadata import SQLOrderMetadata
+from .trade_allocation import SQLTradeAllocation
 
-__all__ = ["SQLOrder", "SQLOrderMetadata"]
+__all__ = ["SQLOrder", "SQLTradeAllocation"]

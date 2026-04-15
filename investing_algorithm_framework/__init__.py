@@ -19,6 +19,7 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     Trade, APP_MODE, AppMode, DATETIME_FORMAT, load_backtests_from_directory, \
     BacktestDateRange, convert_polars_to_pandas, BacktestRun, \
     DEFAULT_LOGGING_CONFIG, DataType, DataProvider, StopLossRule, \
+    ScalingRule, TradingCost, \
     TradeStatus, generate_backtest_summary_metrics, generate_algorithm_id, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus, \
@@ -206,6 +207,8 @@ __all__ = [
     "recalculate_backtests",
     "TakeProfitRule",
     "StopLossRule",
+    "ScalingRule",
+    "TradingCost",
     "TradeStopLossService",
     "TradeTakeProfitService",
     "generate_algorithm_id",

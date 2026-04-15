@@ -22,7 +22,7 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     Order, TradeStatus, StrategyProfile, Trade, MarketCredential, \
     AppMode, DataType, DataSource, PortfolioSnapshot, PositionSnapshot, \
     TradeTakeProfit, TradeStopLoss, Event, SnapshotInterval, \
-    TakeProfitRule, StopLossRule, PositionSize
+    TakeProfitRule, StopLossRule, PositionSize, ScalingRule, TradingCost
 from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
 from .services import MarketCredentialService, AbstractPortfolioSyncService, \
@@ -146,6 +146,8 @@ __all__ = [
     'DataError',
     'TakeProfitRule',
     'StopLossRule',
+    'ScalingRule',
+    'TradingCost',
     "load_backtests_from_directory",
     "save_backtests_to_directory",
     "retag_backtests",

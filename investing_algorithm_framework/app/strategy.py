@@ -7,7 +7,7 @@ import pandas as pd
 from investing_algorithm_framework.domain import OperationalException, \
     Position, PositionSize, TimeUnit, StrategyProfile, Trade, \
     DataSource, DataType, OrderSide, StopLossRule, TakeProfitRule, Order, \
-    INDEX_DATETIME
+    INDEX_DATETIME, ScalingRule, TradingCost
 from .context import Context
 
 logger = logging.getLogger(__name__)
@@ -54,6 +54,8 @@ class TradingStrategy:
     position_sizes: List[PositionSize] = []
     stop_losses: List[StopLossRule] = []
     take_profits: List[TakeProfitRule] = []
+    scaling_rules: List[ScalingRule] = []
+    trading_costs: List[TradingCost] = []
     symbols: List[str] = []
     trading_symbol: str = None
 
@@ -68,6 +70,8 @@ class TradingStrategy:
         position_sizes=None,
         stop_losses=None,
         take_profits=None,
+        scaling_rules=None,
+        trading_costs=None,
         symbols=None,
         trading_symbol=None,
         decorated=None
@@ -198,13 +202,39 @@ class TradingStrategy:
             self.take_profits = list(class_take_profits) \
                 if class_take_profits else []
 
+        # Initialize scaling_rules as a new list per instance
+        if scaling_rules is not None:
+            self.scaling_rules = list(scaling_rules)
+        else:
+            class_scaling_rules = getattr(
+                self.__class__, 'scaling_rules', []
+            )
+            self.scaling_rules = list(class_scaling_rules) \
+                if class_scaling_rules else []
+
+        # Initialize trading_costs as a new list per instance
+        if trading_costs is not None:
+            self.trading_costs = list(trading_costs)
+        else:
+            class_trading_costs = getattr(
+                self.__class__, 'trading_costs', []
+            )
+            self.trading_costs = list(class_trading_costs) \
+                if class_trading_costs else []
+
         # context initialization
         self._context = None
         self._last_run = None
         self.stop_loss_rules_lookup = {}
         self.take_profit_rules_lookup = {}
+        self.scaling_rules_lookup = {}
         self.position_sizes_lookup = {}
         self._parameters = {}
+
+        # Scaling state: tracks cooldown and scale-out count per symbol.
+        # Persists across run_strategy() calls in event-based backtests.
+        self._cooldown_remaining = {}   # {symbol: bars remaining}
+        self._scale_out_counts = {}     # {symbol: number of scale-outs}
 
     def set_parameters(self, params: dict) -> None:
         """
@@ -368,7 +398,23 @@ class TradingStrategy:
         buy_signals = self.generate_buy_signals(data)
         sell_signals = self.generate_sell_signals(data)
 
-        # Phase 1: Collect all pending buy orders
+        # Generate optional scale-in/scale-out signals.
+        # If generate_scale_in_signals returns None, fall back to buy_signals.
+        # If generate_scale_out_signals returns None, no scale-out occurs.
+        scale_in_signals = self.generate_scale_in_signals(data)
+        scale_out_signals = self.generate_scale_out_signals(data)
+
+        if scale_in_signals is None:
+            scale_in_signals = buy_signals
+
+        # Tick down cooldown counters for all symbols
+        for symbol in self.symbols:
+            if symbol in self._cooldown_remaining:
+                self._cooldown_remaining[symbol] -= 1
+                if self._cooldown_remaining[symbol] <= 0:
+                    del self._cooldown_remaining[symbol]
+
+        # Phase 1: Collect all pending buy orders (new entries + scale-ins)
         pending_buy_orders = []
         portfolio = self.context.get_portfolio()
         available_funds = self.context.get_unallocated()
@@ -378,8 +424,12 @@ class TradingStrategy:
             if self.has_open_orders(symbol):
                 continue
 
-            if not self.has_position(symbol):
+            # Check cooldown — skip buy/scale-in if in cooldown
+            if symbol in self._cooldown_remaining:
+                continue
 
+            if not self.has_position(symbol):
+                # --- New entry ---
                 if symbol not in buy_signals:
                     continue
 
@@ -399,6 +449,87 @@ class TradingStrategy:
                         'price': price,
                         'amount': amount,
                     })
+            else:
+                # --- Scale-in: add to existing position ---
+                scaling_rule = self.get_scaling_rule(symbol)
+
+                if scaling_rule is None:
+                    continue
+
+                if symbol not in scale_in_signals:
+                    continue
+
+                signals = scale_in_signals[symbol]
+                last_row = signals.iloc[-1]
+
+                if not last_row:
+                    continue
+
+                # Check max_entries: count open trades for this symbol
+                open_trades = self.context.get_open_trades(
+                    target_symbol=symbol
+                )
+                num_entries = len(open_trades)
+
+                if num_entries >= scaling_rule.max_entries:
+                    logger.info(
+                        f"Skipping scale-in for {symbol}: "
+                        f"max entries reached "
+                        f"({num_entries}/{scaling_rule.max_entries})"
+                    )
+                    continue
+
+                # Check max_position_percentage cap
+                if scaling_rule.max_position_percentage is not None:
+                    current_pct = \
+                        self.context \
+                        .get_position_percentage_of_portfolio_by_net_size(
+                            symbol
+                        )
+
+                    if current_pct >= scaling_rule.max_position_percentage:
+                        logger.info(
+                            f"Skipping scale-in for {symbol}: "
+                            f"position is {current_pct:.1f}% of portfolio, "
+                            f"cap is "
+                            f"{scaling_rule.max_position_percentage}%"
+                        )
+                        continue
+
+                # Use per-entry percentage (0-indexed: entry 0 = first
+                # scale-in after the initial buy)
+                scale_in_index = num_entries - 1
+                pct = scaling_rule.get_scale_in_percentage(scale_in_index)
+
+                position_size = self.get_position_size(symbol)
+                full_symbol = (f"{symbol}/"
+                               f"{self.context.get_trading_symbol()}")
+                price = self.context.get_latest_price(full_symbol)
+                base_amount = position_size.get_size(portfolio, price)
+                amount = base_amount * (pct / 100)
+
+                # Clamp to max_position_percentage if set
+                if scaling_rule.max_position_percentage is not None:
+                    net_size = portfolio.get_net_size()
+                    max_allowed = (
+                        net_size
+                        * scaling_rule.max_position_percentage / 100
+                    )
+                    position = self.get_position(symbol)
+                    current_cost = position.cost if position else 0
+                    headroom = max_allowed - current_cost
+
+                    if headroom <= 0:
+                        continue
+
+                    amount = min(amount, headroom)
+
+                pending_buy_orders.append({
+                    'symbol': symbol,
+                    'full_symbol': full_symbol,
+                    'price': price,
+                    'amount': amount,
+                })
 
         # Phase 2: Scale orders proportionally if total exceeds available
         total_required = sum(o['amount'] for o in pending_buy_orders)
@@ -462,17 +593,28 @@ class TradingStrategy:
                     created_at=index_datetime
                 )
 
-        # Phase 4: Process sell signals
+            # Start cooldown after a buy/scale-in
+            scaling_rule = self.get_scaling_rule(symbol)
+            if scaling_rule and scaling_rule.cooldown_in_bars > 0:
+                self._cooldown_remaining[symbol] = \
+                    scaling_rule.cooldown_in_bars
+
+        # Phase 4: Process sell and scale-out signals.
+        # Sell (full exit) ALWAYS takes priority over scale-out.
         for symbol in self.symbols:
 
             if self.has_open_orders(symbol):
                 continue
 
-            if self.has_position(symbol):
-                # Check in the last row if there is a sell signal
-                if symbol not in sell_signals:
-                    continue
+            if not self.has_position(symbol):
+                continue
 
+            # Check cooldown — skip sell/scale-out if in cooldown
+            if symbol in self._cooldown_remaining:
+                continue
+
+            # Phase 4a: Full sell (always checked first — bypasses scaling)
+            if symbol in sell_signals:
                 signals = sell_signals[symbol]
                 last_row = signals.iloc[-1]
 
@@ -497,6 +639,59 @@ class TradingStrategy:
                         sync=True,
                         price=price
                     )
+
+                    # Reset scale-out counter and start cooldown
+                    self._scale_out_counts.pop(symbol, None)
+                    scaling_rule = self.get_scaling_rule(symbol)
+                    if scaling_rule and scaling_rule.cooldown_in_bars > 0:
+                        self._cooldown_remaining[symbol] = \
+                            scaling_rule.cooldown_in_bars
+
+                    continue
+
+            # Phase 4b: Scale-out (partial close)
+            scaling_rule = self.get_scaling_rule(symbol)
+
+            if (scaling_rule is not None
+                    and scale_out_signals is not None
+                    and symbol in scale_out_signals):
+                signals = scale_out_signals[symbol]
+                last_row = signals.iloc[-1]
+
+                if last_row:
+                    position = self.get_position(symbol)
+
+                    if position is not None and position.amount > 0:
+                        so_index = self._scale_out_counts.get(symbol, 0)
+                        pct = scaling_rule.get_scale_out_percentage(
+                            so_index
+                        )
+                        sell_amount = position.amount * pct / 100
+
+                        if sell_amount > 0.0:
+                            full_symbol = (
+                                f"{symbol}/"
+                                f"{self.context.get_trading_symbol()}"
+                            )
+                            price = self.context.get_latest_price(
+                                full_symbol
+                            )
+                            self.create_limit_order(
+                                target_symbol=symbol,
+                                order_side=OrderSide.SELL,
+                                amount=sell_amount,
+                                execute=True,
+                                validate=True,
+                                sync=True,
+                                price=price
+                            )
+
+                            self._scale_out_counts[symbol] = so_index + 1
+
+                            # Start cooldown after a scale-out
+                            if scaling_rule.cooldown_in_bars > 0:
+                                self._cooldown_remaining[symbol] = \
+                                    scaling_rule.cooldown_in_bars
 
     def apply_strategy(self, context, data):
         if self.decorated:
@@ -588,6 +783,69 @@ class TradingStrategy:
             )
 
         return position_size
+
+    def get_scaling_rule(self, symbol: str) -> Union[ScalingRule, None]:
+        """
+        Get the scaling rule for a given symbol.
+
+        Args:
+            symbol (str): The symbol of the asset.
+
+        Returns:
+            Union[ScalingRule, None]: The scaling rule if found,
+              None otherwise.
+        """
+
+        if self.scaling_rules is None or len(self.scaling_rules) == 0:
+            return None
+
+        if self.scaling_rules_lookup == {}:
+            for sr in self.scaling_rules:
+                self.scaling_rules_lookup[sr.symbol] = sr
+
+        return self.scaling_rules_lookup.get(symbol, None)
+
+    def generate_scale_in_signals(
+        self, data: Dict[str, Any]
+    ) -> Union[Dict[str, pd.Series], None]:
+        """
+        Optional method to generate scale-in signals. Override this to
+        provide separate logic for when to add to an existing position.
+
+        If not overridden, the framework falls back to using
+        generate_buy_signals for scale-in decisions.
+
+        Args:
+            data (Dict[str, Any]): The market data for the strategy.
+
+        Returns:
+            Dict[str, Series] | None: A dictionary where the keys are
+                symbols and values are pandas Series with boolean
+                scale-in signals per row. Return None to fall back
+                to buy signals.
+        """
+        return None
+
+    def generate_scale_out_signals(
+        self, data: Dict[str, Any]
+    ) -> Union[Dict[str, pd.Series], None]:
+        """
+        Optional method to generate scale-out signals. Override this to
+        provide separate logic for when to partially close a position.
+
+        If not overridden, no scale-out signals are generated (only
+        full sell signals from generate_sell_signals apply).
+
+        Args:
+            data (Dict[str, Any]): The market data for the strategy.
+
+        Returns:
+            Dict[str, Series] | None: A dictionary where the keys are
+                symbols and values are pandas Series with boolean
+                scale-out signals per row. Return None for no
+                scale-out signals.
+        """
+        return None
 
     def on_trade_closed(self, context: Context, trade: Trade):
         pass

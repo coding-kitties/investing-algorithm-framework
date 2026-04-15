@@ -7,7 +7,7 @@ from .repositories import SQLOrderRepository, SQLPositionRepository, \
     SQLPortfolioRepository, SQLTradeRepository, \
     SQLPortfolioSnapshotRepository, SQLPositionSnapshotRepository, \
     SQLTradeTakeProfitRepository, SQLTradeStopLossRepository, \
-    SQLOrderMetadataRepository
+    SQLTradeAllocationRepository
 from .services import AzureBlobStorageStateHandler, AWSS3StorageStateHandler, \
     BacktestService
 from .data_providers import CSVOHLCVDataProvider, \
@@ -39,7 +39,7 @@ __all__ = [
     "SQLTradeStopLoss",
     "SQLTradeTakeProfitRepository",
     "SQLTradeStopLossRepository",
-    "SQLOrderMetadataRepository",
+    "SQLTradeAllocationRepository",
     "CSVOHLCVDataProvider",
     "CSVTickerDataProvider",
     "CCXTOrderExecutor",

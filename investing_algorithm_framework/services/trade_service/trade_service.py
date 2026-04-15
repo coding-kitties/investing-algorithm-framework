@@ -13,12 +13,79 @@ from investing_algorithm_framework.services.repository_service import \
 logger = logging.getLogger(__name__)
 
 
+def _safe_order_fee(order):
+    """Safely get order_fee, avoiding SQLAlchemy detached-instance errors."""
+    try:
+        fee = getattr(order, 'order_fee', None)
+        return fee if fee else 0
+    except Exception:
+        return 0
+
+
+def _safe_buy_order(trade):
+    """Safely get buy_order from a trade, avoiding lazy-load errors."""
+    try:
+        return getattr(trade, 'buy_order', None)
+    except Exception:
+        return None
+
+
+def _get_buy_fee_portion(trade, portion_amount):
+    """Get proportional buy fee for *portion_amount* of the trade."""
+    buy_order = _safe_buy_order(trade)
+    fee = _safe_order_fee(buy_order) if buy_order else 0
+    if fee and trade.amount:
+        return fee * (portion_amount / trade.amount)
+    return 0
+
+
+def _get_sell_fee_portion(sell_order, portion_amount):
+    """Get proportional sell fee for *portion_amount* of the sell order."""
+    fee = _safe_order_fee(sell_order)
+    try:
+        amount = sell_order.amount if sell_order else 0
+    except Exception:
+        amount = 0
+    if fee and amount:
+        return fee * (portion_amount / amount)
+    return 0
+
+
 class TradeService(RepositoryService):
     """
     Trade service class to handle trade related operations. This class
     is responsible for creating, updating, and deleting trades. It also
     takes care of keeping track of all sell transactions that are
     associated with a trade.
+
+    Trade Allocation Pattern
+    ~~~~~~~~~~~~~~~~~~~~~~~~
+    Trades and sell orders have a many-to-many relationship: one sell
+    order can close multiple trades (FIFO), and one trade can be
+    partially closed by multiple sell orders. The TradeAllocation table
+    acts as the allocation ledger — each record captures how much of a
+    sell order was allocated to close a specific trade, along with the
+    prices, fees, and net_gain contribution at time of creation.
+
+    There are two creation paths for these allocation records:
+
+    - **Path 1** (`_create_trade_allocations_fifo`): The sell
+      order is matched to open trades automatically via a FIFO priority
+      queue. Used when no explicit trade list is provided.
+    - **Path 2** (`_create_trade_allocations_explicit`):
+      The caller specifies exactly which trades (and amounts) the sell
+      order should close. Used by stop-loss / take-profit flows.
+
+    Both paths delegate per-allocation accounting to a single shared
+    method (`_allocate_sell_to_trade`) which computes proportional fees,
+    net_gain contribution, updates trade state, and persists the
+    allocation record with all derived values stored.
+
+    The allocation records also enable **cancellation reversal**
+    (`update_trade_with_removed_sell_order`): when a sell order is
+    cancelled, expired, or rejected, the stored `net_gain_contribution`,
+    `buy_fee`, `sell_fee`, and `amount_pending` on each allocation
+    record are used to restore trade state — no re-derivation needed.
     """
 
     def __init__(
@@ -30,7 +97,7 @@ class TradeService(RepositoryService):
         position_repository,
         portfolio_repository,
         configuration_service,
-        order_metadata_repository
+        trade_allocation_repository
     ):
         super(TradeService, self).__init__(trade_repository)
         self.order_repository = order_repository
@@ -39,7 +106,7 @@ class TradeService(RepositoryService):
         self.configuration_service = configuration_service
         self.trade_stop_loss_repository = trade_stop_loss_repository
         self.trade_take_profit_repository = trade_take_profit_repository
-        self.order_metadata_repository = order_metadata_repository
+        self.trade_allocation_repository = trade_allocation_repository
 
     def create_trade_from_buy_order(self, buy_order) -> Union[Trade, None]:
         """
@@ -82,11 +149,91 @@ class TradeService(RepositoryService):
 
         return self.create(data)
 
-    def _create_trade_metadata_with_sell_order(self, sell_order):
+    def _allocate_sell_to_trade(
+        self, trade_id, sell_order, amount_to_close
+    ):
         """
-        Function to create trade metadata with only a sell order.
-        This function will create all metadata objects for the trades
-        that are closed with the sell order amount.
+        Core allocation method — creates a single TradeAllocation record
+        linking a sell order to a trade for the given amount, computes
+        fees and net_gain, updates the trade, and stores everything on
+        the allocation record.
+
+        Both Path 1 (FIFO) and Path 2 (explicit trades) delegate here.
+
+        Args:
+            trade_id: int, the id of the trade to (partially) close
+            sell_order: Sell order providing the close price
+            amount_to_close: float, the amount being closed on this trade
+
+        Returns:
+            The created allocation record
+        """
+        trade = self.get(trade_id)
+        open_price = trade.open_price
+        sell_price = sell_order.price
+        sell_order_id = sell_order.id
+        sell_updated_at = sell_order.updated_at
+        current_available = trade.available_amount
+        current_net_gain = trade.net_gain
+        current_filled = trade.filled_amount
+        current_amount = trade.amount
+
+        buy_fee = _get_buy_fee_portion(trade, amount_to_close)
+        sell_fee = _get_sell_fee_portion(sell_order, amount_to_close)
+        cost = open_price * amount_to_close
+        net_gain = (sell_price * amount_to_close) - cost - buy_fee - sell_fee
+
+        # Create the allocation record with all derived values stored
+        allocation = self.trade_allocation_repository.create({
+            "order_id": sell_order_id,
+            "trade_id": trade_id,
+            "amount": amount_to_close,
+            "amount_pending": amount_to_close,
+            "open_price": open_price,
+            "close_price": sell_price,
+            "buy_fee": buy_fee,
+            "sell_fee": sell_fee,
+            "net_gain_contribution": net_gain,
+        })
+
+        # Re-fetch trade after DB operation to avoid detached instance
+        trade = self.get(trade_id)
+
+        # Link the sell order to the trade
+        sell_order = self.order_repository.get(sell_order_id)
+        self.repository.add_order_to_trade(trade, sell_order)
+
+        # Update trade state
+        new_available = current_available - amount_to_close
+        update_data = {
+            "available_amount": new_available,
+            "updated_at": sell_updated_at,
+            "net_gain": current_net_gain + net_gain,
+        }
+
+        # A trade is CLOSED only when all amount is sold
+        # (available == 0) and the buy order is fully filled
+        # (filled_amount == amount).
+        if new_available == 0 and current_filled == current_amount:
+            update_data["closed_at"] = sell_updated_at
+            update_data["status"] = TradeStatus.CLOSED.value
+        elif new_available == 0:
+            # All available sold but buy order not fully filled
+            update_data["closed_at"] = sell_updated_at
+
+        self.update(trade_id, update_data)
+        return allocation
+
+    def _create_trade_allocations_fifo(self, sell_order):
+        """
+        Path 1 — FIFO auto-match.
+
+        Matches the sell order against open trades in FIFO order
+        (oldest first via PriorityQueue) and delegates each allocation
+        to `_allocate_sell_to_trade`.
+
+        Used when the caller does not specify which trades to close
+        (i.e. a plain sell order from the strategy).
 
         Args:
             sell_order: Order object representing the sell order
@@ -103,12 +250,9 @@ class TradeService(RepositoryService):
             "target_symbol": sell_order.target_symbol,
             "portfolio_id": portfolio_id
         })
-        updated_at = sell_order.updated_at
         total_available_to_close = 0
         amount_to_close = sell_order.amount
         trade_queue = PriorityQueue()
-        sell_order_id = sell_order.id
-        sell_price = sell_order.price
 
         for trade in matching_trades:
             if trade.available_amount > 0:
@@ -120,75 +264,26 @@ class TradeService(RepositoryService):
                 "Not enough amount to close in trades."
             )
 
-        # Create order metadata object
         while amount_to_close > 0 and not trade_queue.empty():
             trade = trade_queue.get()
-            trade_id = trade.id
             available_to_close = trade.available_amount
+            close_amount = min(amount_to_close, available_to_close)
+            self._allocate_sell_to_trade(
+                trade.id, sell_order, close_amount
+            )
+            amount_to_close -= close_amount
 
-            if amount_to_close >= available_to_close:
-                amount_to_close = amount_to_close - available_to_close
-                cost = trade.open_price * available_to_close
-                net_gain = (sell_price * available_to_close) - cost
-                update_data = {
-                    "available_amount": 0,
-                    "orders": trade.orders.append(sell_order),
-                    "updated_at": updated_at,
-                    "closed_at": updated_at,
-                    "net_gain": trade.net_gain + net_gain
-                }
-
-                if trade.remaining == 0:
-                    update_data["status"] = TradeStatus.CLOSED.value
-
-                self.update(trade_id, update_data)
-                self.repository.add_order_to_trade(trade, sell_order)
-
-                # Create metadata object
-                self.order_metadata_repository.\
-                    create({
-                        "order_id": sell_order_id,
-                        "trade_id": trade_id,
-                        "amount": available_to_close,
-                        "amount_pending": available_to_close,
-                    })
-            else:
-                to_be_closed = amount_to_close
-                cost = trade.open_price * to_be_closed
-                net_gain = (sell_price * to_be_closed) - cost
-
-                self.update(
-                    trade_id, {
-                        "available_amount":
-                            trade.available_amount - to_be_closed,
-                        "orders": trade.orders.append(sell_order),
-                        "updated_at": updated_at,
-                        "net_gain": trade.net_gain + net_gain
-                    }
-                )
-                self.repository.add_order_to_trade(trade, sell_order)
-
-                # Create an order metadata object
-                self.order_metadata_repository.\
-                    create({
-                        "order_id": sell_order_id,
-                        "trade_id": trade_id,
-                        "amount": to_be_closed,
-                        "amount_pending": to_be_closed,
-                    })
-
-                amount_to_close = 0
-
-    def _create_stop_loss_metadata_with_sell_order(
+    def _create_stop_loss_allocation_with_sell_order(
         self, sell_order_id, stop_losses
     ):
         """
+        Create allocation records linking a sell order to stop-losses.
         """
         sell_order = self.order_repository.get(sell_order_id)
 
         for stop_loss_data in stop_losses:
 
-            self.order_metadata_repository.\
+            self.trade_allocation_repository.\
                 create({
                     "order_id": sell_order.id,
                     "stop_loss_id": stop_loss_data["stop_loss_id"],
@@ -196,16 +291,17 @@ class TradeService(RepositoryService):
                     "amount_pending": stop_loss_data["amount"]
                 })
 
-    def _create_take_profit_metadata_with_sell_order(
+    def _create_take_profit_allocation_with_sell_order(
         self, sell_order_id, take_profits
     ):
         """
+        Create allocation records linking a sell order to take-profits.
         """
         sell_order = self.order_repository.get(sell_order_id)
 
         for take_profit_data in take_profits:
 
-            self.order_metadata_repository.\
+            self.trade_allocation_repository.\
                 create({
                     "order_id": sell_order.id,
                     "take_profit_id": take_profit_data["take_profit_id"],
@@ -276,119 +372,49 @@ class TradeService(RepositoryService):
 
         return super(TradeService, self).update(trade_id, data)
 
-    def _create_trade_metadata_with_sell_order_and_trades(
+    def _create_trade_allocations_explicit(
         self, sell_order, trades
     ):
         """
-        Function to create trade metadata with a sell order and trades.
+        Path 2 — Explicit trade list.
 
-        The metadata objects function as a link between the trades and
-        the sell order. The metadata objects are used to keep track
-        of the trades that are closed with the sell order.
+        Creates allocation records for a sell order using a caller-
+        supplied list of trades and amounts. Each entry in `trades` is
+        a dict with `trade_id` and `amount`. This path is used by
+        stop-loss and take-profit flows where the exact trade-to-order
+        mapping is already known.
 
-        A single sell order can close or partially close multiple trades.
-        Therefore it is important to keep track of the trades that are
-        closed with the sell order. The metadata objects are used to
-        keep track of this relationship.
-
-
+        Delegates per-allocation accounting to `_allocate_sell_to_trade`.
         """
-        sell_order_id = sell_order.id
-        updated_at = sell_order.updated_at
-        sell_price = sell_order.price
 
         for trade_data in trades:
-            trade = self.get(trade_data["trade_id"])
-            trade_id = trade.id
-            open_price = trade.open_price
-            old_net_gain = trade.net_gain
-            available_amount = trade.available_amount
-            filled_amount = trade.filled_amount
-            amount = trade.amount
+            self._allocate_sell_to_trade(
+                trade_data["trade_id"], sell_order, trade_data["amount"]
+            )
 
-            self.order_metadata_repository.\
-                create({
-                    "order_id": sell_order_id,
-                    "trade_id": trade_data["trade_id"],
-                    "amount": trade_data["amount"],
-                    "amount_pending": trade_data["amount"]
-                })
-
-            # Add the sell order to the trade
-            self.repository.add_order_to_trade(trade, sell_order)
-
-            # Update the trade
-            net_gain = (sell_price * trade_data["amount"]) \
-                - open_price * trade_data["amount"]
-            available_amount = available_amount - trade_data["amount"]
-            trade_updated_data = {
-                "available_amount": available_amount,
-                "updated_at": updated_at,
-                "net_gain": old_net_gain + net_gain
-            }
-
-            if available_amount == 0 and filled_amount == amount:
-                trade_updated_data["status"] = TradeStatus.CLOSED.value
-                trade_updated_data["closed_at"] = updated_at
-            else:
-                trade_updated_data["status"] = TradeStatus.OPEN.value
-
-            # Update the trade object
-            self.update(trade_id, trade_updated_data)
-
-    def create_order_metadata_with_trade_context(
+    def create_trade_allocations(
         self, sell_order, trades=None, stop_losses=None, take_profits=None
     ):
         """
-        Function to create order metadata for trade related models.
+        Create trade allocation records for a sell order, update the
+        associated trades, position cost, and portfolio net_gain.
 
-        If only the sell order is provided, we assume that the sell order
-        is initiated by a client of the order service. In this case we
-        create only metadata objects for the trades based on size of the
-        sell order.
+        If only the sell order is provided, FIFO matching is used. If
+        trades/stop_losses/take_profits are provided, explicit matching
+        is used.
 
-        If also stop losses and take profits are provided, we assume that
-        the sell order is initiated a stop loss or take profit. In this case
-        we create metadata objects for the trades, stop losses,
-        and take profits.
-
-        If the trades param is provided, we assume that the sell order is
-        based on either a stop loss or take profit or a closing of a trade.
-        In this case we create also the metadata objects for the trades,
-
-        As part of this function, we will also update the position cost.
-
-        Scenario 1: Sell order without trades, stop losses, and take profits
-        - Use the sell amount to create all trade metadata objects
-        - Update the position cost
-
-        Scenario 2: Sell order with trades
-        - We assume that the sell amount is same as the total amount
-            of the trades
-        - Use the trades to create all trade metadata objects
-        - Update trade object remaining amount
-        - Update the position cost
-
-        Scenario 3: Sell order with trades, stop losses, and take profits
-        - We assume that the sell amount is same as the total
-            amount of the trades
-        - Use the trades to create all metadata objects
-        - Update trade object remaining amount
-        - Use the stop losses to create all metadata objects
-        - Use the take profits to create all metadata objects
-        - Update the position cost
+        After creating the allocation records, this method reads back
+        the stored fees and net_gain_contribution to update the position
+        and portfolio — no re-derivation needed.
 
         Args:
             sell_order: Order object representing the sell order that has
                 been created
-            trades: List of Trade objects representing the trades that
-                are associated with the sell order. Default is None.
-            stop_losses: List of StopLoss objects representing the stop
-                losses that are associated with the sell order. Default
+            trades: List of dicts with trade_id/amount. Default is None.
+            stop_losses: List of dicts with stop_loss_id/amount. Default
                 is None.
-            take_profits: List of TakeProfit objects representing the take
-                profits that are associated with the sell order. Default
-                is None.
+            take_profits: List of dicts with take_profit_id/amount.
+                Default is None.
 
         Returns:
             None
@@ -400,43 +426,41 @@ class TradeService(RepositoryService):
         if (trades is None or len(trades) == 0) \
                 and (stop_losses is None or len(stop_losses) == 0) \
                 and (take_profits is None or len(take_profits) == 0):
-            self._create_trade_metadata_with_sell_order(sell_order)
+            self._create_trade_allocations_fifo(sell_order)
         else:
 
             if stop_losses is not None:
-                self._create_stop_loss_metadata_with_sell_order(
+                self._create_stop_loss_allocation_with_sell_order(
                     sell_order_id, stop_losses
                 )
 
             if take_profits is not None:
-                self._create_take_profit_metadata_with_sell_order(
+                self._create_take_profit_allocation_with_sell_order(
                     sell_order_id, take_profits
                 )
 
             if trades is not None:
-                self._create_trade_metadata_with_sell_order_and_trades(
+                self._create_trade_allocations_explicit(
                     sell_order, trades
                 )
 
-        # Retrieve all trades metadata objects
-        order_metadatas = self.order_metadata_repository.get_all({
+        # Retrieve all allocation records for this sell order
+        allocations = self.trade_allocation_repository.get_all({
             "order_id": sell_order_id
         })
 
-        # Update the position cost
+        # Update the position cost using stored values
         position = self.position_repository.find({
             "order_id": sell_order_id
         })
 
-        # Update position
         cost = 0
         net_gain = 0
-        for metadata in order_metadatas:
-            if metadata.trade_id is not None:
-                trade = self.get(metadata.trade_id)
-                trade_cost = trade.open_price * metadata.amount
-                cost += trade_cost
-                net_gain += (sell_price * metadata.amount) - trade_cost
+
+        for allocation in allocations:
+            if allocation.trade_id is not None:
+                cost += allocation.open_price * allocation.amount
+                net_gain += allocation.net_gain_contribution
 
         position.cost -= cost
         self.position_repository.save(position)
@@ -452,13 +476,21 @@ class TradeService(RepositoryService):
         self, sell_order
     ) -> Trade:
         """
-        This function updates a trade with a removed sell order that belongs
-        to the trade. This function uses the order metadata objects to
-        update the trade object. The function will update the trade object
-        available amount, cost, and net gain. The function will also
-        update the stop loss and take profit objects that are associated
-        with the trade object. The function will update the position cost
-        and the portfolio net gain.
+        Cancellation reversal — undo the effect of a sell order.
+
+        When a sell order is cancelled, expired, or rejected, this
+        method reads the stored values from each TradeAllocation record
+        to restore each affected trade to its pre-sell state:
+
+        - `available_amount` is increased by the allocated amount.
+        - `net_gain` is decreased by the stored `net_gain_contribution`.
+        - Trade status is set back to OPEN.
+        - Associated stop-loss / take-profit sold_amounts are reversed.
+        - Position cost and portfolio net_gain / net_size are restored.
+
+        Because fees and net_gain are stored on the allocation record
+        at creation time, no re-derivation is needed — eliminating
+        the risk of calculation mismatches.
 
         Args:
             sell_order (Order): Order object representing the sell order
@@ -470,19 +502,30 @@ class TradeService(RepositoryService):
         position_cost = 0
         total_net_gain = 0
 
-        # Get all order metadata objects that are associated with
-        # the sell order
-        order_metadatas = self.order_metadata_repository.get_all({
+        # Get all allocation records for this sell order
+        allocations = self.trade_allocation_repository.get_all({
             "order_id": sell_order.id
         })
 
-        for metadata in order_metadatas:
+        for allocation in allocations:
             # If trade id is not None, update the trade object
-            if metadata.trade_id is not None:
-                trade = self.get(metadata.trade_id)
-                cost = metadata.amount_pending * trade.open_price
-                net_gain = (sell_order.price * metadata.amount_pending) - cost
-                trade.available_amount += metadata.amount_pending
+            if allocation.trade_id is not None:
+                trade = self.get(allocation.trade_id)
+                cost = allocation.amount_pending * allocation.open_price
+
+                # Scale the stored net_gain_contribution proportionally
+                # to the unfilled (pending) portion. If the order was
+                # partially filled before cancellation, only reverse
+                # the unfilled part.
+                if allocation.amount and allocation.amount > 0:
+                    pending_ratio = (
+                        allocation.amount_pending / allocation.amount
+                    )
+                else:
+                    pending_ratio = 1
+                net_gain = allocation.net_gain_contribution * pending_ratio
+
+                trade.available_amount += allocation.amount_pending
                 trade.status = TradeStatus.OPEN.value
                 trade.updated_at = sell_order.updated_at
                 trade.net_gain -= net_gain
@@ -493,10 +536,10 @@ class TradeService(RepositoryService):
                 position_cost += cost
                 total_net_gain += net_gain
 
-            if metadata.stop_loss_id is not None:
+            if allocation.stop_loss_id is not None:
                 stop_loss = self.trade_stop_loss_repository\
-                    .get(metadata.stop_loss_id)
-                stop_loss.sold_amount -= metadata.amount_pending
+                    .get(allocation.stop_loss_id)
+                stop_loss.sold_amount -= allocation.amount_pending
                 stop_loss.remove_sell_price(
                     sell_order.price, sell_order.created_at
                 )
@@ -507,10 +550,10 @@ class TradeService(RepositoryService):
 
                 self.trade_stop_loss_repository.save(stop_loss)
 
-            if metadata.take_profit_id is not None:
+            if allocation.take_profit_id is not None:
                 take_profit = self.trade_take_profit_repository\
-                    .get(metadata.take_profit_id)
-                take_profit.sold_amount -= metadata.amount_pending
+                    .get(allocation.take_profit_id)
+                take_profit.sold_amount -= allocation.amount_pending
                 take_profit.remove_sell_price(
                     sell_order.price, sell_order.created_at
                 )
@@ -617,75 +660,75 @@ class TradeService(RepositoryService):
         Returns:
             Trade object
         """
-        # Update all metadata objects
-        metadata_objects = self.order_metadata_repository.get_all({
+        # Update all allocation records
+        allocations = self.trade_allocation_repository.get_all({
             "order_id": sell_order.id
         })
 
         trade_filled_difference = filled_difference
         stop_loss_filled_difference = filled_difference
         take_profit_filled_difference = filled_difference
-        total_amount_in_metadata = 0
-        trade_metadata_objects = []
+        total_amount_in_allocations = 0
+        trade_allocations = []
 
-        for metadata_object in metadata_objects:
-            # Update the trade metadata object
-            if metadata_object.trade_id is not None \
+        for allocation in allocations:
+            # Update the trade allocation
+            if allocation.trade_id is not None \
                     and trade_filled_difference > 0:
 
-                trade_metadata_objects.append(metadata_object)
-                total_amount_in_metadata += metadata_object.amount
+                trade_allocations.append(allocation)
+                total_amount_in_allocations += allocation.amount
 
-                if metadata_object.amount_pending >= trade_filled_difference:
+                if allocation.amount_pending >= trade_filled_difference:
                     amount = trade_filled_difference
                     trade_filled_difference = 0
                 else:
-                    amount = metadata_object.amount_pending
+                    amount = allocation.amount_pending
                     trade_filled_difference -= amount
 
-                metadata_object.amount_pending -= amount
-                self.order_metadata_repository.save(metadata_object)
+                allocation.amount_pending -= amount
+                self.trade_allocation_repository.save(allocation)
 
-            if metadata_object.stop_loss_id is not None \
+            if allocation.stop_loss_id is not None \
                     and stop_loss_filled_difference > 0:
 
                 if (
-                    metadata_object.amount_pending >=
+                    allocation.amount_pending >=
                     stop_loss_filled_difference
                 ):
                     amount = stop_loss_filled_difference
                     stop_loss_filled_difference = 0
                 else:
-                    amount = metadata_object.amount_pending
+                    amount = allocation.amount_pending
                     stop_loss_filled_difference -= amount
 
-                metadata_object.amount_pending -= amount
-                self.order_metadata_repository.save(metadata_object)
+                allocation.amount_pending -= amount
+                self.trade_allocation_repository.save(allocation)
 
-            if metadata_object.take_profit_id is not None \
+            if allocation.take_profit_id is not None \
                     and take_profit_filled_difference > 0:
 
                 if (
-                    metadata_object.amount_pending >=
+                    allocation.amount_pending >=
                     take_profit_filled_difference
                 ):
                     amount = take_profit_filled_difference
                     take_profit_filled_difference = 0
                 else:
-                    amount = metadata_object.amount_pending
+                    amount = allocation.amount_pending
                     take_profit_filled_difference -= amount
 
-                metadata_object.amount_pending -= amount
-                self.order_metadata_repository.save(metadata_object)
+                allocation.amount_pending -= amount
+                self.trade_allocation_repository.save(allocation)
 
-        # Update trade available amount if the total amount in metadata
+        # Update trade available amount if the total amount in allocations
         # is not equal to the sell order amount
-        if total_amount_in_metadata != sell_order.amount:
-            difference = sell_order.amount - total_amount_in_metadata
+        if total_amount_in_allocations != sell_order.amount:
+            difference = sell_order.amount - total_amount_in_allocations
             trades = []
 
-            for metadata_object in trade_metadata_objects:
-                trade = self.get(metadata_object.trade_id)
+            for allocation in trade_allocations:
+                trade = self.get(allocation.trade_id)
                 trades.append(trade)
 
             # Sort trades by created_at with the most recent first

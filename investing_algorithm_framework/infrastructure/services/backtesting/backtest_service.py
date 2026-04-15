@@ -2226,6 +2226,18 @@ class BacktestService:
                             )
 
                             # Create trade order evaluator
+                            # Collect trading costs from all strategies
+                            all_trading_costs = []
+                            for strat in algorithm.strategies:
+                                if hasattr(strat, 'trading_costs'):
+                                    all_trading_costs.extend(
+                                        strat.trading_costs
+                                    )
+                            pc_list = (
+                                self._portfolio_configuration_service
+                                .get_all()
+                            )
+                            pc = pc_list[0] if pc_list else None
                             trade_order_evaluator = (
                                 BacktestTradeOrderEvaluator(
                                     trade_service=self._trade_service,
@@ -2238,7 +2250,9 @@ class BacktestService:
                                     ),
                                     configuration_service=(
                                         self._configuration_service
-                                    )
+                                    ),
+                                    trading_costs=all_trading_costs,
+                                    portfolio_configuration=pc,
                                 )
                             )
 

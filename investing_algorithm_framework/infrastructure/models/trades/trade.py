@@ -1,8 +1,10 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float
+from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.domain import Trade, TradeStatus
-from investing_algorithm_framework.infrastructure.database import SQLBaseModel
+from investing_algorithm_framework.infrastructure.database import (
+    SQLBaseModel, SqliteDecimal
+)
 from investing_algorithm_framework.infrastructure.models.model_extension \
     import SQLAlchemyModelExtension
 from investing_algorithm_framework.infrastructure.models\
@@ -56,16 +58,16 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
     trading_symbol = Column(String)
     closed_at = Column(DateTime, default=None)
     opened_at = Column(DateTime, default=None)
-    open_price = Column(Float, default=None)
-    amount = Column(Float, default=None)
-    available_amount = Column(Float, default=None)
-    filled_amount = Column(Float, default=None)
-    remaining = Column(Float, default=None)
-    net_gain = Column(Float, default=0)
-    cost = Column(Float, default=0)
-    last_reported_price = Column(Float, default=None)
+    open_price = Column(SqliteDecimal(), default=None)
+    amount = Column(SqliteDecimal(), default=None)
+    available_amount = Column(SqliteDecimal(), default=None)
+    filled_amount = Column(SqliteDecimal(), default=None)
+    remaining = Column(SqliteDecimal(), default=None)
+    net_gain = Column(SqliteDecimal(), default=0)
+    cost = Column(SqliteDecimal(), default=0)
+    last_reported_price = Column(SqliteDecimal(), default=None)
     last_reported_price_datetime = Column(DateTime, default=None)
-    high_water_mark = Column(Float, default=None)
+    high_water_mark = Column(SqliteDecimal(), default=None)
     high_water_mark_datetime = Column(DateTime, default=None)
     updated_at = Column(DateTime, default=None)
     status = Column(String, default=TradeStatus.CREATED.value)

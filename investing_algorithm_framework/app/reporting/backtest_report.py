@@ -77,6 +77,17 @@ def _fmt_date(dt):
     return dt.strftime('%Y-%m-%d')
 
 
+def _is_na(val):
+    """Check whether *val* is a pandas-like NA/NaN sentinel."""
+    try:
+        import pandas as pd
+        if pd.isna(val):
+            return True
+    except (ImportError, TypeError, ValueError):
+        pass
+    return False
+
+
 @dataclass
 class BacktestReport:
     backtests: List[Backtest] = field(default_factory=list)
@@ -451,6 +462,7 @@ class BacktestReport:
                         pct = (ng / cost * 100) if cost else 0
                         op_dt = t.opened_at
                         cl_dt = t.closed_at
+                        total_fees = getattr(t, 'total_fees', 0) or 0
                         trades_list.append({
                             'id': idx_t,
                             'sym': sym,
@@ -461,6 +473,7 @@ class BacktestReport:
                             ),
                             'close_price': round(cp, 2),
                             'cost': round(cost, 2),
+                            'total_fees': round(total_fees, 4),
                             'net_gain': round(ng, 2),
                             'pct': round(pct, 2),
                         })
@@ -518,7 +531,11 @@ class BacktestReport:
                         'best_year', 'worst_year',
                     ):
                         tval = getattr(m, tattr, None)
-                        if tval and tval[0] is not None:
+                        if (
+                            tval
+                            and tval[0] is not None
+                            and not _is_na(tval[0])
+                        ):
                             metrics_dict[tattr] = {
                                 'value': tval[0],
                                 'date': _fmt_date(tval[1]) if tval[1]
@@ -555,6 +572,71 @@ class BacktestReport:
                         ),
                     }
 
+                # Orders
+                orders_list = []
+                if run.orders:
+                    for o in run.orders:
+                        o_dt = getattr(o, 'created_at', None)
+                        u_dt = getattr(o, 'updated_at', None)
+                        o_fee = getattr(o, 'order_fee', None)
+                        if o_fee is None:
+                            o_fee = getattr(o, 'fee', 0)
+                        o_fee = o_fee or 0
+                        o_fee_rate = getattr(
+                            o, 'order_fee_rate', 0
+                        ) or 0
+                        o_slippage = getattr(o, 'slippage', None)
+                        if o_slippage is None:
+                            o_slippage = 0
+                        orders_list.append({
+                            'sym': getattr(o, 'target_symbol', '')
+                            or '',
+                            'side': getattr(o, 'order_side', '')
+                            or '',
+                            'type': getattr(o, 'order_type', '')
+                            or '',
+                            'status': getattr(o, 'status', '')
+                            or '',
+                            'price': round(
+                                getattr(o, 'price', 0) or 0, 4
+                            ),
+                            'amount': round(
+                                getattr(o, 'amount', 0) or 0, 6
+                            ),
+                            'filled': round(
+                                getattr(o, 'filled', 0) or 0, 6
+                            ),
+                            'cost': round(
+                                (getattr(o, 'amount', 0) or 0)
+                                * (getattr(o, 'price', 0) or 0), 2
+                            ),
+                            'fee': round(float(o_fee), 4),
+                            'fee_rate': round(
+                                float(o_fee_rate), 4
+                            ),
+                            'slippage': round(
+                                float(o_slippage), 4
+                            ),
+                            'created': _fmt_date(o_dt)
+                            if o_dt else '',
+                            'updated': _fmt_date(u_dt)
+                            if u_dt else '',
+                        })
+
+                # Positions
+                positions_list = []
+                if run.positions:
+                    for p in run.positions:
+                        positions_list.append({
+                            'sym': getattr(p, 'symbol', '') or '',
+                            'amount': round(
+                                getattr(p, 'amount', 0) or 0, 6
+                            ),
+                            'cost': round(
+                                getattr(p, 'cost', 0) or 0, 2
+                            ),
+                        })
+
                 run_data[rid] = {
                     'label': label,
                     'EQ': eq,
@@ -565,6 +647,8 @@ class BacktestReport:
                     'YR': yr,
                     'MONTHLY_HEATMAP': heatmap,
                     'TRADES': trades_list,
+                    'ORDERS': orders_list,
+                    'POSITIONS': positions_list,
                     'SYM_STATS': sym_stats,
                     'metrics': metrics_dict,
                     'snapshot': snapshot,
