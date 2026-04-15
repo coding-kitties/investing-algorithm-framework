@@ -174,6 +174,15 @@ body { font-family:'Inter',-apple-system,sans-serif; background:var(--bg); color
 .tab-panel { display:none; }
 .tab-panel.active { display:block; }
 
+/* pagination */
+.pagination { display:flex; align-items:center; justify-content:space-between; padding:0.6rem 0.25rem; font-size:0.78rem; color:var(--text-dim); }
+.pagination-btns { display:flex; gap:0.35rem; align-items:center; }
+.pagination-btns button { font-family:inherit; font-size:0.75rem; font-weight:500; padding:0.3rem 0.7rem; border-radius:6px; border:1px solid var(--border); background:var(--surface2); color:var(--text-secondary); cursor:pointer; transition:all 0.15s; }
+.pagination-btns button:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+.pagination-btns button:disabled { opacity:0.35; cursor:default; }
+.pagination-btns button.active { background:var(--accent); color:#000; border-color:var(--accent); }
+.page-size-select { font-family:inherit; font-size:0.75rem; padding:0.25rem 0.5rem; border-radius:6px; border:1px solid var(--border); background:var(--surface2); color:var(--text-secondary); cursor:pointer; }
+
 /* run selector pills */
 .run-selector { display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom:1.25rem; padding:0.25rem 0; }
 .run-pill { font-family:'Inter',sans-serif; font-size:0.72rem; font-weight:500; padding:0.3rem 0.75rem; border-radius:16px; border:1px solid var(--border); background:var(--surface2); color:var(--text-secondary); cursor:pointer; transition:all 0.15s; }

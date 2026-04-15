@@ -369,6 +369,15 @@
   </div>
   {% endif %}
 
+  {# ── Tab bar ─────────────────────────────────────── #}
+  <div class="nav-tabs strat-nav-tabs" id="{{ s.id }}-tabs">
+    <div class="tab active" onclick="switchStratTab('{{ s.id }}','performance')">Performance</div>
+    <div class="tab" onclick="switchStratTab('{{ s.id }}','trading')">Trading</div>
+  </div>
+
+  {# ── Performance tab ─────────────────────────────── #}
+  <div class="tab-panel active" id="{{ s.id }}-performance">
+
   {# Portfolio Summary (visible when a run is selected) #}
   <div id="{{ s.id }}-portfolio-summary"></div>
 
@@ -411,6 +420,11 @@
   {# Return Scenarios (Annual) #}
   <div id="{{ s.id }}-return-scenarios"></div>
 
+  </div>{# /performance tab #}
+
+  {# ── Trading tab ─────────────────────────────────── #}
+  <div class="tab-panel" id="{{ s.id }}-trading">
+
   {# Trade & Order Timeline Scatter #}
   <div id="{{ s.id }}-timeline-scatter"></div>
 
@@ -422,6 +436,8 @@
 
   {# Positions Table #}
   <div id="{{ s.id }}-positions-table"></div>
+
+  </div>{# /trading tab #}
 
 </div>
 {% endfor %}

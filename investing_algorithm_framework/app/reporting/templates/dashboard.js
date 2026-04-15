@@ -5886,23 +5886,101 @@ function getStratRunData(stratIdx) {
   var strat = STRATEGIES[stratIdx];
   var runId = stratSelectedRun[stratIdx] || 'summary';
   if (runId === 'summary') {
-    // Use first run
     var bestRid = strat.runIds[0];
     return RUN_DATA[bestRid];
   }
   return RUN_DATA[runId];
 }
 
-function sortableTable(headers, rows, tableId) {
-  // headers: [{key, label, align?}]
-  // rows: [{key: value, ...}]
-  var html = '<div class="table-wrap"><table class="comp-table" id="' + tableId + '">';
+// ===== STRATEGY TAB SWITCHING =====
+function switchStratTab(sid, tabId) {
+  var page = document.getElementById('page-' + sid);
+  if (!page) return;
+  // Toggle panels
+  var panels = page.querySelectorAll('.tab-panel');
+  panels.forEach(function(p) { p.classList.remove('active'); p.style.display = 'none'; });
+  var target = document.getElementById(sid + '-' + tabId);
+  if (target) { target.classList.add('active'); target.style.display = 'block'; }
+  // Toggle tab highlights
+  var tabs = page.querySelectorAll('.strat-nav-tabs .tab');
+  tabs.forEach(function(t) { t.classList.remove('active'); });
+  var tabNames = ['performance', 'trading'];
+  var idx = tabNames.indexOf(tabId);
+  if (idx >= 0 && tabs[idx]) tabs[idx].classList.add('active');
+  // Re-draw charts if switching to trading tab (scatter needs canvas)
+  if (tabId === 'trading') {
+    var stratIdx = parseInt(sid.replace('strat-', ''));
+    buildTimelineScatter(stratIdx);
+  }
+  if (tabId === 'performance') {
+    requestAnimationFrame(function() { drawPageCharts(sid); });
+  }
+}
+
+// ===== PAGINATION STATE =====
+var paginationState = {};
+var PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
+var DEFAULT_PAGE_SIZE = 25;
+
+function getPagState(tableKey) {
+  if (!paginationState[tableKey]) {
+    paginationState[tableKey] = { page: 1, pageSize: DEFAULT_PAGE_SIZE, sortCol: null, sortAsc: true };
+  }
+  return paginationState[tableKey];
+}
+
+function paginatedTable(headers, allRows, tableKey, containerEl, title) {
+  var ps = getPagState(tableKey);
+
+  // Sort rows
+  var rows = allRows.slice();
+  if (ps.sortCol !== null) {
+    var hdr = headers.find(function(h) { return h.key === ps.sortCol; });
+    rows.sort(function(a, b) {
+      var va = a[ps.sortCol], vb = b[ps.sortCol];
+      if (va == null) va = '';
+      if (vb == null) vb = '';
+      var na = parseFloat(va), nb = parseFloat(vb);
+      if (!isNaN(na) && !isNaN(nb)) {
+        return ps.sortAsc ? na - nb : nb - na;
+      }
+      return ps.sortAsc ? String(va).localeCompare(String(vb)) : String(vb).localeCompare(String(va));
+    });
+  }
+
+  var totalRows = rows.length;
+  var totalPages = Math.max(1, Math.ceil(totalRows / ps.pageSize));
+  if (ps.page > totalPages) ps.page = totalPages;
+  var start = (ps.page - 1) * ps.pageSize;
+  var pageRows = rows.slice(start, start + ps.pageSize);
+
+  var html = '<div class="chart-card">';
+  html += '<div class="chart-title">' + title + ' (' + totalRows + ')</div>';
+
+  // Page size selector + info row
+  html += '<div class="pagination">';
+  html += '<div><span>Show </span><select class="page-size-select" onchange="onPageSizeChange(\'' + tableKey + '\',this.value)">';
+  PAGE_SIZE_OPTIONS.forEach(function(sz) {
+    html += '<option value="' + sz + '"' + (sz === ps.pageSize ? ' selected' : '') + '>' + sz + '</option>';
+  });
+  html += '</select><span> per page</span></div>';
+  html += '<div>' + (start + 1) + '\u2013' + Math.min(start + ps.pageSize, totalRows) + ' of ' + totalRows + '</div>';
+  html += '</div>';
+
+  // Table
+  html += '<div class="table-wrap"><table class="comp-table" id="' + tableKey + '">';
   html += '<thead><tr>';
   headers.forEach(function(h) {
-    html += '<th data-col="' + h.key + '" style="cursor:pointer;' + (h.align === 'right' ? 'text-align:right' : '') + '">' + h.label + ' <span class="sort-arrow">&#9650;</span></th>';
+    var arrow = '&#9650;';
+    var arrowStyle = 'opacity:0.3';
+    if (ps.sortCol === h.key) {
+      arrow = ps.sortAsc ? '&#9650;' : '&#9660;';
+      arrowStyle = 'opacity:1';
+    }
+    html += '<th data-col="' + h.key + '" style="cursor:pointer;' + (h.align === 'right' ? 'text-align:right' : '') + '" onclick="onPagSort(\'' + tableKey + '\',\'' + h.key + '\')">' + h.label + ' <span class="sort-arrow" style="' + arrowStyle + '">' + arrow + '</span></th>';
   });
   html += '</tr></thead><tbody>';
-  rows.forEach(function(r) {
+  pageRows.forEach(function(r) {
     html += '<tr>';
     headers.forEach(function(h) {
       var v = r[h.key];
@@ -5918,36 +5996,102 @@ function sortableTable(headers, rows, tableId) {
     html += '</tr>';
   });
   html += '</tbody></table></div>';
-  return html;
+
+  // Pagination buttons
+  if (totalPages > 1) {
+    html += '<div class="pagination"><div></div><div class="pagination-btns">';
+    html += '<button onclick="onPagNav(\'' + tableKey + '\',' + 1 + ')"' + (ps.page <= 1 ? ' disabled' : '') + '>&laquo;</button>';
+    html += '<button onclick="onPagNav(\'' + tableKey + '\',' + (ps.page - 1) + ')"' + (ps.page <= 1 ? ' disabled' : '') + '>&lsaquo; Prev</button>';
+
+    // Page number buttons (show up to 5 around current)
+    var lo = Math.max(1, ps.page - 2);
+    var hi = Math.min(totalPages, ps.page + 2);
+    if (lo > 1) html += '<button disabled>...</button>';
+    for (var p = lo; p <= hi; p++) {
+      html += '<button onclick="onPagNav(\'' + tableKey + '\',' + p + ')"' + (p === ps.page ? ' class="active"' : '') + '>' + p + '</button>';
+    }
+    if (hi < totalPages) html += '<button disabled>...</button>';
+
+    html += '<button onclick="onPagNav(\'' + tableKey + '\',' + (ps.page + 1) + ')"' + (ps.page >= totalPages ? ' disabled' : '') + '>Next &rsaquo;</button>';
+    html += '<button onclick="onPagNav(\'' + tableKey + '\',' + totalPages + ')"' + (ps.page >= totalPages ? ' disabled' : '') + '>&raquo;</button>';
+    html += '</div></div>';
+  }
+
+  html += '</div>';
+  containerEl.innerHTML = html;
 }
+
+// Global re-render registry: maps tableKey to a re-render function
+var pagTableRenderers = {};
+
+function onPagNav(tableKey, page) {
+  var ps = getPagState(tableKey);
+  ps.page = page;
+  if (pagTableRenderers[tableKey]) pagTableRenderers[tableKey]();
+}
+
+function onPagSort(tableKey, col) {
+  var ps = getPagState(tableKey);
+  if (ps.sortCol === col) {
+    ps.sortAsc = !ps.sortAsc;
+  } else {
+    ps.sortCol = col;
+    ps.sortAsc = true;
+  }
+  ps.page = 1;
+  if (pagTableRenderers[tableKey]) pagTableRenderers[tableKey]();
+}
+
+function onPageSizeChange(tableKey, val) {
+  var ps = getPagState(tableKey);
+  ps.pageSize = parseInt(val);
+  ps.page = 1;
+  if (pagTableRenderers[tableKey]) pagTableRenderers[tableKey]();
+}
+
+// ===== TRADES/ORDERS/POSITIONS TABLE BUILDERS =====
+var tradesHeaders = [
+  {key: 'id', label: '#'},
+  {key: 'sym', label: 'Symbol'},
+  {key: 'opened', label: 'Opened'},
+  {key: 'closed', label: 'Closed'},
+  {key: 'open_price', label: 'Open Price', align: 'right'},
+  {key: 'close_price', label: 'Close Price', align: 'right'},
+  {key: 'cost', label: 'Cost', align: 'right'},
+  {key: 'net_gain', label: 'Net Gain', align: 'right', colorFn: function(r) { return r.net_gain >= 0 ? 'var(--green)' : 'var(--red)'; }},
+  {key: 'pct', label: 'Return %', align: 'right', colorFn: function(r) { return r.pct >= 0 ? 'var(--green)' : 'var(--red)'; }},
+];
+
+var ordersHeaders = [
+  {key: 'sym', label: 'Symbol'},
+  {key: 'side', label: 'Side', colorFn: function(r) { return r.side === 'BUY' ? 'var(--green)' : 'var(--red)'; }},
+  {key: 'type', label: 'Type'},
+  {key: 'status', label: 'Status'},
+  {key: 'price', label: 'Price', align: 'right'},
+  {key: 'amount', label: 'Amount', align: 'right'},
+  {key: 'filled', label: 'Filled', align: 'right'},
+  {key: 'cost', label: 'Cost', align: 'right'},
+  {key: 'created', label: 'Created'},
+  {key: 'updated', label: 'Updated'},
+];
+
+var positionsHeaders = [
+  {key: 'sym', label: 'Symbol'},
+  {key: 'amount', label: 'Amount', align: 'right'},
+  {key: 'cost', label: 'Cost', align: 'right'},
+];
 
 function buildTradesTable(stratIdx) {
   var sid = 'strat-' + stratIdx;
   var el = document.getElementById(sid + '-trades-table');
   if (!el) return;
   var rd = getStratRunData(stratIdx);
-  if (!rd || !rd.TRADES || rd.TRADES.length === 0) {
-    el.innerHTML = '';
-    return;
-  }
-  var trades = rd.TRADES;
-  var headers = [
-    {key: 'id', label: '#'},
-    {key: 'sym', label: 'Symbol'},
-    {key: 'opened', label: 'Opened'},
-    {key: 'closed', label: 'Closed'},
-    {key: 'open_price', label: 'Open Price', align: 'right'},
-    {key: 'close_price', label: 'Close Price', align: 'right'},
-    {key: 'cost', label: 'Cost', align: 'right'},
-    {key: 'net_gain', label: 'Net Gain', align: 'right', colorFn: function(r) { return r.net_gain >= 0 ? 'var(--green)' : 'var(--red)'; }},
-    {key: 'pct', label: 'Return %', align: 'right', colorFn: function(r) { return r.pct >= 0 ? 'var(--green)' : 'var(--red)'; }},
-  ];
-  var html = '<div class="chart-card">';
-  html += '<div class="chart-title">Trades (' + trades.length + ')</div>';
-  html += sortableTable(headers, trades, sid + '-trades-tbl');
-  html += '</div>';
-  el.innerHTML = html;
-  makeTableSortable(sid + '-trades-tbl');
+  if (!rd || !rd.TRADES || rd.TRADES.length === 0) { el.innerHTML = ''; return; }
+  var tableKey = sid + '-trades-tbl';
+  pagTableRenderers[tableKey] = function() {
+    paginatedTable(tradesHeaders, rd.TRADES, tableKey, el, 'Trades');
+  };
+  pagTableRenderers[tableKey]();
 }
 
 function buildOrdersTable(stratIdx) {
@@ -5955,29 +6099,12 @@ function buildOrdersTable(stratIdx) {
   var el = document.getElementById(sid + '-orders-table');
   if (!el) return;
   var rd = getStratRunData(stratIdx);
-  if (!rd || !rd.ORDERS || rd.ORDERS.length === 0) {
-    el.innerHTML = '';
-    return;
-  }
-  var orders = rd.ORDERS;
-  var headers = [
-    {key: 'sym', label: 'Symbol'},
-    {key: 'side', label: 'Side', colorFn: function(r) { return r.side === 'BUY' ? 'var(--green)' : 'var(--red)'; }},
-    {key: 'type', label: 'Type'},
-    {key: 'status', label: 'Status'},
-    {key: 'price', label: 'Price', align: 'right'},
-    {key: 'amount', label: 'Amount', align: 'right'},
-    {key: 'filled', label: 'Filled', align: 'right'},
-    {key: 'cost', label: 'Cost', align: 'right'},
-    {key: 'created', label: 'Created'},
-    {key: 'updated', label: 'Updated'},
-  ];
-  var html = '<div class="chart-card">';
-  html += '<div class="chart-title">Orders (' + orders.length + ')</div>';
-  html += sortableTable(headers, orders, sid + '-orders-tbl');
-  html += '</div>';
-  el.innerHTML = html;
-  makeTableSortable(sid + '-orders-tbl');
+  if (!rd || !rd.ORDERS || rd.ORDERS.length === 0) { el.innerHTML = ''; return; }
+  var tableKey = sid + '-orders-tbl';
+  pagTableRenderers[tableKey] = function() {
+    paginatedTable(ordersHeaders, rd.ORDERS, tableKey, el, 'Orders');
+  };
+  pagTableRenderers[tableKey]();
 }
 
 function buildPositionsTable(stratIdx) {
@@ -5985,61 +6112,12 @@ function buildPositionsTable(stratIdx) {
   var el = document.getElementById(sid + '-positions-table');
   if (!el) return;
   var rd = getStratRunData(stratIdx);
-  if (!rd || !rd.POSITIONS || rd.POSITIONS.length === 0) {
-    el.innerHTML = '';
-    return;
-  }
-  var positions = rd.POSITIONS;
-  var headers = [
-    {key: 'sym', label: 'Symbol'},
-    {key: 'amount', label: 'Amount', align: 'right'},
-    {key: 'cost', label: 'Cost', align: 'right'},
-  ];
-  var html = '<div class="chart-card">';
-  html += '<div class="chart-title">Positions (' + positions.length + ')</div>';
-  html += sortableTable(headers, positions, sid + '-positions-tbl');
-  html += '</div>';
-  el.innerHTML = html;
-  makeTableSortable(sid + '-positions-tbl');
-}
-
-function makeTableSortable(tableId) {
-  var table = document.getElementById(tableId);
-  if (!table) return;
-  var ths = table.querySelectorAll('th[data-col]');
-  var sortState = {};
-  ths.forEach(function(th) {
-    th.addEventListener('click', function() {
-      var col = th.getAttribute('data-col');
-      var asc = sortState[col] === 'asc' ? 'desc' : 'asc';
-      sortState = {};
-      sortState[col] = asc;
-      var tbody = table.querySelector('tbody');
-      var rows = Array.from(tbody.querySelectorAll('tr'));
-      var colIdx = Array.from(th.parentNode.children).indexOf(th);
-      rows.sort(function(a, b) {
-        var va = a.children[colIdx].textContent.trim();
-        var vb = b.children[colIdx].textContent.trim();
-        var na = parseFloat(va), nb = parseFloat(vb);
-        if (!isNaN(na) && !isNaN(nb)) {
-          return asc === 'asc' ? na - nb : nb - na;
-        }
-        return asc === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
-      });
-      rows.forEach(function(r) { tbody.appendChild(r); });
-      // Update arrows
-      ths.forEach(function(h) {
-        var arrow = h.querySelector('.sort-arrow');
-        if (arrow) arrow.innerHTML = '&#9650;';
-        if (arrow) arrow.style.opacity = '0.3';
-      });
-      var arrow = th.querySelector('.sort-arrow');
-      if (arrow) {
-        arrow.innerHTML = asc === 'asc' ? '&#9650;' : '&#9660;';
-        arrow.style.opacity = '1';
-      }
-    });
-  });
+  if (!rd || !rd.POSITIONS || rd.POSITIONS.length === 0) { el.innerHTML = ''; return; }
+  var tableKey = sid + '-positions-tbl';
+  pagTableRenderers[tableKey] = function() {
+    paginatedTable(positionsHeaders, rd.POSITIONS, tableKey, el, 'Positions');
+  };
+  pagTableRenderers[tableKey]();
 }
 
 // Scatter chart for trade/order timeline
@@ -6196,7 +6274,13 @@ function updateStratTables(stratIdx) {
   buildTradesTable(stratIdx);
   buildOrdersTable(stratIdx);
   buildPositionsTable(stratIdx);
-  buildTimelineScatter(stratIdx);
+  // Scatter chart is built on-demand when Trading tab is shown
+  // (Chart.js needs visible canvas for proper sizing)
+  var sid = 'strat-' + stratIdx;
+  var tradingPanel = document.getElementById(sid + '-trading');
+  if (tradingPanel && tradingPanel.classList.contains('active')) {
+    buildTimelineScatter(stratIdx);
+  }
 }
 
 // ===== INIT =====
