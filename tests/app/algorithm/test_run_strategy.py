@@ -1,4 +1,5 @@
 import os
+import shutil
 from typing import Dict, Any
 from unittest import TestCase
 
@@ -72,19 +73,9 @@ class Test(TestCase):
 
     def tearDown(self) -> None:
         super().tearDown()
-        # Delete the resources database directory
-
         database_dir = os.path.join(self.resource_dir, "databases")
-
         if os.path.exists(database_dir):
-            for root, dirs, files in os.walk(database_dir, topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
-
-        if os.path.exists(database_dir):
-            os.rmdir(database_dir)
+            shutil.rmtree(database_dir, ignore_errors=True)
 
     def test_with_strategy_object(self):
         app = create_app(config={RESOURCE_DIRECTORY: self.resource_dir})

@@ -45,14 +45,14 @@ class StrategyForTesting(TradingStrategy):
         DataSource(
             identifier="DOT/EUR_2h",
             data_type=DataType.OHLCV,
-            window_size=200,
+            warmup_window=200,
             symbol="DOT/EUR",
             time_frame="2h",
             market="bitvavo"
         ),
         DataSource(
             data_type=DataType.OHLCV,
-            window_size=200,
+            warmup_window=200,
             symbol="BTC/EUR",
             time_frame="2h",
             market="bitvavo"
@@ -68,7 +68,7 @@ class StrategyForTestingTwo(TradingStrategy):
     data_sources = [
         DataSource(
             data_type=DataType.OHLCV,
-            window_size=200,
+            warmup_window=200,
             symbol="ETH/EUR",
             time_frame="2h",
             market="bitvavo"
@@ -89,7 +89,7 @@ class StrategyForTestingThree(TradingStrategy):
     data_sources = [
         DataSource(
             data_type=DataType.OHLCV,
-            window_size=200,
+            warmup_window=200,
             symbol="BTC/EUR",
             time_frame="2h",
             market="bitvavo"
@@ -180,7 +180,7 @@ class TestEventloopService(TestBase):
         correct_data_sources = [
             DataSource(
                 data_type=DataType.OHLCV,
-                window_size=200,
+                warmup_window=200,
                 symbol="ETH/EUR",
                 time_frame="2h",
                 market="bitvavo"
@@ -191,7 +191,7 @@ class TestEventloopService(TestBase):
             ),
             DataSource(
                 data_type=DataType.OHLCV,
-                window_size=200,
+                warmup_window=200,
                 symbol="DOT/EUR",
                 time_frame="2h",
                 market="bitvavo"
@@ -202,7 +202,7 @@ class TestEventloopService(TestBase):
             [
                 DataSource(
                     data_type=DataType.OHLCV,
-                    window_size=200,
+                    warmup_window=200,
                     symbol="DOT/EUR",
                     time_frame="2h",
                     market="bitvavo"
@@ -213,14 +213,14 @@ class TestEventloopService(TestBase):
                 ),
                 DataSource(
                     data_type=DataType.OHLCV,
-                    window_size=200,
+                    warmup_window=200,
                     symbol="ETH/EUR",
                     time_frame="2h",
                     market="bitvavo"
                 ),
                 DataSource(
                     data_type=DataType.OHLCV,
-                    window_size=200,
+                    warmup_window=200,
                     symbol="ETH/EUR",
                     time_frame="2h",
                     market="bitvavo"

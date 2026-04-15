@@ -1,4 +1,5 @@
 import os
+import shutil
 import unittest
 from datetime import datetime, timezone
 from unittest import TestCase
@@ -54,18 +55,9 @@ class Test(TestCase):
 
     def tearDown(self) -> None:
         super().tearDown()
-        database_dir = os.path.join(
-            self.resource_dir, "databases"
-        )
-
+        database_dir = os.path.join(self.resource_dir, "databases")
         if os.path.exists(database_dir):
-            for root, dirs, files in os.walk(
-                database_dir, topdown=False
-            ):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
+            shutil.rmtree(database_dir, ignore_errors=True)
 
     def test_trade_recent_price_update(self):
         backtest_date_range = BacktestDateRange(

@@ -1,12 +1,14 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Boolean
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.orm import validates
 
 from investing_algorithm_framework.domain import Portfolio
-from investing_algorithm_framework.infrastructure.database import SQLBaseModel
+from investing_algorithm_framework.infrastructure.database import (
+    SQLBaseModel, SqliteDecimal
+)
 from investing_algorithm_framework.infrastructure.models.model_extension \
     import SQLAlchemyModelExtension
 
@@ -16,14 +18,14 @@ class SQLPortfolio(Portfolio, SQLBaseModel, SQLAlchemyModelExtension):
     id = Column(Integer, primary_key=True)
     identifier = Column(String, nullable=False, unique=True)
     trading_symbol = Column(String, nullable=False)
-    realized = Column(Float, nullable=False, default=0)
-    total_revenue = Column(Float, nullable=False, default=0)
-    total_cost = Column(Float, nullable=False, default=0)
-    total_net_gain = Column(Float, nullable=False, default=0)
-    total_trade_volume = Column(Float, nullable=False, default=0)
-    net_size = Column(Float, nullable=False, default=0)
-    unallocated = Column(Float, nullable=False, default=0)
-    initial_balance = Column(Float, nullable=True)
+    realized = Column(SqliteDecimal(), nullable=False, default=0)
+    total_revenue = Column(SqliteDecimal(), nullable=False, default=0)
+    total_cost = Column(SqliteDecimal(), nullable=False, default=0)
+    total_net_gain = Column(SqliteDecimal(), nullable=False, default=0)
+    total_trade_volume = Column(SqliteDecimal(), nullable=False, default=0)
+    net_size = Column(SqliteDecimal(), nullable=False, default=0)
+    unallocated = Column(SqliteDecimal(), nullable=False, default=0)
+    initial_balance = Column(SqliteDecimal(), nullable=True)
     market = Column(String, nullable=False)
     positions = relationship(
         "SQLPosition",

@@ -7,6 +7,7 @@ Merged from:
 - algorithm/test_run_strategy.py
 """
 import os
+import shutil
 from unittest import TestCase
 from typing import Dict, Any
 import pandas as pd
@@ -107,13 +108,7 @@ class RunTestBase(TestCase):
         for subdir in ("databases", "backtest_databases"):
             path = os.path.join(self.resource_dir, subdir)
             if os.path.exists(path):
-                for root, dirs, files in os.walk(path, topdown=False):
-                    for name in files:
-                        os.remove(os.path.join(root, name))
-                    for name in dirs:
-                        os.rmdir(os.path.join(root, name))
-                if os.path.exists(path):
-                    os.rmdir(path)
+                shutil.rmtree(path, ignore_errors=True)
 
     def _create_app_with_strategies(self, strategy_classes, market="BINANCE",
                                      web=False):
@@ -197,4 +192,3 @@ class TestStartDefault(RunTestBase):
         app.run(number_of_iterations=2)
         self.assertTrue(app.has_run("CountingStrategyOne"))
         self.assertTrue(app.has_run("CountingStrategyTwo"))
-
