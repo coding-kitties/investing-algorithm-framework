@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 from decimal import Decimal
 from unittest import TestCase
 
@@ -10,6 +11,8 @@ from investing_algorithm_framework import create_app, App, \
     MarketCredential
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
     ENVIRONMENT, Environment, BACKTEST_DATA_DIRECTORY_NAME
+from investing_algorithm_framework.infrastructure.database import Session
+from sqlalchemy.orm import close_all_sessions
 from tests.resources.stubs import OrderExecutorTest, PortfolioProviderTest
 
 logger = logging.getLogger(__name__)
@@ -108,42 +111,26 @@ class TestBase(TestCase):
                         )
 
     def tearDown(self) -> None:
-        database_dir = os.path.join(
-            self.resource_directory, "databases"
-        )
+        self._cleanup_database()
 
+    @staticmethod
+    def _remove_database_dir(resource_dir):
+        """Remove the databases directory using shutil.rmtree."""
+        database_dir = os.path.join(resource_dir, "databases")
         if os.path.exists(database_dir):
-            for root, dirs, files in os.walk(database_dir, topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
+            shutil.rmtree(database_dir, ignore_errors=True)
+
+    def _cleanup_database(self):
+        """Close SQLAlchemy sessions and remove database files."""
+        close_all_sessions()
+        self._remove_database_dir(self.resource_directory)
 
     def remove_database(self):
-
-        database_dir = os.path.join(
-            self.resource_directory, "databases"
-        )
-
-        if os.path.exists(database_dir):
-            for root, dirs, files in os.walk(database_dir, topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
+        self._cleanup_database()
 
     @classmethod
     def tearDownClass(cls) -> None:
-        database_dir = os.path.join(
-            cls.resource_directory, "databases"
-        )
-
-        if os.path.exists(database_dir):
-            for root, dirs, files in os.walk(database_dir, topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
+        cls._remove_database_dir(cls.resource_directory)
 
 
 class BitvavoTestBase(TestBase):
@@ -259,26 +246,13 @@ class FlaskTestBase(FlaskTestCase):
         return self.iaf_app._flask_app
 
     def tearDown(self) -> None:
-        database_dir = os.path.join(
-            self.resource_directory, "databases"
-        )
-
+        close_all_sessions()
+        database_dir = os.path.join(self.resource_directory, "databases")
         if os.path.exists(database_dir):
-            for root, dirs, files in os.walk(database_dir, topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
+            shutil.rmtree(database_dir, ignore_errors=True)
 
     @classmethod
     def tearDownClass(cls) -> None:
-        database_dir = os.path.join(
-            cls.resource_directory, "databases"
-        )
-
+        database_dir = os.path.join(cls.resource_directory, "databases")
         if os.path.exists(database_dir):
-            for root, dirs, files in os.walk(database_dir, topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
+            shutil.rmtree(database_dir, ignore_errors=True)

@@ -1,9 +1,11 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, Float
+from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy import UniqueConstraint
 from sqlalchemy.orm import relationship, validates
 
 from investing_algorithm_framework.domain import Position
-from investing_algorithm_framework.infrastructure.database import SQLBaseModel
+from investing_algorithm_framework.infrastructure.database import (
+    SQLBaseModel, SqliteDecimal
+)
 from investing_algorithm_framework.infrastructure.models.model_extension \
     import SQLAlchemyModelExtension
 
@@ -12,8 +14,8 @@ class SQLPosition(SQLBaseModel, Position, SQLAlchemyModelExtension):
     __tablename__ = "positions"
     id = Column(Integer, primary_key=True, unique=True)
     symbol = Column(String)
-    amount = Column(Float)
-    cost = Column(Float)
+    amount = Column(SqliteDecimal())
+    cost = Column(SqliteDecimal())
     orders = relationship(
         "SQLOrder",
         back_populates="position",

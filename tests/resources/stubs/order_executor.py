@@ -13,9 +13,10 @@ class OrderExecutorTest(OrderExecutor):
         self.order_amount = None
         self.order_amount_filled = None
         self.order_status = None
+        self.order_price = None
 
     def execute_order(self, portfolio, order, market_credential) -> Order:
-        order.external_id = random_string(10)  
+        order.external_id = random_string(10)
         order.status = OrderStatus.OPEN
 
         if self.order_amount is not None:
@@ -28,6 +29,9 @@ class OrderExecutorTest(OrderExecutor):
 
         if self.order_status is not None:
             order.status = self.order_status
+
+        if self.order_price is not None:
+            order.price = self.order_price
 
         return order
 
@@ -49,3 +53,4 @@ class OrderExecutorTest(OrderExecutor):
         self.order_amount_filled = None
         self.order_amount = None
         self.order_status = None
+        self.order_price = None

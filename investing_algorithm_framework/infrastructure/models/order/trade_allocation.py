@@ -1,9 +1,11 @@
 import logging
 
-from sqlalchemy import Column, Integer, ForeignKey, Float
+from sqlalchemy import Column, Integer, ForeignKey
 from sqlalchemy.orm import relationship
 
-from investing_algorithm_framework.infrastructure.database import SQLBaseModel
+from investing_algorithm_framework.infrastructure.database import (
+    SQLBaseModel, SqliteDecimal
+)
 from investing_algorithm_framework.infrastructure.models.model_extension \
     import SQLAlchemyModelExtension
 
@@ -55,13 +57,13 @@ class SQLTradeAllocation(SQLBaseModel, SQLAlchemyModelExtension):
     trade_id = Column(Integer)
     stop_loss_id = Column(Integer)
     take_profit_id = Column(Integer)
-    amount = Column(Float)
-    amount_pending = Column(Float)
-    open_price = Column(Float, default=0)
-    close_price = Column(Float, default=0)
-    buy_fee = Column(Float, default=0)
-    sell_fee = Column(Float, default=0)
-    net_gain_contribution = Column(Float, default=0)
+    amount = Column(SqliteDecimal())
+    amount_pending = Column(SqliteDecimal())
+    open_price = Column(SqliteDecimal(), default=0)
+    close_price = Column(SqliteDecimal(), default=0)
+    buy_fee = Column(SqliteDecimal(), default=0)
+    sell_fee = Column(SqliteDecimal(), default=0)
+    net_gain_contribution = Column(SqliteDecimal(), default=0)
 
     def __init__(
         self,

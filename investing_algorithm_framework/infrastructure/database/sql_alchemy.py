@@ -1,14 +1,49 @@
 import logging
+from decimal import Decimal
 
-from sqlalchemy import create_engine, StaticPool
+from sqlalchemy import create_engine, StaticPool, String
 from sqlalchemy import inspect
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy import TypeDecorator
 
 from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI, \
     OperationalException
 
 Session = sessionmaker()
 logger = logging.getLogger("investing_algorithm_framework")
+
+
+class SqliteDecimal(TypeDecorator):
+    """
+    A type that stores Python numeric values as TEXT in SQLite for
+    exact precision. This avoids the lossy float conversion that
+    occurs with SQLAlchemy's Float/Numeric types on SQLite.
+
+    - On write: converts the value to its full-precision string
+      representation via Decimal, then stores as TEXT.
+    - On read: returns a Python float for backward compatibility
+      with existing arithmetic code.
+
+    The key benefit is lossless **storage**: the TEXT column preserves
+    the exact decimal representation. For example, a value like
+    12345678901234.567890123456789 is stored as that exact string
+    rather than being silently truncated to a 64-bit float.
+
+    Use this instead of Column(Float) for monetary values, balances,
+    prices, and amounts where storage precision matters.
+    """
+    impl = String
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None:
+            return str(Decimal(str(value)))
+        return None
+
+    def process_result_value(self, value, dialect):
+        if value is not None:
+            return float(Decimal(value))
+        return None
 
 
 class SQLAlchemyAdapter:

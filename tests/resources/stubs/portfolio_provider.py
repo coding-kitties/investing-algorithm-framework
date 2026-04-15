@@ -14,10 +14,14 @@ class PortfolioProviderTest(PortfolioProvider):
         }
         self.order_amount = None
         self.order_amount_filled = None
+        self.return_none_for_order = False
 
     def get_order(
         self, portfolio, order, market_credential
     ) -> Union[Order, None]:
+
+        if self.return_none_for_order:
+            return None
 
         if self.order_amount is not None:
             order.amount = self.order_amount

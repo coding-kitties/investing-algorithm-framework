@@ -2297,7 +2297,10 @@ def main(directory: Optional[Union[str, List[str]]] = None):
         ),
     )
     args = parser.parse_args()
-    dirs = args.directory or ([directory] if isinstance(directory, str) else directory) or []
+    dirs = args.directory or (
+        [directory] if isinstance(directory, str)
+        else directory
+    ) or []
 
     if len(dirs) == 1:
         server = BacktestMCPServer(dirs[0])
