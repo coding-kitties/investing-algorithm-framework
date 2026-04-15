@@ -122,12 +122,14 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
             if (ohlcv_data_after_order['Low'] <= order_price).any():
                 fill_price = tc.get_buy_fill_price(order_price)
                 fee = tc.get_fee(fill_price * order.amount)
+                slippage = fill_price - order_price
                 update_data = {
                     'status': OrderStatus.CLOSED.value,
                     'remaining': 0,
                     'filled': order.amount,
                     'price': fill_price,
                     'order_fee': fee,
+                    'slippage': slippage,
                 }
                 if tc.fee_percentage:
                     update_data['order_fee_rate'] = \
@@ -139,12 +141,14 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
             if (ohlcv_data_after_order['High'] >= order_price).any():
                 fill_price = tc.get_sell_fill_price(order_price)
                 fee = tc.get_fee(fill_price * order.amount)
+                slippage = order_price - fill_price
                 update_data = {
                     'status': OrderStatus.CLOSED.value,
                     'remaining': 0,
                     'filled': order.amount,
                     'price': fill_price,
                     'order_fee': fee,
+                    'slippage': slippage,
                 }
                 if tc.fee_percentage:
                     update_data['order_fee_rate'] = \

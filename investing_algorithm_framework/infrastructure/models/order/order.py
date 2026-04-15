@@ -50,6 +50,7 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     order_fee = Column(SqliteDecimal(), default=None)
     order_fee_currency = Column(String, default=None)
     order_fee_rate = Column(SqliteDecimal(), default=None)
+    slippage = Column(SqliteDecimal(), default=None)
     sell_order_metadata_id = Column(Integer, ForeignKey('orders.id'))
     trade_allocations = relationship(
         'SQLTradeAllocation', back_populates='order'

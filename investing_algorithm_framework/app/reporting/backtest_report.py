@@ -585,6 +585,9 @@ class BacktestReport:
                         o_fee_rate = getattr(
                             o, 'order_fee_rate', 0
                         ) or 0
+                        o_slippage = getattr(o, 'slippage', None)
+                        if o_slippage is None:
+                            o_slippage = 0
                         orders_list.append({
                             'sym': getattr(o, 'target_symbol', '')
                             or '',
@@ -610,6 +613,9 @@ class BacktestReport:
                             'fee': round(float(o_fee), 4),
                             'fee_rate': round(
                                 float(o_fee_rate), 4
+                            ),
+                            'slippage': round(
+                                float(o_slippage), 4
                             ),
                             'created': _fmt_date(o_dt)
                             if o_dt else '',

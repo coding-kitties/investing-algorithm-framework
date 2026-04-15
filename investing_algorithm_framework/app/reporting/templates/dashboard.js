@@ -6074,6 +6074,7 @@ var ordersHeaders = [
   {key: 'cost', label: 'Cost', align: 'right'},
   {key: 'fee', label: 'Fee', align: 'right'},
   {key: 'fee_rate', label: 'Fee Rate', align: 'right'},
+  {key: 'slippage', label: 'Slippage', align: 'right'},
   {key: 'created', label: 'Created'},
   {key: 'updated', label: 'Updated'},
 ];

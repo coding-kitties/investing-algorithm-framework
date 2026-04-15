@@ -269,6 +269,7 @@ class VectorBacktestService:
                 order_fee=sell_fee,
                 order_fee_rate=tc.fee_percentage / 100
                 if tc.fee_percentage else None,
+                slippage=price - sell_fill,
             )
             orders.append(sell_order)
             trade_orders = lt.orders
@@ -306,6 +307,7 @@ class VectorBacktestService:
                         order_fee=ot_sell_fee,
                         order_fee_rate=tc.fee_percentage / 100
                         if tc.fee_percentage else None,
+                        slippage=price - sell_fill,
                     )
                     orders.append(sell_o)
                     ot_orders = ot.orders
@@ -363,6 +365,7 @@ class VectorBacktestService:
                 order_fee=buy_fee,
                 order_fee_rate=tc.fee_percentage / 100
                 if tc.fee_percentage else None,
+                slippage=fill_price - price,
             )
             orders.append(buy_order)
             trade = Trade(
@@ -464,6 +467,7 @@ class VectorBacktestService:
                 order_fee=sell_fee,
                 order_fee_rate=tc.fee_percentage / 100
                 if tc.fee_percentage else None,
+                slippage=price - sell_fill,
             )
             orders.append(sell_order)
             trade_orders = lt.orders
