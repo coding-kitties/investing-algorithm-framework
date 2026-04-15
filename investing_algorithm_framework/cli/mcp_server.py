@@ -241,6 +241,62 @@ def _top_trades(bt, n=10):
     return all_trades[:n]
 
 
+def _all_orders(bt, window=None, limit=50):
+    """Get all orders for a strategy across windows."""
+    orders = []
+    for run in bt.get_all_backtest_runs():
+        if window and run.backtest_date_range_name != window:
+            continue
+        wname = run.backtest_date_range_name or "—"
+        for o in (run.orders or []):
+            price = getattr(o, 'price', 0) or 0
+            amount = getattr(o, 'amount', 0) or 0
+            filled = getattr(o, 'filled', 0) or 0
+            fee = getattr(o, 'order_fee', 0) or 0
+            fee_rate = getattr(o, 'order_fee_rate', 0) or 0
+            slippage = getattr(o, 'slippage', 0) or 0
+            created = getattr(o, 'created_at', None)
+            orders.append({
+                "symbol": getattr(o, 'target_symbol', '—'),
+                "side": str(getattr(o, 'order_side', '—')),
+                "type": str(getattr(o, 'order_type', '—')),
+                "status": str(getattr(o, 'status', '—')),
+                "price": round(float(price), 4),
+                "amount": round(float(amount), 6),
+                "filled": round(float(filled), 6),
+                "cost": round(float(amount) * float(price), 2),
+                "fee": round(float(fee), 4),
+                "fee_rate": round(float(fee_rate), 4),
+                "slippage": round(float(slippage), 4),
+                "created": _fmt_date(created),
+                "window": wname,
+            })
+    orders.sort(
+        key=lambda x: x["created"] if x["created"] != "—" else "",
+        reverse=True,
+    )
+    return orders[:limit]
+
+
+def _all_positions(bt, window=None):
+    """Get all positions for a strategy across windows."""
+    positions = []
+    for run in bt.get_all_backtest_runs():
+        if window and run.backtest_date_range_name != window:
+            continue
+        wname = run.backtest_date_range_name or "—"
+        for p in (run.positions or []):
+            amount = getattr(p, 'amount', 0) or 0
+            cost = getattr(p, 'cost', 0) or 0
+            positions.append({
+                "symbol": getattr(p, 'symbol', '—'),
+                "amount": round(float(amount), 6),
+                "cost": round(float(cost), 2),
+                "window": wname,
+            })
+    return positions
+
+
 def _full_analysis(backtests, tags=None):
     """Generate a complete analysis markdown document."""
     has_tags = tags and any(tags.values())
@@ -1215,6 +1271,66 @@ class BacktestMCPServer:
                 },
             },
             {
+                "name": "get_orders",
+                "description": (
+                    "Get all orders for a strategy — symbol, side, type, "
+                    "status, price, amount, filled, cost, fee, fee_rate, "
+                    "slippage, and creation date. Optionally filter by "
+                    "window. Sorted by date (newest first)."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "strategy_id": {
+                            "type": "string",
+                            "description": (
+                                "The algorithm_id of the strategy"
+                            ),
+                        },
+                        "window": {
+                            "type": "string",
+                            "description": (
+                                "Optional: specific window name "
+                                "to filter by"
+                            ),
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": (
+                                "Max orders to return (default 50)"
+                            ),
+                        },
+                    },
+                    "required": ["strategy_id"],
+                },
+            },
+            {
+                "name": "get_positions",
+                "description": (
+                    "Get all positions for a strategy — symbol, amount, "
+                    "and cost. Optionally filter by window."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "strategy_id": {
+                            "type": "string",
+                            "description": (
+                                "The algorithm_id of the strategy"
+                            ),
+                        },
+                        "window": {
+                            "type": "string",
+                            "description": (
+                                "Optional: specific window name "
+                                "to filter by"
+                            ),
+                        },
+                    },
+                    "required": ["strategy_id"],
+                },
+            },
+            {
                 "name": "get_equity_curve",
                 "description": (
                     "Get equity curve time-series data for one or more "
@@ -2015,6 +2131,72 @@ class BacktestMCPServer:
                     f"| {t['symbol']} | {t['opened']} | {t['closed']} "
                     f"| {t['return_pct']}% | {t['net_gain']} "
                     f"| {t['window']} |\n"
+                )
+            return md
+
+        elif name == "get_orders":
+            sid = arguments.get("strategy_id", "")
+            bt = self._bt_map.get(sid)
+            if not bt:
+                return f"Strategy '{sid}' not found."
+            window = arguments.get("window")
+            limit = arguments.get("limit", 50)
+            orders = _all_orders(bt, window=window, limit=limit)
+            if not orders:
+                return "No orders found."
+            md = f"# Orders for {sid}\n\n"
+            md += (
+                "| Symbol | Side | Type | Status"
+                " | Price | Amount | Filled"
+                " | Cost | Fee | Fee Rate"
+                " | Slippage | Created | Window |\n"
+            )
+            md += (
+                "|--------|------|------|--------"
+                "|-------|--------|--------"
+                "|------|-----|----------"
+                "|----------|---------|--------|\n"
+            )
+            for o in orders:
+                md += (
+                    f"| {o['symbol']} "
+                    f"| {o['side']} "
+                    f"| {o['type']} "
+                    f"| {o['status']} "
+                    f"| {o['price']} "
+                    f"| {o['amount']} "
+                    f"| {o['filled']} "
+                    f"| {o['cost']} "
+                    f"| {o['fee']} "
+                    f"| {o['fee_rate']} "
+                    f"| {o['slippage']} "
+                    f"| {o['created']} "
+                    f"| {o['window']} |\n"
+                )
+            md += (
+                f"\n*Showing {len(orders)} orders"
+                f" (limit: {limit})*\n"
+            )
+            return md
+
+        elif name == "get_positions":
+            sid = arguments.get("strategy_id", "")
+            bt = self._bt_map.get(sid)
+            if not bt:
+                return f"Strategy '{sid}' not found."
+            window = arguments.get("window")
+            positions = _all_positions(bt, window=window)
+            if not positions:
+                return "No positions found."
+            md = f"# Positions for {sid}\n\n"
+            md += "| Symbol | Amount | Cost | Window |\n"
+            md += "|--------|--------|------|--------|\n"
+            for p in positions:
+                md += (
+                    f"| {p['symbol']} "
+                    f"| {p['amount']} "
+                    f"| {p['cost']} "
+                    f"| {p['window']} |\n"
                 )
             return md
 
