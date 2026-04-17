@@ -566,7 +566,8 @@ class TradingStrategy:
                 price=price,
                 execute=True,
                 validate=True,
-                sync=True
+                sync=True,
+                metadata={"order_reason": "buy_signal"}
             )
 
             # Retrieve and apply stop loss and take profit rules
@@ -637,7 +638,8 @@ class TradingStrategy:
                         execute=True,
                         validate=True,
                         sync=True,
-                        price=price
+                        price=price,
+                        metadata={"order_reason": "sell_signal"}
                     )
 
                     # Reset scale-out counter and start cooldown
@@ -683,7 +685,8 @@ class TradingStrategy:
                                 execute=True,
                                 validate=True,
                                 sync=True,
-                                price=price
+                                price=price,
+                                metadata={"order_reason": "scale_out"}
                             )
 
                             self._scale_out_counts[symbol] = so_index + 1
@@ -935,7 +938,8 @@ class TradingStrategy:
         market=None,
         execute=True,
         validate=True,
-        sync=True
+        sync=True,
+        metadata=None
     ) -> Order:
         """
         Function to create a limit order. This function will create
@@ -981,7 +985,8 @@ class TradingStrategy:
             market=market,
             execute=execute,
             validate=validate,
-            sync=sync
+            sync=sync,
+            metadata=metadata
         )
 
     def close_position(

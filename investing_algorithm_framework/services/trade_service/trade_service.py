@@ -1004,6 +1004,7 @@ class TradeService(RepositoryService):
                     "order_type": OrderType.LIMIT.value,
                     "order_side": OrderSide.SELL.value,
                     "portfolio_id": portfolio_id,
+                    "metadata": {"order_reason": "stop_loss"},
                     "stop_losses": stop_loss_metadata,
                     "trades": [{
                         "trade_id": trade.id,
@@ -1110,6 +1111,7 @@ class TradeService(RepositoryService):
                     "order_type": OrderType.LIMIT.value,
                     "order_side": OrderSide.SELL.value,
                     "portfolio_id": portfolio_id,
+                    "metadata": {"order_reason": "take_profit"},
                     "take_profits": take_profit_metadata,
                     "trades": [{
                         "trade_id": trade.id,

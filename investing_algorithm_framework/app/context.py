@@ -161,7 +161,8 @@ class Context:
         market=None,
         execute=True,
         validate=True,
-        sync=True
+        sync=True,
+        metadata=None
     ) -> Order:
         """
         Function to create a limit order. This function will create a limit
@@ -256,6 +257,9 @@ class Context:
             "status": OrderStatus.CREATED.value,
             "trading_symbol": portfolio.trading_symbol,
         }
+
+        if metadata is not None:
+            order_data["metadata"] = metadata
 
         if BACKTESTING_FLAG in self.configuration_service.config \
                 and self.configuration_service.config[BACKTESTING_FLAG]:

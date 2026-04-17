@@ -270,6 +270,7 @@ class VectorBacktestService:
                 order_fee_rate=tc.fee_percentage / 100
                 if tc.fee_percentage else None,
                 slippage=price - sell_fill,
+                metadata={"order_reason": "sell_signal"},
             )
             orders.append(sell_order)
             trade_orders = lt.orders
@@ -308,6 +309,7 @@ class VectorBacktestService:
                         order_fee_rate=tc.fee_percentage / 100
                         if tc.fee_percentage else None,
                         slippage=price - sell_fill,
+                        metadata={"order_reason": "sell_signal"},
                     )
                     orders.append(sell_o)
                     ot_orders = ot.orders
@@ -330,7 +332,8 @@ class VectorBacktestService:
             sym_data['entry_count'] = 0
             sym_data['scale_out_count'] = 0
 
-        def _open_trade(sym, sym_data, price, date, capital):
+        def _open_trade(sym, sym_data, price, date, capital,
+                       order_reason="buy_signal"):
             """Helper to open a new trade for a symbol."""
             nonlocal current_unallocated, total_allocated
 
@@ -366,6 +369,7 @@ class VectorBacktestService:
                 order_fee_rate=tc.fee_percentage / 100
                 if tc.fee_percentage else None,
                 slippage=fill_price - price,
+                metadata={"order_reason": order_reason},
             )
             orders.append(buy_order)
             trade = Trade(
@@ -468,6 +472,7 @@ class VectorBacktestService:
                 order_fee_rate=tc.fee_percentage / 100
                 if tc.fee_percentage else None,
                 slippage=price - sell_fill,
+                metadata={"order_reason": "scale_out"},
             )
             orders.append(sell_order)
             trade_orders = lt.orders
@@ -669,7 +674,8 @@ class VectorBacktestService:
                         else:
                             _open_trade(
                                 symbol, data, current_price,
-                                current_date, capital
+                                current_date, capital,
+                                order_reason="scale_in"
                             )
                             signal_events.append({
                                 "date": current_date,
