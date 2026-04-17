@@ -241,7 +241,7 @@ def _top_trades(bt, n=10):
     return all_trades[:n]
 
 
-def _all_orders(bt, window=None, limit=50):
+def _all_orders(bt, window=None, limit=50, order_reason=None):
     """Get all orders for a strategy across windows."""
     orders = []
     for run in bt.get_all_backtest_runs():
@@ -249,6 +249,10 @@ def _all_orders(bt, window=None, limit=50):
             continue
         wname = run.backtest_date_range_name or "—"
         for o in (run.orders or []):
+            meta = getattr(o, 'metadata', None) or {}
+            reason = meta.get('order_reason', '—')
+            if order_reason and reason != order_reason:
+                continue
             price = getattr(o, 'price', 0) or 0
             amount = getattr(o, 'amount', 0) or 0
             filled = getattr(o, 'filled', 0) or 0
@@ -268,6 +272,8 @@ def _all_orders(bt, window=None, limit=50):
                 "fee": round(float(fee), 4),
                 "fee_rate": round(float(fee_rate), 4),
                 "slippage": round(float(slippage), 4),
+                "order_reason": reason,
+                "metadata": meta,
                 "created": _fmt_date(created),
                 "window": wname,
             })
@@ -1061,7 +1067,12 @@ class BacktestMCPServer:
 
     def _ensure_loaded(self):
         if self._backtests is None:
-            backtests, tags = _load_backtests(self.directory)
+            _log(f"Loading backtests from: {self.directory}")
+            try:
+                backtests, tags = _load_backtests(self.directory)
+            except Exception as exc:
+                _log(f"ERROR loading backtests: {exc}")
+                raise
             self._backtests = backtests
             self._bt_map = {
                 bt.algorithm_id: bt
@@ -1073,6 +1084,10 @@ class BacktestMCPServer:
                 if not tag:
                     tag = tags[i] if i < len(tags) else ''
                 self._bt_tags[bt.algorithm_id] = tag
+            _log(
+                f"Loaded {len(self._backtests)} backtests: "
+                f"{list(self._bt_map.keys())}"
+            )
 
     def _get_tools(self):
         return [
@@ -1153,7 +1168,8 @@ class BacktestMCPServer:
                                 "Metric to rank by, e.g.: sharpe_ratio, "
                                 "cagr, sortino_ratio, calmar_ratio, "
                                 "max_drawdown, win_rate, profit_factor, "
-                                "annual_volatility, trades_per_year"
+                                "annual_volatility, trades_per_year, "
+                                "consistency_score, stability_score"
                             ),
                         },
                         "ascending": {
@@ -1161,6 +1177,14 @@ class BacktestMCPServer:
                             "description": (
                                 "Sort ascending (True) or descending "
                                 "(False, default)"
+                            ),
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": (
+                                "Max number of strategies to return "
+                                "(default: all). Use e.g. 20 to get "
+                                "top 20."
                             ),
                         },
                     },
@@ -1275,8 +1299,11 @@ class BacktestMCPServer:
                 "description": (
                     "Get all orders for a strategy — symbol, side, type, "
                     "status, price, amount, filled, cost, fee, fee_rate, "
-                    "slippage, and creation date. Optionally filter by "
-                    "window. Sorted by date (newest first)."
+                    "slippage, order_reason, metadata, and creation date. "
+                    "Optionally filter by window or order_reason "
+                    "(buy_signal, sell_signal, scale_in, scale_out, "
+                    "stop_loss, take_profit). "
+                    "Sorted by date (newest first)."
                 ),
                 "inputSchema": {
                     "type": "object",
@@ -1292,6 +1319,15 @@ class BacktestMCPServer:
                             "description": (
                                 "Optional: specific window name "
                                 "to filter by"
+                            ),
+                        },
+                        "order_reason": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter by order_reason "
+                                "metadata. Values: buy_signal, "
+                                "sell_signal, scale_in, scale_out, "
+                                "stop_loss, take_profit"
                             ),
                         },
                         "limit": {
@@ -1870,7 +1906,8 @@ class BacktestMCPServer:
                                         "type": "string",
                                         "description": (
                                             "Metric name, e.g. sharpe_ratio, "
-                                            "cagr, max_drawdown, win_rate"
+                                            "cagr, max_drawdown, win_rate, "
+                                            "consistency_score, stability_score"
                                         ),
                                     },
                                     "operator": {
@@ -1887,6 +1924,179 @@ class BacktestMCPServer:
                         },
                     },
                     "required": ["conditions"],
+                },
+            },
+            {
+                "name": "get_strategy_metadata",
+                "description": (
+                    "Get all metadata for a specific strategy, including "
+                    "parameters, grid profile tags, symbols, market, "
+                    "and any other stored metadata."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "strategy_id": {
+                            "type": "string",
+                            "description": (
+                                "The algorithm_id of the strategy"
+                            ),
+                        },
+                    },
+                    "required": ["strategy_id"],
+                },
+            },
+            {
+                "name": "list_tags",
+                "description": (
+                    "List all unique tags across all backtests, with "
+                    "the count of strategies per tag."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {},
+                },
+            },
+            {
+                "name": "get_strategies_by_tag",
+                "description": (
+                    "Get all strategy IDs that match a given tag. "
+                    "Tags come from the batch/directory name or "
+                    "the strategy's stored tag."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "tag": {
+                            "type": "string",
+                            "description": "The tag to filter by.",
+                        },
+                    },
+                    "required": ["tag"],
+                },
+            },
+            {
+                "name": "get_scaled_trades",
+                "description": (
+                    "Find scaling (pyramiding) activity for a strategy by "
+                    "detecting overlapping trades on the same symbol. "
+                    "Shows grouped entries with combined cost, net gain, "
+                    "and per-entry breakdown."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "strategy_id": {
+                            "type": "string",
+                            "description": (
+                                "The algorithm_id of the strategy"
+                            ),
+                        },
+                        "window": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to a specific "
+                                "backtest window name."
+                            ),
+                        },
+                    },
+                    "required": ["strategy_id"],
+                },
+            },
+            {
+                "name": "get_stop_loss_take_profit_activity",
+                "description": (
+                    "Find trades where stop losses or take profits "
+                    "were triggered for one or more strategies. "
+                    "Shows which trades hit their stop loss or take "
+                    "profit, with trigger prices, dates, and trade "
+                    "details. Use strategy_ids or tag to check "
+                    "multiple strategies at once."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "strategy_id": {
+                            "type": "string",
+                            "description": (
+                                "Single strategy algorithm_id. "
+                                "Use this OR strategy_ids/tag."
+                            ),
+                        },
+                        "strategy_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "Multiple strategy algorithm_ids."
+                            ),
+                        },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
+                            ),
+                        },
+                        "window": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to a specific "
+                                "backtest window name."
+                            ),
+                        },
+                        "triggered_only": {
+                            "type": "boolean",
+                            "description": (
+                                "If true (default), only show trades "
+                                "where a stop loss or take profit was "
+                                "actually triggered. If false, show all "
+                                "trades with SL/TP configured."
+                            ),
+                        },
+                    },
+                },
+            },
+            {
+                "name": "get_scaling_activity",
+                "description": (
+                    "Find scaling (pyramiding) activity across one or "
+                    "more strategies. Detects trades with multiple buy "
+                    "orders (scale-in entries). Use strategy_ids or tag "
+                    "to check multiple strategies at once and get a "
+                    "summary of which strategies used scaling."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "strategy_id": {
+                            "type": "string",
+                            "description": (
+                                "Single strategy algorithm_id. "
+                                "Use this OR strategy_ids/tag."
+                            ),
+                        },
+                        "strategy_ids": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": (
+                                "Multiple strategy algorithm_ids."
+                            ),
+                        },
+                        "tag": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to strategies "
+                                "with this tag/batch name."
+                            ),
+                        },
+                        "window": {
+                            "type": "string",
+                            "description": (
+                                "Optional: filter to a specific "
+                                "backtest window name."
+                            ),
+                        },
+                    },
                 },
             },
         ]
@@ -1934,26 +2144,30 @@ class BacktestMCPServer:
                 lines.append(
                     "| Strategy | Batch | CAGR | Sharpe"
                     " | Sortino | Max DD "
-                    "| Win Rate | Profit Factor"
+                    "| Win Rate | Consistency"
+                    " | Stability | Profit Factor"
                     " | Trades/Yr | Parameters |"
                 )
                 lines.append(
                     "|----------|-------|------|-------"
                     "|---------|--------"
-                    "|----------|---------------"
+                    "|----------|-------------"
+                    "|-----------|---------------"
                     "|-----------|------------|"
                 )
             else:
                 lines.append(
                     "| Strategy | CAGR | Sharpe"
                     " | Sortino | Max DD "
-                    "| Win Rate | Profit Factor"
+                    "| Win Rate | Consistency"
+                    " | Stability | Profit Factor"
                     " | Trades/Yr | Parameters |"
                 )
                 lines.append(
                     "|----------|------|-------"
                     "|---------|--------"
-                    "|----------|---------------"
+                    "|----------|-------------"
+                    "|-----------|---------------"
                     "|-----------|------------|"
                 )
             for bt in backtests:
@@ -1962,17 +2176,27 @@ class BacktestMCPServer:
                     bt.algorithm_id, ''
                 )
                 params = ""
-                if bt.parameters:
+                p = bt.parameters
+                if not p and bt.metadata and 'params' in bt.metadata:
+                    p = {
+                        k: v for k, v in bt.metadata['params'].items()
+                        if not k.startswith('_')
+                    }
+                if p:
                     params = ", ".join(
                         f"{k}={v}"
                         for k, v in list(
-                            bt.parameters.items()
+                            p.items()
                         )[:3]
                     )
-                    if len(bt.parameters) > 3:
+                    if len(p) > 3:
                         params += ", ..."
                 tag_col = f"| {tag} " if has_tags else ""
                 if s:
+                    cs = getattr(s, 'consistency_score', None)
+                    cs_str = f"{cs:.1%}" if cs is not None else "—"
+                    ss = getattr(s, 'stability_score', None)
+                    ss_str = f"{ss:.1%}" if ss is not None else "—"
                     lines.append(
                         f"| {bt.algorithm_id} "
                         f"{tag_col}"
@@ -1981,6 +2205,8 @@ class BacktestMCPServer:
                         f"| {_fmt_dec(s.sortino_ratio)} "
                         f"| {_fmt_pct(abs(s.max_drawdown) if s.max_drawdown else None)} "  # noqa: E501
                         f"| {_fmt_pct(s.win_rate)} "
+                        f"| {cs_str} "
+                        f"| {ss_str} "
                         f"| {_fmt_dec(s.profit_factor)} "
                         f"| {_fmt_dec(s.trades_per_year, 0)} "
                         f"| {params} |"
@@ -2007,9 +2233,15 @@ class BacktestMCPServer:
             tag = self._bt_tags.get(bt.algorithm_id, '')
             if tag:
                 md += f"**Batch:** {tag}\n\n"
-            if bt.parameters:
+            p = bt.parameters
+            if not p and bt.metadata and 'params' in bt.metadata:
+                p = {
+                    k: v for k, v in bt.metadata['params'].items()
+                    if not k.startswith('_')
+                }
+            if p:
                 params = ", ".join(
-                    f"{k}={v}" for k, v in bt.parameters.items()
+                    f"{k}={v}" for k, v in p.items()
                 )
                 md += f"**Parameters:** {params}\n\n"
             md += "## Summary Metrics\n\n"
@@ -2041,10 +2273,16 @@ class BacktestMCPServer:
             backtests = self._resolve_backtests(arguments)
             metric = arguments.get("metric", "sharpe_ratio")
             ascending = arguments.get("ascending", False)
-            return _ranking_table(
+            limit = arguments.get("limit")
+            table = _ranking_table(
                 backtests, metric, ascending,
                 tags=self._bt_tags,
             )
+            if limit:
+                lines = table.split("\n")
+                # Keep header (2 lines) + limit data rows
+                table = "\n".join(lines[:2 + limit])
+            return table
 
         elif name == "compare_strategies":
             a_id = arguments.get("strategy_a", "")
@@ -2069,6 +2307,10 @@ class BacktestMCPServer:
                 "average_trade_return_percentage",
                 "average_trade_duration",
                 "max_consecutive_wins", "max_consecutive_losses",
+                "consistency_score", "return_consistency",
+                "win_rate_consistency", "sharpe_consistency",
+                "stability_score", "return_stability",
+                "win_rate_stability", "sharpe_stability",
             ]
             md += f"| Metric | {a_id} | {b_id} | Winner |\n"
             md += "|--------|" + "-" * (len(a_id) + 2) + "|"
@@ -2140,22 +2382,33 @@ class BacktestMCPServer:
             if not bt:
                 return f"Strategy '{sid}' not found."
             window = arguments.get("window")
+            order_reason = arguments.get("order_reason")
             limit = arguments.get("limit", 50)
-            orders = _all_orders(bt, window=window, limit=limit)
+            orders = _all_orders(
+                bt, window=window, limit=limit,
+                order_reason=order_reason,
+            )
             if not orders:
-                return "No orders found."
+                filter_msg = ""
+                if order_reason:
+                    filter_msg = f" with order_reason='{order_reason}'"
+                return f"No orders found{filter_msg}."
             md = f"# Orders for {sid}\n\n"
+            if order_reason:
+                md += f"*Filtered by order_reason: {order_reason}*\n\n"
             md += (
                 "| Symbol | Side | Type | Status"
                 " | Price | Amount | Filled"
                 " | Cost | Fee | Fee Rate"
-                " | Slippage | Created | Window |\n"
+                " | Slippage | Reason"
+                " | Created | Window |\n"
             )
             md += (
                 "|--------|------|------|--------"
                 "|-------|--------|--------"
                 "|------|-----|----------"
-                "|----------|---------|--------|\n"
+                "|----------|--------"
+                "|---------|--------|\n"
             )
             for o in orders:
                 md += (
@@ -2170,6 +2423,7 @@ class BacktestMCPServer:
                     f"| {o['fee']} "
                     f"| {o['fee_rate']} "
                     f"| {o['slippage']} "
+                    f"| {o['order_reason']} "
                     f"| {o['created']} "
                     f"| {o['window']} |\n"
                 )
@@ -2553,6 +2807,528 @@ class BacktestMCPServer:
                     )
             return md
 
+        elif name == "get_strategy_metadata":
+            sid = arguments.get("strategy_id", "")
+            bt = self._bt_map.get(sid)
+            if not bt:
+                avail = list(self._bt_map.keys())
+                return (
+                    f"Strategy '{sid}' not found."
+                    f" Available: {avail}"
+                )
+            md = f"# Metadata for {bt.algorithm_id}\n\n"
+            tag = self._bt_tags.get(bt.algorithm_id, '')
+            if tag:
+                md += f"**Tag:** {tag}\n\n"
+            if bt.parameters:
+                md += "## Parameters\n\n"
+                for k, v in bt.parameters.items():
+                    md += f"- **{k}**: {v}\n"
+                md += "\n"
+            if bt.metadata:
+                md += "## Metadata\n\n"
+                for k, v in bt.metadata.items():
+                    if isinstance(v, dict):
+                        md += f"### {k}\n\n"
+                        for dk, dv in v.items():
+                            md += f"- **{dk}**: {dv}\n"
+                        md += "\n"
+                    elif isinstance(v, list):
+                        md += f"- **{k}**: {', '.join(str(x) for x in v)}\n"
+                    else:
+                        md += f"- **{k}**: {v}\n"
+            return md
+
+        elif name == "list_tags":
+            tag_counts = {}
+            for bt in self._backtests:
+                tag = self._bt_tags.get(bt.algorithm_id, '')
+                if tag:
+                    tag_counts[tag] = tag_counts.get(tag, 0) + 1
+            if not tag_counts:
+                return "No tags found across any strategies."
+            md = "# Tags Overview\n\n"
+            md += "| Tag | Strategies |\n"
+            md += "|-----|------------|\n"
+            for tag, count in sorted(tag_counts.items()):
+                md += f"| {tag} | {count} |\n"
+            md += f"\n**Total:** {len(tag_counts)} tags, "
+            md += f"{sum(tag_counts.values())} strategies\n"
+            return md
+
+        elif name == "get_strategies_by_tag":
+            tag = arguments.get("tag", "")
+            matched = [
+                bt for bt in self._backtests
+                if self._bt_tags.get(bt.algorithm_id) == tag
+            ]
+            if not matched:
+                all_tags = set(
+                    t for t in self._bt_tags.values() if t
+                )
+                return (
+                    f"No strategies found with tag '{tag}'. "
+                    f"Available tags: {sorted(all_tags)}"
+                )
+            md = f"# Strategies with tag: {tag}\n\n"
+            md += f"**Count:** {len(matched)}\n\n"
+            md += "| Strategy | CAGR | Sharpe | Trades/Yr |\n"
+            md += "|----------|------|--------|----------|\n"
+            for bt in matched:
+                s = bt.backtest_summary
+                if s:
+                    md += (
+                        f"| {bt.algorithm_id} "
+                        f"| {_fmt_pct(s.cagr)} "
+                        f"| {_fmt_dec(s.sharpe_ratio)} "
+                        f"| {_fmt_dec(s.trades_per_year, 0)} |\n"
+                    )
+                else:
+                    md += f"| {bt.algorithm_id} | — | — | — |\n"
+            return md
+
+        elif name == "get_scaled_trades":
+            sid = arguments.get("strategy_id", "")
+            window = arguments.get("window")
+            bt = self._bt_map.get(sid)
+            if not bt:
+                avail = list(self._bt_map.keys())
+                return (
+                    f"Strategy '{sid}' not found."
+                    f" Available: {avail}"
+                )
+
+            # Find scaling activity by detecting overlapping open trades
+            # for the same symbol (multiple concurrent positions = scaling)
+            scaled_groups = []
+            for run in bt.get_all_backtest_runs():
+                if window and run.backtest_date_range_name != window:
+                    continue
+                wname = run.backtest_date_range_name or "—"
+                trades = run.trades or []
+
+                # Group trades by symbol
+                by_symbol = {}
+                for t in trades:
+                    sym = getattr(t, 'target_symbol', '—')
+                    by_symbol.setdefault(sym, []).append(t)
+
+                for sym, sym_trades in by_symbol.items():
+                    if len(sym_trades) < 2:
+                        continue
+
+                    # Sort by opened_at
+                    sym_trades.sort(
+                        key=lambda t: t.opened_at or t.opened_at
+                    )
+
+                    # Find groups of overlapping trades (scaling)
+                    # A trade overlaps if it opened before the previous
+                    # trade closed
+                    group = [sym_trades[0]]
+                    for t in sym_trades[1:]:
+                        prev = group[-1]
+                        prev_closed = getattr(prev, 'closed_at', None)
+                        t_opened = getattr(t, 'opened_at', None)
+
+                        # Overlapping if previous not closed yet when
+                        # this one opened, or both open at same time
+                        if (prev_closed is None
+                                or (t_opened and t_opened <= prev_closed)):
+                            group.append(t)
+                        else:
+                            if len(group) > 1:
+                                scaled_groups.append(
+                                    (sym, wname, list(group))
+                                )
+                            group = [t]
+
+                    if len(group) > 1:
+                        scaled_groups.append(
+                            (sym, wname, list(group))
+                        )
+
+            if not scaled_groups:
+                return (
+                    f"No scaling activity found for strategy "
+                    f"{sid}. No overlapping trades for the "
+                    f"same symbol were detected."
+                )
+
+            md = f"# Scaling Activity for {sid}\n\n"
+            md += (
+                f"**{len(scaled_groups)} scaling group(s)** found "
+                f"(overlapping trades on the same symbol)\n\n"
+            )
+
+            for i, (sym, wname, group) in enumerate(scaled_groups, 1):
+                total_cost = sum(
+                    float(getattr(t, 'cost', 0) or 0) for t in group
+                )
+                total_ng = sum(
+                    float(getattr(t, 'net_gain', 0) or 0) for t in group
+                )
+                total_pct = (
+                    (total_ng / total_cost * 100) if total_cost else 0
+                )
+                first_open = min(
+                    t.opened_at for t in group if t.opened_at
+                )
+                last_close = None
+                closes = [
+                    t.closed_at for t in group
+                    if getattr(t, 'closed_at', None)
+                ]
+                if closes:
+                    last_close = max(closes)
+
+                md += f"## Group {i}: {sym} ({wname})\n\n"
+                md += f"- **Entries:** {len(group)}\n"
+                md += f"- **First opened:** {_fmt_date(first_open)}\n"
+                md += (
+                    f"- **Last closed:** "
+                    f"{_fmt_date(last_close)}\n"
+                )
+                md += f"- **Combined cost:** {total_cost:.2f}\n"
+                md += f"- **Combined net gain:** {total_ng:.2f}\n"
+                md += f"- **Combined return:** {total_pct:.2f}%\n\n"
+
+                md += (
+                    "| # | Opened | Closed | Price "
+                    "| Cost | Net Gain | Return |\n"
+                )
+                md += (
+                    "|---|--------|--------|-------"
+                    "|------|----------|--------|\n"
+                )
+                for j, t in enumerate(group, 1):
+                    cost = float(getattr(t, 'cost', 0) or 0)
+                    ng = float(getattr(t, 'net_gain', 0) or 0)
+                    pct = (ng / cost * 100) if cost else 0
+                    md += (
+                        f"| {j} "
+                        f"| {_fmt_date(t.opened_at)} "
+                        f"| {_fmt_date(getattr(t, 'closed_at', None))} "
+                        f"| {float(getattr(t, 'open_price', 0) or 0):.4f} "
+                        f"| {cost:.2f} "
+                        f"| {ng:.2f} "
+                        f"| {pct:.2f}% |\n"
+                    )
+                md += "\n"
+
+            return md
+
+        elif name == "get_stop_loss_take_profit_activity":
+            window = arguments.get("window")
+            triggered_only = arguments.get("triggered_only", True)
+            sids = self._resolve_sids(arguments)
+            if not sids:
+                # If no specific IDs, use all backtests
+                # (possibly filtered by tag)
+                backtests = self._resolve_backtests(arguments)
+                sids = [bt.algorithm_id for bt in backtests]
+
+            missing = [s for s in sids if s not in self._bt_map]
+            if missing:
+                return (
+                    f"Strategy not found: {missing}. "
+                    f"Available: {list(self._bt_map.keys())}"
+                )
+
+            md = "# Stop Loss & Take Profit Activity\n\n"
+            any_found = False
+
+            for sid in sids:
+                bt = self._bt_map[sid]
+                sl_trades = []
+                tp_trades = []
+
+                for run in bt.get_all_backtest_runs():
+                    if window and run.backtest_date_range_name != window:
+                        continue
+                    wname = run.backtest_date_range_name or "—"
+                    for t in (run.trades or []):
+                        # Check stop losses
+                        for sl in (t.stop_losses or []):
+                            if triggered_only and not getattr(
+                                sl, 'triggered', False
+                            ):
+                                continue
+                            sl_trades.append({
+                                "symbol": getattr(
+                                    t, 'target_symbol', '—'),
+                                "opened": _fmt_date(t.opened_at),
+                                "closed": _fmt_date(
+                                    getattr(t, 'closed_at', None)),
+                                "open_price": float(
+                                    getattr(t, 'open_price', 0) or 0),
+                                "sl_price": float(
+                                    getattr(sl, 'stop_loss_price', 0)
+                                    or 0),
+                                "sl_pct": float(
+                                    getattr(sl, 'percentage', 0) or 0),
+                                "trailing": getattr(
+                                    sl, 'trailing', False),
+                                "triggered": getattr(
+                                    sl, 'triggered', False),
+                                "triggered_at": _fmt_date(
+                                    getattr(sl, 'triggered_at', None)),
+                                "net_gain": float(
+                                    getattr(t, 'net_gain', 0) or 0),
+                                "window": wname,
+                            })
+                        # Check take profits
+                        for tp in (t.take_profits or []):
+                            if triggered_only and not getattr(
+                                tp, 'triggered', False
+                            ):
+                                continue
+                            tp_trades.append({
+                                "symbol": getattr(
+                                    t, 'target_symbol', '—'),
+                                "opened": _fmt_date(t.opened_at),
+                                "closed": _fmt_date(
+                                    getattr(t, 'closed_at', None)),
+                                "open_price": float(
+                                    getattr(t, 'open_price', 0) or 0),
+                                "tp_price": float(
+                                    getattr(tp, 'take_profit_price', 0)
+                                    or 0),
+                                "tp_pct": float(
+                                    getattr(tp, 'percentage', 0) or 0),
+                                "trailing": getattr(
+                                    tp, 'trailing', False),
+                                "triggered": getattr(
+                                    tp, 'triggered', False),
+                                "triggered_at": _fmt_date(
+                                    getattr(tp, 'triggered_at', None)),
+                                "net_gain": float(
+                                    getattr(t, 'net_gain', 0) or 0),
+                                "window": wname,
+                            })
+
+                if not sl_trades and not tp_trades:
+                    continue
+
+                any_found = True
+                md += f"## {sid}\n\n"
+
+                if sl_trades:
+                    md += (
+                        f"### Stop Losses "
+                        f"({len(sl_trades)} "
+                        f"{'triggered' if triggered_only else 'configured'})"
+                        f"\n\n"
+                    )
+                    md += (
+                        "| Symbol | Opened | Closed | Open Price"
+                        " | SL Price | SL % | Trailing"
+                        " | Triggered | Triggered At"
+                        " | Net Gain | Window |\n"
+                    )
+                    md += (
+                        "|--------|--------|--------|----------"
+                        "|----------|------|----------"
+                        "|-----------|-------------|"
+                        "----------|--------|\n"
+                    )
+                    for s in sl_trades:
+                        md += (
+                            f"| {s['symbol']} "
+                            f"| {s['opened']} "
+                            f"| {s['closed']} "
+                            f"| {s['open_price']:.4f} "
+                            f"| {s['sl_price']:.4f} "
+                            f"| {s['sl_pct']:.1f}% "
+                            f"| {'Yes' if s['trailing'] else 'No'} "
+                            f"| {'Yes' if s['triggered'] else 'No'} "
+                            f"| {s['triggered_at']} "
+                            f"| {s['net_gain']:.2f} "
+                            f"| {s['window']} |\n"
+                        )
+                    md += "\n"
+
+                if tp_trades:
+                    md += (
+                        f"### Take Profits "
+                        f"({len(tp_trades)} "
+                        f"{'triggered' if triggered_only else 'configured'})"
+                        f"\n\n"
+                    )
+                    md += (
+                        "| Symbol | Opened | Closed | Open Price"
+                        " | TP Price | TP % | Trailing"
+                        " | Triggered | Triggered At"
+                        " | Net Gain | Window |\n"
+                    )
+                    md += (
+                        "|--------|--------|--------|----------"
+                        "|----------|------|----------"
+                        "|-----------|-------------|"
+                        "----------|--------|\n"
+                    )
+                    for s in tp_trades:
+                        md += (
+                            f"| {s['symbol']} "
+                            f"| {s['opened']} "
+                            f"| {s['closed']} "
+                            f"| {s['open_price']:.4f} "
+                            f"| {s['tp_price']:.4f} "
+                            f"| {s['tp_pct']:.1f}% "
+                            f"| {'Yes' if s['trailing'] else 'No'} "
+                            f"| {'Yes' if s['triggered'] else 'No'} "
+                            f"| {s['triggered_at']} "
+                            f"| {s['net_gain']:.2f} "
+                            f"| {s['window']} |\n"
+                        )
+                    md += "\n"
+
+            if not any_found:
+                trig_msg = (
+                    "triggered" if triggered_only
+                    else "configured"
+                )
+                return (
+                    f"No stop loss or take profit activity "
+                    f"({trig_msg}) found for the requested "
+                    f"strategies."
+                )
+            return md
+
+        elif name == "get_scaling_activity":
+            window = arguments.get("window")
+            sids = self._resolve_sids(arguments)
+            if not sids:
+                backtests = self._resolve_backtests(arguments)
+                sids = [bt.algorithm_id for bt in backtests]
+
+            missing = [s for s in sids if s not in self._bt_map]
+            if missing:
+                return (
+                    f"Strategy not found: {missing}. "
+                    f"Available: {list(self._bt_map.keys())}"
+                )
+
+            md = "# Scaling Activity Summary\n\n"
+            any_found = False
+
+            # Summary table first
+            summary_rows = []
+            for sid in sids:
+                bt = self._bt_map[sid]
+                total_trades = 0
+                scaled_trades = 0
+
+                for run in bt.get_all_backtest_runs():
+                    if window and run.backtest_date_range_name != window:
+                        continue
+                    for t in (run.trades or []):
+                        total_trades += 1
+                        # A scaled trade has multiple buy orders
+                        buy_orders = [
+                            o for o in (t.orders or [])
+                            if str(getattr(o, 'order_side', ''))
+                            .upper() in ('BUY', 'ORDERSID.BUY')
+                        ]
+                        if len(buy_orders) > 1:
+                            scaled_trades += 1
+
+                if scaled_trades > 0:
+                    any_found = True
+                summary_rows.append({
+                    "sid": sid,
+                    "total": total_trades,
+                    "scaled": scaled_trades,
+                })
+
+            md += (
+                "| Strategy | Total Trades | Scaled Trades"
+                " | Scaling Rate |\n"
+            )
+            md += (
+                "|----------|-------------|---------------"
+                "|--------------|\n"
+            )
+            for r in summary_rows:
+                rate = (
+                    f"{r['scaled'] / r['total'] * 100:.1f}%"
+                    if r['total'] else "—"
+                )
+                md += (
+                    f"| {r['sid']} | {r['total']} "
+                    f"| {r['scaled']} | {rate} |\n"
+                )
+            md += "\n"
+
+            if not any_found:
+                md += (
+                    "No scaling activity detected. "
+                    "No trades had multiple buy orders.\n"
+                )
+                return md
+
+            # Detailed breakdown for strategies with scaling
+            for sid in sids:
+                bt = self._bt_map[sid]
+                scaled_details = []
+
+                for run in bt.get_all_backtest_runs():
+                    if window and run.backtest_date_range_name != window:
+                        continue
+                    wname = run.backtest_date_range_name or "—"
+                    for t in (run.trades or []):
+                        buy_orders = [
+                            o for o in (t.orders or [])
+                            if str(getattr(o, 'order_side', ''))
+                            .upper() in ('BUY', 'ORDERSID.BUY')
+                        ]
+                        if len(buy_orders) <= 1:
+                            continue
+                        sym = getattr(t, 'target_symbol', '—')
+                        cost = float(getattr(t, 'cost', 0) or 0)
+                        ng = float(getattr(t, 'net_gain', 0) or 0)
+                        pct = (ng / cost * 100) if cost else 0
+                        scaled_details.append({
+                            "symbol": sym,
+                            "entries": len(buy_orders),
+                            "opened": _fmt_date(t.opened_at),
+                            "closed": _fmt_date(
+                                getattr(t, 'closed_at', None)),
+                            "cost": cost,
+                            "net_gain": ng,
+                            "return_pct": pct,
+                            "window": wname,
+                        })
+
+                if not scaled_details:
+                    continue
+
+                md += f"## {sid} — Scaled Trades\n\n"
+                md += (
+                    "| Symbol | Entries | Opened | Closed"
+                    " | Cost | Net Gain | Return"
+                    " | Window |\n"
+                )
+                md += (
+                    "|--------|---------|--------|--------"
+                    "|------|----------|--------"
+                    "|--------|\n"
+                )
+                for d in scaled_details:
+                    md += (
+                        f"| {d['symbol']} "
+                        f"| {d['entries']} "
+                        f"| {d['opened']} "
+                        f"| {d['closed']} "
+                        f"| {d['cost']:.2f} "
+                        f"| {d['net_gain']:.2f} "
+                        f"| {d['return_pct']:.2f}% "
+                        f"| {d['window']} |\n"
+                    )
+                md += "\n"
+
+            return md
+
         return f"Unknown tool: {name}"
 
     def handle_request(self, request):
@@ -2628,27 +3404,46 @@ class BacktestMCPServer:
 
     def run(self):
         """Run the MCP server on stdio."""
+        _log("Run loop started, waiting for JSON-RPC requests on stdin...")
         while True:
             try:
                 line = sys.stdin.readline()
                 if not line:
+                    _log("stdin closed (EOF), shutting down.")
                     break
                 line = line.strip()
                 if not line:
                     continue
+                _log(f"Received request: {line[:200]}")
                 request = json.loads(line)
                 response = self.handle_request(request)
                 if response is not None:
-                    sys.stdout.write(json.dumps(response) + "\n")
+                    out = json.dumps(response)
+                    _log(f"Sending response: {out[:200]}")
+                    sys.stdout.write(out + "\n")
                     sys.stdout.flush()
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as exc:
+                _log(f"JSON decode error: {exc}")
                 continue
             except KeyboardInterrupt:
+                _log("Interrupted (KeyboardInterrupt), shutting down.")
                 break
+        _log("Server stopped.")
+
+
+def _log(msg):
+    """Write a debug message to stderr (stdout is reserved for JSON-RPC)."""
+    sys.stderr.write(f"[MCP-DEBUG] {msg}\n")
+    sys.stderr.flush()
 
 
 def main(directory: Optional[Union[str, List[str]]] = None):
     """Entry point for the MCP server."""
+    _log("MCP server starting...")
+    _log(f"Python: {sys.executable} ({sys.version})")
+    _log(f"CWD: {os.getcwd()}")
+    _log(f"directory arg (from caller): {directory}")
+
     parser = argparse.ArgumentParser(
         description="Backtest Analysis MCP Server"
     )
@@ -2668,10 +3463,17 @@ def main(directory: Optional[Union[str, List[str]]] = None):
         else directory
     ) or []
 
+    _log(f"Resolved directories: {dirs}")
+    for d in dirs:
+        abs_d = os.path.abspath(d)
+        _log(f"  {d} -> {abs_d} (exists={os.path.isdir(abs_d)})")
+
     if len(dirs) == 1:
         server = BacktestMCPServer(dirs[0])
     else:
         server = BacktestMCPServer(dirs)
+
+    _log("Server created, entering run loop (listening on stdin)...")
     server.run()
 
 
