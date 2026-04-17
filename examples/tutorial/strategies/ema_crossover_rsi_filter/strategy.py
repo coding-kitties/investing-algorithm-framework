@@ -5,7 +5,8 @@ import pandas as pd
 from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
-    TimeUnit, DataType, PositionSize
+    TimeUnit, DataType, PositionSize, StopLossRule, TakeProfitRule, \
+    ScalingRule, TradingCost
 
 
 class EMACrossoverRSIFFilterStrategy(TradingStrategy):
@@ -23,18 +24,27 @@ class EMACrossoverRSIFFilterStrategy(TradingStrategy):
         ema_short_period,
         ema_long_period,
         ema_cross_lookback_window,
-        ema_long_result_column = "ema_long",
-        ema_short_result_column = "ema_short",
-        ema_crossunder_result_column = "ema_crossunder",
-        ema_crossover_result_column = "ema_crossover",
-        rsi_result_column = "rsi",
+        ema_long_result_column="ema_long",
+        ema_short_result_column="ema_short",
+        ema_crossunder_result_column="ema_crossunder",
+        ema_crossover_result_column="ema_crossover",
+        rsi_result_column="rsi",
         time_unit: TimeUnit = TimeUnit.HOUR,
         interval: int = 2,
         market: str = "BITVAVO",
-        metadata: dict = None
+        metadata: dict = None,
+        # Risk management parameters
+        stop_loss_percentage: float = 5.0,
+        take_profit_percentage: float = 10.0,
+        trailing_stop_loss: bool = True,
+        # Scaling parameters
+        max_entries: int = 1,
+        scale_in_percentage: float = 100,
+        cooldown_in_bars: int = 0,
+        # Trading cost parameters
+        fee_percentage: float = 0.1,
+        slippage_percentage: float = 0.05,
     ):
-        self.algorithm_id = algorithm_id
-        self.symbols = symbols
         self.rsi_timeframe = rsi_timeframe
         self.rsi_period = rsi_period
         self.rsi_result_column = rsi_result_column
@@ -48,8 +58,16 @@ class EMACrossoverRSIFFilterStrategy(TradingStrategy):
         self.ema_short_period = ema_short_period
         self.ema_long_period = ema_long_period
         self.ema_cross_lookback_window = ema_cross_lookback_window
+
+        # Determine the warmup window needed (largest indicator period)
+        warmup = max(ema_long_period, ema_short_period, rsi_period) + 10
+
         data_sources = []
         position_sizes = []
+        stop_losses = []
+        take_profits = []
+        scaling_rules = []
+        trading_costs = []
 
         for symbol in symbols:
             full_symbol = f"{symbol}/{trading_symbol}"
@@ -60,6 +78,7 @@ class EMACrossoverRSIFFilterStrategy(TradingStrategy):
                     time_frame=self.rsi_timeframe,
                     market=market,
                     symbol=full_symbol,
+                    warmup_window=warmup,
                     pandas=True
                 )
             )
@@ -70,6 +89,7 @@ class EMACrossoverRSIFFilterStrategy(TradingStrategy):
                     time_frame=self.ema_timeframe,
                     market=market,
                     symbol=full_symbol,
+                    warmup_window=warmup,
                     pandas=True
                 )
             )
@@ -79,14 +99,71 @@ class EMACrossoverRSIFFilterStrategy(TradingStrategy):
                     percentage_of_portfolio=1 / len(symbols)
                 )
             )
+            stop_losses.append(
+                StopLossRule(
+                    symbol=symbol,
+                    percentage_threshold=stop_loss_percentage,
+                    sell_percentage=100,
+                    trailing=trailing_stop_loss,
+                )
+            )
+            take_profits.append(
+                TakeProfitRule(
+                    symbol=symbol,
+                    percentage_threshold=take_profit_percentage,
+                    sell_percentage=100,
+                )
+            )
+            scaling_rules.append(
+                ScalingRule(
+                    symbol=symbol,
+                    max_entries=max_entries,
+                    scale_in_percentage=scale_in_percentage,
+                    cooldown_in_bars=cooldown_in_bars,
+                )
+            )
+            trading_costs.append(
+                TradingCost(
+                    symbol=symbol,
+                    fee_percentage=fee_percentage,
+                    slippage_percentage=slippage_percentage,
+                )
+            )
 
         super().__init__(
+            algorithm_id=algorithm_id,
+            symbols=symbols,
+            trading_symbol=trading_symbol,
             data_sources=data_sources,
             position_sizes=position_sizes,
+            stop_losses=stop_losses,
+            take_profits=take_profits,
+            scaling_rules=scaling_rules,
+            trading_costs=trading_costs,
             time_unit=time_unit,
             interval=interval,
-            metadata=metadata
+            metadata=metadata,
         )
+
+        # Store parameters so they get saved to parameters.json
+        self.set_parameters({
+            "ema_timeframe": ema_timeframe,
+            "rsi_timeframe": rsi_timeframe,
+            "ema_short_period": ema_short_period,
+            "ema_long_period": ema_long_period,
+            "ema_cross_lookback_window": ema_cross_lookback_window,
+            "rsi_period": rsi_period,
+            "rsi_overbought_threshold": rsi_overbought_threshold,
+            "rsi_oversold_threshold": rsi_oversold_threshold,
+            "stop_loss_percentage": stop_loss_percentage,
+            "take_profit_percentage": take_profit_percentage,
+            "trailing_stop_loss": trailing_stop_loss,
+            "max_entries": max_entries,
+            "scale_in_percentage": scale_in_percentage,
+            "cooldown_in_bars": cooldown_in_bars,
+            "fee_percentage": fee_percentage,
+            "slippage_percentage": slippage_percentage,
+        })
 
     def prepare_indicators(
         self,
@@ -141,7 +218,6 @@ class EMACrossoverRSIFFilterStrategy(TradingStrategy):
                 ema_data=data[ema_data_identifier],
                 rsi_data=data[rsi_data_identifier]
             )
-
 
             # use only RSI column
             rsi_oversold = rsi_data[self.rsi_result_column] \
