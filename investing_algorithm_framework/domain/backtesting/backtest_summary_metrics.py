@@ -107,6 +107,14 @@ class BacktestSummaryMetrics:
     average_loss_duration: float = None
     max_consecutive_wins: int = None
     max_consecutive_losses: int = None
+    return_consistency: float = None
+    win_rate_consistency: float = None
+    sharpe_consistency: float = None
+    consistency_score: float = None
+    return_stability: float = None
+    win_rate_stability: float = None
+    sharpe_stability: float = None
+    stability_score: float = None
 
     def to_dict(self) -> dict:
         """
@@ -164,6 +172,14 @@ class BacktestSummaryMetrics:
             "cvar_95": self.cvar_95,
             "max_consecutive_wins": self.max_consecutive_wins,
             "max_consecutive_losses": self.max_consecutive_losses,
+            "return_consistency": self.return_consistency,
+            "win_rate_consistency": self.win_rate_consistency,
+            "sharpe_consistency": self.sharpe_consistency,
+            "consistency_score": self.consistency_score,
+            "return_stability": self.return_stability,
+            "win_rate_stability": self.win_rate_stability,
+            "sharpe_stability": self.sharpe_stability,
+            "stability_score": self.stability_score,
         }
 
     def save(self, file_path: str | Path) -> None:
