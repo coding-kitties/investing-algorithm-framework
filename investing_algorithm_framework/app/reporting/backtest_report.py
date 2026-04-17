@@ -125,14 +125,17 @@ class BacktestReport:
         with open(path, "w") as f:
             f.write(self.html_report)
 
+        if browser:
+            webbrowser.open(f"file://{path}")
+            return
+
         try:
             from IPython import get_ipython
             shell = get_ipython().__class__.__name__
             if shell == 'ZMQInteractiveShell':
                 from IPython.display import display, HTML
                 display(HTML(self.html_report))
-                if not browser:
-                    return
+                return
         except (NameError, ImportError):
             pass
 
@@ -463,6 +466,29 @@ class BacktestReport:
                         op_dt = t.opened_at
                         cl_dt = t.closed_at
                         total_fees = getattr(t, 'total_fees', 0) or 0
+                        # Stop-loss / take-profit status
+                        t_sls = getattr(t, 'stop_losses', None)
+                        t_tps = getattr(t, 'take_profits', None)
+                        sl_triggered = any(
+                            getattr(sl, 'triggered', False)
+                            for sl in (t_sls or [])
+                        )
+                        tp_triggered = any(
+                            getattr(tp, 'triggered', False)
+                            for tp in (t_tps or [])
+                        )
+                        has_sl = bool(t_sls and len(t_sls) > 0)
+                        has_tp = bool(t_tps and len(t_tps) > 0)
+                        # Collect unique order reasons
+                        t_reasons = set()
+                        for t_o in (getattr(t, 'orders', None)
+                                    or []):
+                            t_o_meta = getattr(
+                                t_o, 'metadata', None
+                            ) or {}
+                            r = t_o_meta.get('order_reason')
+                            if r:
+                                t_reasons.add(r)
                         trades_list.append({
                             'id': idx_t,
                             'sym': sym,
@@ -476,6 +502,17 @@ class BacktestReport:
                             'total_fees': round(total_fees, 4),
                             'net_gain': round(ng, 2),
                             'pct': round(pct, 2),
+                            'stop_loss': (
+                                'Triggered' if sl_triggered
+                                else ('Set' if has_sl else '')
+                            ),
+                            'take_profit': (
+                                'Triggered' if tp_triggered
+                                else ('Set' if has_tp else '')
+                            ),
+                            'reasons': ', '.join(
+                                sorted(t_reasons)
+                            ),
                         })
                         sym_stats.setdefault(sym, {'count': 0, 'gain': 0})
                         sym_stats[sym]['count'] += 1
@@ -588,6 +625,11 @@ class BacktestReport:
                         o_slippage = getattr(o, 'slippage', None)
                         if o_slippage is None:
                             o_slippage = 0
+                        o_meta = getattr(o, 'metadata', None)
+                        o_meta = o_meta if o_meta else {}
+                        o_reason = o_meta.get(
+                            'order_reason', ''
+                        )
                         orders_list.append({
                             'sym': getattr(o, 'target_symbol', '')
                             or '',
@@ -617,6 +659,7 @@ class BacktestReport:
                             'slippage': round(
                                 float(o_slippage), 4
                             ),
+                            'reason': o_reason,
                             'created': _fmt_date(o_dt)
                             if o_dt else '',
                             'updated': _fmt_date(u_dt)

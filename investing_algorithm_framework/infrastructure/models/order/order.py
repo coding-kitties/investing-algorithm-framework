@@ -1,8 +1,9 @@
+import json
 import logging
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy.orm import relationship, reconstructor
 
 from investing_algorithm_framework.domain import OrderType, \
     OrderSide, Order, OrderStatus
@@ -52,11 +53,32 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     order_fee_rate = Column(SqliteDecimal(), default=None)
     slippage = Column(SqliteDecimal(), default=None)
     sell_order_metadata_id = Column(Integer, ForeignKey('orders.id'))
+    metadata_json = Column(Text, default=None)
     trade_allocations = relationship(
         'SQLTradeAllocation', back_populates='order'
     )
 
+    def __init__(self, metadata=None, **kwargs):
+        super().__init__(metadata=metadata, **kwargs)
+        # Sync metadata dict to JSON column for DB persistence
+        if self.metadata:
+            self.metadata_json = json.dumps(self.metadata)
+
+    @reconstructor
+    def init_on_load(self):
+        """Deserialize metadata from JSON when loaded from DB."""
+        if self.metadata_json:
+            self.metadata = json.loads(self.metadata_json)
+        else:
+            self.metadata = {}
+
     def update(self, data):
+
+        if "metadata" in data:
+            metadata_val = data.pop("metadata")
+            self.metadata = metadata_val if metadata_val else {}
+            self.metadata_json = json.dumps(self.metadata) \
+                if self.metadata else None
 
         if "status" in data and data["status"] is not None:
             data["status"] = OrderStatus.from_value(data["status"]).value
@@ -65,7 +87,7 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
 
     @staticmethod
     def from_order(order):
-        return SQLOrder(
+        sql_order = SQLOrder(
             external_id=order.external_id,
             amount=order.get_amount(),
             filled=order.get_filled(),
@@ -78,7 +100,9 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
             trading_symbol=order.get_trading_symbol(),
             created_at=order.get_created_at(),
             updated_at=order.get_updated_at(),
+            metadata=order.metadata,
         )
+        return sql_order
 
     @staticmethod
     def from_ccxt_order(ccxt_order):

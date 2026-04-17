@@ -153,6 +153,10 @@ class BacktestEvaluationFocus(Enum):
                 # Efficiency metrics
                 "exposure_ratio": 0.5,
                 "trades_per_year": 0.3,
+
+                # Cross-window consistency
+                "consistency_score": 1.5,
+                "stability_score": 1.5,
             }
 
         elif self == BacktestEvaluationFocus.PROFIT:
@@ -179,6 +183,10 @@ class BacktestEvaluationFocus(Enum):
                 # Monthly/yearly consistency
                 "percentage_winning_months": 0.8,
                 "average_monthly_return": 1.0,
+
+                # Cross-window consistency
+                "consistency_score": 1.0,
+                "stability_score": 1.0,
             }
 
         elif self == BacktestEvaluationFocus.FREQUENCY:
@@ -204,6 +212,10 @@ class BacktestEvaluationFocus(Enum):
 
                 # Duration efficiency
                 "average_trade_duration": -0.3,  # Prefer shorter trades
+
+                # Cross-window consistency
+                "consistency_score": 1.0,
+                "stability_score": 1.0,
             }
 
         elif self == BacktestEvaluationFocus.RISK_ADJUSTED:
@@ -234,6 +246,10 @@ class BacktestEvaluationFocus(Enum):
                 # Downside protection
                 "average_trade_loss_percentage": -1.0,
                 "percentage_negative_trades": -1.0,
+
+                # Cross-window consistency (critical for risk-adjusted)
+                "consistency_score": 2.5,
+                "stability_score": 2.5,
             }
 
         # Fallback to balanced if unknown focus

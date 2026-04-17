@@ -24,6 +24,8 @@ const COMP_COLS = [
   ['Volatility','annual_volatility','pct_abs','min'],
   ['Recovery','recovery_factor','ratio','max'],
   ['Net Gain %','total_net_gain_percentage','pct','max'],
+  ['Consistency','consistency_score','pct_abs','max'],
+  ['Stability','stability_score','pct_abs','max'],
   ['VaR 95%','var_95','pct','min'],
   ['CVaR 95%','cvar_95','pct','min'],
 ];
@@ -1720,6 +1722,54 @@ function rebuildRankingTable() {
     if (bestIdx>=0) bestVals[key]=bestIdx;
   });
 
+  // Absolute-threshold color coding: red/yellow/green based on
+  // financially meaningful breakpoints, NOT relative ranking.
+  // Returns a 0-1 score where 0=bad, 1=good.
+  var _absThresholds = {
+    // [bad_end, neutral, good_start] — linear interpolation between
+    // 'max' metrics: higher value = better
+    'cagr':                       [-0.05, 0, 0.15],
+    'sharpe_ratio':               [-0.5, 0.5, 1.5],
+    'sortino_ratio':              [-0.5, 0.5, 2.0],
+    'calmar_ratio':               [-0.5, 0.5, 2.0],
+    'recovery_factor':            [-1, 0, 2.0],
+    'total_net_gain_percentage':  [-0.05, 0, 0.20],
+    'consistency_score':          [0.2, 0.5, 0.8],
+    'stability_score':            [0.2, 0.5, 0.8],
+    // 'min' metrics: lower absolute value = better (inverted internally)
+    'max_drawdown':               [0.03, 0.10, 0.25],   // abs values
+    'annual_volatility':          [0.05, 0.15, 0.40],
+    'var_95':                     [0, -0.02, -0.05],     // negative; closer to 0 = better
+    'cvar_95':                    [0, -0.03, -0.08],
+  };
+
+  function _metricColor(key, v, direction) {
+    if (v == null) return '';
+    var th = _absThresholds[key];
+    if (!th) return '';
+    var t; // 0=bad … 1=good
+    if (direction === 'min') {
+      // For min-direction: value at th[0] = best (green), th[2] = worst (red)
+      if (key === 'max_drawdown') v = Math.abs(v);
+      if (th[2] !== th[0]) t = 1 - Math.max(0, Math.min(1, (v - th[0]) / (th[2] - th[0])));
+      else t = 0.5;
+    } else {
+      // For max-direction: value at th[0] = worst (red), th[2] = best (green)
+      if (th[2] !== th[0]) t = Math.max(0, Math.min(1, (v - th[0]) / (th[2] - th[0])));
+      else t = 0.5;
+    }
+    var h, s, l;
+    if (t <= 0.5) {
+      h = Math.round(t * 2 * 45);
+      s = 70; l = 44;
+    } else {
+      h = Math.round(45 + (t - 0.5) * 2 * 95);
+      s = 65; l = 38 - Math.round((t - 0.5) * 2 * 4);
+    }
+    var alpha = 0.15 + t * 0.20;
+    return 'color:hsl(' + h + ',' + (s + 10) + '%,' + (l - 10) + '%)';
+  }
+
   let html = '';
   pageIndices.forEach(i => {
     const s = STRATEGIES[i];
@@ -1730,11 +1780,18 @@ function rebuildRankingTable() {
     html += '<td class="sticky-col" onclick="showPage(\'strat-'+i+'\')"><span class="sb-dot" style="background:'+s.color+'"></span>'+s.name+(s.tag ? ' <span class="tag-badge">'+s.tag+'</span>' : '')+'</td>';
     COMP_COLS.forEach(([label,key,ftype,direction]) => {
       const v = key === 'cagr' ? s.summary.cagr : m[key];
-      const isBest = bestVals[key]===i;
-      const cls = (isBest && pageIndices.length>1) ? ' class="best-cell"' : '';
-      if (key==='max_drawdown' && v!=null) html += '<td'+cls+' onclick="showPage(\'strat-'+i+'\')">'+(Math.abs(v)*100).toFixed(1)+'%</td>';
-      else if (key==='average_trade_duration' && v!=null) html += '<td'+cls+' onclick="showPage(\'strat-'+i+'\')">'+v.toFixed(1)+'d</td>';
-      else html += '<td'+cls+' onclick="showPage(\'strat-'+i+'\')">' + fmtVal(v,ftype) + '</td>';
+      const isBest = bestVals[key]===i && pageIndices.length > 1;
+      var colorStyle = _metricColor(key, v, direction);
+      var star = isBest ? ' ★' : '';
+      var txt;
+      if (key==='max_drawdown' && v!=null) txt = (Math.abs(v)*100).toFixed(1)+'%';
+      else if (key==='average_trade_duration' && v!=null) txt = v.toFixed(1)+'d';
+      else txt = fmtVal(v,ftype);
+      if (colorStyle) {
+        html += '<td onclick="showPage(\'strat-'+i+'\')"><span style="'+colorStyle+';font-weight:600">'+txt+star+'</span></td>';
+      } else {
+        html += '<td onclick="showPage(\'strat-'+i+'\')">'+txt+star+'</td>';
+      }
     });
     html += '</tr>';
   });
@@ -1848,6 +1905,8 @@ function updateStratSummary(stratIdx) {
       + kpiCard('Windows', String(m.number_of_windows || 0))
       + kpiCard('Profitable', String(m.number_of_profitable_windows || 0), 'var(--green)')
       + kpiCard('Total Net Gain', fmtVal(m.total_net_gain_percentage,'pct'))
+      + kpiCard('Consistency (CV)', m.consistency_score != null ? (m.consistency_score * 100).toFixed(1) + '%' : '—', m.consistency_score != null && m.consistency_score >= 0.6 ? 'var(--green)' : m.consistency_score != null && m.consistency_score < 0.4 ? 'var(--red)' : null)
+      + kpiCard('Stability (σ)', m.stability_score != null ? (m.stability_score * 100).toFixed(1) + '%' : '—', m.stability_score != null && m.stability_score >= 0.6 ? 'var(--green)' : m.stability_score != null && m.stability_score < 0.4 ? 'var(--red)' : null)
       + kpiCard('Runs', String(strat.runIds.length))
       + '</div>';
   } else {
@@ -6061,6 +6120,9 @@ var tradesHeaders = [
   {key: 'total_fees', label: 'Fees', align: 'right'},
   {key: 'net_gain', label: 'Net Gain', align: 'right', colorFn: function(r) { return r.net_gain >= 0 ? 'var(--green)' : 'var(--red)'; }},
   {key: 'pct', label: 'Return %', align: 'right', colorFn: function(r) { return r.pct >= 0 ? 'var(--green)' : 'var(--red)'; }},
+  {key: 'stop_loss', label: 'Stop Loss', colorFn: function(r) { return r.stop_loss === 'Triggered' ? '#E91E63' : (r.stop_loss === 'Set' ? 'var(--text-secondary)' : ''); }},
+  {key: 'take_profit', label: 'Take Profit', colorFn: function(r) { return r.take_profit === 'Triggered' ? '#9C27B0' : (r.take_profit === 'Set' ? 'var(--text-secondary)' : ''); }},
+  {key: 'reasons', label: 'Order Reasons'},
 ];
 
 var ordersHeaders = [
@@ -6068,6 +6130,10 @@ var ordersHeaders = [
   {key: 'side', label: 'Side', colorFn: function(r) { return r.side === 'BUY' ? 'var(--green)' : 'var(--red)'; }},
   {key: 'type', label: 'Type'},
   {key: 'status', label: 'Status'},
+  {key: 'reason', label: 'Reason', colorFn: function(r) {
+    var c = {'buy_signal':'var(--green)','sell_signal':'var(--red)','scale_in':'#2196F3','scale_out':'#FF9800','stop_loss':'#E91E63','take_profit':'#9C27B0'};
+    return c[r.reason] || '';
+  }},
   {key: 'price', label: 'Price', align: 'right'},
   {key: 'amount', label: 'Amount', align: 'right'},
   {key: 'filled', label: 'Filled', align: 'right'},
@@ -6124,8 +6190,7 @@ function buildPositionsTable(stratIdx) {
   pagTableRenderers[tableKey]();
 }
 
-// Scatter chart for trade/order timeline
-var timelineChartInstances = {};
+// Timeline scatter chart (custom canvas — no Chart.js dependency)
 
 function buildTimelineScatter(stratIdx) {
   var sid = 'strat-' + stratIdx;
@@ -6136,142 +6201,257 @@ function buildTimelineScatter(stratIdx) {
 
   var trades = rd.TRADES || [];
   var orders = rd.ORDERS || [];
-  if (trades.length === 0 && orders.length === 0) {
-    el.innerHTML = '';
-    return;
-  }
+  if (trades.length === 0 && orders.length === 0) { el.innerHTML = ''; return; }
 
-  // Build scatter datasets
-  var buyPoints = [];
-  var sellPoints = [];
+  // Collect all points with symbol info
+  var allPoints = [];
   orders.forEach(function(o) {
-    if (!o.created) return;
-    var point = {x: o.created, y: o.price, label: o.sym + ' ' + o.side + ' ' + o.status};
-    if (o.side === 'BUY') buyPoints.push(point);
-    else sellPoints.push(point);
+    if (!o.created || !o.price) return;
+    allPoints.push({
+      date: o.created, y: o.price, sym: o.sym,
+      label: o.sym + ' ' + o.side + ' ' + o.status,
+      series: o.side === 'BUY' ? 'buy' : 'sell'
+    });
   });
-
-  var tradeOpenPoints = [];
-  var tradeClosePoints = [];
   trades.forEach(function(t) {
-    if (t.opened) {
-      tradeOpenPoints.push({x: t.opened, y: t.open_price, label: t.sym + ' opened'});
+    if (t.opened && t.open_price) {
+      allPoints.push({date: t.opened, y: t.open_price, sym: t.sym, label: t.sym + ' opened', series: 'tradeOpen'});
     }
     if (t.closed && t.close_price) {
-      var c = t.net_gain >= 0 ? 'rgba(16,185,129,0.9)' : 'rgba(239,68,68,0.9)';
-      tradeClosePoints.push({x: t.closed, y: t.close_price, label: t.sym + ' closed (' + (t.net_gain >= 0 ? '+' : '') + t.pct + '%)', color: c, gain: t.net_gain});
+      allPoints.push({
+        date: t.closed, y: t.close_price, sym: t.sym,
+        label: t.sym + ' closed (' + (t.net_gain >= 0 ? '+' : '') + t.pct + '%)',
+        series: 'tradeClose', gain: t.net_gain
+      });
     }
   });
+  if (allPoints.length === 0) { el.innerHTML = ''; return; }
 
-  // Destroy old chart
-  if (timelineChartInstances[sid]) {
-    timelineChartInstances[sid].destroy();
-    timelineChartInstances[sid] = null;
-  }
+  // Collect unique symbols sorted
+  var symSet = {};
+  allPoints.forEach(function(p) { if (p.sym) symSet[p.sym] = true; });
+  var symbols = Object.keys(symSet).sort();
+
+  // Build dropdown HTML — default is empty prompt
+  var optionsHtml = '<option value="" selected>Select asset\u2026</option>';
+  symbols.forEach(function(s) { optionsHtml += '<option value="' + s + '">' + s + '</option>'; });
 
   el.innerHTML = '<div class="chart-card">'
-    + '<div class="chart-title">Trade &amp; Order Timeline</div>'
+    + '<div class="chart-title" style="display:flex;align-items:center;gap:12px;">'
+    + 'Trade &amp; Order Timeline'
+    + '<select id="sel-' + sid + '-timeline-sym" style="'
+    + 'font-size:12px;padding:3px 8px;border-radius:6px;'
+    + 'border:1px solid var(--border,#23232a);background:var(--surface,#111113);'
+    + 'color:var(--text,#eaeaf0);cursor:pointer;outline:none;">'
+    + optionsHtml + '</select>'
+    + '</div>'
     + '<div class="chart-wrap"><canvas id="c-' + sid + '-timeline"></canvas>'
     + '<div class="tooltip" id="tt-' + sid + '-timeline"></div></div></div>';
 
-  var canvas = document.getElementById('c-' + sid + '-timeline');
-  if (!canvas) return;
+  // Store points on element for redraw
+  el._allPoints = allPoints;
+  el._stratIdx = stratIdx;
 
-  var datasets = [];
-  if (buyPoints.length > 0) {
-    datasets.push({
-      label: 'Buy Orders',
-      data: buyPoints.map(function(p) { return {x: p.x, y: p.y}; }),
-      pointBackgroundColor: 'rgba(16,185,129,0.7)',
-      pointBorderColor: 'rgba(16,185,129,1)',
-      pointRadius: 5,
-      pointStyle: 'triangle',
-      showLine: false,
-      _labels: buyPoints.map(function(p) { return p.label; }),
+  // Draw initial prompt message (no symbol selected)
+  _drawTimelineCanvas(sid, allPoints, '');
+
+  // Dropdown change handler
+  var sel = document.getElementById('sel-' + sid + '-timeline-sym');
+  if (sel) {
+    sel.addEventListener('change', function() {
+      _drawTimelineCanvas(sid, el._allPoints, sel.value);
     });
   }
-  if (sellPoints.length > 0) {
-    datasets.push({
-      label: 'Sell Orders',
-      data: sellPoints.map(function(p) { return {x: p.x, y: p.y}; }),
-      pointBackgroundColor: 'rgba(239,68,68,0.7)',
-      pointBorderColor: 'rgba(239,68,68,1)',
-      pointRadius: 5,
-      pointStyle: 'triangleDown' in Chart.defaults ? 'triangle' : 'rect',
-      pointRotation: 180,
-      showLine: false,
-      _labels: sellPoints.map(function(p) { return p.label; }),
-    });
-  }
-  if (tradeOpenPoints.length > 0) {
-    datasets.push({
-      label: 'Trade Opened',
-      data: tradeOpenPoints.map(function(p) { return {x: p.x, y: p.y}; }),
-      pointBackgroundColor: 'rgba(34,211,238,0.8)',
-      pointBorderColor: 'rgba(34,211,238,1)',
-      pointRadius: 7,
-      pointStyle: 'circle',
-      showLine: false,
-      _labels: tradeOpenPoints.map(function(p) { return p.label; }),
-    });
-  }
-  if (tradeClosePoints.length > 0) {
-    datasets.push({
-      label: 'Trade Closed',
-      data: tradeClosePoints.map(function(p) { return {x: p.x, y: p.y}; }),
-      pointBackgroundColor: tradeClosePoints.map(function(p) { return p.color; }),
-      pointBorderColor: tradeClosePoints.map(function(p) { return p.color; }),
-      pointRadius: 7,
-      pointStyle: 'rectRounded',
-      showLine: false,
-      _labels: tradeClosePoints.map(function(p) { return p.label; }),
-    });
-  }
+}
 
-  if (datasets.length === 0) { el.innerHTML = ''; return; }
-
-  var isDark = document.documentElement.getAttribute('data-theme') !== 'light';
-  var gridColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
-  var textColor = isDark ? '#9898a6' : '#5a5a72';
-
-  timelineChartInstances[sid] = new Chart(canvas, {
-    type: 'scatter',
-    data: {datasets: datasets},
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      interaction: {mode: 'nearest', intersect: true},
-      plugins: {
-        legend: {
-          display: true,
-          position: 'top',
-          labels: {color: textColor, font: {size: 11}, usePointStyle: true, pointStyleWidth: 12}
-        },
-        tooltip: {
-          callbacks: {
-            label: function(ctx) {
-              var ds = ctx.dataset;
-              var labels = ds._labels || [];
-              var lbl = labels[ctx.dataIndex] || '';
-              return lbl + ' @ ' + ctx.parsed.y;
-            }
-          }
-        }
-      },
-      scales: {
-        x: {
-          type: 'category',
-          grid: {color: gridColor},
-          ticks: {color: textColor, font: {size: 10}, maxRotation: 45, autoSkip: true, maxTicksLimit: 20}
-        },
-        y: {
-          grid: {color: gridColor},
-          ticks: {color: textColor, font: {size: 10}},
-          title: {display: true, text: 'Price', color: textColor}
-        }
+function _drawTimelineCanvas(sid, allPoints, filterSym) {
+  // Filter points
+  // Show prompt when no symbol selected
+  if (!filterSym) {
+    var canvas = document.getElementById('c-' + sid + '-timeline');
+    if (canvas) {
+      var r2 = resizeCanvas('c-' + sid + '-timeline');
+      if (r2) {
+        r2.ctx.font = '14px JetBrains Mono, monospace';
+        r2.ctx.fillStyle = COL.dim; r2.ctx.textAlign = 'center';
+        r2.ctx.fillText('Select an asset to view trades & orders', r2.w / 2, r2.h / 2);
       }
     }
+    return;
+  }
+
+  // Filter points by symbol
+  var points = allPoints.filter(function(p) { return p.sym === filterSym; });
+  if (points.length === 0) {
+    var canvas = document.getElementById('c-' + sid + '-timeline');
+    if (canvas) {
+      var r2 = resizeCanvas('c-' + sid + '-timeline');
+      if (r2) {
+        r2.ctx.font = '13px JetBrains Mono, monospace';
+        r2.ctx.fillStyle = COL.dim; r2.ctx.textAlign = 'center';
+        r2.ctx.fillText('No data for selected asset', r2.w / 2, r2.h / 2);
+      }
+    }
+    return;
+  }
+
+  // Sort by date
+  points.sort(function(a,b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : 0; });
+  var uniqueDates = [];
+  var seen = {};
+  points.forEach(function(p) { if (!seen[p.date]) { uniqueDates.push(p.date); seen[p.date] = true; } });
+
+  // Y range
+  var ys = points.map(function(p) { return p.y; });
+  var yMin = Math.min.apply(null, ys);
+  var yMax = Math.max.apply(null, ys);
+  if (yMin === yMax) { yMin -= 1; yMax += 1; }
+  var yPad = (yMax - yMin) * 0.08;
+  yMin -= yPad; yMax += yPad;
+  var yRange = yMax - yMin;
+
+  var r = resizeCanvas('c-' + sid + '-timeline');
+  if (!r) return;
+  var ctx = r.ctx, w = r.w, h = r.h;
+  var pad = { t: 25, r: 70, b: 35, l: 10 };
+  var cw = w - pad.l - pad.r;
+  var ch = h - pad.t - pad.b;
+
+  // Grid lines & Y labels
+  ctx.strokeStyle = COL.border; ctx.lineWidth = 1;
+  ctx.font = '10px JetBrains Mono, monospace'; ctx.fillStyle = COL.dim; ctx.textAlign = 'right';
+  for (var i = 0; i <= 5; i++) {
+    var gy = pad.t + ch - (i / 5) * ch;
+    var val = yMin + (i / 5) * yRange;
+    ctx.beginPath(); ctx.moveTo(pad.l, gy); ctx.lineTo(w - pad.r, gy); ctx.stroke();
+    ctx.fillText(val.toFixed(val >= 100 ? 0 : 2), w - pad.r + 55, gy + 3.5);
+  }
+
+  // X labels
+  ctx.textAlign = 'center';
+  var maxLabels = Math.min(uniqueDates.length, 8);
+  var step = Math.max(1, Math.floor(uniqueDates.length / maxLabels));
+  for (var i = 0; i < uniqueDates.length; i += step) {
+    var xFrac = uniqueDates.length > 1 ? i / (uniqueDates.length - 1) : 0.5;
+    var lx = pad.l + xFrac * cw;
+    ctx.fillText(uniqueDates[i], lx, h - 5);
+  }
+
+  // Series colors
+  var seriesColors = {
+    buy:        { fill: 'rgba(16,185,129,0.8)',  stroke: 'rgba(16,185,129,1)' },
+    sell:       { fill: 'rgba(239,68,68,0.8)',   stroke: 'rgba(239,68,68,1)' },
+    tradeOpen:  { fill: 'rgba(34,211,238,0.8)',  stroke: 'rgba(34,211,238,1)' },
+    tradeClose: { fill: null, stroke: null },
+  };
+
+  // Draw legend
+  var legendItems = [
+    { label: 'Buy', color: seriesColors.buy.fill, shape: 'triangle' },
+    { label: 'Sell', color: seriesColors.sell.fill, shape: 'triangleDown' },
+    { label: 'Trade Open', color: seriesColors.tradeOpen.fill, shape: 'circle' },
+    { label: 'Trade Close +', color: COL.green, shape: 'rect' },
+    { label: 'Trade Close \u2212', color: COL.red, shape: 'rect' },
+  ];
+  ctx.font = '10px JetBrains Mono, monospace';
+  var lx = pad.l + 5;
+  legendItems.forEach(function(item) {
+    ctx.fillStyle = item.color;
+    if (item.shape === 'circle') {
+      ctx.beginPath(); ctx.arc(lx + 4, pad.t - 12, 4, 0, Math.PI * 2); ctx.fill();
+    } else if (item.shape === 'triangle') {
+      ctx.beginPath(); ctx.moveTo(lx, pad.t - 8); ctx.lineTo(lx + 8, pad.t - 8); ctx.lineTo(lx + 4, pad.t - 16); ctx.closePath(); ctx.fill();
+    } else if (item.shape === 'triangleDown') {
+      ctx.beginPath(); ctx.moveTo(lx, pad.t - 16); ctx.lineTo(lx + 8, pad.t - 16); ctx.lineTo(lx + 4, pad.t - 8); ctx.closePath(); ctx.fill();
+    } else {
+      ctx.fillRect(lx, pad.t - 16, 8, 8);
+    }
+    ctx.fillStyle = COL.dim;
+    ctx.textAlign = 'left';
+    ctx.fillText(item.label, lx + 12, pad.t - 8);
+    lx += ctx.measureText(item.label).width + 24;
   });
+
+  // Draw points
+  var hitBoxes = [];
+  points.forEach(function(p) {
+    var di = uniqueDates.indexOf(p.date);
+    var xFrac = uniqueDates.length > 1 ? di / (uniqueDates.length - 1) : 0.5;
+    var px = pad.l + xFrac * cw;
+    var py = pad.t + ch - ((p.y - yMin) / yRange) * ch;
+    var radius = 5;
+    var sc = seriesColors[p.series];
+    var fillC, strokeC;
+
+    if (p.series === 'tradeClose') {
+      fillC = p.gain >= 0 ? COL.green : COL.red;
+      strokeC = fillC;
+    } else {
+      fillC = sc.fill; strokeC = sc.stroke;
+    }
+
+    ctx.fillStyle = fillC; ctx.strokeStyle = strokeC; ctx.lineWidth = 1.5;
+
+    if (p.series === 'buy') {
+      ctx.beginPath();
+      ctx.moveTo(px, py - radius); ctx.lineTo(px - radius, py + radius); ctx.lineTo(px + radius, py + radius);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if (p.series === 'sell') {
+      ctx.beginPath();
+      ctx.moveTo(px, py + radius); ctx.lineTo(px - radius, py - radius); ctx.lineTo(px + radius, py - radius);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    } else if (p.series === 'tradeOpen') {
+      ctx.beginPath(); ctx.arc(px, py, radius, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    } else {
+      var s = radius * 1.4;
+      ctx.beginPath();
+      ctx.moveTo(px - s + 2, py - s); ctx.lineTo(px + s - 2, py - s);
+      ctx.quadraticCurveTo(px + s, py - s, px + s, py - s + 2);
+      ctx.lineTo(px + s, py + s - 2);
+      ctx.quadraticCurveTo(px + s, py + s, px + s - 2, py + s);
+      ctx.lineTo(px - s + 2, py + s);
+      ctx.quadraticCurveTo(px - s, py + s, px - s, py + s - 2);
+      ctx.lineTo(px - s, py - s + 2);
+      ctx.quadraticCurveTo(px - s, py - s, px - s + 2, py - s);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
+
+    hitBoxes.push({ x: px, y: py, r: radius + 3, label: p.label, price: p.y, date: p.date });
+  });
+
+  // Store hitbox data for tooltip
+  var canvas = document.getElementById('c-' + sid + '-timeline');
+  canvas._timelineHitBoxes = hitBoxes;
+
+  // Setup tooltip (remove old listeners by cloning)
+  var tooltip = document.getElementById('tt-' + sid + '-timeline');
+  if (canvas && tooltip) {
+    var newCanvas = canvas.cloneNode(true);
+    newCanvas._timelineHitBoxes = hitBoxes;
+    newCanvas.getContext('2d').drawImage(canvas, 0, 0);
+    canvas.parentNode.replaceChild(newCanvas, canvas);
+    newCanvas.addEventListener('mousemove', function(e) {
+      var rect = newCanvas.getBoundingClientRect();
+      var mx = e.clientX - rect.left;
+      var my = e.clientY - rect.top;
+      var hit = null;
+      var boxes = newCanvas._timelineHitBoxes || [];
+      for (var i = 0; i < boxes.length; i++) {
+        var b = boxes[i];
+        var dx = mx - b.x, dy = my - b.y;
+        if (dx * dx + dy * dy <= b.r * b.r) { hit = b; break; }
+      }
+      if (hit) {
+        tooltip.textContent = hit.date + ': ' + hit.label + ' @ ' + hit.price.toFixed(2);
+        tooltip.classList.add('visible');
+        tooltip.style.left = (mx + 12) + 'px';
+        tooltip.style.top = (my - 20) + 'px';
+      } else {
+        tooltip.classList.remove('visible');
+      }
+    });
+    newCanvas.addEventListener('mouseleave', function() { tooltip.classList.remove('visible'); });
+  }
 }
 
 function updateStratTables(stratIdx) {
