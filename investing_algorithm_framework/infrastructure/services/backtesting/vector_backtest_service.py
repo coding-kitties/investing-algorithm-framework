@@ -332,8 +332,10 @@ class VectorBacktestService:
             sym_data['entry_count'] = 0
             sym_data['scale_out_count'] = 0
 
-        def _open_trade(sym, sym_data, price, date, capital,
-                       order_reason="buy_signal"):
+        def _open_trade(
+            sym, sym_data, price, date, capital,
+            order_reason="buy_signal"
+        ):
             """Helper to open a new trade for a symbol."""
             nonlocal current_unallocated, total_allocated
 
