@@ -1907,7 +1907,8 @@ class BacktestMCPServer:
                                         "description": (
                                             "Metric name, e.g. sharpe_ratio, "
                                             "cagr, max_drawdown, win_rate, "
-                                            "consistency_score, stability_score"
+                                            "consistency_score, "  # noqa
+                                            "stability_score"
                                         ),
                                     },
                                     "operator": {
