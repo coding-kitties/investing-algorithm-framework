@@ -14,22 +14,62 @@ Orders are instructions to buy or sell assets in the market. The framework provi
 
 ### Market Orders
 
-Execute immediately at the current market price:
+Execute at the best available price. The framework looks up the current price as an **estimated price** for sizing and cash reservation. The actual fill price is determined at execution time and the portfolio is automatically reconciled.
+
+**Using the general method:**
 
 ```python
-# Buy order - spend 100 USDT to buy BTC
-algorithm.create_buy_order(
+from investing_algorithm_framework import OrderSide
+
+# Buy order - spend 100 EUR worth of BTC at market price
+self.create_market_order(
     target_symbol="BTC",
-    amount=100,  # Amount in trading symbol (USDT)
-    order_type="MARKET"
+    order_side=OrderSide.BUY,
+    amount_trading_symbol=100,  # Amount in trading symbol (EUR)
 )
 
-# Sell order - sell 50% of BTC holdings  
-algorithm.create_sell_order(
+# Sell order - sell 50% of BTC position at market price
+self.create_market_order(
     target_symbol="BTC",
-    percentage=0.5,  # Sell 50% of holdings
-    order_type="MARKET"
+    order_side=OrderSide.SELL,
+    percentage_of_position=50,  # Sell 50% of position
 )
+```
+
+**Using convenience methods:**
+
+```python
+# Buy: spend 10% of portfolio on BTC
+self.create_market_buy_order(
+    target_symbol="BTC",
+    percentage_of_portfolio=10,
+)
+
+# Sell: sell 0.5 BTC
+self.create_market_sell_order(
+    target_symbol="BTC",
+    amount=0.5,
+)
+```
+
+:::info How market orders work internally
+1. The framework fetches the **latest price** as an estimated price.
+2. The order is created with `price=estimated_price` for cash reservation and position sizing.
+3. At fill time (next candle open in backtesting, exchange fill in live trading), the **actual fill price** replaces the estimate.
+4. The portfolio is **reconciled**: any difference between the estimated and actual price is adjusted in your unallocated balance and position.
+:::
+
+#### Backtesting Behavior
+
+In backtesting, market orders fill at the **Open price of the next candle** after the order is placed. If you have configured `TradingCost` with a `slippage_percentage`, slippage is applied on top of the open price:
+
+```python
+from investing_algorithm_framework import TradingCost
+
+class MyStrategy(TradingStrategy):
+    trading_costs = [
+        TradingCost(symbol="BTC", slippage_percentage=0.001),  # 0.1% slippage
+    ]
 ```
 
 ### Limit Orders
@@ -47,7 +87,7 @@ algorithm.create_buy_order(
 
 # Sell limit order
 algorithm.create_sell_order(
-    target_symbol="BTC", 
+    target_symbol="BTC",
     percentage=1.0,
     order_type="LIMIT",
     price=55000  # Only sell if BTC price is 55,000 USDT or higher
@@ -71,7 +111,7 @@ algorithm.create_sell_order(
 algorithm.create_buy_order(
     target_symbol="BTC",
     amount=100,
-    order_type="STOP", 
+    order_type="STOP",
     stop_price=52000
 )
 ```
@@ -93,30 +133,41 @@ algorithm.create_sell_order(
 
 ## Order Parameters
 
+### Market Order Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `target_symbol` | `str` | The asset to trade (e.g., `"BTC"`, `"ETH"`) |
+| `order_side` | `OrderSide` | `OrderSide.BUY` or `OrderSide.SELL` |
+| `amount` | `float` | Amount of the target asset |
+| `amount_trading_symbol` | `float` | Amount in trading symbol (e.g., EUR) to spend |
+| `percentage_of_portfolio` | `float` | % of portfolio to buy (BUY only) |
+| `percentage_of_position` | `float` | % of position to sell (SELL only) |
+| `percentage` | `float` | % of portfolio net size to allocate |
+| `precision` | `int` | Decimal precision for rounding the amount |
+| `metadata` | `dict` | Additional metadata for the order |
+
+### Limit Order Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `target_symbol` | `str` | The asset to trade (e.g., `"BTC"`, `"ETH"`) |
+| `order_side` | `OrderSide` | `OrderSide.BUY` or `OrderSide.SELL` |
+| `price` | `float` | Limit price for the order |
+| `amount` | `float` | Amount of the target asset |
+| `amount_trading_symbol` | `float` | Amount in trading symbol to spend |
+| `percentage_of_portfolio` | `float` | % of portfolio to buy (BUY only) |
+| `percentage_of_position` | `float` | % of position to sell (SELL only) |
+| `percentage` | `float` | % of portfolio net size to allocate |
+| `precision` | `int` | Decimal precision for rounding the amount |
+
 ### Common Parameters
 
-- **target_symbol**: The asset to buy/sell (e.g., "BTC", "ETH")
-- **amount**: Amount to spend (for buy orders) in trading symbol
-- **percentage**: Percentage of holdings to sell (for sell orders)
-- **order_type**: Type of order ("MARKET", "LIMIT", "STOP", "STOP_LIMIT")
-- **price**: Limit price (for limit and stop-limit orders)
-- **stop_price**: Stop price (for stop and stop-limit orders)
+All order creation methods support these additional parameters:
 
-### Advanced Parameters
-
-```python
-# Order with advanced parameters
-algorithm.create_buy_order(
-    target_symbol="BTC",
-    amount=100,
-    order_type="LIMIT",
-    price=50000,
-    # Advanced parameters
-    time_in_force="GTC",  # Good Till Cancelled
-    reduce_only=False,    # Allow position increase
-    post_only=True       # Only maker orders (some exchanges)
-)
-```
+- **execute** (default `True`): Whether to execute the order immediately
+- **validate** (default `True`): Whether to validate the order (balance/position checks)
+- **sync** (default `True`): Whether to sync the order with the portfolio
 
 ## Order Management
 
@@ -126,11 +177,11 @@ algorithm.create_buy_order(
 def apply_strategy(self, algorithm, market_data):
     # Get all orders
     orders = algorithm.get_orders()
-    
+
     # Filter by status
     pending_orders = [order for order in orders if order.status == "OPEN"]
     filled_orders = [order for order in orders if order.status == "FILLED"]
-    
+
     # Check specific order
     for order in pending_orders:
         print(f"Order {order.id}: {order.order_type} {order.target_symbol} - {order.status}")
@@ -145,7 +196,7 @@ def apply_strategy(self, algorithm, market_data):
     for order in orders:
         if order.status == "OPEN" and order.created_at < some_time_threshold:
             algorithm.cancel_order(order.id)
-    
+
     # Cancel all open orders for a symbol
     algorithm.cancel_all_orders(symbol="BTC/USDT")
 ```
@@ -155,7 +206,7 @@ def apply_strategy(self, algorithm, market_data):
 ```python
 def apply_strategy(self, algorithm, market_data):
     orders = algorithm.get_orders()
-    
+
     for order in orders:
         if order.status == "OPEN" and order.order_type == "LIMIT":
             # Update order price
@@ -172,17 +223,16 @@ def apply_strategy(self, algorithm, market_data):
 
 ```python
 class DCAStrategy(TradingStrategy):
-    
-    def __init__(self, buy_amount=100):
-        super().__init__()
-        self.buy_amount = buy_amount
-        
-    def apply_strategy(self, algorithm, market_data):
+    time_unit = TimeUnit.DAY
+    interval = 1
+    symbols = ["BTC"]
+    trading_symbol = "EUR"
+
+    def apply_strategy(self, context, data):
         # Buy fixed amount regardless of price
-        algorithm.create_buy_order(
+        self.create_market_buy_order(
             target_symbol="BTC",
-            amount=self.buy_amount,
-            order_type="MARKET"
+            amount_trading_symbol=100,  # Buy 100 EUR worth of BTC
         )
 ```
 
@@ -190,43 +240,42 @@ class DCAStrategy(TradingStrategy):
 
 ```python
 class GridStrategy(TradingStrategy):
-    
-    def __init__(self, grid_levels=5, grid_spacing=0.02):
-        super().__init__()
+    time_unit = TimeUnit.HOUR
+    interval = 1
+    symbols = ["BTC"]
+    trading_symbol = "EUR"
+
+    def __init__(self, grid_levels=5, grid_spacing=0.02, **kwargs):
+        super().__init__(**kwargs)
         self.grid_levels = grid_levels
         self.grid_spacing = grid_spacing
-        
-    def apply_strategy(self, algorithm, market_data):
-        symbol = "BTC/USDT"
-        current_price = market_data.get_last_price(symbol)
-        
-        # Cancel existing orders
-        algorithm.cancel_all_orders(symbol)
-        
-        # Place buy orders below current price
+
+    def apply_strategy(self, context, data):
+        current_price = context.get_latest_price("BTC/EUR")
+
+        # Place buy limit orders below current price
         for i in range(1, self.grid_levels + 1):
             buy_price = current_price * (1 - self.grid_spacing * i)
-            algorithm.create_buy_order(
+            self.create_limit_order(
                 target_symbol="BTC",
-                amount=100,
-                order_type="LIMIT",
-                price=buy_price
+                order_side=OrderSide.BUY,
+                amount_trading_symbol=100,
+                price=buy_price,
             )
-            
-        # Place sell orders above current price  
-        positions = algorithm.get_positions()
-        btc_position = next((p for p in positions if p.symbol == "BTC/USDT"), None)
-        
-        if btc_position and btc_position.amount > 0:
-            sell_amount_per_level = btc_position.amount / self.grid_levels
-            
+
+        # Place sell limit orders above current price
+        position = self.get_position(symbol="BTC")
+
+        if position and position.get_amount() > 0:
+            sell_amount = position.get_amount() / self.grid_levels
+
             for i in range(1, self.grid_levels + 1):
                 sell_price = current_price * (1 + self.grid_spacing * i)
-                algorithm.create_sell_order(
+                self.create_limit_order(
                     target_symbol="BTC",
-                    amount=sell_amount_per_level,
-                    order_type="LIMIT", 
-                    price=sell_price
+                    order_side=OrderSide.SELL,
+                    amount=sell_amount,
+                    price=sell_price,
                 )
 ```
 
@@ -234,68 +283,65 @@ class GridStrategy(TradingStrategy):
 
 ```python
 class TrailingStopStrategy(TradingStrategy):
-    
-    def __init__(self, trailing_percent=0.05):
-        super().__init__()
+    time_unit = TimeUnit.HOUR
+    interval = 1
+    symbols = ["BTC"]
+    trading_symbol = "EUR"
+
+    def __init__(self, trailing_percent=0.05, **kwargs):
+        super().__init__(**kwargs)
         self.trailing_percent = trailing_percent
         self.highest_price = None
-        
-    def apply_strategy(self, algorithm, market_data):
-        symbol = "BTC/USDT"
-        current_price = market_data.get_last_price(symbol)
-        
+
+    def apply_strategy(self, context, data):
+        current_price = context.get_latest_price("BTC/EUR")
+
         # Update highest price
         if self.highest_price is None or current_price > self.highest_price:
             self.highest_price = current_price
-            
+
         # Check if we have a position
-        positions = algorithm.get_positions()
-        btc_position = next((p for p in positions if p.symbol == symbol), None)
-        
-        if btc_position and btc_position.amount > 0:
+        if self.has_position(symbol="BTC", amount_gt=0):
             # Calculate trailing stop price
             stop_price = self.highest_price * (1 - self.trailing_percent)
-            
+
             if current_price <= stop_price:
-                # Trigger trailing stop
-                algorithm.create_sell_order(
+                # Trigger trailing stop - sell entire position at market
+                self.create_market_sell_order(
                     target_symbol="BTC",
-                    percentage=1.0,
-                    order_type="MARKET"
+                    percentage_of_position=100,
                 )
                 self.highest_price = None  # Reset for next position
 ```
 
 ## Order Validation
 
-The framework includes built-in order validation:
+The framework includes built-in order validation for both limit and market orders:
 
 ### Balance Checks
 
+For **buy orders**, the framework validates that you have sufficient unallocated balance. For market orders, this check uses the estimated price:
+
 ```python
 # Framework automatically checks if you have sufficient balance
-try:
-    algorithm.create_buy_order(
-        target_symbol="BTC",
-        amount=10000,  # This might exceed available balance
-        order_type="MARKET"
-    )
-except InsufficientBalanceError as e:
-    print(f"Order failed: {e}")
+# This will raise an OperationalException if balance is insufficient
+self.create_market_buy_order(
+    target_symbol="BTC",
+    amount_trading_symbol=10000,  # This might exceed available balance
+)
 ```
 
 ### Position Checks
 
+For **sell orders**, the framework checks that you have enough holdings:
+
 ```python
 # Framework checks if you have enough holdings to sell
-try:
-    algorithm.create_sell_order(
-        target_symbol="BTC", 
-        percentage=1.5,  # Cannot sell more than 100%
-        order_type="MARKET"
-    )
-except InsufficientHoldingsError as e:
-    print(f"Order failed: {e}")
+# This will raise an OperationalException if position is insufficient
+self.create_market_sell_order(
+    target_symbol="BTC",
+    percentage_of_position=150,  # Cannot sell more than 100%
+)
 ```
 
 ## Best Practices
@@ -313,7 +359,7 @@ Always check if your orders are being filled as expected:
 ```python
 def check_order_health(self, algorithm):
     orders = algorithm.get_orders()
-    
+
     # Check for old unfilled orders
     current_time = datetime.now()
     for order in orders:
@@ -328,12 +374,12 @@ def check_order_health(self, algorithm):
 ```python
 def handle_partial_fills(self, algorithm):
     orders = algorithm.get_orders()
-    
+
     for order in orders:
         if order.status == "PARTIALLY_FILLED":
             fill_ratio = order.filled_amount / order.amount
             print(f"Order {order.id} is {fill_ratio:.1%} filled")
-            
+
             # Decide whether to cancel or wait
             if fill_ratio < 0.1:  # Less than 10% filled
                 algorithm.cancel_order(order.id)
@@ -347,7 +393,7 @@ Always include risk controls in your order logic:
 def apply_strategy(self, algorithm, market_data):
     # Check portfolio exposure before placing orders
     portfolio = algorithm.get_portfolio()
-    
+
     if portfolio.get_total_exposure() < 0.9:  # Less than 90% invested
         # Safe to place buy orders
         algorithm.create_buy_order(

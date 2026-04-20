@@ -65,6 +65,29 @@ class CCXTOrderExecutor(OrderExecutor):
                     external_order = exchange.createLimitSellOrder(
                         symbol, amount, price,
                     )
+            elif OrderType.MARKET.equals(order_type):
+                if OrderSide.BUY.equals(order_side):
+
+                    if not hasattr(exchange, "createMarketBuyOrder"):
+                        raise OperationalException(
+                            f"Exchange {market} does not support "
+                            f"functionality createMarketBuyOrder"
+                        )
+
+                    external_order = exchange.createMarketBuyOrder(
+                        symbol, amount,
+                    )
+                else:
+
+                    if not hasattr(exchange, "createMarketSellOrder"):
+                        raise OperationalException(
+                            f"Exchange {market} does not support "
+                            f"functionality createMarketSellOrder"
+                        )
+
+                    external_order = exchange.createMarketSellOrder(
+                        symbol, amount,
+                    )
             else:
                 raise OperationalException(
                     f"Order type {order_type} not supported "

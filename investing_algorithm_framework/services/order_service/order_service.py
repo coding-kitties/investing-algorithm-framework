@@ -304,6 +304,8 @@ class OrderService(RepositoryService):
 
         if OrderType.LIMIT.equals(order_data["order_type"]):
             self.validate_limit_order(order_data, portfolio)
+        elif OrderType.MARKET.equals(order_data["order_type"]):
+            self.validate_market_order(order_data, portfolio)
         else:
             raise OperationalException(
                 f"Order type {order_data['order_type']} is not supported"
@@ -397,6 +399,64 @@ class OrderService(RepositoryService):
             if unallocated_amount < total_price:
                 raise OperationalException(
                     f"Order total: {total_price} "
+                    f"{portfolio.trading_symbol}, is "
+                    f"larger then unallocated size: {portfolio.unallocated} "
+                    f"{portfolio.trading_symbol} of the portfolio"
+                )
+
+    def validate_market_order(self, order_data, portfolio):
+        """
+        Validate a market order. For sell orders, validates position
+        size. For buy orders, validates using the estimated price
+        (stored in the order price field at creation time) against
+        the portfolio's unallocated balance.
+        """
+
+        if OrderSide.SELL.equals(order_data["order_side"]):
+            amount = order_data["amount"]
+            position = self.position_service\
+                .find(
+                    {
+                        "portfolio": portfolio.id,
+                        "symbol": order_data["target_symbol"]
+                    }
+                )
+
+            if amount <= 0:
+                raise OperationalException(
+                    f"Order amount: {amount} {position.symbol}, is "
+                    f"less or equal to 0"
+                )
+
+            if amount > position.get_amount():
+                raise OperationalException(
+                    f"Order amount: {amount} {position.symbol}, is "
+                    f"larger then position size: {position.get_amount()} "
+                    f"{position.symbol} of the portfolio"
+                )
+        else:
+            # Use the estimated price for validation
+            estimated_price = order_data.get("price", 0)
+            total_price = order_data["amount"] * estimated_price
+            unallocated_position = self.position_service\
+                .find(
+                    {
+                        "portfolio": portfolio.id,
+                        "symbol": portfolio.trading_symbol
+                    }
+                )
+            unallocated_amount = unallocated_position.get_amount()
+
+            if unallocated_amount is None:
+                raise OperationalException(
+                    "Unallocated amount of the portfolio is None. "
+                    "Can't validate market order. Please check if "
+                    "the portfolio configuration is correct."
+                )
+
+            if unallocated_amount < total_price:
+                raise OperationalException(
+                    f"Order total (estimated): {total_price} "
                     f"{portfolio.trading_symbol}, is "
                     f"larger then unallocated size: {portfolio.unallocated} "
                     f"{portfolio.trading_symbol} of the portfolio"

@@ -357,6 +357,28 @@ order = self.create_limit_order(
     sync=True
 )
 
+# Create a market order (fills at best available price)
+order = self.create_market_order(
+    target_symbol="BTC",
+    order_side=OrderSide.BUY,
+    amount=0.01,                    # Amount in target symbol
+    # OR
+    amount_trading_symbol=500,      # Amount in trading symbol (EUR)
+    # OR
+    percentage_of_portfolio=10,     # 10% of portfolio
+)
+
+# Convenience methods for market orders
+self.create_market_buy_order(
+    target_symbol="BTC",
+    percentage_of_portfolio=10,     # Buy 10% of portfolio
+)
+
+self.create_market_sell_order(
+    target_symbol="BTC",
+    percentage_of_position=50,      # Sell 50% of position
+)
+
 # Close a position entirely
 self.close_position(symbol="BTC")
 ```

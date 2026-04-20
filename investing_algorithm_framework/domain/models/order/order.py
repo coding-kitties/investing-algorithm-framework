@@ -377,12 +377,28 @@ class Order(BaseModel):
             updated_at=self.get_updated_at(),
         )
 
+    @property
+    def estimated_price(self):
+        """Get the estimated price stored in metadata (used for market
+        orders to track the price estimate at creation time)."""
+        return self.metadata.get("estimated_price")
+
+    @estimated_price.setter
+    def estimated_price(self, value):
+        self.metadata["estimated_price"] = value
+
     def get_size(self):
         """
-        Get the size of the order
+        Get the size of the order. For market orders with an estimated
+        price, uses the estimated price for size calculation.
 
         Returns:
             float: The size of the order
         """
-        return self.get_amount() * self.get_price() \
-            if self.get_price() is not None else 0
+        price = self.get_price()
+
+        if price is None or price == 0:
+            # Fall back to estimated_price for market orders
+            price = self.estimated_price
+
+        return self.get_amount() * price if price is not None else 0

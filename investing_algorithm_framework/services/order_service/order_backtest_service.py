@@ -3,7 +3,7 @@ import logging
 import polars as pl
 
 from investing_algorithm_framework.domain import INDEX_DATETIME, \
-    OrderStatus, OrderSide, Order, DataType
+    OrderStatus, OrderSide, Order, DataType, OrderType
 from .order_service import OrderService
 
 logger = logging.getLogger("investing_algorithm_framework")
@@ -154,6 +154,10 @@ class OrderBacktestService(OrderService):
         ohlcv_data_after_order = ohlcv_data_frame.filter(
             pl.col('Datetime') >= created_at
         )
+
+        # Market orders always execute on the next available candle
+        if OrderType.MARKET.equals(order.get_order_type()):
+            return not ohlcv_data_after_order.is_empty()
 
         # Check if the order execution conditions are met
         if OrderSide.BUY.equals(order_side):
