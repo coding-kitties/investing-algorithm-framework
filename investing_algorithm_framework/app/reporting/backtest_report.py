@@ -10,7 +10,7 @@ from datetime import datetime, timedelta
 from jinja2 import Environment, FileSystemLoader
 
 from investing_algorithm_framework.domain import (
-    Backtest, OperationalException
+    Backtest, OperationalException, tqdm
 )
 
 logger = logging.getLogger("investing_algorithm_framework")
@@ -88,6 +88,70 @@ def _is_na(val):
     return False
 
 
+def _downsample(series, max_points=300):
+    """Downsample a time-series list to at most *max_points* entries.
+
+    Uses the Largest-Triangle-Three-Buckets (LTTB) algorithm to
+    preserve visual fidelity while drastically reducing data size
+    for the browser.  Always keeps the first and last points.
+    """
+    if not series or len(series) <= max_points:
+        return series
+
+    n = len(series)
+    # Each element is [value, date_str]
+    sampled = [series[0]]
+    bucket_size = (n - 2) / (max_points - 2)
+
+    a_idx = 0
+    for i in range(1, max_points - 1):
+        # Calculate bucket boundaries
+        avg_start = int((i) * bucket_size) + 1
+        avg_end = int((i + 1) * bucket_size) + 1
+        if avg_end > n - 1:
+            avg_end = n - 1
+
+        # Average point of next bucket
+        avg_x = 0
+        avg_y = 0
+        count = avg_end - avg_start
+        if count <= 0:
+            count = 1
+            avg_end = avg_start + 1
+        for j in range(avg_start, avg_end):
+            avg_x += j
+            avg_y += series[j][0]
+        avg_x /= count
+        avg_y /= count
+
+        # Current bucket boundaries
+        range_start = int((i - 1) * bucket_size) + 1
+        range_end = int(i * bucket_size) + 1
+        if range_end > n - 1:
+            range_end = n - 1
+
+        # Pick the point with the largest triangle area
+        a_x = a_idx
+        a_y = series[a_idx][0]
+        max_area = -1
+        best_idx = range_start
+
+        for j in range(range_start, range_end):
+            area = abs(
+                (a_x - avg_x) * (series[j][0] - a_y)
+                - (a_x - j) * (avg_y - a_y)
+            ) * 0.5
+            if area > max_area:
+                max_area = area
+                best_idx = j
+
+        sampled.append(series[best_idx])
+        a_idx = best_idx
+
+    sampled.append(series[-1])
+    return sampled
+
+
 @dataclass
 class BacktestReport:
     backtests: List[Backtest] = field(default_factory=list)
@@ -162,6 +226,7 @@ class BacktestReport:
     def open(
         backtests: List[Backtest] = None,
         directory_path: Union[str, List[str], None] = None,
+        show_progress: bool = False,
     ) -> "BacktestReport":
         loaded = []
         source_tags = []
@@ -178,11 +243,12 @@ class BacktestReport:
         else:
             dir_paths = []
 
+        # Collect all backtest paths first for progress tracking
+        backtest_paths = []
         for dp in dir_paths:
             tag = os.path.basename(os.path.normpath(dp))
             if BacktestReport._is_backtest(dp):
-                loaded.append(Backtest.open(dp))
-                source_tags.append(tag)
+                backtest_paths.append((dp, tag))
             else:
                 for root, dirs, _ in os.walk(dp):
                     for dir_name in dirs:
@@ -192,10 +258,20 @@ class BacktestReport:
                         if BacktestReport._is_backtest(
                             subdir
                         ):
-                            loaded.append(
-                                Backtest.open(subdir)
+                            backtest_paths.append(
+                                (subdir, tag)
                             )
-                            source_tags.append(tag)
+
+        iterator = backtest_paths
+        if show_progress:
+            iterator = tqdm(
+                backtest_paths,
+                desc="Loading backtests",
+            )
+
+        for path, tag in iterator:
+            loaded.append(Backtest.open(path))
+            source_tags.append(tag)
 
         for bt in backtests:
             if not isinstance(bt, Backtest):
@@ -339,10 +415,10 @@ class BacktestReport:
                     initial = ec[0][0] if ec else 1
                     if initial == 0:
                         initial = 1
-                    rep_eq = [
+                    rep_eq = _downsample([
                         [(v / initial - 1) * 100, _fmt_date(d)]
                         for v, d in ec
-                    ]
+                    ])
 
             # Run IDs / mappings / labels
             run_ids, run_name_map, run_labels_list = [], {}, []
@@ -679,6 +755,11 @@ class BacktestReport:
                                 getattr(p, 'cost', 0) or 0, 2
                             ),
                         })
+
+                # Downsample heavy time series for browser perf
+                eq = _downsample(eq)
+                dd = _downsample(dd)
+                rs = _downsample(rs)
 
                 run_data[rid] = {
                     'label': label,
