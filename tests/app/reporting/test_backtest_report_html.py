@@ -165,8 +165,11 @@ class TestBacktestReportHtml(TestCase):
         bt2 = _make_backtest("strat_b")
         report = BacktestReport(backtests=[bt1, bt2])
         html = report._build_html()
-        self.assertIn('id="page-strat-0"', html)
-        self.assertIn('id="page-strat-1"', html)
+        # Strategy pages are lazy-rendered by JS on first visit;
+        # verify the container and strategy data are present.
+        self.assertIn('id="strategy-pages-container"', html)
+        self.assertIn('strat-0', html)
+        self.assertIn('strat-1', html)
 
     def test_html_has_finterion_page(self):
         report = BacktestReport(backtests=[_make_backtest()])

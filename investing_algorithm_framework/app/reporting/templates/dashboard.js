@@ -63,6 +63,92 @@ let selectedRunView = 'summary';
   });
 })();
 
+// ===== LAZY STRATEGY PAGE RENDERING =====
+var _renderedStratPages = {};
+
+function ensureStratPage(stratIdx) {
+  if (_renderedStratPages[stratIdx]) return;
+  _renderedStratPages[stratIdx] = true;
+
+  var s = STRATEGIES[stratIdx];
+  if (!s) return;
+  var sid = s.id;
+  var i = stratIdx;
+  var rl = s.runLabels || [];
+
+  var h = '<div class="page" id="page-' + sid + '" style="display:none">';
+  h += '<h2 class="page-title">';
+  h += '<span class="sb-dot" style="background:' + s.color + ';width:12px;height:12px"></span> ';
+  h += escHtmlLazy(s.name);
+  if (s.tag) h += ' <span class="tag-badge">' + escHtmlLazy(s.tag) + '</span>';
+  if (rl.length > 1) {
+    h += ' <select class="view-select strat-window-select" data-strat="' + i + '" onchange="onStratWindowChange(' + i + ', this.value)">';
+    h += '<option value="summary">&Sigma; All Windows</option>';
+    rl.forEach(function(pair) {
+      var rn = pair[0], lab = pair[1];
+      var mapped = s.runNameMap[rn] || '';
+      h += '<option value="' + mapped + '">' + escHtmlLazy(lab) + '</option>';
+    });
+    h += '</select>';
+  }
+  h += '</h2>';
+
+  h += '<div id="' + sid + '-summary-content"></div>';
+  h += '<div id="' + sid + '-parameters"></div>';
+
+  if (rl.length > 1) {
+    h += '<div class="chart-card collapsed"><div class="chart-title">Backtest Runs</div>';
+    h += '<div class="table-wrap"><table class="comp-table" id="strat-runs-table-' + i + '">';
+    h += '<thead><tr><th>Run</th><th>Return</th><th>Sharpe</th><th>Max DD</th><th>Trades</th></tr></thead><tbody>';
+    rl.forEach(function(pair) {
+      var rn = pair[0], lab = pair[1];
+      var mapped = s.runNameMap[rn] || '';
+      h += '<tr data-run="' + mapped + '"><td>' + escHtmlLazy(lab) + '</td><td></td><td></td><td></td><td></td></tr>';
+    });
+    h += '</tbody></table></div></div>';
+  }
+
+  h += '<div class="nav-tabs strat-nav-tabs" id="' + sid + '-tabs">';
+  h += '<div class="tab active" onclick="switchStratTab(\'' + sid + '\',\'performance\')">Performance</div>';
+  h += '<div class="tab" onclick="switchStratTab(\'' + sid + '\',\'trading\')">Trading</div>';
+  h += '</div>';
+
+  h += '<div class="tab-panel active" id="' + sid + '-performance">';
+  h += '<div id="' + sid + '-portfolio-summary"></div>';
+  h += '<div id="' + sid + '-trading-activity"></div>';
+
+  h += '<div class="chart-card"><div class="chart-title" id="eq-title-' + sid + '">Equity Curves (All Runs)</div>';
+  h += '<div class="chart-wrap"><canvas id="c-' + sid + '-eq"></canvas><div class="tooltip" id="tt-' + sid + '-eq"></div></div></div>';
+
+  h += '<div class="chart-card"><div class="chart-title" id="rs-title-' + sid + '">Rolling Sharpe Ratio (All Runs)</div>';
+  h += '<div class="chart-wrap"><canvas id="c-' + sid + '-rsharpe"></canvas><div class="tooltip" id="tt-' + sid + '-rsharpe"></div></div></div>';
+
+  h += '<div class="chart-card"><div class="chart-title" id="dd-title-' + sid + '">Drawdown (All Runs)</div>';
+  h += '<div class="chart-wrap"><canvas id="c-' + sid + '-dd"></canvas><div class="tooltip" id="tt-' + sid + '-dd"></div></div></div>';
+
+  h += '<div id="' + sid + '-monthly-returns"></div>';
+  h += '<div id="' + sid + '-yearly-returns"></div>';
+  h += '<div id="' + sid + '-return-scenarios"></div>';
+  h += '</div>';
+
+  h += '<div class="tab-panel" id="' + sid + '-trading">';
+  h += '<div id="' + sid + '-timeline-scatter"></div>';
+  h += '<div id="' + sid + '-trades-table"></div>';
+  h += '<div id="' + sid + '-orders-table"></div>';
+  h += '<div id="' + sid + '-positions-table"></div>';
+  h += '</div>';
+
+  h += '</div>';
+
+  var container = document.getElementById('strategy-pages-container');
+  if (container) container.insertAdjacentHTML('beforeend', h);
+}
+
+function escHtmlLazy(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
 function onOverviewWindowChange(value) {
   onRunViewChange(value);
 }
@@ -448,6 +534,10 @@ function syncSbChallenger() {
 }
 
 function showPage(pageId) {
+  // Lazy-render strategy pages on first visit
+  var stratMatch = pageId.match(/^strat-(\d+)$/);
+  if (stratMatch) ensureStratPage(parseInt(stratMatch[1]));
+
   document.querySelectorAll('.page').forEach(p => p.style.display = 'none');
   const target = document.getElementById('page-' + pageId);
   if (target) target.style.display = 'block';
@@ -4494,8 +4584,9 @@ function drawPageCharts(pageId) {
 
 // ===== POPULATE RUNS TAB CELLS =====
 function populateRunsTabs() {
+  // Only populate runs tables for already-rendered strategy pages
   STRATEGIES.forEach((s, idx) => {
-    populateStratRunsTable(idx);
+    if (_renderedStratPages[idx]) populateStratRunsTable(idx);
   });
 }
 
@@ -6468,6 +6559,17 @@ function updateStratTables(stratIdx) {
 }
 
 // ===== INIT =====
+// Auto-select top 10 by CAGR when there are more than 10 strategies
+if (!IS_SINGLE && STRATEGIES.length > 10) {
+  var _initIndices = STRATEGIES.map(function(_,i){return i;});
+  _initIndices.sort(function(a,b) {
+    var ca = STRATEGIES[a].summary.cagr, cb = STRATEGIES[b].summary.cagr;
+    if (ca == null) ca = -Infinity;
+    if (cb == null) cb = -Infinity;
+    return cb - ca;
+  });
+  _initIndices.slice(0, 10).forEach(function(i){ selectedForCompare.add(i); });
+}
 buildBenchmarkChips();
 rebuildWindowCoverage();
 rebuildOverviewKPIs();
@@ -6476,6 +6578,7 @@ rebuildOverviewTradingActivity();
 rebuildReturnScenarios();
 initCollapseButtons();
 syncModalCount();
+syncMainTableCheckboxes();
 populateRunsTabs();
 drawPageCharts('overview');
 renderNotesList();
