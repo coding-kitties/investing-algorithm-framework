@@ -20,7 +20,7 @@
     <img src="https://img.shields.io/badge/apache%202.0-blue.svg?style=flat-square&label=license" alt="license" style="height: 20px;">
   </a>
   <br>
-  <a href="https://discord.gg/dQsRmGZP">
+  <a href="https://discord.gg/jQsnnYZgzR">
     <img src="https://img.shields.io/badge/discord-7289da.svg?style=flat-square&logo=discord" alt="discord" style="height: 20px;">
   </a>
   <a href="https://www.reddit.com/r/InvestingBots/">
@@ -33,6 +33,12 @@
 
 <p align="center">
     <img src="static/showcase.svg" alt="dashboard" style="max-width: 100%;">
+</p>
+
+<p align="center">
+  <a href="https://discord.gg/jQsnnYZgzR">
+    <img src="https://img.shields.io/badge/Join%20our%20Discord-7289DA?style=for-the-badge&logo=discord&logoColor=white" alt="Join our Discord">
+  </a>
 </p>
 
 <p align="center">

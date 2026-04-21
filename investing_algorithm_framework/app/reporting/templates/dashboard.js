@@ -3081,17 +3081,66 @@ function buildComparePage() {
   // Monthly Returns (rows / heatmap / growth)
   buildCompareMonthlyReturns(indices);
 
-  // Yearly returns
+  // Yearly returns (comparison table)
   const yrEl = document.getElementById('compare-yearly');
   if (yrEl) {
-    let html = '<div class="chart-card">';
-    html += '<div class="chart-title">Yearly Returns</div>';
-    indices.forEach(i => {
-      var isChalYr = challengerIdx === i;
-      html += '<div style="margin-bottom:1.25rem'+(isChalYr ? ';border-left:3px solid var(--accent);padding-left:0.5rem' : '')+'"><div style="font-size:0.72rem;font-weight:500;color:var(--text-secondary);margin-bottom:0.5rem;display:flex;align-items:center;gap:0.3rem"><span class="sb-dot" style="background:'+STRATEGIES[i].color+'"></span>'+(isChalYr ? '\u2691 ' : '')+STRATEGIES[i].name+(STRATEGIES[i].tag ? ' <span class="tag-badge">'+STRATEGIES[i].tag+'</span>' : '')+'</div><div class="chart-wrap chart-sm"><canvas id="c-compare-yearly-'+i+'"></canvas></div></div>';
+    // Collect all years across all strategies
+    var allYears = new Set();
+    indices.forEach(function(i) {
+      var rd = getViewRunData(i);
+      if (rd && rd.YR) rd.YR.forEach(function(d) { allYears.add(d[1]); });
     });
-    html += '</div>';
-    yrEl.innerHTML = html;
+    var years = Array.from(allYears).sort();
+
+    if (years.length === 0) {
+      yrEl.innerHTML = '';
+    } else {
+      var html = '<div class="chart-card">';
+      html += '<div class="chart-title">Yearly Returns</div>';
+      html += '<div class="table-wrap"><table class="comp-table"><thead><tr>';
+      html += '<th class="sticky-col">Strategy</th>';
+      years.forEach(function(y) { html += '<th>' + y + '</th>'; });
+      html += '</tr></thead><tbody>';
+
+      // Find best per year for highlighting
+      var bestPerYear = {};
+      years.forEach(function(y) {
+        var bestVal = -Infinity, bestIdx = -1;
+        indices.forEach(function(i) {
+          var rd = getViewRunData(i);
+          if (!rd || !rd.YR) return;
+          var match = rd.YR.find(function(d) { return d[1] === y; });
+          if (match && match[0] > bestVal) { bestVal = match[0]; bestIdx = i; }
+        });
+        if (bestIdx >= 0) bestPerYear[y] = bestIdx;
+      });
+
+      indices.forEach(function(i) {
+        var s = STRATEGIES[i];
+        var rd = getViewRunData(i);
+        var yrMap = {};
+        if (rd && rd.YR) rd.YR.forEach(function(d) { yrMap[d[1]] = d[0]; });
+        var isChal = challengerIdx === i;
+        html += '<tr class="comp-row' + (isChal ? ' challenger-row' : '') + '">';
+        html += '<td class="sticky-col"><span class="sb-dot" style="background:' + s.color + '"></span>' + s.name + (s.tag ? ' <span class="tag-badge">' + s.tag + '</span>' : '') + '</td>';
+        years.forEach(function(y) {
+          var v = yrMap[y];
+          var isBest = bestPerYear[y] === i && indices.length > 1;
+          var cls = isBest ? ' class="best-cell"' : '';
+          if (v == null) {
+            html += '<td' + cls + '>\u2014</td>';
+          } else {
+            var pct = (v * 100).toFixed(1);
+            var color = v >= 0 ? 'var(--green)' : 'var(--red)';
+            html += '<td' + cls + '><span style="color:' + color + ';font-weight:600">' + (v >= 0 ? '+' : '') + pct + '%</span></td>';
+          }
+        });
+        html += '</tr>';
+      });
+
+      html += '</tbody></table></div></div>';
+      yrEl.innerHTML = html;
+    }
   }
 }
 
@@ -3537,12 +3586,6 @@ function drawCompareExtras() {
 
   // Relative Performance
   drawRelativePerformance();
-
-  // Draw yearly bar charts
-  indices.forEach(i => {
-    const rd = getViewRunData(i);
-    if (rd && rd.YR) drawBarChart('c-compare-yearly-'+i, rd.YR);
-  });
 }
 
 function drawCompareDrawdown(indices) {

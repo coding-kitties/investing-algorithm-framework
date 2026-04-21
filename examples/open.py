@@ -2,10 +2,8 @@ import os
 from investing_algorithm_framework import BacktestReport, recalculate_backtests, retag_backtests
 
 
-batch_one_path = os.path.join(os.path.dirname(__file__), "batch_one")
+batch_one_path = os.path.join(os.path.dirname(__file__), "tutorial/backtest_results/in_sample")
 
 if __name__ == "__main__":
-    retag_backtests("batch_one", directory_path=batch_one_path)
     report = BacktestReport.open(directory_path=batch_one_path)
-    recalculate_backtests(report.backtests)
     report.show()
