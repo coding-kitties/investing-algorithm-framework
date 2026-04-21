@@ -53,34 +53,28 @@ class Context:
 
     def _validate_target_symbol(self, target_symbol, market=None):
         """
-        Validate that the target_symbol is a known symbol by checking
-        against registered data source symbols.
+        Validate that the target_symbol combined with the portfolio's
+        trading_symbol does not result in trading_symbol/trading_symbol
+        (e.g., EUR/EUR), which is a nonsensical order.
 
         Args:
-            target_symbol: The symbol to validate (e.g., "BTC" or "BTC/EUR")
+            target_symbol: The symbol of the asset to trade
             market: The market to check against
 
         Raises:
-            OperationalException: If the symbol is not recognized
+            OperationalException: If target_symbol equals
+              the trading_symbol
         """
-        known_symbols = set()
+        portfolio = self.portfolio_service.find({"market": market})
+        trading_symbol = portfolio.trading_symbol.upper()
 
-        # Collect symbols from registered data sources
-        if self.data_provider_service.data_provider_index is not None:
-            for data_source, _ in \
-                    self.data_provider_service \
-                    .data_provider_index.get_all():
-                if data_source.symbol is not None:
-                    known_symbols.add(data_source.symbol.upper())
-
-        target = target_symbol.upper()
-
-        if target not in known_symbols:
-            sorted_symbols = sorted(known_symbols)
+        if target_symbol.upper() == trading_symbol:
             raise OperationalException(
-                f"Symbol '{target_symbol}' is not a known asset. "
-                f"Known symbols: {sorted_symbols}. "
-                f"Check for typos or add a DataSource for this symbol. "
+                f"target_symbol '{target_symbol}' is the same as "
+                f"the trading_symbol '{portfolio.trading_symbol}'. "
+                f"This would result in a "
+                f"'{portfolio.trading_symbol}/{portfolio.trading_symbol}' "
+                f"order which is not valid. "
                 f"To skip this check, set validate_symbol=False "
                 f"or omit the parameter."
             )
@@ -132,7 +126,7 @@ class Context:
             sync: If set to True, the created order will be synced
             with the portfolio of the algorithm.
             validate_symbol: Default False. If set to True,
-              the target_symbol will be validated against known symbols.
+              validates that target_symbol is not the trading_symbol.
 
         Returns:
             The order created
@@ -235,8 +229,7 @@ class Context:
               the created order will be synced with the
                 portfolio of the algorithm
             validate_symbol (optional): Default False. If set to True,
-              the target_symbol will be validated against known symbols
-              from registered data sources.
+              validates that target_symbol is not the trading_symbol.
 
         Returns:
             Order: Instance of the order created
