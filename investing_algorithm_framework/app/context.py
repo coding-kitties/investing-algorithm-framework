@@ -51,6 +51,59 @@ class Context:
         self.trade_take_profit_service: TradeTakeProfitService = \
             trade_take_profit_service
 
+    def _validate_target_symbol(self, target_symbol, market=None):
+        """
+        Validate that the target_symbol is a known symbol by checking
+        against registered data sources and existing portfolio positions.
+
+        Args:
+            target_symbol: The symbol to validate (e.g., "BTC" or "BTC/EUR")
+            market: The market to check against
+
+        Raises:
+            OperationalException: If the symbol is not recognized
+        """
+        known_symbols = set()
+
+        # Collect symbols from registered data sources
+        if self.data_provider_service.data_provider_index is not None:
+            for data_source, _ in \
+                    self.data_provider_service \
+                    .data_provider_index.get_all():
+                if data_source.symbol is not None:
+                    known_symbols.add(data_source.symbol.upper())
+
+        # Collect symbols from existing portfolio positions
+        portfolio = self.portfolio_service.find({"market": market})
+
+        if portfolio is not None:
+            positions = self.position_service.get_all(
+                {"portfolio": portfolio.id}
+            )
+
+            for position in positions:
+                if position.symbol is not None:
+                    symbol = f"{position.symbol.upper()}" \
+                        f"/{portfolio.trading_symbol.upper()}"
+                    known_symbols.add(symbol)
+
+        # Build the full symbol for comparison
+        full_symbol = target_symbol.upper()
+
+        if "/" not in full_symbol and portfolio is not None:
+            full_symbol = \
+                f"{full_symbol}/{portfolio.trading_symbol.upper()}"
+
+        if full_symbol not in known_symbols:
+            sorted_symbols = sorted(known_symbols)
+            raise OperationalException(
+                f"Symbol '{target_symbol}' is not a known asset. "
+                f"Known symbols: {sorted_symbols}. "
+                f"Check for typos or add a DataSource for this symbol. "
+                f"To skip this check, set validate_symbol=False "
+                f"or omit the parameter."
+            )
+
     @property
     def config(self):
         """
@@ -78,7 +131,8 @@ class Context:
         market=None,
         execute=True,
         validate=True,
-        sync=True
+        sync=True,
+        validate_symbol=False
     ) -> Order:
         """
         Function to create an order. This function will create an order
@@ -96,10 +150,15 @@ class Context:
             validate: If set to True, the order will be validated
             sync: If set to True, the created order will be synced
             with the portfolio of the algorithm.
+            validate_symbol: Default False. If set to True,
+              the target_symbol will be validated against known symbols.
 
         Returns:
             The order created
         """
+        if validate_symbol:
+            self._validate_target_symbol(target_symbol, market=market)
+
         portfolio = self.portfolio_service.find({"market": market})
         order_data = {
             "target_symbol": target_symbol,
@@ -162,7 +221,8 @@ class Context:
         execute=True,
         validate=True,
         sync=True,
-        metadata=None
+        metadata=None,
+        validate_symbol=False
     ) -> Order:
         """
         Function to create a limit order. This function will create a limit
@@ -193,10 +253,16 @@ class Context:
             sync (optional): Default True. If set to True,
               the created order will be synced with the
                 portfolio of the algorithm
+            validate_symbol (optional): Default False. If set to True,
+              the target_symbol will be validated against known symbols
+              from registered data sources and portfolio positions.
 
         Returns:
             Order: Instance of the order created
         """
+        if validate_symbol:
+            self._validate_target_symbol(target_symbol, market=market)
+
         portfolio = self.portfolio_service.find({"market": market})
 
         if percentage_of_portfolio is not None:
