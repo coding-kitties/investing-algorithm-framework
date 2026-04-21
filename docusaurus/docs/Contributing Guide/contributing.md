@@ -56,9 +56,9 @@ Before contributing, ensure you have:
 ### Creating a Feature Branch
 
 ```bash
-# Make sure you're on main and up to date
-git checkout main
-git pull upstream main
+# Make sure you're on dev and up to date
+git checkout dev
+git pull upstream dev
 
 # Create a new feature branch
 git checkout -b feature/your-feature-name
