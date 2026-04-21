@@ -288,10 +288,6 @@ body { font-family:'Inter',-apple-system,sans-serif; background:var(--bg); color
 .fin-bottom-cta p { font-size:0.85rem; color:var(--text-secondary); margin-bottom:0; }
 .dot { width:8px; height:8px; border-radius:50%; display:inline-block; }
 
-/* gen-note */
-.gen-note { text-align:center; padding:2rem 0 1rem; color:var(--text-dim); font-size:0.72rem; position:fixed; bottom:0; left:260px; right:0; background:var(--bg); border-top:1px solid var(--border); z-index:5; }
-.gen-note a { color:var(--accent); text-decoration:none; }
-
 /* compare */
 .compare-btn { display:none; align-items:center; gap:0.4rem; font-family:'Inter',sans-serif; font-size:0.85rem; font-weight:600; padding:0.65rem 1.5rem; border-radius:10px; border:none; background:var(--accent); color:#000; cursor:pointer; position:fixed; bottom:2rem; left:50%; transform:translateX(-50%); z-index:1000; box-shadow:0 4px 20px rgba(0,0,0,0.4); transition:all 0.25s ease; }
 .compare-btn:hover { opacity:0.9; transform:translateX(-50%) scale(1.03); }
@@ -321,8 +317,6 @@ body { font-family:'Inter',-apple-system,sans-serif; background:var(--bg); color
 .notes-pane.expanded.open { right:0; }
 body.notes-open .main { width:calc(100vw - 260px - 420px); }
 body.notes-open.notes-expanded .main { width:calc(100vw - 260px - 50vw); }
-body.notes-open .gen-note { right:420px; }
-body.notes-open.notes-expanded .gen-note { right:50vw; }
 body.notes-open .top-controls { right:calc(420px + 1.25rem); }
 body.notes-open.notes-expanded .top-controls { right:calc(50vw + 1.25rem); }
 
@@ -511,11 +505,9 @@ body.notes-open.notes-expanded .top-controls { right:calc(50vw + 1.25rem); }
 @media (max-width:900px) {
   .sidebar { display:none; }
   .main { margin-left:0; padding:1.5rem 1rem 4rem; }
-  .gen-note { left:0; }
   .grid-2x2 { grid-template-columns:1fr; }
   .grid-2x3 { grid-template-columns:1fr; }
   .notes-pane { width:100%; right:-100%; }
   body.notes-open .main { width:100%; }
-  body.notes-open .gen-note { right:0; }
   body.notes-open .top-controls { right:1.25rem; }
 }

@@ -45,5 +45,13 @@
     "var_95": 0.0,
     "cvar_95": 0.0,
     "max_consecutive_wins": 0,
-    "max_consecutive_losses": 0
+    "max_consecutive_losses": 0,
+    "return_consistency": null,
+    "win_rate_consistency": null,
+    "sharpe_consistency": null,
+    "consistency_score": null,
+    "return_stability": null,
+    "win_rate_stability": null,
+    "sharpe_stability": null,
+    "stability_score": null
 }
