@@ -1,8 +1,15 @@
 
+import sys
+from pathlib import Path
 from typing import Dict, Any
 
 import pandas as pd
 from pyindicators import ema, rsi, crossover, crossunder
+
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, PositionSize, StopLossRule, TakeProfitRule, \

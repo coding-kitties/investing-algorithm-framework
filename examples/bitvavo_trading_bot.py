@@ -1,6 +1,13 @@
+import sys
+from pathlib import Path
 from dotenv import load_dotenv
 from typing import Dict, Any
 import logging.config
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from investing_algorithm_framework import TimeUnit, TradingStrategy, \
     create_app, DEFAULT_LOGGING_CONFIG, Context, DataSource

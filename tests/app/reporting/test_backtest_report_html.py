@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from unittest import TestCase
 
 from investing_algorithm_framework.app.reporting import BacktestReport
+from investing_algorithm_framework.app.reporting import backtest_report
 from investing_algorithm_framework.domain import (
     Backtest, BacktestRun, BacktestMetrics, PortfolioSnapshot,
     BacktestDateRange, OperationalException,
@@ -211,7 +212,7 @@ class TestBacktestReportSave(TestCase):
         report.save(path)
         self.assertTrue(os.path.isfile(path))
 
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             content = f.read()
         self.assertIn("<!DOCTYPE html>", content)
         self.assertIn("const STRATEGIES", content)
@@ -222,6 +223,38 @@ class TestBacktestReportSave(TestCase):
         report.save(path)
         # html_report should be cached now
         self.assertIsNotNone(report.html_report)
+
+    def test_save_writes_utf8_html(self):
+        report = BacktestReport(backtests=[_make_backtest()])
+        report.html_report = "<html><body>Euro: EUR, symbol: EUR, emoji: 🚀</body></html>"
+        path = os.path.join(self.tmp_dir, "report.html")
+
+        report.save(path)
+
+        with open(path, encoding="utf-8") as f:
+            self.assertEqual(f.read(), report.html_report)
+
+
+class TestBacktestReportEncoding(TestCase):
+    def test_read_template_uses_utf8(self):
+        tmp_dir = tempfile.mkdtemp()
+        try:
+            template_path = os.path.join(tmp_dir, "dashboard.css")
+            expected = "Euro: EUR, symbol: EUR, emoji: 🚀"
+            with open(template_path, "w", encoding="utf-8") as f:
+                f.write(expected)
+
+            original_dir = backtest_report._TEMPLATE_DIR
+            backtest_report._TEMPLATE_DIR = tmp_dir
+            try:
+                self.assertEqual(
+                    backtest_report._read_template("dashboard.css"),
+                    expected,
+                )
+            finally:
+                backtest_report._TEMPLATE_DIR = original_dir
+        finally:
+            shutil.rmtree(tmp_dir)
 
 
 class TestBacktestReportDataTransform(TestCase):
