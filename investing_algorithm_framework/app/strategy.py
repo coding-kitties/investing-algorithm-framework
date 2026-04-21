@@ -939,7 +939,8 @@ class TradingStrategy:
         execute=True,
         validate=True,
         sync=True,
-        metadata=None
+        metadata=None,
+        validate_symbol=False
     ) -> Order:
         """
         Function to create a limit order. This function will create
@@ -986,7 +987,8 @@ class TradingStrategy:
             execute=execute,
             validate=validate,
             sync=sync,
-            metadata=metadata
+            metadata=metadata,
+            validate_symbol=validate_symbol
         )
 
     def close_position(
