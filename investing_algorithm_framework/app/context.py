@@ -54,7 +54,7 @@ class Context:
     def _validate_target_symbol(self, target_symbol, market=None):
         """
         Validate that the target_symbol is a known symbol by checking
-        against registered data sources and existing portfolio positions.
+        against registered data source symbols.
 
         Args:
             target_symbol: The symbol to validate (e.g., "BTC" or "BTC/EUR")
@@ -73,28 +73,9 @@ class Context:
                 if data_source.symbol is not None:
                     known_symbols.add(data_source.symbol.upper())
 
-        # Collect symbols from existing portfolio positions
-        portfolio = self.portfolio_service.find({"market": market})
+        target = target_symbol.upper()
 
-        if portfolio is not None:
-            positions = self.position_service.get_all(
-                {"portfolio": portfolio.id}
-            )
-
-            for position in positions:
-                if position.symbol is not None:
-                    symbol = f"{position.symbol.upper()}" \
-                        f"/{portfolio.trading_symbol.upper()}"
-                    known_symbols.add(symbol)
-
-        # Build the full symbol for comparison
-        full_symbol = target_symbol.upper()
-
-        if "/" not in full_symbol and portfolio is not None:
-            full_symbol = \
-                f"{full_symbol}/{portfolio.trading_symbol.upper()}"
-
-        if full_symbol not in known_symbols:
+        if target not in known_symbols:
             sorted_symbols = sorted(known_symbols)
             raise OperationalException(
                 f"Symbol '{target_symbol}' is not a known asset. "
@@ -255,7 +236,7 @@ class Context:
                 portfolio of the algorithm
             validate_symbol (optional): Default False. If set to True,
               the target_symbol will be validated against known symbols
-              from registered data sources and portfolio positions.
+              from registered data sources.
 
         Returns:
             Order: Instance of the order created

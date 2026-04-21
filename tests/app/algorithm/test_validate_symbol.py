@@ -88,14 +88,14 @@ class TestValidateSymbol(TestBase):
         self._register_data_source("BTC/EUR")
 
         self.app.context.create_limit_order(
-            target_symbol="BTC",
+            target_symbol="BTC/EUR",
             amount=1,
             price=10,
             order_side=OrderSide.BUY,
             validate_symbol=True,
         )
         order_repository = self.app.container.order_repository()
-        order = order_repository.find({"target_symbol": "BTC"})
+        order = order_repository.find({"target_symbol": "BTC/EUR"})
         self.assertIsNotNone(order)
 
     def test_validate_symbol_true_multiple_data_sources(self):
@@ -104,22 +104,22 @@ class TestValidateSymbol(TestBase):
         self._register_data_source("BTC/EUR")
         self._register_data_source("ETH/EUR")
 
-        # ETH should pass
+        # ETH/EUR should pass
         self.app.context.create_limit_order(
-            target_symbol="ETH",
+            target_symbol="ETH/EUR",
             amount=1,
             price=10,
             order_side=OrderSide.BUY,
             validate_symbol=True,
         )
         order_repository = self.app.container.order_repository()
-        order = order_repository.find({"target_symbol": "ETH"})
+        order = order_repository.find({"target_symbol": "ETH/EUR"})
         self.assertIsNotNone(order)
 
-        # SOL should fail
+        # SOL/EUR should fail
         with self.assertRaises(OperationalException):
             self.app.context.create_limit_order(
-                target_symbol="SOL",
+                target_symbol="SOL/EUR",
                 amount=1,
                 price=10,
                 order_side=OrderSide.BUY,
