@@ -203,13 +203,13 @@ class TestPolygonTimeFrame(TestCase):
     def test_supported_timeframes(self):
         for tf in ["1m", "5m", "15m", "30m", "1h", "1d", "1W", "1M"]:
             provider = PolygonOHLCVDataProvider(time_frame=tf)
-            config = provider._get_polygon_config()
+            config = provider._get_provider_interval()
             self.assertIsNotNone(config)
 
     def test_unsupported_timeframe_raises(self):
         provider = PolygonOHLCVDataProvider(time_frame="2m")
         with self.assertRaises(Exception) as cm:
-            provider._get_polygon_config()
+            provider._get_provider_interval()
         self.assertIn("not supported", str(cm.exception))
 
 

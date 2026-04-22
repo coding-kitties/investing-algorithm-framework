@@ -28,7 +28,8 @@ from .domain import ApiException, combine_backtests, PositionSize, \
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, \
     CCXTOHLCVDataProvider, CCXTTickerDataProvider, \
-    PandasOHLCVDataProvider, YahooOHLCVDataProvider, \
+    PandasOHLCVDataProvider, OHLCVDataProviderBase, \
+    YahooOHLCVDataProvider, \
     AlphaVantageOHLCVDataProvider, PolygonOHLCVDataProvider, \
     AWSS3StorageStateHandler
 from .create_app import create_app
@@ -117,6 +118,7 @@ __all__ = [
     'CSVTickerDataProvider',
     "CCXTOHLCVDataProvider",
     "CCXTTickerDataProvider",
+    "OHLCVDataProviderBase",
     "YahooOHLCVDataProvider",
     "AlphaVantageOHLCVDataProvider",
     "PolygonOHLCVDataProvider",

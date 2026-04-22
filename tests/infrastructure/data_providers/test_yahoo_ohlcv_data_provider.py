@@ -203,13 +203,13 @@ class TestYahooOHLCVDataProviderTimeFrame(TestCase):
     def test_supported_timeframes(self):
         for tf in ["1m", "2m", "5m", "15m", "30m", "1h", "1d", "1W", "1M"]:
             provider = YahooOHLCVDataProvider(time_frame=tf)
-            interval = provider._get_yfinance_interval()
+            interval = provider._get_provider_interval()
             self.assertIsNotNone(interval)
 
     def test_unsupported_timeframe_raises(self):
         provider = YahooOHLCVDataProvider(time_frame="3d")
         with self.assertRaises(Exception) as cm:
-            provider._get_yfinance_interval()
+            provider._get_provider_interval()
         self.assertIn("not supported", str(cm.exception))
 
 

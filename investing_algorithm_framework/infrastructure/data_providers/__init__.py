@@ -1,6 +1,7 @@
 from .ccxt import CCXTOHLCVDataProvider, CCXTTickerDataProvider
 from .csv import CSVOHLCVDataProvider, CSVTickerDataProvider
 from .pandas import PandasOHLCVDataProvider
+from .ohlcv_base import OHLCVDataProviderBase
 from .yahoo import YahooOHLCVDataProvider
 from .alpha_vantage import AlphaVantageOHLCVDataProvider
 from .polygon import PolygonOHLCVDataProvider
@@ -44,6 +45,7 @@ __all__ = [
     'CCXTTickerDataProvider',
     'get_default_data_providers',
     'get_default_ohlcv_data_providers',
+    'OHLCVDataProviderBase',
     'PandasOHLCVDataProvider',
     'YahooOHLCVDataProvider',
     'AlphaVantageOHLCVDataProvider',
