@@ -939,7 +939,8 @@ class TradingStrategy:
         execute=True,
         validate=True,
         sync=True,
-        metadata=None
+        metadata=None,
+        validate_symbol=False
     ) -> Order:
         """
         Function to create a limit order. This function will create
@@ -975,6 +976,70 @@ class TradingStrategy:
         return self.context.create_limit_order(
             target_symbol=target_symbol,
             price=price,
+            order_side=order_side,
+            amount=amount,
+            amount_trading_symbol=amount_trading_symbol,
+            percentage=percentage,
+            percentage_of_portfolio=percentage_of_portfolio,
+            percentage_of_position=percentage_of_position,
+            precision=precision,
+            market=market,
+            execute=execute,
+            validate=validate,
+            sync=sync,
+            metadata=metadata,
+            validate_symbol=validate_symbol
+        )
+
+    def create_market_order(
+        self,
+        target_symbol,
+        order_side,
+        amount=None,
+        amount_trading_symbol=None,
+        percentage=None,
+        percentage_of_portfolio=None,
+        percentage_of_position=None,
+        precision=None,
+        market=None,
+        execute=True,
+        validate=True,
+        sync=True,
+        metadata=None
+    ) -> Order:
+        """
+        Function to create a market order. Market orders execute at
+        the best available price. In backtesting, this means the
+        open price of the next candle (+ slippage).
+
+        Args:
+            target_symbol: The symbol of the asset to trade
+            order_side: The side of the order (BUY or SELL)
+            amount (optional): The amount of the asset to trade
+            amount_trading_symbol (optional): The amount of the trading
+              symbol to trade
+            percentage (optional): The percentage of the portfolio to
+                allocate to the order
+            percentage_of_portfolio (optional): The percentage of
+              the portfolio to allocate to the order
+            percentage_of_position (optional): The percentage of
+              the position to allocate to the order.
+              (Only supported for SELL orders)
+            precision (optional): The precision of the amount
+            market (optional): The market to trade the asset
+            execute (optional): Default True. If set to True, the order
+              will be executed
+            validate (optional): Default True. If set to True, the order
+              will be validated
+            sync (optional): Default True. If set to True, the created
+              order will be synced with the portfolio of the context
+            metadata (optional): Additional metadata for the order
+
+        Returns:
+            Order: Instance of the order created
+        """
+        return self.context.create_market_order(
+            target_symbol=target_symbol,
             order_side=order_side,
             amount=amount,
             amount_trading_symbol=amount_trading_symbol,

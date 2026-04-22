@@ -211,7 +211,7 @@ class TestBacktestReportSave(TestCase):
         report.save(path)
         self.assertTrue(os.path.isfile(path))
 
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             content = f.read()
         self.assertIn("<!DOCTYPE html>", content)
         self.assertIn("const STRATEGIES", content)

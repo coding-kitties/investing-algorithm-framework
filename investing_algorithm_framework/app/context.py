@@ -51,6 +51,57 @@ class Context:
         self.trade_take_profit_service: TradeTakeProfitService = \
             trade_take_profit_service
 
+    def _validate_target_symbol(self, target_symbol, market=None):
+        """
+        Validate the target_symbol for order creation:
+        1. Prevents orders where target_symbol equals trading_symbol
+           (e.g. EUR/EUR).
+        2. Checks that a data source exists for the
+           target_symbol/trading_symbol combination (e.g. BTC/EUR).
+
+        Args:
+            target_symbol: The symbol of the asset to trade
+            market: The market to check against
+
+        Raises:
+            OperationalException: If validation fails
+        """
+        portfolio = self.portfolio_service.find({"market": market})
+        trading_symbol = portfolio.trading_symbol
+
+        # Check target_symbol != trading_symbol
+        if target_symbol.upper() == trading_symbol.upper():
+            raise OperationalException(
+                f"target_symbol '{target_symbol}' is the same as "
+                f"the trading_symbol '{trading_symbol}'. "
+                f"This would result in a "
+                f"'{trading_symbol}/{trading_symbol}' "
+                f"order which is not valid. "
+                f"To skip this check, set validate_symbol=False "
+                f"or omit the parameter."
+            )
+
+        # Check that a data source is registered for this pair
+        expected_symbol = f"{target_symbol}/{trading_symbol}".upper()
+        known_symbols = set()
+
+        if self.data_provider_service.data_provider_index is not None:
+            for data_source, _ in \
+                    self.data_provider_service \
+                    .data_provider_index.get_all():
+                if data_source.symbol is not None:
+                    known_symbols.add(data_source.symbol.upper())
+
+        if expected_symbol not in known_symbols:
+            sorted_symbols = sorted(known_symbols)
+            raise OperationalException(
+                f"No data source registered for '{expected_symbol}'. "
+                f"A data source is required to track price history. "
+                f"Registered data source symbols: {sorted_symbols}. "
+                f"To skip this check, set validate_symbol=False "
+                f"or omit the parameter."
+            )
+
     @property
     def config(self):
         """
@@ -78,7 +129,8 @@ class Context:
         market=None,
         execute=True,
         validate=True,
-        sync=True
+        sync=True,
+        validate_symbol=False
     ) -> Order:
         """
         Function to create an order. This function will create an order
@@ -96,10 +148,15 @@ class Context:
             validate: If set to True, the order will be validated
             sync: If set to True, the created order will be synced
             with the portfolio of the algorithm.
+            validate_symbol: Default False. If set to True,
+              validates that target_symbol is not the trading_symbol.
 
         Returns:
             The order created
         """
+        if validate_symbol:
+            self._validate_target_symbol(target_symbol, market=market)
+
         portfolio = self.portfolio_service.find({"market": market})
         order_data = {
             "target_symbol": target_symbol,
@@ -162,7 +219,8 @@ class Context:
         execute=True,
         validate=True,
         sync=True,
-        metadata=None
+        metadata=None,
+        validate_symbol=False
     ) -> Order:
         """
         Function to create a limit order. This function will create a limit
@@ -193,10 +251,15 @@ class Context:
             sync (optional): Default True. If set to True,
               the created order will be synced with the
                 portfolio of the algorithm
+            validate_symbol (optional): Default False. If set to True,
+              validates that target_symbol is not the trading_symbol.
 
         Returns:
             Order: Instance of the order created
         """
+        if validate_symbol:
+            self._validate_target_symbol(target_symbol, market=market)
+
         portfolio = self.portfolio_service.find({"market": market})
 
         if percentage_of_portfolio is not None:
@@ -268,6 +331,225 @@ class Context:
 
         return self.order_service.create(
             order_data, execute=execute, validate=validate, sync=sync
+        )
+
+    def create_market_order(
+        self,
+        target_symbol,
+        order_side,
+        amount=None,
+        amount_trading_symbol=None,
+        percentage=None,
+        percentage_of_portfolio=None,
+        percentage_of_position=None,
+        precision=None,
+        market=None,
+        execute=True,
+        validate=True,
+        sync=True,
+        metadata=None
+    ) -> Order:
+        """
+        Function to create a market order. Market orders execute at
+        the best available price. In backtesting, this means the
+        open price of the next candle (+ slippage).
+
+        An estimated price (current latest price) is used for amount
+        calculation and cash reservation. The actual fill price is
+        determined at fill time and the portfolio is reconciled.
+
+        Args:
+            target_symbol: The symbol of the asset to trade
+            order_side: The side of the order (BUY or SELL)
+            amount (optional): The amount of the asset to trade
+            amount_trading_symbol (optional): The amount of the
+              trading symbol to trade
+            percentage (optional): The percentage of the portfolio
+              to allocate to the order
+            percentage_of_portfolio (optional): The percentage
+              of the portfolio to allocate to the order
+            percentage_of_position (optional): The percentage
+              of the position to allocate to the
+                order. (Only supported for SELL orders)
+            precision (optional): The precision of the amount
+            market (optional): The market to trade the asset
+            execute (optional): Default True. If set to True,
+              the order will be executed
+            validate (optional): Default True. If set to
+              True, the order will be validated
+            sync (optional): Default True. If set to True,
+              the created order will be synced with the
+                portfolio of the algorithm
+            metadata (optional): Additional metadata for the order
+
+        Returns:
+            Order: Instance of the order created
+        """
+        portfolio = self.portfolio_service.find({"market": market})
+        full_symbol = (f"{target_symbol}/{portfolio.trading_symbol}")
+        estimated_price = self.get_latest_price(full_symbol, market=market)
+
+        if estimated_price is None:
+            raise OperationalException(
+                f"Cannot create market order for {target_symbol}: "
+                f"no price data available to estimate order size."
+            )
+
+        if percentage_of_portfolio is not None:
+            if not OrderSide.BUY.equals(order_side):
+                raise OperationalException(
+                    "Percentage of portfolio is only supported for BUY orders."
+                )
+
+            net_size = portfolio.get_net_size()
+            size = net_size * (percentage_of_portfolio / 100)
+            amount = size / estimated_price
+
+        elif percentage_of_position is not None:
+
+            if not OrderSide.SELL.equals(order_side):
+                raise OperationalException(
+                    "Percentage of position is only supported for SELL orders."
+                )
+
+            position = self.position_service.find(
+                {
+                    "symbol": target_symbol,
+                    "portfolio": portfolio.id
+                }
+            )
+            amount = position.get_amount() * (percentage_of_position / 100)
+
+        elif percentage is not None:
+            net_size = portfolio.get_net_size()
+            size = net_size * (percentage / 100)
+            amount = size / estimated_price
+
+        if precision is not None:
+            amount = RoundingService.round_down(amount, precision)
+
+        if amount_trading_symbol is not None:
+            amount = amount_trading_symbol / estimated_price
+
+        if amount is None:
+            raise OperationalException(
+                "The amount parameter is required to create a market order. "
+                "Either the amount, amount_trading_symbol, percentage, "
+                "percentage_of_portfolio or percentage_of_position "
+                "parameter must be specified."
+            )
+
+        logger.info(
+            f"Creating market order: {target_symbol} "
+            f"{order_side} {amount} @ estimated {estimated_price}"
+        )
+
+        order_metadata = metadata if metadata is not None else {}
+        order_metadata["estimated_price"] = estimated_price
+
+        order_data = {
+            "target_symbol": target_symbol,
+            "price": estimated_price,
+            "amount": amount,
+            "order_type": OrderType.MARKET.value,
+            "order_side": OrderSide.from_value(order_side).value,
+            "portfolio_id": portfolio.id,
+            "status": OrderStatus.CREATED.value,
+            "trading_symbol": portfolio.trading_symbol,
+            "metadata": order_metadata,
+        }
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            order_data["created_at"] = \
+                self.configuration_service.config[INDEX_DATETIME]
+
+        return self.order_service.create(
+            order_data, execute=execute, validate=validate, sync=sync
+        )
+
+    def create_market_buy_order(
+        self,
+        target_symbol,
+        amount=None,
+        percentage_of_portfolio=None,
+        market=None,
+        portfolio_id=None,
+        metadata=None
+    ) -> Order:
+        """
+        Function to create a market buy order.
+
+        Args:
+            target_symbol (str): The symbol of the asset to buy
+            amount (float, optional): The amount of the asset to buy
+            percentage_of_portfolio (float, optional): The percentage of the
+                portfolio to buy.
+            market (str, optional): the portfolio corresponding to the market
+                to buy the asset
+            portfolio_id (str, optional): The ID of the portfolio to buy
+                the asset from.
+            metadata (dict, optional): Additional metadata for the order
+
+        Returns:
+            Order: The order created
+        """
+
+        if amount is None and percentage_of_portfolio is None:
+            raise OperationalException(
+                "Either amount or percentage_of_portfolio must be specified "
+                "to create a market buy order."
+            )
+
+        return self.create_market_order(
+            target_symbol=target_symbol,
+            order_side=OrderSide.BUY,
+            amount=amount,
+            percentage_of_portfolio=percentage_of_portfolio,
+            market=market,
+            metadata=metadata
+        )
+
+    def create_market_sell_order(
+        self,
+        target_symbol,
+        amount=None,
+        percentage_of_position=None,
+        market=None,
+        portfolio_id=None,
+        metadata=None
+    ) -> Order:
+        """
+        Function to create a market sell order.
+
+        Args:
+            target_symbol (str): The symbol of the asset to sell
+            amount (float, optional): The amount of the asset to sell
+            percentage_of_position (float, optional): The percentage of the
+                position to sell.
+            market (str, optional): the portfolio corresponding to the market
+                to sell the asset
+            portfolio_id (str, optional): The ID of the portfolio to sell
+                the asset from.
+            metadata (dict, optional): Additional metadata for the order
+
+        Returns:
+            Order: The order created
+        """
+
+        if amount is None and percentage_of_position is None:
+            raise OperationalException(
+                "Either amount or percentage_of_position must be specified "
+                "to create a market sell order."
+            )
+
+        return self.create_market_order(
+            target_symbol=target_symbol,
+            order_side=OrderSide.SELL,
+            amount=amount,
+            percentage_of_position=percentage_of_position,
+            market=market,
+            metadata=metadata
         )
 
     def create_limit_sell_order(
