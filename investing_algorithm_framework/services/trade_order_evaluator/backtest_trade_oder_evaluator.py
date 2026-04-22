@@ -3,7 +3,7 @@ from typing import List, Dict
 import polars as pl
 
 from investing_algorithm_framework.domain import OrderSide, OrderStatus, \
-    Trade, Order, TradeStatus, TradingCost
+    Trade, Order, TradeStatus, TradingCost, OrderType
 from .trade_order_evaluator import TradeOrderEvaluator
 
 
@@ -116,6 +116,75 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
             return
 
         tc = self._resolve_trading_cost(order.symbol)
+
+        # Market orders: fill at the open of the first available candle
+        if OrderType.MARKET.equals(order.order_type):
+            first_candle = ohlcv_data_after_order.head(1)
+            base_price = first_candle["Open"][0]
+            estimated_price = order.estimated_price
+
+            if OrderSide.BUY.equals(order_side):
+                fill_price = tc.get_buy_fill_price(base_price)
+                slippage = fill_price - base_price
+            else:
+                fill_price = tc.get_sell_fill_price(base_price)
+                slippage = base_price - fill_price
+
+            fee = tc.get_fee(fill_price * order.amount)
+            update_data = {
+                'status': OrderStatus.CLOSED.value,
+                'remaining': 0,
+                'filled': order.amount,
+                'price': fill_price,
+                'order_fee': fee,
+                'slippage': slippage,
+            }
+            if tc.fee_percentage:
+                update_data['order_fee_rate'] = tc.fee_percentage / 100
+
+            # Reconcile portfolio balance: adjust for the difference
+            # between estimated price and actual fill price
+            if estimated_price is not None:
+                price_delta = fill_price - estimated_price
+                cost_adjustment = price_delta * order.amount
+
+                if cost_adjustment != 0:
+                    position = self.order_service.position_service.get(
+                        order.position_id
+                    )
+                    portfolio = \
+                        self.order_service.portfolio_repository.get(
+                            position.portfolio_id
+                        )
+
+                    if OrderSide.BUY.equals(order_side):
+                        # If fill price > estimated: need more cash
+                        # If fill price < estimated: release excess cash
+                        new_unallocated = \
+                            portfolio.get_unallocated() - cost_adjustment
+                        self.order_service.portfolio_repository.update(
+                            portfolio.id,
+                            {"unallocated": new_unallocated}
+                        )
+                        # Also update the trading symbol position
+                        trading_position = \
+                            self.order_service.position_service.find(
+                                {
+                                    "symbol": portfolio.trading_symbol,
+                                    "portfolio": portfolio.id
+                                }
+                            )
+                        self.order_service.position_service.update(
+                            trading_position.id,
+                            {
+                                "amount":
+                                    trading_position.get_amount()
+                                    - cost_adjustment
+                            }
+                        )
+
+            self.order_service.update(order.id, update_data)
+            return
 
         if OrderSide.BUY.equals(order_side):
             # Check if the low price drops below or equals the order price
