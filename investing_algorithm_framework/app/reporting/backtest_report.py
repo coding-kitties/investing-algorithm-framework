@@ -34,7 +34,7 @@ _TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), 'templates')
 
 
 def _read_template(filename):
-    with open(os.path.join(_TEMPLATE_DIR, filename), 'r') as f:
+    with open(os.path.join(_TEMPLATE_DIR, filename), 'r', encoding='utf-8') as f:
         return f.read()
 
 
@@ -186,7 +186,7 @@ class BacktestReport:
             self.html_report = self._build_html()
 
         path = "/tmp/backtest_report.html"
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(self.html_report)
 
         if browser:
@@ -208,7 +208,7 @@ class BacktestReport:
     def save(self, path):
         if not self.html_report:
             self.html_report = self._build_html()
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(self.html_report)
 
     @staticmethod
