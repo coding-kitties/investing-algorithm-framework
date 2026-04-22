@@ -1,5 +1,5 @@
 from investing_algorithm_framework import PortfolioConfiguration, \
-    MarketCredential, OrderSide
+    MarketCredential, OrderSide, DataSource
 from investing_algorithm_framework.domain import OperationalException
 from tests.resources import TestBase
 from tests.resources.strategies_for_testing import StrategyOne
@@ -8,8 +8,9 @@ from tests.resources.strategies_for_testing import StrategyOne
 class TestValidateSymbol(TestBase):
     """Tests for opt-in symbol validation on order creation (issue #247).
 
-    Validates that target_symbol is not the same as trading_symbol,
-    which would result in a nonsensical order (e.g. EUR/EUR).
+    Validates:
+    1. target_symbol is not the same as trading_symbol (e.g. EUR/EUR)
+    2. A data source exists for the target_symbol/trading_symbol pair
     """
     portfolio_configurations = [
         PortfolioConfiguration(
@@ -28,8 +29,21 @@ class TestValidateSymbol(TestBase):
         "EUR": 1000
     }
 
-    def test_default_allows_trading_symbol_as_target(self):
-        """Default behavior: no validation, even trading_symbol is accepted."""
+    def _register_data_source(self, symbol):
+        """Register a data source symbol in the data provider index."""
+        data_source = DataSource(
+            identifier=f"{symbol}_ohlcv",
+            symbol=symbol,
+            data_type="OHLCV",
+            time_frame="1d",
+            market="BITVAVO",
+        )
+        data_provider_service = self.app.container.data_provider_service()
+        data_provider_service.data_provider_index\
+            .data_providers_lookup[data_source] = None
+
+    def test_default_allows_any_symbol(self):
+        """Default behavior: no validation, any symbol is accepted."""
         self.app.add_strategy(StrategyOne)
         self.app.context.create_limit_order(
             target_symbol="EUR",
@@ -41,8 +55,8 @@ class TestValidateSymbol(TestBase):
         order = order_repository.find({"target_symbol": "EUR"})
         self.assertIsNotNone(order)
 
-    def test_validate_symbol_false_allows_trading_symbol_as_target(self):
-        """Explicit validate_symbol=False allows trading_symbol as target."""
+    def test_validate_symbol_false_allows_any_symbol(self):
+        """Explicit validate_symbol=False skips all validation."""
         self.app.add_strategy(StrategyOne)
         self.app.context.create_limit_order(
             target_symbol="EUR",
@@ -55,9 +69,8 @@ class TestValidateSymbol(TestBase):
         order = order_repository.find({"target_symbol": "EUR"})
         self.assertIsNotNone(order)
 
-    def test_validate_symbol_true_rejects_trading_symbol_as_target(self):
-        """validate_symbol=True raises when target_symbol equals
-        trading_symbol (e.g. EUR/EUR)."""
+    def test_rejects_target_equals_trading_symbol(self):
+        """Rejects orders where target_symbol == trading_symbol (EUR/EUR)."""
         self.app.add_strategy(StrategyOne)
 
         with self.assertRaises(OperationalException) as cm:
@@ -70,12 +83,11 @@ class TestValidateSymbol(TestBase):
             )
 
         error_msg = str(cm.exception)
-        self.assertIn("EUR", error_msg)
-        self.assertIn("trading_symbol", error_msg)
         self.assertIn("EUR/EUR", error_msg)
+        self.assertIn("trading_symbol", error_msg)
 
-    def test_validate_symbol_true_case_insensitive(self):
-        """validate_symbol=True catches trading_symbol regardless of case."""
+    def test_rejects_target_equals_trading_symbol_case_insensitive(self):
+        """Case-insensitive check for target == trading_symbol."""
         self.app.add_strategy(StrategyOne)
 
         with self.assertRaises(OperationalException):
@@ -87,10 +99,27 @@ class TestValidateSymbol(TestBase):
                 validate_symbol=True,
             )
 
-    def test_validate_symbol_true_accepts_valid_target(self):
-        """validate_symbol=True passes for a target that differs
-        from trading_symbol."""
+    def test_rejects_missing_data_source(self):
+        """Rejects when no data source is registered for the pair."""
         self.app.add_strategy(StrategyOne)
+
+        with self.assertRaises(OperationalException) as cm:
+            self.app.context.create_limit_order(
+                target_symbol="BTC",
+                amount=1,
+                price=10,
+                order_side=OrderSide.BUY,
+                validate_symbol=True,
+            )
+
+        error_msg = str(cm.exception)
+        self.assertIn("BTC/EUR", error_msg)
+        self.assertIn("No data source registered", error_msg)
+
+    def test_accepts_with_matching_data_source(self):
+        """Passes when a data source exists for target/trading pair."""
+        self.app.add_strategy(StrategyOne)
+        self._register_data_source("BTC/EUR")
 
         self.app.context.create_limit_order(
             target_symbol="BTC",
@@ -103,13 +132,14 @@ class TestValidateSymbol(TestBase):
         order = order_repository.find({"target_symbol": "BTC"})
         self.assertIsNotNone(order)
 
-    def test_validate_symbol_error_message(self):
-        """Error message explains the EUR/EUR problem and how to skip."""
+    def test_rejects_wrong_data_source(self):
+        """Rejects when only a different pair is registered."""
         self.app.add_strategy(StrategyOne)
+        self._register_data_source("ETH/EUR")
 
         with self.assertRaises(OperationalException) as cm:
             self.app.context.create_limit_order(
-                target_symbol="EUR",
+                target_symbol="BTC",
                 amount=1,
                 price=10,
                 order_side=OrderSide.BUY,
@@ -117,5 +147,27 @@ class TestValidateSymbol(TestBase):
             )
 
         error_msg = str(cm.exception)
-        self.assertIn("EUR/EUR", error_msg)
+        self.assertIn("BTC/EUR", error_msg)
+        self.assertIn("ETH/EUR", error_msg)
+
+    def test_error_message_lists_registered_symbols(self):
+        """Error message includes registered data source symbols."""
+        self.app.add_strategy(StrategyOne)
+        self._register_data_source("BTC/EUR")
+        self._register_data_source("ETH/EUR")
+
+        with self.assertRaises(OperationalException) as cm:
+            self.app.context.create_limit_order(
+                target_symbol="SOL",
+                amount=1,
+                price=10,
+                order_side=OrderSide.BUY,
+                validate_symbol=True,
+            )
+
+        error_msg = str(cm.exception)
+        self.assertIn("SOL/EUR", error_msg)
+        self.assertIn("BTC/EUR", error_msg)
+        self.assertIn("ETH/EUR", error_msg)
+        self.assertIn("validate_symbol=False", error_msg)
         self.assertIn("validate_symbol=False", error_msg)
