@@ -29,11 +29,17 @@ azure-mgmt-storage = "^21.2.1"
 azure-mgmt-web = "^7.3.1"
 azure-mgmt-resource = "^23.2.0"
 python-dotenv = "^1.0.1"
-yfinance = "^0.2.61"
-alpha_vantage = "^3.0.0"
-polygon-api-client = "^1.14.0"
+yfinance = {version = "^0.2.61", optional = true}
+alpha_vantage = {version = "^3.0.0", optional = true}
+polygon-api-client = {version = "^1.14.0", optional = true}
 plotly = "^6.1.2"
 boto3 = "^1.38.41"
+
+[tool.poetry.extras]
+yahoo = ["yfinance"]
+alpha_vantage = ["alpha_vantage"]
+polygon = ["polygon-api-client"]
+all = ["yfinance", "alpha_vantage", "polygon-api-client"]
 
 [tool.poetry.group.test.dependencies]
 coverage= "7.4.2"

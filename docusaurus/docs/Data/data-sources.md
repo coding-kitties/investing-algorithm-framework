@@ -354,6 +354,8 @@ The framework ships with built-in data providers for multiple markets. Set the `
 
 Free, no API key required. Powered by the [yfinance](https://github.com/ranaroussi/yfinance) library using data from [Yahoo Finance](https://finance.yahoo.com/).
 
+**Installation:** `pip install investing-algorithm-framework[yahoo]`
+
 ```python
 DataSource(
     identifier="aapl_daily",
@@ -378,6 +380,8 @@ DataSource(
 **Best for:** Production-grade US stock, options, forex, and crypto data.
 
 Requires an API key from [Polygon.io](https://polygon.io/). Powered by the [polygon-api-client](https://github.com/polygon-io/client-python) library.
+
+**Installation:** `pip install investing-algorithm-framework[polygon]`
 
 ```python
 from investing_algorithm_framework import MarketCredential
@@ -409,6 +413,8 @@ DataSource(
 **Best for:** Prototyping and lightweight stock/forex/crypto strategies.
 
 Requires a free or premium API key from [Alpha Vantage](https://www.alphavantage.co/). Powered by the [alpha_vantage](https://github.com/RomelTorres/alpha_vantage) Python library.
+
+**Installation:** `pip install investing-algorithm-framework[alpha_vantage]`
 
 ```python
 from investing_algorithm_framework import MarketCredential

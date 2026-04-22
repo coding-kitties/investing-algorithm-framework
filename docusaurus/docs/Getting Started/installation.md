@@ -24,6 +24,32 @@ Install the latest stable version from PyPI:
 pip install investing-algorithm-framework
 ```
 
+This installs the core framework with CCXT support for crypto exchanges.
+
+### Optional Data Provider Extras
+
+The framework supports additional data providers that can be installed as optional extras:
+
+```bash
+# Yahoo Finance (stocks, ETFs, indices — free, no API key)
+pip install investing-algorithm-framework[yahoo]
+
+# Alpha Vantage (stocks, forex, crypto — free API key required)
+pip install investing-algorithm-framework[alpha_vantage]
+
+# Polygon.io (US stocks, options, forex, crypto — API key required)
+pip install investing-algorithm-framework[polygon]
+
+# Install all optional data providers at once
+pip install investing-algorithm-framework[all]
+```
+
+You can combine multiple extras:
+
+```bash
+pip install investing-algorithm-framework[yahoo,polygon]
+```
+
 ### Option 2: Install from Source
 
 For the latest development version, install directly from GitHub:

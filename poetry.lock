@@ -206,7 +206,7 @@ tz = ["tzdata"]
 name = "alpha-vantage"
 version = "3.0.0"
 description = "Python module to get stock data from the Alpha Vantage Api"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "alpha_vantage-3.0.0-py3-none-any.whl", hash = "sha256:5c64b3a179cfcd68aa2166bacaf581758522fa4fe06392a0298847d49db9596f"},
@@ -1157,7 +1157,7 @@ test-randomorder = ["pytest-randomly"]
 name = "curl-cffi"
 version = "0.13.0"
 description = "libcurl ffi bindings for Python, with impersonation support."
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
     {file = "curl_cffi-0.13.0-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:434cadbe8df2f08b2fc2c16dff2779fb40b984af99c06aa700af898e185bb9db"},
@@ -1453,7 +1453,7 @@ files = [
 name = "frozendict"
 version = "2.4.7"
 description = "A simple immutable dictionary"
-optional = false
+optional = true
 python-versions = ">=3.6"
 files = [
     {file = "frozendict-2.4.7-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:bd37c087a538944652363cfd77fb7abe8100cc1f48afea0b88b38bf0f469c3d2"},
@@ -2735,7 +2735,7 @@ typing-extensions = {version = ">=4.1.0", markers = "python_version < \"3.11\""}
 name = "multitasking"
 version = "0.0.12"
 description = "Non-blocking Python methods using decorators"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "multitasking-0.0.12.tar.gz", hash = "sha256:2fba2fa8ed8c4b85e227c5dd7dc41c7d658de3b6f247927316175a57349b84d1"},
@@ -3110,7 +3110,7 @@ testing = ["docopt", "pytest"]
 name = "peewee"
 version = "3.18.3"
 description = "a little orm"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "peewee-3.18.3.tar.gz", hash = "sha256:62c3d93315b1a909360c4b43c3a573b47557a1ec7a4583a71286df2a28d4b72e"},
@@ -3235,7 +3235,7 @@ files = [
 name = "polygon-api-client"
 version = "1.16.3"
 description = "Official Polygon.io REST and Websocket client."
-optional = false
+optional = true
 python-versions = "<4.0,>=3.9"
 files = [
     {file = "polygon_api_client-1.16.3-py3-none-any.whl", hash = "sha256:4dec9e27fb5d17a36aacd9372d1df30af2f2b7639b4166ca10d2d48d128d2cd8"},
@@ -3410,7 +3410,7 @@ files = [
 name = "protobuf"
 version = "6.33.5"
 description = ""
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
     {file = "protobuf-6.33.5-cp310-abi3-win32.whl", hash = "sha256:d71b040839446bac0f4d162e758bea99c8251161dae9d0983a3b88dee345153b"},
@@ -4727,7 +4727,7 @@ test = ["pytest", "websockets"]
 name = "websockets"
 version = "15.0.1"
 description = "An implementation of the WebSocket Protocol (RFC 6455 & 7692)"
-optional = false
+optional = true
 python-versions = ">=3.9"
 files = [
     {file = "websockets-15.0.1-cp310-cp310-macosx_10_9_universal2.whl", hash = "sha256:d63efaa0cd96cf0c5fe4d581521d9fa87744540d4bc999ae6e08595a1014b45b"},
@@ -5096,7 +5096,7 @@ propcache = ">=0.2.1"
 name = "yfinance"
 version = "0.2.66"
 description = "Download market data from Yahoo! Finance API"
-optional = false
+optional = true
 python-versions = "*"
 files = [
     {file = "yfinance-0.2.66-py2.py3-none-any.whl", hash = "sha256:511a1a40a687f277aae3a02543009a8aeaa292fce5509671f58915078aebb5c7"},
@@ -5121,7 +5121,13 @@ websockets = ">=13.0"
 nospam = ["requests_cache (>=1.0)", "requests_ratelimiter (>=0.3.1)"]
 repair = ["scipy (>=1.6.3)"]
 
+[extras]
+all = ["alpha_vantage", "polygon-api-client", "yfinance"]
+alpha-vantage = ["alpha_vantage"]
+polygon = ["polygon-api-client"]
+yahoo = ["yfinance"]
+
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.10,<4.0"
-content-hash = "9506f2a1d8a8830a89293b07fff187123fe90999a40eb87506d743b4ef5fa21b"
+content-hash = "928b3ec838420d2c1020a85c04ab2943810f59e54c48e0d14c4048f2a104066b"
