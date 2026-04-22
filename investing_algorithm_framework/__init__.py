@@ -28,7 +28,7 @@ from .domain import ApiException, combine_backtests, PositionSize, \
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, \
     CCXTOHLCVDataProvider, CCXTTickerDataProvider, \
-    PandasOHLCVDataProvider, \
+    PandasOHLCVDataProvider, YahooOHLCVDataProvider, \
     AWSS3StorageStateHandler
 from .create_app import create_app
 from .download_data import download, download_v2, DownloadResult, \
@@ -116,6 +116,7 @@ __all__ = [
     'CSVTickerDataProvider',
     "CCXTOHLCVDataProvider",
     "CCXTTickerDataProvider",
+    "YahooOHLCVDataProvider",
     "DataProvider",
     "get_annual_volatility",
     "get_sortino_ratio",

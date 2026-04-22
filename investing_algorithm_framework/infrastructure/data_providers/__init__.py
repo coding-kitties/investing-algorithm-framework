@@ -1,6 +1,7 @@
 from .ccxt import CCXTOHLCVDataProvider, CCXTTickerDataProvider
 from .csv import CSVOHLCVDataProvider, CSVTickerDataProvider
 from .pandas import PandasOHLCVDataProvider
+from .yahoo import YahooOHLCVDataProvider
 
 
 def get_default_data_providers():
@@ -13,6 +14,7 @@ def get_default_data_providers():
     return [
         CCXTOHLCVDataProvider(),
         CCXTTickerDataProvider(),
+        YahooOHLCVDataProvider(),
     ]
 
 
@@ -25,6 +27,7 @@ def get_default_ohlcv_data_providers():
     """
     return [
         CCXTOHLCVDataProvider(),
+        YahooOHLCVDataProvider(),
     ]
 
 
@@ -36,4 +39,5 @@ __all__ = [
     'get_default_data_providers',
     'get_default_ohlcv_data_providers',
     'PandasOHLCVDataProvider',
+    'YahooOHLCVDataProvider',
 ]
