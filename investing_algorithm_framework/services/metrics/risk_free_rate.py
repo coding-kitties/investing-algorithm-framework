@@ -1,4 +1,3 @@
-import yfinance as yf
 import logging
 
 
@@ -12,6 +11,15 @@ def get_risk_free_rate_us():
     Returns:
         float or None: The latest yield as a decimal (e.g., 0.0423 for 4.23%), or None if unavailable.
     """
+    try:
+        import yfinance as yf
+    except ImportError:
+        logger.warning(
+            "yfinance is required for risk-free rate retrieval. "
+            "Install it with: pip install investing-algorithm-framework[yahoo]"
+        )
+        return None
+
     try:
         ten_year = yf.Ticker("^TNX")
         hist = ten_year.history(period="5d")
