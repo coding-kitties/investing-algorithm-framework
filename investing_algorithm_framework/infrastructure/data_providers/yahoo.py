@@ -1,12 +1,10 @@
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 import polars as pl
 import pandas as pd
 
 from investing_algorithm_framework.domain import (
-    OperationalException,
-    DataType,
     DataSource,
 )
 from .ohlcv_base import OHLCVDataProviderBase

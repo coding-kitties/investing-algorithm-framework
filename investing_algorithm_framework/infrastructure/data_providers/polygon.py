@@ -4,9 +4,6 @@ from datetime import datetime, timezone
 import polars as pl
 import pandas as pd
 
-from investing_algorithm_framework.domain import (
-    OperationalException,
-)
 from .ohlcv_base import OHLCVDataProviderBase
 
 logger = logging.getLogger("investing_algorithm_framework")

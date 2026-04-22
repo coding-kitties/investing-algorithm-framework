@@ -2,7 +2,7 @@ import logging
 import os
 from abc import abstractmethod
 from datetime import datetime, timedelta, timezone
-from typing import Union, List, Dict
+from typing import Union, Dict
 
 import polars as pl
 import pandas as pd
