@@ -12,7 +12,7 @@ from investing_algorithm_framework.domain import DataProvider, \
 class PandasOHLCVDataProvider(DataProvider):
     """
     Implementation of Data Provider for OHLCV data. OHLCV data
-    will be loaded from a CSV file. The CSV file should contain
+    will be loaded from a pandas DataFrame. The DataFrame should contain
     the following columns: Datetime, Open, High, Low, Close, Volume.
     The Datetime column should be in UTC timezone and in milliseconds.
     The data will be loaded into a Polars DataFrame and will be kept in memory.
@@ -20,13 +20,14 @@ class PandasOHLCVDataProvider(DataProvider):
     Attributes:
         data_type (DataType): The type of data provided by this provider,
             which is OHLCV.
-        data_provider_identifier (str): Identifier for the CSV OHLCV data
+        data_provider_identifier (str): Identifier for the Pandas OHLCV data
             provider.
         _start_date_data_source (datetime): The start date of the data
             source, determined from the first row of the data.
         _end_date_data_source (datetime): The end date of the data
             source, determined from the last row of the data.
-        data (polars.DataFrame): The OHLCV data loaded from the CSV file.
+        data (polars.DataFrame): The OHLCV data loaded from the
+            pandas DataFrame.
     """
     data_type = DataType.OHLCV
     data_provider_identifier = "pandas_ohlcv_data_provider"
@@ -42,8 +43,6 @@ class PandasOHLCVDataProvider(DataProvider):
         data_provider_identifier: str = None,
         pandas: bool = False
     ):
-        if warmup_window is not None and window_size is None:
-            window_size = warmup_window
         """
         Initialize the Pandas Data Provider.
 
@@ -55,6 +54,9 @@ class PandasOHLCVDataProvider(DataProvider):
             window_size (int, optional): The window size for the data.
                 Defaults to None.
         """
+        if warmup_window is not None and window_size is None:
+            window_size = warmup_window
+
         if data_provider_identifier is None:
             data_provider_identifier = self.data_provider_identifier
         super().__init__(
