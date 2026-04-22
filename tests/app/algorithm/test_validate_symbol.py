@@ -1,5 +1,5 @@
 from investing_algorithm_framework import PortfolioConfiguration, \
-    MarketCredential, OrderSide, DataSource
+    MarketCredential, OrderSide, OrderType, DataSource
 from investing_algorithm_framework.domain import OperationalException
 from tests.resources import TestBase
 from tests.resources.strategies_for_testing import StrategyOne
@@ -170,4 +170,57 @@ class TestValidateSymbol(TestBase):
         self.assertIn("BTC/EUR", error_msg)
         self.assertIn("ETH/EUR", error_msg)
         self.assertIn("validate_symbol=False", error_msg)
-        self.assertIn("validate_symbol=False", error_msg)
+
+    # ── create_order tests ──────────────────────────────────────────
+
+    def test_create_order_rejects_missing_data_source(self):
+        """create_order with validate_symbol=True rejects when no
+        data source is registered for the pair."""
+        self.app.add_strategy(StrategyOne)
+
+        with self.assertRaises(OperationalException) as cm:
+            self.app.context.create_order(
+                target_symbol="BTC",
+                amount=1,
+                price=10,
+                order_type=OrderType.LIMIT,
+                order_side=OrderSide.BUY,
+                validate_symbol=True,
+            )
+
+        error_msg = str(cm.exception)
+        self.assertIn("BTC/EUR", error_msg)
+        self.assertIn("No data source registered", error_msg)
+
+    def test_create_order_accepts_with_matching_data_source(self):
+        """create_order with validate_symbol=True passes when a
+        data source exists for the pair."""
+        self.app.add_strategy(StrategyOne)
+        self._register_data_source("BTC/EUR")
+
+        self.app.context.create_order(
+            target_symbol="BTC",
+            amount=1,
+            price=10,
+            order_type=OrderType.LIMIT,
+            order_side=OrderSide.BUY,
+            validate_symbol=True,
+        )
+        order_repository = self.app.container.order_repository()
+        order = order_repository.find({"target_symbol": "BTC"})
+        self.assertIsNotNone(order)
+
+    def test_create_order_default_skips_validation(self):
+        """create_order without validate_symbol allows any symbol."""
+        self.app.add_strategy(StrategyOne)
+
+        self.app.context.create_order(
+            target_symbol="UNKNOWN",
+            amount=1,
+            price=10,
+            order_type=OrderType.LIMIT,
+            order_side=OrderSide.BUY,
+        )
+        order_repository = self.app.container.order_repository()
+        order = order_repository.find({"target_symbol": "UNKNOWN"})
+        self.assertIsNotNone(order)
