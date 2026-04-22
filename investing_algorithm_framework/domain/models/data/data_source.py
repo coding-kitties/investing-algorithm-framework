@@ -1,7 +1,7 @@
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone, timedelta
-from typing import Union
+from typing import Union, Callable, Optional
 
 from dateutil import parser
 
@@ -41,6 +41,18 @@ class DataSource:
     start_date: Union[datetime, None] = None
     end_date: Union[datetime, None] = None
     save: bool = False
+    # CSV URL fields
+    url: Optional[str] = None
+    date_column: Optional[str] = None
+    date_format: Optional[str] = None
+    cache: bool = True
+    refresh_interval: Optional[str] = None
+    pre_process: Optional[Callable] = field(
+        default=None, repr=False, compare=False
+    )
+    post_process: Optional[Callable] = field(
+        default=None, repr=False, compare=False
+    )
 
     def __post_init__(self):
         # Handle backward compatibility for window_size -> warmup_window
@@ -107,6 +119,169 @@ class DataSource:
 
         if self.symbol is not None:
             object.__setattr__(self, 'symbol', self.symbol.upper())
+
+    @classmethod
+    def from_csv(
+        cls,
+        identifier: str,
+        url: str,
+        date_column: str = None,
+        date_format: str = None,
+        cache: bool = True,
+        refresh_interval: str = None,
+        pre_process: Callable = None,
+        post_process: Callable = None,
+    ) -> "DataSource":
+        """
+        Create a DataSource that fetches CSV data from a remote URL.
+
+        Args:
+            identifier: Unique identifier for this data source.
+            url: URL to fetch the CSV data from.
+            date_column: Name of the column containing dates.
+            date_format: strftime format for parsing the date column.
+            cache: Whether to cache the fetched data locally
+                (default: True).
+            refresh_interval: How often to re-fetch the data
+                (e.g., "1d", "1h"). If None, data is fetched once and
+                cached indefinitely.
+            pre_process: Optional callback to transform the raw CSV
+                text before parsing. Receives a string, must return
+                a string.
+            post_process: Optional callback to transform the parsed
+                DataFrame. Receives a DataFrame, must return a
+                DataFrame.
+
+        Returns:
+            DataSource: A configured DataSource for CSV URL fetching.
+
+        Example:
+            DataSource.from_csv(
+                identifier="sentiment",
+                url="https://example.com/crypto_sentiment.csv",
+                date_column="date",
+                date_format="%Y-%m-%d",
+                cache=True,
+                refresh_interval="1d",
+            )
+        """
+        return cls(
+            identifier=identifier,
+            data_type=DataType.CUSTOM,
+            data_provider_identifier="csv_url_data_provider",
+            url=url,
+            date_column=date_column,
+            date_format=date_format,
+            cache=cache,
+            refresh_interval=refresh_interval,
+            pre_process=pre_process,
+            post_process=post_process,
+        )
+
+    @classmethod
+    def from_json(
+        cls,
+        identifier: str,
+        url: str,
+        date_column: str = None,
+        date_format: str = None,
+        cache: bool = True,
+        refresh_interval: str = None,
+        pre_process: Callable = None,
+        post_process: Callable = None,
+    ) -> "DataSource":
+        """
+        Create a DataSource that fetches JSON data from a remote URL.
+
+        The JSON data must be either an array of objects (records
+        orientation) or an object of arrays (columnar orientation).
+
+        Args:
+            identifier: Unique identifier for this data source.
+            url: URL to fetch the JSON data from.
+            date_column: Name of the column containing dates.
+            date_format: strftime format for parsing the date column.
+            cache: Whether to cache the fetched data locally
+                (default: True).
+            refresh_interval: How often to re-fetch the data
+                (e.g., "1d", "1h").
+            pre_process: Optional callback to transform the raw JSON
+                text before parsing. Receives a string, must return
+                a string.
+            post_process: Optional callback to transform the parsed
+                DataFrame.
+
+        Returns:
+            DataSource: A configured DataSource for JSON URL fetching.
+
+        Example:
+            DataSource.from_json(
+                identifier="earnings",
+                url="https://api.example.com/earnings.json",
+                date_column="report_date",
+            )
+        """
+        return cls(
+            identifier=identifier,
+            data_type=DataType.CUSTOM,
+            data_provider_identifier="json_url_data_provider",
+            url=url,
+            date_column=date_column,
+            date_format=date_format,
+            cache=cache,
+            refresh_interval=refresh_interval,
+            pre_process=pre_process,
+            post_process=post_process,
+        )
+
+    @classmethod
+    def from_parquet(
+        cls,
+        identifier: str,
+        url: str,
+        date_column: str = None,
+        date_format: str = None,
+        cache: bool = True,
+        refresh_interval: str = None,
+        post_process: Callable = None,
+    ) -> "DataSource":
+        """
+        Create a DataSource that fetches Parquet data from a remote
+        URL.
+
+        Args:
+            identifier: Unique identifier for this data source.
+            url: URL to fetch the Parquet file from.
+            date_column: Name of the column containing dates.
+            date_format: strftime format for parsing the date column.
+            cache: Whether to cache the fetched data locally
+                (default: True).
+            refresh_interval: How often to re-fetch the data
+                (e.g., "1d", "1h").
+            post_process: Optional callback to transform the parsed
+                DataFrame.
+
+        Returns:
+            DataSource: A configured DataSource for Parquet URL
+            fetching.
+
+        Example:
+            DataSource.from_parquet(
+                identifier="features",
+                url="https://storage.example.com/features.parquet",
+            )
+        """
+        return cls(
+            identifier=identifier,
+            data_type=DataType.CUSTOM,
+            data_provider_identifier="parquet_url_data_provider",
+            url=url,
+            date_column=date_column,
+            date_format=date_format,
+            cache=cache,
+            refresh_interval=refresh_interval,
+            post_process=post_process,
+        )
 
     def get_identifier(self):
         """

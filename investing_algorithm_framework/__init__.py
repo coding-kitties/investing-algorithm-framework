@@ -26,7 +26,8 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     save_backtests_to_directory, BacktestMetrics, DATA_DIRECTORY, \
     retag_backtests
 from .infrastructure import AzureBlobStorageStateHandler, \
-    CSVOHLCVDataProvider, CSVTickerDataProvider, \
+    CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
+    JSONURLDataProvider, ParquetURLDataProvider, \
     CCXTOHLCVDataProvider, CCXTTickerDataProvider, \
     PandasOHLCVDataProvider, OHLCVDataProviderBase, \
     YahooOHLCVDataProvider, \
@@ -116,7 +117,8 @@ __all__ = [
     'DataType',
     'CSVOHLCVDataProvider',
     'CSVTickerDataProvider',
-    "CCXTOHLCVDataProvider",
+    'CSVURLDataProvider',    'JSONURLDataProvider',
+    'ParquetURLDataProvider',    "CCXTOHLCVDataProvider",
     "CCXTTickerDataProvider",
     "OHLCVDataProviderBase",
     "YahooOHLCVDataProvider",

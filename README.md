@@ -76,6 +76,7 @@ This framework is built around the full loop: **create strategies → backtest t
 - 🎯 **Return Scenario Projections** — Good, average, bad & very bad year projections from backtest data
 - 📉 **Benchmark Comparison** — Beat-rate analysis vs Buy & Hold, DCA, risk-free & custom benchmarks
 - 📄 **One-Click HTML Report** — Self-contained file, no server, dark & light theme, shareable
+- 🌐 **Load External Data** — Fetch CSV, JSON, or Parquet from any URL with caching and auto-refresh
 - 🚀 **Build → Backtest → Deploy** — Local dev, cloud deploy (AWS / Azure), or monetize on Finterion
 
 </details>
@@ -262,15 +263,17 @@ report.save("my_report.html")
 
 | | |
 |---|---|
-| **Backtest Report Dashboard** | Self-contained HTML report with ranking tables, equity curves, metric charts, heatmaps, and strategy comparison |
-| **Event-Driven Backtesting** | Realistic, order-by-order simulation |
-| **Vectorized Backtesting** | Fast signal research and prototyping |
+| **[Backtest Report Dashboard](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** | Self-contained HTML report with ranking tables, equity curves, metric charts, heatmaps, and strategy comparison |
+| **[Event-Driven Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtesting)** | Realistic, order-by-order simulation |
+| **[Vectorized Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/vector-backtesting)** | Fast signal research and prototyping |
 | **50+ Metrics** | CAGR, Sharpe, Sortino, max drawdown, win rate, profit factor, recovery factor, volatility, and more |
-| **Live Trading** | Connect to exchanges via CCXT for real-time execution |
-| **Portfolio Management** | Position tracking, trade management, persistence |
-| **Cloud Deployment** | Deploy to AWS Lambda, Azure Functions, or run as a web service |
-| **Market Data** | OHLCV, tickers, custom data — Polars and Pandas native |
-| **Extensible** | Custom data providers, order executors, and strategy classes |
+| **[Live Trading](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/application-setup)** | Connect to exchanges via CCXT for real-time execution |
+| **[Portfolio Management](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/portfolio-configuration)** | Position tracking, trade management, persistence |
+| **[Cloud Deployment](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)** | Deploy to AWS Lambda, Azure Functions, or run as a web service |
+| **[Market Data Providers](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/custom-data-providers)** | Built-in providers for CCXT, Yahoo Finance, Alpha Vantage, and Polygon — or build your own |
+| **[Load External Data](https://coding-kitties.github.io/investing-algorithm-framework/Data/external-data)** | Fetch CSV, JSON, or Parquet from any URL with caching, date parsing, and pre/post-processing |
+| **[Strategies](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/strategies)** | OHLCV, tickers, custom data — Polars and Pandas native |
+| **[Extensible](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/custom-data-providers)** | Custom data providers, order executors, and strategy classes |
 
 </details>
 
