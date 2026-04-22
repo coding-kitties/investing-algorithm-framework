@@ -53,28 +53,51 @@ class Context:
 
     def _validate_target_symbol(self, target_symbol, market=None):
         """
-        Validate that the target_symbol combined with the portfolio's
-        trading_symbol does not result in trading_symbol/trading_symbol
-        (e.g., EUR/EUR), which is a nonsensical order.
+        Validate the target_symbol for order creation:
+        1. Prevents orders where target_symbol equals trading_symbol
+           (e.g. EUR/EUR).
+        2. Checks that a data source exists for the
+           target_symbol/trading_symbol combination (e.g. BTC/EUR).
 
         Args:
             target_symbol: The symbol of the asset to trade
             market: The market to check against
 
         Raises:
-            OperationalException: If target_symbol equals
-              the trading_symbol
+            OperationalException: If validation fails
         """
         portfolio = self.portfolio_service.find({"market": market})
-        trading_symbol = portfolio.trading_symbol.upper()
+        trading_symbol = portfolio.trading_symbol
 
-        if target_symbol.upper() == trading_symbol:
+        # Check target_symbol != trading_symbol
+        if target_symbol.upper() == trading_symbol.upper():
             raise OperationalException(
                 f"target_symbol '{target_symbol}' is the same as "
-                f"the trading_symbol '{portfolio.trading_symbol}'. "
+                f"the trading_symbol '{trading_symbol}'. "
                 f"This would result in a "
-                f"'{portfolio.trading_symbol}/{portfolio.trading_symbol}' "
+                f"'{trading_symbol}/{trading_symbol}' "
                 f"order which is not valid. "
+                f"To skip this check, set validate_symbol=False "
+                f"or omit the parameter."
+            )
+
+        # Check that a data source is registered for this pair
+        expected_symbol = f"{target_symbol}/{trading_symbol}".upper()
+        known_symbols = set()
+
+        if self.data_provider_service.data_provider_index is not None:
+            for data_source, _ in \
+                    self.data_provider_service \
+                    .data_provider_index.get_all():
+                if data_source.symbol is not None:
+                    known_symbols.add(data_source.symbol.upper())
+
+        if expected_symbol not in known_symbols:
+            sorted_symbols = sorted(known_symbols)
+            raise OperationalException(
+                f"No data source registered for '{expected_symbol}'. "
+                f"A data source is required to track price history. "
+                f"Registered data source symbols: {sorted_symbols}. "
                 f"To skip this check, set validate_symbol=False "
                 f"or omit the parameter."
             )
