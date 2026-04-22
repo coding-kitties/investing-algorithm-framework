@@ -1,7 +1,7 @@
 import logging
 
-# Default US 10-year Treasury yield approximation (4%)
-DEFAULT_RISK_FREE_RATE = 0.04
+# Default US 10-year Treasury yield approximation (2%)
+DEFAULT_RISK_FREE_RATE = 0.02
 
 logger = logging.getLogger("investing_algorithm_framework")
 
