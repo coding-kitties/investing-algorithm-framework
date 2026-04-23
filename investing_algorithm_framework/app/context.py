@@ -2008,3 +2008,191 @@ class Context:
             query_params["triggered"] = triggered
 
         return self.trade_stop_loss_service.get_all(query_params)
+
+    def fetch_csv(
+        self,
+        url,
+        date_column=None,
+        date_format=None,
+        cache=True,
+        refresh_interval=None,
+        pre_process=None,
+        post_process=None,
+    ):
+        """
+        Fetch CSV data from a remote URL on demand.
+
+        This is a convenience method for dynamically loading external
+        CSV data during strategy execution without pre-declaring it
+        as a DataSource.
+
+        Args:
+            url (str): URL to fetch the CSV data from.
+            date_column (str, optional): Name of the date column to
+                parse.
+            date_format (str, optional): strftime format for parsing
+                dates.
+            cache (bool): Cache fetched data locally (default: True).
+            refresh_interval (str, optional): Re-fetch interval
+                (e.g., "1d", "1h").
+            pre_process (callable, optional): Transform raw CSV text
+                before parsing.
+            post_process (callable, optional): Transform the parsed
+                DataFrame.
+
+        Returns:
+            polars.DataFrame: The parsed CSV data.
+
+        Example::
+
+            def run_strategy(self, context, data):
+                earnings = context.fetch_csv(
+                    url="https://example.com/earnings.csv",
+                    date_column="report_date",
+                )
+                latest = earnings["eps"].iloc[-1]
+        """
+        from investing_algorithm_framework.infrastructure \
+            import CSVURLDataProvider
+
+        if not hasattr(self, '_csv_url_providers'):
+            self._csv_url_providers = {}
+
+        if url not in self._csv_url_providers:
+            provider = CSVURLDataProvider(
+                url=url,
+                date_column=date_column,
+                date_format=date_format,
+                cache=cache,
+                refresh_interval=refresh_interval,
+                pre_process=pre_process,
+                post_process=post_process,
+            )
+            provider.config = self.configuration_service.get_config()
+            self._csv_url_providers[url] = provider
+
+        return self._csv_url_providers[url].get_data()
+
+    def fetch_json(
+        self,
+        url,
+        date_column=None,
+        date_format=None,
+        cache=True,
+        refresh_interval=None,
+        pre_process=None,
+        post_process=None,
+    ):
+        """
+        Fetch JSON data from a remote URL on demand.
+
+        This is a convenience method for dynamically loading external
+        JSON data during strategy execution without pre-declaring it
+        as a DataSource.
+
+        The JSON data must be either an array of objects or an object
+        of arrays.
+
+        Args:
+            url (str): URL to fetch the JSON data from.
+            date_column (str, optional): Name of the date column to
+                parse.
+            date_format (str, optional): strftime format for parsing
+                dates.
+            cache (bool): Cache fetched data locally (default: True).
+            refresh_interval (str, optional): Re-fetch interval
+                (e.g., "1d", "1h").
+            pre_process (callable, optional): Transform raw JSON text
+                before parsing.
+            post_process (callable, optional): Transform the parsed
+                DataFrame.
+
+        Returns:
+            polars.DataFrame: The parsed JSON data.
+
+        Example::
+
+            def run_strategy(self, context, data):
+                earnings = context.fetch_json(
+                    url="https://api.example.com/earnings",
+                    date_column="report_date",
+                )
+        """
+        from investing_algorithm_framework.infrastructure \
+            import JSONURLDataProvider
+
+        if not hasattr(self, '_json_url_providers'):
+            self._json_url_providers = {}
+
+        if url not in self._json_url_providers:
+            provider = JSONURLDataProvider(
+                url=url,
+                date_column=date_column,
+                date_format=date_format,
+                cache=cache,
+                refresh_interval=refresh_interval,
+                pre_process=pre_process,
+                post_process=post_process,
+            )
+            provider.config = self.configuration_service.get_config()
+            self._json_url_providers[url] = provider
+
+        return self._json_url_providers[url].get_data()
+
+    def fetch_parquet(
+        self,
+        url,
+        date_column=None,
+        date_format=None,
+        cache=True,
+        refresh_interval=None,
+        post_process=None,
+    ):
+        """
+        Fetch Parquet data from a remote URL on demand.
+
+        This is a convenience method for dynamically loading external
+        Parquet data during strategy execution without pre-declaring
+        it as a DataSource.
+
+        Args:
+            url (str): URL to fetch the Parquet file from.
+            date_column (str, optional): Name of the date column to
+                parse.
+            date_format (str, optional): strftime format for parsing
+                dates.
+            cache (bool): Cache fetched data locally (default: True).
+            refresh_interval (str, optional): Re-fetch interval
+                (e.g., "1d", "1h").
+            post_process (callable, optional): Transform the parsed
+                DataFrame.
+
+        Returns:
+            polars.DataFrame: The parsed Parquet data.
+
+        Example::
+
+            def run_strategy(self, context, data):
+                features = context.fetch_parquet(
+                    url="https://storage.example.com/features.parquet",
+                )
+        """
+        from investing_algorithm_framework.infrastructure \
+            import ParquetURLDataProvider
+
+        if not hasattr(self, '_parquet_url_providers'):
+            self._parquet_url_providers = {}
+
+        if url not in self._parquet_url_providers:
+            provider = ParquetURLDataProvider(
+                url=url,
+                date_column=date_column,
+                date_format=date_format,
+                cache=cache,
+                refresh_interval=refresh_interval,
+                post_process=post_process,
+            )
+            provider.config = self.configuration_service.get_config()
+            self._parquet_url_providers[url] = provider
+
+        return self._parquet_url_providers[url].get_data()

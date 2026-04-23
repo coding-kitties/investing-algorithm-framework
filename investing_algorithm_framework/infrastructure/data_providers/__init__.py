@@ -1,5 +1,8 @@
 from .ccxt import CCXTOHLCVDataProvider, CCXTTickerDataProvider
 from .csv import CSVOHLCVDataProvider, CSVTickerDataProvider
+from .csv_url import CSVURLDataProvider
+from .json_url import JSONURLDataProvider
+from .parquet_url import ParquetURLDataProvider
 from .pandas import PandasOHLCVDataProvider
 from .ohlcv_base import OHLCVDataProviderBase
 
@@ -59,6 +62,9 @@ def get_default_data_providers():
     providers = [
         CCXTOHLCVDataProvider(),
         CCXTTickerDataProvider(),
+        CSVURLDataProvider(),
+        JSONURLDataProvider(),
+        ParquetURLDataProvider(),
     ]
 
     if _yahoo_available:
@@ -99,6 +105,9 @@ def get_default_ohlcv_data_providers():
 __all__ = [
     'CSVOHLCVDataProvider',
     'CSVTickerDataProvider',
+    'CSVURLDataProvider',
+    'JSONURLDataProvider',
+    'ParquetURLDataProvider',
     'CCXTOHLCVDataProvider',
     'CCXTTickerDataProvider',
     'get_default_data_providers',

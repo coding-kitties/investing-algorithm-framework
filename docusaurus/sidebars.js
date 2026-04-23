@@ -67,6 +67,10 @@ const sidebars = {
                     type: 'doc',
                     id: 'Data/multiple-market-data-sources',
                 },
+                {
+                    type: 'doc',
+                    id: 'Data/external-data',
+                },
             ],
         },
         {

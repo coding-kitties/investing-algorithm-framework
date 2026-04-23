@@ -11,7 +11,8 @@ from .repositories import SQLOrderRepository, SQLPositionRepository, \
 from .services import AzureBlobStorageStateHandler, AWSS3StorageStateHandler, \
     BacktestService
 from .data_providers import CSVOHLCVDataProvider, \
-    CSVTickerDataProvider, get_default_data_providers, \
+    CSVTickerDataProvider, CSVURLDataProvider, JSONURLDataProvider, \
+    ParquetURLDataProvider, get_default_data_providers, \
     get_default_ohlcv_data_providers, CCXTOHLCVDataProvider, \
     CCXTTickerDataProvider, PandasOHLCVDataProvider, \
     OHLCVDataProviderBase, \
@@ -55,6 +56,9 @@ __all__ = [
     "BacktestOrderExecutor",
     "PandasOHLCVDataProvider",
     "OHLCVDataProviderBase",
+    "CSVURLDataProvider",
+    "JSONURLDataProvider",
+    "ParquetURLDataProvider",
     "YahooOHLCVDataProvider",
     "AlphaVantageOHLCVDataProvider",
     "PolygonOHLCVDataProvider",
