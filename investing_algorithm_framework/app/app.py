@@ -71,10 +71,16 @@ class App:
         self._state_handler = state_handler
         self._run_history = None
         self._name = name
+        self._blotter = None
 
     @property
     def context(self):
-        return self.container.context()
+        ctx = self.container.context()
+
+        if self._blotter is not None:
+            ctx._blotter = self._blotter
+
+        return ctx
 
     @property
     def resource_directory_path(self):
@@ -2206,6 +2212,39 @@ class App:
             secret_key=secret_key
         )
         self.add_market_credential(market_credential)
+
+    def set_blotter(self, blotter):
+        """
+        Set a blotter for order book management. The blotter sits
+        between the strategy and the order execution layer, enabling
+        batch ordering, transaction tracking, and custom order routing.
+
+        Args:
+            blotter: Instance of Blotter
+
+        Returns:
+            None
+        """
+        from investing_algorithm_framework.domain.blotter import Blotter
+
+        if inspect.isclass(blotter):
+            blotter = blotter()
+
+        if not isinstance(blotter, Blotter):
+            raise OperationalException(
+                "Blotter should be an instance of Blotter"
+            )
+
+        self._blotter = blotter
+
+    def get_blotter(self):
+        """
+        Get the configured blotter.
+
+        Returns:
+            Blotter or None: The configured blotter instance.
+        """
+        return self._blotter
 
     def add_order_executor(self, order_executor):
         """

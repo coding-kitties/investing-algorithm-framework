@@ -50,6 +50,7 @@ class Context:
             trade_stop_loss_service
         self.trade_take_profit_service: TradeTakeProfitService = \
             trade_take_profit_service
+        self._blotter = None
 
     def _validate_target_symbol(self, target_symbol, market=None):
         """
@@ -2196,3 +2197,111 @@ class Context:
             self._parquet_url_providers[url] = provider
 
         return self._parquet_url_providers[url].get_data()
+
+    def batch_order(self, orders, market=None):
+        """
+        Place multiple orders at once.
+
+        If a blotter is configured (via ``app.set_blotter()``), the
+        orders are routed through the blotter. Otherwise, orders are
+        created directly.
+
+        Each order dict supports the same parameters as
+        ``create_limit_order`` and ``create_market_order``.
+
+        Args:
+            orders (list[dict]): List of order dicts. Each dict should
+                contain at minimum ``target_symbol``, ``order_side``,
+                and either ``amount`` or ``percentage_of_portfolio``.
+                Include ``price`` for limit orders.
+                Include ``order_type`` to specify MARKET orders
+                (default is LIMIT).
+            market (str, optional): Default market for all orders.
+                Can be overridden per order.
+
+        Returns:
+            list[Order]: The created orders.
+
+        Example::
+
+            context.batch_order([
+                {
+                    "target_symbol": "BTC",
+                    "order_side": OrderSide.BUY,
+                    "percentage_of_portfolio": 5.0,
+                    "price": 45000,
+                },
+                {
+                    "target_symbol": "ETH",
+                    "order_side": OrderSide.BUY,
+                    "percentage_of_portfolio": 3.0,
+                    "price": 3000,
+                },
+            ])
+        """
+        if self._blotter is not None:
+            # Add default market to each order if not set
+            for order_data in orders:
+                if "market" not in order_data and market is not None:
+                    order_data["market"] = market
+
+            return self._blotter.batch_order(orders, self)
+
+        # Default: create orders directly
+        results = []
+
+        for order_data in orders:
+            order_market = order_data.get("market", market)
+            order_type = order_data.get("order_type", OrderType.LIMIT.value)
+
+            if OrderType.MARKET.equals(order_type):
+                order = self.create_market_order(
+                    target_symbol=order_data["target_symbol"],
+                    order_side=order_data["order_side"],
+                    amount=order_data.get("amount"),
+                    percentage_of_portfolio=order_data.get(
+                        "percentage_of_portfolio"
+                    ),
+                    percentage_of_position=order_data.get(
+                        "percentage_of_position"
+                    ),
+                    precision=order_data.get("precision"),
+                    market=order_market,
+                    metadata=order_data.get("metadata"),
+                )
+            else:
+                order = self.create_limit_order(
+                    target_symbol=order_data["target_symbol"],
+                    price=order_data["price"],
+                    order_side=order_data["order_side"],
+                    amount=order_data.get("amount"),
+                    percentage_of_portfolio=order_data.get(
+                        "percentage_of_portfolio"
+                    ),
+                    percentage_of_position=order_data.get(
+                        "percentage_of_position"
+                    ),
+                    precision=order_data.get("precision"),
+                    market=order_market,
+                    metadata=order_data.get("metadata"),
+                )
+
+            results.append(order)
+
+        return results
+
+    def get_transactions(self):
+        """
+        Get all recorded transactions from the blotter.
+
+        Returns a list of Transaction objects representing all
+        fills/executions that have been processed through the blotter.
+
+        Returns:
+            list[Transaction]: Recorded transactions, or an empty
+                list if no blotter is configured.
+        """
+        if self._blotter is not None:
+            return self._blotter.get_transactions()
+
+        return []
