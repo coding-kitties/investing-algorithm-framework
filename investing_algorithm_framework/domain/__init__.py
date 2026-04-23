@@ -25,7 +25,7 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TakeProfitRule, StopLossRule, PositionSize, ScalingRule, TradingCost
 from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
-from .blotter import Blotter, SimulationBlotter, Transaction, \
+from .blotter import Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
     SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage, \
     CommissionModel, NoCommission, PercentageCommission, FixedCommission
 from .services import MarketCredentialService, AbstractPortfolioSyncService, \
@@ -156,6 +156,7 @@ __all__ = [
     "retag_backtests",
     "generate_algorithm_id",
     "Blotter",
+    "DefaultBlotter",
     "SimulationBlotter",
     "Transaction",
     "SlippageModel",

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock
 
 from investing_algorithm_framework.domain.blotter import (
-    Blotter, SimulationBlotter, Transaction,
+    Blotter, DefaultBlotter, SimulationBlotter, Transaction,
     SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage,
     CommissionModel, NoCommission, PercentageCommission, FixedCommission,
 )
@@ -175,17 +175,18 @@ class ConcreteBlotter(Blotter):
     """Minimal concrete implementation for testing."""
 
     def place_order(self, order_data, context):
-        return context.create_limit_order(
-            target_symbol=order_data["target_symbol"],
-            price=order_data["price"],
-            order_side=order_data["order_side"],
-            amount=order_data.get("amount"),
+        execute = order_data.pop("_execute", True)
+        validate = order_data.pop("_validate", True)
+        sync = order_data.pop("_sync", True)
+        return context.order_service.create(
+            order_data, execute=execute, validate=validate, sync=sync
         )
 
     def cancel_order(self, order_id, context):
-        return context.order_service.update(
+        context.order_service.update(
             order_id, {"status": "CANCELED"}
         )
+        return context.order_service.get(order_id)
 
 
 class TestBlotter(unittest.TestCase):
@@ -240,7 +241,7 @@ class TestBlotter(unittest.TestCase):
 
         mock_order_1 = MagicMock()
         mock_order_2 = MagicMock()
-        context.create_limit_order.side_effect = [
+        context.order_service.create.side_effect = [
             mock_order_1, mock_order_2
         ]
 
@@ -263,7 +264,7 @@ class TestBlotter(unittest.TestCase):
         self.assertEqual(len(results), 2)
         self.assertEqual(results[0], mock_order_1)
         self.assertEqual(results[1], mock_order_2)
-        self.assertEqual(context.create_limit_order.call_count, 2)
+        self.assertEqual(context.order_service.create.call_count, 2)
 
     def test_get_open_orders_delegates_to_context(self):
         blotter = ConcreteBlotter()
@@ -280,6 +281,93 @@ class TestBlotter(unittest.TestCase):
         blotter = ConcreteBlotter()
         context = MagicMock()
         blotter.prune_orders(context)
+
+
+class TestDefaultBlotter(unittest.TestCase):
+
+    def test_place_order_delegates_to_order_service(self):
+        blotter = DefaultBlotter()
+        context = MagicMock()
+        mock_order = MagicMock()
+        context.order_service.create.return_value = mock_order
+
+        order_data = {
+            "target_symbol": "BTC",
+            "price": 45000.0,
+            "amount": 0.1,
+            "order_type": "LIMIT",
+            "order_side": "BUY",
+            "portfolio_id": 1,
+            "status": "CREATED",
+            "trading_symbol": "EUR",
+        }
+
+        result = blotter.place_order(order_data, context)
+        self.assertEqual(result, mock_order)
+        context.order_service.create.assert_called_once()
+
+    def test_place_order_respects_flow_control_params(self):
+        blotter = DefaultBlotter()
+        context = MagicMock()
+        mock_order = MagicMock()
+        context.order_service.create.return_value = mock_order
+
+        order_data = {
+            "target_symbol": "BTC",
+            "price": 45000.0,
+            "amount": 0.1,
+            "_execute": False,
+            "_validate": False,
+            "_sync": False,
+        }
+
+        blotter.place_order(order_data, context)
+        call_kwargs = context.order_service.create.call_args
+        self.assertEqual(call_kwargs.kwargs["execute"], False)
+        self.assertEqual(call_kwargs.kwargs["validate"], False)
+        self.assertEqual(call_kwargs.kwargs["sync"], False)
+
+    def test_place_order_defaults_flow_control(self):
+        blotter = DefaultBlotter()
+        context = MagicMock()
+        mock_order = MagicMock()
+        context.order_service.create.return_value = mock_order
+
+        order_data = {
+            "target_symbol": "BTC",
+            "price": 45000.0,
+            "amount": 0.1,
+        }
+
+        blotter.place_order(order_data, context)
+        call_kwargs = context.order_service.create.call_args
+        self.assertEqual(call_kwargs.kwargs["execute"], True)
+        self.assertEqual(call_kwargs.kwargs["validate"], True)
+        self.assertEqual(call_kwargs.kwargs["sync"], True)
+
+    def test_cancel_order(self):
+        blotter = DefaultBlotter()
+        context = MagicMock()
+        mock_order = MagicMock()
+        context.order_service.get.return_value = mock_order
+
+        blotter.cancel_order(42, context)
+
+        context.order_service.update.assert_called_once_with(
+            42, {"status": "CANCELED"}
+        )
+
+    def test_cancel_nonexistent_order_raises(self):
+        blotter = DefaultBlotter()
+        context = MagicMock()
+        context.order_service.get.return_value = None
+
+        with self.assertRaises(Exception):
+            blotter.cancel_order(999, context)
+
+    def test_no_transactions_by_default(self):
+        blotter = DefaultBlotter()
+        self.assertEqual(blotter.get_transactions(), [])
 
 
 class TestSimulationBlotter(unittest.TestCase):
@@ -301,7 +389,7 @@ class TestSimulationBlotter(unittest.TestCase):
         )
         self.assertEqual(blotter.commission_model.percentage, 0.002)
 
-    def test_place_limit_order(self):
+    def test_place_order(self):
         blotter = SimulationBlotter()
         context = MagicMock()
         mock_order = MagicMock()
@@ -310,17 +398,21 @@ class TestSimulationBlotter(unittest.TestCase):
         mock_order.get_order_side.return_value = "BUY"
         mock_order.get_price.return_value = 45000.0
         mock_order.get_amount.return_value = 0.1
-        context.create_limit_order.return_value = mock_order
+        context.order_service.create.return_value = mock_order
 
         result = blotter.place_order({
             "target_symbol": "BTC",
             "order_side": "BUY",
             "price": 45000.0,
             "amount": 0.1,
+            "order_type": "LIMIT",
+            "portfolio_id": 1,
+            "status": "CREATED",
+            "trading_symbol": "EUR",
         }, context)
 
         self.assertEqual(result, mock_order)
-        context.create_limit_order.assert_called_once()
+        context.order_service.create.assert_called_once()
         self.assertEqual(len(blotter.get_transactions()), 1)
 
         tx = blotter.get_transactions()[0]
@@ -329,28 +421,7 @@ class TestSimulationBlotter(unittest.TestCase):
         self.assertEqual(tx.price, 45000.0)
         self.assertEqual(tx.amount, 0.1)
 
-    def test_place_market_order(self):
-        blotter = SimulationBlotter()
-        context = MagicMock()
-        mock_order = MagicMock()
-        mock_order.get_id.return_value = 2
-        mock_order.get_symbol.return_value = "ETH/EUR"
-        mock_order.get_order_side.return_value = "BUY"
-        mock_order.get_price.return_value = 3000.0
-        mock_order.get_amount.return_value = 1.0
-        context.create_market_order.return_value = mock_order
-
-        result = blotter.place_order({
-            "target_symbol": "ETH",
-            "order_side": "BUY",
-            "order_type": "MARKET",
-            "amount": 1.0,
-        }, context)
-
-        self.assertEqual(result, mock_order)
-        context.create_market_order.assert_called_once()
-
-    def test_slippage_applied_to_limit_order(self):
+    def test_slippage_applied_to_price(self):
         blotter = SimulationBlotter(
             slippage_model=PercentageSlippage(0.01)
         )
@@ -359,22 +430,25 @@ class TestSimulationBlotter(unittest.TestCase):
         mock_order.get_id.return_value = 1
         mock_order.get_symbol.return_value = "BTC/EUR"
         mock_order.get_order_side.return_value = "BUY"
-        mock_order.get_price.return_value = 45450.0  # slipped
+        mock_order.get_price.return_value = 45450.0
         mock_order.get_amount.return_value = 0.1
-        context.create_limit_order.return_value = mock_order
+        context.order_service.create.return_value = mock_order
 
         blotter.place_order({
             "target_symbol": "BTC",
             "order_side": "BUY",
             "price": 45000.0,
             "amount": 0.1,
+            "order_type": "LIMIT",
+            "portfolio_id": 1,
+            "status": "CREATED",
+            "trading_symbol": "EUR",
         }, context)
 
-        # Verify slipped price was passed to create_limit_order
-        call_kwargs = context.create_limit_order.call_args
-        self.assertAlmostEqual(
-            call_kwargs.kwargs["price"], 45450.0, places=0
-        )
+        # Verify slipped price was passed to order_service.create
+        call_args = context.order_service.create.call_args
+        order_data = call_args[0][0]
+        self.assertAlmostEqual(order_data["price"], 45450.0, places=0)
 
         # Check transaction records slippage
         tx = blotter.get_transactions()[0]
@@ -391,13 +465,17 @@ class TestSimulationBlotter(unittest.TestCase):
         mock_order.get_order_side.return_value = "BUY"
         mock_order.get_price.return_value = 45000.0
         mock_order.get_amount.return_value = 0.1
-        context.create_limit_order.return_value = mock_order
+        context.order_service.create.return_value = mock_order
 
         blotter.place_order({
             "target_symbol": "BTC",
             "order_side": "BUY",
             "price": 45000.0,
             "amount": 0.1,
+            "order_type": "LIMIT",
+            "portfolio_id": 1,
+            "status": "CREATED",
+            "trading_symbol": "EUR",
         }, context)
 
         tx = blotter.get_transactions()[0]
@@ -449,7 +527,7 @@ class TestSimulationBlotter(unittest.TestCase):
         mock_order_2.get_price.return_value = 3010.0
         mock_order_2.get_amount.return_value = 1.0
 
-        context.create_limit_order.side_effect = [
+        context.order_service.create.side_effect = [
             mock_order_1, mock_order_2
         ]
 
@@ -459,12 +537,20 @@ class TestSimulationBlotter(unittest.TestCase):
                 "order_side": "BUY",
                 "price": 45000.0,
                 "amount": 0.1,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CREATED",
+                "trading_symbol": "EUR",
             },
             {
                 "target_symbol": "ETH",
                 "order_side": "BUY",
                 "price": 3000.0,
                 "amount": 1.0,
+                "order_type": "LIMIT",
+                "portfolio_id": 1,
+                "status": "CREATED",
+                "trading_symbol": "EUR",
             },
         ], context)
 
@@ -487,14 +573,17 @@ class TestSimulationBlotter(unittest.TestCase):
         mock_order.get_order_side.return_value = "BUY"
         mock_order.get_price.return_value = 0
         mock_order.get_amount.return_value = 0.1
-        context.create_market_order.return_value = mock_order
+        context.order_service.create.return_value = mock_order
 
-        # No price, market order
         result = blotter.place_order({
             "target_symbol": "BTC",
             "order_side": "BUY",
             "order_type": "MARKET",
             "amount": 0.1,
+            "price": 0,
+            "portfolio_id": 1,
+            "status": "CREATED",
+            "trading_symbol": "EUR",
         }, context)
 
         self.assertIsNotNone(result)
@@ -509,22 +598,28 @@ class TestSimulationBlotter(unittest.TestCase):
         mock_order.get_order_side.return_value = "BUY"
         mock_order.get_price.return_value = 45000.0
         mock_order.get_amount.return_value = 0.1
-        context.create_limit_order.return_value = mock_order
+        context.order_service.create.return_value = mock_order
 
         blotter.place_order({
             "target_symbol": "BTC",
             "order_side": "BUY",
             "price": 45000.0,
             "amount": 0.1,
+            "order_type": "LIMIT",
+            "portfolio_id": 1,
+            "status": "CREATED",
+            "trading_symbol": "EUR",
             "metadata": {"strategy": "momentum"},
         }, context)
 
-        call_kwargs = context.create_limit_order.call_args.kwargs
+        call_args = context.order_service.create.call_args
+        order_data = call_args[0][0]
         self.assertEqual(
-            call_kwargs["metadata"], {"strategy": "momentum"}
+            order_data["metadata"], {"strategy": "momentum"}
         )
 
-    def test_place_order_passes_percentage_of_portfolio(self):
+    def test_flow_control_params_extracted(self):
+        """Test that _execute/_validate/_sync are popped from order_data."""
         blotter = SimulationBlotter()
         context = MagicMock()
         mock_order = MagicMock()
@@ -532,18 +627,28 @@ class TestSimulationBlotter(unittest.TestCase):
         mock_order.get_symbol.return_value = "BTC/EUR"
         mock_order.get_order_side.return_value = "BUY"
         mock_order.get_price.return_value = 45000.0
-        mock_order.get_amount.return_value = 0.5
-        context.create_limit_order.return_value = mock_order
+        mock_order.get_amount.return_value = 0.1
+        context.order_service.create.return_value = mock_order
 
         blotter.place_order({
             "target_symbol": "BTC",
             "order_side": "BUY",
             "price": 45000.0,
-            "percentage_of_portfolio": 5.0,
+            "amount": 0.1,
+            "_execute": False,
+            "_validate": False,
+            "_sync": False,
         }, context)
 
-        call_kwargs = context.create_limit_order.call_args.kwargs
-        self.assertEqual(call_kwargs["percentage_of_portfolio"], 5.0)
+        call_kwargs = context.order_service.create.call_args
+        self.assertEqual(call_kwargs.kwargs["execute"], False)
+        self.assertEqual(call_kwargs.kwargs["validate"], False)
+        self.assertEqual(call_kwargs.kwargs["sync"], False)
+        # Verify _execute/_validate/_sync are NOT in the order_data
+        order_data = call_kwargs[0][0]
+        self.assertNotIn("_execute", order_data)
+        self.assertNotIn("_validate", order_data)
+        self.assertNotIn("_sync", order_data)
 
 
 class TestSlippageModelAbstract(unittest.TestCase):
@@ -565,22 +670,24 @@ class TestImports(unittest.TestCase):
 
     def test_import_from_domain(self):
         from investing_algorithm_framework.domain import (  # noqa: F401
-            Blotter, SimulationBlotter, Transaction,
+            Blotter, DefaultBlotter, SimulationBlotter, Transaction,
             SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage,
             CommissionModel, NoCommission, PercentageCommission,
             FixedCommission,
         )
         self.assertIsNotNone(Blotter)
+        self.assertIsNotNone(DefaultBlotter)
         self.assertIsNotNone(SimulationBlotter)
         self.assertIsNotNone(Transaction)
 
     def test_import_from_top_level(self):
         from investing_algorithm_framework import (  # noqa: F401
-            Blotter, SimulationBlotter, Transaction,
+            Blotter, DefaultBlotter, SimulationBlotter, Transaction,
             NoSlippage, PercentageSlippage, FixedSlippage,
             NoCommission, PercentageCommission, FixedCommission,
         )
         self.assertIsNotNone(Blotter)
+        self.assertIsNotNone(DefaultBlotter)
         self.assertIsNotNone(SimulationBlotter)
         self.assertIsNotNone(Transaction)
 

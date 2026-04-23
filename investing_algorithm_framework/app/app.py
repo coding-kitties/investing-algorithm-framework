@@ -75,10 +75,12 @@ class App:
 
     @property
     def context(self):
-        ctx = self.container.context()
+        from investing_algorithm_framework.domain.blotter import \
+            DefaultBlotter
 
-        if self._blotter is not None:
-            ctx._blotter = self._blotter
+        ctx = self.container.context()
+        ctx._blotter = self._blotter \
+            if self._blotter is not None else DefaultBlotter()
 
         return ctx
 
@@ -2325,10 +2327,15 @@ class App:
         first check if the app is running in backtest mode or not. If it is
         running in backtest mode, all order executors will be removed and
         a single BacktestOrderExecutor will be added to the order executors.
+        It will also set the SimulationBlotter as the default blotter if
+        no custom blotter has been configured.
 
         If it is not running in backtest mode, it will add the default
         CCXTOrderExecutor with a priority 3.
         """
+        from investing_algorithm_framework.domain.blotter import \
+            SimulationBlotter
+
         logger.info("Adding order executors")
         order_executor_lookup = self.container.order_executor_lookup()
         environment = self.config[ENVIRONMENT]
@@ -2341,6 +2348,11 @@ class App:
             order_executor_lookup.add_order_executor(
                 BacktestOrderExecutor(priority=1)
             )
+
+            # Auto-set SimulationBlotter for backtesting if no
+            # custom blotter has been configured
+            if self._blotter is None:
+                self._blotter = SimulationBlotter()
         else:
             order_executor_lookup.add_order_executor(
                 CCXTOrderExecutor(priority=3)

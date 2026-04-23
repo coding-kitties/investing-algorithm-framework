@@ -25,7 +25,7 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus, \
     save_backtests_to_directory, BacktestMetrics, DATA_DIRECTORY, \
     retag_backtests, \
-    Blotter, SimulationBlotter, Transaction, \
+    Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
     SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage, \
     CommissionModel, NoCommission, PercentageCommission, FixedCommission
 from .infrastructure import AzureBlobStorageStateHandler, \
@@ -234,6 +234,7 @@ __all__ = [
     "create_data_storage_path",
     "DATA_DIRECTORY",
     "Blotter",
+    "DefaultBlotter",
     "SimulationBlotter",
     "Transaction",
     "SlippageModel",

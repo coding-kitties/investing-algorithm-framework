@@ -350,6 +350,71 @@ class Blotter(ABC):
         pass
 
 
+class DefaultBlotter(Blotter):
+    """
+    Pass-through blotter for live trading.
+
+    Does not apply slippage or commission — orders are forwarded
+    directly to the OrderService for execution through the
+    configured OrderExecutor.
+
+    This is the default blotter used when no custom blotter is
+    configured.
+
+    Usage::
+
+        app.set_blotter(DefaultBlotter())
+    """
+
+    def place_order(self, order_data, context):
+        """
+        Place an order directly through the order service.
+
+        Args:
+            order_data: Dict with order parameters (as built by Context).
+            context: The Context instance.
+
+        Returns:
+            Order: The created order.
+        """
+        execute = order_data.pop("_execute", True)
+        validate = order_data.pop("_validate", True)
+        sync = order_data.pop("_sync", True)
+        return context.order_service.create(
+            order_data, execute=execute, validate=validate, sync=sync
+        )
+
+    def cancel_order(self, order_id, context):
+        """
+        Cancel a specific order.
+
+        Args:
+            order_id: The ID of the order to cancel.
+            context: The Context instance.
+
+        Returns:
+            Order: The cancelled order.
+        """
+        from investing_algorithm_framework.domain.models.order.order_status \
+            import OrderStatus
+
+        order = context.order_service.get(order_id)
+
+        if order is None:
+            from investing_algorithm_framework.domain.exceptions \
+                import OperationalException
+            raise OperationalException(
+                f"Order with id {order_id} not found"
+            )
+
+        context.order_service.update(
+            order_id,
+            {"status": OrderStatus.CANCELED.value}
+        )
+
+        return context.order_service.get(order_id)
+
+
 class SimulationBlotter(Blotter):
     """
     Default blotter for backtesting with configurable slippage
@@ -388,60 +453,33 @@ class SimulationBlotter(Blotter):
         A Transaction is recorded for audit purposes.
 
         Args:
-            order_data: Dict with order parameters.
+            order_data: Dict with order parameters (as built by Context,
+                with amounts already resolved).
             context: The Context instance.
 
         Returns:
             Order: The created order.
         """
-        from investing_algorithm_framework.domain.models.order.order_type \
-            import OrderType
-
-        order_type = order_data.get("order_type", OrderType.LIMIT.value)
-        target_symbol = order_data["target_symbol"]
-        order_side = order_data["order_side"]
+        order_side = order_data.get("order_side")
         price = order_data.get("price")
-        amount = order_data.get("amount")
-        percentage_of_portfolio = order_data.get("percentage_of_portfolio")
-        percentage_of_position = order_data.get("percentage_of_position")
-        precision = order_data.get("precision")
-        market = order_data.get("market")
-        metadata = order_data.get("metadata")
-
-        # Apply slippage to price
         original_price = price
 
+        # Apply slippage to price for limit orders
         if price is not None and price > 0:
             slipped_price = self.slippage_model.calculate_slippage(
-                price, order_side, amount
+                price, order_side, order_data.get("amount")
             )
-        else:
-            slipped_price = price
+            order_data["price"] = slipped_price
 
-        # Create order through context
-        if OrderType.MARKET.equals(order_type):
-            order = context.create_market_order(
-                target_symbol=target_symbol,
-                order_side=order_side,
-                amount=amount,
-                percentage_of_portfolio=percentage_of_portfolio,
-                percentage_of_position=percentage_of_position,
-                precision=precision,
-                market=market,
-                metadata=metadata,
-            )
-        else:
-            order = context.create_limit_order(
-                target_symbol=target_symbol,
-                price=slipped_price,
-                order_side=order_side,
-                amount=amount,
-                percentage_of_portfolio=percentage_of_portfolio,
-                percentage_of_position=percentage_of_position,
-                precision=precision,
-                market=market,
-                metadata=metadata,
-            )
+        # Extract flow control params before passing to order_service
+        execute = order_data.pop("_execute", True)
+        validate = order_data.pop("_validate", True)
+        sync = order_data.pop("_sync", True)
+
+        # Create order through order service directly
+        order = context.order_service.create(
+            order_data, execute=execute, validate=validate, sync=sync
+        )
 
         # Calculate commission
         fill_price = order.get_price()
