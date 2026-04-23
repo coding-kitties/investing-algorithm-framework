@@ -72,6 +72,8 @@ class App:
         self._run_history = None
         self._name = name
         self._blotter = None
+        self._fx_rate_provider = None
+        self._base_currency = None
 
     @property
     def context(self):
@@ -81,6 +83,8 @@ class App:
         ctx = self.container.context()
         ctx._blotter = self._blotter \
             if self._blotter is not None else DefaultBlotter()
+        ctx._fx_rate_provider = self._fx_rate_provider
+        ctx._base_currency = self._base_currency
 
         return ctx
 
@@ -2251,6 +2255,65 @@ class App:
             Blotter or None: The configured blotter instance.
         """
         return self._blotter
+
+    def set_base_currency(self, currency: str) -> None:
+        """
+        Set the base currency for multi-currency portfolio reporting.
+
+        When a base currency is set and an FX rate provider is registered,
+        the framework will automatically convert position values from
+        their local currency to the base currency when computing
+        portfolio totals.
+
+        Args:
+            currency: Currency code (e.g. "EUR", "USD", "GBP").
+
+        Returns:
+            None
+        """
+        self._base_currency = currency.upper()
+
+    def get_base_currency(self) -> str:
+        """
+        Get the configured base currency.
+
+        Returns:
+            str or None: The base currency code, or None if not set.
+        """
+        return self._base_currency
+
+    def add_fx_rate_provider(self, fx_rate_provider) -> None:
+        """
+        Register an FX rate provider for multi-currency portfolio
+        support. The provider supplies exchange rates between
+        currency pairs.
+
+        Args:
+            fx_rate_provider: Instance of FXRateProvider.
+
+        Returns:
+            None
+        """
+        from investing_algorithm_framework.domain.fx import FXRateProvider
+
+        if inspect.isclass(fx_rate_provider):
+            fx_rate_provider = fx_rate_provider()
+
+        if not isinstance(fx_rate_provider, FXRateProvider):
+            raise OperationalException(
+                "FX rate provider should be an instance of FXRateProvider"
+            )
+
+        self._fx_rate_provider = fx_rate_provider
+
+    def get_fx_rate_provider(self):
+        """
+        Get the configured FX rate provider.
+
+        Returns:
+            FXRateProvider or None: The FX rate provider instance.
+        """
+        return self._fx_rate_provider
 
     def add_order_executor(self, order_executor):
         """

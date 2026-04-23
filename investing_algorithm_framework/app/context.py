@@ -51,6 +51,8 @@ class Context:
         self.trade_take_profit_service: TradeTakeProfitService = \
             trade_take_profit_service
         self._blotter = None
+        self._fx_rate_provider = None
+        self._base_currency = None
 
     def _validate_target_symbol(self, target_symbol, market=None):
         """
@@ -715,6 +717,137 @@ class Context:
         )
 
         return ticker['bid'] if ticker and 'bid' in ticker else None
+
+    def get_fx_rate(
+        self, from_currency: str, to_currency: str
+    ) -> float:
+        """
+        Get the exchange rate between two currencies using the
+        registered FX rate provider.
+
+        Args:
+            from_currency: Source currency code (e.g. "USD").
+            to_currency: Target currency code (e.g. "EUR").
+
+        Returns:
+            float: The exchange rate. Returns 1.0 if the currencies
+                are the same.
+
+        Raises:
+            OperationalException: If no FX rate provider is registered.
+        """
+        from_c = from_currency.upper()
+        to_c = to_currency.upper()
+
+        if from_c == to_c:
+            return 1.0
+
+        if self._fx_rate_provider is None:
+            raise OperationalException(
+                f"Cannot convert {from_c} to {to_c}: "
+                "no FX rate provider registered. "
+                "Use app.add_fx_rate_provider() to register one."
+            )
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            date = self.configuration_service.config[INDEX_DATETIME]
+        else:
+            date = datetime.now(tz=timezone.utc)
+
+        return self._fx_rate_provider.get_rate(from_c, to_c, date=date)
+
+    def convert_to_base_currency(
+        self, amount: float, from_currency: str
+    ) -> float:
+        """
+        Convert an amount to the base currency.
+
+        Args:
+            amount: The amount to convert.
+            from_currency: The currency of the amount.
+
+        Returns:
+            float: The converted amount in the base currency.
+
+        Raises:
+            OperationalException: If no base currency is set or no
+                FX rate provider is registered.
+        """
+        if self._base_currency is None:
+            raise OperationalException(
+                "No base currency configured. "
+                "Use app.set_base_currency() to set one."
+            )
+
+        rate = self.get_fx_rate(from_currency, self._base_currency)
+        return amount * rate
+
+    def get_portfolio_value(self) -> float:
+        """
+        Compute the total portfolio value across all markets,
+        converted to the base currency.
+
+        If no base currency is set, returns the total value of
+        the first (default) portfolio in its own trading currency.
+
+        Each portfolio's value = unallocated cash + sum of
+        (position_amount * current_price), converted via FX rates
+        to the base currency.
+
+        Returns:
+            float: Total portfolio value in the base currency.
+        """
+        portfolios = self.portfolio_service.get_all()
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            date = self.configuration_service.config[INDEX_DATETIME]
+        else:
+            date = datetime.now(tz=timezone.utc)
+
+        total_value = 0.0
+
+        for portfolio in portfolios:
+            trading_symbol = portfolio.trading_symbol
+            positions = self.position_service.get_all(
+                {"portfolio": portfolio.id}
+            )
+
+            # Portfolio value in its local trading currency
+            local_value = 0.0
+
+            for position in positions:
+                if position.symbol == trading_symbol:
+                    local_value += position.get_amount()
+                else:
+                    ticker = self.data_provider_service.get_ticker_data(
+                        symbol=(
+                            f"{position.symbol}/{trading_symbol}"
+                        ),
+                        market=portfolio.market,
+                        date=date
+                    )
+
+                    if ticker is not None and "bid" in ticker:
+                        local_value += (
+                            position.get_amount() * ticker["bid"]
+                        )
+
+            # Convert to base currency if configured
+            if (
+                self._base_currency is not None
+                and self._fx_rate_provider is not None
+                and trading_symbol != self._base_currency
+            ):
+                rate = self._fx_rate_provider.get_rate(
+                    trading_symbol, self._base_currency, date=date
+                )
+                total_value += local_value * rate
+            else:
+                total_value += local_value
+
+        return total_value
 
     def get_portfolios(self):
         """

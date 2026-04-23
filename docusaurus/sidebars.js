@@ -83,6 +83,10 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Advanced Concepts/fx-conversion',
+                },
+                {
+                    type: 'doc',
                     id: 'Advanced Concepts/custom-data-providers',
                 },
                 {

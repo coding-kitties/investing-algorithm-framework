@@ -29,7 +29,8 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage, \
     VolumeImpactSlippage, \
     CommissionModel, NoCommission, PercentageCommission, FixedCommission, \
-    FillModel, FullFill, VolumeBasedFill
+    FillModel, FullFill, VolumeBasedFill, \
+    FXRateProvider, StaticFXRateProvider
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
     JSONURLDataProvider, ParquetURLDataProvider, \
@@ -251,4 +252,6 @@ __all__ = [
     "FillModel",
     "FullFill",
     "VolumeBasedFill",
+    "FXRateProvider",
+    "StaticFXRateProvider",
 ]

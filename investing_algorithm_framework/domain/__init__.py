@@ -30,6 +30,7 @@ from .blotter import Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
     VolumeImpactSlippage, \
     CommissionModel, NoCommission, PercentageCommission, FixedCommission, \
     FillModel, FullFill, VolumeBasedFill
+from .fx import FXRateProvider, StaticFXRateProvider
 from .services import MarketCredentialService, AbstractPortfolioSyncService, \
     RoundingService, StateHandler
 from .stateless_actions import StatelessActions
@@ -173,4 +174,6 @@ __all__ = [
     "FillModel",
     "FullFill",
     "VolumeBasedFill",
+    "FXRateProvider",
+    "StaticFXRateProvider",
 ]
