@@ -348,7 +348,14 @@ class TestDataSource(TestCase):
             "storage_path",
             "date",
             "identifier",
-            "warmup_window"
+            "warmup_window",
+            "url",
+            "date_column",
+            "date_format",
+            "cache",
+            "refresh_interval",
+            "pre_process",
+            "post_process"
         ]
 
         self.assertEqual(set(field_names), set(expected_fields))
@@ -362,7 +369,7 @@ class TestDataSource(TestCase):
 
         for field in fields(DataSource):
 
-            if field.name in ["save", "pandas"]:
+            if field.name in ["save", "pandas", "cache"]:
                 # These fields are expected to have a default value
                 self.assertIsNotNone(field.default)
             else:
