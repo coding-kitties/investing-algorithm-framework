@@ -27,7 +27,9 @@ from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
 from .blotter import Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
     SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage, \
-    CommissionModel, NoCommission, PercentageCommission, FixedCommission
+    VolumeImpactSlippage, \
+    CommissionModel, NoCommission, PercentageCommission, FixedCommission, \
+    FillModel, FullFill, VolumeBasedFill
 from .services import MarketCredentialService, AbstractPortfolioSyncService, \
     RoundingService, StateHandler
 from .stateless_actions import StatelessActions
@@ -163,8 +165,12 @@ __all__ = [
     "NoSlippage",
     "PercentageSlippage",
     "FixedSlippage",
+    "VolumeImpactSlippage",
     "CommissionModel",
     "NoCommission",
     "PercentageCommission",
     "FixedCommission",
+    "FillModel",
+    "FullFill",
+    "VolumeBasedFill",
 ]

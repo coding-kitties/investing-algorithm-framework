@@ -261,7 +261,7 @@ class SmartOrderRouter(Blotter):
             order1 = context.order_service.create(order_data)
             order2 = context.order_service.create(order_data)
             return order1  # Return the first order
-        
+
         return context.order_service.create(order_data)
 
     def cancel_order(self, order_id, context):
@@ -271,7 +271,7 @@ class SmartOrderRouter(Blotter):
         order = context.order_service.get(order_id)
         if order is None:
             raise Exception(f"Order {order_id} not found")
-        
+
         context.order_service.update(
             order_id, {"status": "CANCELED"}
         )

@@ -27,7 +27,9 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     retag_backtests, \
     Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
     SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage, \
-    CommissionModel, NoCommission, PercentageCommission, FixedCommission
+    VolumeImpactSlippage, \
+    CommissionModel, NoCommission, PercentageCommission, FixedCommission, \
+    FillModel, FullFill, VolumeBasedFill
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
     JSONURLDataProvider, ParquetURLDataProvider, \
@@ -241,8 +243,12 @@ __all__ = [
     "NoSlippage",
     "PercentageSlippage",
     "FixedSlippage",
+    "VolumeImpactSlippage",
     "CommissionModel",
     "NoCommission",
     "PercentageCommission",
     "FixedCommission",
+    "FillModel",
+    "FullFill",
+    "VolumeBasedFill",
 ]

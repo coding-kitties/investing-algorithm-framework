@@ -5,7 +5,9 @@ from unittest.mock import MagicMock
 from investing_algorithm_framework.domain.blotter import (
     Blotter, DefaultBlotter, SimulationBlotter, Transaction,
     SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage,
+    VolumeImpactSlippage,
     CommissionModel, NoCommission, PercentageCommission, FixedCommission,
+    FillModel, FullFill, VolumeBasedFill,
 )
 
 
@@ -376,11 +378,13 @@ class TestSimulationBlotter(unittest.TestCase):
         blotter = SimulationBlotter()
         self.assertIsInstance(blotter.slippage_model, NoSlippage)
         self.assertIsInstance(blotter.commission_model, NoCommission)
+        self.assertIsInstance(blotter.fill_model, FullFill)
 
     def test_custom_models(self):
         blotter = SimulationBlotter(
             slippage_model=PercentageSlippage(0.01),
             commission_model=PercentageCommission(0.002),
+            fill_model=VolumeBasedFill(0.1),
         )
         self.assertIsInstance(blotter.slippage_model, PercentageSlippage)
         self.assertEqual(blotter.slippage_model.percentage, 0.01)
@@ -388,16 +392,16 @@ class TestSimulationBlotter(unittest.TestCase):
             blotter.commission_model, PercentageCommission
         )
         self.assertEqual(blotter.commission_model.percentage, 0.002)
+        self.assertIsInstance(blotter.fill_model, VolumeBasedFill)
 
-    def test_place_order(self):
-        blotter = SimulationBlotter()
+    def test_place_order_no_slippage_at_creation(self):
+        """place_order should NOT apply slippage or commission."""
+        blotter = SimulationBlotter(
+            slippage_model=PercentageSlippage(0.01),
+            commission_model=PercentageCommission(0.001),
+        )
         context = MagicMock()
         mock_order = MagicMock()
-        mock_order.get_id.return_value = 1
-        mock_order.get_symbol.return_value = "BTC/EUR"
-        mock_order.get_order_side.return_value = "BUY"
-        mock_order.get_price.return_value = 45000.0
-        mock_order.get_amount.return_value = 0.1
         context.order_service.create.return_value = mock_order
 
         result = blotter.place_order({
@@ -413,75 +417,80 @@ class TestSimulationBlotter(unittest.TestCase):
 
         self.assertEqual(result, mock_order)
         context.order_service.create.assert_called_once()
-        self.assertEqual(len(blotter.get_transactions()), 1)
+        # Price should NOT have been modified by slippage
+        call_args = context.order_service.create.call_args
+        order_data = call_args[0][0]
+        self.assertEqual(order_data["price"], 45000.0)
+        # No transactions recorded at order creation time
+        self.assertEqual(len(blotter.get_transactions()), 0)
 
-        tx = blotter.get_transactions()[0]
-        self.assertEqual(tx.order_id, 1)
-        self.assertEqual(tx.symbol, "BTC/EUR")
-        self.assertEqual(tx.price, 45000.0)
-        self.assertEqual(tx.amount, 0.1)
-
-    def test_slippage_applied_to_price(self):
+    def test_get_fill_price_buy(self):
         blotter = SimulationBlotter(
             slippage_model=PercentageSlippage(0.01)
         )
-        context = MagicMock()
-        mock_order = MagicMock()
-        mock_order.get_id.return_value = 1
-        mock_order.get_symbol.return_value = "BTC/EUR"
-        mock_order.get_order_side.return_value = "BUY"
-        mock_order.get_price.return_value = 45450.0
-        mock_order.get_amount.return_value = 0.1
-        context.order_service.create.return_value = mock_order
+        fill_price = blotter.get_fill_price(100.0, "BUY")
+        self.assertAlmostEqual(fill_price, 101.0)
 
-        blotter.place_order({
-            "target_symbol": "BTC",
-            "order_side": "BUY",
-            "price": 45000.0,
-            "amount": 0.1,
-            "order_type": "LIMIT",
-            "portfolio_id": 1,
-            "status": "CREATED",
-            "trading_symbol": "EUR",
-        }, context)
+    def test_get_fill_price_sell(self):
+        blotter = SimulationBlotter(
+            slippage_model=PercentageSlippage(0.01)
+        )
+        fill_price = blotter.get_fill_price(100.0, "SELL")
+        self.assertAlmostEqual(fill_price, 99.0)
 
-        # Verify slipped price was passed to order_service.create
-        call_args = context.order_service.create.call_args
-        order_data = call_args[0][0]
-        self.assertAlmostEqual(order_data["price"], 45450.0, places=0)
-
-        # Check transaction records slippage
-        tx = blotter.get_transactions()[0]
-        self.assertGreater(tx.slippage, 0)
-
-    def test_commission_recorded(self):
+    def test_get_fill_commission(self):
         blotter = SimulationBlotter(
             commission_model=PercentageCommission(0.001)
         )
-        context = MagicMock()
-        mock_order = MagicMock()
-        mock_order.get_id.return_value = 1
-        mock_order.get_symbol.return_value = "BTC/EUR"
-        mock_order.get_order_side.return_value = "BUY"
-        mock_order.get_price.return_value = 45000.0
-        mock_order.get_amount.return_value = 0.1
-        context.order_service.create.return_value = mock_order
-
-        blotter.place_order({
-            "target_symbol": "BTC",
-            "order_side": "BUY",
-            "price": 45000.0,
-            "amount": 0.1,
-            "order_type": "LIMIT",
-            "portfolio_id": 1,
-            "status": "CREATED",
-            "trading_symbol": "EUR",
-        }, context)
-
-        tx = blotter.get_transactions()[0]
         # 45000 * 0.1 * 0.001 = 4.5
-        self.assertAlmostEqual(tx.commission, 4.5)
-        mock_order.set_order_fee.assert_called_once_with(4.5)
+        commission = blotter.get_fill_commission(45000.0, 0.1, "BUY")
+        self.assertAlmostEqual(commission, 4.5)
+
+    def test_get_fill_amount_full_fill(self):
+        blotter = SimulationBlotter()
+        amount = blotter.get_fill_amount(10.0, available_volume=1000.0)
+        self.assertEqual(amount, 10.0)
+
+    def test_get_fill_amount_volume_based(self):
+        blotter = SimulationBlotter(
+            fill_model=VolumeBasedFill(max_volume_fraction=0.1)
+        )
+        # 10% of 50 = 5, order is 10 → fill 5
+        amount = blotter.get_fill_amount(10.0, available_volume=50.0)
+        self.assertAlmostEqual(amount, 5.0)
+
+    def test_get_commission_rate(self):
+        blotter = SimulationBlotter(
+            commission_model=PercentageCommission(0.002)
+        )
+        self.assertEqual(blotter.get_commission_rate(), 0.002)
+
+    def test_get_commission_rate_none_for_fixed(self):
+        blotter = SimulationBlotter(
+            commission_model=FixedCommission(5.0)
+        )
+        self.assertIsNone(blotter.get_commission_rate())
+
+    def test_on_fill_records_transaction(self):
+        blotter = SimulationBlotter(
+            commission_model=PercentageCommission(0.001)
+        )
+        commission = blotter.on_fill(
+            order_id=1,
+            symbol="BTC/EUR",
+            order_side="BUY",
+            fill_price=45045.0,
+            base_price=45000.0,
+            fill_amount=0.1,
+        )
+        # 45045 * 0.1 * 0.001 = 4.5045
+        self.assertAlmostEqual(commission, 4.5045)
+        self.assertEqual(len(blotter.get_transactions()), 1)
+        tx = blotter.get_transactions()[0]
+        self.assertEqual(tx.order_id, 1)
+        self.assertEqual(tx.symbol, "BTC/EUR")
+        self.assertAlmostEqual(tx.price, 45045.0)
+        self.assertAlmostEqual(tx.slippage, 45.0)
 
     def test_cancel_order(self):
         blotter = SimulationBlotter()
@@ -498,6 +507,81 @@ class TestSimulationBlotter(unittest.TestCase):
             context.order_service.get.call_count, 2
         )
 
+
+class TestVolumeImpactSlippage(unittest.TestCase):
+
+    def test_buy_with_volume(self):
+        model = VolumeImpactSlippage(
+            base_percentage=0.01, impact_power=0.5
+        )
+        # amount=100, volume=10000 → ratio=0.01, impact=0.01*0.1=0.001
+        result = model.calculate_slippage(
+            100.0, "BUY", amount=100, volume=10000
+        )
+        self.assertGreater(result, 100.0)
+
+    def test_sell_with_volume(self):
+        model = VolumeImpactSlippage(
+            base_percentage=0.01, impact_power=0.5
+        )
+        result = model.calculate_slippage(
+            100.0, "SELL", amount=100, volume=10000
+        )
+        self.assertLess(result, 100.0)
+
+    def test_no_volume_falls_back_to_base(self):
+        model = VolumeImpactSlippage(base_percentage=0.01)
+        result = model.calculate_slippage(100.0, "BUY")
+        self.assertAlmostEqual(result, 101.0)
+
+    def test_large_order_higher_impact(self):
+        model = VolumeImpactSlippage(
+            base_percentage=0.01, impact_power=0.5
+        )
+        small = model.calculate_slippage(
+            100.0, "BUY", amount=10, volume=10000
+        )
+        large = model.calculate_slippage(
+            100.0, "BUY", amount=1000, volume=10000
+        )
+        self.assertGreater(large - 100.0, small - 100.0)
+
+
+class TestFullFill(unittest.TestCase):
+
+    def test_fills_entire_amount(self):
+        model = FullFill()
+        self.assertEqual(model.get_fill_amount(100.0, 50.0), 100.0)
+
+    def test_fills_without_volume(self):
+        model = FullFill()
+        self.assertEqual(model.get_fill_amount(100.0, None), 100.0)
+
+
+class TestVolumeBasedFill(unittest.TestCase):
+
+    def test_partial_fill(self):
+        model = VolumeBasedFill(max_volume_fraction=0.1)
+        # 10% of 50 = 5, less than 100 → fill 5
+        self.assertAlmostEqual(
+            model.get_fill_amount(100.0, 50.0), 5.0
+        )
+
+    def test_full_fill_when_enough_volume(self):
+        model = VolumeBasedFill(max_volume_fraction=0.1)
+        # 10% of 10000 = 1000, more than 10 → fill 10
+        self.assertAlmostEqual(
+            model.get_fill_amount(10.0, 10000.0), 10.0
+        )
+
+    def test_no_volume_fills_entire(self):
+        model = VolumeBasedFill(max_volume_fraction=0.1)
+        self.assertEqual(model.get_fill_amount(100.0, None), 100.0)
+
+    def test_default_fraction(self):
+        model = VolumeBasedFill()
+        self.assertEqual(model.max_volume_fraction, 0.1)
+
     def test_cancel_nonexistent_order_raises(self):
         blotter = SimulationBlotter()
         context = MagicMock()
@@ -507,6 +591,7 @@ class TestSimulationBlotter(unittest.TestCase):
             blotter.cancel_order(999, context)
 
     def test_batch_order_with_slippage_and_commission(self):
+        """batch_order delegates to place_order; no transactions at creation."""
         blotter = SimulationBlotter(
             slippage_model=FixedSlippage(amount=10.0),
             commission_model=FixedCommission(amount=5.0),
@@ -514,18 +599,7 @@ class TestSimulationBlotter(unittest.TestCase):
         context = MagicMock()
 
         mock_order_1 = MagicMock()
-        mock_order_1.get_id.return_value = 1
-        mock_order_1.get_symbol.return_value = "BTC/EUR"
-        mock_order_1.get_order_side.return_value = "BUY"
-        mock_order_1.get_price.return_value = 45010.0
-        mock_order_1.get_amount.return_value = 0.1
-
         mock_order_2 = MagicMock()
-        mock_order_2.get_id.return_value = 2
-        mock_order_2.get_symbol.return_value = "ETH/EUR"
-        mock_order_2.get_order_side.return_value = "BUY"
-        mock_order_2.get_price.return_value = 3010.0
-        mock_order_2.get_amount.return_value = 1.0
 
         context.order_service.create.side_effect = [
             mock_order_1, mock_order_2
@@ -555,24 +629,21 @@ class TestSimulationBlotter(unittest.TestCase):
         ], context)
 
         self.assertEqual(len(results), 2)
-        self.assertEqual(len(blotter.get_transactions()), 2)
+        # No transactions at creation time — recorded at fill time
+        self.assertEqual(len(blotter.get_transactions()), 0)
 
-        # Both should have fixed commission of 5.0
-        for tx in blotter.get_transactions():
-            self.assertEqual(tx.commission, 5.0)
+        # Verify fill-time commission model works
+        self.assertEqual(
+            blotter.get_fill_commission(45000.0, 0.1, "BUY"), 5.0
+        )
 
     def test_place_order_with_no_price(self):
-        """Test that None price doesn't cause slippage errors."""
+        """Test that None/zero price doesn't cause errors."""
         blotter = SimulationBlotter(
             slippage_model=PercentageSlippage(0.01)
         )
         context = MagicMock()
         mock_order = MagicMock()
-        mock_order.get_id.return_value = 1
-        mock_order.get_symbol.return_value = "BTC/EUR"
-        mock_order.get_order_side.return_value = "BUY"
-        mock_order.get_price.return_value = 0
-        mock_order.get_amount.return_value = 0.1
         context.order_service.create.return_value = mock_order
 
         result = blotter.place_order({
@@ -587,7 +658,8 @@ class TestSimulationBlotter(unittest.TestCase):
         }, context)
 
         self.assertIsNotNone(result)
-        self.assertEqual(len(blotter.get_transactions()), 1)
+        # No transactions at creation time
+        self.assertEqual(len(blotter.get_transactions()), 0)
 
     def test_place_order_passes_metadata(self):
         blotter = SimulationBlotter()

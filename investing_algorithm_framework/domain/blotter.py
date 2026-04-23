@@ -16,7 +16,9 @@ class SlippageModel(ABC):
     """
 
     @abstractmethod
-    def calculate_slippage(self, price, order_side, amount=None):
+    def calculate_slippage(
+        self, price, order_side, amount=None, volume=None
+    ):
         """
         Calculate the slipped execution price.
 
@@ -24,6 +26,7 @@ class SlippageModel(ABC):
             price: The intended fill price
             order_side: The side of the order ('BUY' or 'SELL')
             amount: The order amount (for volume-based models)
+            volume: Available market volume (for impact models)
 
         Returns:
             float: The adjusted price after slippage
@@ -34,7 +37,9 @@ class SlippageModel(ABC):
 class NoSlippage(SlippageModel):
     """No slippage — fills at the exact order price."""
 
-    def calculate_slippage(self, price, order_side, amount=None):
+    def calculate_slippage(
+        self, price, order_side, amount=None, volume=None
+    ):
         return price
 
 
@@ -53,7 +58,9 @@ class PercentageSlippage(SlippageModel):
         """
         self.percentage = percentage
 
-    def calculate_slippage(self, price, order_side, amount=None):
+    def calculate_slippage(
+        self, price, order_side, amount=None, volume=None
+    ):
         from investing_algorithm_framework.domain.models.order.order_side \
             import OrderSide
 
@@ -78,7 +85,9 @@ class FixedSlippage(SlippageModel):
         """
         self.amount = amount
 
-    def calculate_slippage(self, price, order_side, amount=None):
+    def calculate_slippage(
+        self, price, order_side, amount=None, volume=None
+    ):
         from investing_algorithm_framework.domain.models.order.order_side \
             import OrderSide
 
@@ -86,6 +95,62 @@ class FixedSlippage(SlippageModel):
             return price + self.amount
         else:
             return price - self.amount
+
+
+class VolumeImpactSlippage(SlippageModel):
+    """
+    Volume-based market impact slippage model.
+
+    Slippage increases with order size relative to available volume
+    using a power-law model:
+
+        impact = base_percentage * (amount / volume) ^ impact_power
+
+    Buy orders fill higher, sell orders fill lower. When volume
+    data is unavailable, falls back to base_percentage as flat
+    slippage.
+
+    Usage::
+
+        VolumeImpactSlippage(
+            base_percentage=0.001,  # 0.1% base
+            impact_power=0.5        # square-root impact
+        )
+    """
+
+    def __init__(self, base_percentage=0.001, impact_power=0.5):
+        """
+        Args:
+            base_percentage: Base slippage as a decimal (0.001 = 0.1%).
+            impact_power: Exponent for the participation rate.
+                0.5 gives square-root impact (common in literature).
+        """
+        self.base_percentage = base_percentage
+        self.impact_power = impact_power
+
+    def calculate_slippage(
+        self, price, order_side, amount=None, volume=None
+    ):
+        from investing_algorithm_framework.domain.models.order.order_side \
+            import OrderSide
+
+        if (
+            volume is not None
+            and volume > 0
+            and amount is not None
+            and amount > 0
+        ):
+            participation_rate = amount / volume
+            impact = self.base_percentage * (
+                participation_rate ** self.impact_power
+            )
+        else:
+            impact = self.base_percentage
+
+        if OrderSide.BUY.equals(order_side):
+            return price * (1 + impact)
+        else:
+            return price * (1 - impact)
 
 
 class CommissionModel(ABC):
@@ -152,6 +217,68 @@ class FixedCommission(CommissionModel):
 
     def calculate_commission(self, price, amount, order_side):
         return self.amount
+
+
+class FillModel(ABC):
+    """
+    Abstract base class for fill models.
+
+    Fill models determine how much of an order can be filled
+    in a single evaluation step. This enables partial fill
+    simulation during backtesting.
+    """
+
+    @abstractmethod
+    def get_fill_amount(self, order_amount, available_volume=None):
+        """
+        Calculate the fillable amount for this evaluation step.
+
+        Args:
+            order_amount: The remaining order amount to fill.
+            available_volume: Available market volume for the
+                current candle (None if unknown).
+
+        Returns:
+            float: The amount that can be filled (up to order_amount).
+        """
+        raise NotImplementedError
+
+
+class FullFill(FillModel):
+    """Fill the entire order immediately (default behavior)."""
+
+    def get_fill_amount(self, order_amount, available_volume=None):
+        return order_amount
+
+
+class VolumeBasedFill(FillModel):
+    """
+    Volume-based partial fill model.
+
+    Limits each fill to a fraction of the candle's traded volume,
+    simulating realistic liquidity constraints. Orders larger than
+    the available volume fraction remain partially open and are
+    re-evaluated on subsequent candles.
+
+    Usage::
+
+        VolumeBasedFill(max_volume_fraction=0.1)  # max 10% of volume
+    """
+
+    def __init__(self, max_volume_fraction=0.1):
+        """
+        Args:
+            max_volume_fraction: Maximum fraction of candle volume
+                that can be filled per step (0.1 = 10%).
+        """
+        self.max_volume_fraction = max_volume_fraction
+
+    def get_fill_amount(self, order_amount, available_volume=None):
+        if available_volume is None or available_volume <= 0:
+            return order_amount
+
+        max_fill = available_volume * self.max_volume_fraction
+        return min(order_amount, max_fill)
 
 
 class Transaction:
@@ -349,6 +476,110 @@ class Blotter(ABC):
         """
         pass
 
+    # ------------------------------------------------------------------
+    # Fill-time methods: used by the BacktestTradeOrderEvaluator
+    # to calculate fill prices, fees, and amounts at the moment an
+    # order is detected as filled.
+    # ------------------------------------------------------------------
+
+    def get_fill_price(
+        self, base_price, order_side, amount=None, volume=None
+    ):
+        """
+        Calculate the fill price after slippage.
+
+        Called by the evaluator when an order fill is detected.
+        Override for custom slippage behavior.
+
+        Args:
+            base_price: The base price (candle open for market
+                orders, limit price for limit orders).
+            order_side: The side of the order ('BUY' or 'SELL').
+            amount: The fill amount.
+            volume: Available candle volume (for impact models).
+
+        Returns:
+            float: The adjusted fill price.
+        """
+        return base_price
+
+    def get_fill_commission(self, price, amount, order_side):
+        """
+        Calculate commission for a fill.
+
+        Called by the evaluator when an order fill is detected.
+        Override for custom fee models.
+
+        Args:
+            price: The fill price.
+            amount: The fill amount.
+            order_side: The side of the order.
+
+        Returns:
+            float: The commission amount.
+        """
+        return 0.0
+
+    def get_fill_amount(self, order_amount, available_volume=None):
+        """
+        Calculate how much of an order can be filled.
+
+        Override for partial fill behavior based on volume.
+
+        Args:
+            order_amount: The remaining order amount.
+            available_volume: Available candle volume.
+
+        Returns:
+            float: The fillable amount (up to order_amount).
+        """
+        return order_amount
+
+    def get_commission_rate(self):
+        """
+        Return the commission rate if applicable.
+
+        Returns:
+            float or None: The commission rate as a decimal,
+                or None if not rate-based.
+        """
+        return None
+
+    def on_fill(
+        self, order_id, symbol, order_side,
+        fill_price, base_price, fill_amount,
+    ):
+        """
+        Called when an order fill is detected. Records a transaction
+        and returns the commission.
+
+        Args:
+            order_id: The order ID.
+            symbol: The symbol traded.
+            order_side: The side of the order.
+            fill_price: The actual fill price.
+            base_price: The original base price before slippage.
+            fill_amount: The amount filled.
+
+        Returns:
+            float: The commission amount.
+        """
+        commission = self.get_fill_commission(
+            fill_price, fill_amount, order_side
+        )
+        slippage = abs(fill_price - base_price)
+        self.record_transaction(Transaction(
+            order_id=order_id,
+            symbol=symbol,
+            order_side=order_side,
+            price=fill_price,
+            amount=fill_amount,
+            cost=fill_price * fill_amount,
+            commission=commission,
+            slippage=slippage,
+        ))
+        return commission
+
 
 class DefaultBlotter(Blotter):
     """
@@ -415,21 +646,25 @@ class DefaultBlotter(Blotter):
 
 class SimulationBlotter(Blotter):
     """
-    Default blotter for backtesting with configurable slippage
-    and commission models.
+    Default blotter for backtesting with configurable slippage,
+    commission, and fill models.
 
-    Applies slippage to order prices and calculates commission
-    fees, recording each fill as a Transaction for audit purposes.
+    Slippage and commission are applied at fill time (when the
+    BacktestTradeOrderEvaluator detects a fill in OHLCV data),
+    not at order creation time. This avoids double-counting and
+    provides accurate fill tracking.
 
     Usage::
 
         from investing_algorithm_framework import (
-            SimulationBlotter, PercentageSlippage, PercentageCommission
+            SimulationBlotter, PercentageSlippage,
+            PercentageCommission, VolumeBasedFill
         )
 
         app.set_blotter(SimulationBlotter(
-            slippage_model=PercentageSlippage(0.001),   # 0.1%
-            commission_model=PercentageCommission(0.001) # 0.1%
+            slippage_model=PercentageSlippage(0.001),    # 0.1%
+            commission_model=PercentageCommission(0.001), # 0.1%
+            fill_model=VolumeBasedFill(0.1),  # max 10% of volume
         ))
     """
 
@@ -437,85 +672,64 @@ class SimulationBlotter(Blotter):
         self,
         slippage_model=None,
         commission_model=None,
+        fill_model=None,
     ):
         super().__init__()
         self.slippage_model = slippage_model or NoSlippage()
         self.commission_model = commission_model or NoCommission()
+        self.fill_model = fill_model or FullFill()
 
     def place_order(self, order_data, context):
         """
-        Place an order with slippage and commission applied.
+        Place an order through the order service.
 
-        For limit orders, slippage is applied to the order price.
-        Commission is calculated and stored on the order.
-        A Transaction is recorded for audit purposes.
+        Slippage and commission are NOT applied here — they are
+        applied at fill time by the BacktestTradeOrderEvaluator
+        using get_fill_price() and get_fill_commission().
 
         Args:
-            order_data: Dict with order parameters (as built by Context,
-                with amounts already resolved).
+            order_data: Dict with order parameters.
             context: The Context instance.
 
         Returns:
             Order: The created order.
         """
-        order_side = order_data.get("order_side")
-        price = order_data.get("price")
-        original_price = price
-
-        # Apply slippage to price for limit orders
-        if price is not None and price > 0:
-            slipped_price = self.slippage_model.calculate_slippage(
-                price, order_side, order_data.get("amount")
-            )
-            order_data["price"] = slipped_price
-
-        # Extract flow control params before passing to order_service
         execute = order_data.pop("_execute", True)
         validate = order_data.pop("_validate", True)
         sync = order_data.pop("_sync", True)
-
-        # Create order through order service directly
-        order = context.order_service.create(
+        return context.order_service.create(
             order_data, execute=execute, validate=validate, sync=sync
         )
 
-        # Calculate commission
-        fill_price = order.get_price()
-        fill_amount = order.get_amount()
-        commission = self.commission_model.calculate_commission(
-            fill_price, fill_amount, order_side
+    def get_fill_price(
+        self, base_price, order_side, amount=None, volume=None
+    ):
+        """Calculate fill price using the configured slippage model."""
+        return self.slippage_model.calculate_slippage(
+            base_price, order_side, amount=amount, volume=volume
         )
 
-        # Update order with fee info
-        if commission > 0:
-            order.set_order_fee(commission)
+    def get_fill_commission(self, price, amount, order_side):
+        """Calculate commission using the configured commission model."""
+        return self.commission_model.calculate_commission(
+            price, amount, order_side
+        )
 
-        # Calculate slippage amount
-        if original_price is not None and original_price > 0:
-            slippage_amount = abs(fill_price - original_price)
-        else:
-            slippage_amount = 0
+    def get_fill_amount(self, order_amount, available_volume=None):
+        """Calculate fillable amount using the configured fill model."""
+        return self.fill_model.get_fill_amount(
+            order_amount, available_volume
+        )
 
-        # Record transaction
-        self.record_transaction(Transaction(
-            order_id=order.get_id(),
-            symbol=order.get_symbol(),
-            order_side=order.get_order_side(),
-            price=fill_price,
-            amount=fill_amount,
-            cost=fill_price * fill_amount,
-            commission=commission,
-            slippage=slippage_amount,
-        ))
-
-        return order
+    def get_commission_rate(self):
+        """Return the commission rate if using PercentageCommission."""
+        if hasattr(self.commission_model, 'percentage'):
+            return self.commission_model.percentage
+        return None
 
     def cancel_order(self, order_id, context):
         """
         Cancel a specific order by delegating to the OrderService.
-
-        In backtesting, applies any configured models before
-        cancellation.
 
         Args:
             order_id: The ID of the order to cancel.

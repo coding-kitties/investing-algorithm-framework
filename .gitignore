@@ -161,3 +161,4 @@ venv
 examples/tutorial/data
 examples/tutorial/backtest_results
 examples/tutorial/resources
+.data_cache/
