@@ -50,6 +50,7 @@ class Context:
             trade_stop_loss_service
         self.trade_take_profit_service: TradeTakeProfitService = \
             trade_take_profit_service
+        self._blotter = None
 
     def _validate_target_symbol(self, target_symbol, market=None):
         """
@@ -174,9 +175,11 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
-        return self.order_service.create(
-            order_data, execute=execute, validate=validate, sync=sync
-        )
+        order_data["_execute"] = execute
+        order_data["_validate"] = validate
+        order_data["_sync"] = sync
+
+        return self._blotter.place_order(order_data, self)
 
     def has_balance(self, symbol, amount, market=None):
         """
@@ -329,9 +332,11 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
-        return self.order_service.create(
-            order_data, execute=execute, validate=validate, sync=sync
-        )
+        order_data["_execute"] = execute
+        order_data["_validate"] = validate
+        order_data["_sync"] = sync
+
+        return self._blotter.place_order(order_data, self)
 
     def create_market_order(
         self,
@@ -464,9 +469,11 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
-        return self.order_service.create(
-            order_data, execute=execute, validate=validate, sync=sync
-        )
+        order_data["_execute"] = execute
+        order_data["_validate"] = validate
+        order_data["_sync"] = sync
+
+        return self._blotter.place_order(order_data, self)
 
     def create_market_buy_order(
         self,
@@ -590,43 +597,14 @@ class Context:
                 "to create a limit sell order."
             )
 
-        if portfolio_id is not None:
-            portfolio = self.portfolio_service.get(portfolio_id)
-        elif market is not None:
-            portfolio = self.portfolio_service.find({"market": market})
-        else:
-            portfolio = self.portfolio_service.get_all()[0]
-
-        if percentage_of_position is not None:
-            position = self.position_service.find(
-                {
-                    "symbol": target_symbol,
-                    "portfolio": portfolio.id
-                }
-            )
-            amount = position.get_amount() * (percentage_of_position / 100)
-
-        logger.info(
-            f"Creating limit order: {target_symbol} "
-            f"SELL {amount} @ {price}"
+        return self.create_limit_order(
+            target_symbol=target_symbol,
+            price=price,
+            order_side=OrderSide.SELL,
+            amount=amount,
+            percentage_of_position=percentage_of_position,
+            market=market,
         )
-        order_data = {
-            "target_symbol": target_symbol,
-            "price": price,
-            "amount": amount,
-            "order_type": OrderType.LIMIT.value,
-            "order_side": OrderSide.SELL.value,
-            "portfolio_id": portfolio.id,
-            "status": OrderStatus.CREATED.value,
-            "trading_symbol": portfolio.trading_symbol,
-        }
-
-        if BACKTESTING_FLAG in self.configuration_service.config \
-                and self.configuration_service.config[BACKTESTING_FLAG]:
-            order_data["created_at"] = \
-                self.configuration_service.config[INDEX_DATETIME]
-
-        return self.order_service.create(order_data)
 
     def create_limit_buy_order(
         self,
@@ -667,37 +645,13 @@ class Context:
                 "to create a limit buy order."
             )
 
-        if portfolio_id is not None:
-            portfolio = self.portfolio_service.get(portfolio_id)
-        elif market is not None:
-            portfolio = self.portfolio_service.find({"market": market})
-        else:
-            portfolio = self.portfolio_service.get_all()[0]
-
-        if percentage_of_portfolio is not None:
-            net_size = portfolio.get_net_size()
-            size = net_size * (percentage_of_portfolio / 100)
-            amount = size / price
-        logger.info(
-            f"Creating limit order: {target_symbol} "
-            f"BUY {amount} @ {price}"
-        )
-        order_data = {
-            "target_symbol": target_symbol,
-            "price": price,
-            "amount": amount,
-            "order_type": OrderType.LIMIT.value,
-            "order_side": OrderSide.BUY.value,
-            "portfolio_id": portfolio.id,
-            "status": OrderStatus.CREATED.value,
-            "trading_symbol": portfolio.trading_symbol,
-        }
-        if BACKTESTING_FLAG in self.configuration_service.config \
-                and self.configuration_service.config[BACKTESTING_FLAG]:
-            order_data["created_at"] = \
-                self.configuration_service.config[INDEX_DATETIME]
-        return self.order_service.create(
-            order_data, execute=True, validate=True, sync=True
+        return self.create_limit_order(
+            target_symbol=target_symbol,
+            price=price,
+            order_side=OrderSide.BUY,
+            amount=amount,
+            percentage_of_portfolio=percentage_of_portfolio,
+            market=market,
         )
 
     def get_portfolio(self, market=None) -> Portfolio:
@@ -1189,7 +1143,7 @@ class Context:
                         "status": OrderStatus.OPEN.value
                     }
                 ):
-            self.order_service.cancel_order(order)
+            self._blotter.cancel_order(order.id, self)
 
         target_symbol = position.get_symbol()
         symbol = f"{target_symbol.upper()}/{portfolio.trading_symbol.upper()}"
@@ -1810,16 +1764,11 @@ class Context:
             date=self.config[INDEX_DATETIME]
         )
         logger.info(f"Closing trade {trade.id} {trade.symbol}")
-        self.order_service.create(
-            {
-                "portfolio_id": portfolio.id,
-                "trading_symbol": trade.trading_symbol,
-                "target_symbol": trade.target_symbol,
-                "amount": amount,
-                "order_side": OrderSide.SELL.value,
-                "order_type": OrderType.LIMIT.value,
-                "price": ticker["bid"],
-            }
+        self.create_limit_order(
+            target_symbol=trade.target_symbol,
+            amount=amount,
+            order_side=OrderSide.SELL,
+            price=ticker["bid"],
         )
 
     def get_number_of_positions(self):
@@ -2196,3 +2145,59 @@ class Context:
             self._parquet_url_providers[url] = provider
 
         return self._parquet_url_providers[url].get_data()
+
+    def batch_order(self, orders, market=None):
+        """
+        Place multiple orders at once through the blotter.
+
+        Each order dict supports the same parameters as
+        ``create_limit_order`` and ``create_market_order``.
+
+        Args:
+            orders (list[dict]): List of order dicts. Each dict should
+                contain at minimum ``target_symbol``, ``order_side``,
+                and either ``amount`` or ``percentage_of_portfolio``.
+                Include ``price`` for limit orders.
+                Include ``order_type`` to specify MARKET orders
+                (default is LIMIT).
+            market (str, optional): Default market for all orders.
+                Can be overridden per order.
+
+        Returns:
+            list[Order]: The created orders.
+
+        Example::
+
+            context.batch_order([
+                {
+                    "target_symbol": "BTC",
+                    "order_side": OrderSide.BUY,
+                    "percentage_of_portfolio": 5.0,
+                    "price": 45000,
+                },
+                {
+                    "target_symbol": "ETH",
+                    "order_side": OrderSide.BUY,
+                    "percentage_of_portfolio": 3.0,
+                    "price": 3000,
+                },
+            ])
+        """
+        # Add default market to each order if not set
+        for order_data in orders:
+            if "market" not in order_data and market is not None:
+                order_data["market"] = market
+
+        return self._blotter.batch_order(orders, self)
+
+    def get_transactions(self):
+        """
+        Get all recorded transactions from the blotter.
+
+        Returns a list of Transaction objects representing all
+        fills/executions that have been processed through the blotter.
+
+        Returns:
+            list[Transaction]: Recorded transactions.
+        """
+        return self._blotter.get_transactions()

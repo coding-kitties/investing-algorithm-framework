@@ -24,7 +24,12 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus, \
     save_backtests_to_directory, BacktestMetrics, DATA_DIRECTORY, \
-    retag_backtests
+    retag_backtests, \
+    Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
+    SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage, \
+    VolumeImpactSlippage, \
+    CommissionModel, NoCommission, PercentageCommission, FixedCommission, \
+    FillModel, FullFill, VolumeBasedFill
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
     JSONURLDataProvider, ParquetURLDataProvider, \
@@ -229,5 +234,21 @@ __all__ = [
     "download_v2",
     "DownloadResult",
     "create_data_storage_path",
-    "DATA_DIRECTORY"
+    "DATA_DIRECTORY",
+    "Blotter",
+    "DefaultBlotter",
+    "SimulationBlotter",
+    "Transaction",
+    "SlippageModel",
+    "NoSlippage",
+    "PercentageSlippage",
+    "FixedSlippage",
+    "VolumeImpactSlippage",
+    "CommissionModel",
+    "NoCommission",
+    "PercentageCommission",
+    "FixedCommission",
+    "FillModel",
+    "FullFill",
+    "VolumeBasedFill",
 ]

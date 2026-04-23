@@ -79,6 +79,10 @@ const sidebars = {
             items: [
                 {
                     type: 'doc',
+                    id: 'Advanced Concepts/blotter',
+                },
+                {
+                    type: 'doc',
                     id: 'Advanced Concepts/custom-data-providers',
                 },
                 {
