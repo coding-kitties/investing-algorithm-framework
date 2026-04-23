@@ -353,8 +353,8 @@ class TestDefaultBlotter(unittest.TestCase):
 
         blotter.cancel_order(42, context)
 
-        context.order_service.update.assert_called_once_with(
-            42, {"status": "CANCELED"}
+        context.order_service.cancel_order.assert_called_once_with(
+            mock_order
         )
 
     def test_cancel_nonexistent_order_raises(self):
@@ -491,8 +491,8 @@ class TestSimulationBlotter(unittest.TestCase):
 
         blotter.cancel_order(42, context)
 
-        context.order_service.update.assert_called_once_with(
-            42, {"status": "CANCELED"}
+        context.order_service.cancel_order.assert_called_once_with(
+            mock_order
         )
         self.assertEqual(
             context.order_service.get.call_count, 2

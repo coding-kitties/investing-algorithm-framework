@@ -11,7 +11,6 @@ from investing_algorithm_framework.app.eventloop import EventLoopService
 from investing_algorithm_framework.domain import ENVIRONMENT, Environment, \
     BACKTESTING_START_DATE, LAST_SNAPSHOT_DATETIME, \
     SNAPSHOT_INTERVAL, SnapshotInterval
-from investing_algorithm_framework.infrastructure import BacktestOrderExecutor
 from investing_algorithm_framework.services import DataProviderService, \
     BacktestTradeOrderEvaluator
 from tests.resources import TestBase, OrderExecutorTest
@@ -344,7 +343,6 @@ class TestEventloopService(TestBase):
 #         configuration_service.add_value(BACKTESTING_START_DATE,
 #                                         backtest_date_range.start_date)
 #
-#         self.app.add_order_executor(BacktestOrderExecutor())
 #         self.app.add_portfolio_configuration(
 #             PortfolioConfiguration(
 #                 market="bitvavo",
@@ -462,7 +460,6 @@ class TestEventloopService(TestBase):
 #             strategies=[strategy],
 #             tasks=[]
 #         )
-#         self.app.add_order_executor(BacktestOrderExecutor())
 #         self.app.add_portfolio_configuration(
 #             PortfolioConfiguration(
 #                 market="bitvavo",
@@ -570,7 +567,6 @@ class TestEventloopService(TestBase):
 #             strategies=[strategy],
 #             tasks=[]
 #         )
-#         self.app.add_order_executor(BacktestOrderExecutor())
 #         self.app.add_portfolio_configuration(
 #             PortfolioConfiguration(
 #                 market="bitvavo",
@@ -680,7 +676,6 @@ class TestEventloopService(TestBase):
 #             strategies=[strategy],
 #             tasks=[]
 #         )
-#         self.app.add_order_executor(BacktestOrderExecutor())
 #         self.app.add_portfolio_configuration(
 #             PortfolioConfiguration(
 #                 market="bitvavo",

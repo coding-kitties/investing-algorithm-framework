@@ -24,7 +24,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, DATA_DIRECTORY
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
-    BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db, \
+    CCXTOHLCVDataProvider, clear_db, \
     PandasOHLCVDataProvider
 from investing_algorithm_framework.services import OrderBacktestService, \
     BacktestPortfolioService, DefaultTradeOrderEvaluator
@@ -659,7 +659,9 @@ class App:
                 .trade_stop_loss_service(),
                 trade_take_profit_service=self.container
                 .trade_take_profit_service(),
-                configuration_service=self.container.configuration_service()
+                configuration_service=self.container.configuration_service(),
+                blotter=self._blotter,
+                context=self.context
             )
             event_loop_service = EventLoopService(
                 configuration_service=self.container.configuration_service(),
@@ -1507,6 +1509,7 @@ class App:
             checkpoint_batch_size=checkpoint_batch_size,
             fill_missing_data=fill_missing_data,
             iterative_summary_update=iterative_summary_update,
+            blotter=self._blotter,
         )
 
         # Cleanup resources
@@ -1745,6 +1748,7 @@ class App:
             trading_symbol=trading_symbol,
             fill_missing_data=fill_missing_data,
             skip_data_sources_initialization=True,
+            blotter=self._blotter,
         )
 
         # Store run history
@@ -2325,10 +2329,10 @@ class App:
         """
         Function to initialize the order executors. This function will
         first check if the app is running in backtest mode or not. If it is
-        running in backtest mode, all order executors will be removed and
-        a single BacktestOrderExecutor will be added to the order executors.
-        It will also set the SimulationBlotter as the default blotter if
-        no custom blotter has been configured.
+        running in backtest mode, all order executors will be removed
+        (OrderBacktestService handles execution directly) and the
+        SimulationBlotter will be set as the default blotter if no custom
+        blotter has been configured.
 
         If it is not running in backtest mode, it will add the default
         CCXTOrderExecutor with a priority 3.
@@ -2341,13 +2345,9 @@ class App:
         environment = self.config[ENVIRONMENT]
 
         if Environment.BACKTEST.equals(environment):
-            # If the app is running in backtest mode,
-            # remove all order executors
-            # and add a single BacktestOrderExecutor
+            # In backtest mode, OrderBacktestService handles execution
+            # directly — no order executor needed
             order_executor_lookup.reset()
-            order_executor_lookup.add_order_executor(
-                BacktestOrderExecutor(priority=1)
-            )
 
             # Auto-set SimulationBlotter for backtesting if no
             # custom blotter has been configured
@@ -2549,9 +2549,7 @@ class App:
         environment = self.config[ENVIRONMENT]
 
         if Environment.BACKTEST.equals(environment):
-            # If the app is running in backtest mode,
-            # remove all order executors
-            # and add a single BacktestOrderExecutor
+            # In backtest mode, remove all portfolio providers
             portfolio_provider_lookup.reset()
         else:
             portfolio_provider_lookup.add_portfolio_provider(

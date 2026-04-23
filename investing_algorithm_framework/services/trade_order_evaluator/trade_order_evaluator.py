@@ -12,13 +12,17 @@ class TradeOrderEvaluator(ABC):
         trade_stop_loss_service,
         trade_take_profit_service,
         order_service,
-        configuration_service=None
+        configuration_service=None,
+        blotter=None,
+        context=None
     ):
         self.trade_service = trade_service
         self.trade_stop_loss_service = trade_stop_loss_service
         self.trade_take_profit_service = trade_take_profit_service
         self.order_service = order_service
         self.configuration_service = configuration_service
+        self._blotter = blotter
+        self._context = context
 
     @abstractmethod
     def evaluate(
@@ -46,6 +50,15 @@ class TradeOrderEvaluator(ABC):
         """
         pass
 
+    def _create_order(self, order_data):
+        """
+        Create an order through the blotter if available,
+        otherwise fall back to the order service directly.
+        """
+        if self._blotter is not None and self._context is not None:
+            return self._blotter.place_order(order_data, self._context)
+        return self.order_service.create(order_data)
+
     def _check_take_profits(self):
         current_date = self.configuration_service.config[INDEX_DATETIME]
         take_profits_orders_data = self.trade_service \
@@ -53,7 +66,7 @@ class TradeOrderEvaluator(ABC):
 
         for take_profit_order in take_profits_orders_data:
             take_profits = take_profit_order["take_profits"]
-            self.order_service.create(take_profit_order)
+            self._create_order(take_profit_order)
             self.trade_take_profit_service.mark_triggered(
                 [
                     take_profit.get("take_profit_id")
@@ -70,7 +83,7 @@ class TradeOrderEvaluator(ABC):
         for stop_loss_order in stop_losses_orders_data:
             stop_losses = stop_loss_order["stop_losses"]
 
-            self.order_service.create(stop_loss_order)
+            self._create_order(stop_loss_order)
             self.trade_stop_loss_service.mark_triggered(
                 [
                     stop_loss.get("stop_loss_id") for stop_loss in

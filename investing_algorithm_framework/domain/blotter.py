@@ -386,7 +386,11 @@ class DefaultBlotter(Blotter):
 
     def cancel_order(self, order_id, context):
         """
-        Cancel a specific order.
+        Cancel a specific order by delegating to the OrderService.
+
+        In live trading, this communicates with the exchange to
+        cancel the order. In backtesting, it updates the order
+        status directly.
 
         Args:
             order_id: The ID of the order to cancel.
@@ -395,23 +399,17 @@ class DefaultBlotter(Blotter):
         Returns:
             Order: The cancelled order.
         """
-        from investing_algorithm_framework.domain.models.order.order_status \
-            import OrderStatus
+        from investing_algorithm_framework.domain.exceptions \
+            import OperationalException
 
         order = context.order_service.get(order_id)
 
         if order is None:
-            from investing_algorithm_framework.domain.exceptions \
-                import OperationalException
             raise OperationalException(
                 f"Order with id {order_id} not found"
             )
 
-        context.order_service.update(
-            order_id,
-            {"status": OrderStatus.CANCELED.value}
-        )
-
+        context.order_service.cancel_order(order)
         return context.order_service.get(order_id)
 
 
@@ -514,7 +512,10 @@ class SimulationBlotter(Blotter):
 
     def cancel_order(self, order_id, context):
         """
-        Cancel a specific order.
+        Cancel a specific order by delegating to the OrderService.
+
+        In backtesting, applies any configured models before
+        cancellation.
 
         Args:
             order_id: The ID of the order to cancel.
@@ -523,21 +524,15 @@ class SimulationBlotter(Blotter):
         Returns:
             Order: The cancelled order.
         """
-        from investing_algorithm_framework.domain.models.order.order_status \
-            import OrderStatus
+        from investing_algorithm_framework.domain.exceptions \
+            import OperationalException
 
         order = context.order_service.get(order_id)
 
         if order is None:
-            from investing_algorithm_framework.domain.exceptions \
-                import OperationalException
             raise OperationalException(
                 f"Order with id {order_id} not found"
             )
 
-        context.order_service.update(
-            order_id,
-            {"status": OrderStatus.CANCELED.value}
-        )
-
+        context.order_service.cancel_order(order)
         return context.order_service.get(order_id)

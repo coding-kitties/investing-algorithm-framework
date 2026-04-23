@@ -1143,7 +1143,7 @@ class Context:
                         "status": OrderStatus.OPEN.value
                     }
                 ):
-            self.order_service.cancel_order(order)
+            self._blotter.cancel_order(order.id, self)
 
         target_symbol = position.get_symbol()
         symbol = f"{target_symbol.upper()}/{portfolio.trading_symbol.upper()}"
@@ -1764,16 +1764,11 @@ class Context:
             date=self.config[INDEX_DATETIME]
         )
         logger.info(f"Closing trade {trade.id} {trade.symbol}")
-        self.order_service.create(
-            {
-                "portfolio_id": portfolio.id,
-                "trading_symbol": trade.trading_symbol,
-                "target_symbol": trade.target_symbol,
-                "amount": amount,
-                "order_side": OrderSide.SELL.value,
-                "order_type": OrderType.LIMIT.value,
-                "price": ticker["bid"],
-            }
+        self.create_limit_order(
+            target_symbol=trade.target_symbol,
+            amount=amount,
+            order_side=OrderSide.SELL,
+            price=ticker["bid"],
         )
 
     def get_number_of_positions(self):

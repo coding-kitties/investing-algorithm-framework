@@ -18,7 +18,7 @@ from .data_providers import CSVOHLCVDataProvider, \
     OHLCVDataProviderBase, \
     YahooOHLCVDataProvider, AlphaVantageOHLCVDataProvider, \
     PolygonOHLCVDataProvider
-from .order_executors import CCXTOrderExecutor, BacktestOrderExecutor
+from .order_executors import CCXTOrderExecutor
 from .portfolio_providers import CCXTPortfolioProvider
 
 __all__ = [
@@ -53,7 +53,6 @@ __all__ = [
     "AWSS3StorageStateHandler",
     "CCXTOHLCVDataProvider",
     "CCXTTickerDataProvider",
-    "BacktestOrderExecutor",
     "PandasOHLCVDataProvider",
     "OHLCVDataProviderBase",
     "CSVURLDataProvider",
