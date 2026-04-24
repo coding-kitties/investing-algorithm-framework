@@ -112,6 +112,7 @@ class BacktestRun:
     metadata: Dict[str, str] = field(default_factory=dict)
     signals: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     signal_events: List[Dict[str, Any]] = field(default_factory=list)
+    recorded_values: Dict[str, List] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         """
@@ -167,6 +168,16 @@ class BacktestRun:
                     "date": ensure_iso(evt["date"])
                 } for evt in self.signal_events
             ],
+            "recorded_values": {
+                key: [
+                    {
+                        "datetime": ensure_iso(entry[0]),
+                        "value": entry[1]
+                    }
+                    for entry in entries
+                ]
+                for key, entries in self.recorded_values.items()
+            },
         }
 
     @staticmethod
@@ -330,10 +341,26 @@ class BacktestRun:
                     pass
             signal_events.append(parsed)
 
+        # Parse recorded_values
+        raw_recorded = data.pop("recorded_values", {})
+        recorded_values = {}
+        for key, entries in raw_recorded.items():
+            parsed_entries = []
+            for entry in entries:
+                dt = entry.get("datetime")
+                if isinstance(dt, str):
+                    try:
+                        dt = datetime.fromisoformat(dt)
+                    except (ValueError, TypeError):
+                        pass
+                parsed_entries.append((dt, entry.get("value")))
+            recorded_values[key] = parsed_entries
+
         return BacktestRun(
             backtest_metrics=backtest_metrics,
             signals=signals,
             signal_events=signal_events,
+            recorded_values=recorded_values,
             **data
         )
 

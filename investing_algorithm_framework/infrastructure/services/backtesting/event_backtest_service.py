@@ -112,6 +112,8 @@ class EventBacktestService:
             backtest_date_range=backtest_date_range,
             number_of_runs=event_loop_service.total_number_of_runs,
             risk_free_rate=risk_free_rate,
+            recorded_values=event_loop_service.context
+            .get_recorded_values(),
         )
 
     def generate_schedule(
@@ -175,6 +177,7 @@ class EventBacktestService:
         backtest_date_range: BacktestDateRange,
         number_of_runs: int,
         risk_free_rate: float,
+        recorded_values: dict = None,
     ) -> BacktestRun:
         """
         Create a BacktestRun from the current state after event loop execution.
@@ -184,6 +187,7 @@ class EventBacktestService:
             backtest_date_range: The date range of the backtest.
             number_of_runs: Total number of strategy executions.
             risk_free_rate: Risk-free rate for metrics calculation.
+            recorded_values: Optional dict of recorded values from context.
 
         Returns:
             BacktestRun: The completed backtest run with metrics.
@@ -215,6 +219,7 @@ class EventBacktestService:
             positions=self._position_repository.get_all(
                 {"portfolio": portfolio.id}
             ),
+            recorded_values=recorded_values or {},
         )
 
         # Calculate and add metrics
