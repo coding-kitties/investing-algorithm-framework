@@ -47,6 +47,14 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Getting Started/vector-backtesting',
+                },
+                {
+                    type: 'doc',
+                    id: 'Getting Started/backtest-reports',
+                },
+                {
+                    type: 'doc',
                     id: 'Getting Started/deployment',
                 },
             ],
@@ -61,7 +69,15 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
-                    id: 'Data/data-sources',
+                    id: 'Data/market-data-sources',
+                },
+                {
+                    type: 'doc',
+                    id: 'Data/multiple-market-data-sources',
+                },
+                {
+                    type: 'doc',
+                    id: 'Data/external-data',
                 },
                 {
                     type: 'doc',
@@ -73,6 +89,26 @@ const sidebars = {
             type: 'category',
             label: 'Advanced Concepts',
             items: [
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/blotter',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/fx-conversion',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/custom-data-providers',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/logging-configuration',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/execution-logic',
+                },
                 {
                     type: 'doc',
                     id: 'Advanced Concepts/vector-backtesting',

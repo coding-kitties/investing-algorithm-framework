@@ -7,6 +7,7 @@
 <style>
 {{ css }}
 </style>
+<script src="https://finterion.com/sdk/finterion-auth.js"></script>
 </head>
 <body>
 
@@ -479,6 +480,13 @@
     </p>
     <a class="finterion-cta" href="https://finterion.com" target="_blank"
        rel="noopener noreferrer">Get Started &rarr;</a>
+    <div style="margin-top:1.25rem">
+      <button id="connect-btn" class="finterion-connect-btn">Connect to Finterion</button>
+    </div>
+    <div id="finterion-user-info" class="fin-user-info" style="display:none">
+      <span class="fin-user-dot"></span>
+      Connected as <strong id="finterion-username"></strong>
+    </div>
   </div>
 
   {# Features #}
@@ -559,6 +567,29 @@ const RUN_LABELS = {{ run_labels | tojson }};
 const BENCHMARKS = {{ benchmarks | tojson }};
 // ===== STATIC JS =====
 {{ js }}
+
+// ===== FINTERION AUTH =====
+(function() {
+  if (typeof FinterionAuth === 'undefined') return;
+  var auth = new FinterionAuth();
+  var btn = document.getElementById('connect-btn');
+  if (!btn) return;
+  btn.addEventListener('click', function() {
+    auth.login()
+      .then(function(user) {
+        var info = document.getElementById('finterion-user-info');
+        var name = document.getElementById('finterion-username');
+        if (info && name) {
+          name.textContent = user.username;
+          info.style.display = 'inline-flex';
+        }
+        btn.style.display = 'none';
+      })
+      .catch(function(err) {
+        console.log('Auth flow cancelled');
+      });
+  });
+})();
 </script>
 
 <button class="compare-btn" id="compare-btn"

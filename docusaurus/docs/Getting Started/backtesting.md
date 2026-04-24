@@ -2,20 +2,11 @@
 sidebar_position: 8
 ---
 
-# Backtesting
+# Event-Driven Backtesting
 
-Backtesting allows you to test your trading strategies against historical data to evaluate their performance before deploying them in live markets.
-
-## Overview
-
-The framework supports two types of backtesting:
-
-1. **Event-based Backtesting**: Simulates market events tick-by-tick, providing realistic order execution
-2. **Vector Backtesting**: High-performance approach that processes data in batches, ideal for testing many strategies
+Event-driven backtesting simulates the market environment by processing each price update sequentially, just like live trading. It provides realistic order execution with full support for stop losses, take profits, and position sizing.
 
 ## Quick Start
-
-### Basic Backtest
 
 ```python
 from investing_algorithm_framework import create_app, BacktestDateRange
@@ -32,24 +23,13 @@ backtest_range = BacktestDateRange(
 )
 
 # Run an event backtest
-event_backtest = app.run_backtest(
-    backtest_date_range=backtest_range,
-    initial_amount=1000
-)
-
-# Run a vector backtest
-vector_backtest = app.run_vector_backtest(
+backtest = app.run_backtest(
     backtest_date_range=backtest_range,
     initial_amount=1000
 )
 ```
 
-## Event-Based Backtesting
-
-Event-based backtesting simulates the market environment by processing each price update sequentially, just like live trading,
-based on the defined strategy interval (e.g., 1-minute, 5-minute bars).
-
-### Running an Event-Based Backtest
+## Running an Event-Based Backtest
 
 ```python
 backtest = app.run_backtest(
@@ -59,7 +39,7 @@ backtest = app.run_backtest(
 )
 ```
 
-### Multiple Date Ranges
+## Multiple Date Ranges
 
 Test your strategy across different market conditions:
 
@@ -83,80 +63,18 @@ backtests = app.run_backtests(
 )
 ```
 
-## Vector Backtesting
+## Event-Driven vs Vector Backtesting
 
-Vector backtesting is significantly faster (10-100x) and is ideal for:
-- Testing multiple parameter combinations
-- Running backtests across many time periods
-- Large-scale strategy optimization
+The framework supports two backtesting modes. This page covers event-driven backtesting. For vector backtesting, see [Vector Backtesting](vector-backtesting).
 
-### Running a Vector Backtest
-
-```python
-backtest = app.run_vector_backtest(
-    backtest_date_range=backtest_range,
-    strategy=my_strategy,
-    initial_amount=1000,
-    market="bitvavo",
-    trading_symbol="EUR"
-)
-```
-
-### Multiple Strategies
-
-Test many strategies simultaneously:
-
-```python
-from investing_algorithm_framework import SnapshotInterval
-
-strategies = [
-    MyStrategy(rsi_period=10),
-    MyStrategy(rsi_period=14),
-    MyStrategy(rsi_period=20),
-]
-
-backtests = app.run_vector_backtests(
-    backtest_date_ranges=[date_range_1, date_range_2],
-    strategies=strategies,
-    initial_amount=1000,
-    snapshot_interval=SnapshotInterval.DAILY,
-    market="bitvavo",
-    trading_symbol="EUR"
-)
-```
-
-## Key Differences: Vector vs Event Backtesting
-
-### Signal Timing
-- **Vector Backtest**: Signals are executed at the exact timestamp they are generated.
-- **Event Backtest**: Signals are executed at the next strategy interval boundary (e.g ., next 5-minute bar).
-- This can lead to slight differences in execution prices, especially in volatile markets.
-
-### Stop Loss and Take Profit
-- **Vector Backtest**: Does not support stop loss and take profit orders natively due to its batch processing nature.
-- **Event Backtest**: Fully supports stop loss and take profit orders as they can be evaluated in real-time.
-
-### Position Sizing
-- **Vector Backtest**: Position sizing is calculated based on the portfolio value at the time of signal generation.
-- **Event Backtest**: Position sizing is based on the portfolio value at the time of order execution, which may differ from signal generation time.
-- This can lead to different position sizes if the portfolio value changes significantly between signal generation and execution.
-
-### Data Provision
-The data provision between vector and event backtests is fundamentally different:
-
-| Aspect | Vector Backtest | Event Backtest |
-|--------|-----------------|----------------|
-| **Data Loading** | All data at once | Window at each step |
-| **Signal Computation** | On full history | On window only |
-| **Warmup Period** | Included in data | Part of window |
-| **Indicator Behavior** | Consistent throughout | Fresh computation each step |
-
-**What this means:**
-
-- **Vector backtest** loads the entire dataset upfront and computes signals on the full history. Indicators like EMA/RSI see all historical data at once.
-- **Event backtest** simulates real-time trading by providing only a sliding window of data at each step. Indicators are computed fresh on each window.
-
-With a sufficiently large `warmup_window` (e.g., 800 bars), both approaches should produce identical signals. However, execution timing may still differ slightly since vector backtests execute at the exact signal timestamp while event backtests execute at strategy interval boundaries.
+| Aspect | Event-Driven | Vector |
+|--------|-------------|--------|
+| **Speed** | Slower, realistic simulation | 10-100x faster |
+| **Stop Loss / Take Profit** | Fully supported | Not supported |
+| **Signal Timing** | Executes at next strategy interval | Executes at exact signal timestamp |
+| **Position Sizing** | Based on portfolio at execution time | Based on portfolio at signal time |
+| **Data Loading** | Sliding window at each step | All data loaded at once |
+| **Best For** | Final validation, realistic results | Fast prototyping, parameter sweeps |
 
 ## Analyzing Results
 
@@ -292,6 +210,6 @@ backtests = app.run_vector_backtests(
 
 ## Next Steps
 
-- Learn about [Vector Backtesting](/docs/Advanced%20Concepts/vector-backtesting) for advanced optimization
-- Explore [Performance Optimization](/docs/Advanced%20Concepts/OPTIMIZATION_GUIDE) for large-scale testing
-- Check out [Parallel Processing](/docs/Advanced%20Concepts/PARALLEL_PROCESSING_GUIDE) for multi-core utilization
+- Learn about [Vector Backtesting](vector-backtesting) for fast parameter sweeps and optimization
+- Explore [Backtest Reports](/docs/Getting%20Started/backtest-reports) for the interactive dashboard
+- Check out [Performance Optimization](/docs/Advanced%20Concepts/OPTIMIZATION_GUIDE) for large-scale testing
