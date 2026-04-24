@@ -75,6 +75,9 @@ class VectorBacktestService:
         scale_in_signals = strategy.generate_scale_in_signals(data)
         scale_out_signals = strategy.generate_scale_out_signals(data)
 
+        # Generate optional recorded values
+        raw_recorded = strategy.generate_recorded_values(data)
+
         if scale_in_signals is None:
             scale_in_signals = buy_signals
 
@@ -798,6 +801,7 @@ class VectorBacktestService:
             symbols=list(buy_signals.keys()),
             signals=raw_signals,
             signal_events=signal_events,
+            recorded_values=self._convert_recorded_values(raw_recorded),
         )
 
         # Create backtest metrics
@@ -805,6 +809,34 @@ class VectorBacktestService:
             run, risk_free_rate=risk_free_rate
         )
         return run
+
+    @staticmethod
+    def _convert_recorded_values(raw_recorded):
+        """
+        Convert recorded values from pandas Series to list-of-tuples format.
+
+        Args:
+            raw_recorded: Dict[str, pd.Series] or None from
+                strategy.generate_recorded_values().
+
+        Returns:
+            Dict[str, List[Tuple[datetime, Any]]]: Converted values.
+        """
+        if raw_recorded is None:
+            return {}
+
+        recorded_values = {}
+        for key, series in raw_recorded.items():
+            entries = []
+            for ts, val in series.items():
+                dt = ts
+                if isinstance(dt, pd.Timestamp):
+                    dt = dt.to_pydatetime()
+                if hasattr(dt, 'tzinfo') and dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                entries.append((dt, val))
+            recorded_values[key] = entries
+        return recorded_values
 
     @staticmethod
     def get_most_granular_ohlcv_data_source(data_sources):
