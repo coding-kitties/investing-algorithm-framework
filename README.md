@@ -308,7 +308,7 @@ python -m unittest discover -s tests
 
 - [Open an issue](https://github.com/coding-kitties/investing-algorithm-framework/issues/new) for bugs or ideas
 - Read the [Contributing Guide](https://coding-kitties.github.io/investing-algorithm-framework/Contributing%20Guide/contributing)
-- PRs go against the `develop` branch
+- PRs go against the `dev` branch
 
 ## Risk Disclaimer
 
