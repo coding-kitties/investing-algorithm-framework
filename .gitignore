@@ -132,6 +132,9 @@ bot_configuration.db
 *.db
 .idea
 *log*
+!docusaurus/docs/**/execution-logic.md
+!docusaurus/docs/**/logging-configuration.md
+!docusaurus/docs/**/logging-configuration/
 
 !plugins/strategies/
 plugins/strategies/*.py
