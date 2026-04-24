@@ -121,6 +121,10 @@ const sidebars = {
                     type: 'doc',
                     id: 'Advanced Concepts/PARALLEL_PROCESSING_GUIDE',
                 },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/recording-variables',
+                },
             ],
         },
         {

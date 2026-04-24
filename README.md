@@ -77,7 +77,8 @@ This framework is built around the full loop: **create strategies → backtest t
 - 📉 **Benchmark Comparison** — Beat-rate analysis vs Buy & Hold, DCA, risk-free & custom benchmarks
 - 📄 **One-Click HTML Report** — Self-contained file, no server, dark & light theme, shareable
 - 🌐 **Load External Data** — Fetch CSV, JSON, or Parquet from any URL with caching and auto-refresh
-- 🚀 **Build → Backtest → Deploy** — Local dev, cloud deploy (AWS / Azure), or monetize on Finterion
+- � **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
+- �🚀 **Build → Backtest → Deploy** — Local dev, cloud deploy (AWS / Azure), or monetize on Finterion
 
 </details>
 
