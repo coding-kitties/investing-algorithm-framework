@@ -11,6 +11,10 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Getting Started/simple-example',
+                },
+                {
+                    type: 'doc',
                     id: 'Getting Started/application-setup',
                 },
                 {
@@ -43,6 +47,10 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Getting Started/vector-backtesting',
+                },
+                {
+                    type: 'doc',
                     id: 'Getting Started/backtest-reports',
                 },
                 {
@@ -70,6 +78,10 @@ const sidebars = {
                 {
                     type: 'doc',
                     id: 'Data/external-data',
+                },
+                {
+                    type: 'doc',
+                    id: 'Data/backtest_data',
                 },
             ],
         },
@@ -113,7 +125,7 @@ const sidebars = {
         },
         {
             type: "category",
-            label: "Contributing",
+            label: "Contributing Guide",
             items: [
                 {
                     type: 'doc',

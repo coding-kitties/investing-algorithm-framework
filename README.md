@@ -265,7 +265,7 @@ report.save("my_report.html")
 |---|---|
 | **[Backtest Report Dashboard](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** | Self-contained HTML report with ranking tables, equity curves, metric charts, heatmaps, and strategy comparison |
 | **[Event-Driven Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtesting)** | Realistic, order-by-order simulation |
-| **[Vectorized Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/vector-backtesting)** | Fast signal research and prototyping |
+| **[Vectorized Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting)** | Fast signal research and prototyping |
 | **50+ Metrics** | CAGR, Sharpe, Sortino, max drawdown, win rate, profit factor, recovery factor, volatility, and more |
 | **[Live Trading](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/application-setup)** | Connect to exchanges via CCXT for real-time execution |
 | **[Portfolio Management](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/portfolio-configuration)** | Position tracking, trade management, persistence |
