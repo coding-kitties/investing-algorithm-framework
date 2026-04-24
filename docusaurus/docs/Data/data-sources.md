@@ -54,7 +54,7 @@ class MyStrategy(TradingStrategy):
     interval = 1
     symbols = ["BTC"]
     trading_symbol = "EUR"
-    
+
     data_sources = [
         DataSource(
             identifier="btc_1h",
@@ -64,27 +64,27 @@ class MyStrategy(TradingStrategy):
             market="BITVAVO"
         )
     ]
-    
+
     position_sizes = [
         PositionSize(symbol="BTC", percentage=0.5),
     ]
-    
+
     def generate_buy_signals(self, data):
         df = data["btc_1h"]  # Access by identifier
         close = df["Close"]
         ma50 = close.rolling(50).mean()
         ma200 = close.rolling(200).mean()
-        
+
         # Golden cross signal
         buy_signal = (ma50 > ma200) & (ma50.shift(1) <= ma200.shift(1))
         return {"BTC": buy_signal}
-    
+
     def generate_sell_signals(self, data):
         df = data["btc_1h"]
         close = df["Close"]
         ma50 = close.rolling(50).mean()
         ma200 = close.rolling(200).mean()
-        
+
         # Death cross signal
         sell_signal = (ma50 < ma200) & (ma50.shift(1) >= ma200.shift(1))
         return {"BTC": sell_signal}
@@ -100,7 +100,7 @@ class MultiAssetStrategy(TradingStrategy):
     interval = 4
     symbols = ["BTC", "ETH", "ADA", "DOT"]
     trading_symbol = "EUR"
-    
+
     data_sources = [
         DataSource(
             identifier="btc_4h",
@@ -131,34 +131,34 @@ class MultiAssetStrategy(TradingStrategy):
             market="BITVAVO"
         )
     ]
-    
+
     position_sizes = [
         PositionSize(symbol="BTC", percentage=0.25),
         PositionSize(symbol="ETH", percentage=0.25),
         PositionSize(symbol="ADA", percentage=0.25),
         PositionSize(symbol="DOT", percentage=0.25),
     ]
-    
+
     def generate_buy_signals(self, data):
         signals = {}
-        
+
         for symbol in self.symbols:
             identifier = f"{symbol.lower()}_4h"
             df = data[identifier]
             ma50 = df["Close"].rolling(50).mean()
             signals[symbol] = df["Close"] > ma50
-        
+
         return signals
-    
+
     def generate_sell_signals(self, data):
         signals = {}
-        
+
         for symbol in self.symbols:
             identifier = f"{symbol.lower()}_4h"
             df = data[identifier]
             ma50 = df["Close"].rolling(50).mean()
             signals[symbol] = df["Close"] < ma50
-        
+
         return signals
 ```
 
@@ -172,7 +172,7 @@ class MultiTimeframeStrategy(TradingStrategy):
     interval = 1
     symbols = ["BTC"]
     trading_symbol = "EUR"
-    
+
     data_sources = [
         # Daily for long-term trend
         DataSource(
@@ -199,51 +199,51 @@ class MultiTimeframeStrategy(TradingStrategy):
             market="BITVAVO"
         )
     ]
-    
+
     position_sizes = [
         PositionSize(symbol="BTC", percentage=0.8),
     ]
-    
+
     def _analyze_trend(self, df, ma_period=20):
         """Determine trend direction"""
         ma = df["Close"].rolling(ma_period).mean()
         current_price = df["Close"].iloc[-1]
         current_ma = ma.iloc[-1]
-        
+
         if current_price > current_ma:
             return "bullish"
         elif current_price < current_ma:
             return "bearish"
         return "neutral"
-    
+
     def generate_buy_signals(self, data):
         daily_df = data["btc_daily"]
         h4_df = data["btc_4h"]
         h1_df = data["btc_1h"]
-        
+
         # Check all timeframes
         daily_trend = self._analyze_trend(daily_df, ma_period=20)
         h4_trend = self._analyze_trend(h4_df, ma_period=20)
-        
+
         # Generate hourly signals
         h1_ma = h1_df["Close"].rolling(20).mean()
         h1_cross_above = (h1_df["Close"] > h1_ma) & (h1_df["Close"].shift(1) <= h1_ma.shift(1))
-        
+
         # Only buy when all timeframes align bullish
         buy_signal = h1_cross_above.copy()
-        
+
         if daily_trend != "bullish" or h4_trend != "bullish":
             buy_signal = buy_signal & False
-        
+
         return {"BTC": buy_signal}
-    
+
     def generate_sell_signals(self, data):
         h1_df = data["btc_1h"]
         h1_ma = h1_df["Close"].rolling(20).mean()
-        
+
         # Sell on hourly MA cross below
         sell_signal = (h1_df["Close"] < h1_ma) & (h1_df["Close"].shift(1) >= h1_ma.shift(1))
-        
+
         return {"BTC": sell_signal}
 ```
 
@@ -256,10 +256,10 @@ class DynamicMultiAssetStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 4
     trading_symbol = "EUR"
-    
+
     def __init__(
-        self, 
-        symbols=None, 
+        self,
+        symbols=None,
         market="BITVAVO",
         time_frame="4h",
         warmup_window=100,
@@ -267,20 +267,20 @@ class DynamicMultiAssetStrategy(TradingStrategy):
     ):
         if symbols is None:
             symbols = ["BTC", "ETH"]
-        
+
         self.symbols = symbols
         self.market = market
         self._time_frame = time_frame
-        
+
         # Dynamically create data sources
         data_sources = []
         position_sizes = []
         allocation = 0.8 / len(symbols)  # 80% total allocation
-        
+
         for symbol in symbols:
             full_symbol = f"{symbol}/EUR"
             identifier = f"{symbol.lower()}_{time_frame}"
-            
+
             data_sources.append(
                 DataSource(
                     identifier=identifier,
@@ -290,37 +290,37 @@ class DynamicMultiAssetStrategy(TradingStrategy):
                     market=market
                 )
             )
-            
+
             position_sizes.append(
                 PositionSize(symbol=symbol, percentage=allocation)
             )
-        
+
         super().__init__(
             data_sources=data_sources,
             position_sizes=position_sizes,
             **kwargs
         )
-    
+
     def generate_buy_signals(self, data):
         signals = {}
-        
+
         for symbol in self.symbols:
             identifier = f"{symbol.lower()}_{self._time_frame}"
             df = data[identifier]
             ma20 = df["Close"].rolling(20).mean()
             signals[symbol] = df["Close"] > ma20
-        
+
         return signals
-    
+
     def generate_sell_signals(self, data):
         signals = {}
-        
+
         for symbol in self.symbols:
             identifier = f"{symbol.lower()}_{self._time_frame}"
             df = data[identifier]
             ma20 = df["Close"].rolling(20).mean()
             signals[symbol] = df["Close"] < ma20
-        
+
         return signals
 
 # Usage
@@ -332,61 +332,158 @@ strategy = DynamicMultiAssetStrategy(
 )
 ```
 
-## Data Providers
+## Supported Markets
 
-Data providers are responsible for fetching and serving data to your strategies.
+The framework ships with built-in data providers for multiple markets. Set the `market` parameter on your `DataSource` to tell the framework where to fetch data from.
 
-### CCXTOHLCVDataProvider
+### Choosing the Right Market
 
-The default data provider uses CCXT to fetch data from cryptocurrency exchanges:
+| Use Case | Recommended Market | Why |
+|----------|-------------------|-----|
+| **Crypto trading** (live) | CCXT exchanges (`BINANCE`, `BITVAVO`, etc.) | Direct exchange connection, supports order execution |
+| **US stocks / ETFs** (research & backtesting) | `YAHOO` | Free, no API key, broad coverage |
+| **US stocks** (production-grade) | `POLYGON` | High reliability, real-time data, official exchange feeds |
+| **Stocks + forex + crypto** (lightweight) | `ALPHA_VANTAGE` | Simple API, good for prototyping |
+| **Local / offline data** | CSV or Pandas provider | Full control, no network dependency |
+
+---
+
+### Yahoo Finance — `market="YAHOO"`
+
+**Best for:** Stocks, ETFs, indices, forex, and crypto research and backtesting.
+
+Free, no API key required. Powered by the [yfinance](https://github.com/ranaroussi/yfinance) library using data from [Yahoo Finance](https://finance.yahoo.com/).
+
+**Installation:** `pip install investing-algorithm-framework[yahoo]`
 
 ```python
-from investing_algorithm_framework import create_app
-from investing_algorithm_framework.infrastructure import CCXTOHLCVDataProvider
-
-app = create_app()
-
-# The CCXTOHLCVDataProvider is automatically added by default
-# You can also add it explicitly with custom configuration:
-ccxt_provider = CCXTOHLCVDataProvider(
-    symbol="BTC/EUR",
-    time_frame="1h",
-    market="bitvavo"
+DataSource(
+    identifier="aapl_daily",
+    market="YAHOO",
+    symbol="AAPL",
+    data_type="OHLCV",
+    time_frame="1d",
+    warmup_window=200,
 )
-
-app.add_data_provider(ccxt_provider, priority=3)
 ```
 
-### PandasOHLCVDataProvider
+**Supported timeframes:** `1m`, `2m`, `5m`, `15m`, `30m`, `1h`, `1d`, `1W`, `1M`
 
-Use pre-loaded pandas DataFrames as data source:
+**Symbol format:** Standard ticker symbols — `AAPL`, `MSFT`, `GOOGL`, `BTC-USD`, `EURUSD=X`
+
+> ⚠️ Yahoo Finance is great for research and backtesting but is not recommended for production live trading due to rate limits and data delays.
+
+---
+
+### Polygon.io — `market="POLYGON"`
+
+**Best for:** Production-grade US stock, options, forex, and crypto data.
+
+Requires an API key from [Polygon.io](https://polygon.io/). Powered by the [polygon-api-client](https://github.com/polygon-io/client-python) library.
+
+**Installation:** `pip install investing-algorithm-framework[polygon]`
 
 ```python
-from investing_algorithm_framework import create_app
-from investing_algorithm_framework.infrastructure import PandasOHLCVDataProvider
-import pandas as pd
+from investing_algorithm_framework import MarketCredential
 
-# Load your data
-df = pd.read_csv("btc_data.csv", index_col=0, parse_dates=True)
-
-# Create provider
-pandas_provider = PandasOHLCVDataProvider(
-    dataframe=df,
-    symbol="BTC/EUR",
-    time_frame="1h",
-    market="bitvavo"
+app.add_market_credential(
+    MarketCredential(market="POLYGON", api_key="your_polygon_api_key")
 )
 
-app = create_app()
-app.add_data_provider(pandas_provider, priority=1)  # Higher priority
+DataSource(
+    identifier="aapl_daily",
+    market="POLYGON",
+    symbol="AAPL",
+    data_type="OHLCV",
+    time_frame="1d",
+    warmup_window=200,
+)
 ```
 
-### CSVOHLCVDataProvider
+**Supported timeframes:** `1m`, `5m`, `15m`, `30m`, `1h`, `1d`, `1W`, `1M`
 
-Load data directly from CSV files:
+**Symbol format:** Standard ticker symbols — `AAPL`, `MSFT`, `X:BTCUSD` (crypto), `C:EURUSD` (forex)
+
+> You can also configure the API key via environment variable: `export POLYGON_API_KEY=your_key`
+
+---
+
+### Alpha Vantage — `market="ALPHA_VANTAGE"`
+
+**Best for:** Prototyping and lightweight stock/forex/crypto strategies.
+
+Requires a free or premium API key from [Alpha Vantage](https://www.alphavantage.co/). Powered by the [alpha_vantage](https://github.com/RomelTorres/alpha_vantage) Python library.
+
+**Installation:** `pip install investing-algorithm-framework[alpha_vantage]`
 
 ```python
-from investing_algorithm_framework import create_app
+from investing_algorithm_framework import MarketCredential
+
+app.add_market_credential(
+    MarketCredential(market="ALPHA_VANTAGE", api_key="your_av_api_key")
+)
+
+DataSource(
+    identifier="aapl_daily",
+    market="ALPHA_VANTAGE",
+    symbol="AAPL",
+    data_type="OHLCV",
+    time_frame="1d",
+    warmup_window=200,
+)
+```
+
+**Supported timeframes:** `1m`, `5m`, `15m`, `30m`, `1h`, `1d`, `1W`, `1M`
+
+**Symbol format:** Standard ticker symbols — `AAPL`, `MSFT`, `IBM`
+
+> ⚠️ The free tier is limited to 25 API calls per day. For heavier usage, consider a [premium plan](https://www.alphavantage.co/premium/).
+
+---
+
+### CCXT Exchanges — Crypto
+
+**Best for:** Live crypto trading and backtesting on specific exchanges.
+
+The [CCXT](https://github.com/ccxt/ccxt) provider supports 100+ cryptocurrency exchanges. No additional API key is needed for public OHLCV data, but order execution requires exchange credentials.
+
+```python
+DataSource(
+    identifier="btc_hourly",
+    market="BITVAVO",       # any CCXT-supported exchange
+    symbol="BTC/EUR",
+    data_type="OHLCV",
+    time_frame="1h",
+    warmup_window=200,
+)
+```
+
+**Popular exchanges:**
+
+| Exchange | Market Identifier | Website |
+|----------|-------------------|---------|
+| Binance | `BINANCE` | [binance.com](https://www.binance.com/) |
+| Bitvavo | `BITVAVO` | [bitvavo.com](https://bitvavo.com/) |
+| Coinbase | `COINBASE` | [coinbase.com](https://www.coinbase.com/) |
+| Kraken | `KRAKEN` | [kraken.com](https://www.kraken.com/) |
+| Bybit | `BYBIT` | [bybit.com](https://www.bybit.com/) |
+| OKX | `OKX` | [okx.com](https://www.okx.com/) |
+| KuCoin | `KUCOIN` | [kucoin.com](https://www.kucoin.com/) |
+| Bitfinex | `BITFINEX` | [bitfinex.com](https://www.bitfinex.com/) |
+
+**Symbol format:** Trading pairs with slash — `BTC/EUR`, `ETH/USDT`, `ADA/BTC`
+
+> See the full list of supported exchanges in the [CCXT documentation](https://docs.ccxt.com/#/README?id=supported-cryptocurrency-exchange-markets).
+
+---
+
+### CSV and Pandas — Local Data
+
+**Best for:** Offline backtesting, custom data pipelines, or data from unsupported sources.
+
+#### CSVOHLCVDataProvider
+
+```python
 from investing_algorithm_framework.infrastructure import CSVOHLCVDataProvider
 
 csv_provider = CSVOHLCVDataProvider(
@@ -396,18 +493,70 @@ csv_provider = CSVOHLCVDataProvider(
     market="bitvavo"
 )
 
-app = create_app()
 app.add_data_provider(csv_provider, priority=1)
 ```
 
-### Data Provider Priority
+CSV files must contain columns: `Datetime`, `Open`, `High`, `Low`, `Close`, `Volume`.
 
-When multiple data providers can serve the same data source, the framework uses priority to select:
+#### PandasOHLCVDataProvider
+
+```python
+from investing_algorithm_framework.infrastructure import PandasOHLCVDataProvider
+import pandas as pd
+
+df = pd.read_csv("btc_data.csv", index_col=0, parse_dates=True)
+
+pandas_provider = PandasOHLCVDataProvider(
+    dataframe=df,
+    symbol="BTC/EUR",
+    time_frame="1h",
+    market="bitvavo"
+)
+
+app.add_data_provider(pandas_provider, priority=1)
+```
+
+---
+
+### Mixing Markets
+
+You can use different markets for different symbols in the same strategy:
+
+```python
+class MultiMarketStrategy(TradingStrategy):
+    time_unit = TimeUnit.DAY
+    interval = 1
+    symbols = ["AAPL", "BTC"]
+    trading_symbol = "USD"
+
+    data_sources = [
+        # Stocks from Yahoo Finance
+        DataSource(
+            identifier="aapl_daily",
+            market="YAHOO",
+            symbol="AAPL",
+            time_frame="1d",
+            warmup_window=200,
+        ),
+        # Crypto from Binance
+        DataSource(
+            identifier="btc_daily",
+            market="BINANCE",
+            symbol="BTC/USDT",
+            time_frame="1d",
+            warmup_window=200,
+        ),
+    ]
+```
+
+## Data Provider Priority
+
+When multiple data providers can serve the same `DataSource`, the framework uses priority to select the best one. Lower number = higher priority:
 
 ```python
 from investing_algorithm_framework import create_app
 from investing_algorithm_framework.infrastructure import (
-    CCXTOHLCVDataProvider, 
+    CCXTOHLCVDataProvider,
     PandasOHLCVDataProvider
 )
 
@@ -420,73 +569,7 @@ app.add_data_provider(pandas_provider, priority=1)
 app.add_data_provider(CCXTOHLCVDataProvider(), priority=3)
 ```
 
-### Combining Multiple Providers
-
-```python
-from investing_algorithm_framework import create_app, PortfolioConfiguration
-from investing_algorithm_framework.infrastructure import (
-    CCXTOHLCVDataProvider,
-    PandasOHLCVDataProvider
-)
-import pandas as pd
-
-# Create app
-app = create_app()
-
-# Add portfolio configuration
-app.add_portfolio_configuration(
-    PortfolioConfiguration(
-        initial_balance=10000,
-        market="BITVAVO",
-        trading_symbol="EUR"
-    )
-)
-
-# Add custom data provider for specific symbol (higher priority)
-custom_btc_data = pd.read_csv("./data/btc_custom.csv", index_col=0, parse_dates=True)
-custom_provider = PandasOHLCVDataProvider(
-    dataframe=custom_btc_data,
-    symbol="BTC/EUR",
-    time_frame="1h",
-    market="bitvavo"
-)
-app.add_data_provider(custom_provider, priority=1)
-
-# CCXT provider as fallback (lower priority)
-app.add_data_provider(CCXTOHLCVDataProvider(), priority=3)
-
-# Now when the strategy requests BTC/EUR 1h data from BITVAVO,
-# it will use the custom_provider first
-```
-
-## Supported Exchanges
-
-The CCXT-based data provider supports many exchanges:
-
-| Exchange | Market Identifier |
-|----------|-------------------|
-| Bitvavo | `"bitvavo"` or `"BITVAVO"` |
-| Binance | `"binance"` or `"BINANCE"` |
-| Coinbase | `"coinbase"` or `"COINBASE"` |
-| Kraken | `"kraken"` or `"KRAKEN"` |
-| Bybit | `"bybit"` or `"BYBIT"` |
-| OKX | `"okx"` or `"OKX"` |
-| KuCoin | `"kucoin"` or `"KUCOIN"` |
-| Bitfinex | `"bitfinex"` or `"BITFINEX"` |
-
-```python
-# Bitvavo
-DataSource(symbol="BTC/EUR", market="BITVAVO", ...)
-
-# Binance
-DataSource(symbol="BTC/USDT", market="BINANCE", ...)
-
-# Coinbase
-DataSource(symbol="BTC/EUR", market="COINBASE", ...)
-
-# Kraken
-DataSource(symbol="BTC/EUR", market="KRAKEN", ...)
-```
+> To learn how to build your own data provider for a custom API, see [Custom Data Providers](../Advanced%20Concepts/custom-data-providers).
 
 ## Warmup Window
 
@@ -594,32 +677,32 @@ class CorrelationStrategy(TradingStrategy):
     interval = 4
     symbols = ["BTC"]
     trading_symbol = "EUR"
-    
+
     data_sources = [
         DataSource(identifier="btc", symbol="BTC/EUR", time_frame="4h", warmup_window=100, market="BITVAVO"),
         DataSource(identifier="eth", symbol="ETH/EUR", time_frame="4h", warmup_window=100, market="BITVAVO"),
     ]
-    
+
     def _calculate_correlation(self, df1, df2, window=20):
         """Calculate rolling correlation between two assets"""
         returns1 = df1["Close"].pct_change()
         returns2 = df2["Close"].pct_change()
         return returns1.rolling(window).corr(returns2)
-    
+
     def generate_buy_signals(self, data):
         btc_df = data["btc"]
         eth_df = data["eth"]
-        
+
         # Calculate correlation
         correlation = self._calculate_correlation(btc_df, eth_df)
-        
+
         # Buy BTC when correlation is high and ETH is rising
         eth_momentum = eth_df["Close"].pct_change(5)
-        
+
         buy_signal = (correlation > 0.7) & (eth_momentum > 0.02)
-        
+
         return {"BTC": buy_signal}
-    
+
     def generate_sell_signals(self, data):
         btc_df = data["btc"]
         ma = btc_df["Close"].rolling(20).mean()
@@ -690,7 +773,7 @@ data_sources = [
 class MyStrategy(TradingStrategy):
     time_unit = TimeUnit.HOUR
     interval = 4  # Runs every 4 hours
-    
+
     data_sources = [
         DataSource(
             identifier="btc_data",
@@ -746,24 +829,24 @@ data_sources = [
 ```python
 def generate_buy_signals(self, data):
     signals = {}
-    
+
     for symbol in self.symbols:
         identifier = f"{symbol.lower()}_4h"
-        
+
         if identifier not in data:
             print(f"Warning: No data for {identifier}")
             continue
-        
+
         df = data[identifier]
-        
+
         if len(df) < 50:  # Minimum required data
             signals[symbol] = pd.Series([False] * len(df), index=df.index)
             continue
-        
+
         # Normal signal generation
         ma = df["Close"].rolling(50).mean()
         signals[symbol] = df["Close"] > ma
-    
+
     return signals
 ```
 
@@ -772,4 +855,3 @@ def generate_buy_signals(self, data):
 - Learn about [Backtest Data](backtest_data) for data visualization
 - Explore [Download Data](download) to fetch historical data
 - Check out [Trading Strategies](../Getting%20Started/strategies) for strategy implementation
-

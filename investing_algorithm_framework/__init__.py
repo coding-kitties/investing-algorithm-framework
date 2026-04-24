@@ -24,11 +24,20 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus, \
     save_backtests_to_directory, BacktestMetrics, DATA_DIRECTORY, \
-    retag_backtests
+    retag_backtests, \
+    Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
+    SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage, \
+    VolumeImpactSlippage, \
+    CommissionModel, NoCommission, PercentageCommission, FixedCommission, \
+    FillModel, FullFill, VolumeBasedFill, \
+    FXRateProvider, StaticFXRateProvider
 from .infrastructure import AzureBlobStorageStateHandler, \
-    CSVOHLCVDataProvider, CSVTickerDataProvider, \
+    CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
+    JSONURLDataProvider, ParquetURLDataProvider, \
     CCXTOHLCVDataProvider, CCXTTickerDataProvider, \
-    PandasOHLCVDataProvider, \
+    PandasOHLCVDataProvider, OHLCVDataProviderBase, \
+    YahooOHLCVDataProvider, \
+    AlphaVantageOHLCVDataProvider, PolygonOHLCVDataProvider, \
     AWSS3StorageStateHandler
 from .create_app import create_app
 from .download_data import download, download_v2, DownloadResult, \
@@ -114,8 +123,13 @@ __all__ = [
     'DataType',
     'CSVOHLCVDataProvider',
     'CSVTickerDataProvider',
-    "CCXTOHLCVDataProvider",
+    'CSVURLDataProvider',    'JSONURLDataProvider',
+    'ParquetURLDataProvider',    "CCXTOHLCVDataProvider",
     "CCXTTickerDataProvider",
+    "OHLCVDataProviderBase",
+    "YahooOHLCVDataProvider",
+    "AlphaVantageOHLCVDataProvider",
+    "PolygonOHLCVDataProvider",
     "DataProvider",
     "get_annual_volatility",
     "get_sortino_ratio",
@@ -221,5 +235,23 @@ __all__ = [
     "download_v2",
     "DownloadResult",
     "create_data_storage_path",
-    "DATA_DIRECTORY"
+    "DATA_DIRECTORY",
+    "Blotter",
+    "DefaultBlotter",
+    "SimulationBlotter",
+    "Transaction",
+    "SlippageModel",
+    "NoSlippage",
+    "PercentageSlippage",
+    "FixedSlippage",
+    "VolumeImpactSlippage",
+    "CommissionModel",
+    "NoCommission",
+    "PercentageCommission",
+    "FixedCommission",
+    "FillModel",
+    "FullFill",
+    "VolumeBasedFill",
+    "FXRateProvider",
+    "StaticFXRateProvider",
 ]

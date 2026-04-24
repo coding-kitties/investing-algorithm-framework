@@ -67,12 +67,28 @@ const sidebars = {
                     type: 'doc',
                     id: 'Data/multiple-market-data-sources',
                 },
+                {
+                    type: 'doc',
+                    id: 'Data/external-data',
+                },
             ],
         },
         {
             type: 'category',
             label: 'Advanced Concepts',
             items: [
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/blotter',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/fx-conversion',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/custom-data-providers',
+                },
                 {
                     type: 'doc',
                     id: 'Advanced Concepts/logging-configuration',

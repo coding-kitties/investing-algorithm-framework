@@ -50,6 +50,9 @@ class Context:
             trade_stop_loss_service
         self.trade_take_profit_service: TradeTakeProfitService = \
             trade_take_profit_service
+        self._blotter = None
+        self._fx_rate_provider = None
+        self._base_currency = None
 
     def _validate_target_symbol(self, target_symbol, market=None):
         """
@@ -174,9 +177,11 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
-        return self.order_service.create(
-            order_data, execute=execute, validate=validate, sync=sync
-        )
+        order_data["_execute"] = execute
+        order_data["_validate"] = validate
+        order_data["_sync"] = sync
+
+        return self._blotter.place_order(order_data, self)
 
     def has_balance(self, symbol, amount, market=None):
         """
@@ -329,9 +334,11 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
-        return self.order_service.create(
-            order_data, execute=execute, validate=validate, sync=sync
-        )
+        order_data["_execute"] = execute
+        order_data["_validate"] = validate
+        order_data["_sync"] = sync
+
+        return self._blotter.place_order(order_data, self)
 
     def create_market_order(
         self,
@@ -464,9 +471,11 @@ class Context:
             order_data["created_at"] = \
                 self.configuration_service.config[INDEX_DATETIME]
 
-        return self.order_service.create(
-            order_data, execute=execute, validate=validate, sync=sync
-        )
+        order_data["_execute"] = execute
+        order_data["_validate"] = validate
+        order_data["_sync"] = sync
+
+        return self._blotter.place_order(order_data, self)
 
     def create_market_buy_order(
         self,
@@ -590,43 +599,14 @@ class Context:
                 "to create a limit sell order."
             )
 
-        if portfolio_id is not None:
-            portfolio = self.portfolio_service.get(portfolio_id)
-        elif market is not None:
-            portfolio = self.portfolio_service.find({"market": market})
-        else:
-            portfolio = self.portfolio_service.get_all()[0]
-
-        if percentage_of_position is not None:
-            position = self.position_service.find(
-                {
-                    "symbol": target_symbol,
-                    "portfolio": portfolio.id
-                }
-            )
-            amount = position.get_amount() * (percentage_of_position / 100)
-
-        logger.info(
-            f"Creating limit order: {target_symbol} "
-            f"SELL {amount} @ {price}"
+        return self.create_limit_order(
+            target_symbol=target_symbol,
+            price=price,
+            order_side=OrderSide.SELL,
+            amount=amount,
+            percentage_of_position=percentage_of_position,
+            market=market,
         )
-        order_data = {
-            "target_symbol": target_symbol,
-            "price": price,
-            "amount": amount,
-            "order_type": OrderType.LIMIT.value,
-            "order_side": OrderSide.SELL.value,
-            "portfolio_id": portfolio.id,
-            "status": OrderStatus.CREATED.value,
-            "trading_symbol": portfolio.trading_symbol,
-        }
-
-        if BACKTESTING_FLAG in self.configuration_service.config \
-                and self.configuration_service.config[BACKTESTING_FLAG]:
-            order_data["created_at"] = \
-                self.configuration_service.config[INDEX_DATETIME]
-
-        return self.order_service.create(order_data)
 
     def create_limit_buy_order(
         self,
@@ -667,37 +647,13 @@ class Context:
                 "to create a limit buy order."
             )
 
-        if portfolio_id is not None:
-            portfolio = self.portfolio_service.get(portfolio_id)
-        elif market is not None:
-            portfolio = self.portfolio_service.find({"market": market})
-        else:
-            portfolio = self.portfolio_service.get_all()[0]
-
-        if percentage_of_portfolio is not None:
-            net_size = portfolio.get_net_size()
-            size = net_size * (percentage_of_portfolio / 100)
-            amount = size / price
-        logger.info(
-            f"Creating limit order: {target_symbol} "
-            f"BUY {amount} @ {price}"
-        )
-        order_data = {
-            "target_symbol": target_symbol,
-            "price": price,
-            "amount": amount,
-            "order_type": OrderType.LIMIT.value,
-            "order_side": OrderSide.BUY.value,
-            "portfolio_id": portfolio.id,
-            "status": OrderStatus.CREATED.value,
-            "trading_symbol": portfolio.trading_symbol,
-        }
-        if BACKTESTING_FLAG in self.configuration_service.config \
-                and self.configuration_service.config[BACKTESTING_FLAG]:
-            order_data["created_at"] = \
-                self.configuration_service.config[INDEX_DATETIME]
-        return self.order_service.create(
-            order_data, execute=True, validate=True, sync=True
+        return self.create_limit_order(
+            target_symbol=target_symbol,
+            price=price,
+            order_side=OrderSide.BUY,
+            amount=amount,
+            percentage_of_portfolio=percentage_of_portfolio,
+            market=market,
         )
 
     def get_portfolio(self, market=None) -> Portfolio:
@@ -761,6 +717,137 @@ class Context:
         )
 
         return ticker['bid'] if ticker and 'bid' in ticker else None
+
+    def get_fx_rate(
+        self, from_currency: str, to_currency: str
+    ) -> float:
+        """
+        Get the exchange rate between two currencies using the
+        registered FX rate provider.
+
+        Args:
+            from_currency: Source currency code (e.g. "USD").
+            to_currency: Target currency code (e.g. "EUR").
+
+        Returns:
+            float: The exchange rate. Returns 1.0 if the currencies
+                are the same.
+
+        Raises:
+            OperationalException: If no FX rate provider is registered.
+        """
+        from_c = from_currency.upper()
+        to_c = to_currency.upper()
+
+        if from_c == to_c:
+            return 1.0
+
+        if self._fx_rate_provider is None:
+            raise OperationalException(
+                f"Cannot convert {from_c} to {to_c}: "
+                "no FX rate provider registered. "
+                "Use app.add_fx_rate_provider() to register one."
+            )
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            date = self.configuration_service.config[INDEX_DATETIME]
+        else:
+            date = datetime.now(tz=timezone.utc)
+
+        return self._fx_rate_provider.get_rate(from_c, to_c, date=date)
+
+    def convert_to_base_currency(
+        self, amount: float, from_currency: str
+    ) -> float:
+        """
+        Convert an amount to the base currency.
+
+        Args:
+            amount: The amount to convert.
+            from_currency: The currency of the amount.
+
+        Returns:
+            float: The converted amount in the base currency.
+
+        Raises:
+            OperationalException: If no base currency is set or no
+                FX rate provider is registered.
+        """
+        if self._base_currency is None:
+            raise OperationalException(
+                "No base currency configured. "
+                "Use app.set_base_currency() to set one."
+            )
+
+        rate = self.get_fx_rate(from_currency, self._base_currency)
+        return amount * rate
+
+    def get_portfolio_value(self) -> float:
+        """
+        Compute the total portfolio value across all markets,
+        converted to the base currency.
+
+        If no base currency is set, returns the total value of
+        the first (default) portfolio in its own trading currency.
+
+        Each portfolio's value = unallocated cash + sum of
+        (position_amount * current_price), converted via FX rates
+        to the base currency.
+
+        Returns:
+            float: Total portfolio value in the base currency.
+        """
+        portfolios = self.portfolio_service.get_all()
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            date = self.configuration_service.config[INDEX_DATETIME]
+        else:
+            date = datetime.now(tz=timezone.utc)
+
+        total_value = 0.0
+
+        for portfolio in portfolios:
+            trading_symbol = portfolio.trading_symbol
+            positions = self.position_service.get_all(
+                {"portfolio": portfolio.id}
+            )
+
+            # Portfolio value in its local trading currency
+            local_value = 0.0
+
+            for position in positions:
+                if position.symbol == trading_symbol:
+                    local_value += position.get_amount()
+                else:
+                    ticker = self.data_provider_service.get_ticker_data(
+                        symbol=(
+                            f"{position.symbol}/{trading_symbol}"
+                        ),
+                        market=portfolio.market,
+                        date=date
+                    )
+
+                    if ticker is not None and "bid" in ticker:
+                        local_value += (
+                            position.get_amount() * ticker["bid"]
+                        )
+
+            # Convert to base currency if configured
+            if (
+                self._base_currency is not None
+                and self._fx_rate_provider is not None
+                and trading_symbol != self._base_currency
+            ):
+                rate = self._fx_rate_provider.get_rate(
+                    trading_symbol, self._base_currency, date=date
+                )
+                total_value += local_value * rate
+            else:
+                total_value += local_value
+
+        return total_value
 
     def get_portfolios(self):
         """
@@ -1189,7 +1276,7 @@ class Context:
                         "status": OrderStatus.OPEN.value
                     }
                 ):
-            self.order_service.cancel_order(order)
+            self._blotter.cancel_order(order.id, self)
 
         target_symbol = position.get_symbol()
         symbol = f"{target_symbol.upper()}/{portfolio.trading_symbol.upper()}"
@@ -1810,16 +1897,11 @@ class Context:
             date=self.config[INDEX_DATETIME]
         )
         logger.info(f"Closing trade {trade.id} {trade.symbol}")
-        self.order_service.create(
-            {
-                "portfolio_id": portfolio.id,
-                "trading_symbol": trade.trading_symbol,
-                "target_symbol": trade.target_symbol,
-                "amount": amount,
-                "order_side": OrderSide.SELL.value,
-                "order_type": OrderType.LIMIT.value,
-                "price": ticker["bid"],
-            }
+        self.create_limit_order(
+            target_symbol=trade.target_symbol,
+            amount=amount,
+            order_side=OrderSide.SELL,
+            price=ticker["bid"],
         )
 
     def get_number_of_positions(self):
@@ -2008,3 +2090,247 @@ class Context:
             query_params["triggered"] = triggered
 
         return self.trade_stop_loss_service.get_all(query_params)
+
+    def fetch_csv(
+        self,
+        url,
+        date_column=None,
+        date_format=None,
+        cache=True,
+        refresh_interval=None,
+        pre_process=None,
+        post_process=None,
+    ):
+        """
+        Fetch CSV data from a remote URL on demand.
+
+        This is a convenience method for dynamically loading external
+        CSV data during strategy execution without pre-declaring it
+        as a DataSource.
+
+        Args:
+            url (str): URL to fetch the CSV data from.
+            date_column (str, optional): Name of the date column to
+                parse.
+            date_format (str, optional): strftime format for parsing
+                dates.
+            cache (bool): Cache fetched data locally (default: True).
+            refresh_interval (str, optional): Re-fetch interval
+                (e.g., "1d", "1h").
+            pre_process (callable, optional): Transform raw CSV text
+                before parsing.
+            post_process (callable, optional): Transform the parsed
+                DataFrame.
+
+        Returns:
+            polars.DataFrame: The parsed CSV data.
+
+        Example::
+
+            def run_strategy(self, context, data):
+                earnings = context.fetch_csv(
+                    url="https://example.com/earnings.csv",
+                    date_column="report_date",
+                )
+                latest = earnings["eps"].iloc[-1]
+        """
+        from investing_algorithm_framework.infrastructure \
+            import CSVURLDataProvider
+
+        if not hasattr(self, '_csv_url_providers'):
+            self._csv_url_providers = {}
+
+        if url not in self._csv_url_providers:
+            provider = CSVURLDataProvider(
+                url=url,
+                date_column=date_column,
+                date_format=date_format,
+                cache=cache,
+                refresh_interval=refresh_interval,
+                pre_process=pre_process,
+                post_process=post_process,
+            )
+            provider.config = self.configuration_service.get_config()
+            self._csv_url_providers[url] = provider
+
+        return self._csv_url_providers[url].get_data()
+
+    def fetch_json(
+        self,
+        url,
+        date_column=None,
+        date_format=None,
+        cache=True,
+        refresh_interval=None,
+        pre_process=None,
+        post_process=None,
+    ):
+        """
+        Fetch JSON data from a remote URL on demand.
+
+        This is a convenience method for dynamically loading external
+        JSON data during strategy execution without pre-declaring it
+        as a DataSource.
+
+        The JSON data must be either an array of objects or an object
+        of arrays.
+
+        Args:
+            url (str): URL to fetch the JSON data from.
+            date_column (str, optional): Name of the date column to
+                parse.
+            date_format (str, optional): strftime format for parsing
+                dates.
+            cache (bool): Cache fetched data locally (default: True).
+            refresh_interval (str, optional): Re-fetch interval
+                (e.g., "1d", "1h").
+            pre_process (callable, optional): Transform raw JSON text
+                before parsing.
+            post_process (callable, optional): Transform the parsed
+                DataFrame.
+
+        Returns:
+            polars.DataFrame: The parsed JSON data.
+
+        Example::
+
+            def run_strategy(self, context, data):
+                earnings = context.fetch_json(
+                    url="https://api.example.com/earnings",
+                    date_column="report_date",
+                )
+        """
+        from investing_algorithm_framework.infrastructure \
+            import JSONURLDataProvider
+
+        if not hasattr(self, '_json_url_providers'):
+            self._json_url_providers = {}
+
+        if url not in self._json_url_providers:
+            provider = JSONURLDataProvider(
+                url=url,
+                date_column=date_column,
+                date_format=date_format,
+                cache=cache,
+                refresh_interval=refresh_interval,
+                pre_process=pre_process,
+                post_process=post_process,
+            )
+            provider.config = self.configuration_service.get_config()
+            self._json_url_providers[url] = provider
+
+        return self._json_url_providers[url].get_data()
+
+    def fetch_parquet(
+        self,
+        url,
+        date_column=None,
+        date_format=None,
+        cache=True,
+        refresh_interval=None,
+        post_process=None,
+    ):
+        """
+        Fetch Parquet data from a remote URL on demand.
+
+        This is a convenience method for dynamically loading external
+        Parquet data during strategy execution without pre-declaring
+        it as a DataSource.
+
+        Args:
+            url (str): URL to fetch the Parquet file from.
+            date_column (str, optional): Name of the date column to
+                parse.
+            date_format (str, optional): strftime format for parsing
+                dates.
+            cache (bool): Cache fetched data locally (default: True).
+            refresh_interval (str, optional): Re-fetch interval
+                (e.g., "1d", "1h").
+            post_process (callable, optional): Transform the parsed
+                DataFrame.
+
+        Returns:
+            polars.DataFrame: The parsed Parquet data.
+
+        Example::
+
+            def run_strategy(self, context, data):
+                features = context.fetch_parquet(
+                    url="https://storage.example.com/features.parquet",
+                )
+        """
+        from investing_algorithm_framework.infrastructure \
+            import ParquetURLDataProvider
+
+        if not hasattr(self, '_parquet_url_providers'):
+            self._parquet_url_providers = {}
+
+        if url not in self._parquet_url_providers:
+            provider = ParquetURLDataProvider(
+                url=url,
+                date_column=date_column,
+                date_format=date_format,
+                cache=cache,
+                refresh_interval=refresh_interval,
+                post_process=post_process,
+            )
+            provider.config = self.configuration_service.get_config()
+            self._parquet_url_providers[url] = provider
+
+        return self._parquet_url_providers[url].get_data()
+
+    def batch_order(self, orders, market=None):
+        """
+        Place multiple orders at once through the blotter.
+
+        Each order dict supports the same parameters as
+        ``create_limit_order`` and ``create_market_order``.
+
+        Args:
+            orders (list[dict]): List of order dicts. Each dict should
+                contain at minimum ``target_symbol``, ``order_side``,
+                and either ``amount`` or ``percentage_of_portfolio``.
+                Include ``price`` for limit orders.
+                Include ``order_type`` to specify MARKET orders
+                (default is LIMIT).
+            market (str, optional): Default market for all orders.
+                Can be overridden per order.
+
+        Returns:
+            list[Order]: The created orders.
+
+        Example::
+
+            context.batch_order([
+                {
+                    "target_symbol": "BTC",
+                    "order_side": OrderSide.BUY,
+                    "percentage_of_portfolio": 5.0,
+                    "price": 45000,
+                },
+                {
+                    "target_symbol": "ETH",
+                    "order_side": OrderSide.BUY,
+                    "percentage_of_portfolio": 3.0,
+                    "price": 3000,
+                },
+            ])
+        """
+        # Add default market to each order if not set
+        for order_data in orders:
+            if "market" not in order_data and market is not None:
+                order_data["market"] = market
+
+        return self._blotter.batch_order(orders, self)
+
+    def get_transactions(self):
+        """
+        Get all recorded transactions from the blotter.
+
+        Returns a list of Transaction objects representing all
+        fills/executions that have been processed through the blotter.
+
+        Returns:
+            list[Transaction]: Recorded transactions.
+        """
+        return self._blotter.get_transactions()

@@ -1971,6 +1971,7 @@ class BacktestService:
         checkpoint_batch_size: int = 25,
         fill_missing_data: bool = True,
         iterative_summary_update: bool = False,
+        blotter=None,
     ) -> List[Backtest]:
         """
         Run event-driven backtests for multiple algorithms with optional
@@ -2253,6 +2254,8 @@ class BacktestService:
                                     ),
                                     trading_costs=all_trading_costs,
                                     portfolio_configuration=pc,
+                                    blotter=blotter,
+                                    context=context,
                                 )
                             )
 
@@ -2586,6 +2589,7 @@ class BacktestService:
         market: str = None,
         trading_symbol: str = None,
         fill_missing_data: bool = True,
+        blotter=None,
     ) -> tuple:
         """
         Run an event-driven backtest for a single algorithm.
@@ -2639,6 +2643,7 @@ class BacktestService:
             backtest_storage_directory=backtest_storage_directory,
             use_checkpoints=use_checkpoints,
             fill_missing_data=fill_missing_data,
+            blotter=blotter,
         )
 
         # Extract the single backtest result

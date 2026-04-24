@@ -25,6 +25,12 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TakeProfitRule, StopLossRule, PositionSize, ScalingRule, TradingCost
 from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
+from .blotter import Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
+    SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage, \
+    VolumeImpactSlippage, \
+    CommissionModel, NoCommission, PercentageCommission, FixedCommission, \
+    FillModel, FullFill, VolumeBasedFill
+from .fx import FXRateProvider, StaticFXRateProvider
 from .services import MarketCredentialService, AbstractPortfolioSyncService, \
     RoundingService, StateHandler
 from .stateless_actions import StatelessActions
@@ -152,4 +158,22 @@ __all__ = [
     "save_backtests_to_directory",
     "retag_backtests",
     "generate_algorithm_id",
+    "Blotter",
+    "DefaultBlotter",
+    "SimulationBlotter",
+    "Transaction",
+    "SlippageModel",
+    "NoSlippage",
+    "PercentageSlippage",
+    "FixedSlippage",
+    "VolumeImpactSlippage",
+    "CommissionModel",
+    "NoCommission",
+    "PercentageCommission",
+    "FixedCommission",
+    "FillModel",
+    "FullFill",
+    "VolumeBasedFill",
+    "FXRateProvider",
+    "StaticFXRateProvider",
 ]

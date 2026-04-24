@@ -41,8 +41,6 @@ class CSVOHLCVDataProvider(DataProvider):
         data_provider_identifier: str = None,
         pandas: bool = False,
     ):
-        if warmup_window is not None and window_size is None:
-            window_size = warmup_window
         """
         Initialize the CSV Data Provider.
 
@@ -54,6 +52,9 @@ class CSVOHLCVDataProvider(DataProvider):
             window_size (int, optional): The window size for the data.
                 Defaults to None.
         """
+        if warmup_window is not None and window_size is None:
+            window_size = warmup_window
+
         if data_provider_identifier is None:
             data_provider_identifier = self.data_provider_identifier
         super().__init__(

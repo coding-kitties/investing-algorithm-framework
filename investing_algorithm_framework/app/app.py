@@ -24,7 +24,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, DATA_DIRECTORY
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
-    BacktestOrderExecutor, CCXTOHLCVDataProvider, clear_db, \
+    CCXTOHLCVDataProvider, clear_db, \
     PandasOHLCVDataProvider
 from investing_algorithm_framework.services import OrderBacktestService, \
     BacktestPortfolioService, DefaultTradeOrderEvaluator
@@ -71,10 +71,22 @@ class App:
         self._state_handler = state_handler
         self._run_history = None
         self._name = name
+        self._blotter = None
+        self._fx_rate_provider = None
+        self._base_currency = None
 
     @property
     def context(self):
-        return self.container.context()
+        from investing_algorithm_framework.domain.blotter import \
+            DefaultBlotter
+
+        ctx = self.container.context()
+        ctx._blotter = self._blotter \
+            if self._blotter is not None else DefaultBlotter()
+        ctx._fx_rate_provider = self._fx_rate_provider
+        ctx._base_currency = self._base_currency
+
+        return ctx
 
     @property
     def resource_directory_path(self):
@@ -651,7 +663,9 @@ class App:
                 .trade_stop_loss_service(),
                 trade_take_profit_service=self.container
                 .trade_take_profit_service(),
-                configuration_service=self.container.configuration_service()
+                configuration_service=self.container.configuration_service(),
+                blotter=self._blotter,
+                context=self.context
             )
             event_loop_service = EventLoopService(
                 configuration_service=self.container.configuration_service(),
@@ -1499,6 +1513,7 @@ class App:
             checkpoint_batch_size=checkpoint_batch_size,
             fill_missing_data=fill_missing_data,
             iterative_summary_update=iterative_summary_update,
+            blotter=self._blotter,
         )
 
         # Cleanup resources
@@ -1737,6 +1752,7 @@ class App:
             trading_symbol=trading_symbol,
             fill_missing_data=fill_missing_data,
             skip_data_sources_initialization=True,
+            blotter=self._blotter,
         )
 
         # Store run history
@@ -2207,6 +2223,98 @@ class App:
         )
         self.add_market_credential(market_credential)
 
+    def set_blotter(self, blotter):
+        """
+        Set a blotter for order book management. The blotter sits
+        between the strategy and the order execution layer, enabling
+        batch ordering, transaction tracking, and custom order routing.
+
+        Args:
+            blotter: Instance of Blotter
+
+        Returns:
+            None
+        """
+        from investing_algorithm_framework.domain.blotter import Blotter
+
+        if inspect.isclass(blotter):
+            blotter = blotter()
+
+        if not isinstance(blotter, Blotter):
+            raise OperationalException(
+                "Blotter should be an instance of Blotter"
+            )
+
+        self._blotter = blotter
+
+    def get_blotter(self):
+        """
+        Get the configured blotter.
+
+        Returns:
+            Blotter or None: The configured blotter instance.
+        """
+        return self._blotter
+
+    def set_base_currency(self, currency: str) -> None:
+        """
+        Set the base currency for multi-currency portfolio reporting.
+
+        When a base currency is set and an FX rate provider is registered,
+        the framework will automatically convert position values from
+        their local currency to the base currency when computing
+        portfolio totals.
+
+        Args:
+            currency: Currency code (e.g. "EUR", "USD", "GBP").
+
+        Returns:
+            None
+        """
+        self._base_currency = currency.upper()
+
+    def get_base_currency(self) -> str:
+        """
+        Get the configured base currency.
+
+        Returns:
+            str or None: The base currency code, or None if not set.
+        """
+        return self._base_currency
+
+    def add_fx_rate_provider(self, fx_rate_provider) -> None:
+        """
+        Register an FX rate provider for multi-currency portfolio
+        support. The provider supplies exchange rates between
+        currency pairs.
+
+        Args:
+            fx_rate_provider: Instance of FXRateProvider.
+
+        Returns:
+            None
+        """
+        from investing_algorithm_framework.domain.fx import FXRateProvider
+
+        if inspect.isclass(fx_rate_provider):
+            fx_rate_provider = fx_rate_provider()
+
+        if not isinstance(fx_rate_provider, FXRateProvider):
+            raise OperationalException(
+                "FX rate provider should be an instance of FXRateProvider"
+            )
+
+        self._fx_rate_provider = fx_rate_provider
+
+    def get_fx_rate_provider(self):
+        """
+        Get the configured FX rate provider.
+
+        Returns:
+            FXRateProvider or None: The FX rate provider instance.
+        """
+        return self._fx_rate_provider
+
     def add_order_executor(self, order_executor):
         """
         Function to add an order executor to the app. The order executor
@@ -2284,24 +2392,30 @@ class App:
         """
         Function to initialize the order executors. This function will
         first check if the app is running in backtest mode or not. If it is
-        running in backtest mode, all order executors will be removed and
-        a single BacktestOrderExecutor will be added to the order executors.
+        running in backtest mode, all order executors will be removed
+        (OrderBacktestService handles execution directly) and the
+        SimulationBlotter will be set as the default blotter if no custom
+        blotter has been configured.
 
         If it is not running in backtest mode, it will add the default
         CCXTOrderExecutor with a priority 3.
         """
+        from investing_algorithm_framework.domain.blotter import \
+            SimulationBlotter
+
         logger.info("Adding order executors")
         order_executor_lookup = self.container.order_executor_lookup()
         environment = self.config[ENVIRONMENT]
 
         if Environment.BACKTEST.equals(environment):
-            # If the app is running in backtest mode,
-            # remove all order executors
-            # and add a single BacktestOrderExecutor
+            # In backtest mode, OrderBacktestService handles execution
+            # directly — no order executor needed
             order_executor_lookup.reset()
-            order_executor_lookup.add_order_executor(
-                BacktestOrderExecutor(priority=1)
-            )
+
+            # Auto-set SimulationBlotter for backtesting if no
+            # custom blotter has been configured
+            if self._blotter is None:
+                self._blotter = SimulationBlotter()
         else:
             order_executor_lookup.add_order_executor(
                 CCXTOrderExecutor(priority=3)
@@ -2498,9 +2612,7 @@ class App:
         environment = self.config[ENVIRONMENT]
 
         if Environment.BACKTEST.equals(environment):
-            # If the app is running in backtest mode,
-            # remove all order executors
-            # and add a single BacktestOrderExecutor
+            # In backtest mode, remove all portfolio providers
             portfolio_provider_lookup.reset()
         else:
             portfolio_provider_lookup.add_portfolio_provider(
