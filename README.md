@@ -273,6 +273,7 @@ report.save("my_report.html")
 | **[Cloud Deployment](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)** | Deploy to AWS Lambda, Azure Functions, or run as a web service |
 | **[Market Data Providers](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/custom-data-providers)** | Built-in providers for CCXT, Yahoo Finance, Alpha Vantage, and Polygon — or build your own |
 | **[Load External Data](https://coding-kitties.github.io/investing-algorithm-framework/Data/external-data)** | Fetch CSV, JSON, or Parquet from any URL with caching, date parsing, and pre/post-processing |
+| **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** | Track any indicator or metric during backtests with `context.record()` |
 | **[Strategies](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/strategies)** | OHLCV, tickers, custom data — Polars and Pandas native |
 | **[Extensible](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/custom-data-providers)** | Custom data providers, order executors, and strategy classes |
 
