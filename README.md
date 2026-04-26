@@ -8,23 +8,13 @@
 
 <h4 align="center">
   <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain">
-    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=linux%20(main)&style=flat-square&logo=linux&logoColor=white" alt="linux main" style="height: 20px;">
+    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=linux&style=flat-square&logo=linux&logoColor=white" alt="linux main" style="height: 20px;">
   </a>
   <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain">
-    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=macos%20(main)&style=flat-square&logo=apple&logoColor=white" alt="macos main" style="height: 20px;">
+    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=macos&style=flat-square&logo=apple&logoColor=white" alt="macos main" style="height: 20px;">
   </a>
   <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Amain">
-    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=windows%20(main)&style=flat-square&logo=windows&logoColor=white" alt="windows main" style="height: 20px;">
-  </a>
-  <br>
-  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Adev">
-    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=dev&label=linux%20(dev)&style=flat-square&logo=linux&logoColor=white" alt="linux dev" style="height: 20px;">
-  </a>
-  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Adev">
-    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=dev&label=macos%20(dev)&style=flat-square&logo=apple&logoColor=white" alt="macos dev" style="height: 20px;">
-  </a>
-  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml?query=branch%3Adev">
-    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=dev&label=windows%20(dev)&style=flat-square&logo=windows&logoColor=white" alt="windows dev" style="height: 20px;">
+    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=main&label=windows&style=flat-square&logo=windows&logoColor=white" alt="windows main" style="height: 20px;">
   </a>
   <a href="https://pypi.org/project/investing-algorithm-framework/">
     <img src="https://img.shields.io/pypi/v/investing-algorithm-framework.svg?style=flat-square" alt="pypi" style="height: 20px;">
