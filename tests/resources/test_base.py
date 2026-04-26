@@ -83,7 +83,7 @@ class TestBase(TestCase):
 
         if self.initialize:
             self.app.initialize_config()
-            self.app.initialize_storage()
+            self.app.initialize_storage(remove_database_if_exists=True)
             self.app.initialize_services()
             self.app.initialize_portfolios()
 
@@ -215,7 +215,7 @@ class FlaskTestBase(FlaskTestCase):
 
         if self.initialize:
             self.iaf_app.initialize_config()
-            self.iaf_app.initialize_storage()
+            self.iaf_app.initialize_storage(remove_database_if_exists=True)
             self.iaf_app.initialize_services()
             self.iaf_app.initialize_portfolios()
 

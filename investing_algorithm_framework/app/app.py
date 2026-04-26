@@ -368,6 +368,18 @@ class App:
                 logger.info(
                     f"Removing existing database at {database_path}"
                 )
+
+                # Dispose the existing engine to release file locks
+                # (required on Windows where locks are mandatory)
+                from investing_algorithm_framework.infrastructure.database \
+                    import Session
+                from sqlalchemy.orm import close_all_sessions
+                close_all_sessions()
+                bind = Session.kw.get("bind")
+
+                if bind is not None:
+                    bind.dispose()
+
                 os.remove(database_path)
 
         # Create the sqlalchemy database uri
