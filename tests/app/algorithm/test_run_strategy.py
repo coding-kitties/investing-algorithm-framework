@@ -8,6 +8,8 @@ import pandas as pd
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, PortfolioConfiguration, RESOURCE_DIRECTORY, Algorithm, \
     MarketCredential
+from investing_algorithm_framework.infrastructure.database import \
+    teardown_sqlalchemy
 from tests.resources import random_string, OrderExecutorTest, \
     PortfolioProviderTest
 
@@ -73,6 +75,7 @@ class Test(TestCase):
 
     def tearDown(self) -> None:
         super().tearDown()
+        teardown_sqlalchemy()
         database_dir = os.path.join(self.resource_dir, "databases")
         if os.path.exists(database_dir):
             shutil.rmtree(database_dir, ignore_errors=True)

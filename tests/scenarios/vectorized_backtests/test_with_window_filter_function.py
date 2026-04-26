@@ -627,4 +627,4 @@ class Test(TestCase):
         )
         if os.path.exists(temp_storage_dir):
             import shutil
-            shutil.rmtree(temp_storage_dir)
+            shutil.rmtree(temp_storage_dir, ignore_errors=True)

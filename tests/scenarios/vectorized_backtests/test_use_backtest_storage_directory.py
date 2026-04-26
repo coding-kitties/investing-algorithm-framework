@@ -280,7 +280,7 @@ class Test(TestCase):
 
         # Clean up any existing storage directory
         if os.path.exists(backtest_storage_dir):
-            shutil.rmtree(backtest_storage_dir)
+            shutil.rmtree(backtest_storage_dir, ignore_errors=True)
 
         param_set = {
             "rsi_time_frame": "2h",
@@ -427,7 +427,7 @@ class Test(TestCase):
 
         # Clean up any existing storage directory
         if os.path.exists(backtest_storage_dir):
-            shutil.rmtree(backtest_storage_dir)
+            shutil.rmtree(backtest_storage_dir, ignore_errors=True)
 
 
         start_time = time.time()
@@ -475,7 +475,7 @@ class Test(TestCase):
             resource_directory, "backtest_reports_for_testing", "temp_storage"
         )
         if os.path.exists(backtest_storage_dir):
-            shutil.rmtree(backtest_storage_dir)
+            shutil.rmtree(backtest_storage_dir, ignore_errors=True)
 
     def test_preexisting_backtests_not_included_in_new_run(self):
         """
@@ -519,7 +519,7 @@ class Test(TestCase):
 
         # Clean up any existing storage directory
         if os.path.exists(backtest_storage_dir):
-            shutil.rmtree(backtest_storage_dir)
+            shutil.rmtree(backtest_storage_dir, ignore_errors=True)
 
         # ===== FIRST RUN: Run backtests for first set of strategies =====
         app1 = create_app(name="FirstRun", config=config)
@@ -693,7 +693,7 @@ class Test(TestCase):
 
         # Clean up
         if os.path.exists(backtest_storage_dir):
-            shutil.rmtree(backtest_storage_dir)
+            shutil.rmtree(backtest_storage_dir, ignore_errors=True)
 
     def test_preexisting_backtests_not_included_with_final_filter(self):
         """
@@ -735,7 +735,7 @@ class Test(TestCase):
         )
 
         if os.path.exists(backtest_storage_dir):
-            shutil.rmtree(backtest_storage_dir)
+            shutil.rmtree(backtest_storage_dir, ignore_errors=True)
 
         # ===== FIRST RUN: Create pre-existing backtests =====
         app1 = create_app(name="FirstRun", config=config)
@@ -896,4 +896,4 @@ class Test(TestCase):
 
         # Clean up
         if os.path.exists(backtest_storage_dir):
-            shutil.rmtree(backtest_storage_dir)
+            shutil.rmtree(backtest_storage_dir, ignore_errors=True)

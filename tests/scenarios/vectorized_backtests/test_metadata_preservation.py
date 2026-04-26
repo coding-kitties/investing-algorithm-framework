@@ -8,6 +8,9 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 from unittest import TestCase
 
+from investing_algorithm_framework.infrastructure.database import \
+    teardown_sqlalchemy
+
 import pandas as pd
 from pyindicators import ema, rsi, crossover, crossunder
 
@@ -424,5 +427,6 @@ class Test(TestCase):
 
     def tearDown(self):
         # Clean up storage directory after tests
+        teardown_sqlalchemy()
         if os.path.exists(self.backtest_storage_dir):
-            shutil.rmtree(self.backtest_storage_dir)
+            shutil.rmtree(self.backtest_storage_dir, ignore_errors=True)

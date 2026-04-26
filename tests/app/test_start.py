@@ -7,6 +7,8 @@ import pandas as pd
 from investing_algorithm_framework import create_app, TradingStrategy, \
     TimeUnit, RESOURCE_DIRECTORY, PortfolioConfiguration, Algorithm, \
     MarketCredential
+from investing_algorithm_framework.infrastructure.database import \
+    teardown_sqlalchemy
 from tests.resources import OrderExecutorTest, PortfolioProviderTest
 
 
@@ -106,6 +108,7 @@ class Test(TestCase):
         )
 
     def tearDown(self):
+        teardown_sqlalchemy()
         for subdir in ("databases", "backtest_databases"):
             path = os.path.join(self.resource_dir, subdir)
             if os.path.exists(path):

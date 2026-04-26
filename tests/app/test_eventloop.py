@@ -240,7 +240,7 @@ class TestEventloopService(TestBase):
         )
 
         if os.path.exists(databases_directory):
-            shutil.rmtree(databases_directory)
+            shutil.rmtree(databases_directory, ignore_errors=True)
 
         if os.path.exists(backtest_databases_directory):
-            shutil.rmtree(backtest_databases_directory)
+            shutil.rmtree(backtest_databases_directory, ignore_errors=True)
