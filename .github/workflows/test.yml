@@ -9,6 +9,7 @@ on:
     paths:
       - 'investing_algorithm_framework/**'
       - 'tests/**'
+      - '.github/workflows/test.yml'
 
 jobs:
   linting:
