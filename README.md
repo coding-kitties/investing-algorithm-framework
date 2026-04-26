@@ -8,7 +8,13 @@
 
 <h4 align="center">
   <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml">
-    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=master&label=tests&style=flat-square" alt="tests" style="height: 20px;">
+    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=master&label=linux&style=flat-square&logo=linux&logoColor=white" alt="linux" style="height: 20px;">
+  </a>
+  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=master&label=macos&style=flat-square&logo=apple&logoColor=white" alt="macos" style="height: 20px;">
+  </a>
+  <a href="https://github.com/coding-kitties/investing-algorithm-framework/actions/workflows/test.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/coding-kitties/investing-algorithm-framework/test.yml?branch=master&label=windows&style=flat-square&logo=windows&logoColor=white" alt="windows" style="height: 20px;">
   </a>
   <a href="https://pypi.org/project/investing-algorithm-framework/">
     <img src="https://img.shields.io/pypi/v/investing-algorithm-framework.svg?style=flat-square" alt="pypi" style="height: 20px;">
