@@ -3,7 +3,7 @@
 </h1>
 
 <p align="center">
-  <i align="center">Create trading strategies. Compare them side by side. Pick the best one. 🚀</i>
+  <i align="center">Create trading strategies. Compare them side by side. Pick the best one and Deploy 🚀</i>
 </p>
 
 <h4 align="center">
@@ -61,7 +61,7 @@
 
 Most quant frameworks stop at "here's your backtest result." You get a number, maybe a chart, and then you're on your own figuring out which strategy is actually better.
 
-This framework is built around the full loop: **create strategies → backtest them → compare them in a single report → deploy the winner.** It generates a self-contained HTML dashboard that lets you rank, filter, and visually compare every strategy you've tested — all in one view, no notebooks required.
+This framework is built around the full loop: **create strategies → vector backtest for signals analysis → compare them in a single report → event backtest the most promising strategies → deploy the winner.** It generates a self-contained HTML dashboard that lets you rank, filter, and visually compare every strategy you've tested — all in one view, no notebooks required.
 
 <details open>
 <summary>
@@ -69,6 +69,10 @@ This framework is built around the full loop: **create strategies → backtest t
 </summary> <br>
 
 - 📊 **30+ Metrics** — CAGR, Sharpe, Sortino, Calmar, VaR, CVaR, Max DD, Recovery & more
+- ⚡ **Vector Backtesting for Signal Analysis** — Quickly test your strategy logic on historical data to see how signals would have behaved before committing to full event-driven backtests
+- 🏃 **Event-Driven Backtesting** — Once promising strategies are identified via vector backtests, run full event-driven backtests to simulate realistic execution and portfolio management
+- 🔀 **Permutation Testing / Monte Carlo Simulations** — Assess the statistical robustness of your strategies by running them across randomized market scenarios to see how often your results could occur by chance
+- 🚀 **Deployment** — Once the best strategy is identified through backtesting and comparison, deploy it to production locally or in the cloud (AWS Lambda / Azure Functions) to start live trading
 - ⚔️ **Multi-Strategy Comparison** — Rank, filter & compare strategies in a single interactive report
 - 🪟 **Multi-Window Robustness** — Test across different time periods with window coverage analysis
 - 📈 **Equity & Drawdown Charts** — Overlay equity curves, rolling Sharpe, drawdown & return distributions
