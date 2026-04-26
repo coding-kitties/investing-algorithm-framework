@@ -93,6 +93,19 @@ def teardown_sqlalchemy():
     bind = Session.kw.get("bind")
 
     if bind is not None:
+
+        # StaticPool._close_connection() is a no-op, so
+        # engine.dispose() alone won't close the underlying DBAPI
+        # connection. Use invalidate() which bypasses the pool's
+        # _close_connection and calls dialect.do_close() directly,
+        # ensuring the sqlite3 file lock is released on Windows.
+        try:
+            conn = bind.connect()
+            conn.invalidate()
+            conn.close()
+        except Exception:
+            pass
+
         bind.dispose()
 
     Session.configure(bind=None)

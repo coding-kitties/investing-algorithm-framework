@@ -378,7 +378,18 @@ class App:
                 bind = Session.kw.get("bind")
 
                 if bind is not None:
+
+                    try:
+                        conn = bind.connect()
+                        conn.invalidate()
+                        conn.close()
+                    except Exception:
+                        pass
+
                     bind.dispose()
+
+                import gc
+                gc.collect()
 
                 os.remove(database_path)
 
