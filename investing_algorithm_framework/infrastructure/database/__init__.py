@@ -1,5 +1,5 @@
 from .sql_alchemy import Session, setup_sqlalchemy, SQLBaseModel, \
-    create_all_tables, clear_db, SqliteDecimal
+    create_all_tables, clear_db, teardown_sqlalchemy, SqliteDecimal
 
 __all__ = [
     "Session",
@@ -7,5 +7,6 @@ __all__ = [
     "SQLBaseModel",
     "create_all_tables",
     "clear_db",
+    "teardown_sqlalchemy",
     "SqliteDecimal"
 ]

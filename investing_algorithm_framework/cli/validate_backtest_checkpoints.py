@@ -50,7 +50,7 @@ def validate_and_create_checkpoints(
     verbose_file_handle = None
 
     if verbose_output_file is not None:
-        verbose_file_handle = open(verbose_output_file, 'w')
+        verbose_file_handle = open(verbose_output_file, 'w', encoding='utf-8')
 
         def echo(msg):
             verbose_file_handle.write(msg + "\n")
