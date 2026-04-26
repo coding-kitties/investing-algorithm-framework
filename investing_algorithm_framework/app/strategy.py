@@ -850,6 +850,32 @@ class TradingStrategy:
         """
         return None
 
+    def generate_recorded_values(
+        self, data: Dict[str, Any]
+    ) -> Union[Dict[str, pd.Series], None]:
+        """
+        Optional method to generate recorded values for vectorized
+        backtesting. Override this to record arbitrary indicators,
+        metrics, or variables as time series during a vectorized
+        backtest.
+
+        Each key in the returned dict becomes a recorded variable
+        with the Series index as timestamps and the Series values
+        as the recorded data.
+
+        This is the vectorized equivalent of calling
+        ``context.record()`` in event-driven backtests.
+
+        Args:
+            data (Dict[str, Any]): The market data for the strategy.
+
+        Returns:
+            Dict[str, Series] | None: A dictionary where keys are
+                variable names and values are pandas Series with the
+                recorded values. Return None to not record anything.
+        """
+        return None
+
     def on_trade_closed(self, context: Context, trade: Trade):
         pass
 

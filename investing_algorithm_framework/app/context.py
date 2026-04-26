@@ -53,6 +53,7 @@ class Context:
         self._blotter = None
         self._fx_rate_provider = None
         self._base_currency = None
+        self._recorded_values = {}  # key -> list of (datetime, value)
 
     def _validate_target_symbol(self, target_symbol, market=None):
         """
@@ -2334,3 +2335,64 @@ class Context:
             list[Transaction]: Recorded transactions.
         """
         return self._blotter.get_transactions()
+
+    def record(self, **kwargs):
+        """
+        Record arbitrary key-value pairs at the current backtest timestamp.
+
+        This method allows you to store any custom indicator, metric, or
+        variable during a backtest. Each key creates a time series of
+        values that can be retrieved after the backtest completes via
+        ``BacktestRun.recorded_values``.
+
+        The values are stored as a list of ``(datetime, value)`` tuples
+        per key, allowing you to track any indicator over time.
+
+        This method only records during backtesting. In live mode it is
+        a no-op.
+
+        Args:
+            **kwargs: Arbitrary key-value pairs to record. Keys are
+                strings, values can be any type (float, int, str,
+                dict, list, etc.).
+
+        Example::
+
+            def on_run(self, context, data):
+                context.record(
+                    rsi=compute_rsi(data),
+                    sma_20=compute_sma(data, 20),
+                    signal_strength=0.85,
+                )
+        """
+        is_backtest = self.configuration_service.config.get(
+            BACKTESTING_FLAG, False
+        )
+
+        if not is_backtest:
+            return
+
+        current_datetime = self.configuration_service.config.get(
+            INDEX_DATETIME
+        )
+
+        for key, value in kwargs.items():
+            if key not in self._recorded_values:
+                self._recorded_values[key] = []
+            self._recorded_values[key].append((current_datetime, value))
+
+    def get_recorded_values(self):
+        """
+        Get all recorded values from the context.
+
+        Returns:
+            dict: A dictionary mapping keys to lists of
+                ``(datetime, value)`` tuples.
+        """
+        return self._recorded_values
+
+    def clear_recorded_values(self):
+        """
+        Clear all recorded values from the context.
+        """
+        self._recorded_values = {}
