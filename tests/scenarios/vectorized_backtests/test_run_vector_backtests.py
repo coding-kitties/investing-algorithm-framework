@@ -274,7 +274,7 @@ class Test(TestCase):
 
         # Clean up any existing storage directory
         if os.path.exists(backtest_storage_dir):
-            shutil.rmtree(backtest_storage_dir)
+            shutil.rmtree(backtest_storage_dir, ignore_errors=True)
 
         strategies = []
         for param_set in param_variations:

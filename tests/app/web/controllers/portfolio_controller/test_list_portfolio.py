@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 
 from investing_algorithm_framework import MarketCredential, \
     PortfolioConfiguration, DataSource, INDEX_DATETIME
@@ -33,13 +34,7 @@ class Test(FlaskTestBase):
         )
 
         if os.path.exists(database_dir):
-            for root, dirs, files in os.walk(database_dir, topdown=False):
-                for name in files:
-                    os.remove(os.path.join(root, name))
-                for name in dirs:
-                    os.rmdir(os.path.join(root, name))
-
-            os.rmdir(database_dir)
+            shutil.rmtree(database_dir, ignore_errors=True)
 
     def test_list_portfolios(self):
         strategy = StrategyOne()

@@ -18,6 +18,8 @@ import pandas as pd
 from investing_algorithm_framework import TradingStrategy, Algorithm, \
     create_app, RESOURCE_DIRECTORY, PortfolioConfiguration, \
     BacktestDateRange, TimeUnit
+from investing_algorithm_framework.infrastructure.database import \
+    teardown_sqlalchemy
 from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI
 
 
@@ -70,13 +72,14 @@ class BacktestTestBase(TestCase):
 
     def tearDown(self) -> None:
         super().tearDown()
+        teardown_sqlalchemy()
         for path in (
             os.path.join(self.resource_dir, "databases"),
             self.backtest_databases_dir,
             self.backtest_reports_dir,
         ):
             if os.path.exists(path):
-                shutil.rmtree(path)
+                shutil.rmtree(path, ignore_errors=True)
 
 
 # ---------------------------------------------------------------------------
@@ -253,4 +256,3 @@ class TestRunBacktests(BacktestTestBase):
             risk_free_rate=0.027
         )
         self.assertEqual(3, len(reports))
-

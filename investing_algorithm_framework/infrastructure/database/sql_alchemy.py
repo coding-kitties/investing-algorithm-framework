@@ -3,7 +3,7 @@ from decimal import Decimal
 
 from sqlalchemy import create_engine, StaticPool, String
 from sqlalchemy import inspect
-from sqlalchemy.orm import DeclarativeBase, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker, close_all_sessions
 from sqlalchemy import TypeDecorator
 
 from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI, \
@@ -83,6 +83,34 @@ def create_all_tables():
     SQLBaseModel.metadata.create_all(bind=Session().bind)
 
 
+def teardown_sqlalchemy():
+    """
+    Dispose the engine and close all sessions to release file locks.
+    This is essential on Windows where file locks are mandatory and
+    prevent deletion of SQLite database files while connections are open.
+    """
+    close_all_sessions()
+    bind = Session.kw.get("bind")
+
+    if bind is not None:
+
+        # StaticPool._close_connection() is a no-op, so
+        # engine.dispose() alone won't close the underlying DBAPI
+        # connection. Use invalidate() which bypasses the pool's
+        # _close_connection and calls dialect.do_close() directly,
+        # ensuring the sqlite3 file lock is released on Windows.
+        try:
+            conn = bind.connect()
+            conn.invalidate()
+            conn.close()
+        except Exception:
+            pass
+
+        bind.dispose()
+
+    Session.configure(bind=None)
+
+
 from sqlalchemy import event
 from sqlalchemy.orm import mapper
 from datetime import timezone
@@ -98,6 +126,7 @@ def clear_db(db_uri):
     Returns:
         None
     """
+    engine = None
     # Drop all tables before deleting file
     try:
         engine = create_engine(db_uri)
@@ -107,12 +136,9 @@ def clear_db(db_uri):
             SQLBaseModel.metadata.drop_all(bind=engine)
     except Exception as e:
         logger.error(f"Error dropping tables: {e}")
-
-    # # Clear mappers (if using classical mappings)
-    # try:
-    #     clear_mappers()
-    # except Exception:
-    #     pass  # ignore if not needed
+    finally:
+        if engine is not None:
+            engine.dispose()
 
 
 @event.listens_for(mapper, "load")

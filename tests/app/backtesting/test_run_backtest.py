@@ -8,6 +8,8 @@ import pandas as pd
 from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
     TradingStrategy, PortfolioConfiguration, TimeUnit, Algorithm, \
     BacktestDateRange
+from investing_algorithm_framework.infrastructure.database import \
+    teardown_sqlalchemy
 
 
 class TestStrategy(TradingStrategy):
@@ -47,12 +49,13 @@ class Test(TestCase):
 
     def tearDown(self) -> None:
         super().tearDown()
+        teardown_sqlalchemy()
 
         if os.path.exists(self.backtest_databases_directory):
-            shutil.rmtree(self.backtest_databases_directory)
+            shutil.rmtree(self.backtest_databases_directory, ignore_errors=True)
 
         if os.path.exists(self.backtest_report_directory):
-            shutil.rmtree(self.backtest_report_directory)
+            shutil.rmtree(self.backtest_report_directory, ignore_errors=True)
 
     def test_report_creation(self):
         app = create_app(

@@ -11,8 +11,8 @@ from investing_algorithm_framework import create_app, App, \
     MarketCredential
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
     ENVIRONMENT, Environment, BACKTEST_DATA_DIRECTORY_NAME
-from investing_algorithm_framework.infrastructure.database import Session
-from sqlalchemy.orm import close_all_sessions
+from investing_algorithm_framework.infrastructure.database import \
+    Session, teardown_sqlalchemy
 from tests.resources.stubs import OrderExecutorTest, PortfolioProviderTest
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ class TestBase(TestCase):
 
         if self.initialize:
             self.app.initialize_config()
-            self.app.initialize_storage()
+            self.app.initialize_storage(remove_database_if_exists=True)
             self.app.initialize_services()
             self.app.initialize_portfolios()
 
@@ -121,8 +121,8 @@ class TestBase(TestCase):
             shutil.rmtree(database_dir, ignore_errors=True)
 
     def _cleanup_database(self):
-        """Close SQLAlchemy sessions and remove database files."""
-        close_all_sessions()
+        """Close SQLAlchemy sessions, dispose engine, and remove db files."""
+        teardown_sqlalchemy()
         self._remove_database_dir(self.resource_directory)
 
     def remove_database(self):
@@ -215,7 +215,7 @@ class FlaskTestBase(FlaskTestCase):
 
         if self.initialize:
             self.iaf_app.initialize_config()
-            self.iaf_app.initialize_storage()
+            self.iaf_app.initialize_storage(remove_database_if_exists=True)
             self.iaf_app.initialize_services()
             self.iaf_app.initialize_portfolios()
 
@@ -246,7 +246,7 @@ class FlaskTestBase(FlaskTestCase):
         return self.iaf_app._flask_app
 
     def tearDown(self) -> None:
-        close_all_sessions()
+        teardown_sqlalchemy()
         database_dir = os.path.join(self.resource_directory, "databases")
         if os.path.exists(database_dir):
             shutil.rmtree(database_dir, ignore_errors=True)
