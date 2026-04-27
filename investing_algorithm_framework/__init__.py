@@ -254,4 +254,13 @@ __all__ = [
     "VolumeBasedFill",
     "FXRateProvider",
     "StaticFXRateProvider",
+    "load_ipython_extension",
 ]
+
+
+def load_ipython_extension(ipython):
+    """Allow ``%load_ext investing_algorithm_framework`` to register
+    the ``%backtest`` / ``%%backtest`` magic commands."""
+    from investing_algorithm_framework.notebook import load_ipython_extension \
+        as _load
+    _load(ipython)
