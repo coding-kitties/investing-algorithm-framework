@@ -1,9 +1,11 @@
 import os
 import csv
 import base64
+import tempfile
 import webbrowser
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import List, Union
 from datetime import datetime, timedelta
 
@@ -185,12 +187,14 @@ class BacktestReport:
         if not self.html_report:
             self.html_report = self._build_html()
 
-        path = "/tmp/backtest_report.html"
+        path = os.path.join(tempfile.gettempdir(), "backtest_report.html")
         with open(path, "w", encoding="utf-8") as f:
             f.write(self.html_report)
 
+        file_uri = Path(path).as_uri()
+
         if browser:
-            webbrowser.open(f"file://{path}")
+            webbrowser.open(file_uri)
             return
 
         try:
@@ -203,7 +207,7 @@ class BacktestReport:
         except (NameError, ImportError):
             pass
 
-        webbrowser.open(f"file://{path}")
+        webbrowser.open(file_uri)
 
     def save(self, path):
         if not self.html_report:
