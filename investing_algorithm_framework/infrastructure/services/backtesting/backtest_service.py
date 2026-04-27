@@ -31,6 +31,21 @@ from .vector_backtest_service import VectorBacktestService
 
 logger = logging.getLogger(__name__)
 
+# Module-level global used by worker processes. Set via _init_worker
+# which is called once per worker by ProcessPoolExecutor's initializer.
+_worker_data_provider_service = None
+
+
+def _init_worker(data_provider_service):
+    """Initializer for ProcessPoolExecutor workers.
+
+    Stores the data_provider_service in a module-level global so each
+    worker pickles/unpickles it only once at startup rather than per task.
+    This dramatically reduces overhead on Windows/WSL (spawn start method).
+    """
+    global _worker_data_provider_service
+    _worker_data_provider_service = data_provider_service
+
 
 def _print_progress(message: str, show_progress: bool = False):
     """
@@ -939,6 +954,13 @@ class BacktestService:
                     manager = multiprocessing.Manager()
                     progress_counter = manager.Value('i', 0)
 
+                    # Copy data provider once and pass via initializer
+                    # so each worker inherits it at startup instead of
+                    # pickling it per task (major speedup on Windows/WSL
+                    # where spawn is used instead of fork).
+                    shared_data_provider = \
+                        self._data_provider_service.copy()
+
                     worker_args = []
 
                     for batch in strategy_batches:
@@ -949,7 +971,7 @@ class BacktestService:
                             snapshot_interval,
                             risk_free_rate,
                             continue_on_error,
-                            self._data_provider_service.copy(),
+                            None,  # placeholder, worker reads global
                             False,
                             dynamic_position_sizing,
                             progress_counter,
@@ -979,8 +1001,15 @@ class BacktestService:
                     )
                     monitor.start()
 
-                    # Execute batches in parallel
-                    with ProcessPoolExecutor(max_workers=n_workers) as ex:
+                    # Execute batches in parallel.
+                    # Use initializer to pass data_provider_service
+                    # once per worker process rather than pickling it
+                    # with every submitted task.
+                    with ProcessPoolExecutor(
+                        max_workers=n_workers,
+                        initializer=_init_worker,
+                        initargs=(shared_data_provider,),
+                    ) as ex:
                         # Submit all batch tasks
                         futures = [
                             ex.submit(
@@ -1774,6 +1803,12 @@ class BacktestService:
                 dynamic_position_sizing,
             ) = args
             progress_counter = None
+
+        # Use the worker-global data provider if none was passed
+        # directly (parallel mode passes None and relies on the
+        # initializer to set the global once per worker process).
+        if data_provider_service is None:
+            data_provider_service = _worker_data_provider_service
 
         vector_backtest_service = VectorBacktestService(
             data_provider_service=data_provider_service
