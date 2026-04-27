@@ -6,7 +6,8 @@ Usage:
     %load_ext investing_algorithm_framework
 
     # Cell magic — define and run a backtest inline
-    %%backtest --start 2023-01-01 --end 2023-12-31 --initial-amount 10000 -o results
+    %%backtest --start 2023-01-01 --end 2023-12-31 \
+        --initial-amount 10000 -o results
     from investing_algorithm_framework import TradingStrategy, DataSource
 
     class MyStrategy(TradingStrategy):
@@ -25,14 +26,14 @@ Usage:
             ...
 
     # Line magic — run a strategy from an existing file
-    %backtest strategies/my_strategy.py --start 2023-01-01 --end 2023-12-31 -o results
+    %backtest strategies/my_strategy.py \
+        --start 2023-01-01 --end 2023-12-31 -o results
 """
 
 import argparse
 import os
 import shlex
 import sys
-import textwrap
 from datetime import datetime, timezone
 from pathlib import Path
 
