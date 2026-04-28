@@ -67,7 +67,9 @@ from .services import get_annual_volatility, get_sortino_ratio, \
     get_current_average_trade_loss, get_negative_trades, \
     get_positive_trades, get_number_of_trades, get_current_win_rate, \
     get_current_win_loss_ratio, create_backtest_metrics_for_backtest, \
-    recalculate_backtests, TradeTakeProfitService, TradeStopLossService
+    recalculate_backtests, TradeTakeProfitService, TradeStopLossService, \
+    get_cv_consistency, get_normalized_stability, \
+    get_consistency_score, get_stability_score
 
 
 __all__ = [
@@ -255,6 +257,10 @@ __all__ = [
     "FXRateProvider",
     "StaticFXRateProvider",
     "load_ipython_extension",
+    "get_cv_consistency",
+    "get_normalized_stability",
+    "get_consistency_score",
+    "get_stability_score",
 ]
 
 

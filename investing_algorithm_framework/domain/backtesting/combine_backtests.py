@@ -2,6 +2,10 @@ import logging
 import math
 from typing import List
 
+from .consistency import (
+    get_cv_consistency, get_normalized_stability,
+    get_consistency_score, get_stability_score,
+)
 from .backtest_metrics import BacktestMetrics
 from .backtest_summary_metrics import BacktestSummaryMetrics
 
@@ -441,45 +445,14 @@ def generate_backtest_summary_metrics(
     ) if consecutive_losses else None
 
     # === CONSISTENCY METRICS ===
-    # Two complementary approaches to measure cross-window stability.
-    #
-    # 1) CV-based consistency: 1 - CV  (CV = std / |mean|), capped [0, 1].
-    #    Standard statistical measure; scale-invariant.
-    #    Drawback: undefined when mean ≈ 0.
-    #
-    # 2) Normalized-std stability: 1 - std/max_std, capped [0, 1].
-    #    Uses a domain-specific max_std for normalization.
-    #    More intuitive for bounded metrics (win rate 0-100,
-    #    Sharpe typically -2 to +4).
-
     return_consistency = None
     win_rate_consistency = None
     sharpe_consistency = None
-    consistency_score = None
+    consistency_score_val = None
     return_stability = None
     win_rate_stability = None
     sharpe_stability = None
-    stability_score = None
-
-    def _cv_consistency(values):
-        """1 - CV capped to [0, 1], or None if insufficient data."""
-        if len(values) < 2:
-            return None
-        mean = sum(values) / len(values)
-        if abs(mean) < 1e-9:
-            return 0.0  # mean ≈ 0 → unstable
-        var = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
-        cv = math.sqrt(var) / abs(mean)
-        return max(0.0, min(1.0, 1.0 - cv))
-
-    def _norm_stability(values, max_std):
-        """1 - std/max_std capped to [0, 1], or None if insufficient."""
-        if len(values) < 2:
-            return None
-        mean = sum(values) / len(values)
-        var = sum((x - mean) ** 2 for x in values) / (len(values) - 1)
-        std = math.sqrt(var)
-        return max(0.0, min(1.0, 1.0 - std / max_std))
+    stability_score_val = None
 
     if len(valid_metrics) >= 2:
         # --- Per-window returns ---
@@ -487,9 +460,10 @@ def generate_backtest_summary_metrics(
             b.total_net_gain_percentage for b in valid_metrics
             if b.total_net_gain_percentage is not None
         ]
-        return_consistency = _cv_consistency(per_window_returns)
-        # max_std = 100: a std of 100% of initial capital → score 0
-        return_stability = _norm_stability(per_window_returns, 100.0)
+        return_consistency = get_cv_consistency(per_window_returns)
+        return_stability = get_normalized_stability(
+            per_window_returns, 100.0
+        )
 
         # --- Per-window win rates ---
         per_window_win_rates = [
@@ -498,10 +472,10 @@ def generate_backtest_summary_metrics(
             and b.number_of_trades_closed is not None
             and b.number_of_trades_closed > 0
         ]
-        return_consistency = _cv_consistency(per_window_returns)
-        win_rate_consistency = _cv_consistency(per_window_win_rates)
-        # max_std = 50: theoretical max std for a [0, 100] range
-        win_rate_stability = _norm_stability(per_window_win_rates, 50.0)
+        win_rate_consistency = get_cv_consistency(per_window_win_rates)
+        win_rate_stability = get_normalized_stability(
+            per_window_win_rates, 50.0
+        )
 
         # --- Per-window Sharpe ratios ---
         per_window_sharpe = [
@@ -510,45 +484,19 @@ def generate_backtest_summary_metrics(
             and not math.isnan(b.sharpe_ratio)
             and not math.isinf(b.sharpe_ratio)
         ]
-        sharpe_consistency = _cv_consistency(per_window_sharpe)
-        # max_std = 2: Sharpe ratios typically range -2 to +4;
-        # a std of 2 means wildly inconsistent
-        sharpe_stability = _norm_stability(per_window_sharpe, 2.0)
+        sharpe_consistency = get_cv_consistency(per_window_sharpe)
+        sharpe_stability = get_normalized_stability(
+            per_window_sharpe, 2.0
+        )
 
         # --- Composite scores ---
-        # Both use the same weighting scheme:
-        # 35% returns, 25% win rate, 20% Sharpe, 20% profitable
-        # window ratio.
-        def _composite(ret_c, wr_c, sh_c):
-            components = []
-            weights_c = []
-            if ret_c is not None:
-                components.append(ret_c)
-                weights_c.append(0.35)
-            if wr_c is not None:
-                components.append(wr_c)
-                weights_c.append(0.25)
-            if sh_c is not None:
-                components.append(sh_c)
-                weights_c.append(0.20)
-            if number_of_windows and number_of_windows > 0:
-                pw_ratio = (
-                    number_of_profitable_windows / number_of_windows
-                )
-                components.append(pw_ratio)
-                weights_c.append(0.20)
-            if not components:
-                return None
-            total_w = sum(weights_c)
-            return sum(
-                c * w for c, w in zip(components, weights_c)
-            ) / total_w
-
-        consistency_score = _composite(
-            return_consistency, win_rate_consistency, sharpe_consistency
+        consistency_score_val = get_consistency_score(
+            return_consistency, win_rate_consistency, sharpe_consistency,
+            number_of_profitable_windows, number_of_windows,
         )
-        stability_score = _composite(
-            return_stability, win_rate_stability, sharpe_stability
+        stability_score_val = get_stability_score(
+            return_stability, win_rate_stability, sharpe_stability,
+            number_of_profitable_windows, number_of_windows,
         )
 
     return BacktestSummaryMetrics(
@@ -602,9 +550,9 @@ def generate_backtest_summary_metrics(
         return_consistency=return_consistency,
         win_rate_consistency=win_rate_consistency,
         sharpe_consistency=sharpe_consistency,
-        consistency_score=consistency_score,
+        consistency_score=consistency_score_val,
         return_stability=return_stability,
         win_rate_stability=win_rate_stability,
         sharpe_stability=sharpe_stability,
-        stability_score=stability_score,
+        stability_score=stability_score_val,
     )
