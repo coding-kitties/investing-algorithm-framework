@@ -1,5 +1,6 @@
 import logging
 import os
+import tempfile
 from pathlib import Path
 import webbrowser
 from dataclasses import dataclass
@@ -117,12 +118,14 @@ class BacktestReport:
             self._create_html_report(backtest_date_range)
 
         # Save the html report to a tmp location
-        path = "/tmp/backtest_report.html"
+        path = os.path.join(tempfile.gettempdir(), "backtest_report.html")
         with open(path, "w") as html_file:
             html_file.write(self.html_report)
 
+        file_uri = Path(path).as_uri()
+
         if browser:
-            webbrowser.open(f"file://{path}")
+            webbrowser.open(file_uri)
 
         def in_jupyter_notebook():
             try:
@@ -134,7 +137,7 @@ class BacktestReport:
         if in_jupyter_notebook():
             display(HTML(self.html_report))
         else:
-            webbrowser.open(f"file://{path}")
+            webbrowser.open(file_uri)
 
     def _create_html_report(self, backtest_date_range: BacktestDateRange):
         """

@@ -279,10 +279,11 @@ class App:
 
         if SQLALCHEMY_DATABASE_URI not in config \
                 or config[SQLALCHEMY_DATABASE_URI] is None:
-            path = "sqlite:///" + os.path.join(
+            db_path = os.path.join(
                 configuration_service.config[DATABASE_DIRECTORY_PATH],
                 configuration_service.config[DATABASE_NAME]
             )
+            path = "sqlite:///" + db_path.replace("\\", "/")
             configuration_service.add_value(SQLALCHEMY_DATABASE_URI, path)
 
     def initialize_backtest_config(
@@ -394,7 +395,7 @@ class App:
                 os.remove(database_path)
 
         # Create the sqlalchemy database uri
-        path = f"sqlite:///{database_path}"
+        path = "sqlite:///" + database_path.replace("\\", "/")
         self.set_config(SQLALCHEMY_DATABASE_URI, path)
 
         # Setup sql if needed

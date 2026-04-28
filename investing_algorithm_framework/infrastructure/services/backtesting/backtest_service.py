@@ -1,14 +1,18 @@
 import gc
 import json
 import logging
+import multiprocessing
 import os
+import threading
+from collections import defaultdict
+from concurrent.futures import ProcessPoolExecutor, as_completed
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Callable, Dict, List, Optional, Union
+
 import numpy as np
 import pandas as pd
 import polars as pl
-from collections import defaultdict
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Dict, List, Union, Optional, Callable
 
 from investing_algorithm_framework.domain import BacktestRun, TimeUnit, \
     OperationalException, BacktestDateRange, Backtest, combine_backtests, \
@@ -26,6 +30,21 @@ from .vector_backtest_service import VectorBacktestService
 
 
 logger = logging.getLogger(__name__)
+
+# Module-level global used by worker processes. Set via _init_worker
+# which is called once per worker by ProcessPoolExecutor's initializer.
+_worker_data_provider_service = None
+
+
+def _init_worker(data_provider_service):
+    """Initializer for ProcessPoolExecutor workers.
+
+    Stores the data_provider_service in a module-level global so each
+    worker pickles/unpickles it only once at startup rather than per task.
+    This dramatically reduces overhead on Windows/WSL (spawn start method).
+    """
+    global _worker_data_provider_service
+    _worker_data_provider_service = data_provider_service
 
 
 def _print_progress(message: str, show_progress: bool = False):
@@ -902,10 +921,6 @@ class BacktestService:
 
                 if use_parallel:
                     # Parallel processing of backtests (batches per worker)
-                    import multiprocessing
-                    from concurrent.futures import \
-                        ProcessPoolExecutor, as_completed
-
                     # Determine number of workers
                     if n_workers == -1:
                         n_workers = multiprocessing.cpu_count()
@@ -933,6 +948,19 @@ class BacktestService:
                             show_progress
                         )
 
+                    # Shared counter for strategy-level progress
+                    # across all workers. Use Manager so the proxy
+                    # object can be pickled by ProcessPoolExecutor.
+                    manager = multiprocessing.Manager()
+                    progress_counter = manager.Value('i', 0)
+
+                    # Copy data provider once and pass via initializer
+                    # so each worker inherits it at startup instead of
+                    # pickling it per task (major speedup on Windows/WSL
+                    # where spawn is used instead of fork).
+                    shared_data_provider = \
+                        self._data_provider_service.copy()
+
                     worker_args = []
 
                     for batch in strategy_batches:
@@ -943,13 +971,45 @@ class BacktestService:
                             snapshot_interval,
                             risk_free_rate,
                             continue_on_error,
-                            self._data_provider_service.copy(),
+                            None,  # placeholder, worker reads global
                             False,
-                            dynamic_position_sizing
+                            dynamic_position_sizing,
+                            progress_counter,
                         ))
 
-                    # Execute batches in parallel
-                    with ProcessPoolExecutor(max_workers=n_workers) as ex:
+                    # Start a monitoring thread that updates a
+                    # strategy-level progress bar in real time
+                    total_strategies = len(strategies_to_run)
+                    pbar = tqdm(
+                        total=total_strategies,
+                        colour="green",
+                        desc="Running backtests for "
+                             f"{start_date} to {end_date}",
+                        disable=not show_progress,
+                        unit="strategy",
+                    )
+                    stop_event = threading.Event()
+
+                    def _monitor_progress():
+                        while not stop_event.is_set():
+                            pbar.n = progress_counter.value
+                            pbar.refresh()
+                            stop_event.wait(0.5)
+
+                    monitor = threading.Thread(
+                        target=_monitor_progress, daemon=True
+                    )
+                    monitor.start()
+
+                    # Execute batches in parallel.
+                    # Use initializer to pass data_provider_service
+                    # once per worker process rather than pickling it
+                    # with every submitted task.
+                    with ProcessPoolExecutor(
+                        max_workers=n_workers,
+                        initializer=_init_worker,
+                        initargs=(shared_data_provider,),
+                    ) as ex:
                         # Submit all batch tasks
                         futures = [
                             ex.submit(
@@ -961,15 +1021,8 @@ class BacktestService:
                         # Track completed batches for periodic cleanup
                         completed_count = 0
 
-                        # Collect results with progress bar
-                        for future in tqdm(
-                            as_completed(futures),
-                            total=len(futures),
-                            colour="green",
-                            desc="Running backtests for "
-                                 f"{start_date} to {end_date}",
-                            disable=not show_progress
-                        ):
+                        # Collect results as batches complete
+                        for future in as_completed(futures):
                             try:
                                 batch_result = future.result()
                                 if batch_result:
@@ -1005,6 +1058,15 @@ class BacktestService:
                                     continue
                                 else:
                                     raise
+
+                    # Stop the monitoring thread and finalise
+                    # the progress bar
+                    stop_event.set()
+                    monitor.join()
+                    pbar.n = progress_counter.value
+                    pbar.refresh()
+                    pbar.close()
+                    manager.shutdown()
 
                     # Save remaining batch and create checkpoint files when
                     # storage directory provided
@@ -1309,8 +1371,6 @@ class BacktestService:
                     combined_backtests.append(backtests_list[0])
                 else:
                     # Combine multiple backtests for the same algorithm
-                    from investing_algorithm_framework.domain import (
-                        combine_backtests)
                     combined = combine_backtests(backtests_list)
                     combined_backtests.append(combined)
 
@@ -1709,23 +1769,46 @@ class BacktestService:
                 continue_on_error,
                 data_provider_service,
                 show_progress,
-                dynamic_position_sizing
+                dynamic_position_sizing,
+                progress_counter (optional),
             )
 
         Returns:
             List[Backtest]: List of completed backtest results
         """
-        (
-            strategy_batch,
-            backtest_date_range,
-            portfolio_configuration,
-            snapshot_interval,
-            risk_free_rate,
-            continue_on_error,
-            data_provider_service,
-            show_progress,
-            dynamic_position_sizing
-        ) = args
+        # Support both old (9-element) and new (10-element) tuple
+        if len(args) == 10:
+            (
+                strategy_batch,
+                backtest_date_range,
+                portfolio_configuration,
+                snapshot_interval,
+                risk_free_rate,
+                continue_on_error,
+                data_provider_service,
+                show_progress,
+                dynamic_position_sizing,
+                progress_counter,
+            ) = args
+        else:
+            (
+                strategy_batch,
+                backtest_date_range,
+                portfolio_configuration,
+                snapshot_interval,
+                risk_free_rate,
+                continue_on_error,
+                data_provider_service,
+                show_progress,
+                dynamic_position_sizing,
+            ) = args
+            progress_counter = None
+
+        # Use the worker-global data provider if none was passed
+        # directly (parallel mode passes None and relies on the
+        # initializer to set the global once per worker process).
+        if data_provider_service is None:
+            data_provider_service = _worker_data_provider_service
 
         vector_backtest_service = VectorBacktestService(
             data_provider_service=data_provider_service
@@ -1768,12 +1851,21 @@ class BacktestService:
                 )
                 batch_results.append(backtest)
 
+                # Increment shared progress counter so the
+                # main process can track per-strategy progress
+                if progress_counter is not None:
+                    progress_counter.value += 1
+
             except Exception as e:
                 if continue_on_error:
                     logger.error(
                         "Worker error for strategy "
                         f"{strategy.algorithm_id}: {e}"
                     )
+                    # Still increment counter for failed strategies
+                    # so progress total stays accurate
+                    if progress_counter is not None:
+                        progress_counter.value += 1
                     continue
                 else:
                     raise
