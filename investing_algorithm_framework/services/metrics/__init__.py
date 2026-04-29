@@ -40,6 +40,8 @@ from .trades import get_negative_trades, get_positive_trades, \
     get_average_trade_duration
 from .mean_daily_return import get_mean_daily_return, get_mean_yearly_return
 from .standard_deviation import get_daily_returns_std
+from .consistency import get_cv_consistency, get_normalized_stability, \
+    get_consistency_score, get_stability_score
 
 __all__ = [
     "get_mean_daily_return",
@@ -115,5 +117,9 @@ __all__ = [
     "get_number_of_open_trades",
     "get_average_trade_duration",
     "create_backtest_metrics_for_backtest",
-    "get_mean_yearly_return"
+    "get_mean_yearly_return",
+    "get_cv_consistency",
+    "get_normalized_stability",
+    "get_consistency_score",
+    "get_stability_score"
 ]
