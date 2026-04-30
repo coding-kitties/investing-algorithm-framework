@@ -31,20 +31,42 @@ from .vector_backtest_service import VectorBacktestService
 
 logger = logging.getLogger(__name__)
 
-# Module-level global used by worker processes. Set via _init_worker
+# Module-level globals used by worker processes. Set via _init_worker
 # which is called once per worker by ProcessPoolExecutor's initializer.
 _worker_data_provider_service = None
+_worker_progress_counter = None
 
 
-def _init_worker(data_provider_service):
+def _init_worker(data_provider_service, progress_counter=None):
     """Initializer for ProcessPoolExecutor workers.
 
-    Stores the data_provider_service in a module-level global so each
-    worker pickles/unpickles it only once at startup rather than per task.
-    This dramatically reduces overhead on Windows/WSL (spawn start method).
+    Stores the data_provider_service and a shared progress counter in
+    module-level globals so each worker inherits them once at startup
+    rather than pickling them per task. This dramatically reduces
+    overhead on Windows/WSL (spawn start method).
+
+    Also pins BLAS / OpenMP / Polars thread pools to a single thread per
+    worker. Without this each worker tries to use all CPU cores for
+    numpy / pandas / polars operations, causing N² thread oversubscription
+    and severe slowdowns on Windows/WSL. These env vars must be set
+    before numpy / polars are imported, which is why ``spawn`` is used
+    as the start method (with ``fork`` they would have no effect because
+    those libraries are already loaded in the parent).
     """
-    global _worker_data_provider_service
+    # Pin math library thread pools to 1 thread per worker.
+    for var in (
+        "OMP_NUM_THREADS",
+        "OPENBLAS_NUM_THREADS",
+        "MKL_NUM_THREADS",
+        "NUMEXPR_NUM_THREADS",
+        "VECLIB_MAXIMUM_THREADS",
+        "POLARS_MAX_THREADS",
+    ):
+        os.environ.setdefault(var, "1")
+
+    global _worker_data_provider_service, _worker_progress_counter
     _worker_data_provider_service = data_provider_service
+    _worker_progress_counter = progress_counter
 
 
 def _print_progress(message: str, show_progress: bool = False):
@@ -921,9 +943,13 @@ class BacktestService:
 
                 if use_parallel:
                     # Parallel processing of backtests (batches per worker)
-                    # Determine number of workers
+                    # Determine number of workers. Cap at 8 by default to
+                    # avoid BLAS / IPC contention on Windows/WSL where
+                    # cpu_count() workers is usually slower than fewer.
                     if n_workers == -1:
-                        n_workers = multiprocessing.cpu_count()
+                        n_workers = min(
+                            max(multiprocessing.cpu_count() - 1, 1), 8
+                        )
 
                     # Calculate optimal batch size per worker
                     # Each worker processes a batch of strategies
@@ -948,11 +974,27 @@ class BacktestService:
                             show_progress
                         )
 
-                    # Shared counter for strategy-level progress
-                    # across all workers. Use Manager so the proxy
-                    # object can be pickled by ProcessPoolExecutor.
-                    manager = multiprocessing.Manager()
-                    progress_counter = manager.Value('i', 0)
+                    # Use a single ``spawn`` context for everything.
+                    # On WSL/Linux the default is ``fork`` which copies
+                    # the entire parent process into each worker,
+                    # bloating workers and preventing the BLAS thread
+                    # env vars set in ``_init_worker`` from taking
+                    # effect (numpy/polars are already loaded). With
+                    # ``spawn`` workers start with a clean interpreter
+                    # and those env vars are honoured.
+                    mp_ctx = multiprocessing.get_context("spawn")
+
+                    # Shared counter for strategy-level progress across
+                    # all workers. Use ``mp_ctx.Value`` (shared memory +
+                    # semaphore) instead of ``Manager().Value`` which
+                    # is a proxy that performs an IPC round-trip for
+                    # every read/write through a separate manager
+                    # process. Manager proxies are catastrophically
+                    # slow on Windows/WSL when many workers update the
+                    # same counter, and they also cause the progress
+                    # bar to appear frozen because the monitor thread's
+                    # reads queue behind worker writes.
+                    progress_counter = mp_ctx.Value('i', 0)
 
                     # Copy data provider once and pass via initializer
                     # so each worker inherits it at startup instead of
@@ -974,11 +1016,15 @@ class BacktestService:
                             None,  # placeholder, worker reads global
                             False,
                             dynamic_position_sizing,
-                            progress_counter,
+                            None,  # progress_counter inherited via init
                         ))
 
                     # Start a monitoring thread that updates a
-                    # strategy-level progress bar in real time
+                    # strategy-level progress bar in real time. Use
+                    # mininterval=0 / miniters=1 so the bar refreshes
+                    # promptly on Windows/WSL where stdout is often
+                    # line-buffered and tqdm's default smoothing can
+                    # otherwise make the bar appear frozen.
                     total_strategies = len(strategies_to_run)
                     pbar = tqdm(
                         total=total_strategies,
@@ -987,6 +1033,8 @@ class BacktestService:
                              f"{start_date} to {end_date}",
                         disable=not show_progress,
                         unit="strategy",
+                        mininterval=0,
+                        miniters=1,
                     )
                     stop_event = threading.Event()
 
@@ -994,21 +1042,26 @@ class BacktestService:
                         while not stop_event.is_set():
                             pbar.n = progress_counter.value
                             pbar.refresh()
-                            stop_event.wait(0.5)
+                            stop_event.wait(0.25)
 
                     monitor = threading.Thread(
                         target=_monitor_progress, daemon=True
                     )
                     monitor.start()
 
-                    # Execute batches in parallel.
-                    # Use initializer to pass data_provider_service
-                    # once per worker process rather than pickling it
-                    # with every submitted task.
+                    # Execute batches in parallel using the spawn pool
+                    # created above. The shared ``progress_counter``
+                    # (a ``mp_ctx.Value``) and ``shared_data_provider``
+                    # are passed through the initializer so they are
+                    # inherited once per worker rather than pickled per
+                    # task.
                     with ProcessPoolExecutor(
                         max_workers=n_workers,
+                        mp_context=mp_ctx,
                         initializer=_init_worker,
-                        initargs=(shared_data_provider,),
+                        initargs=(
+                            shared_data_provider, progress_counter,
+                        ),
                     ) as ex:
                         # Submit all batch tasks
                         futures = [
@@ -1066,7 +1119,6 @@ class BacktestService:
                     pbar.n = progress_counter.value
                     pbar.refresh()
                     pbar.close()
-                    manager.shutdown()
 
                     # Save remaining batch and create checkpoint files when
                     # storage directory provided
@@ -1810,6 +1862,12 @@ class BacktestService:
         if data_provider_service is None:
             data_provider_service = _worker_data_provider_service
 
+        # In parallel mode the progress counter is inherited via the
+        # worker initializer (multiprocessing.Value, shared memory).
+        # Fall back to the per-task argument for backward compatibility.
+        if progress_counter is None:
+            progress_counter = _worker_progress_counter
+
         vector_backtest_service = VectorBacktestService(
             data_provider_service=data_provider_service
         )
@@ -1852,9 +1910,12 @@ class BacktestService:
                 batch_results.append(backtest)
 
                 # Increment shared progress counter so the
-                # main process can track per-strategy progress
+                # main process can track per-strategy progress.
+                # ``multiprocessing.Value`` lives in shared memory; the
+                # lock makes ``+= 1`` atomic across workers.
                 if progress_counter is not None:
-                    progress_counter.value += 1
+                    with progress_counter.get_lock():
+                        progress_counter.value += 1
 
             except Exception as e:
                 if continue_on_error:
@@ -1865,7 +1926,8 @@ class BacktestService:
                     # Still increment counter for failed strategies
                     # so progress total stays accurate
                     if progress_counter is not None:
-                        progress_counter.value += 1
+                        with progress_counter.get_lock():
+                            progress_counter.value += 1
                     continue
                 else:
                     raise
