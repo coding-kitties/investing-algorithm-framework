@@ -1,7 +1,7 @@
 # Pipeline API — Design Doc
 
-> Status: **DRAFT for review**.  
-> Tracking issue: [#438](https://github.com/coding-kitties/investing-algorithm-framework/issues/438).  
+> Status: **DRAFT for review**.
+> Tracking issue: [#438](https://github.com/coding-kitties/investing-algorithm-framework/issues/438).
 > Phase issues: [#501](https://github.com/coding-kitties/investing-algorithm-framework/issues/501) (event), [#502](https://github.com/coding-kitties/investing-algorithm-framework/issues/502) (vector), [#503](https://github.com/coding-kitties/investing-algorithm-framework/issues/503) (live).
 
 ## 1. Goals & non-goals
@@ -130,7 +130,7 @@ hash(
 )
 ```
 
-Hits return the cached panel/factor frame without recomputation.  
+Hits return the cached panel/factor frame without recomputation.
 Parameter sweeps over **non-pipeline** attributes (signal thresholds, position sizing) reuse the cache for free.
 
 ## 6. Performance contract
