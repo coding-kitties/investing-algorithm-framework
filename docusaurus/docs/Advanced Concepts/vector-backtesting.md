@@ -171,6 +171,71 @@ backtest_storage/
 │   └── ...
 ```
 
+#### Content-aware checkpoints
+
+Checkpoints are **content-aware**. Each entry in `checkpoints.json`
+stores a `manifest_hash` next to the `algorithm_id`. The hash
+fingerprints:
+
+- the strategy class source code
+- the strategy's instance parameters
+- the data sources (symbols, timeframe, type, market)
+- the backtest date range
+
+When you edit a strategy or change a parameter, the hash changes, the
+stored checkpoint becomes *stale*, and that strategy is **rerun
+automatically** on the next call. No prompt, no flag.
+
+```json
+{
+    "2022-01-01T00:00:00+00:00_2023-01-01T00:00:00+00:00": {
+        "94cf4f10": "a1b2c3d4e5f6a7b8",
+        "bc0899f9": "9a8b7c6d5e4f3a2b"
+    }
+}
+```
+
+Old `checkpoints.json` files using the legacy list format keep working
+unchanged — entries without a stored hash fall back to the previous
+"match by `algorithm_id` only" behaviour, and are migrated to the new
+dict shape the next time they're written.
+
+#### Overriding checkpoint behaviour
+
+Two explicit, non-interactive knobs let you override the default
+skip-on-match behaviour. They are safe in CI, AWS Lambda, parallel
+workers, and headless notebooks.
+
+```python
+backtests = app.run_vector_backtests(
+    strategies=strategies,
+    backtest_date_ranges=date_ranges,
+    initial_amount=1000,
+    market="BITVAVO",
+    trading_symbol="EUR",
+    use_checkpoints=True,
+    backtest_storage_directory="./backtest_storage",
+
+    # Rerun only strategies whose code or params changed:
+    force_rerun="stale",
+
+    # Or rerun everything, ignoring checkpoints:
+    # force_rerun=True,
+
+    # Log a single line per matched-checkpoint batch:
+    on_checkpoint_match="warn",
+)
+```
+
+| Parameter             | Value      | Behaviour                                      |
+|-----------------------|------------|------------------------------------------------|
+| `force_rerun`         | `False` (default) | Skip on hash match (today's behaviour)  |
+| `force_rerun`         | `"stale"`  | Rerun only when stored hash mismatches         |
+| `force_rerun`         | `True`     | Ignore checkpoints; rerun everything           |
+| `on_checkpoint_match` | `"skip"` (default) | Silent skip                            |
+| `on_checkpoint_match` | `"warn"`   | Skip but emit one log line per match           |
+| `on_checkpoint_match` | `"rerun"`  | Rerun even on a hash match                     |
+
 #### Checkpoint Behavior
 
 | `use_checkpoints` | `backtest_storage_directory` | Creates Checkpoints? | Uses Checkpoints? |
@@ -1181,10 +1246,38 @@ use_checkpoints=True
 # Ensure storage directory is provided
 backtest_storage_directory="./storage"
 
-# Check that strategy algorithm_ids are consistent
-# (changing strategy parameters changes algorithm_id)
-
 # Don't delete the storage directory between runs
+```
+
+Note: checkpoints are **content-aware**. If you edit the strategy
+class or change any of its parameters, the manifest hash changes and
+the checkpoint is treated as stale, which triggers an automatic
+rerun. This is intentional — it prevents silently using stale
+results. To force-skip stale entries (not recommended), pass
+`force_rerun=False` together with `on_checkpoint_match="skip"` and
+delete the manifest hash from `checkpoints.json`.
+
+### Issue: Strategies Silently Skipped After Edits
+
+**Symptoms**: You edited a strategy but the rerun produces the same
+results as before.
+
+**Cause**: This was the behaviour in older versions where checkpoints
+keyed on `algorithm_id` only. The framework now uses content-aware
+checkpoints, so this should no longer happen with new runs.
+
+**Solution**: Run once to migrate any legacy `checkpoints.json`
+entries to the new format. From then on, edits to the strategy code or
+its parameters will trigger a rerun automatically. To force a rerun
+explicitly, use:
+
+```python
+backtests = app.run_vector_backtests(
+    ...,
+    use_checkpoints=True,
+    backtest_storage_directory="./storage",
+    force_rerun=True,  # rerun everything once
+)
 ```
 
 ### Issue: Filtered Backtests Still Present

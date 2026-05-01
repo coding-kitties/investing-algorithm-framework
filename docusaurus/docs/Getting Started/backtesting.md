@@ -163,6 +163,13 @@ backtests = app.run_vector_backtests(
 )
 ```
 
+Checkpoints are **content-aware**: when you edit a strategy or change
+a parameter, the stored checkpoint hash no longer matches and that
+strategy is rerun automatically. Use `force_rerun="stale"` to rerun
+*only* changed strategies, or `force_rerun=True` to ignore checkpoints
+entirely. See the [vector backtesting guide](../Advanced%20Concepts/vector-backtesting.md#content-aware-checkpoints)
+for details.
+
 ### Filtering Strategies
 
 Filter out underperforming strategies during backtesting:
