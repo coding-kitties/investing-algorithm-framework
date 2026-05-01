@@ -1,0 +1,279 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 720" width="1200" height="720">
+<defs>
+<linearGradient id="mcpglow" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="0" stop-color="#0891b2" stop-opacity=".35"/>
+  <stop offset="1" stop-color="#0891b2" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="notesglow" x1="0" y1="0" x2="1" y2="0">
+  <stop offset="0" stop-color="#d97706" stop-opacity=".30"/>
+  <stop offset="1" stop-color="#d97706" stop-opacity="0"/>
+</linearGradient>
+
+<style>
+@keyframes fi{from{opacity:0}to{opacity:1}}
+@keyframes dl{from{stroke-dashoffset:1500}to{stroke-dashoffset:0}}
+@keyframes pl{0%,100%{opacity:.55}50%{opacity:1}}
+.a0{opacity:0;animation:fi .5s .05s both}
+.a1{opacity:0;animation:fi .5s .2s both}
+.a2{opacity:0;animation:fi .5s .35s both}
+.a3{opacity:0;animation:fi .5s .5s both}
+.a4{opacity:0;animation:fi .5s .65s both}
+.a5{opacity:0;animation:fi .5s .8s both}
+.a6{opacity:0;animation:fi .5s .95s both}
+.a7{opacity:0;animation:fi .5s 1.1s both}
+.a8{opacity:0;animation:fi .5s 1.25s both}
+.a9{opacity:0;animation:fi .5s 1.4s both}
+.l1{stroke-dasharray:1500;stroke-dashoffset:1500;animation:dl 2.4s 1.2s both}
+.l2{stroke-dasharray:1500;stroke-dashoffset:1500;animation:dl 2.4s 1.4s both}
+.l3{stroke-dasharray:1500;stroke-dashoffset:1500;animation:dl 2.4s 1.6s both}
+.pl{animation:pl 2s infinite}
+</style>
+<pattern id="gp" width="22" height="22" patternUnits="userSpaceOnUse">
+<circle cx="11" cy="11" r=".55" fill="#e2e8f0"/>
+</pattern>
+<radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="600" cy="300" r="600">
+<stop offset="0" stop-color="#0891b2" stop-opacity=".07"/>
+<stop offset="1" stop-color="#0891b2" stop-opacity="0"/>
+</radialGradient>
+<linearGradient id="hdr" gradientUnits="userSpaceOnUse" x1="0" y1="60" x2="0" y2="120">
+<stop offset="0" stop-color="#0f172a"/>
+<stop offset="1" stop-color="#0e7490"/>
+</linearGradient>
+<linearGradient id="eqfill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#0891b2" stop-opacity=".35"/>
+<stop offset="1" stop-color="#0891b2" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="ddfill" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#dc2626" stop-opacity=".35"/>
+<stop offset="1" stop-color="#dc2626" stop-opacity="0"/>
+</linearGradient>
+<clipPath id="card"><rect x="40" y="120" width="1120" height="440" rx="14"/></clipPath>
+</defs>
+
+<!-- BACKGROUND -->
+<rect width="1200" height="600" fill="#ffffff" rx="14"/>
+<rect width="1200" height="600" fill="url(#gp)" rx="14"/>
+<rect width="1200" height="600" fill="url(#glow)" rx="14"/>
+
+<!-- HEADER -->
+<g class="a0">
+<rect x="40" y="40" width="11" height="11" rx="2" fill="#0891b2"/>
+<text x="60" y="50" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#0891b2" letter-spacing="2" font-weight="700">BACKTEST REPORT</text>
+</g>
+<text class="a1" x="40" y="92" font-family="system-ui,-apple-system,sans-serif" font-size="34" font-weight="700" fill="url(#hdr)">Self-Contained HTML Dashboard</text>
+<text class="a2" x="40" y="112" font-family="system-ui,-apple-system,sans-serif" font-size="13" fill="#475569">One file. No server. Rank, filter &amp; compare every strategy you've tested — dark &amp; light theme, fully shareable.</text>
+
+<!-- BROWSER FRAME / DASHBOARD CARD -->
+<g class="a3">
+<rect x="40" y="120" width="1120" height="440" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+<!-- title bar -->
+<rect x="40" y="120" width="1120" height="34" rx="14" fill="#f8fafc"/>
+<rect x="40" y="142" width="1120" height="12" fill="#f8fafc"/>
+<circle cx="60" cy="137" r="5" fill="#dc2626"/>
+<circle cx="78" cy="137" r="5" fill="#d97706"/>
+<circle cx="96" cy="137" r="5" fill="#059669"/>
+<rect x="320" y="128" width="560" height="18" rx="9" fill="#ffffff" stroke="#e2e8f0"/>
+<text x="600" y="141" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#64748b" text-anchor="middle">backtest_report.html</text>
+<!-- theme toggle -->
+<rect x="1100" y="128" width="44" height="18" rx="9" fill="#ffffff" stroke="#0891b2" stroke-opacity=".35"/>
+<circle cx="1110" cy="137" r="5" fill="#0891b2"/>
+<text x="1136" y="141" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#0891b2" text-anchor="end" font-weight="600">DARK</text>
+</g>
+
+<!-- KPI ROW -->
+<g class="a4">
+<g transform="translate(60,170)">
+<rect width="200" height="76" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="14" y="22" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#64748b" letter-spacing="1.5" font-weight="600">CAGR</text>
+<text x="14" y="50" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="700" fill="#059669">+34.2%</text>
+<text x="14" y="66" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">vs B&amp;H +18.4%</text>
+</g>
+<g transform="translate(280,170)">
+<rect width="200" height="76" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="14" y="22" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#64748b" letter-spacing="1.5" font-weight="600">SHARPE</text>
+<text x="14" y="50" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="700" fill="#0891b2">1.84</text>
+<text x="14" y="66" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">Sortino 2.31</text>
+</g>
+<g transform="translate(500,170)">
+<rect width="200" height="76" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="14" y="22" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#64748b" letter-spacing="1.5" font-weight="600">MAX DRAWDOWN</text>
+<text x="14" y="50" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="700" fill="#dc2626">-12.6%</text>
+<text x="14" y="66" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">Recovery 38d</text>
+</g>
+<g transform="translate(720,170)">
+<rect width="200" height="76" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="14" y="22" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#64748b" letter-spacing="1.5" font-weight="600">WIN RATE</text>
+<text x="14" y="50" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="700" fill="#7c3aed">62.4%</text>
+<text x="14" y="66" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">142 / 228 trades</text>
+</g>
+<g transform="translate(940,170)">
+<rect width="200" height="76" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="14" y="22" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#64748b" letter-spacing="1.5" font-weight="600">CALMAR</text>
+<text x="14" y="50" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="700" fill="#d97706">2.71</text>
+<text x="14" y="66" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">VaR 95% -2.1%</text>
+</g>
+</g>
+
+<!-- EQUITY CURVE (large) -->
+<g class="a5" transform="translate(60,260)">
+<rect width="640" height="200" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="16" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#64748b" letter-spacing="1.5" font-weight="700">EQUITY CURVE</text>
+<!-- legend -->
+<g transform="translate(450,18)">
+<rect x="0" y="-8" width="10" height="3" fill="#0891b2"/>
+<text x="14" y="-2" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#475569">Strategy</text>
+<rect x="76" y="-8" width="10" height="3" fill="#64748b"/>
+<text x="90" y="-2" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#475569">Buy &amp; Hold</text>
+<rect x="170" y="-8" width="10" height="3" fill="#7c3aed" stroke-dasharray="2,2"/>
+<text x="184" y="-2" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#475569">DCA</text>
+</g>
+<!-- y axis lines -->
+<line x1="40" y1="50" x2="624" y2="50" stroke="#e2e8f0"/>
+<line x1="40" y1="100" x2="624" y2="100" stroke="#e2e8f0"/>
+<line x1="40" y1="150" x2="624" y2="150" stroke="#e2e8f0"/>
+<line x1="40" y1="180" x2="624" y2="180" stroke="#e2e8f0"/>
+<text x="20" y="54" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#94a3b8">$15k</text>
+<text x="20" y="104" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#94a3b8">$12k</text>
+<text x="20" y="154" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#94a3b8">$10k</text>
+<!-- area -->
+<polyline points="40,148 90,140 140,128 190,118 240,124 290,108 340,96 390,86 440,80 490,68 540,74 590,58 624,46 624,180 40,180" fill="url(#eqfill)"/>
+<!-- B&H baseline -->
+<polyline class="l2" points="40,150 100,146 160,142 220,138 280,134 340,130 400,126 460,122 520,118 580,114 624,112" fill="none" stroke="#64748b" stroke-width="1.5" stroke-linejoin="round"/>
+<!-- DCA -->
+<polyline class="l3" points="40,150 100,148 160,144 220,140 280,134 340,130 400,124 460,120 520,114 580,108 624,104" fill="none" stroke="#7c3aed" stroke-width="1.3" stroke-dasharray="3,3" stroke-linejoin="round"/>
+<!-- Strategy line -->
+<polyline class="l1" points="40,148 90,140 140,128 190,118 240,124 290,108 340,96 390,86 440,80 490,68 540,74 590,58 624,46" fill="none" stroke="#0891b2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle class="pl" cx="624" cy="46" r="4" fill="#0891b2"/>
+<!-- x labels -->
+<text x="40" y="194" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#94a3b8">Jan</text>
+<text x="200" y="194" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#94a3b8">Apr</text>
+<text x="360" y="194" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#94a3b8">Jul</text>
+<text x="520" y="194" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#94a3b8">Oct</text>
+<text x="610" y="194" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#94a3b8">Dec</text>
+</g>
+
+<!-- DRAWDOWN -->
+<g class="a6" transform="translate(60,476)">
+<rect width="640" height="68" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="16" y="20" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#64748b" letter-spacing="1.5" font-weight="700">DRAWDOWN</text>
+<polyline points="40,30 90,32 140,38 190,46 240,40 290,52 340,56 390,48 440,42 490,52 540,46 590,38 624,34 624,60 40,60" fill="url(#ddfill)"/>
+<polyline points="40,30 90,32 140,38 190,46 240,40 290,52 340,56 390,48 440,42 490,52 540,46 590,38 624,34" fill="none" stroke="#dc2626" stroke-width="1.4" stroke-linejoin="round"/>
+<line x1="40" y1="30" x2="624" y2="30" stroke="#e2e8f0" stroke-dasharray="2,2"/>
+</g>
+
+<!-- RIGHT SIDE: STRATEGY RANKING TABLE -->
+<g class="a7" transform="translate(720,260)">
+<rect width="420" height="200" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="16" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#64748b" letter-spacing="1.5" font-weight="700">STRATEGY RANKING</text>
+<text x="404" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#0891b2" text-anchor="end">Sort: Sharpe ▾</text>
+<!-- header -->
+<line x1="16" y1="40" x2="404" y2="40" stroke="#e2e8f0"/>
+<text x="16" y="55" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#64748b" letter-spacing="1" font-weight="600">#</text>
+<text x="40" y="55" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#64748b" letter-spacing="1" font-weight="600">STRATEGY</text>
+<text x="220" y="55" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#64748b" letter-spacing="1" font-weight="600">CAGR</text>
+<text x="280" y="55" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#64748b" letter-spacing="1" font-weight="600">SHARPE</text>
+<text x="340" y="55" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#64748b" letter-spacing="1" font-weight="600">MAX DD</text>
+<line x1="16" y1="62" x2="404" y2="62" stroke="#e2e8f0"/>
+
+<!-- highlighted winner -->
+<rect x="8" y="68" width="404" height="24" rx="6" fill="#0891b2" fill-opacity=".08"/>
+<text x="16" y="84" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#0891b2" font-weight="700">1</text>
+<text x="40" y="84" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#0f172a" font-weight="600">RSI + EMA Crossover</text>
+<text x="220" y="84" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#059669" font-weight="600">+34.2%</text>
+<text x="280" y="84" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#0891b2" font-weight="700">1.84</text>
+<text x="340" y="84" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">-12.6%</text>
+
+<text x="16" y="108" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">2</text>
+<text x="40" y="108" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#0f172a">Mean Reversion BB</text>
+<text x="220" y="108" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#059669">+28.7%</text>
+<text x="280" y="108" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#0f172a">1.62</text>
+<text x="340" y="108" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">-15.2%</text>
+
+<text x="16" y="128" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">3</text>
+<text x="40" y="128" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#0f172a">Momentum Breakout</text>
+<text x="220" y="128" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#059669">+24.1%</text>
+<text x="280" y="128" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#0f172a">1.41</text>
+<text x="340" y="128" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">-18.9%</text>
+
+<text x="16" y="148" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">4</text>
+<text x="40" y="148" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#0f172a">Pairs Trading BTC/ETH</text>
+<text x="220" y="148" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#059669">+19.8%</text>
+<text x="280" y="148" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#0f172a">1.18</text>
+<text x="340" y="148" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">-11.4%</text>
+
+<text x="16" y="168" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">5</text>
+<text x="40" y="168" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#0f172a">Buy &amp; Hold</text>
+<text x="220" y="168" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">+18.4%</text>
+<text x="280" y="168" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#0f172a">0.92</text>
+<text x="340" y="168" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#dc2626">-26.1%</text>
+
+<text x="16" y="188" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#64748b">6</text>
+<text x="40" y="188" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#64748b">Random Walk Baseline</text>
+<text x="220" y="188" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#64748b">+2.1%</text>
+<text x="280" y="188" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#64748b">0.14</text>
+<text x="340" y="188" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#64748b">-32.0%</text>
+</g>
+
+<!-- MONTHLY HEATMAP -->
+<g class="a8" transform="translate(720,476)">
+<rect width="420" height="68" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="16" y="20" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#64748b" letter-spacing="1.5" font-weight="700">MONTHLY RETURNS</text>
+<g transform="translate(16,30)">
+<!-- 12 months row -->
+<rect x="0" y="0" width="30" height="28" rx="3" fill="#059669" fill-opacity=".55"/>
+<rect x="32" y="0" width="30" height="28" rx="3" fill="#059669" fill-opacity=".25"/>
+<rect x="64" y="0" width="30" height="28" rx="3" fill="#dc2626" fill-opacity=".4"/>
+<rect x="96" y="0" width="30" height="28" rx="3" fill="#059669" fill-opacity=".75"/>
+<rect x="128" y="0" width="30" height="28" rx="3" fill="#059669" fill-opacity=".35"/>
+<rect x="160" y="0" width="30" height="28" rx="3" fill="#059669" fill-opacity=".95"/>
+<rect x="192" y="0" width="30" height="28" rx="3" fill="#dc2626" fill-opacity=".25"/>
+<rect x="224" y="0" width="30" height="28" rx="3" fill="#059669" fill-opacity=".45"/>
+<rect x="256" y="0" width="30" height="28" rx="3" fill="#059669" fill-opacity=".85"/>
+<rect x="288" y="0" width="30" height="28" rx="3" fill="#059669" fill-opacity=".3"/>
+<rect x="320" y="0" width="30" height="28" rx="3" fill="#dc2626" fill-opacity=".55"/>
+<rect x="352" y="0" width="30" height="28" rx="3" fill="#059669" fill-opacity=".7"/>
+<text x="15" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#f8fafc" text-anchor="middle" font-weight="700">J</text>
+<text x="47" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#475569" text-anchor="middle" font-weight="700">F</text>
+<text x="79" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#fff" text-anchor="middle" font-weight="700">M</text>
+<text x="111" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#f8fafc" text-anchor="middle" font-weight="700">A</text>
+<text x="143" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#475569" text-anchor="middle" font-weight="700">M</text>
+<text x="175" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#f8fafc" text-anchor="middle" font-weight="700">J</text>
+<text x="207" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#475569" text-anchor="middle" font-weight="700">J</text>
+<text x="239" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#f8fafc" text-anchor="middle" font-weight="700">A</text>
+<text x="271" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#f8fafc" text-anchor="middle" font-weight="700">S</text>
+<text x="303" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#475569" text-anchor="middle" font-weight="700">O</text>
+<text x="335" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#fff" text-anchor="middle" font-weight="700">N</text>
+<text x="367" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#f8fafc" text-anchor="middle" font-weight="700">D</text>
+</g>
+</g>
+
+
+<!-- MCP + NOTES CALLOUT BAND -->
+<g class="a9">
+<!-- MCP Server card -->
+<g transform="translate(40, 612)">
+  <rect x="0" y="0" width="566" height="88" rx="14" fill="#ffffff" stroke="#e2e8f0"/>
+  <rect x="0" y="0" width="566" height="88" rx="14" fill="url(#mcpglow)" opacity=".25"/>
+  <!-- icon tile -->
+  <rect x="20" y="20" width="48" height="48" rx="10" fill="#ecfeff" stroke="#0891b2" stroke-opacity=".5"/>
+  <text x="44" y="51" font-family="system-ui,-apple-system,sans-serif" font-size="20" fill="#0891b2" text-anchor="middle" font-weight="700">⌘</text>
+  <!-- text -->
+  <text x="86" y="35" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#0891b2" letter-spacing="1.5" font-weight="700">BUILT-IN MCP SERVER</text>
+  <text x="86" y="55" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#0f172a" font-weight="600">Query backtests with Copilot, Claude, or any agent</text>
+  <text x="86" y="73" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#475569">investing-algorithm-framework mcp · rank · compare · drill into trades</text>
+</g>
+
+<!-- Notes & Annotations card -->
+<g transform="translate(626, 612)">
+  <rect x="0" y="0" width="534" height="88" rx="14" fill="#ffffff" stroke="#e2e8f0"/>
+  <rect x="0" y="0" width="534" height="88" rx="14" fill="url(#notesglow)" opacity=".22"/>
+  <!-- icon tile -->
+  <rect x="20" y="20" width="48" height="48" rx="10" fill="#fef3c7" stroke="#d97706" stroke-opacity=".5"/>
+  <text x="44" y="52" font-family="system-ui,-apple-system,sans-serif" font-size="22" text-anchor="middle">📝</text>
+  <!-- text -->
+  <text x="86" y="35" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#d97706" letter-spacing="1.5" font-weight="700">NOTES &amp; ANNOTATIONS</text>
+  <text x="86" y="55" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#0f172a" font-weight="600">Capture hypotheses &amp; conclusions per backtest</text>
+  <text x="86" y="73" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#475569">Notes travel with the report — research never lost.</text>
+</g>
+</g>
+</svg>

@@ -1,0 +1,171 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600">
+<defs>
+<style>
+@keyframes fi{from{opacity:0}to{opacity:1}}
+@keyframes pl{0%,100%{opacity:.4}50%{opacity:1}}
+@keyframes scan{0%{transform:translateY(-40px)}100%{transform:translateY(290px)}}
+@keyframes flash{0%,100%{fill:#f1f5f9}50%{fill:var(--c,#0891b2)}}
+.a0{opacity:0;animation:fi .5s .05s both}
+.a1{opacity:0;animation:fi .5s .2s both}
+.a2{opacity:0;animation:fi .5s .35s both}
+.a3{opacity:0;animation:fi .5s .5s both}
+.a4{opacity:0;animation:fi .5s .65s both}
+.a5{opacity:0;animation:fi .5s .8s both}
+.pl{animation:pl 1.5s infinite}
+.scan{animation:scan 2.6s linear infinite}
+.fc1{--c:#0891b2;animation:flash 1.2s infinite}
+.fc2{--c:#059669;animation:flash 1.4s .15s infinite}
+.fc3{--c:#7c3aed;animation:flash 1.1s .3s infinite}
+.fc4{--c:#0891b2;animation:flash 1.3s .45s infinite}
+.fc5{--c:#059669;animation:flash 1.0s .6s infinite}
+.fc6{--c:#7c3aed;animation:flash 1.5s .75s infinite}
+.fc7{--c:#0891b2;animation:flash 1.25s .9s infinite}
+.fc8{--c:#d97706;animation:flash 1.35s 1.05s infinite}
+</style>
+<pattern id="gp" width="22" height="22" patternUnits="userSpaceOnUse">
+<circle cx="11" cy="11" r=".55" fill="#e2e8f0"/>
+</pattern>
+<radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="600" cy="300" r="600">
+<stop offset="0" stop-color="#0891b2" stop-opacity=".09"/>
+<stop offset="1" stop-color="#0891b2" stop-opacity="0"/>
+</radialGradient>
+<linearGradient id="hdr" gradientUnits="userSpaceOnUse" x1="0" y1="60" x2="0" y2="120">
+<stop offset="0" stop-color="#0f172a"/>
+<stop offset="1" stop-color="#0e7490"/>
+</linearGradient>
+<linearGradient id="scanline" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="40">
+<stop offset="0" stop-color="#0891b2" stop-opacity="0"/>
+<stop offset=".5" stop-color="#0891b2" stop-opacity=".55"/>
+<stop offset="1" stop-color="#0891b2" stop-opacity="0"/>
+</linearGradient>
+<clipPath id="grid"><rect x="40" y="170" width="1120" height="270" rx="14"/></clipPath>
+
+<g id="row">
+<rect class="fc1" x="0" y="0" width="34" height="22" rx="3"/>
+<rect class="fc2" x="38" y="0" width="34" height="22" rx="3"/>
+<rect class="fc3" x="76" y="0" width="34" height="22" rx="3"/>
+<rect class="fc4" x="114" y="0" width="34" height="22" rx="3"/>
+<rect class="fc5" x="152" y="0" width="34" height="22" rx="3"/>
+<rect class="fc6" x="190" y="0" width="34" height="22" rx="3"/>
+<rect class="fc7" x="228" y="0" width="34" height="22" rx="3"/>
+<rect class="fc8" x="266" y="0" width="34" height="22" rx="3"/>
+<rect class="fc1" x="304" y="0" width="34" height="22" rx="3"/>
+<rect class="fc2" x="342" y="0" width="34" height="22" rx="3"/>
+<rect class="fc3" x="380" y="0" width="34" height="22" rx="3"/>
+<rect class="fc4" x="418" y="0" width="34" height="22" rx="3"/>
+<rect class="fc5" x="456" y="0" width="34" height="22" rx="3"/>
+<rect class="fc6" x="494" y="0" width="34" height="22" rx="3"/>
+<rect class="fc7" x="532" y="0" width="34" height="22" rx="3"/>
+<rect class="fc8" x="570" y="0" width="34" height="22" rx="3"/>
+<rect class="fc1" x="608" y="0" width="34" height="22" rx="3"/>
+<rect class="fc2" x="646" y="0" width="34" height="22" rx="3"/>
+<rect class="fc3" x="684" y="0" width="34" height="22" rx="3"/>
+<rect class="fc4" x="722" y="0" width="34" height="22" rx="3"/>
+<rect class="fc5" x="760" y="0" width="34" height="22" rx="3"/>
+<rect class="fc6" x="798" y="0" width="34" height="22" rx="3"/>
+<rect class="fc7" x="836" y="0" width="34" height="22" rx="3"/>
+<rect class="fc8" x="874" y="0" width="34" height="22" rx="3"/>
+<rect class="fc1" x="912" y="0" width="34" height="22" rx="3"/>
+<rect class="fc2" x="950" y="0" width="34" height="22" rx="3"/>
+<rect class="fc3" x="988" y="0" width="34" height="22" rx="3"/>
+<rect class="fc4" x="1026" y="0" width="34" height="22" rx="3"/>
+<rect class="fc5" x="1064" y="0" width="34" height="22" rx="3"/>
+</g>
+</defs>
+
+<rect width="1200" height="600" fill="#ffffff" rx="14"/>
+<rect width="1200" height="600" fill="url(#gp)" rx="14"/>
+<rect width="1200" height="600" fill="url(#glow)" rx="14"/>
+
+<g class="a0">
+<rect x="40" y="40" width="11" height="11" rx="2" fill="#0891b2"/>
+<text x="60" y="50" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#0891b2" letter-spacing="2" font-weight="700">VECTOR BACKTEST ENGINE</text>
+</g>
+<text class="a1" x="40" y="92" font-family="system-ui,-apple-system,sans-serif" font-size="34" font-weight="700" fill="url(#hdr)">Run thousands of strategies in parallel</text>
+<text class="a2" x="40" y="116" font-family="system-ui,-apple-system,sans-serif" font-size="13" fill="#475569">Polars-powered vectorized signal evaluation — distributed across all your CPU cores. Sweep parameter grids, rank by key metrics, surface your winner.</text>
+
+<g class="a3" transform="translate(40,134)">
+<rect width="240" height="26" rx="13" fill="#f1f5f9" stroke="#0891b2" stroke-opacity=".4"/>
+<circle class="pl" cx="14" cy="13" r="4" fill="#0891b2"/>
+<text x="26" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">strategies evaluated</text>
+<g text-anchor="end" font-family="ui-monospace,Menlo,monospace" font-size="11" font-weight="700" fill="#0891b2">
+  <text x="226" y="17"><animate attributeName="opacity" values="1;0;0;0;1" dur="2s" repeatCount="indefinite"/>1,284</text>
+  <text x="226" y="17" opacity="0"><animate attributeName="opacity" values="0;1;0;0;0" dur="2s" repeatCount="indefinite"/>1,847</text>
+  <text x="226" y="17" opacity="0"><animate attributeName="opacity" values="0;0;1;0;0" dur="2s" repeatCount="indefinite"/>2,463</text>
+  <text x="226" y="17" opacity="0"><animate attributeName="opacity" values="0;0;0;1;0" dur="2s" repeatCount="indefinite"/>3,124</text>
+</g>
+</g>
+<g class="a3" transform="translate(300,134)">
+<rect width="170" height="26" rx="13" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="14" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">throughput</text>
+<text x="156" y="17" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#059669" font-weight="700" text-anchor="end">~1.2k/sec</text>
+</g>
+<g class="a3" transform="translate(490,134)">
+<rect width="180" height="26" rx="13" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="14" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">parallel workers</text>
+<text x="166" y="17" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#7c3aed" font-weight="700" text-anchor="end">12 cores</text>
+</g>
+<g class="a3" transform="translate(690,134)">
+<rect width="160" height="26" rx="13" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="14" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">engine</text>
+<text x="146" y="17" font-family="ui-monospace,Menlo,monospace" font-size="11" fill="#d97706" font-weight="700" text-anchor="end">Polars-native</text>
+</g>
+
+<g class="a4">
+<rect x="40" y="170" width="1120" height="270" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="56" y="188" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#0891b2" letter-spacing="1.5" font-weight="700">PARALLEL EXECUTION</text>
+<text x="178" y="188" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#94a3b8" letter-spacing="1">workload distributed across 12 cores · each row = one worker</text>
+<g font-family="ui-monospace,Menlo,monospace" font-size="7.5" fill="#94a3b8" text-anchor="middle" font-weight="700">
+<text x="50" y="218">W1</text>
+<text x="50" y="244">W2</text>
+<text x="50" y="270">W3</text>
+<text x="50" y="296">W4</text>
+<text x="50" y="322">W5</text>
+<text x="50" y="348">W6</text>
+<text x="50" y="374">W7</text>
+<text x="50" y="400">W8</text>
+<text x="50" y="426">W9</text>
+</g>
+<g clip-path="url(#grid)">
+  <use href="#row" x="66" y="212"/>
+  <use href="#row" x="66" y="238"/>
+  <use href="#row" x="66" y="264"/>
+  <use href="#row" x="66" y="290"/>
+  <use href="#row" x="66" y="316"/>
+  <use href="#row" x="66" y="342"/>
+  <use href="#row" x="66" y="368"/>
+  <use href="#row" x="66" y="394"/>
+  <use href="#row" x="66" y="420"/>
+  <rect class="scan" x="40" y="170" width="1120" height="40" fill="url(#scanline)"/>
+</g>
+</g>
+
+<g class="a5" transform="translate(40,460)">
+<rect width="1120" height="110" rx="10" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="20" y="26" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#64748b" letter-spacing="1.5" font-weight="700">TOP RANKED CANDIDATES</text>
+
+<g transform="translate(20,40)">
+<rect width="354" height="58" rx="8" fill="#f8fafc" stroke="#0891b2" stroke-opacity=".5"/>
+<rect x="0" y="0" width="4" height="58" rx="2" fill="#0891b2"/>
+<text x="20" y="20" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#0891b2" letter-spacing="1.5" font-weight="700">#1 · WINNER</text>
+<text x="20" y="40" font-family="system-ui,-apple-system,sans-serif" font-size="13" fill="#0f172a" font-weight="600">RSI(14) + EMA(50,200) crossover</text>
+<text x="20" y="52" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#475569">Sharpe 1.84 · CAGR +34.2% · MaxDD -12.6%</text>
+</g>
+
+<g transform="translate(384,40)">
+<rect width="354" height="58" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+<rect x="0" y="0" width="4" height="58" rx="2" fill="#059669"/>
+<text x="20" y="20" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#059669" letter-spacing="1.5" font-weight="700">#2</text>
+<text x="20" y="40" font-family="system-ui,-apple-system,sans-serif" font-size="13" fill="#0f172a" font-weight="500">Mean Reversion · Bollinger Bands</text>
+<text x="20" y="52" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#475569">Sharpe 1.62 · CAGR +28.7% · MaxDD -15.2%</text>
+</g>
+
+<g transform="translate(748,40)">
+<rect width="354" height="58" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+<rect x="0" y="0" width="4" height="58" rx="2" fill="#7c3aed"/>
+<text x="20" y="20" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#7c3aed" letter-spacing="1.5" font-weight="700">#3</text>
+<text x="20" y="40" font-family="system-ui,-apple-system,sans-serif" font-size="13" fill="#0f172a" font-weight="500">Momentum Breakout · 20d high</text>
+<text x="20" y="52" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#475569">Sharpe 1.41 · CAGR +24.1% · MaxDD -18.9%</text>
+</g>
+</g>
+</svg>
