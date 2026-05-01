@@ -1,5 +1,5 @@
 ---
-sidebar_position: 9
+sidebar_position: 10
 ---
 
 # Vector Backtesting
@@ -13,7 +13,7 @@ Vector backtesting is a high-performance backtesting approach that processes mar
 - Large-scale strategy optimization (100+ strategies)
 - Fast prototyping and signal research
 
-> For realistic simulation with stop losses and take profits, use [Event-Driven Backtesting](backtesting) instead.
+> For realistic simulation with stop losses and take profits, use [Event-Driven Backtesting](event-backtesting) instead. For a high-level comparison of backtesting modes, see the [Backtesting overview](backtesting).
 
 ## Quick Start
 

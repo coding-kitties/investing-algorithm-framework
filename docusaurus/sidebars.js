@@ -47,6 +47,10 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Getting Started/event-backtesting',
+                },
+                {
+                    type: 'doc',
                     id: 'Getting Started/vector-backtesting',
                 },
                 {

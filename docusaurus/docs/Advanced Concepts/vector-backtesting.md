@@ -532,25 +532,25 @@ def robust_strategies(backtests, date_range):
     filtered = []
     for backtest in backtests:
         metrics = backtest.get_backtest_metrics(date_range)
-        
+
         # Must be profitable
         if metrics.total_growth_percentage <= 0:
             continue
-            
+
         # Must have sufficient trades
         if metrics.number_of_trades_closed < 10:
             continue
-            
+
         # Must have good risk-adjusted returns
         if metrics.sharpe_ratio < 1.5:
             continue
-            
+
         # Must have reasonable drawdown
         if metrics.max_drawdown > 25.0:
             continue
-            
+
         filtered.append(backtest)
-    
+
     return filtered
 ```
 
@@ -597,7 +597,7 @@ def select_top_performers(backtests):
         key=lambda b: b.backtest_summary.total_growth_percentage,
         reverse=True
     )
-    
+
     # Return top 10
     return sorted_backtests[:10]
 
@@ -631,17 +631,17 @@ def best_risk_adjusted(backtests):
 def most_consistent(backtests):
     """Select strategies profitable in ALL periods."""
     consistent = []
-    
+
     for backtest in backtests:
         # Check if profitable in every run
         all_profitable = all(
             run.backtest_metrics.total_growth_percentage > 0
             for run in backtest.backtest_runs
         )
-        
+
         if all_profitable:
             consistent.append(backtest)
-    
+
     return consistent
 ```
 
@@ -650,10 +650,10 @@ def most_consistent(backtests):
 def score_and_select(backtests):
     """Score strategies and select top 50."""
     scored = []
-    
+
     for backtest in backtests:
         summary = backtest.backtest_summary
-        
+
         # Calculate composite score
         score = (
             summary.total_growth_percentage * 0.3 +
@@ -661,9 +661,9 @@ def score_and_select(backtests):
             (100 - summary.max_drawdown) * 0.2 +
             summary.win_rate * 0.2
         )
-        
+
         scored.append((score, backtest))
-    
+
     # Sort by score and return top 50
     scored.sort(reverse=True)
     return [backtest for score, backtest in scored[:50]]
@@ -1099,7 +1099,7 @@ def top_100(backtests):
             (100 - b.backtest_summary.max_drawdown) * 0.2
         )
         scored.append((score, b))
-    
+
     scored.sort(reverse=True)
     return [b for score, b in scored[:100]]
 
@@ -1323,4 +1323,3 @@ For maximum performance:
 5. Use `show_progress=True` to monitor execution
 
 Happy backtesting! 🎉
-
