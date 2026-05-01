@@ -10,6 +10,7 @@ from investing_algorithm_framework.domain import Environment, ENVIRONMENT, \
     TradeStatus, SNAPSHOT_INTERVAL, SnapshotInterval, OperationalException, \
     LAST_SNAPSHOT_DATETIME, INDEX_DATETIME
 from investing_algorithm_framework.services import TradeOrderEvaluator
+from investing_algorithm_framework.services.pipeline import PipelineEngine
 
 from .algorithm import Algorithm
 from .strategy import TradingStrategy
@@ -82,6 +83,7 @@ class EventLoopService:
         self.data_sources = set()
         self.next_run_times = {}
         self.history = {}
+        self._pipeline_engine = PipelineEngine()
 
     @staticmethod
     def _get_data_sources_for_iteration(
@@ -443,6 +445,61 @@ class EventLoopService:
 
         self.cleanup()
 
+    def _run_pipelines(
+        self,
+        strategy: TradingStrategy,
+        data: Dict,
+        data_object: Dict,
+        as_of: datetime,
+    ) -> None:
+        """Compute cross-sectional pipelines attached to ``strategy``
+        and inject their outputs into ``data`` keyed by pipeline
+        class name.
+
+        Strategies without ``pipelines`` skip this entirely (zero cost).
+        Per Phase 1 of the Pipeline API (#501); see
+        ``docs/design/pipeline-api.md``.
+        """
+        pipelines = getattr(strategy, "pipelines", None)
+        if not pipelines:
+            return
+
+        # Map symbol -> data-source identifier from the strategy's
+        # OHLCV data sources. If a symbol appears on multiple data
+        # sources (e.g. multiple timeframes) the first OHLCV match wins.
+        symbol_to_identifier: Dict[str, str] = {}
+        for ds in strategy.data_sources or []:
+            if not DataType.OHLCV.equals(ds.data_type):
+                continue
+            if ds.symbol is None or ds.symbol in symbol_to_identifier:
+                continue
+            symbol_to_identifier[ds.symbol] = ds.get_identifier()
+
+        if not symbol_to_identifier:
+            logger.warning(
+                "Strategy %s declares pipelines but has no OHLCV data "
+                "sources to feed them; pipelines will be skipped.",
+                strategy.strategy_id,
+            )
+            return
+
+        for pipeline_cls in pipelines:
+            try:
+                output = self._pipeline_engine.evaluate(
+                    pipeline_cls=pipeline_cls,
+                    data_object=data_object,
+                    symbol_to_identifier=symbol_to_identifier,
+                    as_of=as_of,
+                )
+            except Exception:  # pragma: no cover - logged + re-raised
+                logger.exception(
+                    "Pipeline %s failed during evaluation at %s",
+                    pipeline_cls.__name__,
+                    as_of,
+                )
+                raise
+            data[pipeline_cls.__name__] = output
+
     def _run_iteration(
         self,
         strategies: List[TradingStrategy] = None,
@@ -552,6 +609,17 @@ class EventLoopService:
                 }
             else:
                 data = {}
+
+            # Step 5b: Run any cross-sectional pipelines attached to
+            # the strategy (Phase 1 of the Pipeline API, see
+            # docs/design/pipeline-api.md). Strategies without
+            # ``pipelines`` skip this entirely.
+            self._run_pipelines(
+                strategy=strategy,
+                data=data,
+                data_object=data_object,
+                as_of=current_datetime,
+            )
 
             for on_strategy_run_hook in \
                     self._algorithm.on_strategy_run_hooks:

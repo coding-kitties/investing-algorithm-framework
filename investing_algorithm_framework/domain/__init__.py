@@ -46,6 +46,17 @@ from .backtesting import BacktestRun, BacktestSummaryMetrics, \
     generate_backtest_summary_metrics, load_backtests_from_directory, \
     save_backtests_to_directory, retag_backtests
 from .algorithm_id import generate_algorithm_id
+from .pipeline import (
+    Pipeline,
+    Factor,
+    CustomFactor,
+    Filter,
+    Returns,
+    AverageDollarVolume,
+    SMA,
+    RSI,
+    Volatility,
+)
 
 __all__ = [
     "OrderStatus",
@@ -158,6 +169,16 @@ __all__ = [
     "save_backtests_to_directory",
     "retag_backtests",
     "generate_algorithm_id",
+    # Pipeline API (Phase 1, see docs/design/pipeline-api.md)
+    "Pipeline",
+    "Factor",
+    "CustomFactor",
+    "Filter",
+    "Returns",
+    "AverageDollarVolume",
+    "SMA",
+    "RSI",
+    "Volatility",
     "Blotter",
     "DefaultBlotter",
     "SimulationBlotter",
