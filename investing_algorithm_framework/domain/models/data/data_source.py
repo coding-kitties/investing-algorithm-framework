@@ -69,9 +69,13 @@ class DataSource:
             if self.warmup_window is None:
                 object.__setattr__(self, 'warmup_window', self.window_size)
 
-        # Sync warmup_window back to window_size for backward compatibility
-        # so existing code reading .window_size still works
-        if self.warmup_window is not None and self.window_size is None:
+        # Keep warmup_window and window_size in sync. warmup_window is the
+        # canonical attribute; window_size is the deprecated alias kept for
+        # backward compatibility (see issue #379). Whenever warmup_window is
+        # set, mirror it onto window_size so consumers reading either
+        # attribute see the same value.
+        if self.warmup_window is not None \
+                and self.window_size != self.warmup_window:
             object.__setattr__(self, 'window_size', self.warmup_window)
 
         # Convert data_type and time_frame to their respective enums if needed
