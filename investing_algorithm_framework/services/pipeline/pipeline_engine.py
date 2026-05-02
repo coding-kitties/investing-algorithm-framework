@@ -16,6 +16,7 @@ from typing import Any, Dict, Mapping, Optional, Type
 import pandas as pd
 import polars as pl
 
+from investing_algorithm_framework.domain.pipeline.factor import _EVAL_CACHE
 from investing_algorithm_framework.domain.pipeline.pipeline import Pipeline
 
 
@@ -108,17 +109,22 @@ class PipelineEngine:
         if panel.is_empty():
             return self._empty_output(pipeline_cls)
 
-        result = panel.select(["datetime", "symbol"])
-        for name, factor in pipeline_cls.get_columns().items():
-            values = factor.compute_panel(panel)
-            result = result.with_columns(values.alias(name))
+        cache: Dict[tuple, pl.Series] = {}
+        token = _EVAL_CACHE.set(cache)
+        try:
+            result = panel.select(["datetime", "symbol"])
+            for name, factor in pipeline_cls.get_columns().items():
+                values = factor.evaluate(panel)
+                result = result.with_columns(values.alias(name))
 
-        universe = pipeline_cls.get_universe()
-        if universe is not None:
-            mask = universe.compute_panel(panel)
-            result = result.with_columns(mask.alias("__universe__"))
-            result = result.filter(pl.col("__universe__"))
-            result = result.drop("__universe__")
+            universe = pipeline_cls.get_universe()
+            if universe is not None:
+                mask = universe.evaluate(panel)
+                result = result.with_columns(mask.alias("__universe__"))
+                result = result.filter(pl.col("__universe__"))
+                result = result.drop("__universe__")
+        finally:
+            _EVAL_CACHE.reset(token)
 
         # Slice to as_of bar
         result = result.filter(pl.col("datetime") == pl.lit(as_of))

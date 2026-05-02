@@ -14,12 +14,23 @@ to a follow-up issue (Phase 1 polish).
 """
 from __future__ import annotations
 
-from typing import List, Optional, TYPE_CHECKING
+from contextvars import ContextVar
+from typing import Dict, List, Optional, TYPE_CHECKING
 
 import polars as pl
 
 if TYPE_CHECKING:  # pragma: no cover - avoid runtime cycle
     from .filter import Filter
+
+
+# Per-evaluation memoisation cache (Phase 2 / #502). The pipeline
+# engines push a fresh dict here while evaluating a panel; nested
+# factors (``_Rank._base``, ``_TopN._base``, …) consult it via
+# :meth:`Factor.evaluate` so that a factor instance shared between a
+# pipeline column and a universe filter is computed only once.
+_EVAL_CACHE: ContextVar[Optional[Dict[tuple, pl.Series]]] = ContextVar(
+    "_pipeline_factor_eval_cache", default=None
+)
 
 
 class Factor:
@@ -63,6 +74,30 @@ class Factor:
         must be aligned with ``panel`` (same length, same row order).
         """
         raise NotImplementedError
+
+    # ------------------------------------------------------------------ #
+    # Cached evaluation (Phase 2 / #502)
+    # ------------------------------------------------------------------ #
+    def evaluate(self, panel: pl.DataFrame) -> pl.Series:
+        """Compute and cache this factor's values on ``panel``.
+
+        Identical to :meth:`compute_panel` when called outside an
+        engine context. When a pipeline engine has installed an
+        evaluation cache (via the ``_EVAL_CACHE`` context var), the
+        result is memoised by ``(id(panel), id(self))`` so that the
+        same factor instance reused as both a column and a filter is
+        only computed once per panel.
+        """
+        cache = _EVAL_CACHE.get()
+        if cache is None:
+            return self.compute_panel(panel)
+        key = (id(panel), id(self))
+        cached = cache.get(key)
+        if cached is not None:
+            return cached
+        values = self.compute_panel(panel)
+        cache[key] = values
+        return values
 
     # ------------------------------------------------------------------ #
     # Cross-sectional ops (Phase 1 surface)
@@ -118,12 +153,12 @@ class _Rank(Factor):
         return int(self.window)
 
     def compute_panel(self, panel: pl.DataFrame) -> pl.Series:
-        values = self._base.compute_panel(panel)
+        values = self._base.evaluate(panel)
         df = panel.select(["datetime", "symbol"]).with_columns(
             values.alias("__rank_input__")
         )
         if self._mask is not None:
-            mask_values = self._mask.compute_panel(panel)
+            mask_values = self._mask.evaluate(panel)
             df = df.with_columns(
                 pl.when(mask_values)
                 .then(pl.col("__rank_input__"))
