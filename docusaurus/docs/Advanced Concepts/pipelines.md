@@ -71,6 +71,10 @@ A per-symbol time-series computation. Phase 1 ships these built-ins:
 | `SMA(window)` | close | simple moving average |
 | `RSI(window)` | close | Wilder's RSI |
 | `Volatility(window, periods_per_year=252)` | close | annualised stdev of log returns |
+| `StaticPerSymbol(mapping, default=None)` | — | broadcasts a `dict[symbol, value]` (e.g. sector / market-cap) into the cross-section |
+| `CrossSectionalMean(base, mask=None)` | base factor | per-bar equal-weight mean across surviving symbols |
+| `RollingBeta(target, market, window>=2)` | two factors | rolling-window OLS beta `cov(t,m)/var(m)`; null when `var(m) == 0` |
+| `Neutralize(target, exposures=[...], mask=None, add_intercept=True)` | factors | per-bar OLS residualisation of `target` against `exposures`; null on rank-deficient bars |
 
 You can also subclass `CustomFactor` to compute your own.
 
@@ -101,6 +105,12 @@ factor.zscore(mask=universe)             # (x - mean) / std per bar
 factor.demean(mask=universe)             # x - mean per bar
 factor.winsorize(0.01, 0.99,             # clip to per-bar quantiles
                  mask=universe)
+
+# Group-relative variants — stats computed within each group
+# (typically sector). `groups` accepts a dict[symbol, key] or any
+# Factor that emits a per-symbol category.
+factor.zscore(groups=SECTORS)            # z-score within sector
+factor.demean(groups=SECTORS, mask=universe)
 ```
 
 Where the cross-sectional `std` is `0` or undefined (e.g. only one
