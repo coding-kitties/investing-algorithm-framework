@@ -32,11 +32,43 @@ If you want to experiment, the same example covers both:
 
 - A streaming panel that appends new bars instead of rebuilding from
   scratch.
-- Validation of `warmup_window` against `pipeline.required_window()`
+- ✅ Validation of `warmup_window` against `pipeline.required_window()`
   so you get a clear error at startup if any data source is too short.
 - First-class handling of partial bars (so you don't accidentally trade
   on an unclosed candle).
 - Live observability hooks for pipeline output (print/log/snapshot).
+
+## Warmup validation (shipped)
+
+When a strategy declares `pipelines = [...]`, the framework validates
+at construction time that every OHLCV data source has a
+`warmup_window` ≥ the pipeline's longest factor window. If any source
+is short — or `warmup_window` is left unset — strategy instantiation
+raises `OperationalException` with an actionable message listing the
+offending sources and the required window size.
+
+```python
+class MomentumScreener(Pipeline):
+    sma = SMA(window=200)
+
+
+class MyStrategy(TradingStrategy):
+    time_unit = TimeUnit.HOUR
+    interval = 1
+    pipelines = [MomentumScreener]
+    data_sources = [
+        DataSource(
+            symbol="BTC/EUR",
+            data_type=DataType.OHLCV,
+            time_frame=TimeFrame.ONE_HOUR,
+            market="BITVAVO",
+            warmup_window=200,   # must be >= 200 to satisfy SMA(200)
+        ),
+    ]
+```
+
+This eliminates a common failure mode in live deployments: a bot
+silently trading on NaN factor columns until enough bars accrue.
 
 ## What stays the same
 
