@@ -42,7 +42,20 @@ class VectorPipelineEngine:
     Universe filtering is applied as in event mode — symbols failing
     the universe mask at a given bar are dropped from that bar's
     output, and the universe column itself is not exposed.
+
+    Args:
+        lazy: If ``True``, the result frame is assembled via
+            :class:`polars.LazyFrame` and collected with the streaming
+            engine at the end. Useful for memory-bound runs over large
+            universes. Built-in factors are still computed eagerly per
+            symbol (each ``Factor.compute_panel`` returns a ``Series``);
+            only the ``with_columns`` / ``filter`` / ``sort`` pipeline
+            on the wide result frame is deferred. Default ``False``
+            preserves Phase 2a behaviour exactly.
     """
+
+    def __init__(self, lazy: bool = False) -> None:
+        self._lazy = bool(lazy)
 
     # ------------------------------------------------------------------ #
     # Panel construction (delegates to event engine for parity)
@@ -130,12 +143,40 @@ class VectorPipelineEngine:
             if universe is not None:
                 mask = universe.evaluate(panel)
                 result = result.with_columns(mask.alias("__universe__"))
+                if self._lazy:
+                    # Stream the filter + drop + sort through Polars'
+                    # streaming engine so memory usage stays bounded
+                    # on large universes.
+                    return self._collect_lazy(
+                        result.lazy()
+                        .filter(pl.col("__universe__"))
+                        .drop("__universe__")
+                        .sort(["datetime", "symbol"])
+                    )
                 result = result.filter(pl.col("__universe__"))
                 result = result.drop("__universe__")
         finally:
             _EVAL_CACHE.reset(token)
 
+        if self._lazy:
+            return self._collect_lazy(
+                result.lazy().sort(["datetime", "symbol"])
+            )
         return result.sort(["datetime", "symbol"])
+
+    @staticmethod
+    def _collect_lazy(lazy: pl.LazyFrame) -> pl.DataFrame:
+        """Collect a :class:`polars.LazyFrame` with the streaming
+        engine when available; fall back to a default collect on
+        older Polars versions that don't accept
+        ``engine="streaming"``.
+        """
+        try:
+            return lazy.collect(engine="streaming")
+        except TypeError:
+            return lazy.collect()
+        except Exception:  # pragma: no cover - polars version drift
+            return lazy.collect()
 
     # ------------------------------------------------------------------ #
     # Slicing helpers
