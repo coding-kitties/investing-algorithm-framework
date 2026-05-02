@@ -36,8 +36,18 @@ class Returns(Factor):
         )["__returns__"]
 
 
-class AverageDollarVolume(Factor):
-    """Mean of ``close * volume`` over the trailing ``window`` bars."""
+class AverageTradedValue(Factor):
+    """Mean of ``close * volume`` over the trailing ``window`` bars.
+
+    This is a liquidity proxy expressed in the **quote currency** of
+    each symbol — for ``BTC/EUR`` the result is in EUR, for
+    ``BTC/USDT`` it is in USDT, etc. The factor itself is
+    quote-currency agnostic; ``close`` and ``volume`` come straight
+    from the OHLCV panel.
+
+    Also exposed as :class:`AverageDollarVolume`, the more familiar
+    Quantopian/Zipline name. The two are interchangeable.
+    """
 
     inputs: List[str] = ["close", "volume"]
 
@@ -48,6 +58,12 @@ class AverageDollarVolume(Factor):
             .over("symbol")
             .alias("__adv__")
         )["__adv__"]
+
+
+# Backwards-compatible alias. "Dollar volume" is the standard quant
+# shorthand for traded value (price * volume) in whatever quote
+# currency the symbols use; the name does not imply USD.
+AverageDollarVolume = AverageTradedValue
 
 
 class SMA(Factor):

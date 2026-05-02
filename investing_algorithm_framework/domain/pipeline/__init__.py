@@ -12,6 +12,7 @@ from .pipeline import Pipeline
 from .factors import (
     Returns,
     AverageDollarVolume,
+    AverageTradedValue,
     SMA,
     RSI,
     Volatility,
@@ -24,6 +25,7 @@ __all__ = [
     "Filter",
     "Returns",
     "AverageDollarVolume",
+    "AverageTradedValue",
     "SMA",
     "RSI",
     "Volatility",

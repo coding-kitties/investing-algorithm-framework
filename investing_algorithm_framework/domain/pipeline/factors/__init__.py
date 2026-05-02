@@ -2,6 +2,7 @@
 from .builtin import (
     Returns,
     AverageDollarVolume,
+    AverageTradedValue,
     SMA,
     RSI,
     Volatility,
@@ -10,6 +11,7 @@ from .builtin import (
 __all__ = [
     "Returns",
     "AverageDollarVolume",
+    "AverageTradedValue",
     "SMA",
     "RSI",
     "Volatility",

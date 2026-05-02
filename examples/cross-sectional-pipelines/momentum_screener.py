@@ -7,20 +7,29 @@ on each iteration.
 
 This example screens a small crypto basket every day for the two
 highest-momentum symbols by 30-day return, ranked within the top-3
-liquidity universe.
+liquidity universe. It does not place any orders — it only prints the
+screen output, so you can see what the pipeline produces.
 
-Run the example after exporting the relevant exchange API keys (or
-using a backtest, see ``docs/Advanced Concepts/pipelines-event-backtest.md``).
+Phase 1 only supports the **event-driven backtest** runner; live
+pipelines are not implemented yet. Run the example with:
+
+.. code-block:: bash
+
+    python examples/cross-sectional-pipelines/momentum_screener.py
+
+See ``docs/Advanced Concepts/pipelines-event-backtest.md``.
 """
 from __future__ import annotations
 
 import logging.config
+from datetime import datetime, timedelta
 from typing import Any, Dict
 
 from dotenv import load_dotenv
 
 from investing_algorithm_framework import (
     AverageDollarVolume,
+    BacktestDateRange,
     Context,
     DataSource,
     DEFAULT_LOGGING_CONFIG,
@@ -36,6 +45,8 @@ load_dotenv()
 
 
 SYMBOLS = ["BTC/EUR", "ETH/EUR", "SOL/EUR", "ADA/EUR", "XRP/EUR"]
+MARKET = "bitvavo"
+TRADING_SYMBOL = "EUR"
 
 
 class MomentumScreener(Pipeline):
@@ -52,10 +63,13 @@ class CrossSectionalMomentum(TradingStrategy):
     algorithm_id = "cross-sectional-momentum"
     time_unit = TimeUnit.DAY
     interval = 1
+    market = MARKET
+    trading_symbol = TRADING_SYMBOL
+    symbols = SYMBOLS
     data_sources = [
         DataSource(
             data_type="OHLCV",
-            market="binance",
+            market=MARKET,
             symbol=symbol,
             warmup_window=60,
             time_frame="1d",
@@ -67,6 +81,8 @@ class CrossSectionalMomentum(TradingStrategy):
 
     def run_strategy(self, context: Context, data: Dict[str, Any]):
         screen = data["MomentumScreener"]
+        if screen is None or screen.is_empty():
+            return
         # Pick the top 2 by alpha rank (highest rank = highest momentum
         # within the liquidity universe).
         top = screen.sort("alpha", descending=True).head(2)
@@ -79,8 +95,13 @@ class CrossSectionalMomentum(TradingStrategy):
 
 app = create_app()
 app.add_strategy(CrossSectionalMomentum)
-app.add_market(market="binance", trading_symbol="EUR", initial_balance=1000)
+app.add_market(market=MARKET, trading_symbol=TRADING_SYMBOL, initial_balance=1000)
 
 
 if __name__ == "__main__":
-    app.run()
+    end = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    start = end - timedelta(days=120)
+    backtest_date_range = BacktestDateRange(start_date=start, end_date=end)
+    backtest = app.run_backtest(backtest_date_range=backtest_date_range)
+    metrics = backtest.get_backtest_metrics(date_range=backtest_date_range)
+    print(metrics)

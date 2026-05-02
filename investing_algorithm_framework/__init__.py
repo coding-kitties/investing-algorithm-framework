@@ -32,7 +32,7 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     FillModel, FullFill, VolumeBasedFill, \
     FXRateProvider, StaticFXRateProvider, \
     Pipeline, Factor, CustomFactor, Filter, \
-    Returns, AverageDollarVolume, SMA, RSI, Volatility
+    Returns, AverageDollarVolume, AverageTradedValue, SMA, RSI, Volatility
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
     JSONURLDataProvider, ParquetURLDataProvider, \
@@ -265,6 +265,7 @@ __all__ = [
     "Filter",
     "Returns",
     "AverageDollarVolume",
+    "AverageTradedValue",
     "SMA",
     "RSI",
     "Volatility",
