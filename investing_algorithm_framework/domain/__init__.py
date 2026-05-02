@@ -57,6 +57,10 @@ from .pipeline import (
     SMA,
     RSI,
     Volatility,
+    StaticPerSymbol,
+    CrossSectionalMean,
+    RollingBeta,
+    Neutralize,
 )
 
 __all__ = [
@@ -181,6 +185,10 @@ __all__ = [
     "SMA",
     "RSI",
     "Volatility",
+    "StaticPerSymbol",
+    "CrossSectionalMean",
+    "RollingBeta",
+    "Neutralize",
     "Blotter",
     "DefaultBlotter",
     "SimulationBlotter",

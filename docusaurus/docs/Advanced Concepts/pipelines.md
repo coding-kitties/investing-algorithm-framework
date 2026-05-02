@@ -108,6 +108,59 @@ symbol survives the mask), `zscore` returns `null` rather than
 `inf`/`NaN`. Masked-out symbols are excluded from the bar's
 statistic *and* from the bar's output.
 
+### Risk neutrality
+
+When you want a factor's signal to be independent of structural
+exposures (sector, beta to the market, multi-factor risk model),
+use the built-in risk-neutrality primitives. They cover three
+common cases:
+
+**Sector neutrality** — z-score or demean *within* each sector
+instead of across the whole universe by passing `groups=`. The
+mapping can be a `dict[symbol, sector]` or any `Factor` that
+emits a per-symbol category:
+
+```python
+SECTORS = {"AAPL": "Tech", "MSFT": "Tech", "JPM": "Fin", ...}
+
+class SectorNeutralMomentum(Pipeline):
+    momentum = Returns(window=60)
+    signal = momentum.zscore(groups=SECTORS)   # z-score within sector
+```
+
+**Beta neutralisation** — strip a factor's exposure to the market
+(or any other reference series) using `RollingBeta` and
+`Neutralize`:
+
+```python
+from investing_algorithm_framework import (
+    Returns, RollingBeta, CrossSectionalMean, Neutralize,
+)
+
+class BetaNeutralAlpha(Pipeline):
+    r = Returns(window=1)
+    market = CrossSectionalMean(r)               # equal-weight market
+    beta = RollingBeta(r, market, window=60)
+    alpha = Neutralize(r, exposures=[beta])      # market-neutral residual
+```
+
+**Multi-factor risk model** — pass several exposures to
+`Neutralize` and the residual is orthogonal to all of them at
+each bar (per-bar OLS):
+
+```python
+class FactorNeutralAlpha(Pipeline):
+    r = Returns(window=1)
+    size = StaticPerSymbol(MARKET_CAPS)          # cross-sectional size
+    val = BookToPrice()
+    mom = Returns(window=252)
+    residual = Neutralize(r, exposures=[size, val, mom])
+```
+
+Bars where the system is rank-deficient (more exposures than
+surviving symbols) yield `null` residuals so they're skipped
+downstream rather than producing `NaN`.
+
 ### Factor algebra
 
 Factors compose via the standard arithmetic operators. The framework
