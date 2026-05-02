@@ -95,7 +95,13 @@ class VectorPipelineEngine:
         )
         result = self.evaluate_panel(pipeline_cls, panel)
         if start is not None and not result.is_empty():
-            result = result.filter(pl.col("datetime") >= pl.lit(start))
+            col_tz = result.schema["datetime"].time_zone
+            start_cmp = (
+                start.replace(tzinfo=None)
+                if col_tz is None and start.tzinfo is not None
+                else start
+            )
+            result = result.filter(pl.col("datetime") >= pl.lit(start_cmp))
         return result
 
     def evaluate_panel(
@@ -144,7 +150,13 @@ class VectorPipelineEngine:
         if long_result.is_empty():
             return long_result.drop("datetime") \
                 if "datetime" in long_result.columns else long_result
-        sliced = long_result.filter(pl.col("datetime") == pl.lit(as_of))
+        col_tz = long_result.schema["datetime"].time_zone
+        as_of_cmp = (
+            as_of.replace(tzinfo=None)
+            if col_tz is None and as_of.tzinfo is not None
+            else as_of
+        )
+        sliced = long_result.filter(pl.col("datetime") == pl.lit(as_of_cmp))
         if "datetime" in sliced.columns:
             sliced = sliced.drop("datetime")
         return sliced

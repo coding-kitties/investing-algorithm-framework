@@ -70,7 +70,14 @@ class PipelineEngine:
             df = df.with_columns(pl.lit(symbol).alias("symbol"))
             df = df.select(list(PANEL_COLUMNS))
             if as_of is not None:
-                df = df.filter(pl.col("datetime") <= pl.lit(as_of))
+                # Normalise tz so naive panels and tz-aware ``as_of``
+                # values (e.g. from BacktestDateRange) compare cleanly.
+                col_tz = df.schema["datetime"].time_zone
+                if col_tz is None and as_of.tzinfo is not None:
+                    as_of_cmp = as_of.replace(tzinfo=None)
+                else:
+                    as_of_cmp = as_of
+                df = df.filter(pl.col("datetime") <= pl.lit(as_of_cmp))
             frames.append(df)
 
         if not frames:
