@@ -39,28 +39,32 @@ def _compound_percentage_returns(percentages):
     Compound percentage returns across multiple periods.
 
     For example, if period 1 has 10% return and period 2 has 5% return,
-    the compounded return is: (1 + 0.10) * (1 + 0.05) - 1 = 15.5%
-    NOT simply 10% + 5% = 15%
+    the compounded return is: (1 + 0.10) * (1 + 0.05) - 1 = 0.155 = 15.5%
+    NOT simply 0.10 + 0.05 = 0.15.
+
+    The framework consistently represents percentages as **decimals**
+    (e.g. ``0.10`` for 10%), so this helper expects decimal inputs and
+    returns a decimal. See issue #511 (B5) — earlier versions assumed
+    whole-number percentages, which silently produced results off by a
+    factor of ~100 once multi-window aggregation was exercised.
 
     Args:
-        percentages (List[float | None]): List of percentage returns
-            (as whole numbers, e.g., 10 for 10%).
+        percentages (List[float | None]): List of period returns expressed
+            as decimals (e.g. ``0.10`` for 10%).
 
     Returns:
-        float | None: The compounded percentage return, or None if no
-            valid percentages.
+        float | None: The compounded return as a decimal, or ``None`` if
+            no valid percentages.
     """
     valid_percentages = [p for p in percentages if p is not None]
     if not valid_percentages:
         return None
 
-    # Convert percentages to decimals, compound, then convert back
     compounded = 1.0
     for pct in valid_percentages:
-        compounded *= (1 + pct / 100)
+        compounded *= (1 + pct)
 
-    # Convert back to percentage
-    return (compounded - 1) * 100
+    return compounded - 1
 
 
 def combine_backtests(backtests):
@@ -173,9 +177,13 @@ def generate_backtest_summary_metrics(
         b.total_net_gain for b in valid_metrics
         if b.total_net_gain is not None
     )
+    # B1/B2 fix (issue #511): per-run ``total_loss`` is now the gross
+    # loss magnitude, so the aggregate is simply the sum of per-run
+    # ``total_loss`` (equivalent to ``sum(gross_loss)``). Both per-run
+    # and aggregate use the same unit (positive currency).
     total_loss = sum(
-        b.gross_loss for b in valid_metrics
-        if b.gross_loss is not None
+        b.total_loss for b in valid_metrics
+        if b.total_loss is not None
     )
     total_growth = sum(
         b.total_growth for b in valid_metrics
@@ -184,13 +192,24 @@ def generate_backtest_summary_metrics(
 
     # === PERCENTAGE RETURNS (compounded, not summed) ===
     # Compound returns: (1 + r1) * (1 + r2) * ... - 1
-    # For percentages stored as whole numbers (e.g., 10 for 10%)
+    # All percentages are stored as decimals (e.g. 0.10 for 10%).
     total_net_gain_percentage = _compound_percentage_returns(
         [b.total_net_gain_percentage for b in valid_metrics]
     )
-    total_loss_percentage = _compound_percentage_returns(
-        [b.total_loss_percentage for b in valid_metrics]
-    )
+    # ``total_loss`` is a non-multiplicative magnitude (it does not
+    # compound across windows). Express the aggregate as the sum of
+    # gross losses divided by the sum of initial capital across
+    # windows, which keeps the unit (decimal fraction) consistent
+    # with the per-run definition. See issue #511 (B2).
+    total_initial_value = 0.0
+    for b in valid_metrics:
+        iv = getattr(b, "initial_unallocated", None)
+        if isinstance(iv, (int, float)) and iv > 0:
+            total_initial_value += iv
+    if total_initial_value > 0 and total_loss is not None:
+        total_loss_percentage = total_loss / total_initial_value
+    else:
+        total_loss_percentage = None
     total_growth_percentage = _compound_percentage_returns(
         [b.total_growth_percentage for b in valid_metrics]
     )
