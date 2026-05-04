@@ -127,23 +127,44 @@ class Factor:
     # ------------------------------------------------------------------ #
     # Cross-sectional transforms (Phase 2 / #502)
     # ------------------------------------------------------------------ #
-    def zscore(self, mask: Optional["Filter"] = None) -> "Factor":
+    def zscore(
+        self,
+        mask: Optional["Filter"] = None,
+        groups=None,
+    ) -> "Factor":
         """Cross-sectional z-score within each timestamp.
 
         Returns ``(x - mean) / std`` computed over the symbols at each
         bar. With ``mask``, symbols outside the mask are excluded from
         the mean/std and receive ``null`` in the output.
-        """
-        return _Zscore(self, mask=mask)
 
-    def demean(self, mask: Optional["Filter"] = None) -> "Factor":
+        ``groups`` enables **group-relative** (e.g. sector-neutral)
+        normalisation: the statistic is computed within each
+        ``(datetime, group)`` cell instead of across all symbols. It
+        accepts:
+
+        - a ``dict[str, Any]`` mapping ``symbol`` → group label —
+          internally wrapped in :class:`StaticPerSymbol`,
+        - a :class:`Factor` returning a categorical value per row
+          (e.g. a slow-moving fundamental bucket).
+        """
+        return _Zscore(self, mask=mask, groups=groups)
+
+    def demean(
+        self,
+        mask: Optional["Filter"] = None,
+        groups=None,
+    ) -> "Factor":
         """Cross-sectional mean removal within each timestamp.
 
         Returns ``x - mean(x)`` computed over the symbols at each bar.
         With ``mask``, symbols outside the mask are excluded from the
         mean and receive ``null`` in the output.
+
+        ``groups`` (same shape as in :meth:`zscore`) enables
+        group-relative demeaning — e.g. sector neutrality.
         """
-        return _Demean(self, mask=mask)
+        return _Demean(self, mask=mask, groups=groups)
 
     def winsorize(
         self,
@@ -272,6 +293,28 @@ def _coerce_operand(operand) -> "Factor":
     )
 
 
+def _coerce_groups(groups) -> Optional["Factor"]:
+    """Normalise the ``groups`` argument of cross-sectional transforms
+    into a :class:`Factor` (or ``None``).
+
+    Accepts ``None``, a ``dict[symbol, group]`` mapping (auto-wrapped
+    in :class:`StaticPerSymbol`), or any pre-existing :class:`Factor`.
+    """
+    if groups is None:
+        return None
+    if isinstance(groups, Factor):
+        return groups
+    if isinstance(groups, dict):
+        # Local import to avoid an import cycle at module load: the
+        # built-in factors module imports from this file.
+        from .factors.builtin import StaticPerSymbol
+        return StaticPerSymbol(groups)
+    raise TypeError(
+        f"Unsupported type for `groups`: {type(groups).__name__}. "
+        f"Expected None, dict[str, Any], or Factor."
+    )
+
+
 class _Constant(Factor):
     """A panel-aligned constant series. Window is 1 (no warmup needed)."""
 
@@ -371,22 +414,36 @@ class _CrossSectionalTransform(Factor):
     Polars expression for the (possibly mask-nulled) factor values and
     returns the transformed expression. The base class handles mask
     application and per-``datetime`` grouping.
+
+    When ``groups`` is provided, statistics are computed within each
+    ``(datetime, group)`` cell instead of across all symbols at a
+    bar — enabling sector-neutral or otherwise group-relative
+    transforms. ``groups`` may be a ``dict[symbol, group]`` (wrapped
+    in :class:`StaticPerSymbol` automatically) or any :class:`Factor`
+    returning a categorical value per row.
     """
 
     def __init__(
         self,
         base: Factor,
         mask: Optional["Filter"] = None,
+        groups=None,
     ) -> None:
         super().__init__(window=base.required_window())
         self._base = base
         self._mask = mask
+        self._groups = _coerce_groups(groups)
         cols = list(base.required_columns())
         if mask is not None:
             for c in mask.required_columns():
                 if c not in cols:
                     cols.append(c)
             self.window = max(self.window, mask.required_window())
+        if self._groups is not None:
+            for c in self._groups.required_columns():
+                if c not in cols:
+                    cols.append(c)
+            self.window = max(self.window, self._groups.required_window())
         self.inputs = cols
 
     def required_columns(self) -> List[str]:
@@ -397,6 +454,15 @@ class _CrossSectionalTransform(Factor):
 
     def _transform_expr(self) -> pl.Expr:
         raise NotImplementedError  # pragma: no cover
+
+    def _group_keys(self) -> List[str]:
+        """Return the columns to group by for the cross-sectional
+        statistic. ``["datetime"]`` for the standard case,
+        ``["datetime", "__group__"]`` when ``groups`` is set.
+        """
+        if self._groups is None:
+            return ["datetime"]
+        return ["datetime", "__group__"]
 
     def compute_panel(self, panel: pl.DataFrame) -> pl.Series:
         values = self._base.evaluate(panel)
@@ -411,17 +477,21 @@ class _CrossSectionalTransform(Factor):
                 .otherwise(None)
                 .alias("__x__")
             )
+        if self._groups is not None:
+            group_values = self._groups.evaluate(panel)
+            df = df.with_columns(group_values.alias("__group__"))
         df = df.with_columns(self._transform_expr().alias("__out__"))
         return df["__out__"]
 
 
 class _Zscore(_CrossSectionalTransform):
-    """Cross-sectional z-score per bar."""
+    """Cross-sectional z-score per bar (optionally per group)."""
 
     def _transform_expr(self) -> pl.Expr:
         x = pl.col("__x__")
-        mean = x.mean().over("datetime")
-        std = x.std().over("datetime")
+        keys = self._group_keys()
+        mean = x.mean().over(keys)
+        std = x.std().over(keys)
         # If std is 0 or null, returning null is the safe choice (it
         # signals "no dispersion" rather than producing inf/NaN that
         # poisons downstream rolling stats).
@@ -433,11 +503,12 @@ class _Zscore(_CrossSectionalTransform):
 
 
 class _Demean(_CrossSectionalTransform):
-    """Cross-sectional mean removal per bar."""
+    """Cross-sectional mean removal per bar (optionally per group)."""
 
     def _transform_expr(self) -> pl.Expr:
         x = pl.col("__x__")
-        return x - x.mean().over("datetime")
+        keys = self._group_keys()
+        return x - x.mean().over(keys)
 
 
 class _Winsorize(_CrossSectionalTransform):

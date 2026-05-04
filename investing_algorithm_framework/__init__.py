@@ -32,7 +32,9 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     FillModel, FullFill, VolumeBasedFill, \
     FXRateProvider, StaticFXRateProvider, \
     Pipeline, Factor, CustomFactor, Filter, \
-    Returns, AverageDollarVolume, AverageTradedValue, SMA, RSI, Volatility
+    Returns, AverageDollarVolume, AverageTradedValue, SMA, RSI, \
+    Volatility, StaticPerSymbol, CrossSectionalMean, RollingBeta, \
+    Neutralize
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
     JSONURLDataProvider, ParquetURLDataProvider, \
@@ -269,6 +271,10 @@ __all__ = [
     "SMA",
     "RSI",
     "Volatility",
+    "StaticPerSymbol",
+    "CrossSectionalMean",
+    "RollingBeta",
+    "Neutralize",
     "load_ipython_extension",
     "get_cv_consistency",
     "get_normalized_stability",
