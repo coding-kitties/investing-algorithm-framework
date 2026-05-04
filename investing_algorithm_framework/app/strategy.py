@@ -48,6 +48,7 @@ class TradingStrategy:
     strategy_id: str = None
     decorated = None
     data_sources: List[DataSource] = []
+    pipelines: List[type] = []
     traces = None
     context: Context = None
     metadata: Dict[str, Any] = None
@@ -130,6 +131,13 @@ class TradingStrategy:
             class_data_sources = getattr(self.__class__, 'data_sources', [])
             self.data_sources = list(class_data_sources) \
                 if class_data_sources else []
+
+        # Initialize pipelines as a new list per instance. Pipelines
+        # are class-attribute opt-in (Phase 1 of the Pipeline API,
+        # see docs/design/pipeline-api.md). When empty, the engine
+        # is never invoked and there is zero behavioural change.
+        class_pipelines = getattr(self.__class__, 'pipelines', [])
+        self.pipelines = list(class_pipelines) if class_pipelines else []
 
         if decorated is not None:
             self.decorated = decorated
