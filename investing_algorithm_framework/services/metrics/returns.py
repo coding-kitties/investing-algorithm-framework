@@ -302,10 +302,19 @@ def get_total_loss(
     snapshots: List[PortfolioSnapshot]
 ) -> Tuple[float, float]:
     """
-    Calculate the total loss from portfolio snapshots.
+    Legacy helper — net portfolio change clamped at zero when positive.
 
-    The total loss is calculated as the percentage change in portfolio value
-    from the first snapshot to the last snapshot, only if there is a loss.
+    .. deprecated::
+        This is **not** a real loss metric. It is the net portfolio
+        return clamped to zero whenever the period was profitable, which
+        means it is identical to ``total_net_gain`` whenever the period
+        is unprofitable and ``0.0`` otherwise. It is no longer used to
+        populate ``BacktestMetrics.total_loss`` — that field now holds
+        the **gross loss** (sum of P&L of all losing trades). See issue
+        #511 (B1). This function is kept for backwards compatibility and
+        will be removed in a future release; prefer
+        :func:`get_gross_loss` from
+        ``investing_algorithm_framework.services.metrics.profit_factor``.
 
     Args:
         snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.

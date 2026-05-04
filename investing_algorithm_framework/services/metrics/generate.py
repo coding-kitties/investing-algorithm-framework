@@ -21,7 +21,7 @@ from .returns import get_monthly_returns, get_yearly_returns, \
     get_average_monthly_return, get_average_monthly_return_winning_months, \
     get_average_monthly_return_losing_months, get_cumulative_return, \
     get_cumulative_return_series
-from .returns import get_total_return, get_final_value, get_total_loss, \
+from .returns import get_total_return, get_final_value, \
     get_total_growth
 from .sharpe_ratio import get_sharpe_ratio, get_rolling_sharpe_ratio
 from .sortino_ratio import get_sortino_ratio
@@ -232,6 +232,11 @@ def create_backtest_metrics(
     backtest_metrics = BacktestMetrics(
         backtest_start_date=backtest_run.backtest_start_date,
         backtest_end_date=backtest_run.backtest_end_date,
+        backtest_date_range_name=(
+            backtest_run.backtest_date_range_name or ""
+        ),
+        trading_symbol=backtest_run.trading_symbol or "",
+        initial_unallocated=backtest_run.initial_unallocated or 0.0,
     )
 
     def safe_set(metric_name, func, *args, index=None):
@@ -268,11 +273,26 @@ def create_backtest_metrics(
 
     if "total_loss" in metrics or "total_loss_percentage" in metrics:
         try:
-            total_loss = get_total_loss(backtest_run.portfolio_snapshots)
+            # B1 fix (issue #511): "total_loss" is now the **gross loss**
+            # (sum of P&L of all losing trades, expressed as a non-negative
+            # magnitude) rather than the snapshot net-return clamped at
+            # zero. The latter was indistinguishable from
+            # ``total_net_gain`` whenever the period was unprofitable and
+            # always 0 otherwise. ``total_loss_percentage`` is the gross
+            # loss expressed as a fraction of the initial unallocated
+            # capital (decimal, e.g. ``0.05`` for a 5% loss magnitude).
+            gross_loss_value = get_gross_loss(backtest_run.trades)
+            initial_value = backtest_run.initial_unallocated or 0.0
+
             if "total_loss" in metrics:
-                backtest_metrics.total_loss = total_loss[0]
+                backtest_metrics.total_loss = gross_loss_value
             if "total_loss_percentage" in metrics:
-                backtest_metrics.total_loss_percentage = total_loss[1]
+                if initial_value > 0:
+                    backtest_metrics.total_loss_percentage = (
+                        gross_loss_value / initial_value
+                    )
+                else:
+                    backtest_metrics.total_loss_percentage = 0.0
         except OperationalException as e:
             logger.warning(f"total_loss failed: {e}")
 

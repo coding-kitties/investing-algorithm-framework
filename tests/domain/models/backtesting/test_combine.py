@@ -27,10 +27,13 @@ class TestCombine(TestCase):
             backtest_end_date=datetime(2020, 12, 31),
             equity_curve=[(1000, datetime(2020, 1, 1)),
                           (1500, datetime(2020, 12, 31))],
+            initial_unallocated=1000,
             total_growth=500,
             total_growth_percentage=50.0,
             total_net_gain=500,
             total_net_gain_percentage=50.0,
+            total_loss=200,
+            total_loss_percentage=0.2,
             final_value=1500.0,
             cagr=0.1,
             sharpe_ratio=1.2,
@@ -39,7 +42,7 @@ class TestCombine(TestCase):
             calmar_ratio=0.8,
             profit_factor=1.5,
             gross_profit=700,
-            gross_loss=-200,
+            gross_loss=200,
             annual_volatility=0.15,
             monthly_returns=[],
             yearly_returns=[],
@@ -89,10 +92,13 @@ class TestCombine(TestCase):
             backtest_end_date=datetime(2021, 12, 31),
             equity_curve=[(2000, datetime(2021, 1, 1)),
                           (1800, datetime(2021, 12, 31))],
+            initial_unallocated=2000,
             total_growth=-200,
             total_growth_percentage=-10.0,
             total_net_gain=-200,
             total_net_gain_percentage=-10.0,
+            total_loss=500,
+            total_loss_percentage=0.25,
             final_value=1800.0,
             cagr=-0.05,
             sharpe_ratio=-0.5,
@@ -101,7 +107,7 @@ class TestCombine(TestCase):
             calmar_ratio=-0.3,
             profit_factor=0.7,
             gross_profit=300,
-            gross_loss=-500,
+            gross_loss=500,
             annual_volatility=0.25,
             monthly_returns=[],
             yearly_returns=[],
@@ -151,7 +157,13 @@ class TestCombine(TestCase):
         # --- Assertions ---
         # Sum metrics
         self.assertEqual(summary.total_net_gain, 300)  # 500 + (-200)
-        self.assertEqual(summary.total_loss, -700)  # -200 + -500
+        # B1/B2 fix (#511): total_loss is the gross loss magnitude
+        # summed across windows.
+        self.assertEqual(summary.total_loss, 700)  # 200 + 500
+        # total_loss_percentage = sum(gross_loss) / sum(initial)
+        self.assertAlmostEqual(
+            summary.total_loss_percentage, 700 / 3000, places=4
+        )
         self.assertEqual(summary.number_of_trades, 30)  # 10 + 20
 
         # Mean metrics
