@@ -418,6 +418,23 @@ class Backtest:
                 os.makedirs(destination_run_path, exist_ok=True)
                 br.save(destination_run_path)
 
+        # Always rebuild the summary from the current set of backtest runs
+        # before writing it to disk. This guarantees that summary.json is
+        # self-consistent with the per-run metrics.json files (e.g.
+        # number_of_windows == number of runs, total_net_gain == sum of
+        # per-run total_net_gain, etc.) regardless of how the in-memory
+        # Backtest was constructed (single backtest, walk-forward,
+        # merge(), …). See issue #511.
+        if self.backtest_runs:
+            per_run_metrics = [
+                br.backtest_metrics for br in self.backtest_runs
+                if br.backtest_metrics is not None
+            ]
+            if per_run_metrics:
+                self.backtest_summary = generate_backtest_summary_metrics(
+                    per_run_metrics
+                )
+
         # Save combined backtest metrics if available
         if self.backtest_summary:
             summary_file = os.path.join(
@@ -517,15 +534,22 @@ class Backtest:
             Backtest: The merged Backtest instance.
         """
 
-        merged = Backtest()
+        merged = Backtest(algorithm_id=self.algorithm_id)
         merged.backtest_runs = self.backtest_runs + other.backtest_runs
 
-        summary = BacktestSummaryMetrics()
+        # Rebuild the summary from the full set of merged backtest runs.
+        # `BacktestSummaryMetrics` is a plain dataclass and does not expose
+        # an `add()` method, so the previous incremental approach raised
+        # AttributeError and silently produced a stale / single-window
+        # summary. See issue #511.
+        merged_metrics = merged.get_all_backtest_metrics()
+        if merged_metrics:
+            merged.backtest_summary = generate_backtest_summary_metrics(
+                merged_metrics
+            )
+        else:
+            merged.backtest_summary = BacktestSummaryMetrics()
 
-        for bt_run in merged.get_all_backtest_metrics():
-            summary.add(bt_run)
-
-        merged.backtest_summary = summary
         merged.backtest_permutation_tests = \
             self.backtest_permutation_tests + other.backtest_permutation_tests
 

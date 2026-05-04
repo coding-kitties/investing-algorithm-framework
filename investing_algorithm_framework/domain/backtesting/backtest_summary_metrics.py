@@ -13,6 +13,30 @@ class BacktestSummaryMetrics:
     Represents the summarized results of a backtest,
     focusing on key headline performance and risk metrics.
 
+    .. note:: Field semantics & known duplicates (issue #511)
+
+        - ``total_loss`` / ``total_loss_percentage`` are gross-loss
+          based: ``total_loss`` is ``sum(per-run gross_loss)`` (a
+          non-negative magnitude in account currency) and
+          ``total_loss_percentage`` is ``total_loss /
+          sum(initial_unallocated)`` (decimal). They no longer mix
+          with net-return semantics. See B1/B2 in issue #511.
+
+        - ``total_growth`` / ``total_growth_percentage`` are
+          numerically equivalent to ``total_net_gain`` /
+          ``total_net_gain_percentage`` for closed-position backtests
+          because both are derived from the same start/end portfolio
+          values. They are kept for backwards compatibility but should
+          be considered legacy aliases. See B3 in issue #511.
+
+        - ``average_net_gain``, ``average_loss``, ``average_growth``
+          (and their ``*_percentage`` counterparts) are time-weighted
+          means **across windows**. For a single-window backtest they
+          collapse to the corresponding ``total_*`` value by
+          definition (weighted mean of one element equals that
+          element). See B4 in issue #511. For per-trade averages use
+          ``average_trade_*`` instead.
+
     Attributes:
         total_net_gain (float): Total net gain from the backtest.
         total_net_gain_percentage (float): Total net gain percentage
