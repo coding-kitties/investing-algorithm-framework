@@ -2,8 +2,8 @@
     "backtest_start_date": "2023-12-02T00:00:00+00:00",
     "backtest_end_date": "2023-12-03T00:00:00+00:00",
     "backtest_date_range_name": "",
-    "trading_symbol": "",
-    "initial_unallocated": 0.0,
+    "trading_symbol": "EUR",
+    "initial_unallocated": 1000.0,
     "equity_curve": [
         [
             1000.0,

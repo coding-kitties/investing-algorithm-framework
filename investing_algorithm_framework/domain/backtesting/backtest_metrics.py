@@ -20,6 +20,21 @@ class BacktestMetrics:
     total return, annualized return, volatility, Sharpe ratio,
     and maximum drawdown.
 
+    .. note:: Field semantics & known duplicates (issue #511)
+
+        - ``total_loss`` is the **gross loss magnitude** (a non-negative
+          number equal to ``sum(abs(net_gain))`` over losing trades).
+          ``total_loss_percentage`` is ``total_loss /
+          initial_unallocated`` (decimal, non-negative). These fields
+          no longer mirror ``total_net_gain`` / ``total_net_gain_pct``;
+          see B1 in issue #511.
+
+        - ``total_growth`` / ``total_growth_percentage`` are
+          numerically equivalent to ``total_net_gain`` /
+          ``total_net_gain_percentage`` for the standard
+          mark-to-market portfolio used in backtests. They are kept as
+          legacy aliases. See B3 in issue #511.
+
     Attributes:
         backtest_date_range_name (str): The name of the date range
             used for the backtest.

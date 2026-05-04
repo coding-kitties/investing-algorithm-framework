@@ -20,12 +20,14 @@ from investing_algorithm_framework.domain.backtesting.combine_backtests import (
 
 def create_mock_backtest_metrics(
     total_net_gain=100.0,
-    total_net_gain_percentage=10.0,
-    gross_loss=-50.0,
-    total_loss_percentage=-5.0,
+    total_net_gain_percentage=0.10,
+    total_loss=50.0,
+    gross_loss=50.0,
+    total_loss_percentage=0.05,
     total_growth=100.0,
-    total_growth_percentage=10.0,
+    total_growth_percentage=0.10,
     gross_profit=150.0,
+    initial_unallocated=1000.0,
     cagr=0.12,
     sharpe_ratio=1.5,
     sortino_ratio=2.0,
@@ -55,11 +57,13 @@ def create_mock_backtest_metrics(
     metrics = MagicMock()
     metrics.total_net_gain = total_net_gain
     metrics.total_net_gain_percentage = total_net_gain_percentage
+    metrics.total_loss = total_loss
     metrics.gross_loss = gross_loss
     metrics.total_loss_percentage = total_loss_percentage
     metrics.total_growth = total_growth
     metrics.total_growth_percentage = total_growth_percentage
     metrics.gross_profit = gross_profit
+    metrics.initial_unallocated = initial_unallocated
     metrics.cagr = cagr
     metrics.sharpe_ratio = sharpe_ratio
     metrics.sortino_ratio = sortino_ratio
@@ -184,57 +188,62 @@ class TestSafeWeightedMean(unittest.TestCase):
 
 
 class TestCompoundPercentageReturns(unittest.TestCase):
-    """Tests for _compound_percentage_returns helper function."""
+    """Tests for _compound_percentage_returns helper function.
+
+    The framework uses **decimal** percentages (e.g. ``0.10`` for 10%),
+    so all inputs and outputs of this helper are decimals. See issue
+    #511 (B5).
+    """
 
     def test_basic_compounding(self):
         """Test basic percentage compounding."""
         # 10% followed by 5%
         # (1 + 0.10) * (1 + 0.05) - 1 = 1.155 - 1 = 0.155 = 15.5%
-        percentages = [10, 5]
+        percentages = [0.10, 0.05]
 
         result = _compound_percentage_returns(percentages)
 
-        self.assertAlmostEqual(result, 15.5, places=5)
+        self.assertAlmostEqual(result, 0.155, places=5)
 
     def test_simple_compounding_not_addition(self):
         """Verify compounding is used, not simple addition."""
-        # If using addition: 10 + 10 = 20%
-        # If using compounding: (1.1) * (1.1) - 1 = 0.21 = 21%
-        percentages = [10, 10]
+        # If using addition: 0.10 + 0.10 = 0.20
+        # If using compounding: (1.1) * (1.1) - 1 = 0.21
+        percentages = [0.10, 0.10]
 
         result = _compound_percentage_returns(percentages)
 
-        # Should be 21%, not 20%
-        self.assertAlmostEqual(result, 21.0, places=5)
+        # Should be 0.21, not 0.20
+        self.assertAlmostEqual(result, 0.21, places=5)
 
     def test_negative_returns(self):
         """Test compounding with negative returns."""
         # -10% followed by -10%
-        # (1 - 0.10) * (1 - 0.10) - 1 = 0.81 - 1 = -0.19 = -19%
-        percentages = [-10, -10]
+        # (1 - 0.10) * (1 - 0.10) - 1 = 0.81 - 1 = -0.19
+        percentages = [-0.10, -0.10]
 
         result = _compound_percentage_returns(percentages)
 
-        self.assertAlmostEqual(result, -19.0, places=5)
+        self.assertAlmostEqual(result, -0.19, places=5)
 
     def test_mixed_positive_negative(self):
         """Test compounding with mixed positive and negative returns."""
         # +20% followed by -10%
-        # (1 + 0.20) * (1 - 0.10) - 1 = 1.2 * 0.9 - 1 = 1.08 - 1 = 0.08 = 8%
-        percentages = [20, -10]
+        # (1 + 0.20) * (1 - 0.10) - 1 = 1.2 * 0.9 - 1 = 0.08
+        percentages = [0.20, -0.10]
 
         result = _compound_percentage_returns(percentages)
 
-        self.assertAlmostEqual(result, 8.0, places=5)
+        self.assertAlmostEqual(result, 0.08, places=5)
 
     def test_ignores_none(self):
         """Test that None values are ignored."""
-        percentages = [10, None, 10]
+        percentages = [0.10, None, 0.10]
 
         result = _compound_percentage_returns(percentages)
 
-        # Only 10% and 10%: 21%
-        self.assertAlmostEqual(result, 21.0, places=5)
+        # Only 0.10 and 0.10: 0.21
+        self.assertAlmostEqual(result, 0.21, places=5)
 
     def test_empty_list(self):
         """Test with empty list."""
@@ -249,27 +258,27 @@ class TestCompoundPercentageReturns(unittest.TestCase):
 
     def test_single_return(self):
         """Test with single return."""
-        percentages = [15]
+        percentages = [0.15]
 
         result = _compound_percentage_returns(percentages)
 
-        self.assertAlmostEqual(result, 15.0, places=5)
+        self.assertAlmostEqual(result, 0.15, places=5)
 
     def test_zero_returns(self):
         """Test with zero returns."""
         # 0% doesn't change the total
-        percentages = [10, 0, 5]
+        percentages = [0.10, 0, 0.05]
 
         result = _compound_percentage_returns(percentages)
 
-        # (1.1) * (1.0) * (1.05) - 1 = 1.155 - 1 = 15.5%
-        self.assertAlmostEqual(result, 15.5, places=5)
+        # (1.1) * (1.0) * (1.05) - 1 = 0.155
+        self.assertAlmostEqual(result, 0.155, places=5)
 
     def test_large_loss_recovery(self):
         """Test recovery from large loss."""
         # -50% followed by +100% = back to even
-        # (1 - 0.5) * (1 + 1.0) - 1 = 0.5 * 2 - 1 = 0%
-        percentages = [-50, 100]
+        # (1 - 0.5) * (1 + 1.0) - 1 = 0.5 * 2 - 1 = 0
+        percentages = [-0.5, 1.0]
 
         result = _compound_percentage_returns(percentages)
 
@@ -358,24 +367,28 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
 
     def test_percentage_returns_compounded(self):
         """Test that percentage returns are compounded, not summed."""
-        # Period 1: 10%, Period 2: 10%
-        # Compounded: (1.1 * 1.1) - 1 = 21%, NOT 20%
-        metrics1 = create_mock_backtest_metrics(total_net_gain_percentage=10)
-        metrics2 = create_mock_backtest_metrics(total_net_gain_percentage=10)
+        # Period 1: 10%, Period 2: 10% (decimals: 0.10)
+        # Compounded: (1.1 * 1.1) - 1 = 0.21 (21%), NOT 0.20
+        metrics1 = create_mock_backtest_metrics(total_net_gain_percentage=0.10)
+        metrics2 = create_mock_backtest_metrics(total_net_gain_percentage=0.10)
 
         result = generate_backtest_summary_metrics([metrics1, metrics2])
 
-        self.assertAlmostEqual(result.total_net_gain_percentage, 21.0, places=3)
+        self.assertAlmostEqual(
+            result.total_net_gain_percentage, 0.21, places=4
+        )
 
     def test_growth_percentage_compounded(self):
         """Test that growth percentage is compounded."""
-        metrics1 = create_mock_backtest_metrics(total_growth_percentage=20)
-        metrics2 = create_mock_backtest_metrics(total_growth_percentage=10)
+        metrics1 = create_mock_backtest_metrics(total_growth_percentage=0.20)
+        metrics2 = create_mock_backtest_metrics(total_growth_percentage=0.10)
 
         result = generate_backtest_summary_metrics([metrics1, metrics2])
 
-        # (1.2 * 1.1) - 1 = 32%
-        self.assertAlmostEqual(result.total_growth_percentage, 32.0, places=3)
+        # (1.2 * 1.1) - 1 = 0.32
+        self.assertAlmostEqual(
+            result.total_growth_percentage, 0.32, places=4
+        )
 
     # ==========================================================
     # Risk-Adjusted Ratios (Weighted by Time)
@@ -562,7 +575,7 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
         """Test combining two equal-length periods."""
         metrics1 = create_mock_backtest_metrics(
             total_net_gain=1000,
-            total_net_gain_percentage=10,
+            total_net_gain_percentage=0.10,
             sharpe_ratio=1.5,
             max_drawdown=-0.15,
             number_of_trades=20,
@@ -572,7 +585,7 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
         )
         metrics2 = create_mock_backtest_metrics(
             total_net_gain=500,
-            total_net_gain_percentage=5,
+            total_net_gain_percentage=0.05,
             sharpe_ratio=1.0,
             max_drawdown=-0.10,
             number_of_trades=10,
@@ -589,8 +602,10 @@ class TestGenerateBacktestSummaryMetrics(unittest.TestCase):
         self.assertEqual(result.number_of_trades_closed, 26)
 
         # Verify compounded percentage
-        # (1.10 * 1.05) - 1 = 15.5%
-        self.assertAlmostEqual(result.total_net_gain_percentage, 15.5, places=3)
+        # (1.10 * 1.05) - 1 = 0.155
+        self.assertAlmostEqual(
+            result.total_net_gain_percentage, 0.155, places=4
+        )
 
         # Verify weighted Sharpe (equal time weights)
         self.assertAlmostEqual(result.sharpe_ratio, 1.25, places=5)
@@ -636,15 +651,17 @@ class TestGenerateBacktestSummaryMetricsCalculationValidity(unittest.TestCase):
         Example: Start with $1000
         - Period 1: +10% -> $1100
         - Period 2: +10% -> $1210
-        Total return: ($1210 - $1000) / $1000 = 21%, NOT 20%
+        Total return: ($1210 - $1000) / $1000 = 0.21 (21%), NOT 0.20
         """
-        metrics1 = create_mock_backtest_metrics(total_net_gain_percentage=10)
-        metrics2 = create_mock_backtest_metrics(total_net_gain_percentage=10)
+        metrics1 = create_mock_backtest_metrics(total_net_gain_percentage=0.10)
+        metrics2 = create_mock_backtest_metrics(total_net_gain_percentage=0.10)
 
         result = generate_backtest_summary_metrics([metrics1, metrics2])
 
-        # Compound return should be 21%
-        self.assertAlmostEqual(result.total_net_gain_percentage, 21.0, places=3)
+        # Compound return should be 0.21 (21%)
+        self.assertAlmostEqual(
+            result.total_net_gain_percentage, 0.21, places=4
+        )
 
     def test_weighted_average_makes_sense_for_ratios(self):
         """
@@ -746,4 +763,3 @@ class TestGenerateBacktestSummaryMetricsCalculationValidity(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
