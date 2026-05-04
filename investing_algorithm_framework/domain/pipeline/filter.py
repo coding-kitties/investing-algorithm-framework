@@ -46,7 +46,7 @@ class _TopN(Filter):
         return int(self.window)
 
     def compute_panel(self, panel: pl.DataFrame) -> pl.Series:
-        values = self._base.compute_panel(panel)
+        values = self._base.evaluate(panel)
         df = panel.select(["datetime", "symbol"]).with_columns(
             values.alias("__topn_input__")
         )
@@ -82,7 +82,7 @@ class _BottomN(Filter):
         return int(self.window)
 
     def compute_panel(self, panel: pl.DataFrame) -> pl.Series:
-        values = self._base.compute_panel(panel)
+        values = self._base.evaluate(panel)
         df = panel.select(["datetime", "symbol"]).with_columns(
             values.alias("__bottomn_input__")
         )

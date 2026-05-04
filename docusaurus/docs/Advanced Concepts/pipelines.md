@@ -90,6 +90,53 @@ factor.top(n)                # boolean mask: top-n by descending value
 factor.bottom(n)             # boolean mask: bottom-n by ascending value
 ```
 
+### Cross-sectional transforms
+
+Per-bar normalisation operators (Phase 2). Each takes an optional
+`mask` so the statistic is computed only over the universe that
+passes the mask:
+
+```python
+factor.zscore(mask=universe)             # (x - mean) / std per bar
+factor.demean(mask=universe)             # x - mean per bar
+factor.winsorize(0.01, 0.99,             # clip to per-bar quantiles
+                 mask=universe)
+```
+
+Where the cross-sectional `std` is `0` or undefined (e.g. only one
+symbol survives the mask), `zscore` returns `null` rather than
+`inf`/`NaN`. Masked-out symbols are excluded from the bar's
+statistic *and* from the bar's output.
+
+### Factor algebra
+
+Factors compose via the standard arithmetic operators. The framework
+auto-coerces scalar operands and shares sub-expression results via a
+per-evaluation cache, so the same input factor is computed once even
+when it appears multiple times:
+
+```python
+class MyScreener(Pipeline):
+    momentum = Returns(window=30)
+    vol = Volatility(window=30)
+
+    universe = AverageDollarVolume(window=30).top(100)
+
+    # Composite alphas — `momentum` is computed once even though it
+    # appears in two terms.
+    risk_adjusted = momentum / vol
+    score = (
+        momentum.zscore(mask=universe)
+        - 0.5 * vol.zscore(mask=universe)
+    )
+```
+
+Supported operators: `+`, `-`, `*`, `/`, unary `-`. Both operands may
+be `Factor` instances; either may be a Python `int` or `float`.
+Division by zero leaves `inf` in place (downstream filters can drop
+it) — for safe normalisation prefer `zscore`, which guards against
+zero dispersion.
+
 ## Phased rollout
 
 Pipelines run today in the **event-driven backtest** path and in
@@ -99,7 +146,7 @@ and cached/lazy execution are tracked separately.
 | Mode | Status | Page |
 | --- | --- | --- |
 | Event-driven backtest | ✅ Phase 1 | [Pipelines: Event-driven backtest](pipelines-event-backtest.md) |
-| Vector backtest | 🚧 Phase 2 ([#502](https://github.com/coding-kitties/investing-algorithm-framework/issues/502)) | [Pipelines: Vector backtest](pipelines-vector-backtest.md) |
+| Vector backtest | ✅ Phase 2 ([#502](https://github.com/coding-kitties/investing-algorithm-framework/issues/502)) | [Pipelines: Vector backtest](pipelines-vector-backtest.md) |
 | Live trading | 🚧 Phase 3 ([#503](https://github.com/coding-kitties/investing-algorithm-framework/issues/503)) | [Pipelines: Live trading](pipelines-live.md) |
 
 Start with the event-driven backtest page — it covers the full Phase 1

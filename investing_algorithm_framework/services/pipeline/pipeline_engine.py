@@ -16,6 +16,7 @@ from typing import Any, Dict, Mapping, Optional, Type
 import pandas as pd
 import polars as pl
 
+from investing_algorithm_framework.domain.pipeline.factor import _EVAL_CACHE
 from investing_algorithm_framework.domain.pipeline.pipeline import Pipeline
 
 
@@ -69,7 +70,14 @@ class PipelineEngine:
             df = df.with_columns(pl.lit(symbol).alias("symbol"))
             df = df.select(list(PANEL_COLUMNS))
             if as_of is not None:
-                df = df.filter(pl.col("datetime") <= pl.lit(as_of))
+                # Normalise tz so naive panels and tz-aware ``as_of``
+                # values (e.g. from BacktestDateRange) compare cleanly.
+                col_tz = df.schema["datetime"].time_zone
+                if col_tz is None and as_of.tzinfo is not None:
+                    as_of_cmp = as_of.replace(tzinfo=None)
+                else:
+                    as_of_cmp = as_of
+                df = df.filter(pl.col("datetime") <= pl.lit(as_of_cmp))
             frames.append(df)
 
         if not frames:
@@ -108,17 +116,22 @@ class PipelineEngine:
         if panel.is_empty():
             return self._empty_output(pipeline_cls)
 
-        result = panel.select(["datetime", "symbol"])
-        for name, factor in pipeline_cls.get_columns().items():
-            values = factor.compute_panel(panel)
-            result = result.with_columns(values.alias(name))
+        cache: Dict[tuple, pl.Series] = {}
+        token = _EVAL_CACHE.set(cache)
+        try:
+            result = panel.select(["datetime", "symbol"])
+            for name, factor in pipeline_cls.get_columns().items():
+                values = factor.evaluate(panel)
+                result = result.with_columns(values.alias(name))
 
-        universe = pipeline_cls.get_universe()
-        if universe is not None:
-            mask = universe.compute_panel(panel)
-            result = result.with_columns(mask.alias("__universe__"))
-            result = result.filter(pl.col("__universe__"))
-            result = result.drop("__universe__")
+            universe = pipeline_cls.get_universe()
+            if universe is not None:
+                mask = universe.evaluate(panel)
+                result = result.with_columns(mask.alias("__universe__"))
+                result = result.filter(pl.col("__universe__"))
+                result = result.drop("__universe__")
+        finally:
+            _EVAL_CACHE.reset(token)
 
         # Slice to as_of bar
         result = result.filter(pl.col("datetime") == pl.lit(as_of))

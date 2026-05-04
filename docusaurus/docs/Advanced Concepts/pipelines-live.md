@@ -42,6 +42,30 @@ If you want to experiment, the same example covers both:
 
 The same `Pipeline` subclasses you use in backtests run live.
 
+## Stateless / serverless deployment (AWS Lambda, Azure Functions)
+
+Live trading is frequently deployed on **AWS Lambda** or **Azure
+Functions** via the framework's stateless mode (see
+`investing_algorithm_framework/cli/deploy_to_aws_lambda.py` and
+`deploy_to_azure_function.py`). The pipeline runtime is designed to
+be safe in those environments:
+
+- **No cross-invocation state.** Pipelines hold no module-level
+  mutable state. Each call to `PipelineEngine.evaluate(...)` (event
+  mode) and `VectorPipelineEngine.evaluate_window(...)` (vector mode)
+  builds a fresh panel and a fresh result frame.
+- **Per-evaluation cache, scoped via `contextvars`.** The shared
+  sub-expression cache used by composite factors (e.g. `r + r.zscore()`
+  reusing `r`'s computation) lives in a `ContextVar` that is
+  installed at the start of each `evaluate` call and reset in a
+  `finally` block. A warm Lambda / Functions container reusing the
+  process between invocations sees a clean cache every time.
+- **Pure factor composition.** `Factor.zscore()`, `demean()`,
+  `winsorize()`, and arithmetic (`+ - * /`, unary `-`) all return new
+  factor objects without mutating their inputs. Building a pipeline
+  is a pure operation, so it's safe to construct pipelines at module
+  load time on Lambda/Functions cold start.
+
 ## Want to help?
 
 Track or comment on the implementation issue:
