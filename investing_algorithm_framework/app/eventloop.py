@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from time import sleep
-from typing import List, Set, Dict
+from typing import List, Set, Dict, FrozenSet, Tuple, Optional, Type
 from logging import getLogger
 
 import polars as pl
@@ -84,6 +84,18 @@ class EventLoopService:
         self.next_run_times = {}
         self.history = {}
         self._pipeline_engine = PipelineEngine()
+
+        # Per (strategy_id, pipeline_cls) cache of the most recent
+        # universe-refresh: (refresh_at, frozen surviving-symbol set).
+        # Populated when a pipeline declares
+        # ``refresh_universe_every`` so the engine can skip re-running
+        # the universe filter every bar.
+        self._pipeline_universe_cache: Dict[
+            Tuple[str, Type], Tuple[datetime, FrozenSet[str]]
+        ] = {}
+        # One-shot flag: live-mode envelope validation runs once per
+        # process. Reset by ``cleanup`` so a new run re-validates.
+        self._pipelines_live_validated: bool = False
 
     @staticmethod
     def _get_data_sources_for_iteration(
@@ -332,6 +344,11 @@ class EventLoopService:
             None
         """
         self._portfolio_snapshot_service.save_all(self._snapshots)
+        # Reset per-run pipeline state so a subsequent run re-runs
+        # live envelope validation and starts with a fresh universe
+        # cache.
+        self._pipeline_universe_cache.clear()
+        self._pipelines_live_validated = False
 
     def start(
         self,
@@ -445,6 +462,121 @@ class EventLoopService:
 
         self.cleanup()
 
+    # ------------------------------------------------------------------ #
+    # Pipeline live-mode helpers (#503 phase 3b/3c/3d)
+    # ------------------------------------------------------------------ #
+    # Envelope: v1 of live pipelines supports daily timeframes only and
+    # caps universes at 50 symbols per pipeline. Any sub-daily timeframe
+    # on a strategy that declares pipelines, or a strategy whose total
+    # OHLCV symbol set exceeds the cap, raises at first iteration when
+    # running outside backtest mode. See #503.
+    _LIVE_MAX_PIPELINE_SYMBOLS: int = 50
+    _LIVE_MIN_TIMEFRAME_MINUTES: int = 24 * 60  # daily
+
+    def _validate_live_envelope(
+        self, strategies: List[TradingStrategy]
+    ) -> None:
+        """Validate the v1 live-pipeline envelope (max 50 symbols /
+        daily-or-coarser timeframes). Called once per run when env is
+        not BACKTEST. Raises :class:`OperationalException` on
+        violation."""
+        for strategy in strategies or []:
+            pipelines = getattr(strategy, "pipelines", None)
+            if not pipelines:
+                continue
+
+            ohlcv_sources = [
+                ds for ds in (strategy.data_sources or [])
+                if DataType.OHLCV.equals(ds.data_type)
+            ]
+
+            sub_daily = [
+                ds for ds in ohlcv_sources
+                if ds.time_frame is not None
+                and ds.time_frame.amount_of_minutes
+                < self._LIVE_MIN_TIMEFRAME_MINUTES
+            ]
+            if sub_daily:
+                desc = ", ".join(
+                    f"{ds.symbol}@{ds.time_frame.value}"
+                    for ds in sub_daily
+                )
+                raise OperationalException(
+                    f"Strategy '{strategy.strategy_id}' declares "
+                    f"pipelines but uses sub-daily OHLCV timeframes "
+                    f"in live mode: {desc}. v1 of the live pipeline "
+                    f"engine supports daily timeframes only — see "
+                    f"#503. Use a daily timeframe or run the strategy "
+                    f"in backtest mode."
+                )
+
+            unique_symbols = {ds.symbol for ds in ohlcv_sources}
+            unique_symbols.discard(None)
+            if len(unique_symbols) > self._LIVE_MAX_PIPELINE_SYMBOLS:
+                raise OperationalException(
+                    f"Strategy '{strategy.strategy_id}' declares "
+                    f"pipelines over {len(unique_symbols)} symbols, "
+                    f"which exceeds the v1 live cap of "
+                    f"{self._LIVE_MAX_PIPELINE_SYMBOLS}. Reduce the "
+                    f"universe or run the strategy in backtest mode "
+                    f"(see #503)."
+                )
+
+    def _maybe_validate_live_envelope(
+        self, strategies: List[TradingStrategy], environment: str
+    ) -> None:
+        """One-shot envelope validation; no-op for BACKTEST mode."""
+        if self._pipelines_live_validated:
+            return
+        if Environment.BACKTEST.equals(environment):
+            self._pipelines_live_validated = True
+            return
+        self._validate_live_envelope(strategies)
+        self._pipelines_live_validated = True
+
+    def _filter_symbols_for_universe_cache(
+        self,
+        strategy_id: str,
+        pipeline_cls: Type,
+        symbol_to_identifier: Dict[str, str],
+        as_of: datetime,
+    ) -> Optional[Dict[str, str]]:
+        """If ``pipeline_cls`` declares ``refresh_universe_every`` and
+        we have a cached surviving-symbol set still inside the cadence,
+        return a restricted ``symbol_to_identifier`` mapping. Returning
+        ``None`` means "no cache hit — run a full universe evaluation".
+        """
+        cadence: Optional[timedelta] = getattr(
+            pipeline_cls, "refresh_universe_every", None
+        )
+        if cadence is None or cadence <= timedelta(0):
+            return None
+
+        cache_key = (strategy_id, pipeline_cls)
+        cached = self._pipeline_universe_cache.get(cache_key)
+        if cached is None:
+            return None
+
+        last_refresh, symbols = cached
+        # Normalise tz so naive backtest datetimes and aware live
+        # datetimes compare cleanly.
+        if last_refresh.tzinfo is None and as_of.tzinfo is not None:
+            cmp_as_of = as_of.replace(tzinfo=None)
+        elif last_refresh.tzinfo is not None and as_of.tzinfo is None:
+            cmp_as_of = as_of.replace(tzinfo=last_refresh.tzinfo)
+        else:
+            cmp_as_of = as_of
+        if cmp_as_of - last_refresh >= cadence:
+            return None  # cadence elapsed → refresh
+
+        # Cache hit: restrict the symbol set, skipping the universe
+        # filter entirely on this iteration.
+        return {
+            sym: ident
+            for sym, ident in symbol_to_identifier.items()
+            if sym in symbols
+        }
+
     def _run_pipelines(
         self,
         strategy: TradingStrategy,
@@ -457,12 +589,26 @@ class EventLoopService:
         class name.
 
         Strategies without ``pipelines`` skip this entirely (zero cost).
-        Per Phase 1 of the Pipeline API (#501); see
-        ``docs/design/pipeline-api.md``.
+
+        Live-mode hardening (#503):
+
+        * The v1 envelope (max 50 symbols, daily-or-coarser timeframes)
+          is validated once per run.
+        * Pipelines that declare ``refresh_universe_every`` reuse the
+          last surviving symbol set within the cadence — saving the
+          cost of evaluating the universe filter every bar.
+        * In non-backtest environments, a single failing pipeline is
+          logged and skipped (the iteration continues with an empty
+          output) instead of killing the whole event loop. Backtests
+          keep raising so failures stay deterministic.
         """
         pipelines = getattr(strategy, "pipelines", None)
         if not pipelines:
             return
+
+        config = self._configuration_service.get_config()
+        environment = config[ENVIRONMENT]
+        is_backtest = Environment.BACKTEST.equals(environment)
 
         # Map symbol -> data-source identifier from the strategy's
         # OHLCV data sources. If a symbol appears on multiple data
@@ -484,20 +630,62 @@ class EventLoopService:
             return
 
         for pipeline_cls in pipelines:
+            # 3c: universe-refresh cache. If the pipeline declares a
+            # refresh cadence and we're inside it, restrict the panel
+            # input to the cached symbols.
+            cached_mapping = self._filter_symbols_for_universe_cache(
+                strategy_id=strategy.strategy_id,
+                pipeline_cls=pipeline_cls,
+                symbol_to_identifier=symbol_to_identifier,
+                as_of=as_of,
+            )
+            mapping = (
+                cached_mapping
+                if cached_mapping is not None
+                else symbol_to_identifier
+            )
+
             try:
                 output = self._pipeline_engine.evaluate(
                     pipeline_cls=pipeline_cls,
                     data_object=data_object,
-                    symbol_to_identifier=symbol_to_identifier,
+                    symbol_to_identifier=mapping,
                     as_of=as_of,
                 )
-            except Exception:  # pragma: no cover - logged + re-raised
+            except Exception:
+                # 3d: live-mode resilience. In live trading a single
+                # pipeline failure must not kill the iteration —
+                # surface an empty frame and log so the rest of the
+                # strategies can still run. Backtests re-raise so
+                # failures stay deterministic.
                 logger.exception(
                     "Pipeline %s failed during evaluation at %s",
                     pipeline_cls.__name__,
                     as_of,
                 )
-                raise
+                if is_backtest:
+                    raise
+                output = self._pipeline_engine._empty_output(
+                    pipeline_cls
+                )
+
+            # 3c: refresh the universe cache when we just ran a full
+            # evaluation (cached_mapping was None) and the pipeline
+            # declares a cadence.
+            cadence = getattr(
+                pipeline_cls, "refresh_universe_every", None
+            )
+            if (
+                cadence is not None
+                and cadence > timedelta(0)
+                and cached_mapping is None
+                and "symbol" in output.columns
+            ):
+                surviving = frozenset(output["symbol"].to_list())
+                self._pipeline_universe_cache[
+                    (strategy.strategy_id, pipeline_cls)
+                ] = (as_of, surviving)
+
             data[pipeline_cls.__name__] = output
 
     def _run_iteration(
@@ -526,6 +714,11 @@ class EventLoopService:
         config = self._configuration_service.get_config()
         environment = config[ENVIRONMENT]
         current_datetime = config[INDEX_DATETIME]
+
+        # Validate the live-pipeline envelope (max 50 symbols /
+        # daily-or-coarser timeframes) once per run. No-op for
+        # backtests. See #503 phase 3b.
+        self._maybe_validate_live_envelope(strategies, environment)
 
         # Step 1: Collect all data for the strategies and for the
         # pending orders

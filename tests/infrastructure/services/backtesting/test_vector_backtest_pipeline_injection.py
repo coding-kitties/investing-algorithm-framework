@@ -8,11 +8,12 @@ directly without spinning up a full backtest.
 """
 from __future__ import annotations
 
+import logging
+import unittest
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
 import polars as pl
-import pytest
 
 from investing_algorithm_framework import (
     AverageDollarVolume,
@@ -77,110 +78,27 @@ def _make_data_sources_and_data():
     return sources, data
 
 
-def test_inject_pipelines_no_pipelines_is_noop():
-    sources, data = _make_data_sources_and_data()
-    strategy = _StubStrategy(data_sources=sources, pipelines=None)
-    before = dict(data)
+class TestVectorBacktestPipelineInjection(unittest.TestCase):
 
-    VectorBacktestService._inject_pipelines(
-        strategy=strategy,
-        data=data,
-        backtest_date_range=BacktestDateRange(
-            start_date=datetime(2024, 1, 2),
-            end_date=datetime(2024, 1, 4),
-        ),
-    )
-    assert data == before
+    def test_inject_pipelines_no_pipelines_is_noop(self):
+        sources, data = _make_data_sources_and_data()
+        strategy = _StubStrategy(data_sources=sources, pipelines=None)
+        before = dict(data)
 
-
-def test_inject_pipelines_adds_long_frame_keyed_by_class_name():
-    sources, data = _make_data_sources_and_data()
-    strategy = _StubStrategy(data_sources=sources, pipelines=[_Screener])
-
-    VectorBacktestService._inject_pipelines(
-        strategy=strategy,
-        data=data,
-        backtest_date_range=BacktestDateRange(
-            start_date=datetime(2024, 1, 2),
-            end_date=datetime(2024, 1, 4),
-        ),
-    )
-
-    assert "_Screener" in data
-    out = data["_Screener"]
-    assert isinstance(out, pl.DataFrame)
-    # Long format: datetime + symbol + factor columns (universe dropped)
-    assert set(out.columns) == {"datetime", "symbol", "adv", "momentum"}
-    # Universe restricts to top-2 by ADV every bar; BBB always loses
-    # (volume=1 vs 100/200) so it must never appear in the output.
-    assert "BBB/EUR" not in out["symbol"].to_list()
-
-
-def test_inject_pipelines_respects_end_date_no_lookahead():
-    sources, data = _make_data_sources_and_data()
-    strategy = _StubStrategy(data_sources=sources, pipelines=[_Screener])
-
-    VectorBacktestService._inject_pipelines(
-        strategy=strategy,
-        data=data,
-        backtest_date_range=BacktestDateRange(
-            start_date=datetime(2024, 1, 2),
-            end_date=datetime(2024, 1, 3),
-        ),
-    )
-    out = data["_Screener"]
-    # No bars beyond end_date should leak in.
-    max_dt = out["datetime"].max()
-    assert max_dt <= datetime(2024, 1, 3)
-
-
-def test_inject_pipelines_skips_when_no_ohlcv_sources(caplog):
-    """A strategy with pipelines but no OHLCV data sources should log
-    and skip silently without raising."""
-    strategy = _StubStrategy(data_sources=[], pipelines=[_Screener])
-    data = {}
-
-    with caplog.at_level(
-        "WARNING",
-        logger=(
-            "investing_algorithm_framework.infrastructure.services."
-            "backtesting.vector_backtest_service"
-        ),
-    ):
         VectorBacktestService._inject_pipelines(
             strategy=strategy,
             data=data,
             backtest_date_range=BacktestDateRange(
                 start_date=datetime(2024, 1, 2),
-                end_date=datetime(2024, 1, 3),
+                end_date=datetime(2024, 1, 4),
             ),
         )
+        self.assertEqual(data, before)
 
-    assert "_Screener" not in data
-    assert any(
-        "no OHLCV data sources" in record.message
-        for record in caplog.records
-    )
+    def test_inject_pipelines_adds_long_frame_keyed_by_class_name(self):
+        sources, data = _make_data_sources_and_data()
+        strategy = _StubStrategy(data_sources=sources, pipelines=[_Screener])
 
-
-def test_inject_pipelines_re_raises_engine_errors():
-    """Pipeline evaluation errors should propagate to the caller so
-    backtest authors see a clear failure rather than a silent skip."""
-
-    class _Broken(Pipeline):
-        adv = AverageDollarVolume(window=2)
-        momentum = Returns(window=2)
-
-    sources, data = _make_data_sources_and_data()
-    # Corrupt one of the inputs to force a polars-level error.
-    bad_id = sources[0].get_identifier()
-    data[bad_id] = pl.DataFrame(
-        {"Datetime": [datetime(2024, 1, 1)], "Close": [10.0]}
-    )
-
-    strategy = _StubStrategy(data_sources=sources, pipelines=[_Broken])
-
-    with pytest.raises(Exception):
         VectorBacktestService._inject_pipelines(
             strategy=strategy,
             data=data,
@@ -190,7 +108,91 @@ def test_inject_pipelines_re_raises_engine_errors():
             ),
         )
 
+        self.assertIn("_Screener", data)
+        out = data["_Screener"]
+        self.assertIsInstance(out, pl.DataFrame)
+        # Long format: datetime + symbol + factor columns (universe dropped)
+        self.assertEqual(
+            set(out.columns), {"datetime", "symbol", "adv", "momentum"}
+        )
+        # Universe restricts to top-2 by ADV every bar; BBB always loses
+        # (volume=1 vs 100/200) so it must never appear in the output.
+        self.assertNotIn("BBB/EUR", out["symbol"].to_list())
+
+    def test_inject_pipelines_respects_end_date_no_lookahead(self):
+        sources, data = _make_data_sources_and_data()
+        strategy = _StubStrategy(data_sources=sources, pipelines=[_Screener])
+
+        VectorBacktestService._inject_pipelines(
+            strategy=strategy,
+            data=data,
+            backtest_date_range=BacktestDateRange(
+                start_date=datetime(2024, 1, 2),
+                end_date=datetime(2024, 1, 3),
+            ),
+        )
+        out = data["_Screener"]
+        # No bars beyond end_date should leak in.
+        max_dt = out["datetime"].max()
+        self.assertLessEqual(max_dt, datetime(2024, 1, 3))
+
+    def test_inject_pipelines_skips_when_no_ohlcv_sources(self):
+        """A strategy with pipelines but no OHLCV data sources should log
+        and skip silently without raising."""
+        strategy = _StubStrategy(data_sources=[], pipelines=[_Screener])
+        data = {}
+
+        logger_name = (
+            "investing_algorithm_framework.infrastructure.services."
+            "backtesting.vector_backtest_service"
+        )
+        with self.assertLogs(logger_name, level=logging.WARNING) as cm:
+            VectorBacktestService._inject_pipelines(
+                strategy=strategy,
+                data=data,
+                backtest_date_range=BacktestDateRange(
+                    start_date=datetime(2024, 1, 2),
+                    end_date=datetime(2024, 1, 3),
+                ),
+            )
+
+        self.assertNotIn("_Screener", data)
+        self.assertTrue(
+            any("no OHLCV data sources" in msg for msg in cm.output)
+        )
+
+    def test_inject_pipelines_re_raises_engine_errors(self):
+        """Pipeline evaluation errors should propagate to the caller so
+        backtest authors see a clear failure rather than a silent skip."""
+
+        class _Broken(Pipeline):
+            adv = AverageDollarVolume(window=2)
+            momentum = Returns(window=2)
+
+        sources, data = _make_data_sources_and_data()
+        # Corrupt one of the inputs to force a polars-level error.
+        bad_id = sources[0].get_identifier()
+        data[bad_id] = pl.DataFrame(
+            {"Datetime": [datetime(2024, 1, 1)], "Close": [10.0]}
+        )
+
+        strategy = _StubStrategy(data_sources=sources, pipelines=[_Broken])
+
+        with self.assertRaises(Exception):
+            VectorBacktestService._inject_pipelines(
+                strategy=strategy,
+                data=data,
+                backtest_date_range=BacktestDateRange(
+                    start_date=datetime(2024, 1, 2),
+                    end_date=datetime(2024, 1, 4),
+                ),
+            )
+
 
 # Suppress the unused import warning — kept for symmetry with other
 # vector-backtest tests in the suite.
 _ = SimpleNamespace, DataType
+
+
+if __name__ == "__main__":
+    unittest.main()

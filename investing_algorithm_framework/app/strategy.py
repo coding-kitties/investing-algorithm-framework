@@ -194,6 +194,57 @@ class TradingStrategy:
                     f"interval or use a smaller data timeframe."
                 )
 
+        # Validate that every declared pipeline has enough warmup on
+        # the strategy's OHLCV data sources to compute its longest
+        # factor window. Without this check a live strategy starts
+        # silently emitting NaN columns until enough bars accrue.
+        # Tracked under #503 (Phase 3 — live hardening).
+        if self.pipelines:
+            ohlcv_sources = [
+                ds for ds in self.data_sources
+                if DataType.OHLCV.equals(ds.data_type)
+            ]
+            if not ohlcv_sources:
+                raise OperationalException(
+                    f"Strategy '{self.strategy_id}' declares "
+                    f"{len(self.pipelines)} pipeline(s) but has no "
+                    f"OHLCV data sources. Pipelines build their panel "
+                    f"from the strategy's OHLCV data sources — add at "
+                    f"least one DataSource(data_type=DataType.OHLCV, "
+                    f"...) to data_sources."
+                )
+            for pipeline_cls in self.pipelines:
+                required = pipeline_cls.required_window()
+                # We compare against each OHLCV source's warmup_window
+                # (canonical) / window_size (legacy alias) — the
+                # framework keeps them in sync, but a source may
+                # legitimately leave both unset, which we treat as
+                # "insufficient" because the pipeline cannot guarantee
+                # a full window of data.
+                short_sources = [
+                    ds for ds in ohlcv_sources
+                    if ds.warmup_window is None
+                    or ds.warmup_window < required
+                ]
+                if short_sources:
+                    short_desc = ", ".join(
+                        f"{ds.symbol}@{ds.time_frame.value if ds.time_frame else '?'}"  # noqa: E501
+                        f" (warmup_window="
+                        f"{ds.warmup_window if ds.warmup_window is not None else 'unset'})"  # noqa: E501
+                        for ds in short_sources
+                    )
+                    raise OperationalException(
+                        f"Strategy '{self.strategy_id}' pipeline "
+                        f"'{pipeline_cls.__name__}' requires a "
+                        f"warmup window of {required} bars but the "
+                        f"following OHLCV data source(s) have an "
+                        f"insufficient warmup_window: {short_desc}. "
+                        f"Set warmup_window>={required} on each OHLCV "
+                        f"DataSource the pipeline relies on, otherwise "
+                        f"the pipeline will emit NaN columns until "
+                        f"enough bars accrue."
+                    )
+
         # Initialize stop_losses as a new list per instance
         if stop_losses is not None:
             self.stop_losses = list(stop_losses)
