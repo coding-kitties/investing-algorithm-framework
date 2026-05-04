@@ -10,11 +10,15 @@ from .custom_factor import CustomFactor
 from .filter import Filter
 from .pipeline import Pipeline
 from .factors import (
-    Returns,
     AverageDollarVolume,
     AverageTradedValue,
-    SMA,
+    CrossSectionalMean,
+    Neutralize,
+    Returns,
+    RollingBeta,
     RSI,
+    SMA,
+    StaticPerSymbol,
     Volatility,
 )
 
@@ -23,10 +27,14 @@ __all__ = [
     "Factor",
     "CustomFactor",
     "Filter",
-    "Returns",
     "AverageDollarVolume",
     "AverageTradedValue",
-    "SMA",
+    "CrossSectionalMean",
+    "Neutralize",
+    "Returns",
+    "RollingBeta",
     "RSI",
+    "SMA",
+    "StaticPerSymbol",
     "Volatility",
 ]

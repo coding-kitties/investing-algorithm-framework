@@ -19,7 +19,8 @@ Example::
 """
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
+from datetime import timedelta
+from typing import ClassVar, Dict, List, Optional, Tuple
 
 from .factor import Factor
 from .filter import Filter
@@ -39,6 +40,14 @@ class Pipeline:
     # Excludes the special ``universe`` column.
     __pipeline_columns__: Tuple[Tuple[str, Factor], ...] = ()
     __pipeline_universe__: Optional[Filter] = None
+
+    #: Optional cadence for re-evaluating the universe filter. When
+    #: set, the engine caches the surviving symbol set and reuses it
+    #: between refreshes — saving the cost of evaluating the (often
+    #: expensive) universe filter every bar. Factors are still
+    #: recomputed on every iteration. ``None`` (the default)
+    #: re-evaluates the universe every bar.
+    refresh_universe_every: ClassVar[Optional[timedelta]] = None
 
     def __init_subclass__(cls, **kwargs) -> None:
         super().__init_subclass__(**kwargs)
