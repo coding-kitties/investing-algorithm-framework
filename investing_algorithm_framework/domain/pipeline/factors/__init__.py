@@ -1,18 +1,26 @@
-"""Built-in factors shipped with the Pipeline API (Phase 1)."""
+"""Built-in factors shipped with the Pipeline API."""
 from .builtin import (
-    Returns,
     AverageDollarVolume,
     AverageTradedValue,
-    SMA,
+    CrossSectionalMean,
+    Neutralize,
+    Returns,
+    RollingBeta,
     RSI,
+    SMA,
+    StaticPerSymbol,
     Volatility,
 )
 
 __all__ = [
-    "Returns",
     "AverageDollarVolume",
     "AverageTradedValue",
-    "SMA",
+    "CrossSectionalMean",
+    "Neutralize",
+    "Returns",
+    "RollingBeta",
     "RSI",
+    "SMA",
+    "StaticPerSymbol",
     "Volatility",
 ]

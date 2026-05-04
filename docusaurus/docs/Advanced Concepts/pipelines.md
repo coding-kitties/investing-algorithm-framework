@@ -71,6 +71,10 @@ A per-symbol time-series computation. Phase 1 ships these built-ins:
 | `SMA(window)` | close | simple moving average |
 | `RSI(window)` | close | Wilder's RSI |
 | `Volatility(window, periods_per_year=252)` | close | annualised stdev of log returns |
+| `StaticPerSymbol(mapping, default=None)` | — | broadcasts a `dict[symbol, value]` (e.g. sector / market-cap) into the cross-section |
+| `CrossSectionalMean(base, mask=None)` | base factor | per-bar equal-weight mean across surviving symbols |
+| `RollingBeta(target, market, window>=2)` | two factors | rolling-window OLS beta `cov(t,m)/var(m)`; null when `var(m) == 0` |
+| `Neutralize(target, exposures=[...], mask=None, add_intercept=True)` | factors | per-bar OLS residualisation of `target` against `exposures`; null on rank-deficient bars |
 
 You can also subclass `CustomFactor` to compute your own.
 
@@ -101,12 +105,71 @@ factor.zscore(mask=universe)             # (x - mean) / std per bar
 factor.demean(mask=universe)             # x - mean per bar
 factor.winsorize(0.01, 0.99,             # clip to per-bar quantiles
                  mask=universe)
+
+# Group-relative variants — stats computed within each group
+# (typically sector). `groups` accepts a dict[symbol, key] or any
+# Factor that emits a per-symbol category.
+factor.zscore(groups=SECTORS)            # z-score within sector
+factor.demean(groups=SECTORS, mask=universe)
 ```
 
 Where the cross-sectional `std` is `0` or undefined (e.g. only one
 symbol survives the mask), `zscore` returns `null` rather than
 `inf`/`NaN`. Masked-out symbols are excluded from the bar's
 statistic *and* from the bar's output.
+
+### Risk neutrality
+
+When you want a factor's signal to be independent of structural
+exposures (sector, beta to the market, multi-factor risk model),
+use the built-in risk-neutrality primitives. They cover three
+common cases:
+
+**Sector neutrality** — z-score or demean *within* each sector
+instead of across the whole universe by passing `groups=`. The
+mapping can be a `dict[symbol, sector]` or any `Factor` that
+emits a per-symbol category:
+
+```python
+SECTORS = {"AAPL": "Tech", "MSFT": "Tech", "JPM": "Fin", ...}
+
+class SectorNeutralMomentum(Pipeline):
+    momentum = Returns(window=60)
+    signal = momentum.zscore(groups=SECTORS)   # z-score within sector
+```
+
+**Beta neutralisation** — strip a factor's exposure to the market
+(or any other reference series) using `RollingBeta` and
+`Neutralize`:
+
+```python
+from investing_algorithm_framework import (
+    Returns, RollingBeta, CrossSectionalMean, Neutralize,
+)
+
+class BetaNeutralAlpha(Pipeline):
+    r = Returns(window=1)
+    market = CrossSectionalMean(r)               # equal-weight market
+    beta = RollingBeta(r, market, window=60)
+    alpha = Neutralize(r, exposures=[beta])      # market-neutral residual
+```
+
+**Multi-factor risk model** — pass several exposures to
+`Neutralize` and the residual is orthogonal to all of them at
+each bar (per-bar OLS):
+
+```python
+class FactorNeutralAlpha(Pipeline):
+    r = Returns(window=1)
+    size = StaticPerSymbol(MARKET_CAPS)          # cross-sectional size
+    val = BookToPrice()
+    mom = Returns(window=252)
+    residual = Neutralize(r, exposures=[size, val, mom])
+```
+
+Bars where the system is rank-deficient (more exposures than
+surviving symbols) yield `null` residuals so they're skipped
+downstream rather than producing `NaN`.
 
 ### Factor algebra
 
