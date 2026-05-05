@@ -1,6 +1,9 @@
-from typing import List, Optional
+from typing import List, Optional, Union
 from logging import getLogger
+import gc
 import os
+import sys
+from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 
 from investing_algorithm_framework.domain import BacktestMetrics, \
@@ -105,7 +108,59 @@ def _recalculate_one(args):
     summary = generate_backtest_summary_metrics(
         [m for m in run_metrics if m is not None]
     )
+    # Drop the local Backtest reference and force a collection so the
+    # worker's RSS can shrink between tasks. Without this the heap can
+    # grow unboundedly when one worker handles many large backtests.
+    del backtest
+    gc.collect()
     return run_metrics, summary
+
+
+def _recalculate_one_path(args):
+    """Worker entry: load a backtest from disk, recalc all metrics,
+    save it back to disk, return the path and a flat index row.
+
+    Used by :func:`recalculate_backtests_in_directory`. The Backtest
+    never crosses the process boundary so the parent stays flat,
+    regardless of batch size.
+    """
+    src_path, dst_path, risk_free_rate, metrics, \
+        include_ohlcv, ohlcv_store = args
+
+    # Local imports keep the worker startup cost predictable and avoid
+    # circular-import issues at module load time.
+    from investing_algorithm_framework.domain.backtesting.bundle import (
+        is_bundle_file, open_bundle, save_bundle,
+    )
+    from investing_algorithm_framework.domain.backtesting.backtest \
+        import Backtest as _Backtest
+    from investing_algorithm_framework.domain.backtesting.backtest_utils \
+        import _backtest_to_index_row
+
+    bt = open_bundle(src_path) if is_bundle_file(src_path) \
+        else _Backtest.open(src_path)
+    rfr = risk_free_rate if risk_free_rate is not None \
+        else (bt.risk_free_rate or 0.0)
+
+    for run in bt.get_all_backtest_runs():
+        run.backtest_metrics = create_backtest_metrics(run, rfr, metrics)
+
+    all_metrics = [
+        run.backtest_metrics
+        for run in bt.get_all_backtest_runs()
+        if run.backtest_metrics is not None
+    ]
+    bt.backtest_summary = generate_backtest_summary_metrics(all_metrics)
+
+    out = str(save_bundle(
+        bt, dst_path,
+        include_ohlcv=include_ohlcv,
+        ohlcv_store=ohlcv_store,
+    ))
+    row = _backtest_to_index_row(bt, bundle_path=os.path.basename(out))
+    del bt
+    gc.collect()
+    return out, row
 
 
 def _apply_recalc_result(backtest, run_metrics, summary):
@@ -115,34 +170,142 @@ def _apply_recalc_result(backtest, run_metrics, summary):
     backtest.backtest_summary = summary
 
 
+def _make_pool(n_workers: int, max_tasks_per_child: Optional[int]):
+    """Create a :class:`ProcessPoolExecutor`, opting into
+    ``max_tasks_per_child`` on Python 3.11+ where it is supported.
+
+    Worker recycling is essential for memory-stable long runs because
+    each task can leave behind cached pandas/polars / numpy buffers
+    that the worker's allocator never returns to the OS. Recycling
+    after a fixed number of tasks reclaims that memory.
+    """
+    if (
+        max_tasks_per_child is not None
+        and sys.version_info >= (3, 11)
+    ):
+        return ProcessPoolExecutor(
+            max_workers=n_workers,
+            max_tasks_per_child=max_tasks_per_child,
+        )
+    return ProcessPoolExecutor(max_workers=n_workers)
+
+
+def _run_pool(
+    submit_fn,
+    items,
+    n_workers: int,
+    max_tasks_per_child: Optional[int],
+    on_result,
+    on_error=None,
+):
+    """Run ``submit_fn(item)`` over *items* with at most ``n_workers``
+    tasks in flight.
+
+    On Python < 3.11, where ``max_tasks_per_child`` does not exist on
+    :class:`ProcessPoolExecutor`, we emulate worker recycling by
+    closing and re-opening the executor every
+    ``max_tasks_per_child * n_workers`` completions. This keeps RSS
+    flat at the cost of process startup overhead between batches.
+    """
+    has_native_recycle = (
+        max_tasks_per_child is not None
+        and sys.version_info >= (3, 11)
+    )
+
+    items_iter = iter(items)
+    completed_in_pool = 0
+    pool_capacity = (
+        (max_tasks_per_child or 0) * n_workers
+        if max_tasks_per_child and not has_native_recycle else None
+    )
+
+    def _open():
+        return _make_pool(n_workers, max_tasks_per_child)
+
+    ex = _open()
+    inflight = {}
+
+    def _submit_next():
+        nonlocal ex, completed_in_pool, inflight
+        try:
+            item = next(items_iter)
+        except StopIteration:
+            return False
+        fut = ex.submit(submit_fn, item)
+        inflight[fut] = item
+        return True
+
+    try:
+        for _ in range(n_workers):
+            if not _submit_next():
+                break
+
+        while inflight:
+            done_set, _unused = wait(
+                inflight.keys(), return_when=FIRST_COMPLETED
+            )
+            for fut in done_set:
+                item = inflight.pop(fut)
+                try:
+                    on_result(item, fut.result())
+                except Exception as e:
+                    if on_error is not None:
+                        on_error(item, e)
+                    else:
+                        logger.error(f"Task failed: {e}")
+                completed_in_pool += 1
+
+            # Emulated recycling: drain the pool, recreate it.
+            if (
+                pool_capacity is not None
+                and completed_in_pool >= pool_capacity
+                and not inflight
+            ):
+                ex.shutdown(wait=True)
+                ex = _open()
+                completed_in_pool = 0
+                for _ in range(n_workers):
+                    if not _submit_next():
+                        break
+            else:
+                _submit_next()
+    finally:
+        ex.shutdown(wait=True)
+
+
 def recalculate_backtests(
     backtests: List[Backtest],
     risk_free_rate: float = None,
     metrics: List[str] = None,
     workers: Optional[int] = None,
+    max_tasks_per_child: Optional[int] = 16,
 ) -> List[Backtest]:
     """
-    Recalculate all metrics for a set of backtests. For each backtest,
-    this recomputes per-run metrics from the raw portfolio snapshots and
-    trades, then regenerates the summary metrics from the updated
-    per-run metrics.
+    Recalculate all metrics for a set of backtests.
+
+    .. warning::
+
+        This function holds every backtest in *backtests* in the
+        parent process simultaneously. For very large batches
+        (thousands of backtests with portfolio snapshots / trades)
+        prefer :func:`recalculate_backtests_in_directory`, which
+        streams from disk in worker processes and never accumulates
+        backtests in the parent.
 
     Args:
-        backtests (List[Backtest]): The backtests to recalculate.
-        risk_free_rate (float, optional): The risk-free rate to use.
-            If None, uses each backtest's own risk_free_rate (falling
-            back to 0.0 if not set).
-        metrics (List[str], optional): List of metric names to compute.
-            If None, a default set of metrics will be computed.
-        workers (int, optional): Number of parallel processes. Defaults
-            to ``1`` (serial), since process startup and pickling
-            overhead can outweigh the recalculation cost for small
-            backtests. Pass an explicit value (e.g. ``min(8, os.cpu_count())``)
-            for large batches with non-trivial per-backtest workloads.
+        backtests: The backtests to recalculate.
+        risk_free_rate: Risk-free rate to use. If ``None``, uses each
+            backtest's own ``risk_free_rate`` (falling back to ``0.0``).
+        metrics: Metric names to compute. ``None`` uses the default set.
+        workers: Number of parallel worker processes. ``None`` or
+            ``1`` runs serially in the calling process.
+        max_tasks_per_child: Recycle each worker after this many tasks
+            to keep RSS flat. Applied natively on Python 3.11+ and
+            emulated by re-creating the pool on older versions. Set to
+            ``None`` to disable recycling.
 
     Returns:
-        List[Backtest]: The same backtest objects with all per-run
-            metrics and summary metrics recalculated.
+        The same backtest objects, mutated in place.
     """
     if not backtests:
         return backtests
@@ -157,48 +320,171 @@ def recalculate_backtests(
             _apply_recalc_result(backtest, run_metrics, summary)
         return backtests
 
-    # Parallel: only keep ``n_workers`` tasks in flight at a time so we
-    # don't pickle every backtest up-front (which can blow memory for
-    # large batches with heavy snapshots/trades). Workers return only
-    # the lightweight metrics + summary, which we merge back into the
-    # caller's existing backtest objects.
-    pending = iter(enumerate(backtests))
-    inflight = {}
+    index_by_id = {id(bt): i for i, bt in enumerate(backtests)}
+    items = (
+        (bt, risk_free_rate, metrics) for bt in backtests
+    )
 
-    def _submit_next(executor):
-        try:
-            idx, bt = next(pending)
-        except StopIteration:
-            return False
-        fut = executor.submit(
-            _recalculate_one, (bt, risk_free_rate, metrics)
+    def _on_result(item, result):
+        bt = item[0]
+        run_metrics, summary = result
+        _apply_recalc_result(backtests[index_by_id[id(bt)]],
+                             run_metrics, summary)
+
+    def _on_error(item, exc):
+        bt = item[0]
+        logger.error(
+            "Failed to recalculate backtest "
+            f"{getattr(bt, 'algorithm_id', '?')}: {exc}"
         )
-        inflight[fut] = idx
-        return True
 
-    with ProcessPoolExecutor(max_workers=n_workers) as ex:
-        for _ in range(n_workers):
-            if not _submit_next(ex):
-                break
-
-        while inflight:
-            done_set, _unused = wait(
-                inflight.keys(), return_when=FIRST_COMPLETED
-            )
-            for fut in done_set:
-                idx = inflight.pop(fut)
-                bt = backtests[idx]
-                try:
-                    run_metrics, summary = fut.result()
-                    _apply_recalc_result(bt, run_metrics, summary)
-                except Exception as e:  # pragma: no cover - defensive
-                    logger.error(
-                        "Failed to recalculate backtest "
-                        f"{getattr(bt, 'algorithm_id', '?')}: {e}"
-                    )
-                _submit_next(ex)
-
+    _run_pool(
+        _recalculate_one,
+        items,
+        n_workers=n_workers,
+        max_tasks_per_child=max_tasks_per_child,
+        on_result=_on_result,
+        on_error=_on_error,
+    )
     return backtests
+
+
+def recalculate_backtests_in_directory(
+    src_dir: Union[str, Path],
+    dst_dir: Optional[Union[str, Path]] = None,
+    *,
+    risk_free_rate: float = None,
+    metrics: List[str] = None,
+    workers: Optional[int] = None,
+    show_progress: bool = False,
+    include_ohlcv: bool = False,
+    max_tasks_per_child: Optional[int] = 16,
+    update_index: bool = True,
+) -> int:
+    """Stream-recalculate backtest metrics for every bundle on disk.
+
+    Each backtest is loaded, recalculated, and written back **inside a
+    worker process**. The full :class:`Backtest` never crosses the
+    process boundary, so the parent process's memory footprint stays
+    constant regardless of how many backtests are processed.
+
+    Args:
+        src_dir: Directory containing ``.iafbt`` bundles (and/or
+            legacy backtest directories).
+        dst_dir: Output directory. If ``None``, bundles are rewritten
+            in place inside *src_dir*.
+        risk_free_rate: Risk-free rate to use. ``None`` uses each
+            backtest's own ``risk_free_rate``.
+        metrics: Metric names to compute. ``None`` uses the default
+            set.
+        workers: Number of parallel worker processes. Defaults to
+            ``min(8, cpu_count)``. Pass ``1`` to force serial.
+        show_progress: Display a tqdm progress bar.
+        include_ohlcv: Re-emit attached OHLCV data with the bundle.
+        max_tasks_per_child: Recycle each worker after this many tasks
+            so RSS stays bounded over long runs.
+        update_index: Rewrite ``index.parquet`` in *dst_dir* (or
+            *src_dir* when in-place) using the freshly computed
+            summaries.
+
+    Returns:
+        Number of backtests recalculated.
+    """
+    from investing_algorithm_framework.domain.backtesting.bundle \
+        import BUNDLE_EXT
+    from investing_algorithm_framework.domain.backtesting.backtest_utils \
+        import _resolve_workers
+    from investing_algorithm_framework.domain.utils.custom_tqdm import tqdm
+
+    src_dir = Path(src_dir)
+    in_place = dst_dir is None
+    out_dir = src_dir if in_place else Path(dst_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Discover sources without loading them.
+    sources: List[str] = []
+    for root, dirs, files in os.walk(src_dir):
+        for fname in files:
+            if fname.endswith(BUNDLE_EXT):
+                sources.append(os.path.join(root, fname))
+        for dname in list(dirs):
+            d = os.path.join(root, dname)
+            if (
+                os.path.isfile(os.path.join(d, "algorithm_id.json"))
+                and os.path.isdir(os.path.join(d, "runs"))
+            ):
+                sources.append(d)
+                dirs.remove(dname)
+
+    if not sources:
+        return 0
+
+    ohlcv_store = (
+        str(out_dir / "ohlcv") if include_ohlcv else None
+    )
+
+    plan = []
+    for src in sources:
+        base = os.path.basename(os.path.normpath(src))
+        if base.endswith(BUNDLE_EXT):
+            base = base[: -len(BUNDLE_EXT)]
+        dst = str(out_dir / f"{base}{BUNDLE_EXT}")
+        plan.append((
+            src, dst, risk_free_rate, metrics,
+            include_ohlcv, ohlcv_store,
+        ))
+
+    n = len(plan)
+    n_workers = min(_resolve_workers(workers), n)
+
+    pbar = tqdm(
+        total=n,
+        desc="Recalculating backtests",
+        disable=not show_progress,
+    )
+
+    rows: List[dict] = []
+
+    def _on_result(item, result):
+        out_path, row = result
+        if update_index and row is not None:
+            rows.append(row)
+        pbar.update(1)
+
+    def _on_error(item, exc):
+        logger.error(f"Failed to recalculate {item[0]}: {exc}")
+        pbar.update(1)
+
+    try:
+        if n_workers <= 1:
+            for item in plan:
+                try:
+                    result = _recalculate_one_path(item)
+                    _on_result(item, result)
+                except Exception as e:
+                    _on_error(item, e)
+        else:
+            _run_pool(
+                _recalculate_one_path,
+                plan,
+                n_workers=n_workers,
+                max_tasks_per_child=max_tasks_per_child,
+                on_result=_on_result,
+                on_error=_on_error,
+            )
+    finally:
+        pbar.close()
+
+    if update_index and rows:
+        import pandas as pd  # local import keeps top of module light
+        df = pd.DataFrame(rows)
+        df.to_parquet(
+            out_dir / "index.parquet",
+            index=False,
+            compression="zstd",
+        )
+
+    return n
 
 
 def create_backtest_metrics(

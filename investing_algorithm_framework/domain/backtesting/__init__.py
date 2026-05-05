@@ -9,6 +9,7 @@ from .combine_backtests import combine_backtests, \
     generate_backtest_summary_metrics
 from .backtest_utils import (
     load_backtests_from_directory,
+    iter_backtests_from_directory,
     save_backtests_to_directory,
     retag_backtests,
     migrate_backtests,
@@ -33,6 +34,7 @@ __all__ = [
     "combine_backtests",
     "generate_backtest_summary_metrics",
     "load_backtests_from_directory",
+    "iter_backtests_from_directory",
     "save_backtests_to_directory",
     "retag_backtests",
     "migrate_backtests",

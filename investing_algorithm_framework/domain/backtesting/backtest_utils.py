@@ -410,22 +410,47 @@ def load_backtests_from_directory(
     else:
         # Process pool only handles bundle loads efficiently; loading
         # legacy directories from workers also works but the win is
-        # smaller. We still parallelise both for simplicity.
-        with ProcessPoolExecutor(max_workers=n_workers) as ex:
-            futures = {
-                ex.submit(_load_one_dispatch, it): it for it in sources
-            }
-            for fut in as_completed(futures):
-                src = futures[fut]
+        # smaller. We still parallelise both for simplicity. Submission
+        # is bounded to ``n_workers`` in flight so the executor's
+        # feeder thread does not buffer the entire source list, and
+        # workers are recycled (Python 3.11+) so RSS stays bounded.
+        import sys
+        pool_kwargs = {"max_workers": n_workers}
+        if sys.version_info >= (3, 11):
+            pool_kwargs["max_tasks_per_child"] = 16
+
+        sources_iter = iter(sources)
+        inflight = {}
+
+        with ProcessPoolExecutor(**pool_kwargs) as ex:
+            def _submit_next():
                 try:
-                    backtests.append(fut.result())
-                except Exception as e:
-                    logger.error(
-                        f"Failed to load backtest from {src[0]}: {e}"
-                    )
-                finally:
-                    if pbar is not None:
-                        pbar.update(1)
+                    it = next(sources_iter)
+                except StopIteration:
+                    return False
+                inflight[ex.submit(_load_one_dispatch, it)] = it
+                return True
+
+            for _ in range(n_workers):
+                if not _submit_next():
+                    break
+
+            while inflight:
+                done_set, _unused = wait(
+                    inflight.keys(), return_when=FIRST_COMPLETED
+                )
+                for fut in done_set:
+                    src = inflight.pop(fut)
+                    try:
+                        backtests.append(fut.result())
+                    except Exception as e:
+                        logger.error(
+                            f"Failed to load backtest from {src[0]}: {e}"
+                        )
+                    finally:
+                        if pbar is not None:
+                            pbar.update(1)
+                    _submit_next()
 
     if pbar is not None:
         pbar.close()
@@ -437,6 +462,87 @@ def load_backtests_from_directory(
             logger.error(f"Error in filter_function: {fe}")
 
     return backtests
+
+
+def iter_backtests_from_directory(
+    directory_path: Union[str, Path],
+    filter_function: Callable[[Backtest], bool] = None,
+    number_of_backtests_to_load: int = None,
+    show_progress: bool = False,
+):
+    """Yield :class:`Backtest` objects one at a time from *directory_path*.
+
+    Memory-stable alternative to :func:`load_backtests_from_directory`:
+    each backtest is loaded only when the caller asks for the next
+    item, so peak memory equals one backtest at a time. Use this when
+    a directory contains so many large backtests that the full list
+    would not fit in RAM.
+
+    Example:
+        >>> for bt in iter_backtests_from_directory(path):
+        ...     process(bt)
+        ...     # bt is dropped here; its memory is reclaimed before
+        ...     # the next one is read from disk.
+
+    Args:
+        directory_path: Source directory.
+        filter_function: Optional predicate; backtests for which it
+            returns False are skipped.
+        number_of_backtests_to_load: Optional cap on the number of
+            backtests yielded.
+        show_progress: Display a tqdm progress bar.
+    """
+    directory_path = str(directory_path)
+    if not os.path.exists(directory_path):
+        logger.warning(
+            f"Directory {directory_path} does not exist. "
+            "No backtests loaded."
+        )
+        return
+
+    sources: List[tuple] = []
+    for entry in sorted(os.listdir(directory_path)):
+        if entry == "checkpoints.json" or entry.endswith(".py"):
+            continue
+        if entry == "index.parquet" or entry == "ohlcv":
+            continue
+        full = os.path.join(directory_path, entry)
+        if os.path.isfile(full):
+            if entry.endswith(BUNDLE_EXT) or is_bundle_file(full):
+                sources.append((full, "bundle"))
+        elif os.path.isdir(full):
+            sources.append((full, "directory"))
+
+    if number_of_backtests_to_load is not None:
+        sources = sources[: max(0, int(number_of_backtests_to_load))]
+
+    pbar = tqdm(
+        total=len(sources),
+        desc="Loading backtests",
+        disable=not show_progress,
+    )
+    try:
+        for item in sources:
+            try:
+                bt = _load_one_dispatch(item)
+            except Exception as e:
+                logger.error(
+                    f"Failed to load backtest from {item[0]}: {e}"
+                )
+                pbar.update(1)
+                continue
+            try:
+                if filter_function is not None and not filter_function(bt):
+                    pbar.update(1)
+                    continue
+            except Exception as fe:  # pragma: no cover - defensive
+                logger.error(f"Error in filter_function: {fe}")
+                pbar.update(1)
+                continue
+            yield bt
+            pbar.update(1)
+    finally:
+        pbar.close()
 
 
 # ---------------------------------------------------------------------------
@@ -699,8 +805,14 @@ def migrate_backtests(
             # Bound in-flight tasks to ``resolved_workers`` so we don't
             # buffer the full plan inside the executor's feeder, and
             # consume results as they finish to keep memory flat.
+            # Recycle workers (3.11+) so RSS stays bounded across long
+            # migrations.
+            import sys
+            pool_kwargs = {"max_workers": resolved_workers}
+            if sys.version_info >= (3, 11):
+                pool_kwargs["max_tasks_per_child"] = 16
             plan_iter = iter(plan)
-            with ProcessPoolExecutor(max_workers=resolved_workers) as ex:
+            with ProcessPoolExecutor(**pool_kwargs) as ex:
                 inflight = {}
                 for _ in range(resolved_workers):
                     try:

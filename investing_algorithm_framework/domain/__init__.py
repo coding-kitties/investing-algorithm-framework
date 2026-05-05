@@ -44,6 +44,7 @@ from .backtesting import BacktestRun, BacktestSummaryMetrics, \
     BacktestDateRange, Backtest, BacktestMetrics, combine_backtests, \
     BacktestPermutationTest, BacktestEvaluationFocus, \
     generate_backtest_summary_metrics, load_backtests_from_directory, \
+    iter_backtests_from_directory, \
     save_backtests_to_directory, retag_backtests, migrate_backtests, \
     BacktestIndex, save_bundle, open_bundle, BUNDLE_EXT, \
     BUNDLE_FORMAT_VERSION
@@ -174,6 +175,7 @@ __all__ = [
     'ScalingRule',
     'TradingCost',
     "load_backtests_from_directory",
+    "iter_backtests_from_directory",
     "save_backtests_to_directory",
     "retag_backtests",
     "migrate_backtests",
