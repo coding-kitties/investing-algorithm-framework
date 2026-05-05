@@ -565,6 +565,24 @@ class BacktestIndex:
 # ---------------------------------------------------------------------------
 
 
+def _migrate_one(args):
+    """Worker entry point: open *src* (legacy dir or bundle), write
+    *dst* as a bundle, return the destination path.
+
+    Doing load+save in one worker call keeps each backtest's data in
+    a single process — avoiding the cost of pickling fully-decoded
+    Backtest objects back to the parent process. This roughly halves
+    peak memory usage for large migrations and is faster end-to-end.
+    """
+    src, dst, include_ohlcv, ohlcv_store = args
+    bt = _open_bundle(src) if is_bundle_file(src) else Backtest.open(src)
+    return str(_save_bundle(
+        bt, dst,
+        include_ohlcv=include_ohlcv,
+        ohlcv_store=ohlcv_store,
+    ))
+
+
 def migrate_backtests(
     src_dir: Union[str, Path],
     dst_dir: Union[str, Path],
@@ -572,19 +590,105 @@ def migrate_backtests(
     workers: Optional[int] = None,
     show_progress: bool = False,
     write_index: bool = True,
+    include_ohlcv: bool = False,
+    skip_existing: bool = True,
 ) -> int:
-    """Rewrite a directory of legacy backtest folders as ``.iafbt``
-    bundles in *dst_dir*. Returns the number of backtests migrated.
+    """Rewrite a directory of legacy backtest folders (or existing
+    ``.iafbt`` bundles) as ``.iafbt`` bundles in *dst_dir*.
+
+    The migration is streamed: each backtest is loaded and re-saved
+    inside a single worker process, so memory usage stays roughly
+    constant regardless of how many backtests are being migrated.
+
+    Args:
+        src_dir: Source directory containing legacy backtest folders
+            and/or ``.iafbt`` bundles. Walked recursively.
+        dst_dir: Destination directory. Created if it does not exist.
+        workers: Number of parallel workers. ``None`` picks
+            ``min(8, cpu_count)``. Pass ``1`` to force serial.
+        show_progress: Display a progress bar.
+        write_index: Write a sibling ``index.parquet`` summarising the
+            destination bundles for fast filtering with
+            :class:`BacktestIndex`.
+        include_ohlcv: Include OHLCV data in the destination bundles.
+        skip_existing: Skip backtests whose destination bundle already
+            exists. Allows resuming an interrupted migration.
+
+    Returns:
+        Number of backtests migrated (excluding skipped ones).
     """
-    backtests = load_backtests_from_directory(
-        src_dir, workers=workers, show_progress=show_progress,
+    src_dir = Path(src_dir)
+    dst_dir = Path(dst_dir)
+    dst_dir.mkdir(parents=True, exist_ok=True)
+
+    # Discover sources: any *.iafbt file or any directory shaped like
+    # a legacy backtest (algorithm_id.json + runs/).
+    sources: List[str] = []
+    for root, dirs, files in os.walk(src_dir):
+        for fname in files:
+            if fname.endswith(BUNDLE_EXT):
+                sources.append(os.path.join(root, fname))
+        for dname in list(dirs):
+            d = os.path.join(root, dname)
+            if (
+                os.path.isfile(os.path.join(d, "algorithm_id.json"))
+                and os.path.isdir(os.path.join(d, "runs"))
+            ):
+                sources.append(d)
+                # Don't descend into a recognised backtest dir.
+                dirs.remove(dname)
+
+    if not sources:
+        return 0
+
+    # Build (src, dst) pairs, optionally skipping ones that already
+    # exist in dst_dir.
+    ohlcv_store = (
+        str(dst_dir / "ohlcv") if include_ohlcv else None
     )
-    save_backtests_to_directory(
-        backtests,
-        dst_dir,
-        format=FORMAT_BUNDLE,
-        workers=workers,
-        show_progress=show_progress,
-        write_index=write_index,
-    )
-    return len(backtests)
+    plan = []
+    for src in sources:
+        base = os.path.basename(os.path.normpath(src))
+        if base.endswith(BUNDLE_EXT):
+            base = base[: -len(BUNDLE_EXT)]
+        dst = str(dst_dir / f"{base}{BUNDLE_EXT}")
+        if skip_existing and os.path.isfile(dst):
+            continue
+        plan.append((src, dst, include_ohlcv, ohlcv_store))
+
+    if not plan:
+        return 0
+
+    n = len(plan)
+    resolved_workers = min(_resolve_workers(workers), n)
+
+    iterator: object
+    if resolved_workers > 1:
+        with ProcessPoolExecutor(max_workers=resolved_workers) as ex:
+            results = ex.map(_migrate_one, plan)
+            iterator = tqdm(
+                results,
+                total=n,
+                desc="Migrating backtests",
+                disable=not show_progress,
+            )
+            for _ in iterator:
+                pass
+    else:
+        for args in tqdm(
+            plan,
+            total=n,
+            desc="Migrating backtests",
+            disable=not show_progress,
+        ):
+            _migrate_one(args)
+
+    if write_index:
+        # Re-open the freshly written bundles (cheap header reads only
+        # for the index) to build the parquet manifest.
+        migrated = load_backtests_from_directory(
+            dst_dir, workers=workers, show_progress=False,
+        )
+        _write_index(dst_dir, migrated)
+
+    return n

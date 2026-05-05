@@ -89,6 +89,39 @@ backtests = load_backtests_from_directory("./my_backtests")
 Backtests are persisted in the framework's optimized **`.iafbt` bundle format** — a single binary file per backtest using zstd compression + MessagePack encoding. Compared to the legacy directory layout it is ~21× smaller, ~27× fewer files, and ~3× faster to load. Both `save_backtests_to_directory` and `load_backtests_from_directory` support parallel I/O via `workers=N`. Existing legacy directories keep working transparently; use `iaf migrate-backtests --src ... --dst ...` to convert them.
 :::
 
+### Migrating Existing Backtests
+
+Convert a directory of legacy backtest folders to the new bundle
+format with `migrate_backtests`. The migration is **streamed**
+(load+save fused per worker), so memory usage stays roughly
+constant regardless of how many backtests you migrate, and an
+interrupted run can simply be re-invoked to resume — destination
+bundles that already exist are skipped by default.
+
+```python
+from investing_algorithm_framework import migrate_backtests
+
+n = migrate_backtests(
+    src_dir="./old_backtests",       # legacy folders and/or .iafbt
+    dst_dir="./bundled_backtests",   # destination
+    workers=8,                        # parallel; None = min(8, cpu)
+    show_progress=True,
+    write_index=True,                 # also build index.parquet
+    include_ohlcv=False,
+    skip_existing=True,               # resume-safe (default)
+)
+print(f"migrated {n} backtests")
+```
+
+Or from the CLI:
+
+```bash
+iaf migrate-backtests \
+    --src ./old_backtests \
+    --dst ./bundled_backtests \
+    --workers 8
+```
+
 ## Reporting
 
 Use [Backtest Reports](/docs/Getting%20Started/backtest-reports) to turn

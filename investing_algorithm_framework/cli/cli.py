@@ -273,13 +273,28 @@ cli.add_command(mcp)
     "--no-index", is_flag=True, default=False,
     help="Skip writing index.parquet at the destination.",
 )
-def migrate_backtests_cmd(src, dst, workers, no_index):
+@click.option(
+    "--include-ohlcv", is_flag=True, default=False,
+    help="Include OHLCV data in the destination bundles.",
+)
+@click.option(
+    "--no-skip-existing", is_flag=True, default=False,
+    help="Re-migrate even if the destination bundle already exists.",
+)
+def migrate_backtests_cmd(
+    src, dst, workers, no_index, include_ohlcv, no_skip_existing
+):
     """Convert a directory of legacy backtest folders into the bundled
     binary format introduced in issue #487.
 
     The new ``.iafbt`` format is a single zstd-compressed MessagePack
     file per backtest. Loading bundled directories is dramatically
     faster than the legacy multi-file layout for large batches.
+
+    Migration is streamed (load+save fused per worker) so memory
+    usage stays roughly constant regardless of source size, and
+    interrupted runs can be resumed (existing destination bundles
+    are skipped by default).
     """
     from investing_algorithm_framework.domain import migrate_backtests
 
@@ -289,6 +304,8 @@ def migrate_backtests_cmd(src, dst, workers, no_index):
         workers=workers,
         show_progress=True,
         write_index=not no_index,
+        include_ohlcv=include_ohlcv,
+        skip_existing=not no_skip_existing,
     )
     click.echo(f"Migrated {n} backtest(s) from {src} to {dst}")
 
