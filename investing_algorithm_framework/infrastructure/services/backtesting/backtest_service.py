@@ -19,7 +19,8 @@ from investing_algorithm_framework.domain import BacktestRun, TimeUnit, \
     OperationalException, BacktestDateRange, Backtest, combine_backtests, \
     generate_backtest_summary_metrics, DataSource, \
     PortfolioConfiguration, tqdm, SnapshotInterval, \
-    save_backtests_to_directory, TimeFrame
+    save_backtests_to_directory, TimeFrame, resolve_backtest_path, \
+    BUNDLE_EXT
 from investing_algorithm_framework.services.data_providers import \
     DataProviderService, fill_missing_timeseries_data, \
     get_missing_timeseries_data_entries
@@ -628,9 +629,11 @@ class BacktestService:
             bool: True if the backtest exists, False otherwise.
         """
         algorithm_id = strategy.algorithm_id
-        backtest_directory = os.path.join(storage_directory, algorithm_id)
+        backtest_directory = resolve_backtest_path(
+            storage_directory, algorithm_id
+        )
 
-        if os.path.exists(backtest_directory):
+        if backtest_directory is not None:
             backtest = Backtest.open(backtest_directory)
             backtest_date_ranges = backtest.get_backtest_date_ranges()
 
@@ -942,9 +945,14 @@ class BacktestService:
                 # rerun in this session.
                 if session_cache is not None:
                     for algo_id in matched_ids:
-                        backtest_path = os.path.join(
+                        backtest_path = resolve_backtest_path(
                             backtest_storage_directory, algo_id
                         )
+                        if backtest_path is None:
+                            backtest_path = os.path.join(
+                                backtest_storage_directory,
+                                f"{algo_id}{BUNDLE_EXT}",
+                            )
                         session_cache["backtests"][algo_id] = backtest_path
 
                 if stale_ids and on_checkpoint_match != "skip":
@@ -1351,10 +1359,10 @@ class BacktestService:
                     # Clear filtered_out flag for backtests that passed
                     # the filter (they may have been filtered out before)
                     for alg_id in filtered_algorithm_ids:
-                        backtest_dir = os.path.join(
+                        backtest_dir = resolve_backtest_path(
                             backtest_storage_directory, alg_id
                         )
-                        if os.path.exists(backtest_dir):
+                        if backtest_dir is not None:
                             try:
                                 backtest = Backtest.open(backtest_dir)
                                 if backtest.metadata is not None and \
@@ -1378,10 +1386,10 @@ class BacktestService:
                     # Mark filtered-out backtests with metadata flag
                     # This preserves them in storage for future runs
                     for alg_id in algorithms_to_mark:
-                        backtest_dir = os.path.join(
+                        backtest_dir = resolve_backtest_path(
                             backtest_storage_directory, alg_id
                         )
-                        if os.path.exists(backtest_dir):
+                        if backtest_dir is not None:
                             try:
                                 # Load the backtest
                                 backtest = Backtest.open(backtest_dir)
@@ -1754,8 +1762,17 @@ class BacktestService:
         """
         for backtest in backtests:
             algorithm_id = backtest.algorithm_id
-            backtest_path = os.path.join(storage_directory, algorithm_id)
-            session_cache["backtests"][algorithm_id] = backtest_path
+            # Use the actual on-disk path (bundle preferred, legacy
+            # directory as fallback) so subsequent reload operations
+            # find the file regardless of save format.
+            resolved = resolve_backtest_path(
+                storage_directory, algorithm_id
+            )
+            if resolved is None:
+                resolved = os.path.join(
+                    storage_directory, f"{algorithm_id}{BUNDLE_EXT}"
+                )
+            session_cache["backtests"][algorithm_id] = resolved
 
     def _save_session_cache(
         self,
@@ -1854,8 +1871,10 @@ class BacktestService:
         for algo_id in checkpointed_ids:
             if algo_id in algorithm_ids:
                 try:
-                    backtest_dir = os.path.join(storage_directory, algo_id)
-                    if os.path.exists(backtest_dir):
+                    backtest_dir = resolve_backtest_path(
+                        storage_directory, algo_id
+                    )
+                    if backtest_dir is not None:
                         backtest = Backtest.open(
                             backtest_dir,
                             backtest_date_ranges=[date_range]
@@ -2504,9 +2523,14 @@ class BacktestService:
                 # Add matched (skipped) ids to session cache
                 if session_cache is not None:
                     for algo_id in matched_ids:
-                        backtest_path = os.path.join(
+                        backtest_path = resolve_backtest_path(
                             backtest_storage_directory, algo_id
                         )
+                        if backtest_path is None:
+                            backtest_path = os.path.join(
+                                backtest_storage_directory,
+                                f"{algo_id}{BUNDLE_EXT}",
+                            )
                         session_cache["backtests"][algo_id] = backtest_path
 
                 if stale_ids and on_checkpoint_match != "skip":
@@ -2813,10 +2837,10 @@ class BacktestService:
                     # Clear filtered_out flag for backtests that passed
                     # the filter (they may have been filtered out before)
                     for alg_id in filtered_ids:
-                        backtest_dir = os.path.join(
+                        backtest_dir = resolve_backtest_path(
                             backtest_storage_directory, alg_id
                         )
-                        if os.path.exists(backtest_dir):
+                        if backtest_dir is not None:
                             try:
                                 backtest = Backtest.open(backtest_dir)
                                 if backtest.metadata is not None and \
@@ -2838,10 +2862,10 @@ class BacktestService:
 
                     # Mark filtered-out backtests with metadata flag
                     for alg_id in algorithms_to_mark:
-                        backtest_dir = os.path.join(
+                        backtest_dir = resolve_backtest_path(
                             backtest_storage_directory, alg_id
                         )
-                        if os.path.exists(backtest_dir):
+                        if backtest_dir is not None:
                             try:
                                 backtest = Backtest.open(backtest_dir)
                                 start_date = backtest_date_range.start_date

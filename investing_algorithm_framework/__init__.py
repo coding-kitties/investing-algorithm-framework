@@ -30,7 +30,11 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     VolumeImpactSlippage, \
     CommissionModel, NoCommission, PercentageCommission, FixedCommission, \
     FillModel, FullFill, VolumeBasedFill, \
-    FXRateProvider, StaticFXRateProvider
+    FXRateProvider, StaticFXRateProvider, \
+    Pipeline, Factor, CustomFactor, Filter, \
+    Returns, AverageDollarVolume, AverageTradedValue, SMA, RSI, \
+    Volatility, StaticPerSymbol, CrossSectionalMean, RollingBeta, \
+    Neutralize
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
     JSONURLDataProvider, ParquetURLDataProvider, \
@@ -256,6 +260,21 @@ __all__ = [
     "VolumeBasedFill",
     "FXRateProvider",
     "StaticFXRateProvider",
+    # Pipeline API (Phase 1, see docs/design/pipeline-api.md)
+    "Pipeline",
+    "Factor",
+    "CustomFactor",
+    "Filter",
+    "Returns",
+    "AverageDollarVolume",
+    "AverageTradedValue",
+    "SMA",
+    "RSI",
+    "Volatility",
+    "StaticPerSymbol",
+    "CrossSectionalMean",
+    "RollingBeta",
+    "Neutralize",
     "load_ipython_extension",
     "get_cv_consistency",
     "get_normalized_stability",

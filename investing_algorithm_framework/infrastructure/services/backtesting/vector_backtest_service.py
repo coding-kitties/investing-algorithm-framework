@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from uuid import uuid4
 
+import logging
+
 import pandas as pd
 
 from investing_algorithm_framework.domain import BacktestDateRange, \
@@ -9,6 +11,11 @@ from investing_algorithm_framework.domain import BacktestDateRange, \
     OrderSide, Trade, TradeStatus, DataType, TradingCost
 from investing_algorithm_framework.services import DataProviderService, \
     create_backtest_metrics
+from investing_algorithm_framework.services.pipeline import \
+    VectorPipelineEngine
+
+
+logger = logging.getLogger(__name__)
 
 
 class VectorBacktestService:
@@ -65,6 +72,19 @@ class VectorBacktestService:
             data_sources=strategy.data_sources,
             start_date=backtest_date_range.start_date,
             end_date=backtest_date_range.end_date
+        )
+
+        # Phase 2 (#502): inject pipeline outputs into ``data`` before
+        # the strategy's vectorised signal generators are called. Each
+        # pipeline is evaluated once over the entire backtest window
+        # and exposed as a long-form ``polars.DataFrame`` keyed by the
+        # pipeline class name (mirroring event-mode behaviour, except
+        # the frame is long instead of single-bar wide because vector
+        # signals consume the full window).
+        self._inject_pipelines(
+            strategy=strategy,
+            data=data,
+            backtest_date_range=backtest_date_range,
         )
 
         # Compute signals from strategy
@@ -837,6 +857,66 @@ class VectorBacktestService:
                 entries.append((dt, val))
             recorded_values[key] = entries
         return recorded_values
+
+    @staticmethod
+    def _inject_pipelines(
+        strategy,
+        data,
+        backtest_date_range: BacktestDateRange,
+    ):
+        """Compute cross-sectional pipelines once over the backtest
+        window and inject their long-form output into ``data``.
+
+        Strategies without ``pipelines`` skip this entirely (zero cost).
+        Per Phase 2 of the Pipeline API (#502); see
+        ``docs/design/pipeline-api.md``.
+
+        ``data[pipeline_cls.__name__]`` is set to a long-form
+        ``polars.DataFrame`` with columns
+        ``(datetime, symbol, *factor_columns)``. The dataset spans the
+        entire panel (warmup included) but is bounded above at
+        ``backtest_date_range.end_date`` to guarantee no look-ahead.
+        Use the ``datetime`` column to slice per bar inside your
+        signal generators.
+        """
+        pipelines = getattr(strategy, "pipelines", None)
+        if not pipelines:
+            return
+
+        # Map symbol -> data-source identifier from the strategy's
+        # OHLCV data sources. Mirrors the eventloop logic so the same
+        # mapping rules apply in both modes.
+        symbol_to_identifier = {}
+        for ds in strategy.data_sources or []:
+            if not DataType.OHLCV.equals(ds.data_type):
+                continue
+            if ds.symbol is None or ds.symbol in symbol_to_identifier:
+                continue
+            symbol_to_identifier[ds.symbol] = ds.get_identifier()
+
+        if not symbol_to_identifier:
+            logger.warning(
+                "Strategy declares pipelines but has no OHLCV data "
+                "sources to feed them; pipelines will be skipped."
+            )
+            return
+
+        engine = VectorPipelineEngine()
+        for pipeline_cls in pipelines:
+            try:
+                output = engine.evaluate_window(
+                    pipeline_cls=pipeline_cls,
+                    data_object=data,
+                    symbol_to_identifier=symbol_to_identifier,
+                    end=backtest_date_range.end_date,
+                )
+            except Exception:
+                logger.exception(
+                    "Pipeline %s failed during vector evaluation",
+                    pipeline_cls.__name__,
+                )
+                raise
+            data[pipeline_cls.__name__] = output
 
     @staticmethod
     def get_most_granular_ohlcv_data_source(data_sources):

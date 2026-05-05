@@ -34,6 +34,9 @@ alpha_vantage = {version = "^3.0.0", optional = true}
 polygon-api-client = {version = "^1.14.0", optional = true}
 plotly = "^6.1.2"
 boto3 = "^1.38.41"
+msgpack = ">=1.0.0"
+zstandard = ">=0.20.0"
+pyarrow = ">=14.0.0"
 
 [tool.poetry.extras]
 yahoo = ["yfinance"]

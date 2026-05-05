@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from logging import getLogger
 from typing import Tuple, List, Dict
 from datetime import datetime, date
@@ -448,6 +448,21 @@ class BacktestMetrics:
         with open(file_path, 'r') as file:
             data = json.load(file)
 
+        return BacktestMetrics.from_dict(data)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'BacktestMetrics':
+        """
+        Reconstruct a ``BacktestMetrics`` from a plain dict (the inverse
+        of :py:meth:`to_dict`). Used by the JSON loader and by the
+        binary bundle loader (issue #487).
+        """
+        if data is None:
+            return None
+
+        # Work on a shallow copy to avoid mutating the caller's dict
+        data = dict(data)
+
         # Parse datetime fields
         data['backtest_start_date'] = datetime.fromisoformat(
             data['backtest_start_date']
@@ -457,29 +472,34 @@ class BacktestMetrics:
         )
 
         # Parse tuple lists with datetime
-        data['equity_curve'] = BacktestMetrics._parse_tuple_list_datetime(
+        data['equity_curve'] = cls._parse_tuple_list_datetime(
             data.get('equity_curve', [])
         )
-        data['rolling_sharpe_ratio'] = BacktestMetrics\
-            ._parse_tuple_list_datetime(data.get('rolling_sharpe_ratio', []))
-        data['monthly_returns'] = BacktestMetrics\
-            ._parse_tuple_list_datetime(data.get('monthly_returns', []))
-        data['drawdown_series'] = BacktestMetrics\
-            ._parse_tuple_list_datetime(data.get('drawdown_series', []))
+        data['rolling_sharpe_ratio'] = cls._parse_tuple_list_datetime(
+            data.get('rolling_sharpe_ratio', [])
+        )
+        data['monthly_returns'] = cls._parse_tuple_list_datetime(
+            data.get('monthly_returns', [])
+        )
+        data['drawdown_series'] = cls._parse_tuple_list_datetime(
+            data.get('drawdown_series', [])
+        )
+        data['cumulative_return_series'] = cls._parse_tuple_list_datetime(
+            data.get('cumulative_return_series', [])
+        )
 
         # Parse tuple lists with date
-        data['yearly_returns'] = BacktestMetrics\
-            ._parse_tuple_list_date(data.get('yearly_returns', []))
+        data['yearly_returns'] = cls._parse_tuple_list_date(
+            data.get('yearly_returns', [])
+        )
 
         # Parse single tuples
-        data['best_month'] = BacktestMetrics\
-            ._parse_tuple_datetime(data.get('best_month'))
-        data['worst_month'] = BacktestMetrics\
-            ._parse_tuple_datetime(data.get('worst_month'))
-        data['best_year'] = BacktestMetrics\
-            ._parse_tuple_date(data.get('best_year'))
-        data['worst_year'] = BacktestMetrics\
-            ._parse_tuple_date(data.get('worst_year'))
+        data['best_month'] = cls._parse_tuple_datetime(data.get('best_month'))
+        data['worst_month'] = cls._parse_tuple_datetime(
+            data.get('worst_month')
+        )
+        data['best_year'] = cls._parse_tuple_date(data.get('best_year'))
+        data['worst_year'] = cls._parse_tuple_date(data.get('worst_year'))
 
         # Parse Trade objects if they exist
         if data.get('best_trade'):
@@ -487,7 +507,15 @@ class BacktestMetrics:
         if data.get('worst_trade'):
             data['worst_trade'] = Trade.from_dict(data['worst_trade'])
 
-        return BacktestMetrics(**data)
+        # Drop fields computed in __post_init__ to avoid duplicate kwargs
+        data.pop('total_number_of_days', None)
+
+        # Drop any unknown keys (forward-compat with new fields written
+        # by a newer version)
+        valid = {f.name for f in fields(cls)}
+        data = {k: v for k, v in data.items() if k in valid}
+
+        return cls(**data)
 
     def __repr__(self):
         """

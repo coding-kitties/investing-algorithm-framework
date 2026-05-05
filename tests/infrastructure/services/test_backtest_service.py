@@ -244,7 +244,7 @@ class TestFilteredOutMetadataUpdate(TestCase):
 
         # Verify the backtest was filtered out
         # (should return empty list or strategy marked as filtered)
-        backtest_dir = os.path.join(storage_dir, algorithm_id)
+        backtest_dir = os.path.join(storage_dir, algorithm_id + ".iafbt")
 
         if os.path.exists(backtest_dir):
             saved_backtest = Backtest.open(backtest_dir)
@@ -342,7 +342,7 @@ class TestFilteredOutMetadataUpdate(TestCase):
         )
 
         # Verify backtest exists and is NOT filtered out
-        backtest_dir = os.path.join(storage_dir, algorithm_id)
+        backtest_dir = os.path.join(storage_dir, algorithm_id + ".iafbt")
         self.assertTrue(
             os.path.exists(backtest_dir),
             "Backtest directory should exist after first run"
@@ -439,7 +439,7 @@ class TestFilteredOutMetadataUpdate(TestCase):
         )
 
         # Verify the backtest was filtered out
-        backtest_dir = os.path.join(storage_dir, algorithm_id)
+        backtest_dir = os.path.join(storage_dir, algorithm_id + ".iafbt")
 
         if os.path.exists(backtest_dir):
             try:
@@ -536,7 +536,7 @@ class TestFilteredOutMetadataUpdate(TestCase):
         )
 
         # Verify backtest exists and is NOT filtered out
-        backtest_dir = os.path.join(storage_dir, algorithm_id)
+        backtest_dir = os.path.join(storage_dir, algorithm_id + ".iafbt")
 
         if not os.path.exists(backtest_dir):
             self.skipTest(
@@ -666,7 +666,7 @@ class TestFilteredOutMetadataMultipleDateRanges(TestCase):
         )
 
         # Verify the backtest was saved
-        backtest_dir = os.path.join(storage_dir, algorithm_id)
+        backtest_dir = os.path.join(storage_dir, algorithm_id + ".iafbt")
         self.assertTrue(
             os.path.exists(backtest_dir),
             "Backtest directory should exist"
@@ -759,11 +759,11 @@ class TestStorageDirectoryIsolation(TestCase):
             "First run should return Strategy A"
         )
 
-        # Verify Strategy A exists in storage
-        backtest_dir_a = os.path.join(storage_dir, algorithm_id_a)
+        # Verify Strategy A exists in storage (bundle format - issue #487)
+        backtest_dir_a = os.path.join(storage_dir, algorithm_id_a + ".iafbt")
         self.assertTrue(
             os.path.exists(backtest_dir_a),
-            "Strategy A backtest directory should exist"
+            "Strategy A backtest bundle should exist"
         )
 
         # --- Second run: Strategy B (different strategy) ---
@@ -2101,13 +2101,15 @@ class TestSessionCache(TestCase):
         self.assertEqual(len(session_cache["backtests"]), 2)
         self.assertIn("algo_1", session_cache["backtests"])
         self.assertIn("algo_2", session_cache["backtests"])
+        # New default save format is the .iafbt bundle (issue #487);
+        # the cache records the resolved on-disk path.
         self.assertEqual(
             session_cache["backtests"]["algo_1"],
-            os.path.join(self.temp_dir, "algo_1")
+            os.path.join(self.temp_dir, "algo_1.iafbt")
         )
         self.assertEqual(
             session_cache["backtests"]["algo_2"],
-            os.path.join(self.temp_dir, "algo_2")
+            os.path.join(self.temp_dir, "algo_2.iafbt")
         )
 
     def test_save_session_cache(self):
@@ -2271,8 +2273,8 @@ class TestSessionCacheIntegration(TestCase):
         self.assertEqual(len(backtests_run1), 1)
         self.assertEqual(backtests_run1[0].algorithm_id, algorithm_id_a)
 
-        # Verify Strategy A exists in storage
-        self.assertTrue(os.path.exists(os.path.join(storage_dir, algorithm_id_a)))
+        # Verify Strategy A exists in storage (bundle format - issue #487)
+        self.assertTrue(os.path.exists(os.path.join(storage_dir, algorithm_id_a + ".iafbt")))
 
         # Verify session file was cleaned up
         session_file = os.path.join(storage_dir, "backtest_session.json")

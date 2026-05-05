@@ -1,8 +1,9 @@
 from datetime import timezone
 
-from dateutil import parser
-
 from investing_algorithm_framework.domain.models.base_model import BaseModel
+from investing_algorithm_framework.domain.datetime_parsing import (
+    parse_datetime as _parse_dt,
+)
 
 
 class PortfolioSnapshot(BaseModel):
@@ -36,7 +37,7 @@ class PortfolioSnapshot(BaseModel):
         self.metadata = metadata if metadata is not None else {}
 
         if created_at is not None and isinstance(created_at, str):
-            self.created_at = parser.parse(created_at)
+            self.created_at = _parse_dt(created_at)
         else:
             self.created_at = created_at
 
@@ -185,7 +186,7 @@ class PortfolioSnapshot(BaseModel):
             PortfolioSnapshot: An instance of PortfolioSnapshot.
         """
         created_at_str = data.get("created_at")
-        created_at = parser.parse(created_at_str)
+        created_at = _parse_dt(created_at_str)
 
         # Ensure created_at is timezone aware
         created_at = created_at.replace(tzinfo=timezone.utc)

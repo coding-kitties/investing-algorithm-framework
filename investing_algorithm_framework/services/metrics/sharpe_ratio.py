@@ -121,6 +121,11 @@ def get_rolling_sharpe_ratio(
     # Ensure chronological order
     snapshots = sorted(snapshots, key=lambda s: s.created_at)
 
+    # O(1) lookup of snapshot by created_at — avoids the O(N^2) scan
+    # that previously dominated recalculate_backtests on large
+    # backtests.
+    snapshot_by_dt = {s.created_at: s for s in snapshots}
+
     result = []
     for date, sharpe in rolling_sharpe_s.items():
 
@@ -128,8 +133,7 @@ def get_rolling_sharpe_ratio(
             result.append((sharpe, date))
             continue
 
-        # Find the corresponding snapshot
-        snapshot = next((s for s in snapshots if s.created_at == date), None)
+        snapshot = snapshot_by_dt.get(date)
 
         if snapshot:
             result.append((sharpe, snapshot.created_at))

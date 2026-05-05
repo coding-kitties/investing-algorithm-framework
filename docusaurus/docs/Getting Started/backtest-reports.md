@@ -60,7 +60,17 @@ report = BacktestReport.open(directory_path="./my_backtests")
 report.show()
 ```
 
-The `open()` method recursively finds all valid backtest directories (containing `algorithm_id.json` and a `runs/` folder) and loads them into a single report.
+The `open()` method recursively finds all valid backtest directories (containing `algorithm_id.json` and a `runs/` folder) **and** any `.iafbt` bundle files, and loads them into a single report.
+
+:::tip Optimized `.iafbt` bundle format
+Backtests are saved by default in the framework's custom **`.iafbt` bundle format** — a single binary file per backtest combining zstd compression and MessagePack encoding. It is purpose-built for backtest reports: ~21× smaller and ~27× fewer files than the legacy directory format, and `BacktestReport.open()` loads it ~3× faster. The legacy directory format is still fully supported for backwards compatibility, and you can mix both in the same folder.
+
+For very large batches, opt into parallel loading:
+
+```python
+report = BacktestReport.open(directory_path="./my_backtests", workers=4)
+```
+:::
 
 You can also combine disk and in-memory backtests:
 

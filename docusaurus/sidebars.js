@@ -129,6 +129,22 @@ const sidebars = {
                     type: 'doc',
                     id: 'Advanced Concepts/recording-variables',
                 },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/pipelines',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/pipelines-event-backtest',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/pipelines-vector-backtest',
+                },
+                {
+                    type: 'doc',
+                    id: 'Advanced Concepts/pipelines-live',
+                },
             ],
         },
         {

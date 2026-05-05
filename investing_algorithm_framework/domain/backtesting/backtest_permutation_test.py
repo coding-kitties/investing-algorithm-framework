@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from typing import List, Dict
 import numpy as np
 import pandas as pd
-from datetime import timezone
+from datetime import datetime, timezone
 
 from .backtest_metrics import BacktestMetrics
 
@@ -265,11 +265,62 @@ class BacktestPermutationTest:
         Returns:
             dict: A dictionary representation of the permutation test results.
         """
+        def ensure_iso(value):
+            if value is None:
+                return None
+            if hasattr(value, "isoformat"):
+                if getattr(value, 'tzinfo', None) is None:
+                    value = value.replace(tzinfo=timezone.utc)
+                return value.isoformat()
+            return value
+
         return {
-            "real_metrics": self.real_metrics.to_dict(),
+            "real_metrics": (
+                self.real_metrics.to_dict() if self.real_metrics else None
+            ),
             "permutated_metrics": [
                 pm.to_dict() for pm in self.permutated_metrics
             ],
             "p_values": self.p_values,
+            "backtest_start_date": ensure_iso(self.backtest_start_date),
+            "backtest_end_date": ensure_iso(self.backtest_end_date),
+            "backtest_date_range_name": self.backtest_date_range_name,
             # Note: DataFrames are not included in the dict representation
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict) -> "BacktestPermutationTest":
+        """
+        Reconstruct a ``BacktestPermutationTest`` from the dict produced
+        by :py:meth:`to_dict`. Used by the binary bundle loader (#487).
+        ``permutated_dataframes`` is not round-tripped (also true of
+        the directory loader).
+        """
+        if data is None:
+            return None
+
+        real = (
+            BacktestMetrics.from_dict(data.get("real_metrics"))
+            if data.get("real_metrics") else None
+        )
+        permuted = [
+            BacktestMetrics.from_dict(pm)
+            for pm in (data.get("permutated_metrics") or [])
+        ]
+        p_values = data.get("p_values") or {}
+
+        def _parse_dt(v):
+            if v is None or isinstance(v, datetime):
+                return v
+            if isinstance(v, str):
+                return pd.to_datetime(v, utc=True).to_pydatetime()
+            return v
+
+        return cls(
+            real_metrics=real,
+            permutated_metrics=permuted,
+            p_values=p_values,
+            backtest_start_date=_parse_dt(data.get("backtest_start_date")),
+            backtest_end_date=_parse_dt(data.get("backtest_end_date")),
+            backtest_date_range_name=data.get("backtest_date_range_name"),
+        )

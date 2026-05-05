@@ -1,5 +1,8 @@
 from datetime import timezone, datetime
-from dateutil.parser import parse
+
+from investing_algorithm_framework.domain.datetime_parsing import (
+    parse_datetime as _parse_dt,
+)
 
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 
@@ -307,13 +310,13 @@ class TradeTakeProfit(BaseModel):
 
     @staticmethod
     def from_dict(data: dict):
-        created_at = parse(data["created_at"]) \
+        created_at = _parse_dt(data["created_at"]) \
             if data.get("created_at") is not None else None
-        updated_at = parse(data["updated_at"]) \
+        updated_at = _parse_dt(data["updated_at"]) \
             if data.get("updated_at") is not None else None
-        triggered_at = parse(data["triggered_at"]) \
+        triggered_at = _parse_dt(data["triggered_at"]) \
             if data.get("triggered_at") is not None else None
-        high_water_mark_date = parse(data.get("high_water_mark_date")) \
+        high_water_mark_date = _parse_dt(data.get("high_water_mark_date")) \
             if data.get("high_water_mark_date") is not None else None
 
         # Make sure all the dates are timezone utc aware

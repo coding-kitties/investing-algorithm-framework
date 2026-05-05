@@ -5,6 +5,8 @@ from typing import Dict, List
 
 from investing_algorithm_framework.domain import BacktestDateRange, \
     BacktestRun, TimeUnit, generate_backtest_summary_metrics, Backtest
+from investing_algorithm_framework.domain.models.trade.trade_status import \
+    TradeStatus
 from investing_algorithm_framework.services import DataProviderService, \
     create_backtest_metrics
 
@@ -221,6 +223,27 @@ class EventBacktestService:
             ),
             recorded_values=recorded_values or {},
         )
+
+        # Populate summary counts so consumers (CLI/MCP/reports) don't see
+        # zeros even though trades/orders are present.
+        run.number_of_days = max(
+            (backtest_date_range.end_date -
+             backtest_date_range.start_date).days,
+            0,
+        )
+        run.number_of_trades = len(run.trades)
+        run.number_of_trades_closed = sum(
+            1 for t in run.trades
+            if getattr(t, "status", None) == TradeStatus.CLOSED.value
+            or getattr(t, "status", None) == TradeStatus.CLOSED
+        )
+        run.number_of_trades_open = sum(
+            1 for t in run.trades
+            if getattr(t, "status", None) == TradeStatus.OPEN.value
+            or getattr(t, "status", None) == TradeStatus.OPEN
+        )
+        run.number_of_orders = len(run.orders)
+        run.number_of_positions = len(run.positions)
 
         # Calculate and add metrics
         backtest_metrics = create_backtest_metrics(
