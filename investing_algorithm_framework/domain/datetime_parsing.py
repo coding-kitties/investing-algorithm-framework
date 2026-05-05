@@ -1,8 +1,9 @@
 """Fast ISO-8601 datetime parsing helper.
 
 ``dateutil.parser.parse`` is the bottleneck in :class:`Backtest` loading
-(see issue #487 profiling notes). The strings emitted by :py:meth:`Backtest.to_dict`
-are always produced by :py:meth:`datetime.isoformat`, so the standard-library
+(see issue #487 profiling notes). The strings emitted by
+:py:meth:`Backtest.to_dict` are always produced by
+:py:meth:`datetime.isoformat`, so the standard-library
 :py:meth:`datetime.fromisoformat` parser handles them ~50x faster.
 
 This helper:

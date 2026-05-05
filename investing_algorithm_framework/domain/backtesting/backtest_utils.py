@@ -42,7 +42,9 @@ def resolve_backtest_path(
     format) and falls back to the legacy directory at
     ``<storage>/<algorithm_id>``.
     """
-    bundle = os.path.join(str(storage_directory), f"{algorithm_id}{BUNDLE_EXT}")
+    bundle = os.path.join(
+        str(storage_directory), f"{algorithm_id}{BUNDLE_EXT}"
+    )
     if os.path.isfile(bundle):
         return bundle
     legacy = os.path.join(str(storage_directory), algorithm_id)

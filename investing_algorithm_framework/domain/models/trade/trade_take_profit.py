@@ -1,5 +1,5 @@
 from datetime import timezone, datetime
-from dateutil.parser import parse
+
 from investing_algorithm_framework.domain.datetime_parsing import (
     parse_datetime as _parse_dt,
 )

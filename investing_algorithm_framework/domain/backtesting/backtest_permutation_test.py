@@ -275,8 +275,9 @@ class BacktestPermutationTest:
             return value
 
         return {
-            "real_metrics": self.real_metrics.to_dict()
-                if self.real_metrics else None,
+            "real_metrics": (
+                self.real_metrics.to_dict() if self.real_metrics else None
+            ),
             "permutated_metrics": [
                 pm.to_dict() for pm in self.permutated_metrics
             ],
