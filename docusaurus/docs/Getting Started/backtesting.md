@@ -109,6 +109,7 @@ n = migrate_backtests(
     write_index=True,                 # also build index.parquet
     include_ohlcv=False,
     skip_existing=True,               # resume-safe (default)
+    delete_source=False,              # set True to remove originals
 )
 print(f"migrated {n} backtests")
 ```
@@ -121,6 +122,11 @@ iaf migrate-backtests \
     --dst ./bundled_backtests \
     --workers 8
 ```
+
+Pass `--delete-source` (or `delete_source=True` in Python) to remove
+each legacy directory/bundle after its destination has been written
+successfully. Sources are deleted per-backtest, so an interrupted
+run leaves only the not-yet-migrated ones behind.
 
 ## Reporting
 

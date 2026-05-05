@@ -567,20 +567,32 @@ class BacktestIndex:
 
 def _migrate_one(args):
     """Worker entry point: open *src* (legacy dir or bundle), write
-    *dst* as a bundle, return the destination path.
+    *dst* as a bundle, optionally delete *src*, return the
+    destination path.
 
-    Doing load+save in one worker call keeps each backtest's data in
-    a single process — avoiding the cost of pickling fully-decoded
-    Backtest objects back to the parent process. This roughly halves
-    peak memory usage for large migrations and is faster end-to-end.
+    Doing load+save (and optionally delete) in one worker call keeps
+    each backtest's data in a single process — avoiding the cost of
+    pickling fully-decoded Backtest objects back to the parent
+    process. This roughly halves peak memory usage for large
+    migrations and is faster end-to-end.
     """
-    src, dst, include_ohlcv, ohlcv_store = args
+    src, dst, include_ohlcv, ohlcv_store, delete_source = args
     bt = _open_bundle(src) if is_bundle_file(src) else Backtest.open(src)
-    return str(_save_bundle(
+    out = str(_save_bundle(
         bt, dst,
         include_ohlcv=include_ohlcv,
         ohlcv_store=ohlcv_store,
     ))
+    if delete_source and os.path.abspath(src) != os.path.abspath(out):
+        import shutil
+        if os.path.isdir(src):
+            shutil.rmtree(src, ignore_errors=True)
+        elif os.path.isfile(src):
+            try:
+                os.remove(src)
+            except OSError:
+                pass
+    return out
 
 
 def migrate_backtests(
@@ -592,6 +604,7 @@ def migrate_backtests(
     write_index: bool = True,
     include_ohlcv: bool = False,
     skip_existing: bool = True,
+    delete_source: bool = False,
 ) -> int:
     """Rewrite a directory of legacy backtest folders (or existing
     ``.iafbt`` bundles) as ``.iafbt`` bundles in *dst_dir*.
@@ -613,6 +626,10 @@ def migrate_backtests(
         include_ohlcv: Include OHLCV data in the destination bundles.
         skip_existing: Skip backtests whose destination bundle already
             exists. Allows resuming an interrupted migration.
+        delete_source: If True, delete each source directory / bundle
+            **after** its destination bundle has been written
+            successfully. The source is left intact when it is the
+            same path as the destination. Use with care.
 
     Returns:
         Number of backtests migrated (excluding skipped ones).
@@ -654,7 +671,7 @@ def migrate_backtests(
         dst = str(dst_dir / f"{base}{BUNDLE_EXT}")
         if skip_existing and os.path.isfile(dst):
             continue
-        plan.append((src, dst, include_ohlcv, ohlcv_store))
+        plan.append((src, dst, include_ohlcv, ohlcv_store, delete_source))
 
     if not plan:
         return 0

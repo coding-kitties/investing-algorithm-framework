@@ -281,8 +281,16 @@ cli.add_command(mcp)
     "--no-skip-existing", is_flag=True, default=False,
     help="Re-migrate even if the destination bundle already exists.",
 )
+@click.option(
+    "--delete-source", is_flag=True, default=False,
+    help=(
+        "Delete each source directory/bundle after its destination "
+        "has been written successfully. Use with care."
+    ),
+)
 def migrate_backtests_cmd(
-    src, dst, workers, no_index, include_ohlcv, no_skip_existing
+    src, dst, workers, no_index, include_ohlcv, no_skip_existing,
+    delete_source,
 ):
     """Convert a directory of legacy backtest folders into the bundled
     binary format introduced in issue #487.
@@ -306,6 +314,7 @@ def migrate_backtests_cmd(
         write_index=not no_index,
         include_ohlcv=include_ohlcv,
         skip_existing=not no_skip_existing,
+        delete_source=delete_source,
     )
     click.echo(f"Migrated {n} backtest(s) from {src} to {dst}")
 
