@@ -1,8 +1,8 @@
-from dateutil.parser import parse
+from datetime import timezone
+
 from investing_algorithm_framework.domain.datetime_parsing import (
     parse_datetime as _parse_dt,
 )
-from datetime import timezone
 
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.models.order import OrderSide, Order

@@ -1,7 +1,5 @@
 from datetime import timezone
 
-from dateutil import parser
-
 from investing_algorithm_framework.domain.models.base_model import BaseModel
 from investing_algorithm_framework.domain.datetime_parsing import (
     parse_datetime as _parse_dt,
