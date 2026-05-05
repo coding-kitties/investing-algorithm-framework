@@ -86,6 +86,7 @@ This framework is built around the full loop: **create strategies → vector bac
 - 🎯 **Return Scenario Projections** — Good, average, bad & very bad year projections from backtest data
 - 📉 **Benchmark Comparison** — Beat-rate analysis vs Buy & Hold, DCA, risk-free & custom benchmarks
 - 📄 **One-Click HTML Report** — Self-contained file, no server, dark & light theme, shareable
+- 📦 **Custom `.iafbt` Backtest Bundle Format** — An explicit, versioned, compressed, language-portable container (zstd + msgpack with magic-byte header) plus a separate parquet index for fast filtering without loading. ~21× smaller and ~27× fewer files than standard filebased directory layouts, with parallel I/O for fast load/save of large amounts of backtests.
 - 🌐 **Load External Data** — Fetch CSV, JSON, or Parquet from any URL with caching and auto-refresh
 - � **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
 - �🚀 **Build → Backtest → Deploy** — Local dev, cloud deploy (AWS / Azure), or monetize on Finterion

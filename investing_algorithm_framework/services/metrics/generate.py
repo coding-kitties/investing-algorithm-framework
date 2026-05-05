@@ -1,5 +1,7 @@
-from typing import List
+from typing import List, Optional
 from logging import getLogger
+import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
 
 from investing_algorithm_framework.domain import BacktestMetrics, \
     BacktestRun, OperationalException, Backtest, BacktestDateRange
@@ -84,10 +86,33 @@ def create_backtest_metrics_for_backtest(
     return backtest
 
 
+def _recalculate_one(args):
+    """Process-pool worker for :func:`recalculate_backtests`.
+
+    Must be a module-level function so it pickles. Returns the mutated
+    backtest so the parent process replaces its in-list reference.
+    """
+    backtest, risk_free_rate, metrics = args
+    rfr = risk_free_rate if risk_free_rate is not None \
+        else (backtest.risk_free_rate or 0.0)
+
+    for run in backtest.get_all_backtest_runs():
+        run.backtest_metrics = create_backtest_metrics(run, rfr, metrics)
+
+    all_metrics = [
+        run.backtest_metrics
+        for run in backtest.get_all_backtest_runs()
+        if run.backtest_metrics is not None
+    ]
+    backtest.backtest_summary = generate_backtest_summary_metrics(all_metrics)
+    return backtest
+
+
 def recalculate_backtests(
     backtests: List[Backtest],
     risk_free_rate: float = None,
     metrics: List[str] = None,
+    workers: Optional[int] = None,
 ) -> List[Backtest]:
     """
     Recalculate all metrics for a set of backtests. For each backtest,
@@ -102,30 +127,46 @@ def recalculate_backtests(
             back to 0.0 if not set).
         metrics (List[str], optional): List of metric names to compute.
             If None, a default set of metrics will be computed.
+        workers (int, optional): Number of parallel processes. Defaults
+            to ``1`` (serial), since process startup and pickling
+            overhead can outweigh the recalculation cost for small
+            backtests. Pass an explicit value (e.g. ``min(8, os.cpu_count())``)
+            for large batches with non-trivial per-backtest workloads.
 
     Returns:
         List[Backtest]: The same backtest objects with all per-run
             metrics and summary metrics recalculated.
     """
-    for backtest in backtests:
-        rfr = risk_free_rate if risk_free_rate is not None \
-            else (backtest.risk_free_rate or 0.0)
+    if not backtests:
+        return backtests
 
-        # Recalculate per-run metrics
-        for run in backtest.get_all_backtest_runs():
-            run.backtest_metrics = create_backtest_metrics(
-                run, rfr, metrics
-            )
+    n_workers = max(1, int(workers)) if workers is not None else 1
 
-        # Regenerate summary from updated run metrics
-        all_metrics = [
-            run.backtest_metrics
-            for run in backtest.get_all_backtest_runs()
-            if run.backtest_metrics is not None
-        ]
-        backtest.backtest_summary = generate_backtest_summary_metrics(
-            all_metrics
-        )
+    if n_workers <= 1 or len(backtests) <= 1:
+        for backtest in backtests:
+            _recalculate_one((backtest, risk_free_rate, metrics))
+        return backtests
+
+    # Parallel: each worker mutates and returns the backtest. Replace
+    # the originals in-place so callers holding the list reference see
+    # the updated objects.
+    tasks = [(bt, risk_free_rate, metrics) for bt in backtests]
+    index_by_id = {id(bt): i for i, bt in enumerate(backtests)}
+    with ProcessPoolExecutor(max_workers=n_workers) as ex:
+        future_to_task = {
+            ex.submit(_recalculate_one, t): t for t in tasks
+        }
+        for fut in as_completed(future_to_task):
+            original_bt = future_to_task[fut][0]
+            try:
+                updated = fut.result()
+            except Exception as e:  # pragma: no cover - defensive
+                logger.error(
+                    "Failed to recalculate backtest "
+                    f"{getattr(original_bt, 'algorithm_id', '?')}: {e}"
+                )
+                continue
+            backtests[index_by_id[id(original_bt)]] = updated
 
     return backtests
 

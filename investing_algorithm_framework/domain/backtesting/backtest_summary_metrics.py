@@ -213,6 +213,13 @@ class BacktestSummaryMetrics:
         with open(file_path, 'w') as file:
             json.dump(self.to_dict(), file, indent=4, default=str)
 
+    @classmethod
+    def from_dict(cls, data: dict) -> 'BacktestSummaryMetrics':
+        """Reconstruct a BacktestSummaryMetrics from a plain dict."""
+        if data is None:
+            return None
+        return cls(**data)
+
     @staticmethod
     def open(file_path: str | Path) -> 'BacktestSummaryMetrics':
         """
@@ -224,7 +231,7 @@ class BacktestSummaryMetrics:
         with open(file_path, 'r') as file:
             data = json.load(file)
 
-        return BacktestSummaryMetrics(**data)
+        return BacktestSummaryMetrics.from_dict(data)
 
     def __repr__(self):
         return json.dumps(

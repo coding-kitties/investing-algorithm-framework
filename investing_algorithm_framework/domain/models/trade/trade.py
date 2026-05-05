@@ -1,4 +1,7 @@
 from dateutil.parser import parse
+from investing_algorithm_framework.domain.datetime_parsing import (
+    parse_datetime as _parse_dt,
+)
 from datetime import timezone
 
 from investing_algorithm_framework.domain.models.base_model import BaseModel
@@ -318,13 +321,13 @@ class Trade(BaseModel):
         orders = None
 
         if "opened_at" in data and data["opened_at"] is not None:
-            opened_at = parse(data["opened_at"])
+            opened_at = _parse_dt(data["opened_at"])
 
         if "closed_at" in data and data["closed_at"] is not None:
-            closed_at = parse(data["closed_at"])
+            closed_at = _parse_dt(data["closed_at"])
 
         if "updated_at" in data and data["updated_at"] is not None:
-            updated_at = parse(data["updated_at"])
+            updated_at = _parse_dt(data["updated_at"])
 
         if "stop_losses" in data and data["stop_losses"] is not None:
             stop_losses = [

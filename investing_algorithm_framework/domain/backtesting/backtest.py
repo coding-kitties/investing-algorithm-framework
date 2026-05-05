@@ -57,6 +57,11 @@ class Backtest:
     strategy_ids: List[int] = field(default_factory=list)
     parameters: Dict = field(default_factory=dict)
     tag: str = None
+    # OHLCV payload optionally attached for save_bundle(include_ohlcv=True).
+    # Keys are conventionally "<symbol>@<timeframe>" (e.g.
+    # "BTC/EUR@1h"), values are pandas DataFrames or any object that
+    # has ``to_pandas()``. See issue #487.
+    ohlcv: Dict[str, object] = field(default_factory=dict, repr=False)
 
     def get_all_backtest_runs(
         self, backtest_date_ranges=None
@@ -194,17 +199,58 @@ class Backtest:
             "tag": self.tag,
         }
 
+    @classmethod
+    def from_dict(cls, data: dict) -> 'Backtest':
+        """
+        Reconstruct a ``Backtest`` from a plain dict produced by
+        :py:meth:`to_dict`. Used by the binary bundle loader (#487).
+
+        Permutation-test entries that were serialized via
+        :py:meth:`BacktestPermutationTest.to_dict` are accepted, but the
+        ``permutated_dataframes`` field of those tests cannot round-trip
+        through this path and is left empty (the directory loader has
+        the same limitation).
+        """
+        if data is None:
+            return None
+
+        runs = []
+        for r in data.get("backtest_runs") or []:
+            runs.append(BacktestRun.from_dict(r))
+
+        summary_dict = data.get("backtest_summary")
+        summary = (
+            BacktestSummaryMetrics.from_dict(summary_dict)
+            if summary_dict else None
+        )
+
+        perm_tests = []
+        for pt in data.get("backtest_permutation_tests") or []:
+            perm_tests.append(BacktestPermutationTest.from_dict(pt))
+
+        return cls(
+            algorithm_id=data.get("algorithm_id"),
+            backtest_runs=runs,
+            backtest_summary=summary,
+            backtest_permutation_tests=perm_tests,
+            metadata=data.get("metadata") or {},
+            risk_free_rate=data.get("risk_free_rate"),
+            strategy_ids=data.get("strategy_ids") or [],
+            parameters=data.get("parameters") or {},
+            tag=data.get("tag"),
+        )
+
     @staticmethod
     def open(
         directory_path: Union[str, Path],
         backtest_date_ranges: List[BacktestDateRange] = None,
     ) -> 'Backtest':
         """
-        Open a backtest report from a directory and return a Backtest instance.
+        Open a backtest report from a directory **or** a ``.iafbt``
+        bundle file (issue #487) and return a :class:`Backtest`.
 
         Args:
-            directory_path (str): The path to the directory containing the
-                backtest report files.
+            directory_path: Path to the backtest directory or bundle file.
             backtest_date_ranges (List[BacktestDateRange], optional): A list of
                 date ranges to filter the backtest runs. If provided, only
                 backtest runs matching these date ranges will be loaded.
@@ -217,6 +263,34 @@ class Backtest:
             OperationalException: If the directory does not exist or if
             there is an error loading the files.
         """
+        path_str = str(directory_path)
+
+        # If the path is a bundle file (or a regular file ending in the
+        # bundle extension), load via the bundle reader.
+        if os.path.isfile(path_str):
+            from .bundle import BUNDLE_EXT, is_bundle_file, open_bundle
+            if path_str.endswith(BUNDLE_EXT) or is_bundle_file(path_str):
+                bt = open_bundle(path_str)
+                if backtest_date_ranges is not None:
+                    bt.backtest_runs = bt.get_all_backtest_runs(
+                        backtest_date_ranges
+                    )
+                return bt
+
+        # Fallback: caller passed a path without extension but a sibling
+        # bundle file exists (e.g. session_cache stores
+        # "<storage>/<algorithm_id>" while the new default save format
+        # writes "<storage>/<algorithm_id>.iafbt").
+        if not os.path.exists(path_str):
+            from .bundle import BUNDLE_EXT, open_bundle
+            candidate = path_str + BUNDLE_EXT
+            if os.path.isfile(candidate):
+                bt = open_bundle(candidate)
+                if backtest_date_ranges is not None:
+                    bt.backtest_runs = bt.get_all_backtest_runs(
+                        backtest_date_ranges
+                    )
+                return bt
         algorithm_id = None
         backtest_runs = []
         backtest_summary_metrics = None
@@ -399,6 +473,23 @@ class Backtest:
             None: This method does not return anything, it saves the
             metrics to a file.
         """
+        # Bundle-format dispatch (issue #487):
+        #   * If the caller passed a path ending in ``.iafbt``, save as
+        #     a bundle file.
+        #   * If the caller passed a base path (no extension) and a
+        #     sibling ``<path>.iafbt`` exists, replace it in place.
+        #   * Otherwise fall through to the legacy directory format
+        #     below (preserved for backward compatibility).
+        from .bundle import BUNDLE_EXT, save_bundle as _save_bundle
+        path_str = str(directory_path)
+        if path_str.endswith(BUNDLE_EXT):
+            _save_bundle(self, path_str)
+            return
+        sibling = path_str + BUNDLE_EXT
+        if os.path.isfile(sibling):
+            _save_bundle(self, sibling)
+            return
+
         if not os.path.exists(directory_path):
             os.makedirs(directory_path)
 
@@ -522,6 +613,37 @@ class Backtest:
         return json.dumps(
             self.to_dict(), indent=4, sort_keys=True, default=str
         )
+
+    def save_bundle(
+        self,
+        path: Union[str, Path],
+        *,
+        include_ohlcv: bool = False,
+        ohlcv_store: Union[str, Path, None] = None,
+    ) -> Path:
+        """Persist this backtest as a single ``.iafbt`` bundle.
+
+        See :py:func:`investing_algorithm_framework.domain.backtesting.
+        bundle.save_bundle` for details. This is a thin convenience
+        wrapper.
+        """
+        from .bundle import save_bundle as _save_bundle
+        return _save_bundle(
+            self,
+            path,
+            include_ohlcv=include_ohlcv,
+            ohlcv_store=ohlcv_store,
+        )
+
+    @staticmethod
+    def open_bundle(
+        path: Union[str, Path],
+        *,
+        ohlcv_store: Union[str, Path, None] = None,
+    ) -> 'Backtest':
+        """Load a :class:`Backtest` from a ``.iafbt`` bundle file."""
+        from .bundle import open_bundle as _open_bundle
+        return _open_bundle(path, ohlcv_store=ohlcv_store)
 
     def merge(self, other: 'Backtest') -> 'Backtest':
         """

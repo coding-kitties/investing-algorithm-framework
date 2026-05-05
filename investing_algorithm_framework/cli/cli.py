@@ -250,3 +250,73 @@ def mcp(directory):
 
 
 cli.add_command(mcp)
+
+
+@click.command(name="migrate-backtests")
+@click.option(
+    "--src", "-s",
+    required=True,
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    help="Source directory containing legacy backtest sub-directories.",
+)
+@click.option(
+    "--dst", "-d",
+    required=True,
+    type=click.Path(file_okay=False, dir_okay=True),
+    help="Destination directory for the new ``.iafbt`` bundle files.",
+)
+@click.option(
+    "--workers", "-w", type=int, default=None,
+    help="Number of parallel workers (default: min(8, CPU count)).",
+)
+@click.option(
+    "--no-index", is_flag=True, default=False,
+    help="Skip writing index.parquet at the destination.",
+)
+@click.option(
+    "--include-ohlcv", is_flag=True, default=False,
+    help="Include OHLCV data in the destination bundles.",
+)
+@click.option(
+    "--no-skip-existing", is_flag=True, default=False,
+    help="Re-migrate even if the destination bundle already exists.",
+)
+@click.option(
+    "--delete-source", is_flag=True, default=False,
+    help=(
+        "Delete each source directory/bundle after its destination "
+        "has been written successfully. Use with care."
+    ),
+)
+def migrate_backtests_cmd(
+    src, dst, workers, no_index, include_ohlcv, no_skip_existing,
+    delete_source,
+):
+    """Convert a directory of legacy backtest folders into the bundled
+    binary format introduced in issue #487.
+
+    The new ``.iafbt`` format is a single zstd-compressed MessagePack
+    file per backtest. Loading bundled directories is dramatically
+    faster than the legacy multi-file layout for large batches.
+
+    Migration is streamed (load+save fused per worker) so memory
+    usage stays roughly constant regardless of source size, and
+    interrupted runs can be resumed (existing destination bundles
+    are skipped by default).
+    """
+    from investing_algorithm_framework.domain import migrate_backtests
+
+    n = migrate_backtests(
+        src,
+        dst,
+        workers=workers,
+        show_progress=True,
+        write_index=not no_index,
+        include_ohlcv=include_ohlcv,
+        skip_existing=not no_skip_existing,
+        delete_source=delete_source,
+    )
+    click.echo(f"Migrated {n} backtest(s) from {src} to {dst}")
+
+
+cli.add_command(migrate_backtests_cmd)

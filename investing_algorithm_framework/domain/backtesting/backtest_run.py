@@ -180,6 +180,166 @@ class BacktestRun:
             },
         }
 
+    @classmethod
+    def from_dict(
+        cls,
+        data: dict,
+        backtest_metrics: 'BacktestMetrics' = None,
+    ) -> 'BacktestRun':
+        """
+        Reconstruct a ``BacktestRun`` from a plain dict produced by
+        :py:meth:`to_dict`.
+
+        Used by :py:meth:`open` (the directory-based loader) and by the
+        binary bundle loader (issue #487). The ``backtest_metrics``
+        parameter lets callers inject a metrics instance loaded from a
+        sibling file; if not supplied, the ``backtest_metrics`` key on
+        ``data`` is used.
+
+        Args:
+            data: Dict with the same shape as ``to_dict()``.
+            backtest_metrics: Pre-constructed ``BacktestMetrics`` (used by
+                the directory loader where metrics live in a separate
+                file). If None, parses from ``data['backtest_metrics']``.
+
+        Returns:
+            BacktestRun: The reconstructed run.
+        """
+        # Work on a shallow copy so the caller's dict is untouched.
+        data = dict(data)
+
+        # Resolve metrics: prefer an explicitly injected instance, else
+        # fall back to the inline dict (binary bundle case).
+        metrics_dict = data.pop("backtest_metrics", None)
+        if backtest_metrics is None and metrics_dict is not None:
+            backtest_metrics = BacktestMetrics.from_dict(metrics_dict)
+
+        # Validate and set defaults for required fields
+        required_fields = {
+            "backtest_start_date": "2020-01-01 00:00:00",
+            "backtest_end_date": "2020-01-02 00:00:00",
+            "created_at": "2020-01-01 00:00:00",
+            "trading_symbol": "USD",
+            "initial_unallocated": 1000.0,
+            "number_of_runs": 1
+        }
+        for field_name, default_value in required_fields.items():
+            if field_name not in data or data[field_name] is None:
+                logger.warning(
+                    f"Missing required field '{field_name}' in "
+                    f"backtest data, using default: {default_value}"
+                )
+                data[field_name] = default_value
+
+        # Parse datetime fields. Accept both ISO 8601 (new format) and the
+        # legacy "%Y-%m-%d %H:%M:%S" form for backwards compatibility.
+        def _parse_dt(value):
+            if isinstance(value, datetime):
+                dt = value
+            elif isinstance(value, str):
+                try:
+                    dt = datetime.fromisoformat(value)
+                except ValueError:
+                    dt = datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+            else:
+                return value
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            else:
+                dt = dt.astimezone(timezone.utc)
+            return dt
+
+        data["backtest_start_date"] = _parse_dt(data["backtest_start_date"])
+        data["backtest_end_date"] = _parse_dt(data["backtest_end_date"])
+        data["created_at"] = _parse_dt(data["created_at"])
+
+        # Parse orders with error handling
+        orders = []
+        for order_data in data.get("orders", []) or []:
+            try:
+                orders.append(Order.from_dict(order_data))
+            except Exception as e:
+                logger.error(f"Failed to parse order data: {e}")
+                continue
+        data["orders"] = orders
+
+        # Parse positions
+        positions = []
+        for position_data in data.get("positions", []) or []:
+            try:
+                positions.append(Position.from_dict(position_data))
+            except Exception as e:
+                logger.error(f"Failed to parse position data: {e}")
+                continue
+        data["positions"] = positions
+
+        # Parse trades
+        trades = []
+        for trade_data in data.get("trades", []) or []:
+            try:
+                trades.append(Trade.from_dict(trade_data))
+            except Exception as e:
+                logger.error(f"Failed to parse trade data: {e}")
+                continue
+        data["trades"] = trades
+
+        # Parse portfolio snapshots
+        portfolio_snapshots = []
+        for ps_data in data.get("portfolio_snapshots", []) or []:
+            try:
+                portfolio_snapshots.append(
+                    PortfolioSnapshot.from_dict(ps_data)
+                )
+            except Exception as e:
+                logger.error(f"Failed to parse portfolio snapshot data: {e}")
+                continue
+        data["portfolio_snapshots"] = portfolio_snapshots
+
+        # Signals stored as lists of ISO date strings
+        signals = data.pop("signals", {}) or {}
+
+        # Parse signal_events dates back to datetime
+        raw_events = data.pop("signal_events", []) or []
+        signal_events = []
+        for evt in raw_events:
+            parsed = dict(evt)
+            if isinstance(parsed.get("date"), str):
+                try:
+                    parsed["date"] = datetime.fromisoformat(parsed["date"])
+                except (ValueError, TypeError):
+                    pass
+            signal_events.append(parsed)
+
+        # Parse recorded_values
+        raw_recorded = data.pop("recorded_values", {}) or {}
+        recorded_values = {}
+        for key, entries in raw_recorded.items():
+            parsed_entries = []
+            for entry in entries:
+                dt = entry.get("datetime")
+                if isinstance(dt, str):
+                    try:
+                        dt = datetime.fromisoformat(dt)
+                    except (ValueError, TypeError):
+                        pass
+                parsed_entries.append((dt, entry.get("value")))
+            recorded_values[key] = parsed_entries
+
+        # Drop fields not present on the dataclass (forward-compat).
+        # The dataclass has ``backtest_metrics`` but we set it explicitly
+        # below to allow injection.
+        from dataclasses import fields as _fields
+        valid = {f.name for f in _fields(cls)} - {"backtest_metrics"}
+        filtered = {k: v for k, v in data.items() if k in valid}
+
+        return cls(
+            backtest_metrics=backtest_metrics,
+            signals=signals,
+            signal_events=signal_events,
+            recorded_values=recorded_values,
+            **filtered,
+        )
+
     @staticmethod
     def open(directory_path: Union[str, Path]) -> 'BacktestRun':
         """
@@ -197,172 +357,33 @@ class BacktestRun:
             OperationalException: If the directory does not exist or if
             there is an error loading the files.
         """
-        backtest_metrics = None
-
         if not os.path.exists(directory_path):
             raise OperationalException(
                 f"The directory {directory_path} does not exist."
             )
 
         # Load combined backtest metrics
+        backtest_metrics = None
         metrics_file = os.path.join(directory_path, "metrics.json")
-
         if os.path.isfile(metrics_file):
             backtest_metrics = BacktestMetrics.open(metrics_file)
 
-        # Load backtest results
+        # Load run.json
         run_file = os.path.join(directory_path, "run.json")
-
-        if os.path.isfile(run_file):
-            with open(run_file, 'r') as f:
-                content = f.read().strip()
-
-            if not content:
-                raise OperationalException(
-                    f"The run file {run_file} is empty."
-                )
-
-            data = json.loads(content)
-        else:
+        if not os.path.isfile(run_file):
             raise OperationalException(
                 f"The run file {run_file} does not exist."
             )
 
-        # Validate and set defaults for required fields
-        required_fields = {
-            "backtest_start_date": "2020-01-01 00:00:00",
-            "backtest_end_date": "2020-01-02 00:00:00",
-            "created_at": "2020-01-01 00:00:00",
-            "trading_symbol": "USD",
-            "initial_unallocated": 1000.0,
-            "number_of_runs": 1
-        }
+        with open(run_file, 'r') as f:
+            content = f.read().strip()
+        if not content:
+            raise OperationalException(
+                f"The run file {run_file} is empty."
+            )
 
-        for field_name, default_value in required_fields.items():
-            if field_name not in data:
-                logger.warning(f"Missing required field '{field_name}' in "
-                               f"backtest data, using "
-                               f"default: {default_value}")
-                data[field_name] = default_value
-
-        # Parse datetime fields
-        data["backtest_start_date"] = datetime.strptime(
-            data["backtest_start_date"], "%Y-%m-%d %H:%M:%S"
-        )
-        data["backtest_end_date"] = datetime.strptime(
-            data["backtest_end_date"], "%Y-%m-%d %H:%M:%S"
-        )
-        data["created_at"] = datetime.strptime(
-            data["created_at"], "%Y-%m-%d %H:%M:%S"
-        )
-        # Convert all to utc timezone
-        data["backtest_start_date"] = data[
-            "backtest_start_date"].replace(tzinfo=timezone.utc)
-        data["backtest_end_date"] = data[
-            "backtest_end_date"].replace(tzinfo=timezone.utc)
-        data["created_at"] = data["created_at"].replace(tzinfo=timezone.utc)
-
-        # Parse orders with error handling
-        orders = []
-        for order_data in data.get("orders", []):
-            try:
-                order = Order.from_dict(order_data)
-                orders.append(order)
-            except KeyError as e:
-                logger.error(f"Failed to parse order "
-                             f"data, missing field {e}: {order_data}")
-                continue
-            except Exception as e:
-                logger.error(f"Failed to parse order data: {e}")
-                continue
-        data["orders"] = orders
-
-        # Parse positions with error handling
-        positions = []
-        for position_data in data.get("positions", []):
-            try:
-                position = Position.from_dict(position_data)
-                positions.append(position)
-            except KeyError as e:
-                logger.error(f"Failed to parse position data, "
-                             f"missing field {e}: {position_data}")
-                continue
-            except Exception as e:
-                logger.error(f"Failed to parse position data: {e}")
-                continue
-        data["positions"] = positions
-
-        # Parse trades with error handling
-        trades = []
-        for trade_data in data.get("trades", []):
-            try:
-                trade = Trade.from_dict(trade_data)
-                trades.append(trade)
-            except KeyError as e:
-                logger.error(f"Failed to parse trade data, "
-                             f"missing field {e}: {trade_data}")
-                # Skip this trade and continue with the next one
-                continue
-            except Exception as e:
-                logger.error(f"Failed to parse trade data: {e}")
-                continue
-        data["trades"] = trades
-
-        # Parse portfolio snapshots with error handling
-        portfolio_snapshots = []
-        for ps_data in data.get("portfolio_snapshots", []):
-            try:
-                ps = PortfolioSnapshot.from_dict(ps_data)
-                portfolio_snapshots.append(ps)
-            except KeyError as e:
-                logger.error(f"Failed to parse portfolio snapshot data, "
-                             f"missing field {e}: {ps_data}")
-                continue
-            except Exception as e:
-                logger.error(f"Failed to parse portfolio snapshot data: {e}")
-                continue
-        data["portfolio_snapshots"] = portfolio_snapshots
-
-        # Parse signals (stored as lists of ISO date strings)
-        signals = data.pop("signals", {})
-        # Keep as-is (dict of symbol -> {buy: [dates], sell: [dates]})
-
-        # Parse signal_events dates back to datetime
-        raw_events = data.pop("signal_events", [])
-        signal_events = []
-        for evt in raw_events:
-            parsed = dict(evt)
-            if isinstance(parsed.get("date"), str):
-                try:
-                    parsed["date"] = datetime.fromisoformat(
-                        parsed["date"]
-                    )
-                except (ValueError, TypeError):
-                    pass
-            signal_events.append(parsed)
-
-        # Parse recorded_values
-        raw_recorded = data.pop("recorded_values", {})
-        recorded_values = {}
-        for key, entries in raw_recorded.items():
-            parsed_entries = []
-            for entry in entries:
-                dt = entry.get("datetime")
-                if isinstance(dt, str):
-                    try:
-                        dt = datetime.fromisoformat(dt)
-                    except (ValueError, TypeError):
-                        pass
-                parsed_entries.append((dt, entry.get("value")))
-            recorded_values[key] = parsed_entries
-
-        return BacktestRun(
-            backtest_metrics=backtest_metrics,
-            signals=signals,
-            signal_events=signal_events,
-            recorded_values=recorded_values,
-            **data
-        )
+        data = json.loads(content)
+        return BacktestRun.from_dict(data, backtest_metrics=backtest_metrics)
 
     def create_directory_name(self) -> str:
         """

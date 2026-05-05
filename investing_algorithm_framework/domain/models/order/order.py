@@ -2,6 +2,9 @@ import logging
 from datetime import datetime, timezone
 
 from dateutil.parser import parse
+from investing_algorithm_framework.domain.datetime_parsing import (
+    parse_datetime as _parse_dt,
+)
 
 from investing_algorithm_framework.domain.exceptions import \
     OperationalException
@@ -280,10 +283,10 @@ class Order(BaseModel):
             trading_symbol = data.get("trading_symbol", None)
 
         if created_at is not None:
-            created_at = parse(created_at)
+            created_at = _parse_dt(created_at)
 
         if updated_at is not None:
-            updated_at = parse(updated_at)
+            updated_at = _parse_dt(updated_at)
 
         order = Order(
             id=data.get("id", None),
