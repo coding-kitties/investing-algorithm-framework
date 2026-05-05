@@ -38,7 +38,11 @@
 </h4>
 
 <p align="center">
-    <img src="static/showcase.svg" alt="dashboard" style="max-width: 100%;">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="static/features/hero-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="static/features/hero-light.svg">
+    <img src="static/features/hero-dark.svg" alt="Investing Algorithm Framework — features overview" style="max-width: 100%;">
+  </picture>
 </p>
 
 <p align="center">
@@ -48,17 +52,9 @@
 </p>
 
 <p align="center">
-  <sub><b>Sponsored by</b></sub>
+  <sub>Proudly sponsored by</sub>
   <br>
-  <a href="https://www.finterion.com/" target="_blank">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png">
-      <source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png">
-      <img src="static/sponsors/finterion-light.png" alt="Finterion" width="200">
-    </picture>
-  </a>
-  <br>
-  <sub>Marketplace for trading bots</sub>
+  <a href="https://www.finterion.com/" target="_blank"><picture><source media="(prefers-color-scheme: dark)" srcset="static/sponsors/finterion-dark.png"><source media="(prefers-color-scheme: light)" srcset="static/sponsors/finterion-light.png"><img src="static/sponsors/finterion-light.png" alt="Finterion" width="180"></picture></a>
 </p>
 
 ## Introduction
@@ -75,6 +71,7 @@ This framework is built around the full loop: **create strategies → vector bac
 </summary> <br>
 
 - 📊 **30+ Metrics** — CAGR, Sharpe, Sortino, Calmar, VaR, CVaR, Max DD, Recovery & more
+- 🧮 **[Cross-Sectional Pipelines](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines)** — Rank, filter and score entire universes of symbols every iteration with a tidy factor table
 - ⚡ **Vector Backtesting for Signal Analysis** — Quickly test your strategy logic on historical data to see how signals would have behaved before committing to full event-driven backtests
 - 🏃 **Event-Driven Backtesting** — Once promising strategies are identified via vector backtests, run full event-driven backtests to simulate realistic execution and portfolio management
 - 🔀 **Permutation Testing / Monte Carlo Simulations** — Assess the statistical robustness of your strategies by running them across randomized market scenarios to see how often your results could occur by chance
@@ -93,7 +90,109 @@ This framework is built around the full loop: **create strategies → vector bac
 
 </details>
 
-## Usage
+<details open>
+<summary>
+  <strong>Backtesting Engines</strong>
+</summary> <br>
+
+### ⚡ Vector Backtesting — Test thousands of strategies, fast
+
+Polars-powered vectorized signal evaluation. Compare thousands of strategies side by side, sweep parameter grids, run multi-window robustness checks, rank by key metrics and surface your top candidates in seconds — all before committing to a full event-driven simulation.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="static/features/vector-backtest-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="static/features/vector-backtest-light.svg">
+    <img src="static/features/vector-backtest-dark.svg" alt="Vector backtest engine — run thousands of strategies in parallel" style="max-width: 100%;">
+  </picture>
+</p>
+
+### 🏃 Event-Driven Backtesting — Bar-by-bar realism
+
+Once you've narrowed down promising strategies, run them through a full event-driven simulation. Pluggable slippage and fill models, partial fills, and a complete simulation blotter — using the **same code path** you'll deploy live.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="static/features/event-backtest-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="static/features/event-backtest-light.svg">
+    <img src="static/features/event-backtest-dark.svg" alt="Event-driven backtest engine — bar-by-bar realism with order fills" style="max-width: 100%;">
+  </picture>
+</p>
+
+</details>
+
+<details open>
+<summary>
+  <strong>Backtest Analysis & Dashboard</strong>
+</summary> <br>
+
+Every backtest produces a **self-contained HTML dashboard** — open it in any browser, share with teammates, archive it. No server, no Jupyter, no dependencies. Compare strategies side-by-side, drill into trades, and capture your reasoning as you go.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="static/features/dashboard-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="static/features/dashboard-light.svg">
+    <img src="static/features/dashboard-dark.svg" alt="Backtest analysis dashboard with MCP server and notes" style="max-width: 100%;">
+  </picture>
+</p>
+
+- **Self-contained HTML reports** — equity curves, drawdowns, trade lists, monthly returns, side-by-side strategy comparison
+- **Built-in MCP server** — let Copilot, Claude, or any MCP-compatible agent query your backtests, rank strategies, and reason over trades through `investing-algorithm-framework mcp`
+- **Notes keeping** — annotate every backtest with hypotheses, observations and conclusions; notes travel with the report so your research is never lost
+
+→ [Backtest dashboard docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtesting) · [MCP server docs](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/mcp-server)
+
+</details>
+
+<details open>
+<summary>
+  <strong>Live Trading</strong>
+</summary> <br>
+
+Once a strategy proves itself in backtests, deploy it with the **same code path** you backtested. Connect to any exchange — use the built-in [CCXT](https://github.com/ccxt/ccxt) integration, or plug in your own [`OrderExecutor`](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/custom-order-executors) for brokers, FIX gateways, or any custom venue. Run locally, in Docker, or deploy serverless to **AWS Lambda** or **Azure Functions**. Built-in portfolio tracking, position management, order persistence, and automatic state recovery.
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="static/features/live-trading-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="static/features/live-trading-light.svg">
+    <img src="static/features/live-trading-dark.svg" alt="Live trading & deployment — AWS Lambda and Azure Functions" style="max-width: 100%;">
+  </picture>
+</p>
+
+- **No code rewrites** — your `TradingStrategy` runs identically in backtest, paper trading and live
+- **Cloud deploy** — `investing-algorithm-framework init --type aws_lambda` / `--type azure_function`
+- **Multiple exchanges & venues** — CCXT integration out of the box (Binance, Bitvavo, Coinbase, Kraken …), or plug in your own `OrderExecutor` for any broker / FIX / custom venue
+- **Portfolio persistence** — trades, orders and positions survive restarts
+
+→ [Live trading & deployment docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)
+
+</details>
+
+<details open>
+<summary>
+  <strong>Marketplace Integration</strong>
+</summary> <br>
+
+Publish your winning strategies to the [**Finterion**](https://www.finterion.com/) marketplace and monetize them. Investors subscribe to your bot, you earn a recurring revenue share — the framework handles the technical integration.
+
+<p align="center">
+  <a href="https://www.finterion.com/" target="_blank">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="static/features/marketplace-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="static/features/marketplace-light.svg">
+      <img src="static/features/marketplace-dark.svg" alt="Marketplace integration — featuring Finterion" style="max-width: 100%;">
+    </picture>
+  </a>
+</p>
+
+→ [Finterion plugin](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin)
+
+</details>
+
+<details>
+<summary>
+  <strong>Usage and Installation</strong>
+</summary> <br>
 
 To get started, install the framework and scaffold a new project:
 
@@ -243,6 +342,14 @@ Create as many strategy variants as you want — different parameters, different
 
 Every backtest produces a **single HTML file** you can open in any browser, share with teammates, or archive. No server, no dependencies, no Jupyter required.
 
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="static/features/dashboard-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="static/features/dashboard-light.svg">
+    <img src="static/features/dashboard-dark.svg" alt="Self-contained HTML backtest dashboard" style="max-width: 100%;">
+  </picture>
+</p>
+
 ```python
 from investing_algorithm_framework import BacktestReport
 
@@ -278,6 +385,7 @@ report.save("my_report.html")
 | **[Backtest Report Dashboard](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** | Self-contained HTML report with ranking tables, equity curves, metric charts, heatmaps, and strategy comparison |
 | **[Event-Driven Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtesting)** | Realistic, order-by-order simulation |
 | **[Vectorized Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting)** | Fast signal research and prototyping |
+| **[Cross-Sectional Pipelines](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines)** | Compute factors across many symbols at once — rank, filter and score universes per iteration |
 | **50+ Metrics** | CAGR, Sharpe, Sortino, max drawdown, win rate, profit factor, recovery factor, volatility, and more |
 | **[Live Trading](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/application-setup)** | Connect to exchanges via CCXT for real-time execution |
 | **[Portfolio Management](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/portfolio-configuration)** | Position tracking, trade management, persistence |
@@ -290,14 +398,23 @@ report.save("my_report.html")
 
 </details>
 
-## Plugins
+</details>
+
+<details>
+<summary>
+  <strong>Plugins</strong>
+</summary> <br>
 
 | Plugin | Description |
 |--------|-------------|
 | [PyIndicators](https://github.com/coding-kitties/PyIndicators) | Technical analysis indicators (EMA, RSI, MACD, etc.) |
 | [Finterion Plugin](https://github.com/Finterion/finterion-investing-algorithm-framework-plugin) | Share and monetize strategies on Finterion's marketplace |
 
-## Development
+</details>
+
+## Development & Contributing
+
+We welcome contributions! Open an issue, pick one up, or send a PR.
 
 ```bash
 git clone https://github.com/coding-kitties/investing-algorithm-framework.git
@@ -308,18 +425,16 @@ poetry install
 python -m unittest discover -s tests
 ```
 
+- [Open an issue](https://github.com/coding-kitties/investing-algorithm-framework/issues/new) for bugs or ideas
+- Read the [Contributing Guide](https://coding-kitties.github.io/investing-algorithm-framework/Contributing%20Guide/contributing)
+- PRs go against the `dev` branch
+
 ## Resources
 
 - **[Documentation](https://coding-kitties.github.io/investing-algorithm-framework/)** — Guides and API reference
 - **[Quick Start](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/installation)** — Get up and running
 - **[Discord](https://discord.gg/dQsRmGZP)** — Chat and support
 - **[Reddit](https://www.reddit.com/r/InvestingBots/)** — Strategy discussion
-
-## Contributing
-
-- [Open an issue](https://github.com/coding-kitties/investing-algorithm-framework/issues/new) for bugs or ideas
-- Read the [Contributing Guide](https://coding-kitties.github.io/investing-algorithm-framework/Contributing%20Guide/contributing)
-- PRs go against the `dev` branch
 
 ## Risk Disclaimer
 

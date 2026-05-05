@@ -1,0 +1,274 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" width="1200" height="600">
+<defs>
+<style>
+@keyframes fi{from{opacity:0}to{opacity:1}}
+@keyframes pl{0%,100%{opacity:.4}50%{opacity:1}}
+@keyframes flow{0%{stroke-dashoffset:60}100%{stroke-dashoffset:0}}
+@keyframes ping{0%{r:6;opacity:1}100%{r:18;opacity:0}}
+@keyframes order{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes tickup{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
+.a0{opacity:0;animation:fi .5s .05s both}
+.a1{opacity:0;animation:fi .5s .2s both}
+.a2{opacity:0;animation:fi .5s .35s both}
+.a3{opacity:0;animation:fi .5s .5s both}
+.a4{opacity:0;animation:fi .5s .65s both}
+.a5{opacity:0;animation:fi .5s .8s both}
+.pl{animation:pl 1.5s infinite}
+.flow{stroke-dasharray:8,4;animation:flow 1.2s linear infinite}
+.ping{animation:ping 2s ease-out infinite}
+.o1{opacity:0;animation:order .5s 1.2s forwards}
+.o2{opacity:0;animation:order .5s 2.0s forwards}
+.o3{opacity:0;animation:order .5s 2.8s forwards}
+.o4{opacity:0;animation:order .5s 3.6s forwards}
+</style>
+<pattern id="gp" width="22" height="22" patternUnits="userSpaceOnUse">
+<circle cx="11" cy="11" r=".55" fill="#e2e8f0"/>
+</pattern>
+<radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="600" cy="300" r="600">
+<stop offset="0" stop-color="#059669" stop-opacity=".09"/>
+<stop offset="1" stop-color="#059669" stop-opacity="0"/>
+</radialGradient>
+<linearGradient id="hdr" gradientUnits="userSpaceOnUse" x1="0" y1="60" x2="0" y2="120">
+<stop offset="0" stop-color="#0f172a"/>
+<stop offset="1" stop-color="#047857"/>
+</linearGradient>
+<clipPath id="bookclip"><rect x="700" y="180" width="440" height="240" rx="10"/></clipPath>
+</defs>
+
+<!-- BACKGROUND -->
+<rect width="1200" height="600" fill="#ffffff" rx="14"/>
+<rect width="1200" height="600" fill="url(#gp)" rx="14"/>
+<rect width="1200" height="600" fill="url(#glow)" rx="14"/>
+
+<!-- HEADER -->
+<g class="a0">
+<rect x="40" y="40" width="11" height="11" rx="2" fill="#059669"/>
+<text x="60" y="50" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#059669" letter-spacing="2" font-weight="700">LIVE TRADING &amp; DEPLOYMENT</text>
+</g>
+<text class="a1" x="40" y="92" font-family="system-ui,-apple-system,sans-serif" font-size="34" font-weight="700" fill="url(#hdr)">Deploy serverless. Trade live.</text>
+<text class="a2" x="40" y="116" font-family="system-ui,-apple-system,sans-serif" font-size="13" fill="#475569">Same code path you backtested — running on AWS Lambda or Azure Functions. No rewrites, no infra to manage, no servers to babysit.</text>
+
+<!-- LIVE PILLS -->
+<g class="a3" transform="translate(40,134)">
+<rect width="160" height="26" rx="13" fill="#f1f5f9" stroke="#059669" stroke-opacity=".4"/>
+<circle class="pl" cx="14" cy="13" r="4" fill="#059669"/>
+<text x="26" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">deployment</text>
+<text x="146" y="17" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#059669" font-weight="700" text-anchor="end">RUNNING</text>
+</g>
+<g class="a3" transform="translate(220,134)">
+<rect width="180" height="26" rx="13" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="14" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">venue</text>
+<text x="166" y="17" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#0891b2" font-weight="700" text-anchor="end">CCXT · custom</text>
+</g>
+<g class="a3" transform="translate(420,134)">
+<rect width="160" height="26" rx="13" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="14" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">region</text>
+<text x="146" y="17" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#7c3aed" font-weight="700" text-anchor="end">eu-west-1</text>
+</g>
+<g class="a3" transform="translate(600,134)">
+<rect width="160" height="26" rx="13" fill="#f1f5f9" stroke="#e2e8f0"/>
+<text x="14" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#475569">latency</text>
+<text x="146" y="17" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#d97706" font-weight="700" text-anchor="end">~84 ms</text>
+</g>
+
+<!-- ═══ LEFT: DEPLOYMENT PIPELINE ═══ -->
+<g class="a4">
+<rect x="40" y="170" width="640" height="250" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="56" y="190" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#64748b" letter-spacing="1.5" font-weight="700">DEPLOYMENT PIPELINE</text>
+
+<!-- Step 1: Local strategy -->
+<g transform="translate(70,220)">
+  <rect width="120" height="80" rx="10" fill="#f1f5f9" stroke="#0891b2" stroke-opacity=".35"/>
+  <rect x="14" y="14" width="28" height="28" rx="6" fill="#0891b2" fill-opacity=".15"/>
+  <text x="28" y="33" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#0891b2" text-anchor="middle" font-weight="700">{ }</text>
+  <text x="60" y="60" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#0f172a" text-anchor="middle" font-weight="600">Your Strategy</text>
+  <text x="60" y="73" font-family="ui-monospace,Menlo,monospace" font-size="8.5" fill="#475569" text-anchor="middle">strategy.py</text>
+</g>
+<text x="130" y="316" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#64748b" text-anchor="middle" letter-spacing="1">LOCAL DEV</text>
+
+<!-- Arrow 1 -->
+<line class="flow" x1="195" y1="260" x2="245" y2="260" stroke="#059669" stroke-width="2" stroke-linecap="round"/>
+<polygon points="245,256 252,260 245,264" fill="#059669"/>
+
+<!-- Step 2: CLI build -->
+<g transform="translate(255,220)">
+  <rect width="160" height="80" rx="10" fill="#f1f5f9" stroke="#059669" stroke-opacity=".35"/>
+  <rect x="14" y="14" width="28" height="28" rx="6" fill="#059669" fill-opacity=".15"/>
+  <text x="28" y="33" font-family="ui-monospace,Menlo,monospace" font-size="13" fill="#059669" text-anchor="middle" font-weight="700">$_</text>
+  <text x="80" y="60" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#0f172a" text-anchor="middle" font-weight="600">CLI Build &amp; Package</text>
+  <text x="80" y="73" font-family="ui-monospace,Menlo,monospace" font-size="8" fill="#475569" text-anchor="middle">init --type aws_lambda</text>
+</g>
+<text x="335" y="316" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#64748b" text-anchor="middle" letter-spacing="1">ONE COMMAND</text>
+
+<!-- Arrow 2 (split) -->
+<line class="flow" x1="420" y1="260" x2="465" y2="260" stroke="#059669" stroke-width="2" stroke-linecap="round"/>
+<line x1="465" y1="260" x2="465" y2="220" stroke="#059669" stroke-width="1.5" stroke-opacity=".4"/>
+<line x1="465" y1="260" x2="465" y2="300" stroke="#059669" stroke-width="1.5" stroke-opacity=".4"/>
+<line class="flow" x1="465" y1="220" x2="495" y2="220" stroke="#d97706" stroke-width="2" stroke-linecap="round"/>
+<line class="flow" x1="465" y1="300" x2="495" y2="300" stroke="#0891b2" stroke-width="2" stroke-linecap="round"/>
+<polygon points="495,216 502,220 495,224" fill="#d97706"/>
+<polygon points="495,296 502,300 495,304" fill="#0891b2"/>
+
+<!-- Step 3a: AWS Lambda -->
+<g transform="translate(505,180)">
+  <rect width="170" height="80" rx="10" fill="#f1f5f9" stroke="#d97706" stroke-opacity=".5"/>
+  <!-- AWS Lambda official logo -->
+  <g transform="translate(14,14)">
+    <rect width="28" height="28" rx="6" fill="#ffffff"/>
+    <image href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAxOS4wLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgeD0iMHB4IiB5PSIwcHgiDQoJIHZpZXdCb3g9IjAgMCAzMDQgMTgyIiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCAzMDQgMTgyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7ZmlsbDojMjUyRjNFO30NCgkuc3Qxe2ZpbGwtcnVsZTpldmVub2RkO2NsaXAtcnVsZTpldmVub2RkO2ZpbGw6I0ZGOTkwMDt9DQo8L3N0eWxlPg0KPGc+DQoJPHBhdGggY2xhc3M9InN0MCIgZD0iTTg2LjQsNjYuNGMwLDMuNywwLjQsNi43LDEuMSw4LjljMC44LDIuMiwxLjgsNC42LDMuMiw3LjJjMC41LDAuOCwwLjcsMS42LDAuNywyLjNjMCwxLTAuNiwyLTEuOSwzbC02LjMsNC4yDQoJCWMtMC45LDAuNi0xLjgsMC45LTIuNiwwLjljLTEsMC0yLTAuNS0zLTEuNEM3Ni4yLDkwLDc1LDg4LjQsNzQsODYuOGMtMS0xLjctMi0zLjYtMy4xLTUuOWMtNy44LDkuMi0xNy42LDEzLjgtMjkuNCwxMy44DQoJCWMtOC40LDAtMTUuMS0yLjQtMjAtNy4yYy00LjktNC44LTcuNC0xMS4yLTcuNC0xOS4yYzAtOC41LDMtMTUuNCw5LjEtMjAuNmM2LjEtNS4yLDE0LjItNy44LDI0LjUtNy44YzMuNCwwLDYuOSwwLjMsMTAuNiwwLjgNCgkJYzMuNywwLjUsNy41LDEuMywxMS41LDIuMnYtNy4zYzAtNy42LTEuNi0xMi45LTQuNy0xNmMtMy4yLTMuMS04LjYtNC42LTE2LjMtNC42Yy0zLjUsMC03LjEsMC40LTEwLjgsMS4zYy0zLjcsMC45LTcuMywyLTEwLjgsMy40DQoJCWMtMS42LDAuNy0yLjgsMS4xLTMuNSwxLjNjLTAuNywwLjItMS4yLDAuMy0xLjYsMC4zYy0xLjQsMC0yLjEtMS0yLjEtMy4xdi00LjljMC0xLjYsMC4yLTIuOCwwLjctMy41YzAuNS0wLjcsMS40LTEuNCwyLjgtMi4xDQoJCWMzLjUtMS44LDcuNy0zLjMsMTIuNi00LjVjNC45LTEuMywxMC4xLTEuOSwxNS42LTEuOWMxMS45LDAsMjAuNiwyLjcsMjYuMiw4LjFjNS41LDUuNCw4LjMsMTMuNiw4LjMsMjQuNlY2Ni40eiBNNDUuOCw4MS42DQoJCWMzLjMsMCw2LjctMC42LDEwLjMtMS44YzMuNi0xLjIsNi44LTMuNCw5LjUtNi40YzEuNi0xLjksMi44LTQsMy40LTYuNGMwLjYtMi40LDEtNS4zLDEtOC43di00LjJjLTIuOS0wLjctNi0xLjMtOS4yLTEuNw0KCQljLTMuMi0wLjQtNi4zLTAuNi05LjQtMC42Yy02LjcsMC0xMS42LDEuMy0xNC45LDRjLTMuMywyLjctNC45LDYuNS00LjksMTEuNWMwLDQuNywxLjIsOC4yLDMuNywxMC42DQoJCUMzNy43LDgwLjQsNDEuMiw4MS42LDQ1LjgsODEuNnogTTEyNi4xLDkyLjRjLTEuOCwwLTMtMC4zLTMuOC0xYy0wLjgtMC42LTEuNS0yLTIuMS0zLjlMOTYuNywxMC4yYy0wLjYtMi0wLjktMy4zLTAuOS00DQoJCWMwLTEuNiwwLjgtMi41LDIuNC0yLjVoOS44YzEuOSwwLDMuMiwwLjMsMy45LDFjMC44LDAuNiwxLjQsMiwyLDMuOWwxNi44LDY2LjJsMTUuNi02Ni4yYzAuNS0yLDEuMS0zLjMsMS45LTMuOWMwLjgtMC42LDIuMi0xLDQtMQ0KCQloOGMxLjksMCwzLjIsMC4zLDQsMWMwLjgsMC42LDEuNSwyLDEuOSwzLjlsMTUuOCw2N2wxNy4zLTY3YzAuNi0yLDEuMy0zLjMsMi0zLjljMC44LTAuNiwyLjEtMSwzLjktMWg5LjNjMS42LDAsMi41LDAuOCwyLjUsMi41DQoJCWMwLDAuNS0wLjEsMS0wLjIsMS42Yy0wLjEsMC42LTAuMywxLjQtMC43LDIuNWwtMjQuMSw3Ny4zYy0wLjYsMi0xLjMsMy4zLTIuMSwzLjljLTAuOCwwLjYtMi4xLDEtMy44LDFoLTguNmMtMS45LDAtMy4yLTAuMy00LTENCgkJYy0wLjgtMC43LTEuNS0yLTEuOS00TDE1NiwyM2wtMTUuNCw2NC40Yy0wLjUsMi0xLjEsMy4zLTEuOSw0Yy0wLjgsMC43LTIuMiwxLTQsMUgxMjYuMXogTTI1NC42LDk1LjFjLTUuMiwwLTEwLjQtMC42LTE1LjQtMS44DQoJCWMtNS0xLjItOC45LTIuNS0xMS41LTRjLTEuNi0wLjktMi43LTEuOS0zLjEtMi44Yy0wLjQtMC45LTAuNi0xLjktMC42LTIuOHYtNS4xYzAtMi4xLDAuOC0zLjEsMi4zLTMuMWMwLjYsMCwxLjIsMC4xLDEuOCwwLjMNCgkJYzAuNiwwLjIsMS41LDAuNiwyLjUsMWMzLjQsMS41LDcuMSwyLjcsMTEsMy41YzQsMC44LDcuOSwxLjIsMTEuOSwxLjJjNi4zLDAsMTEuMi0xLjEsMTQuNi0zLjNjMy40LTIuMiw1LjItNS40LDUuMi05LjUNCgkJYzAtMi44LTAuOS01LjEtMi43LTdjLTEuOC0xLjktNS4yLTMuNi0xMC4xLTUuMkwyNDYsNTJjLTcuMy0yLjMtMTIuNy01LjctMTYtMTAuMmMtMy4zLTQuNC01LTkuMy01LTE0LjVjMC00LjIsMC45LTcuOSwyLjctMTEuMQ0KCQljMS44LTMuMiw0LjItNiw3LjItOC4yYzMtMi4zLDYuNC00LDEwLjQtNS4yYzQtMS4yLDguMi0xLjcsMTIuNi0xLjdjMi4yLDAsNC41LDAuMSw2LjcsMC40YzIuMywwLjMsNC40LDAuNyw2LjUsMS4xDQoJCWMyLDAuNSwzLjksMSw1LjcsMS42YzEuOCwwLjYsMy4yLDEuMiw0LjIsMS44YzEuNCwwLjgsMi40LDEuNiwzLDIuNWMwLjYsMC44LDAuOSwxLjksMC45LDMuM3Y0LjdjMCwyLjEtMC44LDMuMi0yLjMsMy4yDQoJCWMtMC44LDAtMi4xLTAuNC0zLjgtMS4yYy01LjctMi42LTEyLjEtMy45LTE5LjItMy45Yy01LjcsMC0xMC4yLDAuOS0xMy4zLDIuOGMtMy4xLDEuOS00LjcsNC44LTQuNyw4LjljMCwyLjgsMSw1LjIsMyw3LjENCgkJYzIsMS45LDUuNywzLjgsMTEsNS41bDE0LjIsNC41YzcuMiwyLjMsMTIuNCw1LjUsMTUuNSw5LjZjMy4xLDQuMSw0LjYsOC44LDQuNiwxNGMwLDQuMy0wLjksOC4yLTIuNiwxMS42DQoJCWMtMS44LDMuNC00LjIsNi40LTcuMyw4LjhjLTMuMSwyLjUtNi44LDQuMy0xMS4xLDUuNkMyNjQuNCw5NC40LDI1OS43LDk1LjEsMjU0LjYsOTUuMXoiLz4NCgk8Zz4NCgkJPHBhdGggY2xhc3M9InN0MSIgZD0iTTI3My41LDE0My43Yy0zMi45LDI0LjMtODAuNywzNy4yLTEyMS44LDM3LjJjLTU3LjYsMC0xMDkuNS0yMS4zLTE0OC43LTU2LjdjLTMuMS0yLjgtMC4zLTYuNiwzLjQtNC40DQoJCQljNDIuNCwyNC42LDk0LjcsMzkuNSwxNDguOCwzOS41YzM2LjUsMCw3Ni42LTcuNiwxMTMuNS0yMy4yQzI3NC4yLDEzMy42LDI3OC45LDEzOS43LDI3My41LDE0My43eiIvPg0KCQk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjg3LjIsMTI4LjFjLTQuMi01LjQtMjcuOC0yLjYtMzguNS0xLjNjLTMuMiwwLjQtMy43LTIuNC0wLjgtNC41YzE4LjgtMTMuMiw0OS43LTkuNCw1My4zLTUNCgkJCWMzLjYsNC41LTEsMzUuNC0xOC42LDUwLjJjLTIuNywyLjMtNS4zLDEuMS00LjEtMS45QzI4Mi41LDE1NS43LDI5MS40LDEzMy40LDI4Ny4yLDEyOC4xeiIvPg0KCTwvZz4NCjwvZz4NCjwvc3ZnPg0K" x="3" y="6" width="22" height="16" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+  <text x="50" y="30" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#0f172a" font-weight="600">AWS Lambda</text>
+  <text x="50" y="44" font-family="ui-monospace,Menlo,monospace" font-size="8" fill="#475569">+ EventBridge schedule</text>
+  <circle cx="150" cy="64" r="3" fill="#059669" class="pl"/>
+  <text x="143" y="68" font-family="ui-monospace,Menlo,monospace" font-size="8" fill="#059669" text-anchor="end" font-weight="700">DEPLOYED</text>
+</g>
+
+<!-- Step 3b: Azure Functions -->
+<g transform="translate(505,260)">
+  <rect width="170" height="80" rx="10" fill="#f1f5f9" stroke="#0891b2" stroke-opacity=".5"/>
+  <!-- Azure official logo -->
+  <g transform="translate(14,14)">
+    <rect width="28" height="28" rx="6" fill="#ffffff"/>
+    <image href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDk2IDk2IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgogICAgPGRlZnM+CiAgICAgICAgPGxpbmVhckdyYWRpZW50IGlkPSJlMzk5YzE5Zi1iNjhmLTQyOWQtYjE3Ni0xOGMyMTE3ZmY3M2MiIHgxPSItMTAzMi4xNzIiIHgyPSItMTA1OS4yMTMiIHkxPSIxNDUuMzEyIiB5Mj0iNjUuNDI2IiBncmFkaWVudFRyYW5zZm9ybT0ibWF0cml4KDEgMCAwIC0xIDEwNzUgMTU4KSIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMxMTRhOGIiLz4KICAgICAgICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDY2OWJjIi8+CiAgICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgICAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImFjMmE2ZmMyLWNhNDgtNDMyNy05YTNjLWQ0ZGNjMzI1NmUxNSIgeDE9Ii0xMDIzLjcyNSIgeDI9Ii0xMDI5Ljk4IiB5MT0iMTA4LjA4MyIgeTI9IjEwNS45NjgiIGdyYWRpZW50VHJhbnNmb3JtPSJtYXRyaXgoMSAwIDAgLTEgMTA3NSAxNTgpIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgICAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1vcGFjaXR5PSIuMyIvPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9Ii4wNzEiIHN0b3Atb3BhY2l0eT0iLjIiLz4KICAgICAgICAgICAgPHN0b3Agb2Zmc2V0PSIuMzIxIiBzdG9wLW9wYWNpdHk9Ii4xIi8+CiAgICAgICAgICAgIDxzdG9wIG9mZnNldD0iLjYyMyIgc3RvcC1vcGFjaXR5PSIuMDUiLz4KICAgICAgICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgICAgICA8L2xpbmVhckdyYWRpZW50PgogICAgICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iYTdmZWU5NzAtYTc4NC00YmIxLWFmOGQtNjNkMThlNWY3ZGI5IiB4MT0iLTEwMjcuMTY1IiB4Mj0iLTk5Ny40ODIiIHkxPSIxNDcuNjQyIiB5Mj0iNjguNTYxIiBncmFkaWVudFRyYW5zZm9ybT0ibWF0cml4KDEgMCAwIC0xIDEwNzUgMTU4KSIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzY2NiZjQiLz4KICAgICAgICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMjg5MmRmIi8+CiAgICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxwYXRoIGZpbGw9InVybCgjZTM5OWMxOWYtYjY4Zi00MjlkLWIxNzYtMThjMjExN2ZmNzNjKSIgZD0iTTMzLjMzOCA2LjU0NGgyNi4wMzhsLTI3LjAzIDgwLjA4N2E0LjE1MiA0LjE1MiAwIDAgMS0zLjkzMyAyLjgyNEg4LjE0OWE0LjE0NSA0LjE0NSAwIDAgMS0zLjkyOC01LjQ3TDI5LjQwNCA5LjM2OGE0LjE1MiA0LjE1MiAwIDAgMSAzLjkzNC0yLjgyNXoiLz4KICAgIDxwYXRoIGZpbGw9IiMwMDc4ZDQiIGQ9Ik03MS4xNzUgNjAuMjYxaC00MS4yOWExLjkxMSAxLjkxMSAwIDAgMC0xLjMwNSAzLjMwOWwyNi41MzIgMjQuNzY0YTQuMTcxIDQuMTcxIDAgMCAwIDIuODQ2IDEuMTIxaDIzLjM4eiIvPgogICAgPHBhdGggZmlsbD0idXJsKCNhYzJhNmZjMi1jYTQ4LTQzMjctOWEzYy1kNGRjYzMyNTZlMTUpIiBkPSJNMzMuMzM4IDYuNTQ0YTQuMTE4IDQuMTE4IDAgMCAwLTMuOTQzIDIuODc5TDQuMjUyIDgzLjkxN2E0LjE0IDQuMTQgMCAwIDAgMy45MDggNS41MzhoMjAuNzg3YTQuNDQzIDQuNDQzIDAgMCAwIDMuNDEtMi45bDUuMDE0LTE0Ljc3NyAxNy45MSAxNi43MDVhNC4yMzcgNC4yMzcgMCAwIDAgMi42NjYuOTcySDgxLjI0TDcxLjAyNCA2MC4yNjFsLTI5Ljc4MS4wMDdMNTkuNDcgNi41NDR6Ii8+CiAgICA8cGF0aCBmaWxsPSJ1cmwoI2E3ZmVlOTcwLWE3ODQtNGJiMS1hZjhkLTYzZDE4ZTVmN2RiOSkiIGQ9Ik02Ni41OTUgOS4zNjRhNC4xNDUgNC4xNDUgMCAwIDAtMy45MjgtMi44MkgzMy42NDhhNC4xNDYgNC4xNDYgMCAwIDEgMy45MjggMi44MmwyNS4xODQgNzQuNjJhNC4xNDYgNC4xNDYgMCAwIDEtMy45MjggNS40NzJoMjkuMDJhNC4xNDYgNC4xNDYgMCAwIDAgMy45MjctNS40NzJ6Ii8+Cjwvc3ZnPg==" x="4" y="4" width="20" height="20" preserveAspectRatio="xMidYMid meet"/>
+  </g>
+  <text x="50" y="30" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#0f172a" font-weight="600">Azure Functions</text>
+  <text x="50" y="44" font-family="ui-monospace,Menlo,monospace" font-size="8" fill="#475569">+ Timer trigger</text>
+  <circle cx="150" cy="64" r="3" fill="#059669" class="pl"/>
+  <text x="143" y="68" font-family="ui-monospace,Menlo,monospace" font-size="8" fill="#059669" text-anchor="end" font-weight="700">DEPLOYED</text>
+</g>
+
+<!-- Bottom command strip -->
+<g transform="translate(56,360)">
+<rect width="608" height="42" rx="6" fill="#000" stroke="#e2e8f0"/>
+<text x="14" y="20" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#64748b">$</text>
+<text x="28" y="20" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#059669">investing-algorithm-framework</text>
+<text x="218" y="20" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#0f172a">init --type aws_lambda</text>
+<text x="14" y="36" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#64748b">→</text>
+<text x="28" y="36" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#475569">scaffolding strategy + IaC + CI/CD pipeline</text>
+<text x="540" y="36" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#059669" font-weight="700">✓ ready</text>
+</g>
+</g>
+
+<!-- ═══ RIGHT: LIVE TRADE LOG ═══ -->
+<g class="a4">
+<rect x="700" y="170" width="440" height="250" rx="14" fill="#f8fafc" stroke="#e2e8f0"/>
+<text x="716" y="190" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#64748b" letter-spacing="1.5" font-weight="700">LIVE TRADE STREAM</text>
+<g transform="translate(1124,184)">
+<circle class="pl" r="4" fill="#059669"/>
+<circle class="ping" r="6" fill="none" stroke="#059669" stroke-width="1.5"/>
+<text x="-10" y="4" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#059669" text-anchor="end" font-weight="700">LIVE</text>
+</g>
+
+<!-- Column headers -->
+<g transform="translate(716,210)">
+<text x="0" y="0" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#64748b" letter-spacing="1" font-weight="600">TIME</text>
+<text x="80" y="0" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#64748b" letter-spacing="1" font-weight="600">SIDE</text>
+<text x="130" y="0" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#64748b" letter-spacing="1" font-weight="600">SYMBOL</text>
+<text x="210" y="0" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#64748b" letter-spacing="1" font-weight="600">PRICE</text>
+<text x="290" y="0" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#64748b" letter-spacing="1" font-weight="600">PNL</text>
+<text x="380" y="0" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#64748b" letter-spacing="1" font-weight="600">VENUE</text>
+</g>
+<line x1="716" y1="216" x2="1124" y2="216" stroke="#e2e8f0"/>
+
+<g clip-path="url(#bookclip)">
+<g class="o1" transform="translate(716,234)">
+  <rect x="-4" y="-12" width="416" height="22" rx="4" fill="#059669" fill-opacity=".06"/>
+  <text x="0" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#475569">14:02:18</text>
+  <text x="80" y="2" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#059669" font-weight="700">BUY</text>
+  <text x="130" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#0f172a">BTC/EUR</text>
+  <text x="210" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#0f172a">42,221</text>
+  <text x="290" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#059669">+€38.40</text>
+  <text x="380" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9" fill="#d97706">λ AWS</text>
+</g>
+
+<g class="o2" transform="translate(716,266)">
+  <rect x="-4" y="-12" width="416" height="22" rx="4" fill="#0891b2" fill-opacity=".06"/>
+  <text x="0" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#475569">14:03:00</text>
+  <text x="80" y="2" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#0891b2" font-weight="700">FILL</text>
+  <text x="130" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#0f172a">BTC/EUR</text>
+  <text x="210" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#0f172a">42,221</text>
+  <text x="290" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#475569">0.42 BTC</text>
+  <text x="380" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9" fill="#d97706">λ AWS</text>
+</g>
+
+<g class="o3" transform="translate(716,298)">
+  <rect x="-4" y="-12" width="416" height="22" rx="4" fill="#dc2626" fill-opacity=".06"/>
+  <text x="0" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#475569">14:08:42</text>
+  <text x="80" y="2" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#dc2626" font-weight="700">SELL</text>
+  <text x="130" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#0f172a">ETH/EUR</text>
+  <text x="210" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#0f172a">2,418</text>
+  <text x="290" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#059669">+€72.10</text>
+  <text x="380" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9" fill="#0891b2">⚡ Azure</text>
+</g>
+
+<g class="o4" transform="translate(716,330)">
+  <rect x="-4" y="-12" width="416" height="22" rx="4" fill="#059669" fill-opacity=".06"/>
+  <text x="0" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#475569">14:14:05</text>
+  <text x="80" y="2" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#059669" font-weight="700">BUY</text>
+  <text x="130" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#0f172a">SOL/EUR</text>
+  <text x="210" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#0f172a">142.18</text>
+  <text x="290" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#059669">+€14.20</text>
+  <text x="380" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9" fill="#0891b2">⚡ Azure</text>
+</g>
+
+<!-- static older rows -->
+<g transform="translate(716,362)" opacity=".4">
+  <text x="0" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#475569">13:58:11</text>
+  <text x="80" y="2" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#059669" font-weight="700">BUY</text>
+  <text x="130" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#475569">BTC/EUR</text>
+  <text x="210" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#475569">42,180</text>
+  <text x="290" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#64748b">—</text>
+  <text x="380" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9" fill="#64748b">λ AWS</text>
+</g>
+<g transform="translate(716,392)" opacity=".25">
+  <text x="0" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#475569">13:42:00</text>
+  <text x="80" y="2" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#dc2626" font-weight="700">SELL</text>
+  <text x="130" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#64748b">ETH/EUR</text>
+  <text x="210" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#64748b">2,402</text>
+  <text x="290" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#64748b">+€18.00</text>
+  <text x="380" y="2" font-family="ui-monospace,Menlo,monospace" font-size="9" fill="#64748b">⚡ Azure</text>
+</g>
+</g>
+</g>
+
+<!-- ═══ BOTTOM: feature cards ═══ -->
+<g class="a5">
+<rect x="40" y="440" width="1120" height="130" rx="10" fill="#f1f5f9" stroke="#e2e8f0"/>
+
+<g transform="translate(72,470)">
+<rect width="248" height="84" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+<rect x="14" y="14" width="32" height="32" rx="8" fill="#ffffff"/>
+<image href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4NCjwhLS0gR2VuZXJhdG9yOiBBZG9iZSBJbGx1c3RyYXRvciAxOS4wLjEsIFNWRyBFeHBvcnQgUGx1Zy1JbiAuIFNWRyBWZXJzaW9uOiA2LjAwIEJ1aWxkIDApICAtLT4NCjxzdmcgdmVyc2lvbj0iMS4xIiBpZD0iTGF5ZXJfMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgeD0iMHB4IiB5PSIwcHgiDQoJIHZpZXdCb3g9IjAgMCAzMDQgMTgyIiBzdHlsZT0iZW5hYmxlLWJhY2tncm91bmQ6bmV3IDAgMCAzMDQgMTgyOyIgeG1sOnNwYWNlPSJwcmVzZXJ2ZSI+DQo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPg0KCS5zdDB7ZmlsbDojMjUyRjNFO30NCgkuc3Qxe2ZpbGwtcnVsZTpldmVub2RkO2NsaXAtcnVsZTpldmVub2RkO2ZpbGw6I0ZGOTkwMDt9DQo8L3N0eWxlPg0KPGc+DQoJPHBhdGggY2xhc3M9InN0MCIgZD0iTTg2LjQsNjYuNGMwLDMuNywwLjQsNi43LDEuMSw4LjljMC44LDIuMiwxLjgsNC42LDMuMiw3LjJjMC41LDAuOCwwLjcsMS42LDAuNywyLjNjMCwxLTAuNiwyLTEuOSwzbC02LjMsNC4yDQoJCWMtMC45LDAuNi0xLjgsMC45LTIuNiwwLjljLTEsMC0yLTAuNS0zLTEuNEM3Ni4yLDkwLDc1LDg4LjQsNzQsODYuOGMtMS0xLjctMi0zLjYtMy4xLTUuOWMtNy44LDkuMi0xNy42LDEzLjgtMjkuNCwxMy44DQoJCWMtOC40LDAtMTUuMS0yLjQtMjAtNy4yYy00LjktNC44LTcuNC0xMS4yLTcuNC0xOS4yYzAtOC41LDMtMTUuNCw5LjEtMjAuNmM2LjEtNS4yLDE0LjItNy44LDI0LjUtNy44YzMuNCwwLDYuOSwwLjMsMTAuNiwwLjgNCgkJYzMuNywwLjUsNy41LDEuMywxMS41LDIuMnYtNy4zYzAtNy42LTEuNi0xMi45LTQuNy0xNmMtMy4yLTMuMS04LjYtNC42LTE2LjMtNC42Yy0zLjUsMC03LjEsMC40LTEwLjgsMS4zYy0zLjcsMC45LTcuMywyLTEwLjgsMy40DQoJCWMtMS42LDAuNy0yLjgsMS4xLTMuNSwxLjNjLTAuNywwLjItMS4yLDAuMy0xLjYsMC4zYy0xLjQsMC0yLjEtMS0yLjEtMy4xdi00LjljMC0xLjYsMC4yLTIuOCwwLjctMy41YzAuNS0wLjcsMS40LTEuNCwyLjgtMi4xDQoJCWMzLjUtMS44LDcuNy0zLjMsMTIuNi00LjVjNC45LTEuMywxMC4xLTEuOSwxNS42LTEuOWMxMS45LDAsMjAuNiwyLjcsMjYuMiw4LjFjNS41LDUuNCw4LjMsMTMuNiw4LjMsMjQuNlY2Ni40eiBNNDUuOCw4MS42DQoJCWMzLjMsMCw2LjctMC42LDEwLjMtMS44YzMuNi0xLjIsNi44LTMuNCw5LjUtNi40YzEuNi0xLjksMi44LTQsMy40LTYuNGMwLjYtMi40LDEtNS4zLDEtOC43di00LjJjLTIuOS0wLjctNi0xLjMtOS4yLTEuNw0KCQljLTMuMi0wLjQtNi4zLTAuNi05LjQtMC42Yy02LjcsMC0xMS42LDEuMy0xNC45LDRjLTMuMywyLjctNC45LDYuNS00LjksMTEuNWMwLDQuNywxLjIsOC4yLDMuNywxMC42DQoJCUMzNy43LDgwLjQsNDEuMiw4MS42LDQ1LjgsODEuNnogTTEyNi4xLDkyLjRjLTEuOCwwLTMtMC4zLTMuOC0xYy0wLjgtMC42LTEuNS0yLTIuMS0zLjlMOTYuNywxMC4yYy0wLjYtMi0wLjktMy4zLTAuOS00DQoJCWMwLTEuNiwwLjgtMi41LDIuNC0yLjVoOS44YzEuOSwwLDMuMiwwLjMsMy45LDFjMC44LDAuNiwxLjQsMiwyLDMuOWwxNi44LDY2LjJsMTUuNi02Ni4yYzAuNS0yLDEuMS0zLjMsMS45LTMuOWMwLjgtMC42LDIuMi0xLDQtMQ0KCQloOGMxLjksMCwzLjIsMC4zLDQsMWMwLjgsMC42LDEuNSwyLDEuOSwzLjlsMTUuOCw2N2wxNy4zLTY3YzAuNi0yLDEuMy0zLjMsMi0zLjljMC44LTAuNiwyLjEtMSwzLjktMWg5LjNjMS42LDAsMi41LDAuOCwyLjUsMi41DQoJCWMwLDAuNS0wLjEsMS0wLjIsMS42Yy0wLjEsMC42LTAuMywxLjQtMC43LDIuNWwtMjQuMSw3Ny4zYy0wLjYsMi0xLjMsMy4zLTIuMSwzLjljLTAuOCwwLjYtMi4xLDEtMy44LDFoLTguNmMtMS45LDAtMy4yLTAuMy00LTENCgkJYy0wLjgtMC43LTEuNS0yLTEuOS00TDE1NiwyM2wtMTUuNCw2NC40Yy0wLjUsMi0xLjEsMy4zLTEuOSw0Yy0wLjgsMC43LTIuMiwxLTQsMUgxMjYuMXogTTI1NC42LDk1LjFjLTUuMiwwLTEwLjQtMC42LTE1LjQtMS44DQoJCWMtNS0xLjItOC45LTIuNS0xMS41LTRjLTEuNi0wLjktMi43LTEuOS0zLjEtMi44Yy0wLjQtMC45LTAuNi0xLjktMC42LTIuOHYtNS4xYzAtMi4xLDAuOC0zLjEsMi4zLTMuMWMwLjYsMCwxLjIsMC4xLDEuOCwwLjMNCgkJYzAuNiwwLjIsMS41LDAuNiwyLjUsMWMzLjQsMS41LDcuMSwyLjcsMTEsMy41YzQsMC44LDcuOSwxLjIsMTEuOSwxLjJjNi4zLDAsMTEuMi0xLjEsMTQuNi0zLjNjMy40LTIuMiw1LjItNS40LDUuMi05LjUNCgkJYzAtMi44LTAuOS01LjEtMi43LTdjLTEuOC0xLjktNS4yLTMuNi0xMC4xLTUuMkwyNDYsNTJjLTcuMy0yLjMtMTIuNy01LjctMTYtMTAuMmMtMy4zLTQuNC01LTkuMy01LTE0LjVjMC00LjIsMC45LTcuOSwyLjctMTEuMQ0KCQljMS44LTMuMiw0LjItNiw3LjItOC4yYzMtMi4zLDYuNC00LDEwLjQtNS4yYzQtMS4yLDguMi0xLjcsMTIuNi0xLjdjMi4yLDAsNC41LDAuMSw2LjcsMC40YzIuMywwLjMsNC40LDAuNyw2LjUsMS4xDQoJCWMyLDAuNSwzLjksMSw1LjcsMS42YzEuOCwwLjYsMy4yLDEuMiw0LjIsMS44YzEuNCwwLjgsMi40LDEuNiwzLDIuNWMwLjYsMC44LDAuOSwxLjksMC45LDMuM3Y0LjdjMCwyLjEtMC44LDMuMi0yLjMsMy4yDQoJCWMtMC44LDAtMi4xLTAuNC0zLjgtMS4yYy01LjctMi42LTEyLjEtMy45LTE5LjItMy45Yy01LjcsMC0xMC4yLDAuOS0xMy4zLDIuOGMtMy4xLDEuOS00LjcsNC44LTQuNyw4LjljMCwyLjgsMSw1LjIsMyw3LjENCgkJYzIsMS45LDUuNywzLjgsMTEsNS41bDE0LjIsNC41YzcuMiwyLjMsMTIuNCw1LjUsMTUuNSw5LjZjMy4xLDQuMSw0LjYsOC44LDQuNiwxNGMwLDQuMy0wLjksOC4yLTIuNiwxMS42DQoJCWMtMS44LDMuNC00LjIsNi40LTcuMyw4LjhjLTMuMSwyLjUtNi44LDQuMy0xMS4xLDUuNkMyNjQuNCw5NC40LDI1OS43LDk1LjEsMjU0LjYsOTUuMXoiLz4NCgk8Zz4NCgkJPHBhdGggY2xhc3M9InN0MSIgZD0iTTI3My41LDE0My43Yy0zMi45LDI0LjMtODAuNywzNy4yLTEyMS44LDM3LjJjLTU3LjYsMC0xMDkuNS0yMS4zLTE0OC43LTU2LjdjLTMuMS0yLjgtMC4zLTYuNiwzLjQtNC40DQoJCQljNDIuNCwyNC42LDk0LjcsMzkuNSwxNDguOCwzOS41YzM2LjUsMCw3Ni42LTcuNiwxMTMuNS0yMy4yQzI3NC4yLDEzMy42LDI3OC45LDEzOS43LDI3My41LDE0My43eiIvPg0KCQk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjg3LjIsMTI4LjFjLTQuMi01LjQtMjcuOC0yLjYtMzguNS0xLjNjLTMuMiwwLjQtMy43LTIuNC0wLjgtNC41YzE4LjgtMTMuMiw0OS43LTkuNCw1My4zLTUNCgkJCWMzLjYsNC41LTEsMzUuNC0xOC42LDUwLjJjLTIuNywyLjMtNS4zLDEuMS00LjEtMS45QzI4Mi41LDE1NS43LDI5MS40LDEzMy40LDI4Ny4yLDEyOC4xeiIvPg0KCTwvZz4NCjwvZz4NCjwvc3ZnPg0K" x="17" y="20" width="26" height="20" preserveAspectRatio="xMidYMid meet"/>
+<text x="58" y="28" font-family="system-ui,-apple-system,sans-serif" font-size="12" fill="#0f172a" font-weight="600">AWS Lambda</text>
+<text x="58" y="48" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">Generated SAM template</text>
+<text x="58" y="62" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">EventBridge cron schedule</text>
+</g>
+
+<g transform="translate(340,470)">
+<rect width="248" height="84" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+<rect x="14" y="14" width="32" height="32" rx="8" fill="#ffffff"/>
+<image href="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTUwIiBoZWlnaHQ9IjE1MCIgdmlld0JveD0iMCAwIDk2IDk2IiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgogICAgPGRlZnM+CiAgICAgICAgPGxpbmVhckdyYWRpZW50IGlkPSJlMzk5YzE5Zi1iNjhmLTQyOWQtYjE3Ni0xOGMyMTE3ZmY3M2MiIHgxPSItMTAzMi4xNzIiIHgyPSItMTA1OS4yMTMiIHkxPSIxNDUuMzEyIiB5Mj0iNjUuNDI2IiBncmFkaWVudFRyYW5zZm9ybT0ibWF0cml4KDEgMCAwIC0xIDEwNzUgMTU4KSIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMxMTRhOGIiLz4KICAgICAgICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDY2OWJjIi8+CiAgICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgICAgICA8bGluZWFyR3JhZGllbnQgaWQ9ImFjMmE2ZmMyLWNhNDgtNDMyNy05YTNjLWQ0ZGNjMzI1NmUxNSIgeDE9Ii0xMDIzLjcyNSIgeDI9Ii0xMDI5Ljk4IiB5MT0iMTA4LjA4MyIgeTI9IjEwNS45NjgiIGdyYWRpZW50VHJhbnNmb3JtPSJtYXRyaXgoMSAwIDAgLTEgMTA3NSAxNTgpIiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgICAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1vcGFjaXR5PSIuMyIvPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9Ii4wNzEiIHN0b3Atb3BhY2l0eT0iLjIiLz4KICAgICAgICAgICAgPHN0b3Agb2Zmc2V0PSIuMzIxIiBzdG9wLW9wYWNpdHk9Ii4xIi8+CiAgICAgICAgICAgIDxzdG9wIG9mZnNldD0iLjYyMyIgc3RvcC1vcGFjaXR5PSIuMDUiLz4KICAgICAgICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLW9wYWNpdHk9IjAiLz4KICAgICAgICA8L2xpbmVhckdyYWRpZW50PgogICAgICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iYTdmZWU5NzAtYTc4NC00YmIxLWFmOGQtNjNkMThlNWY3ZGI5IiB4MT0iLTEwMjcuMTY1IiB4Mj0iLTk5Ny40ODIiIHkxPSIxNDcuNjQyIiB5Mj0iNjguNTYxIiBncmFkaWVudFRyYW5zZm9ybT0ibWF0cml4KDEgMCAwIC0xIDEwNzUgMTU4KSIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICAgICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMzY2NiZjQiLz4KICAgICAgICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMjg5MmRmIi8+CiAgICAgICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDwvZGVmcz4KICAgIDxwYXRoIGZpbGw9InVybCgjZTM5OWMxOWYtYjY4Zi00MjlkLWIxNzYtMThjMjExN2ZmNzNjKSIgZD0iTTMzLjMzOCA2LjU0NGgyNi4wMzhsLTI3LjAzIDgwLjA4N2E0LjE1MiA0LjE1MiAwIDAgMS0zLjkzMyAyLjgyNEg4LjE0OWE0LjE0NSA0LjE0NSAwIDAgMS0zLjkyOC01LjQ3TDI5LjQwNCA5LjM2OGE0LjE1MiA0LjE1MiAwIDAgMSAzLjkzNC0yLjgyNXoiLz4KICAgIDxwYXRoIGZpbGw9IiMwMDc4ZDQiIGQ9Ik03MS4xNzUgNjAuMjYxaC00MS4yOWExLjkxMSAxLjkxMSAwIDAgMC0xLjMwNSAzLjMwOWwyNi41MzIgMjQuNzY0YTQuMTcxIDQuMTcxIDAgMCAwIDIuODQ2IDEuMTIxaDIzLjM4eiIvPgogICAgPHBhdGggZmlsbD0idXJsKCNhYzJhNmZjMi1jYTQ4LTQzMjctOWEzYy1kNGRjYzMyNTZlMTUpIiBkPSJNMzMuMzM4IDYuNTQ0YTQuMTE4IDQuMTE4IDAgMCAwLTMuOTQzIDIuODc5TDQuMjUyIDgzLjkxN2E0LjE0IDQuMTQgMCAwIDAgMy45MDggNS41MzhoMjAuNzg3YTQuNDQzIDQuNDQzIDAgMCAwIDMuNDEtMi45bDUuMDE0LTE0Ljc3NyAxNy45MSAxNi43MDVhNC4yMzcgNC4yMzcgMCAwIDAgMi42NjYuOTcySDgxLjI0TDcxLjAyNCA2MC4yNjFsLTI5Ljc4MS4wMDdMNTkuNDcgNi41NDR6Ii8+CiAgICA8cGF0aCBmaWxsPSJ1cmwoI2E3ZmVlOTcwLWE3ODQtNGJiMS1hZjhkLTYzZDE4ZTVmN2RiOSkiIGQ9Ik02Ni41OTUgOS4zNjRhNC4xNDUgNC4xNDUgMCAwIDAtMy45MjgtMi44MkgzMy42NDhhNC4xNDYgNC4xNDYgMCAwIDEgMy45MjggMi44MmwyNS4xODQgNzQuNjJhNC4xNDYgNC4xNDYgMCAwIDEtMy45MjggNS40NzJoMjkuMDJhNC4xNDYgNC4xNDYgMCAwIDAgMy45MjctNS40NzJ6Ii8+Cjwvc3ZnPg==" x="18" y="18" width="24" height="24" preserveAspectRatio="xMidYMid meet"/>
+<text x="58" y="28" font-family="system-ui,-apple-system,sans-serif" font-size="12" fill="#0f172a" font-weight="600">Azure Functions</text>
+<text x="58" y="48" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">Generated Bicep template</text>
+<text x="58" y="62" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">Timer trigger included</text>
+</g>
+
+<g transform="translate(608,470)">
+<rect width="248" height="84" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+<rect x="14" y="14" width="32" height="32" rx="8" fill="#059669" fill-opacity=".15"/>
+<text x="30" y="36" font-family="system-ui,-apple-system,sans-serif" font-size="16" fill="#059669" text-anchor="middle">⇄</text>
+<text x="58" y="28" font-family="system-ui,-apple-system,sans-serif" font-size="12" fill="#0f172a" font-weight="600">Same Code Path</text>
+<text x="58" y="48" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">backtest → paper → live</text>
+<text x="58" y="62" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">No rewrites between stages</text>
+</g>
+
+<g transform="translate(876,470)">
+<rect width="248" height="84" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+<rect x="14" y="14" width="32" height="32" rx="8" fill="#7c3aed" fill-opacity=".15"/>
+<text x="30" y="36" font-family="system-ui,-apple-system,sans-serif" font-size="16" fill="#7c3aed" text-anchor="middle">∞</text>
+<text x="58" y="28" font-family="system-ui,-apple-system,sans-serif" font-size="12" fill="#0f172a" font-weight="600">Auto-scale &amp; Pay-per-run</text>
+<text x="58" y="48" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">No idle servers</text>
+<text x="58" y="62" font-family="system-ui,-apple-system,sans-serif" font-size="9.5" fill="#475569">Scales with your bot count</text>
+</g>
+</g>
+</svg>

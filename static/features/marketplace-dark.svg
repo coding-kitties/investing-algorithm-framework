@@ -1,0 +1,129 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" width="1200" height="520">
+<defs>
+<style>
+@keyframes fi{from{opacity:0}to{opacity:1}}
+@keyframes pl{0%,100%{opacity:.55}50%{opacity:1}}
+@keyframes fl{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+.a0{opacity:0;animation:fi .5s .05s both}
+.a1{opacity:0;animation:fi .5s .2s both}
+.a2{opacity:0;animation:fi .5s .35s both}
+.a3{opacity:0;animation:fi .5s .5s both}
+.a4{opacity:0;animation:fi .5s .65s both}
+.a5{opacity:0;animation:fi .5s .8s both}
+.a6{opacity:0;animation:fi .5s .95s both}
+.a7{opacity:0;animation:fi .5s 1.1s both}
+.a8{opacity:0;animation:fi .5s 1.25s both}
+.a9{opacity:0;animation:fi .5s 1.4s both}
+.pl{animation:pl 2.4s infinite}
+.fl{animation:fl 4s ease-in-out infinite;transform-origin:center}
+</style>
+<pattern id="gp" width="22" height="22" patternUnits="userSpaceOnUse">
+<circle cx="11" cy="11" r=".55" fill="#1c1c27"/>
+</pattern>
+<radialGradient id="glow" gradientUnits="userSpaceOnUse" cx="600" cy="260" r="500">
+<stop offset="0" stop-color="#22d3ee" stop-opacity=".09"/>
+<stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+</radialGradient>
+<radialGradient id="fglow" gradientUnits="userSpaceOnUse" cx="600" cy="270" r="260">
+<stop offset="0" stop-color="#22d3ee" stop-opacity=".22"/>
+<stop offset=".6" stop-color="#22d3ee" stop-opacity=".05"/>
+<stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+</radialGradient>
+<linearGradient id="hdr" gradientUnits="userSpaceOnUse" x1="0" y1="60" x2="0" y2="120">
+<stop offset="0" stop-color="#ffffff" stop-opacity="1"/>
+<stop offset="1" stop-color="#b0d8e8" stop-opacity="1"/>
+</linearGradient>
+<linearGradient id="fcard" gradientUnits="userSpaceOnUse" x1="380" y1="180" x2="820" y2="420">
+<stop offset="0" stop-color="#0d1a1d" stop-opacity="1"/>
+<stop offset="1" stop-color="#0a1416" stop-opacity="1"/>
+</linearGradient>
+<linearGradient id="border" gradientUnits="userSpaceOnUse" x1="380" y1="180" x2="820" y2="420">
+<stop offset="0" stop-color="#22d3ee" stop-opacity=".5"/>
+<stop offset=".5" stop-color="#22d3ee" stop-opacity=".9"/>
+<stop offset="1" stop-color="#22d3ee" stop-opacity=".5"/>
+</linearGradient>
+</defs>
+
+<!-- BACKGROUND -->
+<rect width="1200" height="520" fill="#07070a" rx="14"/>
+<rect width="1200" height="520" fill="url(#gp)" rx="14"/>
+<rect width="1200" height="520" fill="url(#glow)" rx="14"/>
+
+<!-- HEADER -->
+<g class="a0">
+<rect x="40" y="40" width="11" height="11" rx="2" fill="#22d3ee"/>
+<text x="60" y="50" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#22d3ee" letter-spacing="2" font-weight="700">MARKETPLACE</text>
+</g>
+<text class="a1" x="40" y="100" font-family="system-ui,-apple-system,sans-serif" font-size="38" font-weight="700" fill="url(#hdr)">Marketplace Integration</text>
+<text class="a2" x="40" y="130" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#9898b0">Discover, deploy and monetize battle-tested trading strategies through our partner network.</text>
+
+<!-- AMBIENT GLOW behind featured card -->
+<rect x="320" y="170" width="560" height="280" fill="url(#fglow)"/>
+
+<!-- FEATURED PARTNER CARD - FINTERION -->
+<g class="a5">
+<!-- glow behind -->
+<rect x="316" y="186" width="568" height="248" rx="20" fill="#22d3ee" opacity=".08"/>
+<!-- card -->
+<rect x="320" y="190" width="560" height="240" rx="18" fill="url(#fcard)" stroke="url(#border)" stroke-width="1.5"/>
+
+<!-- "FEATURED PARTNER" pill -->
+<rect x="344" y="212" width="128" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".4" stroke-width="1"/>
+<circle class="pl" cx="358" cy="223" r="3" fill="#22d3ee"/>
+<text x="368" y="227" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#22d3ee" letter-spacing="1.5" font-weight="700">FEATURED PARTNER</text>
+
+<!-- Finterion logo -->
+<image x="336" y="244" width="220" height="52" href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iX9Ch0LvQvtC5XzEiIGRhdGEtbmFtZT0i0KHQu9C+0LkgMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmlld0JveD0iNDE1IDM5NSA0NzAgMTEwIj4KICA8ZGVmcz4KICAgIDxzdHlsZT4KICAgICAgLmNscy0xIHsKICAgICAgICBmaWxsOiB1cmwoI1/QkdC10LfRi9C80Y/QvdC90YvQuV/Qs9GA0LDQtNC40LXQvdGCXzEzLTIpOwogICAgICB9CgogICAgICAuY2xzLTEsIC5jbHMtMiwgLmNscy0zLCAuY2xzLTQsIC5jbHMtNSwgLmNscy02IHsKICAgICAgICBzdHJva2Utd2lkdGg6IDBweDsKICAgICAgfQoKICAgICAgLmNscy0yIHsKICAgICAgICBmaWxsOiB1cmwoI1/QkdC10LfRi9C80Y/QvdC90YvQuV/Qs9GA0LDQtNC40LXQvdGCXzEwLTIpOwogICAgICB9CgogICAgICAuY2xzLTMgewogICAgICAgIGZpbGw6ICMwMDA7CiAgICAgIH0KCiAgICAgIC5jbHMtNCB7CiAgICAgICAgZmlsbDogdXJsKCNf0JHQtdC30YvQvNGP0L3QvdGL0Llf0LPRgNCw0LTQuNC10L3Rgl8xMyk7CiAgICAgIH0KCiAgICAgIC5jbHMtNSB7CiAgICAgICAgZmlsbDogdXJsKCNf0JHQtdC30YvQvNGP0L3QvdGL0Llf0LPRgNCw0LTQuNC10L3Rgl8xMCk7CiAgICAgIH0KCiAgICAgIC5jbHMtNiB7CiAgICAgICAgZmlsbDogI2ZmZjsKICAgICAgfQogICAgPC9zdHlsZT4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iX9CR0LXQt9GL0LzRj9C90L3Ri9C5X9Cz0YDQsNC00LjQtdC90YJfMTAiIGRhdGEtbmFtZT0i0JHQtdC30YvQvNGP0L3QvdGL0Lkg0LPRgNCw0LTQuNC10L3RgiAxMCIgeDE9IjQyMS42IiB5MT0iNDI1LjkiIHgyPSI0ODYuMTkiIHkyPSI0MjUuOSIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiMwMDUyZmYiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjMDA5ZWZmIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJf0JHQtdC30YvQvNGP0L3QvdGL0Llf0LPRgNCw0LTQuNC10L3Rgl8xMC0yIiBkYXRhLW5hbWU9ItCR0LXQt9GL0LzRj9C90L3Ri9C5INCz0YDQsNC00LjQtdC90YIgMTAiIHgxPSI0MjEuNiIgeTE9IjQ2NC43NCIgeDI9IjQ3My45NSIgeTI9IjQ2NC43NCIgeGxpbms6aHJlZj0iI1/QkdC10LfRi9C80Y/QvdC90YvQuV/Qs9GA0LDQtNC40LXQvdGCXzEwIi8+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9Il/QkdC10LfRi9C80Y/QvdC90YvQuV/Qs9GA0LDQtNC40LXQvdGCXzEzIiBkYXRhLW5hbWU9ItCR0LXQt9GL0LzRj9C90L3Ri9C5INCz0YDQsNC00LjQtdC90YIgMTMiIHgxPSI0MjUuODciIHkxPSI0OTAuMTciIHgyPSI0MjUuODgiIHkyPSI0OTAuMTciIGdyYWRpZW50VW5pdHM9InVzZXJTcGFjZU9uVXNlIj4KICAgICAgPHN0b3Agb2Zmc2V0PSIwIiBzdG9wLWNvbG9yPSIjZGJhMjAzIi8+CiAgICAgIDxzdG9wIG9mZnNldD0iMSIgc3RvcC1jb2xvcj0iI2ZmYzAwMCIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iX9CR0LXQt9GL0LzRj9C90L3Ri9C5X9Cz0YDQsNC00LjQtdC90YJfMTMtMiIgZGF0YS1uYW1lPSLQkdC10LfRi9C80Y/QvdC90YvQuSDQs9GA0LDQtNC40LXQvdGCIDEzIiB4MT0iNDI0LjgiIHkxPSI0ODQuNzciIHgyPSI0NTAuODUiIHkyPSI0ODQuNzciIHhsaW5rOmhyZWY9IiNf0JHQtdC30YvQvNGP0L3QvdGL0Llf0LPRgNCw0LTQuNC10L3Rgl8xMyIvPgogIDwvZGVmcz4KICA8Zz4KICAgIDxnPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTYiIGQ9Ik01NDkuNTcsNDIzLjIydi02LjgxaC00MC45MXY2OS44NmgxMS40OHYtMjguMzVoMjQuMjdjMi4zLDAsNC4xNy0xLjg3LDQuMTctNC4xN3YtNi44aC0yOC40NHYtMTkuNTZoMjUuMjZjMi4zLDAsNC4xNy0xLjg3LDQuMTctNC4xN1oiLz4KICAgICAgPHBhdGggY2xhc3M9ImNscy02IiBkPSJNNTU3LjY1LDQzNi4zN3Y0OS45aDEwLjc3di00OS45aC0xMC43N1pNNTY3LjkzLDQxNy4yMWMtMS4zNC0xLjQtMi45Ny0yLjA5LTQuOS0yLjA5cy0zLjU1LjY5LTQuODksMi4wOWMtMS4zNCwxLjM0LTIsMi45My0yLDQuNzlzLjY2LDMuNDksMiw0Ljg5YzEuNCwxLjM0LDMuMDMsMiw0Ljg5LDJzMy40Ni0uNjYsNC43OS0yYzEuNC0xLjQsMi4wOS0zLjAzLDIuMDktNC44OXMtLjY2LTMuNDYtMS45OC00Ljc5WiIvPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTYiIGQ9Ik02MTcuNDMsNDQwLjYxYy0zLjQ5LTMuNjktOC4xMy01LjUzLTEzLjkyLTUuNTMtNi45OSwwLTEyLjE0LDIuNTctMTUuNDcsNy42OHYtNi4zOWgtMTAuNzd2NDkuOWgxMC43N3YtMjYuNzVjMC00LjcyLDEuMTQtOC4zLDMuNC0xMC43MiwyLjI2LTIuNDMsNS4zNi0zLjY0LDkuMjgtMy42NCwzLjQ2LDAsNi4xOSwxLDguMTksMywyLDIsMyw0Ljg1LDMsOC41N3YyOS41NGgxMC43N3YtMzAuNjNjMC02LjMzLTEuNzUtMTEuMzItNS4yNC0xNS4wM1oiLz4KICAgICAgPHBhdGggY2xhc3M9ImNscy02IiBkPSJNNzE0LjQ2LDQ2MS40MWMwLTcuMzEtMi4zNS0xMy41NC03LjA4LTE4LjY1LTQuNzItNS4xMi0xMC43MS03LjY4LTE3Ljk2LTcuNjgtNy43OSwwLTE0LjEsMi41Mi0xOC45Niw3LjU3LTQuOTMsNS4wNy03LjM5LDExLjI4LTcuMzksMTguNjdzMi41LDEzLjg3LDcuNSwxOC44N2M1LjA1LDQuOTIsMTEuNiw3LjM3LDE5LjY1LDcuMzcsOS43MSwwLDE2Ljk5LTMuNjMsMjEuODUtMTAuODhsLTguODgtNS4xOWMtMi45Miw0LjEzLTcuMjIsNi4xOS0xMi44Nyw2LjE5LTQuMTgsMC03LjctMS4wMy0xMC41Mi0zLjA5LTIuODMtMi4wNi00LjY0LTQuOTYtNS40NC04LjY4aDM5LjcxYy4yNi0xLjY2LjQtMy4xNi40LTQuNVpNNjc0LjI2LDQ1Ny4xMmMuNzItMy43OSwyLjQzLTYuNzgsNS4wOS04Ljk3LDIuNjYtMi4yLDUuOTktMy4zLDkuOTctMy4zLDMuNjcsMCw2Ljc4LDEuMDgsOS4zNCwzLjIsMi41NSwyLjE0LDQuMjEsNS4xNiw0LjkzLDkuMDhoLTI5LjMzWiIvPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTYiIGQ9Ik03MzIuNzMsNDQ0Ljc2di04LjM5aC0xMC43OXY0OS45aDEwLjc5di0yNS4xNWMwLTUuMTIsMS41Mi04Ljc5LDQuNTgtMTAuOTcsMy4xMy0yLjI3LDYuNjUtMywxMC43OS0zdi0xMC43OWMtNy41MSwwLTEyLjY0LDIuMi0xNS4zNiw4LjM5WiIvPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTYiIGQ9Ik03NTQuMDgsNDM2LjM3djQ5LjloMTAuNzd2LTQ5LjloLTEwLjc3Wk03NjQuMzUsNDE3LjIxYy0xLjMyLTEuNC0yLjk1LTIuMDktNC44OS0yLjA5cy0zLjU1LjY5LTQuODksMi4wOWMtMS4zNCwxLjM0LTIsMi45My0yLDQuNzlzLjY2LDMuNDksMiw0Ljg5YzEuNCwxLjM0LDMuMDMsMiw0Ljg5LDJzMy40Ni0uNjYsNC43OS0yYzEuNC0xLjQsMi4wOS0zLjAzLDIuMDktNC44OXMtLjY2LTMuNDYtMi00Ljc5WiIvPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTYiIGQ9Ik04MTcuNTMsNDQyLjY1Yy01LjA1LTUuMDUtMTEuMjgtNy41Ny0xOC42NS03LjU3cy0xMy42MSwyLjUyLTE4LjY3LDcuNTdjLTUuMTIsNS4xMy03LjY4LDExLjM1LTcuNjgsMTguNjdzMi41NywxMy41NCw3LjY4LDE4LjY3YzUuMDUsNS4wNSwxMS4yOCw3LjU3LDE4LjY3LDcuNTdzMTMuNi0yLjUyLDE4LjY1LTcuNTdjNS4xMy01LjEzLDcuNjgtMTEuMzUsNy42OC0xOC42N3MtMi41NS0xMy41NC03LjY4LTE4LjY3Wk04MDkuOTYsNDcyLjZjLTMsMy02LjcsNC40OS0xMS4wOCw0LjQ5cy04LjA4LTEuNDktMTEuMDgtNC40OWMtMy0zLTQuNS02Ljc2LTQuNS0xMS4yOHMxLjUxLTguMjgsNC41LTExLjI4YzMtMyw2LjY4LTQuNDksMTEuMDgtNC40OXM4LjA4LDEuNDksMTEuMDgsNC40OWMyLjk4LDMsNC40OSw2Ljc2LDQuNDksMTEuMjhzLTEuNTEsOC4yOC00LjQ5LDExLjI4WiIvPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTYiIGQ9Ik04NzMuMTcsNDQwLjYxYy0zLjQ5LTMuNjktOC4xMy01LjUzLTEzLjkyLTUuNTMtNi45OSwwLTEyLjE0LDIuNTctMTUuNDcsNy42OHYtNi4zOWgtMTAuNzd2NDkuOWgxMC43N3YtMjYuNzVjMC00LjcyLDEuMTQtOC4zLDMuNC0xMC43MnM1LjM2LTMuNjQsOS4yOC0zLjY0YzMuNDYsMCw2LjE5LDEsOC4xOSwzLDIsMiwzLDQuODUsMyw4LjU3djI5LjU0aDEwLjc3di0zMC42M2MwLTYuMzMtMS43NS0xMS4zMi01LjI0LTE1LjAzWiIvPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTYiIGQ9Ik02NjAuMDksNDM2LjM3aC0xMi4zOHYtMTMuOTdsLTEwLjc3LDMuMnYxMC43N2gtOS4xOXYxMC4zOWgyOC4xN2MyLjMsMCw0LjE3LTEuODcsNC4xNy00LjE3di02LjIxWiIvPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTYiIGQ9Ik02NDcuNzEsNDQ2Ljc1bC0xMC43NywzLjI1djIwLjcxYzAsNi41MSwxLjgsMTAuOTgsNS4zOSwxMy40MSwzLjU4LDIuNDMsOS41MSwzLjE1LDE3Ljc2LDIuMTV2LTkuNjhjLTIuNzMuMTItNS4wMS4xNC02Ljg0LjA1LTEuODMtLjExLTMuMjEtLjYtNC4xNS0xLjUxLS45NC0uODktMS40LTIuMzctMS40LTQuNDJ2LTIzLjk1WiIvPgogICAgPC9nPgogICAgPGc+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtNSIgZD0iTTQ4Ni4xOSw0MDMuMTR2MjIuNzRjMCwyLjI5LTEuNTEsNC4zMi0zLjcyLDQuOTZsLTYwLjg4LDE3Ljg0di0yMi43NGMwLTIuMjksMS41MS00LjMyLDMuNzItNC45Nmw2MC44OC0xNy44NFoiLz4KICAgICAgPGc+CiAgICAgICAgPHBhdGggY2xhc3M9ImNscy0yIiBkPSJNNDI1LjMxLDQ1My41NWMtMi4yLjY1LTMuNzIsMi42Ny0zLjcyLDQuOTZ2MjQuMTVjMCwzLjEzLDEuNjcsNS45Niw0LjI3LDcuNTEtMi4zNS01LjUxLTEuMzctOS45OCw4LjQtMTIuNjRsMTYuNTgtNC44NiwxOS4zOS01LjY3YzIuMi0uNjQsMy43Mi0yLjY3LDMuNzItNC45NnYtMjIuNzRsLTQ4LjY0LDE0LjI0WiIvPgogICAgICAgIDxwYXRoIGNsYXNzPSJjbHMtNCIgZD0iTTQyNS44Nyw0OTAuMTdoLjAxczAsMC0uMDEsMGMwLDAsMCwwLDAsMFoiLz4KICAgICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik00MzQuMjcsNDc3LjUzYy05Ljc3LDIuNjYtMTAuNzUsNy4xMy04LjQxLDEyLjYzbC4wMi4wMmgwYzEuMzMuNTgsMi43LDEuMDcsNC4wOSwxLjQ4bDE3LjM4LDUuMDljMS43NS41MSwzLjQ5LS44LDMuNDktMi42MnYtMjEuNDZsLTE2LjU4LDQuODZaIi8+CiAgICAgIDwvZz4KICAgIDwvZz4KICA8L2c+Cjwvc3ZnPg==" preserveAspectRatio="xMinYMid meet"/>
+
+<!-- Tagline -->
+<text x="344" y="324" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#d8d8e8" font-weight="500">The home for systematic traders.</text>
+<text x="344" y="346" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#9898b0">Publish your bot, share your edge, and reach</text>
+<text x="344" y="362" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#9898b0">capital allocators &amp; retail investors.</text>
+
+<!-- Feature pills -->
+<g transform="translate(344, 384)">
+<rect x="0" y="0" width="92" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".25"/>
+<text x="46" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#22d3ee" text-anchor="middle" font-weight="600">Strategy Hub</text>
+
+<rect x="100" y="0" width="92" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".25"/>
+<text x="146" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#22d3ee" text-anchor="middle" font-weight="600">Live Tracking</text>
+
+<rect x="200" y="0" width="92" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".25"/>
+<text x="246" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#22d3ee" text-anchor="middle" font-weight="600">Monetization</text>
+</g>
+
+<!-- Right decorative chart -->
+<g transform="translate(660, 232)" opacity=".9">
+<rect x="0" y="0" width="200" height="160" rx="10" fill="#07070a" stroke="#1c1c27"/>
+<text x="14" y="22" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#5a5a72" letter-spacing="1.5" font-weight="700">EQUITY CURVE</text>
+<polyline points="14,130 38,118 62,124 86,100 110,92 134,72 158,80 186,46" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<polyline points="14,130 38,118 62,124 86,100 110,92 134,72 158,80 186,46 186,150 14,150" fill="#22d3ee" opacity=".08"/>
+<line x1="14" y1="150" x2="186" y2="150" stroke="#1c1c27"/>
+<circle cx="186" cy="46" r="3" fill="#22d3ee"/>
+<text x="14" y="146" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#4a4a62">Jan</text>
+<text x="174" y="146" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#4a4a62">Dec</text>
+<text x="14" y="62" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="700" fill="#10b981">+42.8%</text>
+<text x="14" y="76" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#9898b0">YTD return</text>
+</g>
+</g>
+
+<!-- BOTTOM ROW: marketplace value props -->
+<g class="a7">
+<rect x="40" y="464" width="1120" height="36" rx="10" fill="#0d0d12" stroke="#1c1c27"/>
+
+<g transform="translate(72, 482)">
+<circle cx="0" cy="0" r="3" fill="#22d3ee"/>
+<text x="12" y="4" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#9898b0">One-click strategy publishing</text>
+</g>
+
+<g transform="translate(660, 482)">
+<circle cx="0" cy="0" r="3" fill="#a78bfa"/>
+<text x="12" y="4" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#9898b0">Live performance attribution</text>
+</g>
+
+<g transform="translate(940, 482)">
+<circle cx="0" cy="0" r="3" fill="#f59e0b"/>
+<text x="12" y="4" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#9898b0">Revenue sharing &amp; licensing</text>
+</g>
+</g>
+</svg>

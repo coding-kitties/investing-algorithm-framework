@@ -1,0 +1,324 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" width="1200" height="520">
+<defs>
+<style>
+@keyframes fi{from{opacity:0}to{opacity:1}}
+@keyframes dl{from{stroke-dashoffset:1500}to{stroke-dashoffset:0}}
+@keyframes bk{0%,100%{opacity:1}50%{opacity:.1}}
+@keyframes rw{0%,100%{opacity:.06}50%{opacity:.12}}
+.a0{opacity:0;animation:fi .5s .05s both}
+.a1{opacity:0;animation:fi .5s .2s both}
+.a2{opacity:0;animation:fi .5s .35s both}
+.a3{opacity:0;animation:fi .5s .5s both}
+.a4{opacity:0;animation:fi .45s .65s both}
+.a5{opacity:0;animation:fi .45s .78s both}
+.a6{opacity:0;animation:fi .45s .91s both}
+.a7{opacity:0;animation:fi .45s 1.04s both}
+.a8{opacity:0;animation:fi .45s 1.17s both}
+.a9{opacity:0;animation:fi .45s 1.3s both}
+.a10{opacity:0;animation:fi .45s 1.43s both}
+.a11{opacity:0;animation:fi .45s 1.56s both}
+.a12{opacity:0;animation:fi .4s 1.62s both}
+.a13{opacity:0;animation:fi .4s 1.74s both}
+.a14{opacity:0;animation:fi .4s 1.86s both}
+.a15{opacity:0;animation:fi .4s 1.98s both}
+.a16{opacity:0;animation:fi .4s 2.1s both}
+.a17{opacity:0;animation:fi .4s 2.22s both}
+.a18{opacity:0;animation:fi .4s 2.34s both}
+.a19{opacity:0;animation:fi .4s 2.5s both}
+.l1{stroke-dasharray:1500;stroke-dashoffset:1500;animation:dl 2.4s 1.7s both}
+.l2{stroke-dasharray:1500;stroke-dashoffset:1500;animation:dl 2.4s 1.9s both}
+.l3{stroke-dasharray:1500;stroke-dashoffset:1500;animation:dl 2.4s 2.1s both}
+.l4{stroke-dasharray:1500;stroke-dashoffset:1500;animation:dl 2.4s 2.3s both}
+.l5{stroke-dasharray:1500;stroke-dashoffset:1500;animation:dl 2.4s 2.5s both}
+.bk{animation:bk 1.8s infinite}
+.rw{animation:rw 3s 2s infinite}
+</style>
+<pattern id="gp" width="22" height="22" patternUnits="userSpaceOnUse">
+<circle cx="11" cy="11" r=".55" fill="#1c1c27"/>
+</pattern>
+<radialGradient id="glw" gradientUnits="userSpaceOnUse" cx="0" cy="260" r="440">
+<stop offset="0" stop-color="#22d3ee" stop-opacity=".07"/>
+<stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+</radialGradient>
+<linearGradient id="sep" gradientUnits="userSpaceOnUse" x1="462" y1="0" x2="462" y2="520">
+<stop offset="0" stop-color="#22d3ee" stop-opacity="0"/>
+<stop offset=".35" stop-color="#22d3ee" stop-opacity=".35"/>
+<stop offset="1" stop-color="#22d3ee" stop-opacity="0"/>
+</linearGradient>
+<linearGradient id="hdr" gradientUnits="userSpaceOnUse" x1="0" y1="90" x2="0" y2="150">
+<stop offset="0" stop-color="#ffffff" stop-opacity="1"/>
+<stop offset="1" stop-color="#b0d8e8" stop-opacity="1"/>
+</linearGradient>
+<clipPath id="rclip"><rect x="464" y="0" width="740" height="520" rx="0"/></clipPath>
+<clipPath id="cclip"><rect x="580" y="330" width="600" height="160"/></clipPath>
+</defs>
+
+<!-- ═══ BACKGROUND ═══ -->
+<rect width="1200" height="520" fill="#07070a" rx="14"/>
+<rect width="1200" height="520" fill="url(#gp)" rx="14"/>
+<rect width="460" height="520" fill="url(#glw)"/>
+
+<!-- ═══ LEFT PANEL ═══ -->
+
+<!-- Badge -->
+<g class="a0">
+<rect x="44" y="44" width="224" height="20" rx="10" fill="#0f1a1c" stroke="#22d3ee" stroke-opacity=".3" stroke-width=".8"/>
+<circle cx="58" cy="54" r="3.5" fill="#22d3ee" class="bk"/>
+<text x="68" y="58" font-family="'Courier New',monospace" font-size="9.5" fill="#22d3ee" letter-spacing="2" font-weight="600">INVESTING ALGO FRAMEWORK</text>
+</g>
+
+<!-- Title -->
+<g class="a1">
+<text x="44" y="106" font-family="system-ui,-apple-system,sans-serif" font-size="28" font-weight="700" fill="url(#hdr)" letter-spacing="-1">Investing Algorithm</text>
+</g>
+<g class="a1">
+<text x="44" y="144" font-family="system-ui,-apple-system,sans-serif" font-size="28" font-weight="700" fill="url(#hdr)" letter-spacing="-1">Framework</text>
+</g>
+<g class="a2">
+<text x="44" y="178" font-family="system-ui,-apple-system,sans-serif" font-size="13" font-weight="600" fill="#22d3ee">The complete Python quantitative trading suite.</text>
+</g>
+<g class="a2">
+<text x="44" y="197" font-family="system-ui,-apple-system,sans-serif" font-size="12" fill="#5a5a72">Create your own quantitative trading bots.</text>
+</g>
+
+<!-- Divider -->
+<g class="a3">
+<line x1="44" y1="215" x2="220" y2="215" stroke="#22d3ee" stroke-width=".8" stroke-opacity=".3"/>
+</g>
+
+<!-- Feature list -->
+<g class="a4"><circle cx="54" cy="241" r="4" fill="#22d3ee"/><text x="66" y="245" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" fill="#9898b0">30+ Metrics — Sharpe, Sortino, Calmar, VaR</text></g>
+<g class="a5"><circle cx="54" cy="265" r="4" fill="#f59e0b"/><text x="66" y="269" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" fill="#9898b0">Vector Backtesting</text></g>
+<g class="a6"><circle cx="54" cy="289" r="4" fill="#a78bfa"/><text x="66" y="293" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" fill="#9898b0">Event-Driven Backtesting</text></g>
+<g class="a7"><circle cx="54" cy="313" r="4" fill="#10b981"/><text x="66" y="317" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" fill="#9898b0">Permutation Tests &amp; Monte Carlo Robustness</text></g>
+<g class="a8"><circle cx="54" cy="337" r="4" fill="#ec4899"/><text x="66" y="341" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" fill="#9898b0">Multi-Strategy Comparison &amp; Ranking</text></g>
+<g class="a9"><circle cx="54" cy="361" r="4" fill="#ef4444"/><text x="66" y="365" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" fill="#9898b0">Equity, Drawdown &amp; Rolling Charts</text></g>
+<g class="a10"><circle cx="54" cy="385" r="4" fill="#3b82f6"/><text x="66" y="389" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" fill="#9898b0">Benchmark Beat-Rate vs B&amp;H, DCA &amp; RF</text></g>
+<g class="a11"><circle cx="54" cy="409" r="4" fill="#22d3ee"/><text x="66" y="413" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" fill="#9898b0">Self-Contained HTML Report — Dark/Light</text></g>
+<g class="a11"><circle cx="54" cy="433" r="4" fill="#f97316"/><text x="66" y="437" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" fill="#9898b0">Cloud Deploy — AWS Lambda / Azure Functions</text></g>
+<g class="a11"><circle cx="54" cy="457" r="4" fill="#a78bfa"/><text x="66" y="461" font-family="system-ui,-apple-system,sans-serif" font-size="11.5" fill="#9898b0">Cross-Sectional Pipelines — Rank, filter &amp; score universes</text></g>
+
+
+<!-- ═══ SEPARATOR ═══ -->
+<rect x="461" y="0" width="2" height="520" fill="url(#sep)"/>
+
+<!-- ═══ RIGHT PANEL ═══ -->
+<g clip-path="url(#rclip)">
+
+<!-- Panel background -->
+<rect x="463" y="0" width="737" height="520" fill="#09090d"/>
+
+<!-- Chrome bar -->
+<g class="a0">
+<rect x="463" y="0" width="737" height="30" fill="#111117"/>
+<rect x="463" y="29" width="737" height="1" fill="#1e1e28"/>
+<circle cx="484" cy="15" r="5" fill="#ef4444" opacity=".7"/>
+<circle cx="502" cy="15" r="5" fill="#f59e0b" opacity=".7"/>
+<circle cx="520" cy="15" r="5" fill="#10b981" opacity=".7"/>
+<text x="548" y="19" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#4a4a62">Strategy Comparison Dashboard</text>
+<circle cx="1163" cy="15" r="4" fill="#10b981" class="bk"/>
+<text x="1172" y="19" font-family="'Courier New',monospace" font-size="9" fill="#10b981" letter-spacing="1">LIVE</text>
+</g>
+
+<!-- Sidebar -->
+<g class="a1">
+<rect x="463" y="30" width="112" height="490" fill="#0d0d12"/>
+<rect x="574" y="30" width="1" height="490" fill="#1e1e28"/>
+<text x="475" y="52" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#38384a" letter-spacing="2">STRATEGIES</text>
+<!-- Active item -->
+<rect x="463" y="58" width="112" height="24" fill="#22d3ee" fill-opacity=".07"/>
+<rect x="463" y="58" width="2" height="24" fill="#22d3ee"/>
+<circle cx="478" cy="70" r="4" fill="#ec4899"/>
+<text x="488" y="74" font-family="'Courier New',monospace" font-size="9.5" fill="#22d3ee">0a94a4cf</text>
+<!-- Other items -->
+<circle cx="478" cy="97" r="4" fill="#f59e0b"/>
+<text x="488" y="101" font-family="'Courier New',monospace" font-size="9.5" fill="#4a4a62">0a9cb699</text>
+<circle cx="478" cy="122" r="4" fill="#10b981"/>
+<text x="488" y="126" font-family="'Courier New',monospace" font-size="9.5" fill="#4a4a62">0a1aae1e</text>
+<circle cx="478" cy="147" r="4" fill="#22d3ee"/>
+<text x="488" y="151" font-family="'Courier New',monospace" font-size="9.5" fill="#4a4a62">0a0bbdc2</text>
+<circle cx="478" cy="172" r="4" fill="#ef4444"/>
+<text x="488" y="176" font-family="'Courier New',monospace" font-size="9.5" fill="#4a4a62">0b2ff3f7</text>
+</g>
+
+<!-- Page title -->
+<g class="a2">
+<text x="586" y="54" font-family="system-ui,-apple-system,sans-serif" font-size="15" font-weight="600" fill="#d8d8e8">Overview</text>
+</g>
+
+<!-- ─── KPI CARDS ─── -->
+<!-- Card 1: CAGR -->
+<g class="a3">
+<rect x="586" y="64" width="138" height="80" rx="8" fill="#111117" stroke="#1e1e28" stroke-width=".8"/>
+<text x="600" y="82" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#4a4a62" letter-spacing=".8">CAGR</text>
+<text x="600" y="112" font-family="'Courier New',monospace" font-size="22" font-weight="700" fill="#10b981">+32.0%</text>
+<rect x="600" y="120" width="36" height="14" rx="3" fill="#22d3ee" fill-opacity=".1" stroke="#22d3ee" stroke-opacity=".3" stroke-width=".6"/>
+<text x="608" y="130" font-family="'Courier New',monospace" font-size="8" fill="#22d3ee" letter-spacing="1">BEST</text>
+</g>
+<!-- Card 2: Sharpe -->
+<g class="a4">
+<rect x="734" y="64" width="138" height="80" rx="8" fill="#111117" stroke="#1e1e28" stroke-width=".8"/>
+<text x="748" y="82" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#4a4a62" letter-spacing=".8">SHARPE</text>
+<text x="748" y="112" font-family="'Courier New',monospace" font-size="22" font-weight="700" fill="#22d3ee">1.10</text>
+<rect x="748" y="120" width="36" height="14" rx="3" fill="#22d3ee" fill-opacity=".1" stroke="#22d3ee" stroke-opacity=".3" stroke-width=".6"/>
+<text x="756" y="130" font-family="'Courier New',monospace" font-size="8" fill="#22d3ee" letter-spacing="1">BEST</text>
+</g>
+<!-- Card 3: Max DD -->
+<g class="a5">
+<rect x="882" y="64" width="138" height="80" rx="8" fill="#111117" stroke="#1e1e28" stroke-width=".8"/>
+<text x="896" y="82" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#4a4a62" letter-spacing=".8">MAX DD</text>
+<text x="896" y="112" font-family="'Courier New',monospace" font-size="22" font-weight="700" fill="#ec4899">-9.0%</text>
+<rect x="896" y="120" width="36" height="14" rx="3" fill="#22d3ee" fill-opacity=".1" stroke="#22d3ee" stroke-opacity=".3" stroke-width=".6"/>
+<text x="904" y="130" font-family="'Courier New',monospace" font-size="8" fill="#22d3ee" letter-spacing="1">BEST</text>
+</g>
+<!-- Card 4: Recovery -->
+<g class="a6">
+<rect x="1030" y="64" width="138" height="80" rx="8" fill="#111117" stroke="#1e1e28" stroke-width=".8"/>
+<text x="1044" y="82" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#4a4a62" letter-spacing=".8">RECOVERY</text>
+<text x="1044" y="112" font-family="'Courier New',monospace" font-size="22" font-weight="700" fill="#a78bfa">39.6×</text>
+<rect x="1044" y="120" width="36" height="14" rx="3" fill="#22d3ee" fill-opacity=".1" stroke="#22d3ee" stroke-opacity=".3" stroke-width=".6"/>
+<text x="1052" y="130" font-family="'Courier New',monospace" font-size="8" fill="#22d3ee" letter-spacing="1">BEST</text>
+</g>
+
+<!-- ─── COMPARISON TABLE ─── -->
+<g class="a7">
+<rect x="586" y="158" width="582" height="18" rx="0" fill="#0f0f15"/>
+<text x="598" y="171" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#38384a" letter-spacing=".8">STRATEGY</text>
+<text x="740" y="171" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#38384a" letter-spacing=".8">CAGR</text>
+<text x="810" y="171" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#38384a" letter-spacing=".8">SHARPE</text>
+<text x="878" y="171" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#38384a" letter-spacing=".8">MAX DD</text>
+<text x="960" y="171" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#38384a" letter-spacing=".8">NET GAIN</text>
+<text x="1050" y="171" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#38384a" letter-spacing=".8">SORTINO</text>
+</g>
+
+<!-- Row 1 — 0a94a4cf (best row, pink) -->
+<g class="a8">
+<rect x="586" y="176" width="582" height="26" fill="#22d3ee" fill-opacity=".04" class="rw"/>
+<rect x="586" y="201" width="582" height=".5" fill="#1e1e28"/>
+<circle cx="596" cy="189" r="4" fill="#ec4899"/>
+<text x="606" y="193" font-family="'Courier New',monospace" font-size="9.5" fill="#e8e8f0">0a94a4cf</text>
+<!-- CAGR best -->
+<rect x="728" y="180" width="54" height="18" rx="3" fill="#10b981" fill-opacity=".12"/>
+<text x="740" y="193" font-family="'Courier New',monospace" font-size="10" fill="#10b981" font-weight="700">+32.0%</text>
+<!-- Sharpe best -->
+<rect x="798" y="180" width="46" height="18" rx="3" fill="#22d3ee" fill-opacity=".1"/>
+<text x="810" y="193" font-family="'Courier New',monospace" font-size="10" fill="#22d3ee" font-weight="700">1.10</text>
+<!-- Max DD best -->
+<rect x="866" y="180" width="52" height="18" rx="3" fill="#ec4899" fill-opacity=".1"/>
+<text x="878" y="193" font-family="'Courier New',monospace" font-size="10" fill="#ec4899" font-weight="700">9.0%</text>
+<text x="960" y="193" font-family="'Courier New',monospace" font-size="10" fill="#10b981">+357.4%</text>
+<text x="1050" y="193" font-family="'Courier New',monospace" font-size="10" fill="#22d3ee">1.59</text>
+</g>
+
+<!-- Row 2 — 0a9cb699 -->
+<g class="a9">
+<rect x="586" y="202" width="582" height=".5" fill="#1e1e28"/>
+<circle cx="596" cy="215" r="4" fill="#f59e0b"/>
+<text x="606" y="219" font-family="'Courier New',monospace" font-size="9.5" fill="#9898b0">0a9cb699</text>
+<text x="740" y="219" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">+23.0%</text>
+<text x="810" y="219" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">0.95</text>
+<text x="878" y="219" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">10.5%</text>
+<text x="960" y="219" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">+256.0%</text>
+<text x="1050" y="219" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">1.72</text>
+<rect x="586" y="227" width="582" height=".5" fill="#1e1e28"/>
+</g>
+
+<!-- Row 3 — 0a1aae1e -->
+<g class="a10">
+<circle cx="596" cy="241" r="4" fill="#10b981"/>
+<text x="606" y="245" font-family="'Courier New',monospace" font-size="9.5" fill="#9898b0">0a1aae1e</text>
+<text x="740" y="245" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">+23.1%</text>
+<text x="810" y="245" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">0.78</text>
+<text x="878" y="245" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">11.3%</text>
+<text x="960" y="245" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">+256.5%</text>
+<text x="1050" y="245" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">1.28</text>
+<rect x="586" y="253" width="582" height=".5" fill="#1e1e28"/>
+</g>
+
+<!-- Row 4 — 0a0bbdc2 -->
+<g class="a11">
+<circle cx="596" cy="267" r="4" fill="#22d3ee"/>
+<text x="606" y="271" font-family="'Courier New',monospace" font-size="9.5" fill="#9898b0">0a0bbdc2</text>
+<text x="740" y="271" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">+20.4%</text>
+<text x="810" y="271" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">0.52</text>
+<text x="878" y="271" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">13.8%</text>
+<text x="960" y="271" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">+226.1%</text>
+<text x="1050" y="271" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">0.85</text>
+<rect x="586" y="279" width="582" height=".5" fill="#1e1e28"/>
+</g>
+
+<!-- Row 5 — 0b2ff3f7 -->
+<g class="a12">
+<circle cx="596" cy="293" r="4" fill="#ef4444"/>
+<text x="606" y="297" font-family="'Courier New',monospace" font-size="9.5" fill="#9898b0">0b2ff3f7</text>
+<text x="740" y="297" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">+18.7%</text>
+<text x="810" y="297" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">0.51</text>
+<text x="878" y="297" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">13.7%</text>
+<text x="960" y="297" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">+207.3%</text>
+<text x="1050" y="297" font-family="'Courier New',monospace" font-size="10" fill="#9898b0">0.76</text>
+<rect x="586" y="305" width="582" height=".5" fill="#1e1e28"/>
+</g>
+
+<!-- ─── EQUITY CURVES CHART ─── -->
+<g class="a13">
+<text x="586" y="326" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#38384a" letter-spacing=".8">EQUITY CURVES — NORMALIZED %</text>
+<rect x="586" y="334" width="582" height="156" rx="6" fill="#0c0c11" stroke="#1e1e28" stroke-width=".8"/>
+</g>
+
+<!-- Y-axis grid lines & labels -->
+<g class="a14">
+<line x1="600" y1="358" x2="1158" y2="358" stroke="#1e1e28" stroke-width=".7"/>
+<line x1="600" y1="386" x2="1158" y2="386" stroke="#1e1e28" stroke-width=".7"/>
+<line x1="600" y1="414" x2="1158" y2="414" stroke="#1e1e28" stroke-width=".7"/>
+<line x1="600" y1="442" x2="1158" y2="442" stroke="#1e1e28" stroke-width=".7"/>
+<line x1="600" y1="470" x2="1158" y2="470" stroke="#1e1e28" stroke-width=".7"/>
+<text x="600" y="356" font-family="'Courier New',monospace" font-size="7.5" fill="#2e2e42">+400%</text>
+<text x="600" y="384" font-family="'Courier New',monospace" font-size="7.5" fill="#2e2e42">+300%</text>
+<text x="600" y="412" font-family="'Courier New',monospace" font-size="7.5" fill="#2e2e42">+200%</text>
+<text x="600" y="440" font-family="'Courier New',monospace" font-size="7.5" fill="#2e2e42">+100%</text>
+<text x="600" y="468" font-family="'Courier New',monospace" font-size="7.5" fill="#2e2e42">0%</text>
+</g>
+
+<!-- Equity lines (stroke-dashoffset animated in) -->
+<!-- Chart plot area: x 640-1152, y 344 (max ~+400%) to 468 (0%), height 124 -->
+<!-- Scale: 124px = 400%, so 1% = 0.31px -->
+<!-- End y-values: pink=357.4% → 468-0.31*357.4=357; amber=256% → 368; green=256.5% → 368; cyan=226.1% → 398; red=207.3% → 403 -->
+
+<!-- Pink 0a94a4cf: +357.4% end -->
+<polyline class="l1" fill="none" stroke="#ec4899" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+  points="640,468 706,465 772,460 838,463 904,449 970,430 1036,408 1102,380 1152,357"/>
+
+<!-- Amber 0a9cb699: +256% end -->
+<polyline class="l2" fill="none" stroke="#f59e0b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+  points="640,468 706,465 772,460 838,462 904,452 970,439 1036,422 1102,401 1152,368"/>
+
+<!-- Green 0a1aae1e: +256.5% end -->
+<polyline class="l3" fill="none" stroke="#10b981" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+  points="640,468 706,464 772,459 838,461 904,453 970,440 1036,423 1102,402 1152,368"/>
+
+<!-- Cyan 0a0bbdc2: +226.1% end -->
+<polyline class="l4" fill="none" stroke="#22d3ee" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+  points="640,468 706,465 772,461 838,463 904,455 970,444 1036,430 1102,414 1152,398"/>
+
+<!-- Red 0b2ff3f7: +207.3% end -->
+<polyline class="l5" fill="none" stroke="#ef4444" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"
+  points="640,468 706,466 772,462 838,464 904,457 970,447 1036,434 1102,420 1152,403"/>
+
+<!-- Chart legend -->
+<g class="a19">
+<circle cx="642" cy="497" r="4" fill="#ec4899"/>
+<text x="650" y="501" font-family="'Courier New',monospace" font-size="8.5" fill="#5a5a72">0a94a4cf</text>
+<circle cx="726" cy="497" r="4" fill="#f59e0b"/>
+<text x="734" y="501" font-family="'Courier New',monospace" font-size="8.5" fill="#5a5a72">0a9cb699</text>
+<circle cx="810" cy="497" r="4" fill="#10b981"/>
+<text x="818" y="501" font-family="'Courier New',monospace" font-size="8.5" fill="#5a5a72">0a1aae1e</text>
+<circle cx="894" cy="497" r="4" fill="#22d3ee"/>
+<text x="902" y="501" font-family="'Courier New',monospace" font-size="8.5" fill="#5a5a72">0a0bbdc2</text>
+<circle cx="978" cy="497" r="4" fill="#ef4444"/>
+<text x="986" y="501" font-family="'Courier New',monospace" font-size="8.5" fill="#5a5a72">0b2ff3f7</text>
+</g>
+
+</g>
+<!-- End right panel clip -->
+
+</svg>
