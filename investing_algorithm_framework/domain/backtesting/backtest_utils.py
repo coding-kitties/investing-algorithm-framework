@@ -1,5 +1,6 @@
 import json
 import os
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from logging import getLogger
 from pathlib import Path
 from random import Random
@@ -10,8 +11,71 @@ from investing_algorithm_framework.domain.exceptions import \
 from investing_algorithm_framework.domain.utils.custom_tqdm import tqdm
 
 from .backtest import Backtest
+from .bundle import (
+    BUNDLE_EXT,
+    is_bundle_file,
+    open_bundle as _open_bundle,
+    save_bundle as _save_bundle,
+)
 
 logger = getLogger("investing_algorithm_framework")
+
+
+# ``format`` literal for save/load functions.
+FORMAT_BUNDLE = "bundle"
+FORMAT_DIRECTORY = "directory"
+_VALID_FORMATS = {FORMAT_BUNDLE, FORMAT_DIRECTORY}
+
+
+def _resolve_workers(workers: Optional[int]) -> int:
+    if workers is None:
+        return min(8, (os.cpu_count() or 1))
+    return max(1, int(workers))
+
+
+def resolve_backtest_path(
+    storage_directory: Union[str, Path], algorithm_id: str
+) -> Optional[str]:
+    """Return the on-disk path for a stored backtest, or ``None``.
+
+    Prefers ``<storage>/<algorithm_id>.iafbt`` (issue #487 bundle
+    format) and falls back to the legacy directory at
+    ``<storage>/<algorithm_id>``.
+    """
+    bundle = os.path.join(str(storage_directory), f"{algorithm_id}{BUNDLE_EXT}")
+    if os.path.isfile(bundle):
+        return bundle
+    legacy = os.path.join(str(storage_directory), algorithm_id)
+    if os.path.isdir(legacy):
+        return legacy
+    return None
+
+
+# --- worker entry points (must be top-level so they pickle) -------------
+
+
+def _save_one_bundle(args):
+    backtest, target, include_ohlcv, ohlcv_store = args
+    return str(_save_bundle(
+        backtest, target,
+        include_ohlcv=include_ohlcv,
+        ohlcv_store=ohlcv_store,
+    ))
+
+
+def _load_one_bundle(path: str):
+    return _open_bundle(path)
+
+
+def _load_one_directory(path: str):
+    return Backtest.open(path)
+
+
+def _load_one_dispatch(item):
+    path, kind = item
+    if kind == "bundle":
+        return _load_one_bundle(path)
+    return _load_one_directory(path)
 
 
 def save_backtests_to_directory(
@@ -21,7 +85,11 @@ def save_backtests_to_directory(
     dir_name_generation_function: Callable[[Backtest], str] = None,
     number_of_backtests_to_save: int = None,
     filter_function: Callable[[Backtest], bool] = None,
-    show_progress: bool = False
+    show_progress: bool = False,
+    format: str = FORMAT_BUNDLE,
+    workers: Optional[int] = None,
+    include_ohlcv: bool = False,
+    write_index: bool = True,
 ) -> None:
     """
     Saves a list of Backtest objects to the specified directory.
@@ -35,9 +103,9 @@ def save_backtests_to_directory(
             with this date range will be saved. Defaults to None.
         dir_name_generation_function (Callable[[Backtest], str], optional):
             A function that takes a Backtest object as input and returns
-            a string to be used as the directory name for that backtest.
-            If not provided, the backtest's algorithm_id will be used.
-            Defaults to None.
+            a string to be used as the **bundle base name** (or directory
+            name in legacy ``directory`` format). If not provided, the
+            backtest's ``algorithm_id`` is used.
         number_of_backtests_to_save (int, optional): Maximum number of
             backtests to save. If None, all backtests will be saved.
         filter_function (Callable[[Backtest], bool], optional): A function
@@ -45,58 +113,124 @@ def save_backtests_to_directory(
             backtest should be saved. Defaults to None.
         show_progress (bool, optional): Whether to display a progress bar
             while saving backtests. Defaults to False.
+        format: Persistence layout. ``"bundle"`` (default, issue #487)
+            writes one ``.iafbt`` file per backtest. ``"directory"``
+            keeps the legacy human-readable per-file JSON layout.
+        workers: Process pool size for parallel saves. Only used in
+            ``bundle`` mode. Defaults to ``min(8, os.cpu_count())``.
+            Pass ``1`` to disable parallelism.
+        include_ohlcv: Forward to :py:func:`save_bundle`. Only used in
+            ``bundle`` mode.
+        write_index: When True (the default) and ``format='bundle'``,
+            write a top-level ``index.parquet`` containing one row per
+            saved backtest with its summary metrics, parameters and the
+            relative bundle path. Loaders can use this to filter
+            without opening any bundle.
 
     Returns:
         None
     """
+    if format not in _VALID_FORMATS:
+        raise OperationalException(
+            f"Unknown format '{format}'. Expected one of {_VALID_FORMATS}."
+        )
 
     if not os.path.exists(directory_path):
         os.makedirs(directory_path)
 
-    if show_progress:
-        backtests = tqdm(backtests, desc="Saving backtests")
-
+    # Filter + cap up front so progress / parallel scheduling sees the
+    # real workload.
+    selected: List[tuple] = []
     for backtest in backtests:
-
-        # Check if we have reached the limit of backtests to save
-        if number_of_backtests_to_save is not None:
-            if number_of_backtests_to_save <= 0:
-                break
-
-            number_of_backtests_to_save -= 1
-
-        if filter_function is not None:
-            if not filter_function(backtest):
-                continue
+        if number_of_backtests_to_save is not None and \
+                len(selected) >= number_of_backtests_to_save:
+            break
+        if filter_function is not None and not filter_function(backtest):
+            continue
 
         if dir_name_generation_function is not None:
-            dir_name = dir_name_generation_function(backtest)
+            base_name = dir_name_generation_function(backtest)
         else:
-
-            if not hasattr(backtest, "algorithm_id"):
-                raise OperationalException(
-                    "algorithm_id is not set in backtest instance,"
-                    "cannot generate directory name automatically, "
-                    "please make sure to set the algorithm_id field "
-                    "in your strategies or provide "
-                    "a dir_name_generation_function."
-                )
-
-            # Check if there is an ID in the backtest metadata
-            dir_name = backtest.algorithm_id
-
-        if dir_name is None:
+            base_name = getattr(backtest, "algorithm_id", None)
+        if base_name is None:
             logger.warning(
                 "Backtest algorithm_id is None. "
-                "Generating a random directory name."
+                "Generating a random name."
             )
-            dir_name = str(Random().randint(100000, 999999))
+            base_name = str(Random().randint(100000, 999999))
+        selected.append((backtest, base_name))
 
-        backtest.save(
-            os.path.join(directory_path, dir_name),
-            backtest_date_ranges=[backtest_date_range]
-            if backtest_date_range else None
+    iterator = selected
+    if show_progress:
+        iterator = tqdm(selected, desc="Saving backtests")
+
+    saved_paths: List[str] = []
+
+    if format == FORMAT_DIRECTORY:
+        # Legacy serial path — directory format keeps full backwards
+        # compatibility (parallelising it adds little value because the
+        # bottleneck is the per-file syscalls, not CPU).
+        for backtest, base_name in iterator:
+            path = os.path.join(directory_path, base_name)
+            backtest.save(
+                path,
+                backtest_date_ranges=[backtest_date_range]
+                if backtest_date_range else None,
+            )
+            saved_paths.append(path)
+    else:
+        # Bundle format — fan out across a process pool.
+        ohlcv_store = (
+            os.path.join(str(directory_path), "ohlcv")
+            if include_ohlcv else None
         )
+        n_workers = _resolve_workers(workers)
+
+        if n_workers <= 1 or len(selected) <= 1:
+            for backtest, base_name in iterator:
+                target = os.path.join(
+                    str(directory_path), f"{base_name}{BUNDLE_EXT}"
+                )
+                p = _save_bundle(
+                    backtest, target,
+                    include_ohlcv=include_ohlcv,
+                    ohlcv_store=ohlcv_store,
+                )
+                saved_paths.append(str(p))
+        else:
+            tasks = [
+                (
+                    bt,
+                    os.path.join(
+                        str(directory_path), f"{name}{BUNDLE_EXT}"
+                    ),
+                    include_ohlcv,
+                    ohlcv_store,
+                )
+                for bt, name in selected
+            ]
+            with ProcessPoolExecutor(max_workers=n_workers) as ex:
+                futures = [ex.submit(_save_one_bundle, t) for t in tasks]
+                pbar = (
+                    tqdm(
+                        total=len(futures),
+                        desc="Saving backtests",
+                    )
+                    if show_progress
+                    else None
+                )
+                for fut in as_completed(futures):
+                    saved_paths.append(fut.result())
+                    if pbar is not None:
+                        pbar.update(1)
+                if pbar is not None:
+                    pbar.close()
+
+        if write_index and selected:
+            try:
+                _write_index(directory_path, [bt for bt, _ in selected])
+            except Exception as e:  # pragma: no cover - non-fatal
+                logger.warning(f"Failed to write index.parquet: {e}")
 
 
 def retag_backtests(
@@ -201,10 +335,15 @@ def load_backtests_from_directory(
     directory_path: Union[str, Path],
     filter_function: Callable[[Backtest], bool] = None,
     number_of_backtests_to_load: int = None,
-    show_progress: bool = False
+    show_progress: bool = False,
+    workers: Optional[int] = None,
 ) -> List[Backtest]:
     """
     Loads Backtest objects from the specified directory.
+
+    Auto-detects each entry: ``.iafbt`` bundle files (issue #487) and
+    legacy backtest directories are both supported and may coexist in
+    the same parent directory.
 
     Args:
         directory_path (str): Path to the directory from which backtests
@@ -216,12 +355,13 @@ def load_backtests_from_directory(
             backtests to load. If None, all backtests will be loaded.
         show_progress (bool, optional): Whether to display a progress bar
             while loading backtests. Defaults to False.
+        workers: Process pool size for parallel loads. Defaults to
+            ``min(8, os.cpu_count())``. Pass ``1`` to disable.
 
     Returns:
         List[Backtest]: List of loaded Backtest objects.
     """
-
-    backtests = []
+    backtests: List[Backtest] = []
 
     if not os.path.exists(directory_path):
         logger.warning(
@@ -230,68 +370,221 @@ def load_backtests_from_directory(
         )
         return backtests
 
-    dirs = os.listdir(directory_path)
-
-    if show_progress:
-        dirs = tqdm(dirs, desc="Loading backtests")
-
-    for file_name in dirs:
-
-        # Check if the filename is not the checkpoints.json file or
-        # a python file
-        if file_name == "checkpoints.json" or file_name.endswith(".py"):
+    # Build the load list: a list of (path, kind) tuples.
+    sources: List[tuple] = []
+    for entry in sorted(os.listdir(directory_path)):
+        if entry == "checkpoints.json" or entry.endswith(".py"):
             continue
+        if entry == "index.parquet" or entry == "ohlcv":
+            continue
+        full = os.path.join(directory_path, entry)
+        if os.path.isfile(full):
+            if entry.endswith(BUNDLE_EXT) or is_bundle_file(full):
+                sources.append((full, "bundle"))
+        elif os.path.isdir(full):
+            sources.append((full, "directory"))
 
-        # Check if we have reached the limit of backtests to load
-        if number_of_backtests_to_load is not None:
-            if number_of_backtests_to_load <= 0:
-                break
-            number_of_backtests_to_load -= 1
+    if number_of_backtests_to_load is not None:
+        sources = sources[: max(0, int(number_of_backtests_to_load))]
 
-        file_path = os.path.join(directory_path, file_name)
+    n_workers = _resolve_workers(workers)
 
-        try:
+    pbar = None
+    if show_progress:
+        pbar = tqdm(total=len(sources), desc="Loading backtests")
 
-            # Add step-by-step debugging
+    if n_workers <= 1 or len(sources) <= 1:
+        for item in sources:
             try:
-                backtest = Backtest.open(file_path)
-            except KeyError as ke:
+                backtests.append(_load_one_dispatch(item))
+            except Exception as e:
                 logger.error(
-                    f"KeyError during Backtest.open for {file_path}: {ke}"
+                    f"Failed to load backtest from {item[0]}: {e}"
                 )
-                import traceback
-                logger.error(
-                    f"Backtest.open KeyError "
-                    f"traceback: {traceback.format_exc()}"
-                )
-                continue  # Skip this backtest and continue with the next one
-            except Exception as be:
-                logger.error(
-                    f"Other error during Backtest.open for {file_path}: {be}"
-                )
-                import traceback
-                logger.error(
-                    f"Backtest.open error traceback: {traceback.format_exc()}"
-                )
-                continue  # Skip this backtest and continue with the next one
-
-            if filter_function is not None:
+            finally:
+                if pbar is not None:
+                    pbar.update(1)
+    else:
+        # Process pool only handles bundle loads efficiently; loading
+        # legacy directories from workers also works but the win is
+        # smaller. We still parallelise both for simplicity.
+        with ProcessPoolExecutor(max_workers=n_workers) as ex:
+            futures = {
+                ex.submit(_load_one_dispatch, it): it for it in sources
+            }
+            for fut in as_completed(futures):
+                src = futures[fut]
                 try:
-                    if not filter_function(backtest):
-                        continue
-                except Exception as fe:
+                    backtests.append(fut.result())
+                except Exception as e:
                     logger.error(
-                        f"Error in filter_function for {file_path}: {fe}"
+                        f"Failed to load backtest from {src[0]}: {e}"
                     )
-                    continue
+                finally:
+                    if pbar is not None:
+                        pbar.update(1)
 
-            backtests.append(backtest)
+    if pbar is not None:
+        pbar.close()
 
-        except Exception as e:
-            logger.error(
-                f"Unexpected top-level error loading "
-                f"backtest from {file_path}: {e}"
-            )
-            import traceback
+    if filter_function is not None:
+        try:
+            backtests = [bt for bt in backtests if filter_function(bt)]
+        except Exception as fe:  # pragma: no cover - defensive
+            logger.error(f"Error in filter_function: {fe}")
 
     return backtests
+
+
+# ---------------------------------------------------------------------------
+# Index helpers (#487 step 4)
+# ---------------------------------------------------------------------------
+
+
+def _backtest_to_index_row(bt: Backtest, bundle_path: Optional[str] = None):
+    """Flatten a backtest's summary + identity into a single row."""
+    summary = (
+        bt.backtest_summary.to_dict() if bt.backtest_summary else {}
+    )
+    row = {
+        "algorithm_id": getattr(bt, "algorithm_id", None),
+        "tag": getattr(bt, "tag", None),
+        "risk_free_rate": getattr(bt, "risk_free_rate", None),
+        "bundle_path": bundle_path,
+        "number_of_runs": len(bt.backtest_runs or []),
+    }
+    # Include scalar summary metrics only (no nested structures).
+    for k, v in summary.items():
+        if isinstance(v, (int, float, str, bool)) or v is None:
+            row[f"summary.{k}"] = v
+    # Parameters as JSON for round-trippability without exploding columns.
+    if getattr(bt, "parameters", None):
+        try:
+            row["parameters"] = json.dumps(bt.parameters, default=str)
+        except (TypeError, ValueError):
+            row["parameters"] = None
+    return row
+
+
+def _write_index(directory_path: Union[str, Path], backtests: List[Backtest]):
+    """Write ``<directory_path>/index.parquet`` with one row per backtest.
+
+    Uses pandas + pyarrow. Failures are non-fatal — the caller logs them.
+    """
+    import pandas as pd  # local import keeps top of module light
+
+    rows = []
+    for bt in backtests:
+        base = getattr(bt, "algorithm_id", None) or "backtest"
+        rel = f"{base}{BUNDLE_EXT}"
+        rows.append(_backtest_to_index_row(bt, bundle_path=rel))
+
+    df = pd.DataFrame(rows)
+    target = Path(directory_path) / "index.parquet"
+    df.to_parquet(target, index=False, compression="zstd")
+
+
+class BacktestIndex:
+    """Lightweight reader for the ``index.parquet`` produced by
+    :py:func:`save_backtests_to_directory` (issue #487).
+
+    Lets analysis code filter on summary metrics / parameters
+    *without opening any bundle*. Bundles for surviving rows can then
+    be loaded explicitly via :py:meth:`load_backtests`.
+    """
+
+    def __init__(self, directory: Union[str, Path], dataframe):
+        self.directory = Path(directory)
+        self.df = dataframe
+
+    @classmethod
+    def open(cls, directory: Union[str, Path]) -> "BacktestIndex":
+        import pandas as pd
+
+        path = Path(directory) / "index.parquet"
+        if not path.exists():
+            raise FileNotFoundError(
+                f"No index.parquet at {directory}; pass write_index=True "
+                "to save_backtests_to_directory to generate one."
+            )
+        return cls(directory, pd.read_parquet(path))
+
+    def __len__(self) -> int:
+        return len(self.df)
+
+    def filter(self, predicate: Callable) -> "BacktestIndex":
+        """Return a new index restricted to rows where *predicate(row)*
+        is True.  ``predicate`` receives a pandas Series.
+        """
+        mask = self.df.apply(predicate, axis=1).astype(bool)
+        return BacktestIndex(self.directory, self.df.loc[mask].copy())
+
+    def load_backtests(
+        self,
+        workers: Optional[int] = None,
+        show_progress: bool = False,
+    ) -> List[Backtest]:
+        """Load all backtest bundles referenced by the current rows."""
+        n_workers = _resolve_workers(workers)
+        paths = [
+            str(self.directory / p) for p in self.df["bundle_path"].tolist()
+            if isinstance(p, str)
+        ]
+        out: List[Backtest] = []
+        pbar = (
+            tqdm(total=len(paths), desc="Loading backtests")
+            if show_progress else None
+        )
+        if n_workers <= 1 or len(paths) <= 1:
+            for p in paths:
+                try:
+                    out.append(_load_one_bundle(p))
+                except Exception as e:
+                    logger.error(f"Failed to load {p}: {e}")
+                finally:
+                    if pbar is not None:
+                        pbar.update(1)
+        else:
+            with ProcessPoolExecutor(max_workers=n_workers) as ex:
+                futs = {ex.submit(_load_one_bundle, p): p for p in paths}
+                for fut in as_completed(futs):
+                    try:
+                        out.append(fut.result())
+                    except Exception as e:
+                        logger.error(f"Failed to load {futs[fut]}: {e}")
+                    finally:
+                        if pbar is not None:
+                            pbar.update(1)
+        if pbar is not None:
+            pbar.close()
+        return out
+
+
+# ---------------------------------------------------------------------------
+# Migration helper (#487 step 5)
+# ---------------------------------------------------------------------------
+
+
+def migrate_backtests(
+    src_dir: Union[str, Path],
+    dst_dir: Union[str, Path],
+    *,
+    workers: Optional[int] = None,
+    show_progress: bool = False,
+    write_index: bool = True,
+) -> int:
+    """Rewrite a directory of legacy backtest folders as ``.iafbt``
+    bundles in *dst_dir*. Returns the number of backtests migrated.
+    """
+    backtests = load_backtests_from_directory(
+        src_dir, workers=workers, show_progress=show_progress,
+    )
+    save_backtests_to_directory(
+        backtests,
+        dst_dir,
+        format=FORMAT_BUNDLE,
+        workers=workers,
+        show_progress=show_progress,
+        write_index=write_index,
+    )
+    return len(backtests)

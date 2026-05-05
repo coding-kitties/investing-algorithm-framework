@@ -250,3 +250,47 @@ def mcp(directory):
 
 
 cli.add_command(mcp)
+
+
+@click.command(name="migrate-backtests")
+@click.option(
+    "--src", "-s",
+    required=True,
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    help="Source directory containing legacy backtest sub-directories.",
+)
+@click.option(
+    "--dst", "-d",
+    required=True,
+    type=click.Path(file_okay=False, dir_okay=True),
+    help="Destination directory for the new ``.iafbt`` bundle files.",
+)
+@click.option(
+    "--workers", "-w", type=int, default=None,
+    help="Number of parallel workers (default: min(8, CPU count)).",
+)
+@click.option(
+    "--no-index", is_flag=True, default=False,
+    help="Skip writing index.parquet at the destination.",
+)
+def migrate_backtests_cmd(src, dst, workers, no_index):
+    """Convert a directory of legacy backtest folders into the bundled
+    binary format introduced in issue #487.
+
+    The new ``.iafbt`` format is a single zstd-compressed MessagePack
+    file per backtest. Loading bundled directories is dramatically
+    faster than the legacy multi-file layout for large batches.
+    """
+    from investing_algorithm_framework.domain import migrate_backtests
+
+    n = migrate_backtests(
+        src,
+        dst,
+        workers=workers,
+        show_progress=True,
+        write_index=not no_index,
+    )
+    click.echo(f"Migrated {n} backtest(s) from {src} to {dst}")
+
+
+cli.add_command(migrate_backtests_cmd)
