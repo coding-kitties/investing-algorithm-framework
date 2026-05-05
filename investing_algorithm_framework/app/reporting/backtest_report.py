@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from jinja2 import Environment, FileSystemLoader
 
 from investing_algorithm_framework.domain import (
-    Backtest, OperationalException, tqdm
+    Backtest, OperationalException, tqdm, BUNDLE_EXT
 )
 
 logger = logging.getLogger("investing_algorithm_framework")
@@ -217,9 +217,15 @@ class BacktestReport:
 
     @staticmethod
     def _is_backtest(backtest_path):
+        if not os.path.exists(backtest_path):
+            return False
+        # Bundle file (.iafbt)
+        if os.path.isfile(backtest_path) and \
+                backtest_path.endswith(BUNDLE_EXT):
+            return True
+        # Legacy directory layout
         return (
-            os.path.exists(backtest_path)
-            and os.path.isdir(backtest_path)
+            os.path.isdir(backtest_path)
             and os.path.isfile(
                 os.path.join(backtest_path, "algorithm_id.json")
             )
@@ -231,6 +237,7 @@ class BacktestReport:
         backtests: List[Backtest] = None,
         directory_path: Union[str, List[str], None] = None,
         show_progress: bool = False,
+        workers: Union[int, None] = None,
     ) -> "BacktestReport":
         loaded = []
         source_tags = []
@@ -254,7 +261,7 @@ class BacktestReport:
             if BacktestReport._is_backtest(dp):
                 backtest_paths.append((dp, tag))
             else:
-                for root, dirs, _ in os.walk(dp):
+                for root, dirs, files in os.walk(dp):
                     for dir_name in dirs:
                         subdir = os.path.join(
                             root, dir_name
@@ -265,6 +272,11 @@ class BacktestReport:
                             backtest_paths.append(
                                 (subdir, tag)
                             )
+                    for file_name in files:
+                        if file_name.endswith(BUNDLE_EXT):
+                            backtest_paths.append(
+                                (os.path.join(root, file_name), tag)
+                            )
 
         iterator = backtest_paths
         if show_progress:
@@ -273,9 +285,43 @@ class BacktestReport:
                 desc="Loading backtests",
             )
 
-        for path, tag in iterator:
-            loaded.append(Backtest.open(path))
-            source_tags.append(tag)
+        # Parallel load is opt-in (workers > 1). ProcessPoolExecutor
+        # startup costs typically dwarf the per-backtest decode for
+        # batches < ~30, so keep default behaviour serial. Pass
+        # ``workers=N`` (or ``-1`` for cpu_count) to load large
+        # batches in parallel.
+        from investing_algorithm_framework.domain.backtesting.\
+backtest_utils import (
+            _load_one_dispatch, _resolve_workers,
+        )
+
+        n = len(backtest_paths)
+        resolved_workers = (
+            _resolve_workers(workers) if workers is not None else 1
+        )
+        if resolved_workers > 1 and n >= 4:
+            from concurrent.futures import ProcessPoolExecutor
+
+            items = [
+                (path, "bundle" if path.endswith(BUNDLE_EXT) else "dir")
+                for path, _ in backtest_paths
+            ]
+            with ProcessPoolExecutor(max_workers=resolved_workers) as ex:
+                results = list(
+                    tqdm(
+                        ex.map(_load_one_dispatch, items),
+                        total=n,
+                        desc="Loading backtests",
+                        disable=not show_progress,
+                    )
+                )
+            for bt, (_, tag) in zip(results, backtest_paths):
+                loaded.append(bt)
+                source_tags.append(tag)
+        else:
+            for path, tag in iterator:
+                loaded.append(Backtest.open(path))
+                source_tags.append(tag)
 
         for bt in backtests:
             if not isinstance(bt, Backtest):
