@@ -1,6 +1,7 @@
 import json
 import os
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed, \
+    wait, FIRST_COMPLETED
 from logging import getLogger
 from pathlib import Path
 from random import Random
@@ -570,13 +571,14 @@ class BacktestIndex:
 def _migrate_one(args):
     """Worker entry point: open *src* (legacy dir or bundle), write
     *dst* as a bundle, optionally delete *src*, return the
-    destination path.
+    destination path together with a flat index row.
 
     Doing load+save (and optionally delete) in one worker call keeps
     each backtest's data in a single process — avoiding the cost of
     pickling fully-decoded Backtest objects back to the parent
-    process. This roughly halves peak memory usage for large
-    migrations and is faster end-to-end.
+    process. We also build the index row here, while the backtest is
+    still in memory, so the parent never has to re-open the migrated
+    bundles just to build ``index.parquet``.
     """
     src, dst, include_ohlcv, ohlcv_store, delete_source = args
     bt = _open_bundle(src) if is_bundle_file(src) else Backtest.open(src)
@@ -585,6 +587,11 @@ def _migrate_one(args):
         include_ohlcv=include_ohlcv,
         ohlcv_store=ohlcv_store,
     ))
+    rel = os.path.basename(out)
+    row = _backtest_to_index_row(bt, bundle_path=rel)
+    # Drop the heavy backtest before returning so the worker process's
+    # RSS can be reclaimed before it picks up the next task.
+    del bt
     if delete_source and os.path.abspath(src) != os.path.abspath(out):
         import shutil
         if os.path.isdir(src):
@@ -594,7 +601,7 @@ def _migrate_one(args):
                 os.remove(src)
             except OSError:
                 pass
-    return out
+    return out, row
 
 
 def migrate_backtests(
@@ -681,33 +688,68 @@ def migrate_backtests(
     n = len(plan)
     resolved_workers = min(_resolve_workers(workers), n)
 
-    iterator: object
-    if resolved_workers > 1:
-        with ProcessPoolExecutor(max_workers=resolved_workers) as ex:
-            results = ex.map(_migrate_one, plan)
-            iterator = tqdm(
-                results,
-                total=n,
-                desc="Migrating backtests",
-                disable=not show_progress,
-            )
-            for _ in iterator:
-                pass
-    else:
-        for args in tqdm(
-            plan,
-            total=n,
-            desc="Migrating backtests",
-            disable=not show_progress,
-        ):
-            _migrate_one(args)
+    rows: List[dict] = []
+    pbar = tqdm(
+        total=n,
+        desc="Migrating backtests",
+        disable=not show_progress,
+    )
+    try:
+        if resolved_workers > 1:
+            # Bound in-flight tasks to ``resolved_workers`` so we don't
+            # buffer the full plan inside the executor's feeder, and
+            # consume results as they finish to keep memory flat.
+            plan_iter = iter(plan)
+            with ProcessPoolExecutor(max_workers=resolved_workers) as ex:
+                inflight = {}
+                for _ in range(resolved_workers):
+                    try:
+                        args = next(plan_iter)
+                    except StopIteration:
+                        break
+                    inflight[ex.submit(_migrate_one, args)] = args
 
-    if write_index:
-        # Re-open the freshly written bundles (cheap header reads only
-        # for the index) to build the parquet manifest.
-        migrated = load_backtests_from_directory(
-            dst_dir, workers=workers, show_progress=False,
+                while inflight:
+                    done_set, _unused = wait(
+                        inflight.keys(), return_when=FIRST_COMPLETED
+                    )
+                    for fut in done_set:
+                        args = inflight.pop(fut)
+                        try:
+                            _out, row = fut.result()
+                            if write_index:
+                                rows.append(row)
+                        except Exception as e:
+                            logger.error(
+                                f"Failed to migrate {args[0]}: {e}"
+                            )
+                        finally:
+                            pbar.update(1)
+                        try:
+                            nxt = next(plan_iter)
+                        except StopIteration:
+                            continue
+                        inflight[ex.submit(_migrate_one, nxt)] = nxt
+        else:
+            for args in plan:
+                try:
+                    _out, row = _migrate_one(args)
+                    if write_index:
+                        rows.append(row)
+                except Exception as e:
+                    logger.error(f"Failed to migrate {args[0]}: {e}")
+                finally:
+                    pbar.update(1)
+    finally:
+        pbar.close()
+
+    if write_index and rows:
+        import pandas as pd  # local import keeps top of module light
+        df = pd.DataFrame(rows)
+        df.to_parquet(
+            Path(dst_dir) / "index.parquet",
+            index=False,
+            compression="zstd",
         )
-        _write_index(dst_dir, migrated)
 
     return n

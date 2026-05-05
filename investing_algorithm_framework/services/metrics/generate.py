@@ -1,7 +1,7 @@
 from typing import List, Optional
 from logging import getLogger
 import os
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 
 from investing_algorithm_framework.domain import BacktestMetrics, \
     BacktestRun, OperationalException, Backtest, BacktestDateRange
@@ -89,23 +89,30 @@ def create_backtest_metrics_for_backtest(
 def _recalculate_one(args):
     """Process-pool worker for :func:`recalculate_backtests`.
 
-    Must be a module-level function so it pickles. Returns the mutated
-    backtest so the parent process replaces its in-list reference.
+    Must be a module-level function so it pickles. Returns only the
+    freshly computed per-run metrics and summary so the parent can
+    merge them into the existing backtest object without round-tripping
+    the full snapshots/trades back through pickle.
     """
     backtest, risk_free_rate, metrics = args
     rfr = risk_free_rate if risk_free_rate is not None \
         else (backtest.risk_free_rate or 0.0)
 
-    for run in backtest.get_all_backtest_runs():
-        run.backtest_metrics = create_backtest_metrics(run, rfr, metrics)
-
-    all_metrics = [
-        run.backtest_metrics
+    run_metrics = [
+        create_backtest_metrics(run, rfr, metrics)
         for run in backtest.get_all_backtest_runs()
-        if run.backtest_metrics is not None
     ]
-    backtest.backtest_summary = generate_backtest_summary_metrics(all_metrics)
-    return backtest
+    summary = generate_backtest_summary_metrics(
+        [m for m in run_metrics if m is not None]
+    )
+    return run_metrics, summary
+
+
+def _apply_recalc_result(backtest, run_metrics, summary):
+    runs = backtest.get_all_backtest_runs()
+    for run, bm in zip(runs, run_metrics):
+        run.backtest_metrics = bm
+    backtest.backtest_summary = summary
 
 
 def recalculate_backtests(
@@ -144,29 +151,52 @@ def recalculate_backtests(
 
     if n_workers <= 1 or len(backtests) <= 1:
         for backtest in backtests:
-            _recalculate_one((backtest, risk_free_rate, metrics))
+            run_metrics, summary = _recalculate_one(
+                (backtest, risk_free_rate, metrics)
+            )
+            _apply_recalc_result(backtest, run_metrics, summary)
         return backtests
 
-    # Parallel: each worker mutates and returns the backtest. Replace
-    # the originals in-place so callers holding the list reference see
-    # the updated objects.
-    tasks = [(bt, risk_free_rate, metrics) for bt in backtests]
-    index_by_id = {id(bt): i for i, bt in enumerate(backtests)}
+    # Parallel: only keep ``n_workers`` tasks in flight at a time so we
+    # don't pickle every backtest up-front (which can blow memory for
+    # large batches with heavy snapshots/trades). Workers return only
+    # the lightweight metrics + summary, which we merge back into the
+    # caller's existing backtest objects.
+    pending = iter(enumerate(backtests))
+    inflight = {}
+
+    def _submit_next(executor):
+        try:
+            idx, bt = next(pending)
+        except StopIteration:
+            return False
+        fut = executor.submit(
+            _recalculate_one, (bt, risk_free_rate, metrics)
+        )
+        inflight[fut] = idx
+        return True
+
     with ProcessPoolExecutor(max_workers=n_workers) as ex:
-        future_to_task = {
-            ex.submit(_recalculate_one, t): t for t in tasks
-        }
-        for fut in as_completed(future_to_task):
-            original_bt = future_to_task[fut][0]
-            try:
-                updated = fut.result()
-            except Exception as e:  # pragma: no cover - defensive
-                logger.error(
-                    "Failed to recalculate backtest "
-                    f"{getattr(original_bt, 'algorithm_id', '?')}: {e}"
-                )
-                continue
-            backtests[index_by_id[id(original_bt)]] = updated
+        for _ in range(n_workers):
+            if not _submit_next(ex):
+                break
+
+        while inflight:
+            done_set, _unused = wait(
+                inflight.keys(), return_when=FIRST_COMPLETED
+            )
+            for fut in done_set:
+                idx = inflight.pop(fut)
+                bt = backtests[idx]
+                try:
+                    run_metrics, summary = fut.result()
+                    _apply_recalc_result(bt, run_metrics, summary)
+                except Exception as e:  # pragma: no cover - defensive
+                    logger.error(
+                        "Failed to recalculate backtest "
+                        f"{getattr(bt, 'algorithm_id', '?')}: {e}"
+                    )
+                _submit_next(ex)
 
     return backtests
 
