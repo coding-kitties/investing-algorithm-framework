@@ -58,15 +58,16 @@ class TestAppInitialize(TestCase):
         # Strategy directory exists
         self.assertTrue(os.path.isdir(strategy_dir))
 
-        # strategy.py
+        # my_strategy.py (rendered from strategy.py.template)
         self._assert_file_matches_template(
-            os.path.join(strategy_dir, "strategy.py"),
+            os.path.join(strategy_dir, "my_strategy.py"),
             "strategy.py.template"
         )
 
-        # data_providers.py
+        # data_providers.py lives at the project root (so app.py,
+        # notebooks and strategies can all import it the same way)
         self._assert_file_matches_template(
-            os.path.join(strategy_dir, "data_providers.py"),
+            self._output_path("data_providers.py"),
             "data_providers.py.template"
         )
 
