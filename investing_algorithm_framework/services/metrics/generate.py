@@ -3,6 +3,7 @@ from logging import getLogger
 import gc
 import os
 import sys
+import warnings
 from pathlib import Path
 from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 
@@ -281,19 +282,20 @@ def recalculate_backtests(
     max_tasks_per_child: Optional[int] = 16,
 ) -> List[Backtest]:
     """
-    Recalculate all metrics for a set of backtests.
+    Recalculate all metrics for a set of in-memory backtests.
 
-    .. warning::
-
-        This function holds every backtest in *backtests* in the
-        parent process simultaneously. For very large batches
-        (thousands of backtests with portfolio snapshots / trades)
-        prefer :func:`recalculate_backtests_in_directory`, which
-        streams from disk in worker processes and never accumulates
-        backtests in the parent.
+    .. deprecated:: 8.7.2
+        Holding many backtests in the parent process is memory-unsafe:
+        each :class:`Backtest` carries portfolio snapshots, trades and
+        timeseries, so a list of a few thousand backtests can easily
+        consume tens of gigabytes before any work starts. Use
+        :func:`recalculate_backtests_in_directory` instead — it streams
+        backtests from disk inside worker processes and never
+        materialises a ``List[Backtest]`` in the parent. This function
+        will be removed in a future major release.
 
     Args:
-        backtests: The backtests to recalculate.
+        backtests: The backtests to recalculate (mutated in place).
         risk_free_rate: Risk-free rate to use. If ``None``, uses each
             backtest's own ``risk_free_rate`` (falling back to ``0.0``).
         metrics: Metric names to compute. ``None`` uses the default set.
@@ -307,6 +309,16 @@ def recalculate_backtests(
     Returns:
         The same backtest objects, mutated in place.
     """
+    warnings.warn(
+        "recalculate_backtests(List[Backtest]) is deprecated and will "
+        "be removed in a future major release: holding many backtests "
+        "in the parent process is memory-unsafe. Use "
+        "recalculate_backtests_in_directory(src_dir, ...) instead, "
+        "which streams from disk inside worker processes and keeps "
+        "parent memory flat.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if not backtests:
         return backtests
 

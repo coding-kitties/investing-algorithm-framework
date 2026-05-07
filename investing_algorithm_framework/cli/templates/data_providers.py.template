@@ -1,17 +1,40 @@
-from investing_algorithm_framework import CCXTOHLCVMarketDataSource, \
-    CCXTTickerMarketDataSource
+"""Optional custom data providers.
 
-btc_eur_ohlcv_2h = CCXTOHLCVMarketDataSource(
-    identifier="BTC/EUR-ohlcv-2h",
-    market="BITVAVO",
-    symbol="BTC/EUR",
-    time_frame="2h",
-    window_size=200
-)
+By default the framework ships with built-in data providers for CCXT
+exchanges, CSV files and pandas DataFrames, so most strategies don't
+need this file at all — they just declare ``DataSource(...)`` entries
+on the strategy class (see ``strategies/my_strategy.py``).
 
-btc_eur_ticker = CCXTTickerMarketDataSource(
-    identifier="BTC/EUR-ticker",
-    market="BITVAVO",
-    symbol="BTC/EUR",
-    backtest_time_frame="2h",
-)
+Define a custom ``DataProvider`` subclass here when you need to:
+
+* pull data from an exchange or vendor that isn't supported out of the
+  box (e.g. an internal REST API, a parquet lake, a websocket feed),
+* preprocess data before it reaches your strategy (resampling, joins,
+  alternative-data merges),
+* serve simulated data in a backtest (e.g. synthetic OHLCV).
+
+Register them with the app via ``app.add_data_provider(MyProvider())``
+in ``app.py``.
+
+Example skeleton (uncomment and adapt):
+
+    import pandas as pd
+    from investing_algorithm_framework import DataProvider, DataType
+
+
+    class MyCustomOHLCVProvider(DataProvider):
+        data_type = DataType.OHLCV
+        market = "MY_VENUE"
+
+        def get_data(
+            self,
+            symbol: str,
+            time_frame: str,
+            start_date,
+            end_date,
+            **kwargs,
+        ) -> pd.DataFrame:
+            # Fetch and return a DataFrame indexed by Datetime with
+            # columns: Open, High, Low, Close, Volume.
+            raise NotImplementedError
+"""

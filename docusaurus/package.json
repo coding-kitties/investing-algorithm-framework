@@ -29,6 +29,10 @@
   "devDependencies": {
     "@docusaurus/module-type-aliases": "3.9.2"
   },
+  "overrides": {
+    "serialize-javascript": "^7.0.5",
+    "postcss": "^8.5.10"
+  },
   "browserslist": {
     "production": [
       ">0.5%",

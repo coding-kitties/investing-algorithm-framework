@@ -1,48 +1,48 @@
 import logging.config
 import os
-from logging import getLogger
 
 from dotenv import load_dotenv
-from finterion_investing_algorithm_framework import FinterionOrderExecutor, \
-    FinterionPingAction, FinterionPortfolioProvider
-from investing_algorithm_framework import create_app, RESOURCE_DIRECTORY, \
-    AWSS3StorageStateHandler, AWS_S3_STATE_BUCKET_NAME, AWS_LAMBDA_LOGGING_CONFIG
 
-from strategies.strategy import MyTradingStrategy
+from investing_algorithm_framework import (
+    create_app,
+    AWSS3StorageStateHandler,
+    AWS_S3_STATE_BUCKET_NAME,
+    AWS_LAMBDA_LOGGING_CONFIG,
+    RESOURCE_DIRECTORY,
+)
 
+from strategies.my_strategy import MyTradingStrategy
 
-# Make sure to set the resource directory to /tmp because this dir is writable
-app = create_app(config={RESOURCE_DIRECTORY: os.path.join("/tmp", "resources")})
+load_dotenv()
 logging.config.dictConfig(AWS_LAMBDA_LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
-# Get the s3 state bucket name from environment variables for database
-# state storage, this is set during the deployment
-# to AWS Lambda with the `deploy_aws_lambda` cli command.
+# Lambda's filesystem is read-only except for /tmp; route the framework's
+# writable resources there.
+app = create_app(
+    config={RESOURCE_DIRECTORY: os.path.join("/tmp", "resources")}
+)
+
+# The S3 bucket is provisioned and exported as an env var by the
+# `deploy_aws_lambda` CLI command.
 app.add_state_handler(
     AWSS3StorageStateHandler(bucket_name=os.getenv(AWS_S3_STATE_BUCKET_NAME))
 )
+
+app.add_market(market="bitvavo", trading_symbol="EUR", initial_balance=1000)
 app.add_strategy(MyTradingStrategy)
-app.add_market(market="BITVAVO", trading_symbol="EUR")
 
 
 def lambda_handler(event, context):
     """
-    AWS Lambda handler function for executing a trading strategy.
-
-    Args:
-        event: dict, the event data passed to the Lambda function.
-        context: object, the context object provided by AWS Lambda.
-
-    Returns:
-        dict: The result of the trading strategy execution.
+    AWS Lambda handler that runs a single iteration of the trading bot.
     """
     try:
-        app.run(payload={"ACTION": "RUN_STRATEGY"})
+        app.run(number_of_iterations=1)
         return {
             "statusCode": 200,
-            "body": "Trading strategy executed successfully."
+            "body": "Trading strategy executed successfully.",
         }
-    except Exception as e:
-        logger.exception(e)
-        return {"statusCode": 500, "body": str(e)}
+    except Exception as exc:  # noqa: BLE001
+        logger.exception(exc)
+        return {"statusCode": 500, "body": str(exc)}

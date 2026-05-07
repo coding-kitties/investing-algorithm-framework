@@ -1,65 +1,52 @@
-import azure.functions as func
 import logging
-import logging.config
-from investing_algorithm_framework import DEFAULT_LOGGING_CONFIG,\
-    StatelessAction, AzureBlobStorageStateHandler
+import azure.functions as func
+
 from app import app as trading_bot_app
 
-trading_bot_app.add_state_handler(
-    state_handler=AzureBlobStorageStateHandler
-)
+logger = logging.getLogger("investing_algorithm_framework")
 
-logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
 app = func.FunctionApp()
 
-@app.route(route="ping", auth_level=func.AuthLevel.ANONYMOUS)
-def trading_bot(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info("Ping request received.")
 
-    try:
-        response = trading_bot_app.run(
-            payload={"action": StatelessAction.RUN_STRATEGY.value}
-        )
-        return func.HttpResponse(response, status_code=200)
-    except Exception as e:
-        return func.HttpResponse(
-            f"Error running ping action: {e}",
-            status_code=500
-        )
+@app.route(route="ping", auth_level=func.AuthLevel.ANONYMOUS)
+def ping(req: func.HttpRequest) -> func.HttpResponse:
+    """Health check used by deployment scripts and uptime checks."""
+    logger.info("Ping request received.")
+    return func.HttpResponse("pong", status_code=200)
 
 
 @app.route(route="run", auth_level=func.AuthLevel.ANONYMOUS)
 def run_trading_bot(req: func.HttpRequest) -> func.HttpResponse:
-    logging.info("Run request received.")
+    """Manually trigger one strategy run (useful for debugging)."""
+    logger.info("Manual run request received.")
     try:
-        trading_bot_app.run(
-            payload={"action": StatelessAction.RUN_STRATEGY.value}
-        )
-    except Exception as e:
+        trading_bot_app.run(number_of_iterations=1)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Trading bot run failed: %s", exc)
         return func.HttpResponse(
-            f"Error running trading bot: {e}",
-            status_code=500
+            f"Error running trading bot: {exc}", status_code=500
         )
 
     return func.HttpResponse(
-        "Trading bot executed successfully.",
-        status_code=200
+        "Trading bot executed successfully.", status_code=200
     )
+
 
 @app.function_name(name="scheduled_trading_bot_run")
 @app.schedule(
-    schedule="*/30 * * * * *",  # Every 30 seconds Change as needed
+    # Every 5 minutes. Adjust the cron expression to your strategy's
+    # `time_unit` / `interval`. Note: Consumption Plan minimum is ~1 minute.
+    schedule="0 */5 * * * *",
     arg_name="timer",
-    auth_level=func.AuthLevel.ANONYMOUS,
-    run_on_startup=True
+    # `run_on_startup=True` is intentionally NOT set: it blocks the host
+    # readiness probe behind your full strategy initialization, which on
+    # a Consumption cold start frequently kills the worker.
 )
 def scheduled_trading_bot(timer: func.TimerRequest) -> None:
-    logging.info("Scheduled trading bot triggered.")
+    logger.info("Scheduled trading bot triggered.")
     try:
-        trading_bot_app.run(
-            payload={"action": StatelessAction.RUN_STRATEGY.value}
-        )
-    except Exception as e:
-        logging.error(f"Error running scheduled trading bot: {e}")
-        raise e
-    logging.info("Scheduled trading bot executed successfully.")
+        trading_bot_app.run(number_of_iterations=1)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Scheduled trading bot run failed: %s", exc)
+        raise
+    logger.info("Scheduled trading bot executed successfully.")

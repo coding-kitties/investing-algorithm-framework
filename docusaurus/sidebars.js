@@ -59,6 +59,10 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Getting Started/metrics',
+                },
+                {
+                    type: 'doc',
                     id: 'Getting Started/deployment',
                 },
             ],

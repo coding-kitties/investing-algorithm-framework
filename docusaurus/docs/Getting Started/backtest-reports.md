@@ -84,46 +84,51 @@ report.show()
 
 ## Recalculating Metrics
 
-When metric calculations are updated in a newer framework version, previously saved backtests may have stale metrics. Use `recalculate_backtests` to recompute all per-run and summary metrics from the raw portfolio snapshots and trades:
+When metric calculations are updated in a newer framework version, previously saved backtests may have stale metrics. Use `recalculate_backtests_in_directory` to recompute all per-run and summary metrics from the raw portfolio snapshots and trades — **directly on disk**, without ever loading the full set of backtests into memory:
 
 ```python
-from investing_algorithm_framework import BacktestReport, recalculate_backtests
+from investing_algorithm_framework import recalculate_backtests_in_directory
 
-report = BacktestReport.open(directory_path="./my_backtests")
-
-# Recalculate all metrics for all backtests
-recalculate_backtests(report.backtests)
-
-report.show()
+# Rewrites every bundle in ./my_backtests in place
+recalculate_backtests_in_directory("./my_backtests")
 ```
 
-You can specify a custom risk-free rate (otherwise each backtest's stored rate is used):
+Each backtest is loaded, recalculated, and written back **inside a worker process**, so the parent process's memory footprint stays flat regardless of how many backtests are processed. This is the recommended approach for any non-trivial batch (hundreds to thousands of backtests with portfolio snapshots and trades can otherwise consume tens of GB).
+
+Write to a different directory instead of in place:
 
 ```python
-recalculate_backtests(report.backtests, risk_free_rate=0.04)
-```
-
-Or limit which metrics are recomputed:
-
-```python
-recalculate_backtests(
-    report.backtests,
-    metrics=["cagr", "sharpe_ratio", "max_drawdown", "win_rate"]
+recalculate_backtests_in_directory(
+    src_dir="./my_backtests",
+    dst_dir="./my_backtests_v2",
 )
 ```
 
-`recalculate_backtests` works on any list of `Backtest` objects, not just those loaded from disk:
+Use a custom risk-free rate (otherwise each backtest's stored rate is used):
 
 ```python
-from investing_algorithm_framework import recalculate_backtests
+recalculate_backtests_in_directory("./my_backtests", risk_free_rate=0.04)
+```
 
-backtests = [backtest_a, backtest_b, backtest_c]
-recalculate_backtests(backtests, risk_free_rate=0.027)
+Limit which metrics are recomputed, or tune parallelism:
+
+```python
+recalculate_backtests_in_directory(
+    "./my_backtests",
+    metrics=["cagr", "sharpe_ratio", "max_drawdown", "win_rate"],
+    workers=4,
+    show_progress=True,
+)
 ```
 
 For each backtest, the function:
 1. Recomputes per-run `BacktestMetrics` from raw `portfolio_snapshots` and `trades`
 2. Regenerates `BacktestSummaryMetrics` by aggregating the updated per-run metrics
+3. Writes the updated bundle back to disk and (by default) refreshes `index.parquet`
+
+:::warning Deprecated: `recalculate_backtests(List[Backtest])`
+The in-memory variant `recalculate_backtests(backtests)` is **deprecated since 8.7.2** and will be removed in a future major release. Holding many backtests in the parent process is memory-unsafe — each `Backtest` carries portfolio snapshots, trades and timeseries, so a list of a few thousand backtests can easily consume tens of GB before any work starts. Use `recalculate_backtests_in_directory(src_dir, ...)` instead.
+:::
 
 ## Saving Reports
 
@@ -191,7 +196,8 @@ Toggle between dark and light mode using the sun icon in the top-right corner.
 ```python
 from datetime import datetime, timezone
 from investing_algorithm_framework import (
-    create_app, BacktestDateRange, BacktestReport, recalculate_backtests
+    create_app, BacktestDateRange, BacktestReport,
+    recalculate_backtests_in_directory,
 )
 
 app = create_app()
@@ -211,18 +217,18 @@ date_ranges = [
     ),
 ]
 
-backtests = app.run_vector_backtests(
+app.run_vector_backtests(
     strategies=my_strategies,
     backtest_date_ranges=date_ranges,
     initial_amount=1000,
     backtest_storage_directory="./backtests"
 )
 
-# Optional: recalculate metrics with updated calculations
-recalculate_backtests(backtests, risk_free_rate=0.04)
+# Optional: recalculate metrics with updated calculations (memory-safe, on disk)
+recalculate_backtests_in_directory("./backtests", risk_free_rate=0.04)
 
 # Generate and save the comparison report
-report = BacktestReport(backtests=backtests)
+report = BacktestReport.open(directory_path="./backtests")
 report.save("comparison_report.html")
 report.show(browser=True)
 ```
@@ -239,7 +245,29 @@ report.show(browser=True)
 | `report.show(browser=False)` | Display the report. In Jupyter: renders inline. Otherwise: opens browser. Set `browser=True` to force browser. |
 | `report.save(path)` | Save the report as a self-contained HTML file |
 
-### `recalculate_backtests`
+### `recalculate_backtests_in_directory`
+
+Stream-recalculates every backtest bundle on disk inside worker processes. The full `Backtest` never crosses the process boundary, so parent memory stays flat.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `src_dir` | `str \| Path` | Directory containing `.iafbt` bundles (and/or legacy backtest directories) |
+| `dst_dir` | `str \| Path`, optional | Output directory. If `None`, bundles are rewritten in place inside `src_dir` |
+| `risk_free_rate` | `float`, optional | Override risk-free rate. If `None`, uses each backtest's stored rate |
+| `metrics` | `List[str]`, optional | Specific metrics to compute. If `None`, computes all default metrics |
+| `workers` | `int`, optional | Number of parallel worker processes. Defaults to `min(8, cpu_count)`. Pass `1` for serial |
+| `show_progress` | `bool` | Display a tqdm progress bar (default `False`) |
+| `include_ohlcv` | `bool` | Re-emit attached OHLCV data with the bundle (default `False`) |
+| `max_tasks_per_child` | `int`, optional | Recycle each worker after this many tasks so RSS stays bounded (default `16`) |
+| `update_index` | `bool` | Rewrite `index.parquet` in the destination directory (default `True`) |
+
+**Returns:** `int` — the number of backtests recalculated.
+
+### `recalculate_backtests` *(deprecated)*
+
+:::warning Deprecated since 8.7.2
+Use [`recalculate_backtests_in_directory`](#recalculate_backtests_in_directory) instead. This in-memory variant will be removed in a future major release.
+:::
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
@@ -248,5 +276,3 @@ report.show(browser=True)
 | `metrics` | `List[str]`, optional | Specific metrics to compute. If `None`, computes all default metrics |
 
 **Returns:** `List[Backtest]` — the same backtest objects with updated metrics.
-
-Recalculates all per-run `BacktestMetrics` from raw portfolio snapshots and trades, then regenerates `BacktestSummaryMetrics` for each backtest.

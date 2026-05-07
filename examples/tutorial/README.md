@@ -1,10 +1,12 @@
 # Investing Algorithm Framework Tutorial
 
-This tutorial demonstrates the full capabilities of the **Investing Algorithm Framework** 
-through a series of Jupyter notebooks. Each notebook focuses on a specific aspect of 
+This tutorial demonstrates main capabilities of the **Investing Algorithm Framework**
+through a series of Jupyter notebooks. Each notebook focuses on a specific aspect of
 the framework, from data handling to advanced backtesting and analysis.
 
-> **Note**: This tutorial uses the Bitvavo exchange with EUR as the trading symbol. 
+> **Note**: This tutorial only showcases a subset of the framework's capabilities. Advanced features like cross-sectional pipelines can be explored in the [advanced tutorials](../advanced_tutorial/README.md).
+>
+> **Note**: This tutorial uses the Bitvavo exchange with EUR as the trading symbol.
 > You can adapt the examples to other exchanges and symbols supported by the framework.
 
 ## 📋 Table of Contents
@@ -19,16 +21,15 @@ the framework, from data handling to advanced backtesting and analysis.
 
 ## 🎯 Overview
 
-The Investing Algorithm Framework is a comprehensive Python library for building, 
+The Investing Algorithm Framework is a comprehensive Python library for building,
 testing, and deploying algorithmic trading strategies. This tutorial showcases:
 
 - **Data Management** - Download, validate, and fill missing market data
-- **Strategy Development** - Create and visualize trading strategies
-- **Vectorized Backtesting** - High-performance backtesting (10-100x faster)
-- **Event-Based Backtesting** - Realistic trade simulation
-- **Parameter Optimization** - Grid search across thousands of variations
-- **Performance Analysis** - Ranking, filtering, and robustness testing
-- **Checkpointing & Storage** - Save and resume long-running experiments
+- **Strategy Visualization** - Visualize trading strategies
+- **In sample Parameter Sweeping** - Test thousands of parameter combinations with ease through a grid search and vector backtesting.
+- **Out sample Vector Backtesting** - Test thousand of strategies out-of-sample with a fast vectorized backtester.
+- **Out sample event based Backtesting** - Simulate realistic trade execution with an event-based backtester to validate top strategies from the vector backtest.
+- **Final analysis** - Generate reports, rank strategies, and export results for further analysis.
 
 ## 📁 Tutorial Structure
 
@@ -38,12 +39,11 @@ tutorial/
 ├── notebooks/                         # Tutorial notebooks (start here!)
 │   ├── 01_data_exploration.ipynb      # Data download and validation
 │   ├── 02_strategy_visualization.ipynb # Strategy logic visualization
-│   ├── 03_backtest_baseline.ipynb     # Basic backtesting
-│   ├── 04_param_grid_search.ipynb     # Parameter optimization
-│   ├── 05_backtest_optimized.ipynb    # Optimized strategy testing
-│   ├── 06_event_backtest.ipynb        # Event-based backtesting
-│   ├── 07_robustness_analysis.ipynb   # Robustness and validation
-│   └── 08_final_analysis.ipynb        # Final results and reporting
+│   ├── 03_param_sweep.ipynb           # Parameter optimization
+│   ├── 04_backtest_optimized.ipynb    # Optimized strategy testing
+│   ├── 05_event_backtest.ipynb        # Event-based backtesting
+│   ├── 06_robustness_analysis.ipynb   # Robustness and validation
+│   └── 07_final_analysis.ipynb        # Final results and reporting
 ├── strategies/                        # Strategy implementations
 │   └── ema_crossover_rsi_filter/      # Example strategy
 ├── data/                              # Downloaded market data
@@ -151,8 +151,8 @@ report.show(browser=True)
 
 ---
 
-### 04 - Parameter Grid Search
-**File**: `notebooks/04_param_grid_search.ipynb`
+### 04 - Parameter Sweep
+**File**: `notebooks/04_param_sweep.ipynb`
 
 Test thousands of parameter combinations:
 - **`run_vector_backtests()`** - Batch vectorized backtesting
@@ -337,7 +337,7 @@ After completing this tutorial:
 
 - **Documentation**: See `docusaurus/docs/` for full documentation
 - **Example Strategies**: See `examples/example_strategies/`
-- **Advanced Topics**: 
+- **Advanced Topics**:
   - `docs/Advanced Concepts/vector-backtesting.md`
   - `docs/Advanced Concepts/PARALLEL_PROCESSING_GUIDE.md`
 
@@ -352,4 +352,3 @@ After completing this tutorial:
 **Happy Trading! 🚀📈**
 
 *Remember: Past performance does not guarantee future results. Always test thoroughly and use proper risk management.*
-

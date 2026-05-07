@@ -172,6 +172,17 @@ class Backtest:
             return run.backtest_metrics
         return None
 
+    def get_backtest_summary(self) -> Union[BacktestSummaryMetrics, None]:
+        """
+        Retrieve the cross-window BacktestSummaryMetrics roll-up for
+        this backtest.
+
+        Returns:
+            Union[BacktestSummaryMetrics, None]: The summary metrics if
+                they have been computed, otherwise None.
+        """
+        return self.backtest_summary
+
     def to_dict(self) -> dict:
         """
         Convert the Backtest instance to a dictionary.

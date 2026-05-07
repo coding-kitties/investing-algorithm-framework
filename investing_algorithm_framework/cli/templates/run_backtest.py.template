@@ -2,7 +2,7 @@ from datetime import datetime
 
 from investing_algorithm_framework import BacktestDateRange
 from investing_algorithm_framework import create_app
-from strategies.strategy import MyTradingStrategy
+from strategies.my_strategy import MyTradingStrategy
 
 app = create_app()
 app.add_strategy(MyTradingStrategy)
