@@ -70,23 +70,23 @@ This framework is built around the full loop: **create strategies → vector bac
  Features
 </summary> <br>
 
-- 📊 **30+ Metrics** — CAGR, Sharpe, Sortino, Calmar, VaR, CVaR, Max DD, Recovery & more
+- 📊 **[30+ Metrics](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/metrics)** — CAGR, Sharpe, Sortino, Calmar, VaR, CVaR, Max DD, Recovery & more
 - 🧮 **[Cross-Sectional Pipelines](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines)** — Rank, filter and score entire universes of symbols every iteration with a tidy factor table
-- ⚡ **Vector Backtesting for Signal Analysis** — Quickly test your strategy logic on historical data to see how signals would have behaved before committing to full event-driven backtests
-- 🏃 **Event-Driven Backtesting** — Once promising strategies are identified via vector backtests, run full event-driven backtests to simulate realistic execution and portfolio management
-- 🔀 **Permutation Testing / Monte Carlo Simulations** — Assess the statistical robustness of your strategies by running them across randomized market scenarios to see how often your results could occur by chance
-- 🚀 **Deployment** — Once the best strategy is identified through backtesting and comparison, deploy it to production locally or in the cloud (AWS Lambda / Azure Functions) to start live trading
-- ⚔️ **Multi-Strategy Comparison** — Rank, filter & compare strategies in a single interactive report
-- 🪟 **Multi-Window Robustness** — Test across different time periods with window coverage analysis
-- 📈 **Equity & Drawdown Charts** — Overlay equity curves, rolling Sharpe, drawdown & return distributions
-- 🗓️ **Monthly Heatmaps & Yearly Returns** — Calendar heatmap per strategy with return/growth toggles
-- 🎯 **Return Scenario Projections** — Good, average, bad & very bad year projections from backtest data
-- 📉 **Benchmark Comparison** — Beat-rate analysis vs Buy & Hold, DCA, risk-free & custom benchmarks
-- 📄 **One-Click HTML Report** — Self-contained file, no server, dark & light theme, shareable
-- 📦 **Custom `.iafbt` Backtest Bundle Format** — An explicit, versioned, compressed, language-portable container (zstd + msgpack with magic-byte header) plus a separate parquet index for fast filtering without loading. ~21× smaller and ~27× fewer files than standard filebased directory layouts, with parallel I/O for fast load/save of large amounts of backtests.
-- 🌐 **Load External Data** — Fetch CSV, JSON, or Parquet from any URL with caching and auto-refresh
-- � **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
-- �🚀 **Build → Backtest → Deploy** — Local dev, cloud deploy (AWS / Azure), or monetize on Finterion
+- ⚡ **[Vector Backtesting for Signal Analysis](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting)** — Quickly test your strategy logic on historical data to see how signals would have behaved before committing to full event-driven backtests
+- 🏃 **[Event-Driven Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/event-backtesting)** — Once promising strategies are identified via vector backtests, run full event-driven backtests to simulate realistic execution and portfolio management
+- 🔀 **[Permutation Testing / Monte Carlo Simulations](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Assess the statistical robustness of your strategies by running them across randomized market scenarios to see how often your results could occur by chance
+- 🚀 **[Deployment](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)** — Once the best strategy is identified through backtesting and comparison, deploy it to production locally or in the cloud (AWS Lambda / Azure Functions) to start live trading
+- ⚔️ **[Multi-Strategy Comparison](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Rank, filter & compare strategies in a single interactive report
+- 🪟 **[Multi-Window Robustness](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Test across different time periods with window coverage analysis
+- 📈 **[Equity & Drawdown Charts](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Overlay equity curves, rolling Sharpe, drawdown & return distributions
+- 🗓️ **[Monthly Heatmaps & Yearly Returns](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Calendar heatmap per strategy with return/growth toggles
+- 🎯 **[Return Scenario Projections](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Good, average, bad & very bad year projections from backtest data
+- 📉 **[Benchmark Comparison](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Beat-rate analysis vs Buy & Hold, DCA, risk-free & custom benchmarks
+- 📄 **[One-Click HTML Report](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Self-contained file, no server, dark & light theme, shareable
+- 📦 **[Custom `.iafbt` Backtest Bundle Format](https://coding-kitties.github.io/investing-algorithm-framework/Data/backtest_data)** — An explicit, versioned, compressed, language-portable container (zstd + msgpack with magic-byte header) plus a separate parquet index for fast filtering without loading. ~21× smaller and ~27× fewer files than standard filebased directory layouts, with parallel I/O for fast load/save of large amounts of backtests.
+- 🌐 **[Load External Data](https://coding-kitties.github.io/investing-algorithm-framework/Data/external-data)** — Fetch CSV, JSON, or Parquet from any URL with caching and auto-refresh
+- 📝 **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
+- 🚀 **[Build → Backtest → Deploy](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/application-setup)** — Local dev, cloud deploy (AWS / Azure), or monetize on Finterion
 
 </details>
 

@@ -24,7 +24,7 @@ Install the latest stable version from PyPI:
 pip install investing-algorithm-framework
 ```
 
-This installs the core framework with CCXT support for crypto exchanges.
+This installs the core framework with [CCXT](https://github.com/ccxt/ccxt) support.
 
 ### Optional Data Provider Extras
 

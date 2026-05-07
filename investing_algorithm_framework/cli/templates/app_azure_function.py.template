@@ -1,14 +1,35 @@
+import logging.config
+import os
+
 from dotenv import load_dotenv
 
-from investing_algorithm_framework import create_app, PortfolioConfiguration, \
-    TimeUnit, CCXTOHLCVMarketDataSource, Algorithm, \
-    CCXTTickerMarketDataSource, MarketCredential, AzureBlobStorageStateHandler
-from strategies.strategy import MyTradingStrategy
+from investing_algorithm_framework import (
+    create_app,
+    DEFAULT_LOGGING_CONFIG,
+    AzureBlobStorageStateHandler,
+    RESOURCE_DIRECTORY,
+)
+
+from strategies.my_strategy import MyTradingStrategy
 
 load_dotenv()
+logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
 
-app = create_app()
-app.add_market(market="binance", initial_balance=1000, trading_symbol="EUR")
-algorithm = Algorithm(name="MyTradingBot")
-algorithm.add_strategy(MyTradingStrategy)
-app.add_algorithm(algorithm)
+# Azure Function workers can only write to /tmp at runtime; point the
+# framework's resource directory there so SQLite/state files land in a
+# writable location.
+app = create_app(
+    config={RESOURCE_DIRECTORY: os.path.join("/tmp", "resources")}
+)
+
+# Persist portfolio/state in Azure Blob Storage so the function is
+# stateless across cold starts. Connection string + container name are
+# read from app settings (configured by `deploy_to_azure_function`).
+app.add_state_handler(AzureBlobStorageStateHandler())
+
+app.add_market(
+    market="bitvavo",
+    trading_symbol="EUR",
+    initial_balance=1000,
+)
+app.add_strategy(MyTradingStrategy)

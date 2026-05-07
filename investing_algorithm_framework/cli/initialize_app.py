@@ -1,5 +1,35 @@
+import json
 import os
 from enum import Enum
+
+
+# Notebook stubs created in `notebooks/` by `init`. Each entry is
+# (filename, first-markdown-cell-title) and mirrors the recommended
+# research workflow documented in
+# docusaurus/docs/Getting Started/application-setup.md.
+RECOMMENDED_NOTEBOOKS = [
+    ("01_data_exploration.ipynb",
+     "# 01 — Data Exploration\n\nDownload OHLCV, inspect coverage, "
+     "detect and fill gaps."),
+    ("02_backtest_baseline.ipynb",
+     "# 02 — Baseline Backtest\n\nSingle vector backtest of the strategy "
+     "with default parameters and HTML report."),
+    ("03_in_sample_param_grid_search.ipynb",
+     "# 03 — In-Sample Parameter Grid Search\n\nGrid search across "
+     "thousands of parameter combinations on the in-sample window."),
+    ("04_out_of_sample_param_grid_search.ipynb",
+     "# 04 — Out-of-Sample Parameter Grid Search\n\nRe-run top in-sample "
+     "candidates on the held-out out-of-sample window."),
+    ("05_overfitting_analysis.ipynb",
+     "# 05 — Overfitting Analysis\n\nCompare in-sample vs out-of-sample "
+     "performance, walk-forward / permutation checks."),
+    ("06_event_backtests.ipynb",
+     "# 06 — Event-Driven Backtests\n\nValidate the final picks with the "
+     "event-driven engine (fees, slippage, fills)."),
+]
+
+# Empty cache/output directories created in the project root.
+RECOMMENDED_DIRS = ["data", "backtest_results", "reports", "resources"]
 
 
 class AppType(Enum):
@@ -98,6 +128,71 @@ def create_file_from_template(template_path, output_path, replace=False):
 
         with open(output_path, "w") as file:
             file.write(template)
+
+
+def _create_empty_notebook(file_path, title_markdown, replace=False):
+    """
+    Create a minimal Jupyter notebook (nbformat 4) with a single
+    markdown title cell.
+    """
+    if os.path.exists(file_path):
+        if replace:
+            os.remove(file_path)
+        else:
+            return
+
+    notebook = {
+        "cells": [
+            {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": title_markdown,
+            }
+        ],
+        "metadata": {
+            "kernelspec": {
+                "display_name": "Python 3",
+                "language": "python",
+                "name": "python3",
+            },
+            "language_info": {"name": "python"},
+        },
+        "nbformat": 4,
+        "nbformat_minor": 5,
+    }
+
+    with open(file_path, "w") as file:
+        json.dump(notebook, file, indent=1)
+
+
+def _scaffold_recommended_layout(path, replace=False):
+    """
+    Create the directories and notebook stubs that are part of the
+    recommended project layout but not directly tied to a specific
+    deployment target (default, web, AWS Lambda, Azure Function).
+
+    Creates:
+        notebooks/                  with 6 stub research notebooks
+        data/                       cache for downloaded market data
+        backtest_results/           saved backtest bundles
+        reports/                    generated HTML/CSV reports
+        resources/                  misc assets (databases, configs)
+    """
+    notebooks_path = os.path.join(path, "notebooks")
+    create_directory(notebooks_path)
+
+    for filename, title_markdown in RECOMMENDED_NOTEBOOKS:
+        _create_empty_notebook(
+            os.path.join(notebooks_path, filename),
+            title_markdown,
+            replace=replace,
+        )
+
+    for directory_name in RECOMMENDED_DIRS:
+        directory_path = os.path.join(path, directory_name)
+        create_directory(directory_path)
+        # .gitkeep so the empty directory is committed
+        create_file(os.path.join(directory_path, ".gitkeep"))
 
 
 def command(path=None, app_type="default", replace=False):
@@ -207,19 +302,22 @@ def create_default_app(path=None, replace=False):
         os.path.join(path, "run_backtest.py"),
         replace=replace
     )
-    # Create the main directory
+    # Create the strategies package
     create_directory(os.path.join(path, "strategies"))
     strategies_path = os.path.join(path, "strategies")
     create_file(os.path.join(strategies_path, "__init__.py"))
     create_file_from_template(
         strategy_template_path,
-        os.path.join(strategies_path, "strategy.py")
+        os.path.join(strategies_path, "my_strategy.py")
     )
+    # data_providers.py lives at the project root so app.py, notebooks
+    # and strategies can all import it as `from data_providers import ...`
     create_file_from_template(
         data_providers_template_path,
-        os.path.join(strategies_path, "data_providers.py"),
+        os.path.join(path, "data_providers.py"),
         replace=replace
     )
+    _scaffold_recommended_layout(path, replace=replace)
     gitignore_template_path = os.path.join(
         os.path.dirname(current_script_path),
         "templates",
@@ -311,19 +409,22 @@ def create_default_web_app(path=None, replace=False):
         os.path.join(path, "run_backtest.py"),
         replace=replace
     )
-    # Create the main directory
+    # Create the strategies package
     create_directory(os.path.join(path, "strategies"))
     strategies_path = os.path.join(path, "strategies")
     create_file(os.path.join(strategies_path, "__init__.py"))
     create_file_from_template(
         strategy_template_path,
-        os.path.join(strategies_path, "strategy.py")
+        os.path.join(strategies_path, "my_strategy.py")
     )
+    # data_providers.py lives at the project root so app.py, notebooks
+    # and strategies can all import it as `from data_providers import ...`
     create_file_from_template(
         data_providers_template_path,
-        os.path.join(strategies_path, "data_providers.py"),
+        os.path.join(path, "data_providers.py"),
         replace=replace
     )
+    _scaffold_recommended_layout(path, replace=replace)
     gitignore_template_path = os.path.join(
         os.path.dirname(current_script_path),
         "templates",
@@ -417,19 +518,22 @@ def create_aws_lambda_app(path=None, replace=False):
         os.path.join(path, "run_backtest.py"),
         replace=replace
     )
-    # Create the main directory
+    # Create the strategies package
     create_directory(os.path.join(path, "strategies"))
     strategies_path = os.path.join(path, "strategies")
     create_file(os.path.join(strategies_path, "__init__.py"))
     create_file_from_template(
         strategy_template_path,
-        os.path.join(strategies_path, "strategy.py")
+        os.path.join(strategies_path, "my_strategy.py")
     )
+    # data_providers.py lives at the project root so app.py, notebooks
+    # and strategies can all import it as `from data_providers import ...`
     create_file_from_template(
         data_providers_template_path,
-        os.path.join(strategies_path, "data_providers.py"),
+        os.path.join(path, "data_providers.py"),
         replace=replace
     )
+    _scaffold_recommended_layout(path, replace=replace)
     gitignore_template_path = os.path.join(
         os.path.dirname(current_script_path),
         "templates",
@@ -504,10 +608,12 @@ def create_azure_function_app(path=None, replace=False):
         "templates",
         "run_backtest.py.template"
     )
-    # Create the framework app file as app_entry.py
+    # The Azure Functions Python v2 programming model requires the
+    # entry point to be named exactly `function_app.py` at the project
+    # root. Anything else and the host won't discover any triggers.
     create_file_from_template(
         azure_function_template_path,
-        os.path.join(path, "app_web.py"),
+        os.path.join(path, "function_app.py"),
         replace=replace
     )
     # Create the host.json file
@@ -568,19 +674,22 @@ def create_azure_function_app(path=None, replace=False):
         os.path.join(path, "run_backtest.py"),
         replace=replace
     )
-    # Create the main directory
+    # Create the strategies package
     create_directory(os.path.join(path, "strategies"))
     strategies_path = os.path.join(path, "strategies")
     create_file(os.path.join(strategies_path, "__init__.py"))
     create_file_from_template(
         strategy_template_path,
-        os.path.join(strategies_path, "strategy.py")
+        os.path.join(strategies_path, "my_strategy.py")
     )
+    # data_providers.py lives at the project root so app.py, notebooks
+    # and strategies can all import it as `from data_providers import ...`
     create_file_from_template(
         data_providers_template_path,
-        os.path.join(strategies_path, "data_providers.py"),
+        os.path.join(path, "data_providers.py"),
         replace=replace
     )
+    _scaffold_recommended_layout(path, replace=replace)
     gitignore_template_path = os.path.join(
         os.path.dirname(current_script_path),
         "templates",

@@ -4,7 +4,7 @@ sidebar_position: 2
 
 # Simple Example
 
-Get started with a complete working example of a trading bot 
+Get started with a complete working example of a trading bot
 using the Investing Algorithm Framework.
 
 ## Overview
@@ -15,7 +15,7 @@ This example demonstrates how to create a sophisticated trading bot that uses te
 
 Here's a complete working example that you can run right after installation:
 
-> This example uses the `pyindicators` library for technical indicators. 
+> This example uses the `pyindicators` library for technical indicators.
 > Make sure to install it via pip:```pip install pyindicators```
 
 ```python
@@ -32,7 +32,7 @@ from investing_algorithm_framework import TradingStrategy, DataSource, \
     DEFAULT_LOGGING_CONFIG
 
 
-# Use the framework provided logging configuration
+# Use the framework provided logging configuration for better debugging and monitoring
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
 
 
@@ -142,7 +142,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         ema_data
     ):
         """
-        Helper function to prepare the indicators 
+        Helper function to prepare the indicators
         for the strategy. The indicators are calculated
         using the pyindicators library: https://github.com/coding-kitties/PyIndicators
         """
@@ -308,7 +308,7 @@ import pandas as pd
 from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
-    TimeUnit, DataType, PositionSize, create_app, RESOURCE_DIRECTORY, \
+    TimeUnit, DataType, PositionSize, create_app, \
     BacktestDateRange, BacktestReport, TakeProfitRule, StopLossRule, \
     DEFAULT_LOGGING_CONFIG
 ```
@@ -330,17 +330,18 @@ logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
 ```python
 class RSIEMACrossoverStrategy(TradingStrategy):
     algorithm_id = "RSI-EMA-Crossover-Strategy"
-    time_unit = TimeUnit.HOUR
-    interval = 2
-    symbols = ["BTC"]
+    symbols = ["BTC", "ETH"]
     # ...
 ```
 
 **Key Properties:**
 - **algorithm_id**: Unique identifier for your strategy
-- **time_unit**: The time unit for strategy execution (HOUR in this case)
-- **interval**: How often to run the strategy (every 2 hours)
-- **symbols**: List of trading symbols to monitor
+- **symbols**: List of trading symbols the strategy trades. The
+  per-symbol `position_sizes`, `take_profits`, and `stop_losses` rules
+  below are matched against this list.
+- **time_unit** / **interval**: Passed to `super().__init__` from the
+  constructor — controls how often the strategy runs (every 2 hours
+  here).
 
 ### 4. Position Sizing and Risk Management
 
@@ -403,7 +404,7 @@ for symbol in self.symbols:
 
 **Data Sources for Technical Analysis:**
 - **RSI Data Source**: OHLCV data for RSI indicator calculation
-- **EMA Data Source**: OHLCV data for moving average calculations  
+- **EMA Data Source**: OHLCV data for moving average calculations
 - **warmup_window**: 800 candles for sufficient historical data
 - **pandas**: Returns data as pandas DataFrame for easy analysis
 
@@ -412,16 +413,16 @@ for symbol in self.symbols:
 ```python
 def _prepare_indicators(self, rsi_data, ema_data):
     # Calculate short and long EMAs
-    ema_data = ema(ema_data, period=self.ema_short_period, 
+    ema_data = ema(ema_data, period=self.ema_short_period,
                    source_column="Close", result_column=self.ema_short_result_column)
     ema_data = ema(ema_data, period=self.ema_long_period,
                    source_column="Close", result_column=self.ema_long_result_column)
-    
+
     # Detect EMA crossovers
     ema_data = crossover(ema_data, first_column=self.ema_short_result_column,
                         second_column=self.ema_long_result_column,
                         result_column=self.ema_crossover_result_column)
-    
+
     # Calculate RSI
     rsi_data = rsi(rsi_data, period=self.rsi_period,
                    source_column="Close", result_column=self.rsi_result_column)
@@ -440,16 +441,16 @@ def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
     rsi_oversold = rsi_data[self.rsi_result_column] < self.rsi_oversold_threshold
     ema_crossover_lookback = ema_data[self.ema_crossover_result_column].rolling(
         window=self.ema_cross_lookback_window).max().astype(bool)
-    
+
     buy_signal = rsi_oversold & ema_crossover_lookback
     return buy_signal
 
 def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-    # Sell when RSI is overbought AND EMA crossunder occurred recently  
+    # Sell when RSI is overbought AND EMA crossunder occurred recently
     rsi_overbought = rsi_data[self.rsi_result_column] >= self.rsi_overbought_threshold
     ema_crossunder_lookback = ema_data[self.ema_crossunder_result_column].rolling(
         window=self.ema_cross_lookback_window).max().astype(bool)
-        
+
     sell_signal = rsi_overbought & ema_crossunder_lookback
     return sell_signal
 ```
@@ -593,13 +594,22 @@ This example showcases:
 Now that you have a working advanced strategy example, you can:
 
 1. **Experiment with parameters** - Modify RSI periods, EMA periods, and thresholds
-2. **Add more symbols** - Extend to trade ETH, ADA, and other cryptocurrencies  
+2. **Add more symbols** - Extend to trade ETH, ADA, and other cryptocurrencies
 3. **Implement live trading** - Add API credentials for live trading on Bitvavo
 4. **Create custom indicators** - Develop your own technical analysis indicators
 5. **Optimize strategy parameters** - Use the framework's optimization tools
 6. **Add more sophisticated risk management** - Implement dynamic position sizing
 
 Continue to [Application Setup](application-setup) to learn how to structure more complex trading applications, or jump to [Strategies](strategies) to learn about implementing more trading logic.
+
+## See also
+
+The strategy above generates buy/sell signals one symbol at a time. For
+**cross-sectional** strategies — where you score and rank a universe of
+symbols against each other (e.g. "long the top-10 by momentum, short
+the bottom-10") — see the [Pipelines](../Advanced%20Concepts/pipelines)
+guide. Pipelines also enable vectorised backtesting, which is
+significantly faster for large universes.
 
 ## Troubleshooting
 
@@ -620,7 +630,7 @@ Continue to [Application Setup](application-setup) to learn how to structure mor
 
 If you encounter issues:
 1. Check the logs for detailed error messages
-2. Verify your Python version (3.8+ required)
+2. Verify your Python version (3.10+ required)
 3. Ensure all dependencies are installed
 
 This example provides a solid foundation for building more sophisticated trading bots. Once you're comfortable with this advanced structure, you can explore the more advanced features covered in the rest of this documentation.

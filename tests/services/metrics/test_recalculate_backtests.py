@@ -1,8 +1,16 @@
 import os
+import warnings
 from unittest import TestCase
 
 from investing_algorithm_framework import (
     Backtest, recalculate_backtests,
+)
+
+# These tests intentionally exercise the deprecated in-memory API.
+warnings.filterwarnings(
+    "ignore",
+    message=r"recalculate_backtests\(List\[Backtest\]\) is deprecated.*",
+    category=DeprecationWarning,
 )
 
 

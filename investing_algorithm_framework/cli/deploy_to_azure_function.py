@@ -30,6 +30,51 @@ def generate_unique_resource_name(base_name):
     return f"{base_name}{unique_suffix}".lower()
 
 
+async def _wait_until_function_app_ready(
+    function_app_name,
+    resource_group_name,
+    timeout_seconds=300,
+    poll_interval_seconds=10,
+):
+    """
+    Poll `az functionapp show --query state` until the Function App
+    reports 'Running', or raise once `timeout_seconds` is exceeded.
+
+    This replaces the old hard-coded `time.sleep(60)` which both blocked
+    the event loop and frequently published before the host was ready
+    (causing silent SCM 503s).
+    """
+    deadline = time.monotonic() + timeout_seconds
+    last_state = None
+
+    while time.monotonic() < deadline:
+        process = await asyncio.create_subprocess_exec(
+            "az", "functionapp", "show",
+            "--name", function_app_name,
+            "--resource-group", resource_group_name,
+            "--query", "state",
+            "-o", "tsv",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await process.communicate()
+        state = stdout.decode().strip()
+
+        if state and state != last_state:
+            print(f"Function App state: {state}")
+            last_state = state
+
+        if state == "Running":
+            return
+
+        await asyncio.sleep(poll_interval_seconds)
+
+    raise TimeoutError(
+        f"Function App '{function_app_name}' did not reach 'Running' "
+        f"state within {timeout_seconds}s (last seen: {last_state!r})."
+    )
+
+
 def ensure_azure_functools():
     """
     Function to ensure that the Azure Functions Core Tools are installed.
@@ -128,77 +173,93 @@ async def publish_function_app(
     """
     print(f"Publishing Function App {function_app_name}")
 
-    # Wait for 60 seconds to ensure the Function App is ready
-    time.sleep(60)
+    # Wait for the Function App to report a 'Running' state instead of
+    # blindly sleeping. The first deployment can take a while because the
+    # Linux Consumption host is provisioned lazily.
+    await _wait_until_function_app_ready(
+        function_app_name=function_app_name,
+        resource_group_name=resource_group_name,
+        timeout_seconds=300,
+    )
 
     try:
-        # Step 1: Publish the Azure Function App
-        process = await asyncio.create_subprocess_exec(
-            "func", "azure", "functionapp", "publish", function_app_name
-        )
-
-        # Wait for the subprocess to finish
-        _, stderr = await process.communicate()
-
-        # Check the return code
-        if process.returncode != 0:
-
-            if stderr is not None:
-                raise Exception(
-                    f"Error publishing Function App: {stderr.decode().strip()}"
-                )
-            else:
-                raise Exception("Error publishing Function App")
-
-        print(f"Function App {function_app_name} published successfully.")
-
-        # Step 2: Add app settings
+        # Step 1: Push app settings BEFORE publishing so the worker has
+        # the storage credentials available on first cold start.
+        print("Setting AZURE_STORAGE_* app settings...")
         add_settings_process = await asyncio.create_subprocess_exec(
             "az", "functionapp", "config", "appsettings", "set",
             "--name", function_app_name,
+            "--resource-group", resource_group_name,
             "--settings",
             f"AZURE_STORAGE_CONNECTION_STRING={storage_connection_string}",
             f"AZURE_STORAGE_CONTAINER_NAME={storage_container_name}",
-            "--resource-group", resource_group_name
+            "SCM_DO_BUILD_DURING_DEPLOYMENT=true",
+            "ENABLE_ORYX_BUILD=true",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
         _, stderr1 = await add_settings_process.communicate()
 
         if add_settings_process.returncode != 0:
+            raise Exception(
+                "Error adding app settings: " +
+                (stderr1.decode().strip() if stderr1 else "")
+            )
+        print("App settings configured successfully.")
 
-            if stderr1 is not None:
-                raise Exception(
-                    f"Error adding App settings: {stderr1.decode().strip()}"
-                )
-            else:
-                raise Exception("Error adding App settings")
-
+        # Step 2: Publish the Azure Function App. `--build remote --python`
+        # is *required* on Linux Consumption: native wheels (pandas, numpy,
+        # msgpack, polars, ...) must be built on the function host's libc/
+        # arch, otherwise the host crashes silently on import at cold start.
         print(
-            "Added app settings to the Function App successfully"
+            "Running 'func azure functionapp publish' "
+            f"(remote build) for {function_app_name}..."
         )
+        publish_process = await asyncio.create_subprocess_exec(
+            "func", "azure", "functionapp", "publish", function_app_name,
+            "--build", "remote",
+            "--python",
+        )
+        await publish_process.communicate()
 
-        # Step 3: Update the cors settings
+        if publish_process.returncode != 0:
+            raise Exception(
+                "Error publishing Function App. Re-run with the Azure "
+                "CLI directly to see full output:\n  "
+                f"func azure functionapp publish {function_app_name} "
+                "--build remote --python"
+            )
+        print(f"Function App {function_app_name} published successfully.")
+
+        # Step 3: Update the CORS settings.
         cors_process = await asyncio.create_subprocess_exec(
             "az", "functionapp", "cors", "add",
             "--name", function_app_name,
             "--allowed-origins", "*",
-            "--resource-group", resource_group_name
+            "--resource-group", resource_group_name,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
         )
-
-        _, stderr1 = await add_settings_process.communicate()
+        _, cors_stderr = await cors_process.communicate()
 
         if cors_process.returncode != 0:
+            # CORS already configured is not fatal.
+            print(
+                "Warning: could not add CORS rule: " +
+                (cors_stderr.decode().strip() if cors_stderr else "")
+            )
+        else:
+            print("CORS rule '*' added.")
 
-            if stderr1 is not None:
-                raise Exception(
-                    f"Error adding cors settings: {stderr1.decode().strip()}"
-                )
-            else:
-                raise Exception("Error adding cors settings")
-
-        print("All app settings have been added successfully.")
-        print("Function App creation completed successfully.")
+        print("Function App deployment completed successfully.")
+        print(
+            "\nTo stream live logs run:\n  "
+            f"az webapp log tail --name {function_app_name} "
+            f"--resource-group {resource_group_name}"
+        )
     except Exception as e:
         print(f"Error publishing Function App: {e}")
+        raise
 
 
 async def create_function_app(
@@ -268,7 +329,7 @@ async def create_function_app(
             "--runtime",
             "python",
             "--runtime-version",
-            "3.10",
+            "3.11",
             "--functions-version",
             "4",
             "--name",

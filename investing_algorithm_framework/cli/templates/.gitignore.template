@@ -176,3 +176,14 @@ cython_debug/
 
 # Framework related files
 # The following files are related to the investing_algorithm_framework framework.
+
+# Local caches and generated outputs (the directories themselves are kept
+# via .gitkeep, but their contents should not be committed).
+data/*
+!data/.gitkeep
+backtest_results/*
+!backtest_results/.gitkeep
+reports/*
+!reports/.gitkeep
+resources/*
+!resources/.gitkeep
