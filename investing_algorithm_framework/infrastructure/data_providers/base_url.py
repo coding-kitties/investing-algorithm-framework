@@ -45,6 +45,7 @@ class BaseURLDataProvider(DataProvider):
         date_format=None,
         cache=True,
         refresh_interval=None,
+        headers=None,
         pre_process=None,
         post_process=None,
         priority=5,
@@ -62,6 +63,7 @@ class BaseURLDataProvider(DataProvider):
         self._date_format = date_format
         self._cache = cache
         self._refresh_interval = refresh_interval
+        self._headers = headers or {}
         self._pre_process = pre_process
         self._post_process = post_process
         self._cached_data = None
@@ -194,6 +196,7 @@ class BaseURLDataProvider(DataProvider):
         date_format = self._date_format
         cache = self._cache
         refresh_interval = self._refresh_interval
+        headers = self._headers
         pre_process = self._pre_process
         post_process = self._post_process
         identifier = self.data_provider_identifier
@@ -206,6 +209,7 @@ class BaseURLDataProvider(DataProvider):
                 else cache
             refresh_interval = data_source.refresh_interval \
                 or refresh_interval
+            headers = data_source.headers or headers
             pre_process = data_source.pre_process or pre_process
             post_process = data_source.post_process or post_process
 
@@ -215,6 +219,7 @@ class BaseURLDataProvider(DataProvider):
             date_format=date_format,
             cache=cache,
             refresh_interval=refresh_interval,
+            headers=headers,
             pre_process=pre_process,
             post_process=post_process,
             priority=self.priority,
@@ -277,9 +282,11 @@ class BaseURLDataProvider(DataProvider):
 
         # Fetch from URL
         ctx = ssl.create_default_context()
+        headers = {"User-Agent": "investing-algorithm-framework"}
+        headers.update(self._headers)
         req = urllib.request.Request(
             url,
-            headers={"User-Agent": "investing-algorithm-framework"}
+            headers=headers
         )
         with urllib.request.urlopen(req, context=ctx) as response:
             raw_bytes = response.read()
@@ -350,8 +357,12 @@ class BaseURLDataProvider(DataProvider):
         if storage_dir is None:
             storage_dir = os.path.join(os.getcwd(), ".data_cache")
 
+        cache_key = self._url
+        if self._headers:
+            cache_key = f"{cache_key}|headers:{sorted(self._headers.items())}"
+
         url_hash = hashlib.md5(
-            self._url.encode()
+            cache_key.encode()
         ).hexdigest()[:12]
         suffix = self._cache_file_suffix()
         return os.path.join(storage_dir, f"url_{url_hash}{suffix}")

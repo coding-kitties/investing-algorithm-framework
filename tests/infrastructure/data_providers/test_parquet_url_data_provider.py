@@ -39,6 +39,17 @@ class TestDataSourceFromParquet(unittest.TestCase):
         )
         self.assertTrue(ds.cache)
 
+    def test_from_parquet_accepts_headers(self):
+        ds = DataSource.from_parquet(
+            identifier="features",
+            url="https://storage.example.com/features.parquet",
+            headers={"Authorization": "Bearer test-token"},
+        )
+        self.assertEqual(
+            ds.headers,
+            {"Authorization": "Bearer test-token"}
+        )
+
     def test_from_parquet_defaults(self):
         ds = DataSource.from_parquet(
             identifier="test",
@@ -48,6 +59,7 @@ class TestDataSourceFromParquet(unittest.TestCase):
         self.assertIsNone(ds.date_format)
         self.assertTrue(ds.cache)
         self.assertIsNone(ds.refresh_interval)
+        self.assertIsNone(ds.headers)
         self.assertIsNone(ds.post_process)
 
     def test_from_parquet_no_pre_process(self):

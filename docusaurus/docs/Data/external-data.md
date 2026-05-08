@@ -13,7 +13,7 @@ The framework provides two ways to load external data:
 1. **Data Sources** — Declare `DataSource.from_csv()`, `DataSource.from_json()`, or `DataSource.from_parquet()` in your strategy's `data_sources` list. Data is fetched automatically and available in your `data` dict.
 2. **Context methods** — Call `context.fetch_csv()`, `context.fetch_json()`, or `context.fetch_parquet()` on demand inside your strategy's `run_strategy` method.
 
-Both approaches support caching, refresh intervals, date parsing, and pre/post-processing callbacks.
+Both approaches support caching, refresh intervals, date parsing, request headers, and pre/post-processing callbacks.
 
 ## Supported Formats
 
@@ -112,6 +112,7 @@ class MyStrategy(TradingStrategy):
         earnings = context.fetch_json(
             url="https://api.example.com/earnings",
             date_column="report_date",
+            headers={"Authorization": "Bearer <token>"},
         )
 
         # Fetch Parquet on demand
@@ -132,8 +133,49 @@ All three factory methods and context methods accept the same core parameters:
 | `date_format` | `str` | `None` | strftime format for parsing dates (e.g., `"%Y-%m-%d"`). Auto-detected if omitted. |
 | `cache` | `bool` | `True` | Cache fetched data locally to avoid repeated downloads. |
 | `refresh_interval` | `str` | `None` | How often to re-fetch: `"1m"`, `"5m"`, `"15m"`, `"30m"`, `"1h"`, `"4h"`, `"1d"`, `"1W"`. |
+| `headers` | `dict` | `None` | Optional HTTP headers to send with the request, such as API keys or bearer tokens. |
 | `pre_process` | `callable` | `None` | Transform raw text before parsing. Receives `str`, returns `str`. Not available for Parquet. |
 | `post_process` | `callable` | `None` | Transform the parsed DataFrame. Receives `DataFrame`, returns `DataFrame`. |
+
+## Authenticated APIs
+
+Use `headers` when an external data API requires authentication. For example, Adanos Market Sentiment can be loaded as an optional alternative-data signal without writing a custom provider:
+
+```python
+import json
+import os
+
+import polars as pl
+
+from investing_algorithm_framework import TimeUnit, TradingStrategy
+
+
+def extract_adanos_stocks(raw_text):
+    payload = json.loads(raw_text)
+    return json.dumps(payload.get("stocks", []))
+
+
+class SentimentStrategy(TradingStrategy):
+    time_unit = TimeUnit.DAY
+    interval = 1
+    symbols = ["AAPL", "MSFT"]
+
+    def run_strategy(self, context, data):
+        sentiment = context.fetch_json(
+            url=(
+                "https://api.adanos.org/news/stocks/v1/compare"
+                "?tickers=AAPL,MSFT&days=7"
+            ),
+            headers={"X-API-Key": os.environ["ADANOS_API_KEY"]},
+            pre_process=extract_adanos_stocks,
+            cache=True,
+            refresh_interval="1d",
+        )
+
+        aapl = sentiment.filter(pl.col("ticker") == "AAPL")
+        if len(aapl) and aapl["sentiment_score"][0] > 0.2:
+            context.create_limit_order(...)
+```
 
 ## Pre/Post Processing
 
