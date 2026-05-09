@@ -88,6 +88,44 @@ class CCXTOrderExecutor(OrderExecutor):
                     external_order = exchange.createMarketSellOrder(
                         symbol, amount,
                     )
+            elif OrderType.STOP.equals(order_type) \
+                    or OrderType.STOP_LIMIT.equals(order_type):
+                stop_price = order.get_stop_price()
+
+                if stop_price is None:
+                    raise OperationalException(
+                        f"Order type {order_type} requires a stop_price"
+                    )
+
+                if not hasattr(exchange, "createOrder"):
+                    raise OperationalException(
+                        f"Exchange {market} does not support "
+                        f"functionality createOrder needed for "
+                        f"{order_type} orders"
+                    )
+
+                # CCXT unified API: stop / stop-limit are passed as a
+                # generic order with the stopPrice param. STOP maps to
+                # the exchange's market-stop type; STOP_LIMIT to the
+                # stop-limit type. The exchange-specific mapping is
+                # handled by CCXT.
+                ccxt_type = (
+                    "stop_limit"
+                    if OrderType.STOP_LIMIT.equals(order_type)
+                    else "stop"
+                )
+                ccxt_price = price if OrderType.STOP_LIMIT.equals(
+                    order_type
+                ) else None
+
+                external_order = exchange.createOrder(
+                    symbol,
+                    ccxt_type,
+                    OrderSide.from_value(order_side).value.lower(),
+                    amount,
+                    ccxt_price,
+                    {"stopPrice": stop_price},
+                )
             else:
                 raise OperationalException(
                     f"Order type {order_type} not supported "

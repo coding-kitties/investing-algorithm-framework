@@ -46,6 +46,8 @@ class Order(BaseModel):
         slippage=None,
         id=None,
         metadata=None,
+        stop_price=None,
+        triggered_at=None,
     ):
         if target_symbol is None:
             raise OperationalException("Target symbol is not specified")
@@ -92,6 +94,8 @@ class Order(BaseModel):
         self.id = id
         self.cost = cost
         self.metadata = metadata if metadata is not None else {}
+        self.stop_price = stop_price
+        self.triggered_at = triggered_at
 
     def get_id(self):
         return self.id
@@ -113,6 +117,25 @@ class Order(BaseModel):
 
     def set_price(self, price):
         self.price = price
+
+    def get_stop_price(self):
+        return self.stop_price
+
+    def set_stop_price(self, stop_price):
+        self.stop_price = stop_price
+
+    def get_triggered_at(self):
+        return self.triggered_at
+
+    def set_triggered_at(self, triggered_at):
+        self.triggered_at = triggered_at
+
+    def is_stop_order(self):
+        return OrderType.STOP.equals(self.order_type) \
+            or OrderType.STOP_LIMIT.equals(self.order_type)
+
+    def is_triggered(self):
+        return self.triggered_at is not None
 
     def get_order_fee_currency(self):
         return self.order_fee_currency
@@ -266,6 +289,9 @@ class Order(BaseModel):
             "order_fee_rate": self.order_fee_rate,
             "order_fee": self.order_fee,
             "slippage": self.slippage,
+            "stop_price": self.stop_price,
+            "triggered_at": ensure_iso(self.triggered_at)
+            if self.triggered_at else None,
             "metadata": self.metadata if hasattr(self, 'metadata') else {},
         }
 
@@ -288,6 +314,10 @@ class Order(BaseModel):
         if updated_at is not None:
             updated_at = _parse_dt(updated_at)
 
+        triggered_at = data.get("triggered_at", None)
+        if triggered_at is not None:
+            triggered_at = _parse_dt(triggered_at)
+
         order = Order(
             id=data.get("id", None),
             external_id=data.get("external_id", None),
@@ -309,6 +339,8 @@ class Order(BaseModel):
             order_fee_rate=data.get("order_fee_rate", None),
             slippage=data.get("slippage", None),
             metadata=data.get("metadata", {}),
+            stop_price=data.get("stop_price", None),
+            triggered_at=triggered_at,
         )
         return order
 
