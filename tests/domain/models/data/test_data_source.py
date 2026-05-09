@@ -119,7 +119,7 @@ class TestDataSource(TestCase):
         self.assertNotEqual(data_source1, data_source2)
 
     def test_data_source_in_set_uniqueness(self):
-        """Test that DataSource instances are unique in sets based on all attributes"""
+        """Test DataSource set uniqueness based on all attributes"""
         data_source1 = DataSource(
             data_provider_identifier="provider1",
             data_type=DataType.OHLCV,
@@ -159,9 +159,14 @@ class TestDataSource(TestCase):
             market="binance"
         )
 
-        data_sources_set = {data_source1, data_source2, data_source3, data_source4}
+        data_sources_set = {
+            data_source1,
+            data_source2,
+            data_source3,
+            data_source4,
+        }
 
-        # Should only have 3 unique data sources (data_source1 and data_source2 are the same)
+        # data_source1 and data_source2 are the same.
         self.assertEqual(len(data_sources_set), 3)
         self.assertIn(data_source1, data_sources_set)
         self.assertIn(data_source3, data_sources_set)
@@ -223,11 +228,11 @@ class TestDataSource(TestCase):
         )  # Same as data_source1
 
         set1 = {data_source1, data_source2}
-        set2 = {data_source3, data_source2}  # data_source3 is same as data_source1
+        set2 = {data_source3, data_source2}
 
         # Test intersection
         intersection = set1 & set2
-        self.assertEqual(len(intersection), 2)  # Both data sources are in common
+        self.assertEqual(len(intersection), 2)
 
         # Test union
         union = set1 | set2
@@ -235,7 +240,7 @@ class TestDataSource(TestCase):
 
         # Test difference
         difference = set1 - set2
-        self.assertEqual(len(difference), 0)  # No difference since sets are equal
+        self.assertEqual(len(difference), 0)
 
     def test_data_source_uniqueness_edge_cases(self):
         """Test uniqueness with edge cases like None values"""
@@ -261,7 +266,9 @@ class TestDataSource(TestCase):
         try:
             data_source.symbol = "ETH/USD"
             # If we reach here, the class is not frozen
-            self.skipTest("DataSource is not frozen, skipping immutability test")
+            self.skipTest(
+                "DataSource is not frozen, skipping immutability test"
+            )
         except FrozenInstanceError:
             # This is expected behavior when frozen=True
             pass
@@ -283,6 +290,28 @@ class TestDataSource(TestCase):
         self.assertIsNone(data_source.window_size)
         self.assertIsNone(data_source.time_frame)
         self.assertIsNone(data_source.market)
+
+    def test_to_dict_redacts_headers(self):
+        data_source = DataSource.from_json(
+            identifier="sentiment",
+            url="https://api.example.com/sentiment",
+            headers={
+                "Authorization": "Bearer secret-token",
+                "X-API-Key": "secret-key",
+            },
+        )
+
+        data = data_source.to_dict()
+
+        self.assertEqual(
+            data["headers"],
+            {
+                "Authorization": "***",
+                "X-API-Key": "***",
+            }
+        )
+        self.assertNotIn("secret-token", str(data))
+        self.assertNotIn("secret-key", str(data))
 
     def test_data_source_window_size_types(self):
         """Test DataSource with different window_size values"""
@@ -354,6 +383,7 @@ class TestDataSource(TestCase):
             "date_format",
             "cache",
             "refresh_interval",
+            "headers",
             "pre_process",
             "post_process"
         ]
