@@ -68,7 +68,8 @@ class ScheduledDeposit:
     """
 
     amount: float
-    time_unit: Optional[object] = None  # TimeUnit; typed loosely to avoid cycle
+    # TimeUnit; typed loosely to avoid cycle
+    time_unit: Optional[object] = None
     interval: Optional[int] = None
     on: Optional[datetime] = None
     fire_on_anchor: bool = False

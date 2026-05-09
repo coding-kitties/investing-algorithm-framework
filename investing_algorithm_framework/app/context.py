@@ -6,8 +6,9 @@ from investing_algorithm_framework.services import ConfigurationService, \
     MarketCredentialService, OrderService, PortfolioConfigurationService, \
     PortfolioService, PositionService, TradeService, DataProviderService, \
     TradeStopLossService, TradeTakeProfitService, BrokerBalanceTracker
-from investing_algorithm_framework.services.portfolios.portfolio_provider_lookup \
-    import PortfolioProviderLookup
+from investing_algorithm_framework.services.portfolios import (
+    PortfolioProviderLookup,
+)
 from investing_algorithm_framework.domain import OrderStatus, OrderType, \
     OrderSide, OperationalException, Portfolio, RoundingService, \
     BACKTESTING_FLAG, INDEX_DATETIME, Order, \
@@ -1143,7 +1144,9 @@ class Context:
         for order in created_orders or []:
             try:
                 price = float(order.get_price() or 0.0)
-                amount = float(order.get_remaining() or order.get_amount() or 0.0)
+                amount = float(
+                    order.get_remaining() or order.get_amount() or 0.0
+                )
             except Exception:  # noqa: BLE001
                 continue
             if OrderSide.BUY.equals(order.get_order_side()):
