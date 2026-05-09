@@ -232,4 +232,3 @@ class TestAppInitialize(TestCase):
         self.assertTrue(
             os.path.exists(self._output_path("app.py"))
         )
-

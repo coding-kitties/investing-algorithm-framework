@@ -1,0 +1,24 @@
+[package]
+name = "rust_bench"
+version = "0.1.0"
+edition = "2021"
+description = "Reference Rust backtest sweep for the iaf benchmark baseline."
+
+[dependencies]
+polars = { version = "0.46", features = ["lazy", "parquet", "temporal"] }
+rayon = "1.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+clap = { version = "4", features = ["derive"] }
+chrono = "0.4"
+anyhow = "1"
+# Bundled SQLite so the benchmark is self-contained on macOS/Linux/Windows
+# without requiring a system libsqlite. The framework writes a per-backtest
+# `.sqlite3` (orders, snapshots, positions, ...) so we mirror that here to
+# keep the comparison apples-to-apples.
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1

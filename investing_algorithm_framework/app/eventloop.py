@@ -237,12 +237,14 @@ class EventLoopService:
         snapshot_interval = self._configuration_service\
             .config[SNAPSHOT_INTERVAL]
         portfolio = self._portfolio_service.get_all()[0]
+        cash_flow = self._drain_cash_flow_for_snapshot(portfolio)
         if SnapshotInterval.STRATEGY_ITERATION.equals(snapshot_interval):
             snapshot = self._portfolio_snapshot_service.create_snapshot(
                 created_at=current_datetime,
                 portfolio=portfolio,
                 open_orders=open_orders,
                 created_orders=created_orders,
+                cash_flow=cash_flow,
                 save=False,
             )
             self._snapshots.append(snapshot)
@@ -263,12 +265,29 @@ class EventLoopService:
                     portfolio=portfolio,
                     open_orders=open_orders,
                     created_orders=created_orders,
+                    cash_flow=cash_flow,
                     save=False,
                 )
                 self._snapshots.append(snapshot)
                 self._configuration_service.add_value(
                     LAST_SNAPSHOT_DATETIME, current_datetime
                 )
+
+    def _drain_cash_flow_for_snapshot(self, portfolio) -> float:
+        """Return external cash flow absorbed since the last snapshot.
+
+        Drains the per-market accumulator on the
+        :class:`BrokerBalanceTracker` so the next snapshot starts from
+        zero again. Returns 0 if no tracker is wired or the portfolio's
+        market is unknown to the tracker.
+        """
+        tracker = getattr(self.context, "broker_balance_tracker", None)
+        if tracker is None or portfolio is None:
+            return 0.0
+        market = getattr(portfolio, "market", None)
+        if market is None or not tracker.has_market(market):
+            return 0.0
+        return tracker.drain_cash_flow(market)
 
     def initialize(
         self,
@@ -534,6 +553,63 @@ class EventLoopService:
         self._validate_live_envelope(strategies)
         self._pipelines_live_validated = True
 
+    def _tick_broker_balance(self, environment, current_datetime) -> None:
+        """Fire any due ScheduledDeposits in backtest mode.
+
+        In live mode this is a no-op: the actual broker is the source of
+        truth and is consulted directly by ``Context.sync_portfolio``.
+        """
+        if not Environment.BACKTEST.equals(environment):
+            return
+        tracker = getattr(self.context, "broker_balance_tracker", None)
+        if tracker is None:
+            return
+        for market in tracker.markets():
+            tracker.fire_due_deposits(
+                market=market,
+                current_datetime=current_datetime,
+            )
+
+    def _auto_sync_markets(self) -> None:
+        """Call sync_portfolio for any market opted into auto-sync."""
+        tracker = getattr(self.context, "broker_balance_tracker", None)
+        if tracker is None:
+            return
+        from investing_algorithm_framework.domain import (
+            PortfolioOutOfSyncError,
+        )
+        for market in tracker.markets():
+            if not tracker.is_auto_sync(market):
+                continue
+            mode = tracker.get_auto_sync_error_mode(market)
+            try:
+                self.context.sync_portfolio(market=market)
+            except PortfolioOutOfSyncError:
+                # Out-of-sync is a *signal*, not a transient. Always
+                # propagate so users can decide explicitly via
+                # allow_withdrawals or by switching off auto_sync.
+                raise
+            except Exception as exc:  # noqa: BLE001
+                if mode == "raise":
+                    raise
+                if mode == "warn":
+                    logger.warning(
+                        "auto-sync failed on market %s (mode=warn, "
+                        "continuing with stale local state): %s",
+                        market, exc,
+                    )
+                    continue
+                if mode == "halt":
+                    # Halt only this market's auto-sync. Manual
+                    # context.sync_portfolio calls still work.
+                    logger.error(
+                        "auto-sync failed on market %s (mode=halt, "
+                        "disabling auto-sync for this market): %s",
+                        market, exc,
+                    )
+                    tracker.set_auto_sync(market, False)
+                    continue
+
     def _filter_symbols_for_universe_cache(
         self,
         strategy_id: str,
@@ -719,6 +795,19 @@ class EventLoopService:
         # daily-or-coarser timeframes) once per run. No-op for
         # backtests. See #503 phase 3b.
         self._maybe_validate_live_envelope(strategies, environment)
+
+        # Reconcile broker balance with local unallocated:
+        #
+        # 1. In **backtest** mode, advance the simulated broker clock by
+        #    firing any ScheduledDeposits whose cadence has elapsed since
+        #    the previous tick. The deposits land in
+        #    BrokerBalanceTracker.pending and become visible to strategies
+        #    only when they (or auto-sync) call sync_portfolio.
+        # 2. For every market with auto_sync enabled (live or backtest),
+        #    call Context.sync_portfolio so deposits/withdrawals are
+        #    absorbed before any strategy or task sees the iteration.
+        self._tick_broker_balance(environment, current_datetime)
+        self._auto_sync_markets()
 
         # Step 1: Collect all data for the strategies and for the
         # pending orders

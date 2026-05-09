@@ -135,6 +135,10 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Advanced Concepts/portfolio-sync',
+                },
+                {
+                    type: 'doc',
                     id: 'Advanced Concepts/pipelines',
                 },
                 {
