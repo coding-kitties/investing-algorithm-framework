@@ -1436,6 +1436,33 @@ function drawStrategyEquity(stratIdx) {
       i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
     }
     ctx.stroke();
+
+    // TWR overlay (alpha-only, scrubs deposits) — dashed line in
+    // single-run view only.
+    if (showDates) {
+      const rd = RUN_DATA[s.rid];
+      const twr = rd && rd.TWR_EQ;
+      if (twr && twr.length > 1) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.strokeStyle = s.color;
+        ctx.globalAlpha = 0.55;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        for (let i=0;i<twr.length;i++) {
+          const x=pad.l+(i/(twr.length-1))*cw;
+          const y=pad.t+ch-((twr[i][0]-gMin)/range)*ch;
+          i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);
+        }
+        ctx.stroke();
+        ctx.restore();
+        // Legend hint
+        ctx.fillStyle = COL.dim;
+        ctx.font = '10px JetBrains Mono, monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('— solid: account value · ‧ ‧ dashed: TWR (alpha-only)', pad.l, pad.t-3);
+      }
+    }
   });
 }
 
@@ -1589,6 +1616,31 @@ function drawStrategyDrawdown(stratIdx) {
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     }
     ctx.stroke();
+
+    // TWR drawdown overlay (alpha-only) — dashed line, single-run only
+    if (showDates) {
+      const rd = RUN_DATA[s.rid];
+      const twrDd = rd && rd.TWR_DD;
+      if (twrDd && twrDd.length > 1) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.strokeStyle = s.color;
+        ctx.globalAlpha = 0.55;
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 3]);
+        for (let i = 0; i < twrDd.length; i++) {
+          const x = pad.l+(i/(twrDd.length-1))*cw;
+          const y = pad.t+((0-twrDd[i][0])/range)*ch;
+          i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+        ctx.restore();
+        ctx.fillStyle = COL.dim;
+        ctx.font = '10px JetBrains Mono, monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText('— solid: account · ‧ ‧ dashed: TWR (alpha-only)', pad.l, pad.t-3);
+      }
+    }
   });
 
   const canvas = document.getElementById(id);
