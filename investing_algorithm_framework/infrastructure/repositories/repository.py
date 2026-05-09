@@ -47,7 +47,8 @@ class Repository(ABC):
     def update(self, object_id, data):
         # List all datetime fields for your model
         datetime_fields = [
-            "created_at", "updated_at", "closed_at", "opened_at"
+            "created_at", "updated_at", "closed_at", "opened_at",
+            "triggered_at"
         ]
         data = convert_datetime_fields(data, datetime_fields)
         with Session() as db:

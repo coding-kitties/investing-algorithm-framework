@@ -540,6 +540,23 @@ backtest_utils import (
                         for v, d in m.drawdown_series
                     ]
 
+                # TWR (alpha-only) equity curve & drawdown — these
+                # remove the contribution of external deposits/
+                # withdrawals so the curve reflects pure trading P&L.
+                twr_eq = []
+                if m and getattr(m, "twr_equity_curve", None):
+                    twr_initial = m.twr_equity_curve[0][0] or 1
+                    twr_eq = [
+                        [(v / twr_initial - 1) * 100, _fmt_date(d)]
+                        for v, d in m.twr_equity_curve
+                    ]
+                twr_dd = []
+                if m and getattr(m, "twr_drawdown_series", None):
+                    twr_dd = [
+                        [v * 100 if abs(v) < 1 else v, _fmt_date(d)]
+                        for v, d in m.twr_drawdown_series
+                    ]
+
                 # Rolling Sharpe
                 rs = []
                 if m and m.rolling_sharpe_ratio:
@@ -668,6 +685,8 @@ backtest_utils import (
                         'average_trade_gain',
                         'average_trade_gain_percentage',
                         'max_drawdown_absolute', 'max_daily_drawdown',
+                        'twr_max_drawdown',
+                        'twr_max_drawdown_duration',
                         'average_trade_duration',
                         'average_win_duration',
                         'average_loss_duration',
@@ -810,11 +829,15 @@ backtest_utils import (
                 eq = _downsample(eq)
                 dd = _downsample(dd)
                 rs = _downsample(rs)
+                twr_eq = _downsample(twr_eq)
+                twr_dd = _downsample(twr_dd)
 
                 run_data[rid] = {
                     'label': label,
                     'EQ': eq,
                     'DD': dd,
+                    'TWR_EQ': twr_eq,
+                    'TWR_DD': twr_dd,
                     'CR': eq,
                     'RS': rs,
                     'MR': mr,

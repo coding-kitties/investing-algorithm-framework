@@ -4,6 +4,8 @@ from enum import Enum
 class OrderType(Enum):
     LIMIT = 'LIMIT'
     MARKET = 'MARKET'
+    STOP = 'STOP'
+    STOP_LIMIT = 'STOP_LIMIT'
 
     @staticmethod
     def from_string(value: str):

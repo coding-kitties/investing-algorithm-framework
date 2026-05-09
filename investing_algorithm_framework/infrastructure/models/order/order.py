@@ -52,6 +52,8 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
     order_fee_currency = Column(String, default=None)
     order_fee_rate = Column(SqliteDecimal(), default=None)
     slippage = Column(SqliteDecimal(), default=None)
+    stop_price = Column(SqliteDecimal(), default=None)
+    triggered_at = Column(DateTime(timezone=True), default=None)
     sell_order_metadata_id = Column(Integer, ForeignKey('orders.id'))
     metadata_json = Column(Text, default=None)
     trade_allocations = relationship(
@@ -101,6 +103,8 @@ class SQLOrder(Order, SQLBaseModel, SQLAlchemyModelExtension):
             created_at=order.get_created_at(),
             updated_at=order.get_updated_at(),
             metadata=order.metadata,
+            stop_price=order.get_stop_price(),
+            triggered_at=order.get_triggered_at(),
         )
         return sql_order
 

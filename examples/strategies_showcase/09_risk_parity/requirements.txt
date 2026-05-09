@@ -1,0 +1,4 @@
+investing-algorithm-framework>=8.7.3
+numpy>=1.25
+pandas>=2.0
+ccxt>=4.0

@@ -158,6 +158,37 @@ class OrderBacktestService(OrderService):
         if OrderType.MARKET.equals(order.get_order_type()):
             return not ohlcv_data_after_order.is_empty()
 
+        # Stop / Stop-Limit orders: trigger first, then evaluate fill
+        is_stop = OrderType.STOP.equals(order.get_order_type())
+        is_stop_limit = OrderType.STOP_LIMIT.equals(order.get_order_type())
+
+        if is_stop or is_stop_limit:
+            stop_price = order.get_stop_price()
+
+            if stop_price is None:
+                return False
+
+            if OrderSide.SELL.equals(order_side):
+                triggered = (
+                    ohlcv_data_after_order['Low'] <= stop_price
+                ).any()
+            elif OrderSide.BUY.equals(order_side):
+                triggered = (
+                    ohlcv_data_after_order['High'] >= stop_price
+                ).any()
+            else:
+                return False
+
+            if not triggered:
+                return False
+
+            # STOP becomes a market order on trigger
+            if is_stop:
+                return True
+
+            # STOP_LIMIT: after trigger, fall through to limit fill check
+            # against the configured limit price.
+
         # Check if the order execution conditions are met
         if OrderSide.BUY.equals(order_side):
             # Check if the low price drops below or equals the order price

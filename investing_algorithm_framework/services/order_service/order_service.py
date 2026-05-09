@@ -151,6 +151,14 @@ class OrderService(RepositoryService):
         if "take_profits" in data:
             del data["take_profits"]
 
+        # For plain STOP orders the user only provides a stop_price.
+        # Default the order price to the stop_price so downstream
+        # accounting / trade allocation has a numeric reference. The
+        # actual fill price is set at trigger time by the evaluator.
+        if OrderType.STOP.equals(data.get("order_type")) \
+                and data.get("price") is None:
+            data["price"] = data.get("stop_price")
+
         if validate:
             self.validate_order(data, portfolio)
 
@@ -306,6 +314,10 @@ class OrderService(RepositoryService):
             self.validate_limit_order(order_data, portfolio)
         elif OrderType.MARKET.equals(order_data["order_type"]):
             self.validate_market_order(order_data, portfolio)
+        elif OrderType.STOP.equals(order_data["order_type"]):
+            self.validate_stop_order(order_data, portfolio)
+        elif OrderType.STOP_LIMIT.equals(order_data["order_type"]):
+            self.validate_stop_limit_order(order_data, portfolio)
         else:
             raise OperationalException(
                 f"Order type {order_data['order_type']} is not supported"
@@ -461,6 +473,63 @@ class OrderService(RepositoryService):
                     f"larger then unallocated size: {portfolio.unallocated} "
                     f"{portfolio.trading_symbol} of the portfolio"
                 )
+
+    def validate_stop_order(self, order_data, portfolio):
+        """
+        Validate a stop order. A stop order requires a stop_price and,
+        once triggered, executes as a market order.
+
+        Cash / position validation reuses the market-order rules: the
+        stop_price is used as the price reference for buy-side cash
+        reservation since no limit price exists.
+        """
+        stop_price = order_data.get("stop_price")
+
+        if stop_price is None or stop_price <= 0:
+            raise OperationalException(
+                "Stop orders require a positive stop_price"
+            )
+
+        # Reuse market-order validation for amount / cash checks,
+        # using the stop_price as the price reference.
+        validation_data = dict(order_data)
+        validation_data["price"] = stop_price
+        self.validate_market_order(validation_data, portfolio)
+
+    def validate_stop_limit_order(self, order_data, portfolio):
+        """
+        Validate a stop-limit order. Requires both a stop_price (trigger)
+        and a price (limit price after trigger).
+        """
+        stop_price = order_data.get("stop_price")
+        limit_price = order_data.get("price")
+
+        if stop_price is None or stop_price <= 0:
+            raise OperationalException(
+                "Stop-limit orders require a positive stop_price"
+            )
+
+        if limit_price is None or limit_price <= 0:
+            raise OperationalException(
+                "Stop-limit orders require a positive limit price"
+            )
+
+        # Validate stop / limit price consistency relative to side
+        if OrderSide.BUY.equals(order_data["order_side"]):
+            if limit_price < stop_price:
+                raise OperationalException(
+                    "For BUY stop-limit orders, the limit price must be "
+                    "greater than or equal to the stop price"
+                )
+        else:
+            if limit_price > stop_price:
+                raise OperationalException(
+                    "For SELL stop-limit orders, the limit price must be "
+                    "less than or equal to the stop price"
+                )
+
+        # Reuse limit-order amount / cash validation
+        self.validate_limit_order(order_data, portfolio)
 
     def check_pending_orders(self, portfolio=None):
         """

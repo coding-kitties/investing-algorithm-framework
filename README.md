@@ -85,7 +85,8 @@ This framework is built around the full loop: **create strategies → vector bac
 - 📄 **[One-Click HTML Report](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Self-contained file, no server, dark & light theme, shareable
 - 📦 **[Custom `.iafbt` Backtest Bundle Format](https://coding-kitties.github.io/investing-algorithm-framework/Data/backtest_data)** — An explicit, versioned, compressed, language-portable container (zstd + msgpack with magic-byte header) plus a separate parquet index for fast filtering without loading. ~21× smaller and ~27× fewer files than standard filebased directory layouts, with parallel I/O for fast load/save of large amounts of backtests.
 - 🌐 **[Load External Data](https://coding-kitties.github.io/investing-algorithm-framework/Data/external-data)** — Fetch CSV, JSON, or Parquet from any URL with caching and auto-refresh
-- 📝 **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
+- � **[Per-Market Deposit Schedules & Portfolio Sync](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/portfolio-sync)** — Declare recurring or one-shot external cash flows on a market with `deposit_schedule=` / `auto_sync=True`. Backtests simulate the deposits; live mode reconciles with the broker — same `context.sync_portfolio()` API in both modes.
+- �📝 **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
 - 🚀 **[Build → Backtest → Deploy](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/application-setup)** — Local dev, cloud deploy (AWS / Azure), or monetize on Finterion
 
 </details>

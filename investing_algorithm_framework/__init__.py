@@ -35,7 +35,8 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     Pipeline, Factor, CustomFactor, Filter, \
     Returns, AverageDollarVolume, AverageTradedValue, SMA, RSI, \
     Volatility, StaticPerSymbol, CrossSectionalMean, RollingBeta, \
-    Neutralize
+    Neutralize, \
+    SyncResult, ScheduledDeposit, PortfolioOutOfSyncError
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
     JSONURLDataProvider, ParquetURLDataProvider, \
@@ -285,6 +286,9 @@ __all__ = [
     "get_normalized_stability",
     "get_consistency_score",
     "get_stability_score",
+    "SyncResult",
+    "ScheduledDeposit",
+    "PortfolioOutOfSyncError",
 ]
 
 

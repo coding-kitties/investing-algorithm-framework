@@ -110,3 +110,33 @@ class DataError(Exception):
             "status": "error",
             "message": self.error_message
         }
+
+
+class PortfolioOutOfSyncError(OperationalException):
+    """
+    Raised when the local portfolio state diverges from the broker's reported
+    state in a way the framework refuses to silently reconcile (typically a
+    negative delta — the broker reports *less* than the framework expected).
+
+    Attributes:
+        market: Market identifier the mismatch was detected on.
+        local_unallocated: The framework's current unallocated balance.
+        broker_available: The amount the broker reports as available.
+        delta: ``broker_available - local_unallocated`` (negative on
+            shortfall, positive on unexpected deposit when withdrawals
+            were not allowed).
+    """
+
+    def __init__(
+        self,
+        message: str,
+        market: str = None,
+        local_unallocated: float = None,
+        broker_available: float = None,
+        delta: float = None,
+    ) -> None:
+        super().__init__(message)
+        self.market = market
+        self.local_unallocated = local_unallocated
+        self.broker_available = broker_available
+        self.delta = delta

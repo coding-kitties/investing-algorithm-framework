@@ -16,13 +16,15 @@ from .data_provider import DataProvider
 from .data_structures import PeekableQueue
 from .decimal_parsing import parse_decimal_to_string, parse_string_to_decimal
 from .exceptions import OperationalException, ApiException, DataError, \
-    PermissionDeniedApiException, ImproperlyConfigured, NetworkError
+    PermissionDeniedApiException, ImproperlyConfigured, NetworkError, \
+    PortfolioOutOfSyncError
 from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TimeUnit, TimeFrame, PortfolioConfiguration, Portfolio, Position, \
     Order, TradeStatus, StrategyProfile, Trade, MarketCredential, \
     AppMode, DataType, DataSource, PortfolioSnapshot, PositionSnapshot, \
     TradeTakeProfit, TradeStopLoss, Event, SnapshotInterval, \
-    TakeProfitRule, StopLossRule, PositionSize, ScalingRule, TradingCost
+    TakeProfitRule, StopLossRule, PositionSize, ScalingRule, TradingCost, \
+    SyncResult, ScheduledDeposit
 from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
 from .blotter import Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
@@ -168,6 +170,9 @@ __all__ = [
     "BacktestEvaluationFocus",
     'combine_backtests',
     'PositionSize',
+    "SyncResult",
+    "ScheduledDeposit",
+    "PortfolioOutOfSyncError",
     'generate_backtest_summary_metrics',
     'DataError',
     'TakeProfitRule',

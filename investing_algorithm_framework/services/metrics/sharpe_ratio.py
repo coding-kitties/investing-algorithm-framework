@@ -106,11 +106,10 @@ def get_rolling_sharpe_ratio(
     df = df.sort_values('created_at').drop_duplicates('created_at')\
         .set_index('created_at')
 
-    # Resample to daily frequency using last value of the day
-    daily_df = df.resample('1D').last().dropna()
-
-    # Returns as percentage change
-    returns_s = daily_df['total_value'].pct_change().dropna()
+    # TWR-adjusted daily returns so external deposits/withdrawals do not
+    # contaminate the rolling Sharpe.
+    from ._returns_helper import daily_twr_returns
+    returns_s = daily_twr_returns(snapshots)
 
     # Rolling Annualised Sharpe
     rolling = returns_s.rolling(window=365, min_periods=30)

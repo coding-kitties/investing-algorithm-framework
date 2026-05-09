@@ -2242,6 +2242,9 @@ class App:
         initial_balance=None,
         fee_percentage=0.0,
         slippage_percentage=0.0,
+        deposit_schedule=None,
+        auto_sync=False,
+        auto_sync_error_mode="raise",
     ):
         """
         Function to add a market to the app. This function is a utility
@@ -2260,10 +2263,28 @@ class App:
             slippage_percentage: Default slippage percentage for all
                 trades on this market (e.g. 0.05 for 0.05%). Can be
                 overridden per-symbol via TradingCost on the strategy.
+            deposit_schedule: Optional list of
+                :class:`ScheduledDeposit` describing simulated external
+                cash flows landing on this market during a backtest
+                (e.g. monthly paychecks). Ignored in live mode — for
+                live deployments the broker is the source of truth and
+                ``Context.sync_portfolio()`` queries it directly.
+            auto_sync: When ``True``, the framework automatically calls
+                ``Context.sync_portfolio(market=market)`` before every
+                strategy iteration so deposits/withdrawals are absorbed
+                without strategy code having to opt in. Defaults to
+                ``False`` (explicit opt-in via ``context.sync_portfolio()``).
+            auto_sync_error_mode: How auto-sync handles failures. One of
+                ``"raise"`` (loud, default — best for development),
+                ``"warn"`` (log and continue with stale state — best for
+                live trading where transient broker glitches should not
+                crash the bot), or ``"halt"`` (log, disable auto-sync
+                for this market, and continue).
 
         Returns:
             None
         """
+        deposit_schedule = self._normalize_deposit_schedule(deposit_schedule)
 
         portfolio_configuration = PortfolioConfiguration(
             market=market,
@@ -2271,6 +2292,7 @@ class App:
             initial_balance=initial_balance,
             fee_percentage=fee_percentage,
             slippage_percentage=slippage_percentage,
+            deposit_schedule=deposit_schedule,
         )
 
         self.add_portfolio_configuration(portfolio_configuration)
@@ -2280,6 +2302,78 @@ class App:
             secret_key=secret_key
         )
         self.add_market_credential(market_credential)
+
+        tracker = self.container.broker_balance_tracker()
+        if deposit_schedule:
+            tracker.set_schedule(market, deposit_schedule)
+        if auto_sync:
+            tracker.set_auto_sync(market, True)
+        tracker.set_auto_sync_error_mode(market, auto_sync_error_mode)
+
+    @staticmethod
+    def _normalize_deposit_schedule(deposit_schedule):
+        """Coerce a deposit_schedule argument to a validated list.
+
+        Accepts ``None`` (treated as no schedule), a list/tuple of
+        :class:`ScheduledDeposit`, or rejects anything else with a clear
+        error. Notably rejects passing a single ``ScheduledDeposit``
+        directly (which would be iterable over its dataclass fields and
+        produce nonsense).
+        """
+        from investing_algorithm_framework.domain import ScheduledDeposit
+        if deposit_schedule is None:
+            return []
+        if isinstance(deposit_schedule, ScheduledDeposit):
+            raise OperationalException(
+                "deposit_schedule must be a list of ScheduledDeposit, not a "
+                "single ScheduledDeposit. Wrap it: [ScheduledDeposit(...)]."
+            )
+        if not isinstance(deposit_schedule, (list, tuple)):
+            raise OperationalException(
+                "deposit_schedule must be a list of ScheduledDeposit, got "
+                f"{type(deposit_schedule).__name__}."
+            )
+        for entry in deposit_schedule:
+            if not isinstance(entry, ScheduledDeposit):
+                raise OperationalException(
+                    "deposit_schedule entries must be ScheduledDeposit, "
+                    f"got {type(entry).__name__}."
+                )
+        return list(deposit_schedule)
+
+    def add_deposit_schedule(self, market, schedule):
+        """Register simulated external deposits for a backtested market.
+
+        Equivalent to passing ``deposit_schedule=`` to :meth:`add_market`,
+        but usable after the market has already been registered. Replaces
+        any previously registered schedule for this market.
+
+        Args:
+            market: Market identifier.
+            schedule: Iterable of :class:`ScheduledDeposit`.
+
+        Returns:
+            None
+        """
+        self.container.broker_balance_tracker().set_schedule(
+            market, self._normalize_deposit_schedule(schedule)
+        )
+
+    def set_market_auto_sync(self, market, enabled=True):
+        """Toggle automatic ``sync_portfolio`` before each strategy iteration.
+
+        Args:
+            market: Market identifier.
+            enabled: When ``True`` (the default), the framework calls
+                ``Context.sync_portfolio(market=market)`` immediately before
+                each strategy ``run_strategy`` invocation.
+
+        Returns:
+            None
+        """
+        self.container.broker_balance_tracker().set_auto_sync(
+            market, enabled
+        )
 
     def set_blotter(self, blotter):
         """

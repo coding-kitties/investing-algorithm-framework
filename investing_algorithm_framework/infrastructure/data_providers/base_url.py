@@ -25,6 +25,27 @@ INTERVAL_SECONDS = {
 }
 
 
+def url_cache_key(url, headers=None):
+    """Canonical cache key for a (url, headers) pair.
+
+    Used in two places:
+
+    * the in-memory provider dict on :class:`Context` (so two strategies
+      hitting the same URL with different credentials don't collide), and
+    * the on-disk cache filename hash inside
+      :class:`BaseURLDataProvider._get_cache_path` (same reason).
+
+    Both call sites must agree on the exact serialization, otherwise an
+    in-memory hit could read the wrong on-disk file. Centralizing it
+    here prevents that drift.
+    """
+    if not headers:
+        return url
+
+    serialized = "&".join(f"{k}={v}" for k, v in sorted(headers.items()))
+    return f"{url}|headers:{serialized}"
+
+
 class BaseURLDataProvider(DataProvider):
     """
     Abstract base class for data providers that fetch data from a
@@ -357,9 +378,7 @@ class BaseURLDataProvider(DataProvider):
         if storage_dir is None:
             storage_dir = os.path.join(os.getcwd(), ".data_cache")
 
-        cache_key = self._url
-        if self._headers:
-            cache_key = f"{cache_key}|headers:{sorted(self._headers.items())}"
+        cache_key = url_cache_key(self._url, self._headers)
 
         url_hash = hashlib.md5(
             cache_key.encode()

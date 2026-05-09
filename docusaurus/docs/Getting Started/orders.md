@@ -96,40 +96,75 @@ algorithm.create_sell_order(
 
 ### Stop Orders
 
-Trigger market orders when price reaches a specified level:
+A **stop order** rests in the book until the market trades through a configured `stop_price`. Once triggered, it becomes a market order and fills at the next available price.
+
+- **SELL stop** triggers when the market drops to (or below) `stop_price` — used for stop-losses or trend-following exits.
+- **BUY stop** triggers when the market rises to (or above) `stop_price` — used for breakout entries.
 
 ```python
-# Stop loss - sell if price drops to 45,000
-algorithm.create_sell_order(
+from investing_algorithm_framework import OrderType, OrderSide
+
+# SELL stop — exit if BTC drops to 45,000 EUR
+self.create_order(
     target_symbol="BTC",
-    percentage=1.0,
-    order_type="STOP",
-    stop_price=45000
+    order_side=OrderSide.SELL,
+    amount=0.5,
+    order_type=OrderType.STOP,
+    stop_price=45000,
 )
 
-# Buy stop - buy if price rises to 52,000 (breakout strategy)
-algorithm.create_buy_order(
+# BUY stop — enter on a breakout above 52,000 EUR
+self.create_order(
     target_symbol="BTC",
-    amount=100,
-    order_type="STOP",
-    stop_price=52000
+    order_side=OrderSide.BUY,
+    amount=0.1,
+    order_type=OrderType.STOP,
+    stop_price=52000,
+    price=52000,  # used as the cash-reservation reference
 )
 ```
 
 ### Stop-Limit Orders
 
-Combine stop and limit order features:
+A **stop-limit order** triggers like a stop, but instead of becoming a market order, it becomes a **limit order** at the configured `price`. This protects against bad fills during gaps but does not guarantee execution.
 
 ```python
-# Stop-limit sell order
-algorithm.create_sell_order(
+# SELL stop-limit — trigger at 45,000, but only sell at 44,500 or better
+self.create_order(
     target_symbol="BTC",
-    percentage=1.0,
-    order_type="STOP_LIMIT",
-    stop_price=45000,  # Trigger when price hits 45,000
-    price=44500        # But only sell at 44,500 or better
+    order_side=OrderSide.SELL,
+    amount=0.5,
+    order_type=OrderType.STOP_LIMIT,
+    stop_price=45000,   # trigger price
+    price=44500,        # limit price after trigger
 )
 ```
+
+**Validation rules**
+
+- `stop_price` is required for both `STOP` and `STOP_LIMIT` orders.
+- For `STOP_LIMIT`, `price` is also required and must be:
+  - `price <= stop_price` for SELL stop-limit orders
+  - `price >= stop_price` for BUY stop-limit orders
+
+:::note Where stop orders are evaluated
+Stop and stop-limit orders are simulated in **event-driven backtests** and executed by supported exchanges in **live trading** (via the unified CCXT `stopPrice` parameter).
+
+They are **not** evaluated in **vector backtests**. Vector backtesting models strategy *signals* only — it does not simulate the order book, intra-bar price paths, or stop triggers. Use vector backtests to filter parameter sets quickly, then promote promising strategies to event-driven backtests where stops, slippage, commissions, and partial fills are evaluated. See [Vector Backtesting](../Advanced%20Concepts/vector-backtesting) for the trade-offs.
+:::
+
+#### Backtest Trigger Semantics
+
+In an event-driven backtest, the trigger condition is evaluated against each candle's High / Low after the order's `updated_at`:
+
+| Order side | Triggers when |
+|------------|---------------|
+| SELL STOP / STOP_LIMIT | `Low <= stop_price` |
+| BUY STOP / STOP_LIMIT | `High >= stop_price` |
+
+- A **STOP** that triggers fills at `stop_price` on the triggering candle (then slippage and commission from the configured blotter / `TradingCost` are applied via the same fill path used for market orders).
+- A **STOP_LIMIT** that triggers becomes a resting limit order at `price` from the triggering candle onwards, and fills under the normal limit-fill rules (`Low <= price` for BUY, `High >= price` for SELL).
+- The triggering timestamp is stored on the order as `triggered_at` for auditability.
 
 ## Order Parameters
 

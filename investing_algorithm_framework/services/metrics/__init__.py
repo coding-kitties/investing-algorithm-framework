@@ -1,16 +1,18 @@
 from .volatility import get_annual_volatility
 from .sortino_ratio import get_sortino_ratio
 from .drawdown import get_drawdown_series, get_max_drawdown
-from .equity_curve import get_equity_curve
+from .equity_curve import get_equity_curve, get_twr_equity_curve
 from .price_efficiency import get_price_efficiency_ratio
 from .profit_factor import get_profit_factor, \
     get_cumulative_profit_factor_series, get_rolling_profit_factor_series
 from .sharpe_ratio import get_sharpe_ratio, get_rolling_sharpe_ratio
 from .price_efficiency import get_price_efficiency_ratio
-from .equity_curve import get_equity_curve
+from .equity_curve import get_equity_curve, get_twr_equity_curve
 from .drawdown import get_drawdown_series, get_max_drawdown, \
     get_max_drawdown_absolute, get_max_drawdown_duration, \
-    get_max_daily_drawdown
+    get_max_daily_drawdown, \
+    get_twr_drawdown_series, get_twr_max_drawdown, \
+    get_twr_max_drawdown_duration
 from .cagr import get_cagr
 from .standard_deviation import get_standard_deviation_downside_returns, \
     get_standard_deviation_returns

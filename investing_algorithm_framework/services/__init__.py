@@ -7,7 +7,8 @@ from .order_service import OrderService, OrderBacktestService, \
     OrderExecutorLookup
 from .portfolios import PortfolioService, BacktestPortfolioService, \
     PortfolioConfigurationService, PortfolioSyncService, \
-    PortfolioSnapshotService, PortfolioProviderLookup
+    PortfolioSnapshotService, PortfolioProviderLookup, \
+    BrokerBalanceTracker
 from .positions import PositionService, PositionSnapshotService
 from .repository_service import RepositoryService
 from .trade_service import TradeService, TradeStopLossService, \
@@ -62,6 +63,7 @@ __all__ = [
     "OrderExecutorLookup",
     "BacktestTradeOrderEvaluator",
     "PortfolioProviderLookup",
+    "BrokerBalanceTracker",
     "TradeOrderEvaluator",
     "DefaultTradeOrderEvaluator",
     "get_risk_free_rate_us",

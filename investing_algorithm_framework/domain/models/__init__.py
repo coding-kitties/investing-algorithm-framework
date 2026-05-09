@@ -1,7 +1,8 @@
 from .app_mode import AppMode
 from .market import MarketCredential
 from .order import OrderStatus, OrderSide, OrderType, Order
-from .portfolio import PortfolioConfiguration, Portfolio, PortfolioSnapshot
+from .portfolio import PortfolioConfiguration, Portfolio, PortfolioSnapshot, \
+    SyncResult, ScheduledDeposit
 from .position import Position, PositionSnapshot, PositionSize
 from .strategy_profile import StrategyProfile
 from .time_frame import TimeFrame
@@ -45,4 +46,6 @@ __all__ = [
     "StopLossRule",
     "TakeProfitRule",
     "TradingCost",
+    "SyncResult",
+    "ScheduledDeposit",
 ]

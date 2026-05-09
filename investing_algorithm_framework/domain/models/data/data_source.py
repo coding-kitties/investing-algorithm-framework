@@ -152,6 +152,9 @@ class DataSource:
                 (e.g., "1d", "1h"). If None, data is fetched once and
                 cached indefinitely.
             headers: Optional HTTP headers to send with the request.
+                Values are redacted ("***") in ``to_dict()``
+                so secrets do not leak into diagnostic
+                payloads.
             pre_process: Optional callback to transform the raw CSV
                 text before parsing. Receives a string, must return
                 a string.
@@ -215,6 +218,9 @@ class DataSource:
             refresh_interval: How often to re-fetch the data
                 (e.g., "1d", "1h").
             headers: Optional HTTP headers to send with the request.
+                Values are redacted ("***") in ``to_dict()``
+                so secrets do not leak into diagnostic
+                payloads.
             pre_process: Optional callback to transform the raw JSON
                 text before parsing. Receives a string, must return
                 a string.
@@ -271,6 +277,9 @@ class DataSource:
             refresh_interval: How often to re-fetch the data
                 (e.g., "1d", "1h").
             headers: Optional HTTP headers to send with the request.
+                Values are redacted ("***") in ``to_dict()``
+                so secrets do not leak into diagnostic
+                payloads.
             post_process: Optional callback to transform the parsed
                 DataFrame.
 

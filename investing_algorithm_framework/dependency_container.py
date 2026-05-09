@@ -12,7 +12,8 @@ from investing_algorithm_framework.services import OrderService, \
     ConfigurationService, PortfolioSnapshotService, \
     PositionSnapshotService, MarketCredentialService, TradeService, \
     PortfolioSyncService, OrderExecutorLookup, PortfolioProviderLookup, \
-    DataProviderService, TradeTakeProfitService, TradeStopLossService
+    DataProviderService, TradeTakeProfitService, TradeStopLossService, \
+    BrokerBalanceTracker
 
 
 def setup_dependency_container(app, modules=None, packages=None):
@@ -44,6 +45,9 @@ class DependencyContainer(containers.DeclarativeContainer):
     position_repository = providers.Factory(SQLPositionRepository)
     portfolio_provider_lookup = providers.ThreadSafeSingleton(
         PortfolioProviderLookup,
+    )
+    broker_balance_tracker = providers.ThreadSafeSingleton(
+        BrokerBalanceTracker,
     )
     portfolio_repository = providers.Factory(SQLPortfolioRepository)
     position_snapshot_repository = providers.Factory(
@@ -161,6 +165,8 @@ class DependencyContainer(containers.DeclarativeContainer):
         data_provider_service=data_provider_service,
         trade_stop_loss_service=trade_stop_loss_service,
         trade_take_profit_service=trade_take_profit_service,
+        portfolio_provider_lookup=portfolio_provider_lookup,
+        broker_balance_tracker=broker_balance_tracker,
     )
     algorithm_factory = providers.Factory(
         AlgorithmFactory,

@@ -1,6 +1,28 @@
 import numpy as np
 import pandas as pd
 
+from ._returns_helper import daily_twr_returns
+
+
+def _twr_period_returns(snapshots) -> pd.Series:
+    """Per-snapshot TWR returns (subtracting per-snapshot cash_flow).
+
+    Used by metrics that operate on the raw snapshot series rather than
+    a daily resample.
+    """
+    data = [
+        (s.created_at, s.total_value, getattr(s, "cash_flow", 0) or 0)
+        for s in snapshots
+    ]
+    df = pd.DataFrame(
+        data, columns=["created_at", "total_value", "cash_flow"]
+    )
+    df['created_at'] = pd.to_datetime(df['created_at'])
+    df = df.sort_values('created_at').drop_duplicates('created_at')\
+        .set_index('created_at')
+    prev_v = df['total_value'].shift(1)
+    return ((df['total_value'] - df['cash_flow']) / prev_v - 1).dropna()
+
 
 def get_standard_deviation_downside_returns(snapshots):
     """
@@ -17,21 +39,13 @@ def get_standard_deviation_downside_returns(snapshots):
     if len(snapshots) < 2:
         return 0.0  # Not enough data
 
-    # Create DataFrame of net_size over time
-    data = [(s.total_value, s.created_at) for s in snapshots]
-    df = pd.DataFrame(data, columns=["total_value", "created_at"])
-    df['created_at'] = pd.to_datetime(df['created_at'])
-    df = df.sort_values('created_at').drop_duplicates('created_at').copy()
+    df_returns = _twr_period_returns(snapshots)
 
-    # Compute percentage returns
-    df['return'] = df['total_value'].pct_change()
-    df = df.dropna()
-
-    if df.empty:
+    if df_returns.empty:
         return 0.0
 
     # Filter downside returns
-    downside_returns = df['return'][df['return'] < 0]
+    downside_returns = df_returns[df_returns < 0]
 
     if downside_returns.empty:
         return 0.0
@@ -64,21 +78,7 @@ def get_standard_deviation_returns(snapshots):
     if len(snapshots) < 2:
         return 0.0  # Not enough data
 
-    # Create DataFrame of net_size over time
-    data = [(s.total_value, s.created_at) for s in snapshots]
-    df = pd.DataFrame(data, columns=["total_value", "created_at"])
-    df['created_at'] = pd.to_datetime(df['created_at'])
-    df = df.sort_values('created_at').drop_duplicates('created_at').copy()
-
-    # Compute percentage returns
-    df['return'] = df['total_value'].pct_change()
-    df = df.dropna()
-
-    if df.empty:
-        return 0.0
-
-    # Filter downside returns
-    df_returns = df['return']
+    df_returns = _twr_period_returns(snapshots)
 
     if df_returns.empty:
         return 0.0
@@ -108,25 +108,12 @@ def get_daily_returns_std(snapshots):
     if len(snapshots) < 2:
         return 0.0  # Not enough data
 
-    # Create DataFrame from snapshots
-    data = [(s.created_at, s.total_value) for s in snapshots]
-    df = pd.DataFrame(data, columns=["created_at", "total_value"])
-    df["created_at"] = pd.to_datetime(df["created_at"])
-    df = df.drop_duplicates("created_at").set_index("created_at")
-    df = df.sort_index()
-    # Resample to daily frequency (end of day)
-    daily_df = df.resample("D").last().ffill().dropna()
+    returns = daily_twr_returns(snapshots)
 
-    # Calculate daily returns
-    daily_df["return"] = daily_df["total_value"].pct_change().dropna()
-
-    if daily_df["return"].empty:
+    if returns.empty or len(returns) < 2:
         return 0.0
 
-    if len(daily_df["return"].dropna()) < 2:
-        return 0.0
-
-    return daily_df["return"].std()
+    return returns.std()
 
 
 def get_downside_std_of_daily_returns(snapshots):
@@ -143,21 +130,10 @@ def get_downside_std_of_daily_returns(snapshots):
     if len(snapshots) < 2:
         return 0.0  # Not enough data
 
-    # Create DataFrame from snapshots
-    data = [(s.created_at, s.total_value) for s in snapshots]
-    df = pd.DataFrame(data, columns=["created_at", "total_value"])
-    df["created_at"] = pd.to_datetime(df["created_at"])
-    df = df.drop_duplicates("created_at").set_index("created_at")
-    df = df.sort_index()
-
-    # Resample to daily frequency (end of day)
-    daily_df = df.resample("D").last().dropna()
-
-    # Calculate daily returns
-    daily_df["return"] = daily_df["total_value"].pct_change().dropna()
+    returns = daily_twr_returns(snapshots)
 
     # Filter only negative returns for downside deviation
-    negative_returns = daily_df["return"][daily_df["return"] < 0]
+    negative_returns = returns[returns < 0]
 
     if negative_returns.empty:
         return 0.0
