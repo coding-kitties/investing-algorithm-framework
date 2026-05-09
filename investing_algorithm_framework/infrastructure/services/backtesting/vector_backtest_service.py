@@ -257,6 +257,20 @@ class VectorBacktestService:
         total_allocated = 0.0  # Track total allocated in static mode
         open_trades_value = {}  # Track value of open trades per symbol
 
+        # Pre-compute scheduled external deposits (e.g. monthly paychecks)
+        # for the backtest window. Vector backtests are single-pass and
+        # have no Context, so we eagerly resolve the full schedule into a
+        # sorted (timestamp, amount) list and credit ``current_unallocated``
+        # the first bar at-or-after each timestamp. Net effect for the
+        # strategy: the simulated broker balance grows on cadence, and the
+        # equity curve / metrics include the external cash flows just like
+        # the event backtest does after a sync_portfolio call.
+        deposit_events = self._resolve_deposit_schedule(
+            portfolio_configuration=portfolio_configuration,
+            backtest_date_range=backtest_date_range,
+        )
+        deposit_event_idx = 0
+
         def _close_trade(sym, sym_data, price, date):
             """Helper to close an open trade for a symbol."""
             nonlocal current_unallocated, total_realized_gains, \
@@ -537,6 +551,17 @@ class VectorBacktestService:
             if current_date.tzinfo is None:
                 current_date = current_date.replace(tzinfo=timezone.utc)
 
+            # Apply any scheduled external deposits whose timestamp has
+            # been reached by ``current_date``. Each event fires exactly
+            # once at the first bar at-or-after its scheduled time.
+            while (
+                deposit_event_idx < len(deposit_events)
+                and deposit_events[deposit_event_idx][0] <= current_date
+            ):
+                _, deposit_amount = deposit_events[deposit_event_idx]
+                current_unallocated += deposit_amount
+                deposit_event_idx += 1
+
             # Process each symbol at this timestamp
             for symbol, data in symbol_data.items():
                 current_price = float(data['close'].iloc[i])
@@ -728,12 +753,30 @@ class VectorBacktestService:
         unallocated = initial_amount
         total_net_gain = 0.0
         open_trades = []
+        # Replay deposit events for snapshot bookkeeping. Each snapshot
+        # gets ``cash_flow`` set to whatever external cash landed between
+        # the previous snapshot and this one — this is what enables
+        # TWR-aware return metrics (CAGR, monthly/yearly returns) to
+        # subtract external deposits before computing returns.
+        deposit_replay_idx = 0
 
         # Create portfolio snapshots
         for ts in index:
             allocated = 0
             interval_datetime = pd.Timestamp(ts).to_pydatetime()
             interval_datetime = interval_datetime.replace(tzinfo=timezone.utc)
+
+            # Apply any deposits that fired between the previous snapshot
+            # and this one, accumulating them into snapshot_cash_flow.
+            snapshot_cash_flow = 0.0
+            while (
+                deposit_replay_idx < len(deposit_events)
+                and deposit_events[deposit_replay_idx][0] <= interval_datetime
+            ):
+                _, deposit_amount = deposit_events[deposit_replay_idx]
+                unallocated += deposit_amount
+                snapshot_cash_flow += deposit_amount
+                deposit_replay_idx += 1
 
             for trade in trades:
 
@@ -761,14 +804,15 @@ class VectorBacktestService:
                 allocated += open_trade.filled_amount * price
 
             # total_value = invested_value + unallocated
-            # total_net_gain = total_value - initial_amount
+            # total_net_gain = total_value - initial_amount - sum(cash_flow)
             snapshots.append(
                 PortfolioSnapshot(
                     portfolio_id=portfolio.identifier,
                     created_at=interval_datetime,
                     unallocated=unallocated,
                     total_value=unallocated + allocated,
-                    total_net_gain=total_net_gain
+                    total_net_gain=total_net_gain,
+                    cash_flow=snapshot_cash_flow,
                 )
             )
 
@@ -829,6 +873,34 @@ class VectorBacktestService:
             run, risk_free_rate=risk_free_rate
         )
         return run
+
+    @staticmethod
+    def _resolve_deposit_schedule(
+        portfolio_configuration,
+        backtest_date_range,
+    ):
+        """Materialise a portfolio's deposit schedule for the backtest window.
+
+        Returns a chronologically sorted list of ``(timestamp, amount)``
+        tuples. Empty when the configuration has no schedule.
+        """
+        schedule = list(
+            getattr(portfolio_configuration, "deposit_schedule", []) or []
+        )
+        if not schedule:
+            return []
+        # Local import to avoid a circular import between domain and
+        # infrastructure layers.
+        from investing_algorithm_framework.services.portfolios \
+            .broker_balance_tracker import BrokerBalanceTracker
+        tracker = BrokerBalanceTracker()
+        market = portfolio_configuration.market
+        tracker.set_schedule(market, schedule)
+        return tracker.project_total(
+            market=market,
+            start=backtest_date_range.start_date,
+            end=backtest_date_range.end_date,
+        )
 
     @staticmethod
     def _convert_recorded_values(raw_recorded):

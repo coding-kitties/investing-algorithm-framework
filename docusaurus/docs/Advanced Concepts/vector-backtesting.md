@@ -40,6 +40,20 @@ Use vector backtesting when:
 - Needing to complete backtests quickly
 - Working with large strategy sets (100+ strategies)
 
+:::warning Order types not modelled in vector backtests
+Vector backtesting evaluates strategy **signals** (`generate_buy_signals`, `generate_sell_signals`) against the price series. It does **not** simulate the order book, intra-bar price paths, partial fills, or order-type semantics.
+
+This means the following are **only evaluated in event-driven backtests** and live trading:
+
+- `OrderType.MARKET` slippage and next-bar fill behaviour
+- `OrderType.LIMIT` resting fill logic
+- `OrderType.STOP` and `OrderType.STOP_LIMIT` trigger logic
+- Take-profit / stop-loss rules attached to trades
+- Blotter slippage / commission / volume-based fill models
+
+The recommended workflow is to use vector backtests to **screen parameter combinations quickly** based on signal quality, then promote the survivors to **event-driven backtests** where realistic execution is simulated. See [Orders](../Getting%20Started/orders) for the full order-type reference.
+:::
+
 ## Basic Usage
 
 ### Single Strategy, Single Date Range

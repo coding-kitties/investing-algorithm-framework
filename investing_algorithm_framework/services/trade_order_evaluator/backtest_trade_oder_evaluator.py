@@ -132,7 +132,64 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
             )
             return
 
-        # Limit orders: check if OHLCV data triggers a fill
+        # Stop / Stop-Limit orders: first check whether the trigger
+        # condition is met. Once triggered, a STOP becomes a market
+        # order (fill at trigger price) and a STOP_LIMIT becomes a
+        # limit order at the configured limit price.
+        is_stop = OrderType.STOP.equals(order.order_type)
+        is_stop_limit = OrderType.STOP_LIMIT.equals(order.order_type)
+
+        if (is_stop or is_stop_limit) and not order.is_triggered():
+            stop_price = order.get_stop_price()
+
+            if stop_price is None:
+                return
+
+            # SELL stop triggers when price drops to or below stop_price;
+            # BUY stop triggers when price rises to or above stop_price.
+            if OrderSide.SELL.equals(order_side):
+                trigger_candles = ohlcv_data_after_order.filter(
+                    pl.col('Low') <= stop_price
+                )
+            elif OrderSide.BUY.equals(order_side):
+                trigger_candles = ohlcv_data_after_order.filter(
+                    pl.col('High') >= stop_price
+                )
+            else:
+                return
+
+            if trigger_candles.is_empty():
+                return
+
+            triggered_candle = trigger_candles.head(1)
+            order.set_triggered_at(triggered_candle["Datetime"][0])
+
+            if is_stop:
+                # STOP becomes a market order — fill at the stop price
+                # using the triggering candle's volume.
+                volume = (
+                    triggered_candle["Volume"][0]
+                    if "Volume" in triggered_candle.columns
+                    else None
+                )
+                self._apply_fill(
+                    order, stop_price, order_side, volume,
+                    is_market_order=True
+                )
+                return
+
+            # STOP_LIMIT: continue and fall through to limit-fill logic
+            # using the configured limit price (`order.price`). Restrict
+            # the fill search to candles at or after the trigger.
+            ohlcv_data_after_order = ohlcv_data_after_order.filter(
+                pl.col('Datetime') >= order.get_triggered_at()
+            )
+
+            if ohlcv_data_after_order.is_empty():
+                return
+
+        # Limit orders (including triggered STOP_LIMIT):
+        # check if OHLCV data triggers a fill
         if OrderSide.BUY.equals(order_side):
             fill_candles = ohlcv_data_after_order.filter(
                 pl.col('Low') <= order_price
@@ -232,6 +289,11 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
                 'remaining': new_remaining,
                 'order_fee': accumulated_fee,
             }
+
+        # Persist trigger timestamp for stop / stop-limit orders so
+        # subsequent evaluations don't re-trigger.
+        if order.is_triggered():
+            update_data['triggered_at'] = order.get_triggered_at()
 
         # Market order portfolio reconciliation
         if is_market_order and new_remaining <= 0:
