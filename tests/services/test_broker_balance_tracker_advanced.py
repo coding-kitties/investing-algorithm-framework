@@ -6,8 +6,6 @@ case-insensitive market normalization, error-mode storage, and
 from datetime import datetime, timezone
 from unittest import TestCase
 
-import pytest
-
 from investing_algorithm_framework import ScheduledDeposit, TimeUnit
 from investing_algorithm_framework.domain.exceptions import (
     OperationalException,
@@ -64,7 +62,7 @@ class TestErrorModeStorage(TestCase):
 
     def test_invalid_mode_rejected(self):
         tracker = BrokerBalanceTracker()
-        with pytest.raises((ValueError, OperationalException)):
+        with self.assertRaises((ValueError, OperationalException)):
             tracker.set_auto_sync_error_mode("binance", "bogus")
 
 
@@ -85,7 +83,7 @@ class TestMarketNormalization(TestCase):
 
     def test_none_market_raises(self):
         tracker = BrokerBalanceTracker()
-        with pytest.raises((ValueError, OperationalException)):
+        with self.assertRaises((ValueError, OperationalException)):
             tracker.set_schedule(None, [])
 
 
@@ -147,7 +145,7 @@ class TestFireOnAnchor(TestCase):
         self.assertEqual(50.0, tracker.peek_pending("binance"))
 
     def test_fire_on_anchor_rejected_for_one_shot(self):
-        with pytest.raises(ValueError):
+        with self.assertRaises(ValueError):
             ScheduledDeposit(
                 amount=50.0, on=_utc(2024, 1, 1), fire_on_anchor=True
             )
