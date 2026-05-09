@@ -1,4 +1,5 @@
 from .backtest_portfolio_service import BacktestPortfolioService
+from .broker_balance_tracker import BrokerBalanceTracker
 from .portfolio_configuration_service import PortfolioConfigurationService
 from .portfolio_service import PortfolioService
 from .portfolio_snapshot_service import PortfolioSnapshotService
@@ -12,5 +13,6 @@ __all__ = [
     "PortfolioService",
     "PortfolioSnapshotService",
     "BacktestPortfolioService",
-    "PortfolioProviderLookup"
+    "PortfolioProviderLookup",
+    "BrokerBalanceTracker",
 ]

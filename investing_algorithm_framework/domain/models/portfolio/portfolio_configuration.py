@@ -33,6 +33,7 @@ class PortfolioConfiguration(BaseModel):
         initial_balance=None,
         fee_percentage=0.0,
         slippage_percentage=0.0,
+        deposit_schedule=None,
     ):
         self._market = market
 
@@ -45,6 +46,7 @@ class PortfolioConfiguration(BaseModel):
         self._initial_balance = initial_balance
         self._fee_percentage = fee_percentage or 0.0
         self._slippage_percentage = slippage_percentage or 0.0
+        self._deposit_schedule = list(deposit_schedule or [])
 
         if self.identifier is None:
             self._identifier = market.upper()
@@ -90,6 +92,10 @@ class PortfolioConfiguration(BaseModel):
     @property
     def slippage_percentage(self):
         return self._slippage_percentage
+
+    @property
+    def deposit_schedule(self):
+        return list(self._deposit_schedule)
 
     @property
     def has_initial_balance(self):

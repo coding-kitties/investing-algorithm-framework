@@ -5,12 +5,15 @@ from typing import List
 from investing_algorithm_framework.services import ConfigurationService, \
     MarketCredentialService, OrderService, PortfolioConfigurationService, \
     PortfolioService, PositionService, TradeService, DataProviderService, \
-    TradeStopLossService, TradeTakeProfitService
+    TradeStopLossService, TradeTakeProfitService, BrokerBalanceTracker
+from investing_algorithm_framework.services.portfolios.portfolio_provider_lookup \
+    import PortfolioProviderLookup
 from investing_algorithm_framework.domain import OrderStatus, OrderType, \
     OrderSide, OperationalException, Portfolio, RoundingService, \
     BACKTESTING_FLAG, INDEX_DATETIME, Order, \
     Position, Trade, TradeStatus, MarketCredential, TradeStopLoss, \
-    TradeTakeProfit
+    TradeTakeProfit, SyncResult, PortfolioOutOfSyncError, Environment, \
+    ENVIRONMENT
 
 logger = logging.getLogger("investing_algorithm_framework")
 
@@ -33,7 +36,9 @@ class Context:
         trade_service: TradeService,
         trade_stop_loss_service: TradeStopLossService,
         trade_take_profit_service: TradeTakeProfitService,
-        data_provider_service: DataProviderService
+        data_provider_service: DataProviderService,
+        portfolio_provider_lookup: PortfolioProviderLookup = None,
+        broker_balance_tracker: BrokerBalanceTracker = None,
     ):
         self.configuration_service: ConfigurationService = \
             configuration_service
@@ -50,6 +55,10 @@ class Context:
             trade_stop_loss_service
         self.trade_take_profit_service: TradeTakeProfitService = \
             trade_take_profit_service
+        self.portfolio_provider_lookup: PortfolioProviderLookup = \
+            portfolio_provider_lookup
+        self.broker_balance_tracker: BrokerBalanceTracker = \
+            broker_balance_tracker
         self._blotter = None
         self._fx_rate_provider = None
         self._base_currency = None
@@ -134,7 +143,8 @@ class Context:
         execute=True,
         validate=True,
         sync=True,
-        validate_symbol=False
+        validate_symbol=False,
+        stop_price=None,
     ) -> Order:
         """
         Function to create an order. This function will create an order
@@ -154,6 +164,8 @@ class Context:
             with the portfolio of the algorithm.
             validate_symbol: Default False. If set to True,
               validates that target_symbol is not the trading_symbol.
+            stop_price: Required for STOP and STOP_LIMIT order types.
+              The trigger price at which the order activates.
 
         Returns:
             The order created
@@ -172,6 +184,9 @@ class Context:
             "status": OrderStatus.CREATED.value,
             "trading_symbol": portfolio.trading_symbol,
         }
+
+        if stop_price is not None:
+            order_data["stop_price"] = stop_price
 
         if BACKTESTING_FLAG in self.configuration_service.config \
                 and self.configuration_service.config[BACKTESTING_FLAG]:
@@ -883,6 +898,278 @@ class Context:
         return self.position_service.find(
             {"portfolio": portfolio.id, "symbol": trading_symbol}
         ).get_amount()
+
+    def sync_portfolio(
+        self,
+        market: str = None,
+        allow_withdrawals: bool = False,
+        tolerance: float = 1e-9,
+    ) -> SyncResult:
+        """Reconcile the local portfolio's unallocated balance with the broker.
+
+        This is the **canonical entry point** for "make my strategy aware of
+        cash that arrived (or left) my account out-of-band". The contract is
+        identical across live and backtest modes:
+
+        1. Ask the broker (live: registered :class:`PortfolioProvider`;
+           backtest: simulated :class:`BrokerBalanceTracker`) what the
+           trading-symbol balance currently is.
+        2. In live mode, subtract cash reserved for orders the framework
+           knows about but the exchange has not yet acknowledged
+           (``OrderStatus.CREATED``). Without this, the natural race
+           between local order creation and exchange acknowledgement
+           would surface as a phantom "deposit".
+        3. Compute ``delta = adjusted_broker_available - local_unallocated``.
+        4. ``abs(delta) <= tolerance`` → no-op.
+        5. ``delta > 0`` → an external deposit landed; absorb it by topping
+           up ``unallocated``.
+        6. ``delta < 0`` → the broker reports *less* than the framework
+           expected (an external withdrawal, an out-of-band fill, an
+           unrecorded fee, …). By default this raises
+           :class:`PortfolioOutOfSyncError` because silently shrinking
+           the strategy's working capital is almost always the wrong
+           thing to do. Pass ``allow_withdrawals=True`` to explicitly
+           accept the drain.
+
+        The absorbed cash flow is recorded on the
+        :class:`BrokerBalanceTracker` so the snapshot service can attach
+        it to the next portfolio snapshot's ``cash_flow`` field, which in
+        turn lets return metrics (CAGR, monthly/yearly returns) compute
+        true time-weighted returns instead of being inflated by deposits.
+
+        Args:
+            market: Market identifier. Defaults to the first registered
+                portfolio. Case-insensitive.
+            allow_withdrawals: When ``True``, negative deltas drain
+                ``unallocated`` instead of raising. The drain is still
+                refused if it would push ``unallocated`` below zero.
+            tolerance: Absolute drift below which the sync is treated as
+                a noop. Defaults to ``1e-9`` to swallow floating-point
+                dust. Useful to bump (e.g. ``1.0``) for live mode if
+                small fee/rounding glitches keep tripping the check.
+
+        Returns:
+            :class:`SyncResult` describing the outcome.
+
+        Raises:
+            PortfolioOutOfSyncError: On negative delta when
+                ``allow_withdrawals=False``, or when the resulting
+                ``unallocated`` would be negative.
+            OperationalException: When live mode is configured but no
+                :class:`PortfolioProvider` / :class:`MarketCredential`
+                is registered for the market.
+        """
+        if tolerance < 0:
+            raise OperationalException(
+                f"sync_portfolio: tolerance must be non-negative, got "
+                f"{tolerance}."
+            )
+        portfolio = self._resolve_portfolio_for_sync(market)
+        market_id = portfolio.market
+        previous_unallocated = float(portfolio.get_unallocated() or 0.0)
+
+        broker_available, reserved = self._fetch_broker_available(
+            portfolio, previous_unallocated
+        )
+
+        delta = broker_available - previous_unallocated
+
+        if abs(delta) <= tolerance:
+            return SyncResult(
+                market=market_id,
+                kind="noop",
+                delta=delta,
+                broker_available=broker_available,
+                previous_unallocated=previous_unallocated,
+                new_unallocated=previous_unallocated,
+                within_tolerance=delta != 0,
+                reserved_for_pending_orders=reserved,
+            )
+
+        if delta < 0 and not allow_withdrawals:
+            raise PortfolioOutOfSyncError(
+                f"Portfolio out of sync on market '{market_id}': local "
+                f"unallocated {previous_unallocated} > broker available "
+                f"{broker_available} (delta {delta}, "
+                f"{reserved} reserved for pending orders). This usually "
+                f"means an external withdrawal happened, an order filled "
+                f"out-of-band, or fees were charged the framework did not "
+                f"see. Pass allow_withdrawals=True to drain unallocated, "
+                f"or investigate the broker account.",
+                market=market_id,
+                local_unallocated=previous_unallocated,
+                broker_available=broker_available,
+                delta=delta,
+            )
+
+        new_unallocated = broker_available
+        if new_unallocated < 0:
+            raise PortfolioOutOfSyncError(
+                f"Refusing to set unallocated to a negative value on market "
+                f"'{market_id}': broker reports {broker_available}, which is "
+                f"below zero. Investigate the broker account.",
+                market=market_id,
+                local_unallocated=previous_unallocated,
+                broker_available=broker_available,
+                delta=delta,
+            )
+
+        kind = "deposit" if delta > 0 else "withdrawal"
+        self._apply_unallocated_change(portfolio, new_unallocated)
+
+        # Record the cash flow so the next portfolio snapshot gets a
+        # non-zero ``cash_flow`` and TWR-aware metrics work correctly.
+        if self.broker_balance_tracker is not None:
+            self.broker_balance_tracker.record_cash_flow(market_id, delta)
+
+        logger.info(
+            "sync_portfolio[%s] %s: local %.6f -> %.6f (broker reports %.6f, "
+            "delta %+.6f, reserved %.6f)",
+            market_id, kind, previous_unallocated, new_unallocated,
+            broker_available, delta, reserved,
+        )
+
+        return SyncResult(
+            market=market_id,
+            kind=kind,
+            delta=delta,
+            broker_available=broker_available,
+            previous_unallocated=previous_unallocated,
+            new_unallocated=new_unallocated,
+            within_tolerance=False,
+            reserved_for_pending_orders=reserved,
+        )
+
+    def _resolve_portfolio_for_sync(self, market) -> Portfolio:
+        if market is not None:
+            # Portfolio.market is canonically uppercased on creation; match
+            # case-insensitively so users can pass "binance" or "BINANCE".
+            normalized = str(market).upper()
+            portfolio = self.portfolio_service.find({"market": normalized})
+            if portfolio is None:
+                portfolio = self.portfolio_service.find({"market": market})
+        else:
+            portfolios = self.portfolio_service.get_all()
+            if not portfolios:
+                raise OperationalException(
+                    "sync_portfolio: no portfolio registered. "
+                    "Did you call app.add_market(...)?"
+                )
+            portfolio = portfolios[0]
+        if portfolio is None:
+            raise OperationalException(
+                f"sync_portfolio: no portfolio found for market '{market}'."
+            )
+        return portfolio
+
+    def _fetch_broker_available(
+        self, portfolio: Portfolio, previous_unallocated: float
+    ) -> tuple:
+        """Returns (broker_available, reserved_for_pending_orders)."""
+        config = self.configuration_service.get_config()
+        environment = config.get(ENVIRONMENT)
+
+        is_backtest = environment in (
+            Environment.BACKTEST.value,
+            Environment.BACKTEST,
+        )
+
+        if is_backtest:
+            if self.broker_balance_tracker is None:
+                # No tracker wired (legacy app construction); deposits cannot
+                # be simulated → broker == local.
+                return previous_unallocated, 0.0
+            pending = self.broker_balance_tracker.consume_pending(
+                portfolio.market
+            )
+            return previous_unallocated + pending, 0.0
+
+        # Live mode
+        if self.portfolio_provider_lookup is None:
+            raise OperationalException(
+                "sync_portfolio: no PortfolioProviderLookup wired into the "
+                "context. This usually means the app was constructed without "
+                "the standard dependency container."
+            )
+        market_credential = self.market_credential_service.get(
+            portfolio.market
+        )
+        if market_credential is None:
+            raise OperationalException(
+                f"sync_portfolio: no market credential registered for "
+                f"market '{portfolio.market}'. Live broker reconciliation "
+                f"requires API credentials."
+            )
+        provider = self.portfolio_provider_lookup.get_portfolio_provider(
+            portfolio.market
+        )
+        if provider is None:
+            raise OperationalException(
+                f"sync_portfolio: no PortfolioProvider registered for market "
+                f"'{portfolio.market}'."
+            )
+        position = provider.get_position(
+            portfolio, portfolio.trading_symbol, market_credential
+        )
+        raw = float(position.amount) if position is not None else 0.0
+
+        # Subtract cash reserved for orders the framework has issued but
+        # the exchange has not yet acknowledged. ``free`` from the broker
+        # already excludes acknowledged open orders, but not those in
+        # CREATED state — without this adjustment a brief race window
+        # between create_order() and the exchange ack would surface as a
+        # phantom "deposit" of the order's cost.
+        reserved = self._reserved_cash_for_pending_orders(portfolio)
+        return raw - reserved, reserved
+
+    def _reserved_cash_for_pending_orders(
+        self, portfolio: Portfolio
+    ) -> float:
+        """Sum of trading-symbol cash locked by orders the framework has
+        created but the exchange has not yet filled or cancelled.
+
+        Buys consume cash; sells release it. Only ``CREATED`` orders are
+        counted because the broker's ``free`` balance already excludes
+        acknowledged open orders.
+        """
+        try:
+            created_orders = self.order_service.get_all({
+                "portfolio_id": portfolio.id,
+                "status": OrderStatus.CREATED.value,
+            })
+        except Exception:  # noqa: BLE001
+            return 0.0
+        reserved = 0.0
+        for order in created_orders or []:
+            try:
+                price = float(order.get_price() or 0.0)
+                amount = float(order.get_remaining() or order.get_amount() or 0.0)
+            except Exception:  # noqa: BLE001
+                continue
+            if OrderSide.BUY.equals(order.get_order_side()):
+                reserved += price * amount
+            # Sells release cash on fill; not counted here.
+        return reserved
+
+    def _apply_unallocated_change(
+        self, portfolio: Portfolio, new_unallocated: float
+    ) -> None:
+        self.portfolio_service.update(
+            portfolio.id, {"unallocated": new_unallocated}
+        )
+        # Keep the trading-symbol position in lockstep, mirroring the
+        # behaviour of PortfolioSyncService.sync_unallocated().
+        try:
+            trading_position = self.position_service.find({
+                "portfolio": portfolio.id,
+                "symbol": portfolio.trading_symbol,
+            })
+        except Exception:  # noqa: BLE001 — repository raises on miss
+            trading_position = None
+        if trading_position is not None:
+            self.position_service.update(
+                trading_position.id, {"amount": new_unallocated}
+            )
 
     def get_total_size(self):
         """
