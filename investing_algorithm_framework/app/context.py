@@ -2383,13 +2383,12 @@ class Context:
         return self.trade_stop_loss_service.get_all(query_params)
 
     def _get_url_provider_cache_key(self, url, headers):
-        if not headers:
-            return url
-
-        return (
-            url,
-            tuple(sorted(headers.items()))
-        )
+        # Delegates to the canonical helper so the in-memory provider
+        # dict and the on-disk cache filename stay in lockstep — see
+        # ``url_cache_key`` for rationale.
+        from investing_algorithm_framework.infrastructure \
+            .data_providers.base_url import url_cache_key
+        return url_cache_key(url, headers)
 
     def fetch_csv(
         self,
@@ -2419,7 +2418,9 @@ class Context:
             refresh_interval (str, optional): Re-fetch interval
                 (e.g., "1d", "1h").
             headers (dict, optional): HTTP headers to send with the
-                request.
+                request. Header values are redacted (replaced
+                with "***") in ``DataSource.to_dict``, so
+                secrets do not leak into diagnostic payloads.
             pre_process (callable, optional): Transform raw CSV text
                 before parsing.
             post_process (callable, optional): Transform the parsed
@@ -2492,7 +2493,9 @@ class Context:
             refresh_interval (str, optional): Re-fetch interval
                 (e.g., "1d", "1h").
             headers (dict, optional): HTTP headers to send with the
-                request.
+                request. Header values are redacted (replaced
+                with "***") in ``DataSource.to_dict``, so
+                secrets do not leak into diagnostic payloads.
             pre_process (callable, optional): Transform raw JSON text
                 before parsing.
             post_process (callable, optional): Transform the parsed
@@ -2560,7 +2563,9 @@ class Context:
             refresh_interval (str, optional): Re-fetch interval
                 (e.g., "1d", "1h").
             headers (dict, optional): HTTP headers to send with the
-                request.
+                request. Header values are redacted (replaced
+                with "***") in ``DataSource.to_dict``, so
+                secrets do not leak into diagnostic payloads.
             post_process (callable, optional): Transform the parsed
                 DataFrame.
 
