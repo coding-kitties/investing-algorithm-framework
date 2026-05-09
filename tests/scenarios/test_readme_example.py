@@ -8,7 +8,17 @@ stays in sync with the actual codebase.
 import os
 import re
 import unittest
+from datetime import datetime, timezone
+from pathlib import Path
 from unittest import TestCase
+
+from investing_algorithm_framework import (
+    BacktestDateRange,
+    DATA_DIRECTORY,
+    RESOURCE_DIRECTORY,
+    SnapshotInterval,
+    create_app,
+)
 
 
 def extract_python_code_blocks_from_readme(readme_path: str) -> list[str]:
@@ -56,6 +66,19 @@ def extract_main_example_from_readme(readme_path: str) -> str:
     )
 
 
+def prepare_readme_example_for_test(main_example: str) -> str:
+    """Adapt the README strategy to the compact offline test fixture set."""
+    return (
+        main_example
+        .replace('symbols = ["BTC", "ETH"]', 'symbols = ["BTC", "DOT"]')
+        .replace(
+            'identifier="ETH_ohlcv", symbol="ETH/EUR"',
+            'identifier="DOT_ohlcv", symbol="DOT/EUR"',
+        )
+        .replace('symbol="ETH"', 'symbol="DOT"')
+    )
+
+
 class TestReadmeExample(TestCase):
     """
     Test class to verify the README example implementation works correctly.
@@ -70,6 +93,9 @@ class TestReadmeExample(TestCase):
         self.readme_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
             'README.md'
+        )
+        self.resource_directory = str(
+            Path(__file__).parent.parent / 'resources'
         )
 
     def test_readme_code_can_be_extracted(self):
@@ -134,6 +160,45 @@ class TestReadmeExample(TestCase):
         self.assertGreater(len(cls.scaling_rules), 0)
         # Verify stop losses are defined
         self.assertGreater(len(cls.stop_losses), 0)
+
+    def test_readme_strategy_runs_fast_vector_backtest_with_offline_data(self):
+        """The README strategy runs using only compact offline test data."""
+        main_example = extract_main_example_from_readme(self.readme_path)
+        class_code = prepare_readme_example_for_test(main_example)
+
+        namespace = {}
+        exec(class_code, namespace)
+        strategy_class = namespace['RSIEMACrossoverStrategy']
+
+        app = create_app(
+            name="ReadmeExampleTest",
+            config={
+                RESOURCE_DIRECTORY: self.resource_directory,
+                DATA_DIRECTORY: "test_data/ohlcv",
+            },
+        )
+        app.add_market(
+            market="BITVAVO", trading_symbol="EUR", initial_balance=1000
+        )
+
+        strategy = strategy_class(algorithm_id="readme-example-test")
+        backtest = app.run_vector_backtest(
+            initial_amount=1000,
+            backtest_date_range=BacktestDateRange(
+                start_date=datetime(2023, 9, 1, tzinfo=timezone.utc),
+                end_date=datetime(2023, 11, 15, tzinfo=timezone.utc),
+            ),
+            strategy=strategy,
+            snapshot_interval=SnapshotInterval.DAILY,
+            risk_free_rate=0.027,
+            trading_symbol="EUR",
+            market="BITVAVO",
+            use_checkpoints=False,
+        )
+
+        self.assertIsNotNone(backtest)
+        self.assertEqual(len(backtest.get_all_backtest_runs()), 1)
+        self.assertEqual(len(backtest.get_all_backtest_metrics()), 1)
 
 
 if __name__ == "__main__":
