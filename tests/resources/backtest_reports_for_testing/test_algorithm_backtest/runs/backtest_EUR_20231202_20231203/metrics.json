@@ -60,6 +60,28 @@
     "max_drawdown_absolute": 0.0,
     "max_daily_drawdown": 0.0,
     "max_drawdown_duration": 0,
+    "twr_equity_curve": [
+        [
+            1.0,
+            "2023-12-02T00:00:00+00:00"
+        ],
+        [
+            1.0,
+            "2023-12-03T00:00:00+00:00"
+        ]
+    ],
+    "twr_drawdown_series": [
+        [
+            0.0,
+            "2023-12-02T00:00:00+00:00"
+        ],
+        [
+            0.0,
+            "2023-12-03T00:00:00+00:00"
+        ]
+    ],
+    "twr_max_drawdown": 0.0,
+    "twr_max_drawdown_duration": 0,
     "trades_per_year": 0.0,
     "trades_per_week": 0.0,
     "trades_per_month": 0.0,
