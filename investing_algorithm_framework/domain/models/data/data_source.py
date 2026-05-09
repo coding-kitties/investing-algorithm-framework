@@ -47,6 +47,7 @@ class DataSource:
     date_format: Optional[str] = None
     cache: bool = True
     refresh_interval: Optional[str] = None
+    headers: Optional[dict] = None
     pre_process: Optional[Callable] = field(
         default=None, repr=False, compare=False
     )
@@ -133,6 +134,7 @@ class DataSource:
         date_format: str = None,
         cache: bool = True,
         refresh_interval: str = None,
+        headers: dict = None,
         pre_process: Callable = None,
         post_process: Callable = None,
     ) -> "DataSource":
@@ -149,6 +151,7 @@ class DataSource:
             refresh_interval: How often to re-fetch the data
                 (e.g., "1d", "1h"). If None, data is fetched once and
                 cached indefinitely.
+            headers: Optional HTTP headers to send with the request.
             pre_process: Optional callback to transform the raw CSV
                 text before parsing. Receives a string, must return
                 a string.
@@ -178,6 +181,7 @@ class DataSource:
             date_format=date_format,
             cache=cache,
             refresh_interval=refresh_interval,
+            headers=headers,
             pre_process=pre_process,
             post_process=post_process,
         )
@@ -191,6 +195,7 @@ class DataSource:
         date_format: str = None,
         cache: bool = True,
         refresh_interval: str = None,
+        headers: dict = None,
         pre_process: Callable = None,
         post_process: Callable = None,
     ) -> "DataSource":
@@ -209,6 +214,7 @@ class DataSource:
                 (default: True).
             refresh_interval: How often to re-fetch the data
                 (e.g., "1d", "1h").
+            headers: Optional HTTP headers to send with the request.
             pre_process: Optional callback to transform the raw JSON
                 text before parsing. Receives a string, must return
                 a string.
@@ -234,6 +240,7 @@ class DataSource:
             date_format=date_format,
             cache=cache,
             refresh_interval=refresh_interval,
+            headers=headers,
             pre_process=pre_process,
             post_process=post_process,
         )
@@ -247,6 +254,7 @@ class DataSource:
         date_format: str = None,
         cache: bool = True,
         refresh_interval: str = None,
+        headers: dict = None,
         post_process: Callable = None,
     ) -> "DataSource":
         """
@@ -262,6 +270,7 @@ class DataSource:
                 (default: True).
             refresh_interval: How often to re-fetch the data
                 (e.g., "1d", "1h").
+            headers: Optional HTTP headers to send with the request.
             post_process: Optional callback to transform the parsed
                 DataFrame.
 
@@ -284,6 +293,7 @@ class DataSource:
             date_format=date_format,
             cache=cache,
             refresh_interval=refresh_interval,
+            headers=headers,
             post_process=post_process,
         )
 
@@ -330,6 +340,10 @@ class DataSource:
             non_null_attributes['data_type'] = self.data_type.value
         if self.time_frame is not None:
             non_null_attributes['time_frame'] = self.time_frame.value
+        if self.headers is not None:
+            non_null_attributes['headers'] = {
+                key: "***" for key in self.headers
+            }
 
         return non_null_attributes
 

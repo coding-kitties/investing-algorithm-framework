@@ -44,6 +44,14 @@ class TestDataSourceFromJson(unittest.TestCase):
         self.assertIsNone(ds.pre_process)
         self.assertIsNone(ds.post_process)
 
+    def test_from_json_accepts_headers(self):
+        ds = DataSource.from_json(
+            identifier="sentiment",
+            url="https://api.example.com/sentiment",
+            headers={"X-API-Key": "test-key"},
+        )
+        self.assertEqual(ds.headers, {"X-API-Key": "test-key"})
+
 
 class TestJSONURLDataProvider(unittest.TestCase):
     """Tests for JSONURLDataProvider."""
@@ -123,6 +131,40 @@ class TestJSONURLDataProvider(unittest.TestCase):
         self.assertEqual(len(df), 2)
 
     @patch(MOCK_TARGET)
+    def test_get_data_sends_configured_headers(self, mock_urlopen):
+        mock_urlopen.return_value = self._mock_urlopen()
+
+        provider = JSONURLDataProvider(
+            url="https://api.example.com/sentiment",
+            headers={"X-API-Key": "test-key"},
+            cache=False,
+        )
+
+        provider.get_data()
+
+        request = mock_urlopen.call_args.args[0]
+        self.assertEqual(request.headers["X-api-key"], "test-key")
+        self.assertEqual(
+            request.headers["User-agent"],
+            "investing-algorithm-framework"
+        )
+
+    def test_cache_path_includes_headers(self):
+        provider_a = JSONURLDataProvider(
+            url="https://api.example.com/sentiment",
+            headers={"X-API-Key": "key-a"},
+        )
+        provider_b = JSONURLDataProvider(
+            url="https://api.example.com/sentiment",
+            headers={"X-API-Key": "key-b"},
+        )
+
+        self.assertNotEqual(
+            provider_a._get_cache_path(),
+            provider_b._get_cache_path()
+        )
+
+    @patch(MOCK_TARGET)
     def test_get_data_with_date_parsing(self, mock_urlopen):
         mock_urlopen.return_value = self._mock_urlopen()
 
@@ -186,12 +228,14 @@ class TestJSONURLDataProvider(unittest.TestCase):
     def test_copy_with_data_source_overrides(self):
         provider = JSONURLDataProvider(
             url="https://example.com/default.json",
+            headers={"X-API-Key": "default-key"},
         )
 
         ds = DataSource.from_json(
             identifier="test",
             url="https://example.com/override.json",
             date_column="my_date",
+            headers={"X-API-Key": "override-key"},
         )
 
         copied = provider.copy(data_source=ds)
@@ -199,6 +243,7 @@ class TestJSONURLDataProvider(unittest.TestCase):
             copied._url, "https://example.com/override.json"
         )
         self.assertEqual(copied._date_column, "my_date")
+        self.assertEqual(copied._headers, {"X-API-Key": "override-key"})
 
     def test_raises_on_missing_url(self):
         provider = JSONURLDataProvider(cache=False)

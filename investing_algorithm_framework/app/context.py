@@ -2092,6 +2092,15 @@ class Context:
 
         return self.trade_stop_loss_service.get_all(query_params)
 
+    def _get_url_provider_cache_key(self, url, headers):
+        if not headers:
+            return url
+
+        return (
+            url,
+            tuple(sorted(headers.items()))
+        )
+
     def fetch_csv(
         self,
         url,
@@ -2099,6 +2108,7 @@ class Context:
         date_format=None,
         cache=True,
         refresh_interval=None,
+        headers=None,
         pre_process=None,
         post_process=None,
     ):
@@ -2118,6 +2128,8 @@ class Context:
             cache (bool): Cache fetched data locally (default: True).
             refresh_interval (str, optional): Re-fetch interval
                 (e.g., "1d", "1h").
+            headers (dict, optional): HTTP headers to send with the
+                request.
             pre_process (callable, optional): Transform raw CSV text
                 before parsing.
             post_process (callable, optional): Transform the parsed
@@ -2141,20 +2153,23 @@ class Context:
         if not hasattr(self, '_csv_url_providers'):
             self._csv_url_providers = {}
 
-        if url not in self._csv_url_providers:
+        provider_key = self._get_url_provider_cache_key(url, headers)
+
+        if provider_key not in self._csv_url_providers:
             provider = CSVURLDataProvider(
                 url=url,
                 date_column=date_column,
                 date_format=date_format,
                 cache=cache,
                 refresh_interval=refresh_interval,
+                headers=headers,
                 pre_process=pre_process,
                 post_process=post_process,
             )
             provider.config = self.configuration_service.get_config()
-            self._csv_url_providers[url] = provider
+            self._csv_url_providers[provider_key] = provider
 
-        return self._csv_url_providers[url].get_data()
+        return self._csv_url_providers[provider_key].get_data()
 
     def fetch_json(
         self,
@@ -2163,6 +2178,7 @@ class Context:
         date_format=None,
         cache=True,
         refresh_interval=None,
+        headers=None,
         pre_process=None,
         post_process=None,
     ):
@@ -2185,6 +2201,8 @@ class Context:
             cache (bool): Cache fetched data locally (default: True).
             refresh_interval (str, optional): Re-fetch interval
                 (e.g., "1d", "1h").
+            headers (dict, optional): HTTP headers to send with the
+                request.
             pre_process (callable, optional): Transform raw JSON text
                 before parsing.
             post_process (callable, optional): Transform the parsed
@@ -2207,20 +2225,23 @@ class Context:
         if not hasattr(self, '_json_url_providers'):
             self._json_url_providers = {}
 
-        if url not in self._json_url_providers:
+        provider_key = self._get_url_provider_cache_key(url, headers)
+
+        if provider_key not in self._json_url_providers:
             provider = JSONURLDataProvider(
                 url=url,
                 date_column=date_column,
                 date_format=date_format,
                 cache=cache,
                 refresh_interval=refresh_interval,
+                headers=headers,
                 pre_process=pre_process,
                 post_process=post_process,
             )
             provider.config = self.configuration_service.get_config()
-            self._json_url_providers[url] = provider
+            self._json_url_providers[provider_key] = provider
 
-        return self._json_url_providers[url].get_data()
+        return self._json_url_providers[provider_key].get_data()
 
     def fetch_parquet(
         self,
@@ -2229,6 +2250,7 @@ class Context:
         date_format=None,
         cache=True,
         refresh_interval=None,
+        headers=None,
         post_process=None,
     ):
         """
@@ -2247,6 +2269,8 @@ class Context:
             cache (bool): Cache fetched data locally (default: True).
             refresh_interval (str, optional): Re-fetch interval
                 (e.g., "1d", "1h").
+            headers (dict, optional): HTTP headers to send with the
+                request.
             post_process (callable, optional): Transform the parsed
                 DataFrame.
 
@@ -2266,19 +2290,22 @@ class Context:
         if not hasattr(self, '_parquet_url_providers'):
             self._parquet_url_providers = {}
 
-        if url not in self._parquet_url_providers:
+        provider_key = self._get_url_provider_cache_key(url, headers)
+
+        if provider_key not in self._parquet_url_providers:
             provider = ParquetURLDataProvider(
                 url=url,
                 date_column=date_column,
                 date_format=date_format,
                 cache=cache,
                 refresh_interval=refresh_interval,
+                headers=headers,
                 post_process=post_process,
             )
             provider.config = self.configuration_service.get_config()
-            self._parquet_url_providers[url] = provider
+            self._parquet_url_providers[provider_key] = provider
 
-        return self._parquet_url_providers[url].get_data()
+        return self._parquet_url_providers[provider_key].get_data()
 
     def batch_order(self, orders, market=None):
         """

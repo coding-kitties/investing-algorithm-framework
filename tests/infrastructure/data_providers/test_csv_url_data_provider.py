@@ -44,6 +44,7 @@ class TestDataSourceFromCsv(unittest.TestCase):
             date_format="%m/%d/%Y",
             cache=False,
             refresh_interval="1d",
+            headers={"X-API-Key": "test-key"},
             pre_process=pre,
             post_process=post,
         )
@@ -51,6 +52,7 @@ class TestDataSourceFromCsv(unittest.TestCase):
         self.assertEqual(ds.url, "https://example.com/earnings.csv")
         self.assertFalse(ds.cache)
         self.assertEqual(ds.refresh_interval, "1d")
+        self.assertEqual(ds.headers, {"X-API-Key": "test-key"})
         self.assertEqual(ds.pre_process, pre)
         self.assertEqual(ds.post_process, post)
 
@@ -72,6 +74,7 @@ class TestDataSourceFromCsv(unittest.TestCase):
         self.assertIsNone(ds.date_format)
         self.assertTrue(ds.cache)
         self.assertIsNone(ds.refresh_interval)
+        self.assertIsNone(ds.headers)
         self.assertIsNone(ds.pre_process)
         self.assertIsNone(ds.post_process)
 
@@ -160,7 +163,10 @@ class TestCSVURLDataProvider(unittest.TestCase):
 
         def add_header_comment(text):
             # Remove any comment lines
-            lines = [line for line in text.split("\n") if not line.startswith("#")]
+            lines = [
+                line for line in text.split("\n")
+                if not line.startswith("#")
+            ]
             return "\n".join(lines)
 
         provider = CSVURLDataProvider(
