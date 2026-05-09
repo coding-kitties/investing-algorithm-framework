@@ -14,7 +14,7 @@ from typing import List, Tuple
 import pandas as pd
 from datetime import datetime
 from investing_algorithm_framework.domain import PortfolioSnapshot, Trade
-from .equity_curve import get_equity_curve
+from .equity_curve import get_equity_curve, get_twr_equity_curve
 
 
 def get_drawdown_series(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, datetime]]:
@@ -221,3 +221,110 @@ def get_max_drawdown_absolute(snapshots: List[PortfolioSnapshot]) -> float:
         max_drawdown = max(max_drawdown, drawdown)
 
     return abs(max_drawdown)  # Return as positive number (e.g., €10,000)
+
+
+# ---------------------------------------------------------------------------
+# TWR (alpha-only) drawdown variants
+# ---------------------------------------------------------------------------
+#
+# The drawdown functions above operate on raw ``total_value`` — i.e. the
+# absolute account-value path including external deposits/withdrawals.
+# That's the curve users typically want to see ("how deep did my account
+# go in dollars?").
+#
+# These variants below operate on the TWR-growth curve so that a
+# strategy that receives a $1,000 deposit during a drawdown does NOT
+# have its drawdown artificially shortened/erased by the deposit. Use
+# these when comparing risk profiles across portfolios that are funded
+# differently.
+
+
+def get_twr_drawdown_series(
+    snapshots: List[PortfolioSnapshot],
+) -> List[Tuple[float, datetime]]:
+    """Drawdown series computed against the TWR-growth curve.
+
+    Identical shape to :func:`get_drawdown_series` (negative percentages
+    where 0% means "at high-water mark"), but external cash flows do
+    not contaminate the high-water mark.
+    """
+    equity_curve = get_twr_equity_curve(snapshots)
+
+    drawdown_series: List[Tuple[float, datetime]] = []
+    max_value = None
+
+    for value, timestamp in equity_curve:
+        if value <= 0:
+            drawdown_series.append((0.0, timestamp))
+            continue
+        if max_value is None or max_value <= 0:
+            max_value = value
+        max_value = max(max_value, value)
+        drawdown = (value - max_value) / max_value
+        drawdown_series.append((drawdown, timestamp))
+
+    return drawdown_series
+
+
+def get_twr_max_drawdown(snapshots: List[PortfolioSnapshot]) -> float:
+    """Maximum drawdown of the TWR-growth curve, returned as a positive
+    fraction (e.g. ``0.18`` for an 18% peak-to-trough decline in alpha).
+    """
+    equity_curve = get_twr_equity_curve(snapshots)
+    if not equity_curve:
+        return 0.0
+
+    peak = equity_curve[0][0]
+    if peak <= 0:
+        for equity, _ in equity_curve:
+            if equity > 0:
+                peak = equity
+                break
+        else:
+            return 0.0
+
+    max_drawdown_pct = 0.0
+    for equity, _ in equity_curve:
+        if equity <= 0:
+            continue
+        if equity > peak:
+            peak = equity
+        if peak <= 0:
+            continue
+        drawdown_pct = (equity - peak) / peak
+        max_drawdown_pct = min(max_drawdown_pct, drawdown_pct)
+
+    return abs(max_drawdown_pct)
+
+
+def get_twr_max_drawdown_duration(
+    snapshots: List[PortfolioSnapshot],
+) -> int:
+    """Longest stretch in calendar days where the TWR-growth curve was
+    below its high-water mark."""
+    equity_curve = get_twr_equity_curve(snapshots)
+    if not equity_curve:
+        return 0
+
+    peak = equity_curve[0][0]
+    max_duration = 0
+    drawdown_start = None
+
+    for equity, timestamp in equity_curve:
+        if equity < peak:
+            if drawdown_start is None:
+                drawdown_start = timestamp
+        else:
+            if drawdown_start is not None:
+                elapsed = (timestamp - drawdown_start).days
+                max_duration = max(max_duration, elapsed)
+                drawdown_start = None
+            peak = equity
+
+    if drawdown_start is not None and len(equity_curve) > 0:
+        last_timestamp = equity_curve[-1][1]
+        elapsed = (last_timestamp - drawdown_start).days
+        max_duration = max(max_duration, elapsed)
+
+    return max_duration
+

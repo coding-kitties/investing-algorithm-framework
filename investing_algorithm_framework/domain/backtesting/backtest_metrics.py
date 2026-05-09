@@ -188,6 +188,15 @@ class BacktestMetrics:
     max_drawdown_absolute: float = 0.0
     max_daily_drawdown: float = 0.0
     max_drawdown_duration: int = 0
+    # TWR (alpha-only) variants — scrub external cash flows so deposits
+    # don't mask drawdowns. The raw fields above remain account-value
+    # based for absolute reporting.
+    twr_equity_curve: List[Tuple[float, datetime]] = \
+        field(default_factory=list)
+    twr_drawdown_series: List[Tuple[float, datetime]] = \
+        field(default_factory=list)
+    twr_max_drawdown: float = 0.0
+    twr_max_drawdown_duration: int = 0
     trades_per_year: float = 0.0
     trades_per_week: float = 0.0
     trades_per_month: float = 0.0
@@ -299,6 +308,14 @@ class BacktestMetrics:
             "max_drawdown_absolute": self.max_drawdown_absolute,
             "max_daily_drawdown": self.max_daily_drawdown,
             "max_drawdown_duration": self.max_drawdown_duration,
+            "twr_equity_curve": [(value, ensure_iso(date))
+                                 for value, date in self.twr_equity_curve],
+            "twr_drawdown_series": [
+                (value, ensure_iso(date))
+                for value, date in self.twr_drawdown_series
+            ],
+            "twr_max_drawdown": self.twr_max_drawdown,
+            "twr_max_drawdown_duration": self.twr_max_drawdown_duration,
             "trades_per_year": self.trades_per_year,
             "trades_per_week": self.trades_per_week,
             "trades_per_month": self.trades_per_month,
@@ -483,6 +500,12 @@ class BacktestMetrics:
         )
         data['drawdown_series'] = cls._parse_tuple_list_datetime(
             data.get('drawdown_series', [])
+        )
+        data['twr_equity_curve'] = cls._parse_tuple_list_datetime(
+            data.get('twr_equity_curve', [])
+        )
+        data['twr_drawdown_series'] = cls._parse_tuple_list_datetime(
+            data.get('twr_drawdown_series', [])
         )
         data['cumulative_return_series'] = cls._parse_tuple_list_datetime(
             data.get('cumulative_return_series', [])

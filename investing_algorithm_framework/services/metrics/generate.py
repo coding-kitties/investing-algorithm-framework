@@ -15,8 +15,10 @@ from .cagr import get_cagr
 from .calmar_ratio import get_calmar_ratio
 from .drawdown import get_drawdown_series, get_max_drawdown, \
     get_max_daily_drawdown, get_max_drawdown_absolute, \
-    get_max_drawdown_duration
-from .equity_curve import get_equity_curve
+    get_max_drawdown_duration, \
+    get_twr_drawdown_series, get_twr_max_drawdown, \
+    get_twr_max_drawdown_duration
+from .equity_curve import get_equity_curve, get_twr_equity_curve
 from .exposure import get_exposure_ratio, get_cumulative_exposure, \
     get_trades_per_year, get_trades_per_day, get_trades_per_week, \
     get_trades_per_month
@@ -545,6 +547,10 @@ def create_backtest_metrics(
             "max_drawdown_absolute",
             "max_daily_drawdown",
             "max_drawdown_duration",
+            "twr_equity_curve",
+            "twr_drawdown_series",
+            "twr_max_drawdown",
+            "twr_max_drawdown_duration",
             "trades_per_year",
             "trades_per_week",
             "trades_per_month",
@@ -786,6 +792,10 @@ def create_backtest_metrics(
     safe_set("max_drawdown_absolute", get_max_drawdown_absolute, backtest_run.portfolio_snapshots)
     safe_set("max_daily_drawdown", get_max_daily_drawdown, backtest_run.portfolio_snapshots)
     safe_set("max_drawdown_duration", get_max_drawdown_duration, backtest_run.portfolio_snapshots)
+    safe_set("twr_equity_curve", get_twr_equity_curve, backtest_run.portfolio_snapshots)
+    safe_set("twr_drawdown_series", get_twr_drawdown_series, backtest_run.portfolio_snapshots)
+    safe_set("twr_max_drawdown", get_twr_max_drawdown, backtest_run.portfolio_snapshots)
+    safe_set("twr_max_drawdown_duration", get_twr_max_drawdown_duration, backtest_run.portfolio_snapshots)
     safe_set("trades_per_year", get_trades_per_year, backtest_run.trades, backtest_run.backtest_start_date, backtest_run.backtest_end_date)
     safe_set("trades_per_week", get_trades_per_week, backtest_run.trades, backtest_run.backtest_start_date, backtest_run.backtest_end_date)
     safe_set("trades_per_month", get_trades_per_month, backtest_run.trades, backtest_run.backtest_start_date, backtest_run.backtest_end_date)

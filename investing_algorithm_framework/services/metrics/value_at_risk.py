@@ -63,17 +63,23 @@ def get_conditional_value_at_risk(
 def _get_monthly_return_series(
     snapshots: List[PortfolioSnapshot],
 ) -> "pd.Series | None":
-    """Helper: build a monthly return series from snapshots."""
+    """Helper: build a monthly TWR return series from snapshots."""
     if not snapshots or len(snapshots) < 2:
         return None
-    data = [(s.created_at, s.total_value) for s in snapshots]
-    df = pd.DataFrame(data, columns=["created_at", "total_value"])
+    data = [
+        (s.created_at, s.total_value, getattr(s, "cash_flow", 0) or 0)
+        for s in snapshots
+    ]
+    df = pd.DataFrame(data, columns=["created_at", "total_value", "cash_flow"])
     df['created_at'] = pd.to_datetime(df['created_at'])
     df = df.sort_values('created_at').drop_duplicates('created_at')\
         .set_index('created_at')
-    monthly_df = df.resample('ME').last().dropna()
-    monthly_df['return'] = monthly_df['total_value'].pct_change()
-    monthly_df = monthly_df.dropna()
-    if monthly_df.empty:
+    monthly_value = df['total_value'].resample('ME').last().dropna()
+    monthly_cf = df['cash_flow'].resample('ME').sum()
+    monthly_cf = monthly_cf.reindex(monthly_value.index, fill_value=0)
+    prev_value = monthly_value.shift(1)
+    monthly_returns = (monthly_value - monthly_cf) / prev_value - 1
+    monthly_returns = monthly_returns.dropna()
+    if monthly_returns.empty:
         return None
-    return monthly_df['return']
+    return monthly_returns

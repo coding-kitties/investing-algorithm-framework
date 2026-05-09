@@ -9,10 +9,16 @@ from investing_algorithm_framework.domain import PortfolioSnapshot, Trade, \
 
 def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, datetime]]:
     """
-    Calculate the monthly returns from a list of portfolio snapshots.
+    Calculate the monthly time-weighted returns from a list of portfolio
+    snapshots.
 
-    Monthly return is calculated as the percentage change in portfolio value
-    from the end of one month to the end of the next month.
+    Each month's return subtracts external cash flow (deposits /
+    withdrawals absorbed via :meth:`Context.sync_portfolio`) from the
+    end-of-month value before comparing it to the previous month-end:
+
+        r_month = (V_end - cash_flow_in_month) / V_prev_end - 1
+
+    With no cash flows this is identical to ``pct_change()``.
 
     Args:
         snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
@@ -23,15 +29,26 @@ def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float,
     """
 
     # Create DataFrame from snapshots
-    data = [(s.created_at, s.total_value) for s in snapshots]
-    df = pd.DataFrame(data, columns=["created_at", "total_value"])
+    data = [
+        (s.created_at, s.total_value, getattr(s, "cash_flow", 0) or 0)
+        for s in snapshots
+    ]
+    df = pd.DataFrame(data, columns=["created_at", "total_value", "cash_flow"])
     df['created_at'] = pd.to_datetime(df['created_at'])
     df = df.sort_values('created_at').drop_duplicates('created_at')\
         .set_index('created_at')
 
-    # Resample to monthly frequency using last value of the month
-    monthly_df = df.resample('ME').last().dropna()
-    monthly_df['return'] = monthly_df['total_value'].pct_change()
+    monthly_value = df['total_value'].resample('ME').last().dropna()
+    monthly_cf = df['cash_flow'].resample('ME').sum()
+    monthly_df = pd.DataFrame({
+        'total_value': monthly_value,
+        'cash_flow': monthly_cf.reindex(monthly_value.index, fill_value=0),
+    })
+
+    prev_value = monthly_df['total_value'].shift(1)
+    monthly_df['return'] = (
+        (monthly_df['total_value'] - monthly_df['cash_flow']) / prev_value - 1
+    )
     monthly_df = monthly_df.dropna()
 
     # Ensure returns are Python floats, not numpy floats
@@ -43,10 +60,11 @@ def get_monthly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float,
 
 def get_yearly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, date]]:
     """
-    Calculate the yearly returns from a list of portfolio snapshots.
+    Calculate the yearly time-weighted returns from a list of portfolio
+    snapshots.
 
-    Yearly return is calculated as the percentage change in portfolio value
-    from the end of one year to the end of the next year.
+    Same TWR adjustment as :func:`get_monthly_returns`, resampled to
+    year-end.
 
     Args:
         snapshots (List[PortfolioSnapshot]): List of portfolio snapshots.
@@ -57,8 +75,11 @@ def get_yearly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, 
     """
 
     # Create DataFrame from snapshots
-    data = [(s.created_at, s.total_value) for s in snapshots]
-    df = pd.DataFrame(data, columns=["created_at", "total_value"])
+    data = [
+        (s.created_at, s.total_value, getattr(s, "cash_flow", 0) or 0)
+        for s in snapshots
+    ]
+    df = pd.DataFrame(data, columns=["created_at", "total_value", "cash_flow"])
     df['created_at'] = pd.to_datetime(df['created_at'])
     df = df.sort_values('created_at').drop_duplicates('created_at')\
         .set_index('created_at')
@@ -67,9 +88,17 @@ def get_yearly_returns(snapshots: List[PortfolioSnapshot]) -> List[Tuple[float, 
     if df.index.tz is not None:
         df.index = df.index.tz_localize(None)
 
-    # Resample to yearly frequency using last value of the year
-    yearly_df = df.resample('YE').last().dropna()
-    yearly_df['return'] = yearly_df['total_value'].pct_change()
+    yearly_value = df['total_value'].resample('YE').last().dropna()
+    yearly_cf = df['cash_flow'].resample('YE').sum()
+    yearly_df = pd.DataFrame({
+        'total_value': yearly_value,
+        'cash_flow': yearly_cf.reindex(yearly_value.index, fill_value=0),
+    })
+
+    prev_value = yearly_df['total_value'].shift(1)
+    yearly_df['return'] = (
+        (yearly_df['total_value'] - yearly_df['cash_flow']) / prev_value - 1
+    )
     yearly_df = yearly_df.dropna()
 
     # Yearly returns with date objects only representing the year

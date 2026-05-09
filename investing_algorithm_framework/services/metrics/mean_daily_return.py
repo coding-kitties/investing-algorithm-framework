@@ -27,8 +27,11 @@ def get_mean_daily_return(snapshots):
         return 0.0  # Not enough data
 
     # Create DataFrame from snapshots
-    data = [(s.created_at, s.total_value) for s in snapshots]
-    df = pd.DataFrame(data, columns=["created_at", "total_value"])
+    data = [
+        (s.created_at, s.total_value, getattr(s, "cash_flow", 0) or 0)
+        for s in snapshots
+    ]
+    df = pd.DataFrame(data, columns=["created_at", "total_value", "cash_flow"])
     df['created_at'] = pd.to_datetime(df['created_at'])
     df = df.sort_values('created_at').drop_duplicates('created_at')\
         .set_index('created_at')
@@ -45,11 +48,20 @@ def get_mean_daily_return(snapshots):
 
         return (1 + cagr) ** (1 / 365) - 1
 
-    # Resample to daily frequency using last value of the day
-    daily_df = df.resample('1D').last().dropna()
+    # Resample to daily frequency: end-of-day value, daily cash flow sum
+    daily_value = df['total_value'].resample('1D').last().dropna()
+    daily_cf = df['cash_flow'].resample('1D').sum()
+    daily_df = pd.DataFrame({
+        'total_value': daily_value,
+        'cash_flow': daily_cf.reindex(daily_value.index, fill_value=0),
+    })
 
-    # Calculate daily returns
-    daily_df['return'] = daily_df['total_value'].pct_change()
+    # TWR-adjusted daily return:
+    # r_d = (V_end - cash_flow_d) / V_prev_end - 1
+    prev_value = daily_df['total_value'].shift(1)
+    daily_df['return'] = (
+        (daily_df['total_value'] - daily_df['cash_flow']) / prev_value - 1
+    )
     daily_df = daily_df.dropna()
 
     if daily_df.empty:
