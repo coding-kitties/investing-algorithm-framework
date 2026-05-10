@@ -82,6 +82,14 @@ Row size: ~1–2 KB. 12,500 rows ≈ 25 MB. Fits comfortably in SQLite for local
 > existing `BacktestIndex` Parquet sidecar is now built on top of this
 > typed row (`BacktestIndexRow.to_flat_dict()`), making the wire
 > shape and the in-memory shape a single source of truth.
+>
+> **Status (epic #540 phase 2, v8.10):** the SQLite implementation
+> ships as `investing_algorithm_framework.services.backtest_index
+> .SqliteBacktestIndex`, with `iaf index <bundle-dir>` as the CLI
+> entry point. Every scalar field of `BacktestSummaryMetrics` is
+> promoted to its own SQL column (`summary_<name>`), so analysts can
+> filter without opening any bundle, e.g. `SELECT bundle_path FROM
+> backtest_index WHERE summary_sharpe_ratio > 1.0`.
 
 ### 3.2 Tier 2 schemas (Parquet, long format)
 
