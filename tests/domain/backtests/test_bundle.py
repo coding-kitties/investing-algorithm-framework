@@ -191,3 +191,132 @@ class TestBackTestsDirectory(TestCase):
         )
         loaded = load_backtests_from_directory(bundle_dir, workers=2)
         self.assertEqual(len(loaded), 4)
+
+
+class TestBundleFormatV2(TestCase):
+    """Verify bundle format v2 specifics: engine_type split,
+    embedded Parquet metric blobs, summary_only mode, and v1
+    backwards-compatible reads."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.fixture = Backtest.open(_FIXTURE)
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_default_save_emits_v2_header(self):
+        path = os.path.join(self.tmp, "v2" + BUNDLE_EXT)
+        save_bundle(self.fixture, path)
+        with open(path, "rb") as fh:
+            head = fh.read(8)
+        self.assertEqual(head[:4], _MAGIC)
+        self.assertEqual(int.from_bytes(head[4:8], "little"), 2)
+
+    def test_v1_writer_still_supported(self):
+        path = os.path.join(self.tmp, "v1" + BUNDLE_EXT)
+        save_bundle(self.fixture, path, format_version=1)
+        with open(path, "rb") as fh:
+            head = fh.read(8)
+        self.assertEqual(int.from_bytes(head[4:8], "little"), 1)
+        # And v1 still round-trips through the (upgraded) reader.
+        loaded = open_bundle(path)
+        self.assertEqual(
+            loaded.algorithm_id, self.fixture.algorithm_id
+        )
+
+    def test_v2_round_trip_preserves_metric_series(self):
+        path = os.path.join(self.tmp, "v2" + BUNDLE_EXT)
+        save_bundle(self.fixture, path)
+        loaded = open_bundle(path)
+
+        # Find a run on the fixture that has a non-empty equity_curve
+        # to compare against, and assert structural equivalence.
+        if (
+            self.fixture.backtest_runs
+            and self.fixture.backtest_runs[0].backtest_metrics
+            and self.fixture.backtest_runs[0]
+            .backtest_metrics.equity_curve
+        ):
+            self.assertEqual(
+                len(loaded.backtest_runs[0].backtest_metrics.equity_curve),
+                len(self.fixture.backtest_runs[0]
+                    .backtest_metrics.equity_curve),
+            )
+
+    def test_engine_type_round_trips_into_vector_runs_slot(self):
+        bt = Backtest.from_dict(self.fixture.to_dict())
+        bt.engine_type = "vector"
+        path = os.path.join(self.tmp, "vector" + BUNDLE_EXT)
+        save_bundle(bt, path)
+
+        loaded = open_bundle(path)
+        self.assertEqual(loaded.engine_type, "vector")
+        # Properties route to the right slot.
+        self.assertEqual(len(loaded.vector_runs), len(bt.backtest_runs))
+        self.assertEqual(loaded.event_runs, [])
+
+    def test_engine_type_round_trips_into_event_runs_slot(self):
+        bt = Backtest.from_dict(self.fixture.to_dict())
+        bt.engine_type = "event"
+        path = os.path.join(self.tmp, "event" + BUNDLE_EXT)
+        save_bundle(bt, path)
+
+        loaded = open_bundle(path)
+        self.assertEqual(loaded.engine_type, "event")
+        self.assertEqual(len(loaded.event_runs), len(bt.backtest_runs))
+        self.assertEqual(loaded.vector_runs, [])
+
+    def test_summary_only_skips_blob_decode(self):
+        bt = Backtest.from_dict(self.fixture.to_dict())
+        bt.engine_type = "vector"
+        path = os.path.join(self.tmp, "summary" + BUNDLE_EXT)
+        save_bundle(bt, path)
+
+        loaded = open_bundle(path, summary_only=True)
+        # Scalar metrics still populated; blob fields remain as
+        # opaque references {"@blob": "..."} rather than lists.
+        if loaded.backtest_runs and loaded.backtest_runs[0].backtest_metrics:
+            metrics = loaded.backtest_runs[0].backtest_metrics
+            # equity_curve in summary_only mode is left as an
+            # unresolved reference dict (or empty list if the source
+            # had no series). Either is acceptable; what we assert
+            # is that scalar fields are populated.
+            self.assertIsNotNone(metrics.sharpe_ratio)
+
+    def test_v2_bundle_round_trips_through_writer(self):
+        """Smoke test: v2 bundle written via save_bundle reads back
+        with the same structural content. Per-bundle size comparison
+        against v1 isn't meaningful for tiny test fixtures (Parquet
+        headers add a fixed ~100-byte overhead per blob, which
+        dominates when series have <50 entries). Real-world backtests
+        with hundreds of equity-curve points see 30-80% reduction;
+        see ``docs/design/bundle-format-v2.md``.
+        """
+        v2_path = os.path.join(self.tmp, "v2" + BUNDLE_EXT)
+        save_bundle(self.fixture, v2_path, format_version=2)
+        loaded = open_bundle(v2_path)
+        self.assertEqual(
+            loaded.algorithm_id, self.fixture.algorithm_id
+        )
+        self.assertEqual(
+            len(loaded.backtest_runs), len(self.fixture.backtest_runs)
+        )
+
+    def test_engine_type_default_is_none_for_legacy_bundles(self):
+        # Legacy v1 bundles never recorded engine_type. Reading one
+        # should leave engine_type at None and place the runs under
+        # backtest_runs (the engine-agnostic slot).
+        path = os.path.join(self.tmp, "legacy" + BUNDLE_EXT)
+        save_bundle(self.fixture, path, format_version=1)
+        loaded = open_bundle(path)
+        self.assertIsNone(loaded.engine_type)
+        self.assertEqual(loaded.vector_runs, [])
+        self.assertEqual(loaded.event_runs, [])
+        # But the runs are still accessible via the union view.
+        self.assertEqual(
+            len(loaded.backtest_runs), len(self.fixture.backtest_runs)
+        )

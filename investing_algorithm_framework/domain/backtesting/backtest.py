@@ -57,11 +57,54 @@ class Backtest:
     strategy_ids: List[int] = field(default_factory=list)
     parameters: Dict = field(default_factory=dict)
     tag: str = None
+    # Backtest engine that produced this report. One of
+    # ``"vector"``, ``"event"``, or ``None`` (unknown / legacy bundle).
+    # Bundle format v2 uses this to route the runs into the
+    # ``vector_runs`` / ``event_runs`` slots in the on-disk envelope.
+    engine_type: str = None
     # OHLCV payload optionally attached for save_bundle(include_ohlcv=True).
     # Keys are conventionally "<symbol>@<timeframe>" (e.g.
     # "BTC/EUR@1h"), values are pandas DataFrames or any object that
     # has ``to_pandas()``. See issue #487.
     ohlcv: Dict[str, object] = field(default_factory=dict, repr=False)
+
+    # ------------------------------------------------------------------
+    # Engine-aware run / metrics views (bundle v2)
+    # ------------------------------------------------------------------
+    @property
+    def vector_runs(self) -> List[BacktestRun]:
+        """Runs produced by the vectorized backtest engine.
+
+        Returns the full ``backtest_runs`` list when this bundle's
+        ``engine_type == "vector"``, otherwise an empty list. Bundles
+        loaded from format v1 (no ``engine_type`` recorded) return an
+        empty list here; consumers that don't care about the engine
+        should keep using ``backtest_runs``.
+        """
+        return list(self.backtest_runs) if self.engine_type == "vector" \
+            else []
+
+    @property
+    def event_runs(self) -> List[BacktestRun]:
+        """Runs produced by the event-based backtest engine.
+
+        See :py:attr:`vector_runs` for the empty-list semantics on
+        legacy / unknown-engine bundles.
+        """
+        return list(self.backtest_runs) if self.engine_type == "event" \
+            else []
+
+    @property
+    def vector_metrics(self) -> Union[BacktestSummaryMetrics, None]:
+        """Summary metrics for the vector engine (or None)."""
+        return self.backtest_summary if self.engine_type == "vector" \
+            else None
+
+    @property
+    def event_metrics(self) -> Union[BacktestSummaryMetrics, None]:
+        """Summary metrics for the event engine (or None)."""
+        return self.backtest_summary if self.engine_type == "event" \
+            else None
 
     def get_all_backtest_runs(
         self, backtest_date_ranges=None
@@ -208,6 +251,7 @@ class Backtest:
             "algorithm_id": self.algorithm_id,
             "parameters": self.parameters,
             "tag": self.tag,
+            "engine_type": self.engine_type,
         }
 
     @classmethod
@@ -249,12 +293,14 @@ class Backtest:
             strategy_ids=data.get("strategy_ids") or [],
             parameters=data.get("parameters") or {},
             tag=data.get("tag"),
+            engine_type=data.get("engine_type"),
         )
 
     @staticmethod
     def open(
         directory_path: Union[str, Path],
         backtest_date_ranges: List[BacktestDateRange] = None,
+        summary_only: bool = False,
     ) -> 'Backtest':
         """
         Open a backtest report from a directory **or** a ``.iafbt``
@@ -265,6 +311,14 @@ class Backtest:
             backtest_date_ranges (List[BacktestDateRange], optional): A list of
                 date ranges to filter the backtest runs. If provided, only
                 backtest runs matching these date ranges will be loaded.
+            summary_only (bool): When True (bundle format v2 only), skip
+                eager decoding of heavy time-series blobs (equity curves,
+                drawdown series, monthly/yearly returns, etc.). The
+                blobs remain in the in-memory dict as
+                ``{"@blob": "<key>"}`` references and consumers that
+                only need the scalar summary metrics can avoid the
+                Parquet decode cost. Ignored for legacy directory
+                loaders and v1 bundles, where these series live inline.
 
         Returns:
             Backtest: An instance of Backtest with the loaded metrics
@@ -281,7 +335,7 @@ class Backtest:
         if os.path.isfile(path_str):
             from .bundle import BUNDLE_EXT, is_bundle_file, open_bundle
             if path_str.endswith(BUNDLE_EXT) or is_bundle_file(path_str):
-                bt = open_bundle(path_str)
+                bt = open_bundle(path_str, summary_only=summary_only)
                 if backtest_date_ranges is not None:
                     bt.backtest_runs = bt.get_all_backtest_runs(
                         backtest_date_ranges
@@ -296,7 +350,7 @@ class Backtest:
             from .bundle import BUNDLE_EXT, open_bundle
             candidate = path_str + BUNDLE_EXT
             if os.path.isfile(candidate):
-                bt = open_bundle(candidate)
+                bt = open_bundle(candidate, summary_only=summary_only)
                 if backtest_date_ranges is not None:
                     bt.backtest_runs = bt.get_all_backtest_runs(
                         backtest_date_ranges
