@@ -109,6 +109,7 @@ __all__ = [
     "parse_decimal_to_string",
     "parse_string_to_decimal",
     "BacktestRun",
+    "BacktestIndexRow",
     "DATETIME_FORMAT_BACKTESTING",
     "BACKTESTING_FLAG",
     "PortfolioSnapshot",
