@@ -19,6 +19,7 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     Trade, APP_MODE, AppMode, DATETIME_FORMAT, load_backtests_from_directory, \
     iter_backtests_from_directory, \
     BacktestDateRange, convert_polars_to_pandas, BacktestRun, \
+    BacktestIndexRow, \
     DEFAULT_LOGGING_CONFIG, DataType, DataProvider, StopLossRule, \
     ScalingRule, TradingCost, \
     TradeStatus, generate_backtest_summary_metrics, generate_algorithm_id, \
@@ -222,6 +223,7 @@ __all__ = [
     "get_positive_trades",
     "get_number_of_trades",
     "BacktestRun",
+    "BacktestIndexRow",
     "load_backtests_from_directory",
     "iter_backtests_from_directory",
     "save_backtests_to_directory",
