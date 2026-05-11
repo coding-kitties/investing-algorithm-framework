@@ -142,6 +142,38 @@ Every backtest produces a **self-contained HTML dashboard** — open it in any b
 - **Built-in MCP server** — let Copilot, Claude, or any MCP-compatible agent query your backtests, rank strategies, and reason over trades through `investing-algorithm-framework mcp`
 - **Notes keeping** — annotate every backtest with hypotheses, observations and conclusions; notes travel with the report so your research is never lost
 
+#### From backtest results to a report
+
+Every backtest API — vector or event-driven — returns the same `Backtest` object, which the `BacktestReport` consumes directly. So whether you're iterating over an in-memory list or a folder of persisted `.iafbt` bundles, the path to the dashboard is the same:
+
+```python
+from investing_algorithm_framework import BacktestReport
+
+# --- Single event-driven backtest ---
+backtest = app.run_backtest(backtest_date_range=date_range)
+BacktestReport(backtests=[backtest]).save("event_report.html")
+
+# --- A sweep of vector backtests (parameter grid / multi-window) ---
+backtests = app.run_vector_backtests(
+    strategies=[StrategyA(), StrategyB(), StrategyC()],
+    backtest_date_ranges=[range_2022, range_2023, range_2024],
+    n_workers=-1,
+    backtest_storage_directory="./my-backtests/",  # persists .iafbt bundles
+    show_progress=True,
+)
+BacktestReport(backtests=backtests).save("sweep_report.html")
+
+# --- Or: load a folder of bundles back later (parallel decode) ---
+report = BacktestReport.open(
+    directory_path="./my-backtests/",
+    workers=-1,
+    show_progress=True,
+)
+report.save("from_disk_report.html")
+```
+
+For sweeps that grow into the thousands, combine this with the [Backtest Storage Layer](examples/storage_layer_demo/README.md) below — rank in SQLite first, then load only the winners into the report.
+
 → [Backtest dashboard docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtesting) · [MCP server docs](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/mcp-server)
 
 </details>
