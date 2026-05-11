@@ -45,12 +45,21 @@ The script will:
 3. Print the equivalent `iaf` CLI commands you could run by hand.
 4. Run `list_index` / `rank_index` / a raw SQL query and print
    the formatted tables.
-5. Open the top-ranked bundle and print its full backtest report
+5. Open the top-ranked bundle and print its compact backtest report
    (this is the only step that decodes per-run Parquet metric blobs).
-6. Walk the index in rank order and print a one-line summary per
+6. Render an _expanded_ report for the same winning bundle —
+   per-run breakdown, end-of-backtest positions, the first few
+   trades, and a richer slice of per-run risk / return metrics.
+7. Walk the index in rank order and print a one-line summary per
    bundle straight out of the SQLite index — no bundle is opened.
-7. Iterate every bundle in rank order and print a full per-bundle
+8. Iterate every bundle in rank order and print a full per-bundle
    report so you can scan _all_ backtests at a glance.
+9. Tie the storage layer end-to-end into the **HTML dashboard**:
+   pick the top-N bundles via `rank_index` (Tier-1 SQLite only),
+   load each one through `LocalDirStore.open(handle)` (the
+   `BacktestStore` protocol), and feed the resulting list straight
+   into `BacktestReport(...).save(...)`. Open the generated
+   `dashboard.html` to see all selected backtests side-by-side.
 
 ## CLI cheatsheet
 
