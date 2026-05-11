@@ -84,6 +84,7 @@ This framework is built around the full loop: **create strategies → vector bac
 - 📉 **[Benchmark Comparison](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Beat-rate analysis vs Buy & Hold, DCA, risk-free & custom benchmarks
 - 📄 **[One-Click HTML Report](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Self-contained file, no server, dark & light theme, shareable
 - 📦 **[Custom `.iafbt` Backtest Bundle Format](https://coding-kitties.github.io/investing-algorithm-framework/Data/backtest_data)** — An explicit, versioned, compressed, language-portable container (zstd + msgpack with magic-byte header) plus a separate parquet index for fast filtering without loading. ~21× smaller and ~27× fewer files than standard filebased directory layouts, with parallel I/O for fast load/save of large amounts of backtests.
+- 🗄️ **[Tiered Backtest Storage Layer](examples/storage_layer_demo/README.md)** — Manage thousands of `.iafbt` bundles with a Tier-1 SQLite index (sub-100 ms ranks/filters over 10k+ backtests), a swappable `BacktestStore` protocol (`LocalDirStore`, `LocalTieredStore`), content-addressed Tier-3 OHLCV deduplication, and a CLI (`iaf index` / `iaf list` / `iaf rank` / `iaf migrate-store`) that plugs straight into the HTML dashboard.
 - 🌐 **[Load External Data](https://coding-kitties.github.io/investing-algorithm-framework/Data/external-data)** — Fetch CSV, JSON, or Parquet from any URL with caching and auto-refresh
 - � **[Per-Market Deposit Schedules & Portfolio Sync](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/portfolio-sync)** — Declare recurring or one-shot external cash flows on a market with `deposit_schedule=` / `auto_sync=True`. Backtests simulate the deposits; live mode reconciles with the broker — same `context.sync_portfolio()` API in both modes.
 - �📝 **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
@@ -142,6 +143,63 @@ Every backtest produces a **self-contained HTML dashboard** — open it in any b
 - **Notes keeping** — annotate every backtest with hypotheses, observations and conclusions; notes travel with the report so your research is never lost
 
 → [Backtest dashboard docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtesting) · [MCP server docs](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/mcp-server)
+
+</details>
+
+<details open>
+<summary>
+  <strong>Backtest Storage Layer — scale to thousands of backtests</strong>
+</summary> <br>
+
+Once you start sweeping parameter grids and walk-forward windows, a flat folder of `.iafbt` bundles stops scaling: every comparison re-decodes multi-MB Parquet metric blobs just to read a Sharpe number. The storage layer fixes that with three tiers behind a single `BacktestStore` protocol:
+
+- **Tier-1 — SQLite index (`index.sqlite`)**: one row per bundle with every scalar from `BacktestSummaryMetrics` promoted to its own column. Ranking 10k+ bundles becomes a sub-100 ms SQL query — no `.iafbt` is opened.
+- **Tier-2 — `BacktestStore` adapters**: `LocalDirStore` (flat folder of bundles) or `LocalTieredStore` (hive-partitioned layout). Same handle-based API, swap the implementation without touching call sites.
+- **Tier-3 — content-addressed OHLCV chunks**: SHA-256 deduped per-symbol OHLCV blobs shared across every bundle that references them. `garbage_collect_ohlcv()` reclaims orphans.
+
+A CLI ties it all together: `iaf index` builds/refreshes the Tier-1 SQLite, `iaf list` / `iaf rank` query it, and `iaf migrate-store` moves a whole collection between store kinds in one command.
+
+#### Typical workflow
+
+```python
+from investing_algorithm_framework import BacktestReport
+from investing_algorithm_framework.cli.index_command import (
+    build_index, rank_index,
+)
+from investing_algorithm_framework.services.backtest_store import (
+    LocalDirStore,
+)
+
+# 1. Build (or refresh) the Tier-1 SQLite index over a folder of .iafbt bundles.
+build_index("./my-backtests/")          # equivalent to: iaf index ./my-backtests/
+
+# 2. Pick the top 20 by Sharpe straight from SQLite — no Parquet decoded.
+top = rank_index(
+    "./my-backtests/",
+    by="sharpe_ratio",
+    where="summary_number_of_trades > 50",
+    limit=20,
+)
+
+# 3. Materialise just those 20 bundles through the BacktestStore protocol.
+store = LocalDirStore("./my-backtests/")
+backtests = [store.open(row["bundle_path"]) for row in top]
+
+# 4. Feed them straight into the HTML dashboard.
+BacktestReport(backtests=backtests).save("top20.html")
+```
+
+Or from the shell:
+
+```bash
+iaf index ./my-backtests/
+iaf rank  ./my-backtests/ --by sharpe_ratio --where "summary_number_of_trades > 50" -n 20
+iaf list  ./my-backtests/ --sort calmar_ratio --json
+iaf migrate-store --from local-dir --src ./my-backtests/ \
+                  --to   local-tiered --dst ./tiered/
+```
+
+→ End-to-end runnable example: [`examples/storage_layer_demo/`](examples/storage_layer_demo/README.md)
 
 </details>
 
