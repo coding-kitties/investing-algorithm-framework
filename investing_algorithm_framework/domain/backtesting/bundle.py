@@ -318,6 +318,14 @@ class LazyOhlcvDict(Dict[str, Any]):
     def keys(self):  # type: ignore[override]
         return self._manifest.keys()
 
+    def values(self):  # type: ignore[override]
+        for k in self._manifest:
+            yield self[k]
+
+    def items(self):  # type: ignore[override]
+        for k in self._manifest:
+            yield k, self[k]
+
     def __getitem__(self, key: str):
         if key in self._cache:
             return self._cache[key]
