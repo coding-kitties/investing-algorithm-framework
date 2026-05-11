@@ -69,10 +69,27 @@ Cross-bundle redundancy is the dominant unexploited source of size:
 | Identity | `run_id` (uuid7), `bundle_id`, `parent_sweep_id`, `tenant_id`, `project_id` |
 | Provenance | `algorithm_id`, `code_hash`, `framework_version`, `created_at` |
 | Config | `engine_type`, `params_hash`, `symbols_hash`, `date_range_name`, `start_date`, `end_date`, `tag` |
-| Scalar metrics | `BacktestSummary` fields — Sharpe, Sortino, max_dd, CAGR, total_net_gain, win_rate, … |
+| Scalar metrics | `BacktestSummaryMetrics` fields (nested in `BacktestIndexRow.summary_metrics`) — Sharpe, Sortino, max_dd, CAGR, total_net_gain, win_rate, … |
 | Refs | `snapshots_dataset_uri`, `trades_dataset_uri`, `metric_series_dataset_uri`, `ohlcv_chunk_hashes[]`, `code_chunk_hash`, `symbols_chunk_hash`, `params_chunk_hash` |
 
 Row size: ~1–2 KB. 12,500 rows ≈ 25 MB. Fits comfortably in SQLite for local users.
+
+> **Status (epic #540 phase 1, v8.10):** the typed contract for this row
+> ships as `investing_algorithm_framework.BacktestIndexRow`, derived
+> via `Backtest.index_row(bundle_path=...)`. The method works against
+> bundles loaded with `Backtest.open(path, summary_only=True)` — no
+> Parquet metric blobs are decoded on the fast index path. The
+> existing `BacktestIndex` Parquet sidecar is now built on top of this
+> typed row (`BacktestIndexRow.to_flat_dict()`), making the wire
+> shape and the in-memory shape a single source of truth.
+>
+> **Status (epic #540 phase 2, v8.10):** the SQLite implementation
+> ships as `investing_algorithm_framework.services.backtest_index
+> .SqliteBacktestIndex`, with `iaf index <bundle-dir>` as the CLI
+> entry point. Every scalar field of `BacktestSummaryMetrics` is
+> promoted to its own SQL column (`summary_<name>`), so analysts can
+> filter without opening any bundle, e.g. `SELECT bundle_path FROM
+> backtest_index WHERE summary_sharpe_ratio > 1.0`.
 
 ### 3.2 Tier 2 schemas (Parquet, long format)
 
@@ -215,7 +232,7 @@ Zero behavioural difference vs today. Single-file `.iafbt` users get `export()` 
 | Phase | Change | Risk |
 |---|---|---|
 | **v8.9 (shipped)** | Bundle format v2; engine_type split; zstd 19; summary_only read | — |
-| **v8.10** | `Backtest.scalar_summary()` (no decode of bulk); `iaf index <dir>` builds a SQLite index over a folder of bundles; `BacktestSummary` DTO with stable schema | Low — additive read paths |
+| **v8.10** | `Backtest.index_row()` (no decode of bulk); `iaf index <dir>` builds a SQLite index over a folder of bundles; `BacktestIndexRow` DTO with stable schema | Low — additive read paths |
 | **v8.11** | `BacktestStore` interface with `LocalDirStore` (today) and `LocalTieredStore`. `.iafbt` becomes export format; service constructors accept a store | Medium — touches every backtest service constructor; deprecation flag for one minor cycle |
 | **Finterion (closed)** | `RemoteTieredStore` over Postgres + S3 + chunk service | Closed-source, unblocked by v8.11 |
 

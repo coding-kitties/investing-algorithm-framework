@@ -13,6 +13,7 @@ from .backtest_run import BacktestRun
 from .backtest_permutation_test import BacktestPermutationTest
 from .backtest_date_range import BacktestDateRange
 from .backtest_summary_metrics import BacktestSummaryMetrics
+from .backtest_index_row import BacktestIndexRow
 from .combine_backtests import generate_backtest_summary_metrics
 
 
@@ -214,6 +215,42 @@ class Backtest:
         if run:
             return run.backtest_metrics
         return None
+
+    def index_row(
+        self, bundle_path: Union[str, None] = None,
+    ) -> BacktestIndexRow:
+        """Return the typed Tier-1 row contract for this backtest.
+
+        The row carries identity, provenance, config and the scalar
+        :class:`BacktestSummaryMetrics`, but **no heavy time-series
+        data**. It can therefore be built without decoding any v2
+        Parquet metric blobs (``Backtest.open(path,
+        summary_only=True)`` is the canonical fast read path).
+
+        Args:
+            bundle_path: Optional location the bundle was loaded from
+                (relative or absolute). Stored verbatim in
+                :pyattr:`BacktestIndexRow.bundle_path` for downstream
+                indexers that need to round-trip back to the file.
+
+        Returns:
+            BacktestIndexRow: typed, flat-friendly row.
+
+        See also:
+            ``docs/design/tiered-backtest-storage.md`` §3.1 — the
+            authoritative schema this row implements.
+        """
+        return BacktestIndexRow(
+            algorithm_id=self.algorithm_id,
+            tag=self.tag,
+            bundle_path=bundle_path,
+            engine_type=self.engine_type,
+            risk_free_rate=self.risk_free_rate,
+            parameters=dict(self.parameters or {}),
+            strategy_ids=list(self.strategy_ids or []),
+            number_of_runs=len(self.backtest_runs or []),
+            summary_metrics=self.backtest_summary,
+        )
 
     def get_backtest_summary(self) -> Union[BacktestSummaryMetrics, None]:
         """
