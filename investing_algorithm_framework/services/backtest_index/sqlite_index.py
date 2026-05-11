@@ -51,7 +51,7 @@ logger = logging.getLogger(__name__)
 
 # Bumped on any additive schema change. Old files are upgraded
 # in-place by :meth:`SqliteBacktestIndex._migrate`.
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 # Columns of BacktestIndexRow that map 1:1 to typed SQL columns.
 # (parameters / strategy_ids are emitted as JSON text columns; the
@@ -68,6 +68,10 @@ _IDENTITY_COLUMNS: Tuple[Tuple[str, str], ...] = (
     ("strategy_ids_json", "TEXT"),
     ("extras_json", "TEXT"),
     ("summary_extras_json", "TEXT"),
+    # Provenance for incremental indexing — skip bundles whose
+    # mtime + size match an existing row (epic #540 phase 2).
+    ("bundle_mtime_ns", "INTEGER"),
+    ("bundle_size", "INTEGER"),
 )
 
 
@@ -190,8 +194,21 @@ class SqliteBacktestIndex:
     # ------------------------------------------------------------------
     # Writes
     # ------------------------------------------------------------------
-    def upsert(self, row: BacktestIndexRow) -> None:
+    def upsert(
+        self,
+        row: BacktestIndexRow,
+        bundle_mtime_ns: Optional[int] = None,
+        bundle_size: Optional[int] = None,
+    ) -> None:
         """Insert or replace a single row, keyed by ``bundle_path``.
+
+        Args:
+            row: the typed row to write.
+            bundle_mtime_ns: optional file mtime in nanoseconds; used
+                by :meth:`is_up_to_date` to support incremental
+                indexing (epic #540 phase 2).
+            bundle_size: optional file size in bytes, used together
+                with ``bundle_mtime_ns`` for the freshness check.
 
         Raises:
             ValueError: if ``row.bundle_path`` is None (it is the PK).
@@ -202,6 +219,8 @@ class SqliteBacktestIndex:
                 "upsert (used as the primary key)."
             )
         record = self._row_to_record(row)
+        record["bundle_mtime_ns"] = bundle_mtime_ns
+        record["bundle_size"] = bundle_size
         cols = list(record.keys())
         placeholders = ", ".join("?" for _ in cols)
         col_list = ", ".join(f'"{c}"' for c in cols)
@@ -211,6 +230,28 @@ class SqliteBacktestIndex:
             [record[c] for c in cols],
         )
         self._conn.commit()
+
+    def is_up_to_date(
+        self, bundle_path: str, mtime_ns: int, size: int,
+    ) -> bool:
+        """Return True if the index already has a row for *bundle_path*
+        whose ``(mtime_ns, size)`` matches the on-disk file.
+
+        Used by :func:`build_index` to skip bundles that have not
+        changed since the last index build (epic #540 phase 2).
+        """
+        cur = self._conn.execute(
+            f'SELECT bundle_mtime_ns, bundle_size '
+            f'FROM "{_TABLE}" WHERE bundle_path = ?',
+            (bundle_path,),
+        )
+        row = cur.fetchone()
+        if row is None:
+            return False
+        return (
+            row["bundle_mtime_ns"] == mtime_ns
+            and row["bundle_size"] == size
+        )
 
     def upsert_many(self, rows: Iterable[BacktestIndexRow]) -> int:
         """Bulk insert/replace; returns the number of rows written."""

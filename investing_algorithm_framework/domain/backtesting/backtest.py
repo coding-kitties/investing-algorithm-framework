@@ -263,6 +263,22 @@ class Backtest:
         """
         return self.backtest_summary
 
+    def scalar_summary(self) -> Union[BacktestSummaryMetrics, None]:
+        """Alias for :meth:`get_backtest_summary` — the typed scalar
+        roll-up named per epic #540 phase 1.
+
+        The Tier-1 storage layer (``BacktestIndexRow`` and the SQLite
+        index) builds on this scalar view: it can be obtained from a
+        bundle opened with ``summary_only=True`` without decoding any
+        Parquet metric blobs, making list / rank workloads cheap.
+
+        Returns:
+            Union[BacktestSummaryMetrics, None]: The cross-window
+                scalar metrics, or ``None`` if they were never
+                computed for this backtest.
+        """
+        return self.backtest_summary
+
     def to_dict(self) -> dict:
         """
         Convert the Backtest instance to a dictionary.

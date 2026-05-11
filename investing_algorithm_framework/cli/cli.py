@@ -343,7 +343,13 @@ cli.add_command(migrate_backtests_cmd)
     "--no-progress", is_flag=True, default=False,
     help="Suppress the progress bar.",
 )
-def index_cmd(directory, output, absolute_paths, no_progress):
+@click.option(
+    "--rebuild", is_flag=True, default=False,
+    help="Force a full rebuild instead of incremental refresh "
+         "(default: skip bundles whose mtime+size match an existing "
+         "row).",
+)
+def index_cmd(directory, output, absolute_paths, no_progress, rebuild):
     """Build a SQLite Tier-1 index over a folder of ``.iafbt`` bundles.
 
     The resulting ``index.sqlite`` file holds one row per bundle with
@@ -364,8 +370,150 @@ def index_cmd(directory, output, absolute_paths, no_progress):
         output=output,
         relative_paths=not absolute_paths,
         show_progress=not no_progress,
+        incremental=not rebuild,
     )
     click.echo(f"Wrote SQLite index to {out}")
 
 
 cli.add_command(index_cmd)
+
+
+@click.command(name="list")
+@click.argument(
+    "index_path",
+    type=click.Path(exists=True, file_okay=True, dir_okay=True),
+)
+@click.option(
+    "--sort", "sort_by", default=None,
+    help="Metric / column to sort by (e.g. sharpe_ratio, "
+         "summary_total_net_gain_percentage, algorithm_id). "
+         "Bare metric names are auto-prefixed with 'summary_'.",
+)
+@click.option(
+    "--asc", "ascending", is_flag=True, default=False,
+    help="Sort ascending (default: descending / best-first).",
+)
+@click.option(
+    "--limit", "-n", type=int, default=None,
+    help="Maximum number of rows to print.",
+)
+@click.option(
+    "--where", default=None,
+    help='Raw SQL WHERE fragment (no leading WHERE). '
+         'Example: --where "summary_sharpe_ratio > 1.0 AND tag = \'demo\'"',
+)
+@click.option(
+    "--columns", default=None,
+    help="Comma-separated list of columns to print "
+         "(default: a curated set of identity + summary metrics).",
+)
+@click.option(
+    "--json", "as_json", is_flag=True, default=False,
+    help="Emit JSON instead of a text table.",
+)
+def list_cmd(
+    index_path, sort_by, ascending, limit, where, columns, as_json,
+):
+    """List rows from a SQLite Tier-1 index built by ``iaf index``.
+
+    ``INDEX_PATH`` may be either an ``index.sqlite`` file or the
+    directory it lives in.
+
+    Examples:
+
+        iaf list ./backtests --sort sharpe_ratio -n 20
+
+        iaf list index.sqlite --where "summary_max_drawdown > -0.1" \\
+            --sort sortino_ratio
+    """
+    from .index_command import list_index, format_table
+    cols = (
+        [c.strip() for c in columns.split(",")] if columns else None
+    )
+    rows = list_index(
+        index_path=index_path,
+        sort_by=sort_by,
+        ascending=ascending,
+        limit=limit,
+        where=where,
+        columns=cols,
+    )
+    if as_json:
+        import json as _json
+        click.echo(_json.dumps(rows, indent=2, default=str))
+    else:
+        click.echo(format_table(rows, columns=cols))
+
+
+cli.add_command(list_cmd)
+
+
+@click.command(name="rank")
+@click.argument(
+    "index_path",
+    type=click.Path(exists=True, file_okay=True, dir_okay=True),
+)
+@click.option(
+    "--by", "by", required=True,
+    help="Metric to rank by (e.g. sharpe_ratio, sortino_ratio, "
+         "calmar_ratio, profit_factor). Bare metric names are "
+         "auto-prefixed with 'summary_'.",
+)
+@click.option(
+    "--limit", "-n", type=int, default=10,
+    help="Number of rows to return (default: 10).",
+)
+@click.option(
+    "--asc", "ascending", is_flag=True, default=False,
+    help="Rank ascending (e.g. for max_drawdown where smaller is "
+         "better the user typically wants ascending order on the "
+         "magnitude). Default: descending / best-first.",
+)
+@click.option(
+    "--where", default=None,
+    help='Optional SQL WHERE fragment to filter candidates before '
+         'ranking. Example: --where "tag = \'walk-forward\'".',
+)
+@click.option(
+    "--columns", default=None,
+    help="Comma-separated list of columns to print "
+         "(default: identity + key risk-adjusted metrics).",
+)
+@click.option(
+    "--json", "as_json", is_flag=True, default=False,
+    help="Emit JSON instead of a text table.",
+)
+def rank_cmd(index_path, by, limit, ascending, where, columns, as_json):
+    """Rank backtests in a Tier-1 index by a single metric.
+
+    Sugar over ``iaf list --sort <by> --limit <n>`` with a column set
+    geared toward strategy comparison (Sharpe / Sortino / Calmar /
+    return / drawdown).
+
+    Examples:
+
+        iaf rank ./backtests --by sharpe_ratio -n 5
+
+        iaf rank index.sqlite --by profit_factor \\
+            --where "summary_number_of_trades > 50"
+    """
+    from .index_command import rank_index, format_table
+    cols = (
+        [c.strip() for c in columns.split(",")] if columns else None
+    )
+    rows = rank_index(
+        index_path=index_path,
+        by=by,
+        limit=limit,
+        where=where,
+        columns=cols,
+        ascending=ascending,
+    )
+    if as_json:
+        import json as _json
+        click.echo(_json.dumps(rows, indent=2, default=str))
+    else:
+        click.echo(format_table(rows, columns=cols))
+
+
+cli.add_command(rank_cmd)
