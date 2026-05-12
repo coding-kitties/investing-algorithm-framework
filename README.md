@@ -202,7 +202,7 @@ winners = [store.open(row["bundle_path"]) for row in top]
 BacktestReport(backtests=winners).save("top25_by_sharpe.html")
 ```
 
-> 💡 **Going further than a single HTML file?** A self-contained `report.html` is great for sharing a hand-picked set of winners, but past a few dozen backtests in one document the browser starts to struggle. For team-scale workflows — searching, filtering, comparing and annotating across thousands of backtests in a server-backed UI — use a quant infrastructure provider such as **[Finterion](https://www.finterion.com/)**, which is purpose-built on top of this storage layer for large-scale backtest analysis.
+> 💡 **Going further than a single HTML file?** A self-contained `report.html` is great for sharing a hand-picked set of winners, but past a few dozen backtests in one document the browser starts to struggle. If you're looking for more advanced features — searching, filtering, comparing and annotating thousands of backtests on the go in a server-backed UI — have a look at **[Finterion](https://www.finterion.com/)**.
 
 → [Backtest dashboard docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtesting) · [MCP server docs](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/mcp-server)
 
