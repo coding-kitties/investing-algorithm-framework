@@ -1,5 +1,6 @@
-"""``LocalTieredStore`` — Tier-1 SQLite + Tier-2 Parquet + canonical
-``.iafbt`` bundles on a local filesystem (epic #540 phase 3b).
+"""``LocalTieredStore`` — Tier-1 SQLite + Tier-2 Parquet + Tier-3
+content-addressed OHLCV chunks + canonical ``.iafbt`` bundles on a
+local filesystem (epic #540 phases 3b + 3c).
 
 Layout under *root*::
 
@@ -10,6 +11,8 @@ Layout under *root*::
             portfolio_snapshots/run_id=<handle>/part-0.parquet
             trades/run_id=<handle>/part-0.parquet
             orders/run_id=<handle>/part-0.parquet
+        ohlcv/                     # Tier-3, content-addressed by SHA-256
+            <sha256>.parquet       # shared across every bundle in the store
 
 The bundle file is the canonical representation. The Tier-1 index and
 the Tier-2 Parquet datasets are derived, eagerly maintained, and
@@ -61,6 +64,7 @@ logger = logging.getLogger(__name__)
 INDEX_FILENAME = "index.sqlite"
 BUNDLES_SUBDIR = "bundles"
 PARQUET_SUBDIR = "parquet"
+OHLCV_SUBDIR = "ohlcv"
 
 
 def _records_to_table(records: List[dict]) -> Optional[Any]:
@@ -122,9 +126,12 @@ class LocalTieredStore(BacktestStore):
         self.root.mkdir(parents=True, exist_ok=True)
         self._bundles_dir = self.root / BUNDLES_SUBDIR
         self._parquet_dir = self.root / PARQUET_SUBDIR
+        self._ohlcv_dir = self.root / OHLCV_SUBDIR
         self._index_path = self.root / INDEX_FILENAME
         self._bundles_dir.mkdir(parents=True, exist_ok=True)
         self._parquet_dir.mkdir(parents=True, exist_ok=True)
+        # Tier-3 dir is created lazily on first OHLCV-bearing write so
+        # bundles without attached price data leave no empty subdir.
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -180,8 +187,19 @@ class LocalTieredStore(BacktestStore):
         bundle_path = self._bundle_path(bare)
         bundle_path.parent.mkdir(parents=True, exist_ok=True)
 
-        # 1. Canonical bytes — bundle.
-        backtest.save_bundle(bundle_path)
+        # 1. Canonical bytes — bundle. When the backtest has OHLCV
+        # attached, route the side-store to the shared Tier-3 chunk
+        # directory so identical (symbol, timeframe) Parquet bytes are
+        # written once and referenced by every bundle that needs them.
+        has_ohlcv = bool(getattr(backtest, "ohlcv", None))
+        if has_ohlcv:
+            backtest.save_bundle(
+                bundle_path,
+                include_ohlcv=True,
+                ohlcv_store=self._ohlcv_dir,
+            )
+        else:
+            backtest.save_bundle(bundle_path)
 
         # 2. Tier-1 — SQLite row.
         stat = bundle_path.stat()
@@ -242,7 +260,16 @@ class LocalTieredStore(BacktestStore):
         path = self._bundle_path(handle)
         if not path.is_file():
             raise StoreHandleNotFoundError(handle)
-        return Backtest.open(str(path), summary_only=summary_only)
+        # Route OHLCV resolution through the shared Tier-3 chunk
+        # directory regardless of what path the bundle was written
+        # with. Bundles without OHLCV ignore the override.
+        from investing_algorithm_framework.domain.backtesting.bundle \
+            import open_bundle as _open_bundle
+        return _open_bundle(
+            str(path),
+            ohlcv_store=self._ohlcv_dir,
+            summary_only=summary_only,
+        )
 
     def exists(self, handle: StoreHandle) -> bool:
         try:
@@ -380,6 +407,10 @@ class LocalTieredStore(BacktestStore):
         Useful when sidecars were edited out-of-band or after a
         software upgrade adds new index columns. Returns the number of
         rows written.
+
+        Tier-3 OHLCV chunks are *not* touched \u2014 they are
+        content-addressed and globally shared. Use
+        :meth:`garbage_collect_ohlcv` to reclaim orphans.
         """
         if self._index_path.is_file():
             self._index_path.unlink()
@@ -408,3 +439,118 @@ class LocalTieredStore(BacktestStore):
 
     def __repr__(self) -> str:
         return f"LocalTieredStore(root={str(self.root)!r})"
+
+    # ------------------------------------------------------------------
+    # Tier-3 — content-addressed OHLCV chunks
+    # ------------------------------------------------------------------
+    def _read_ohlcv_manifest(self, handle: StoreHandle) -> dict:
+        """Return the ``{key: <sha>.parquet}`` manifest stored in the
+        bundle envelope, or an empty dict if the bundle has no OHLCV.
+
+        Decodes the envelope directly so we avoid the cost of
+        instantiating a full :class:`Backtest`.
+        """
+        from investing_algorithm_framework.domain.backtesting.bundle \
+            import _decode_payload  # noqa: WPS437 — internal helper
+        path = self._bundle_path(handle)
+        if not path.is_file():
+            raise StoreHandleNotFoundError(handle)
+        try:
+            _, doc = _decode_payload(path.read_bytes())
+        except Exception as exc:
+            logger.warning(
+                "Tier-3 manifest read failed for %s: %s", handle, exc,
+            )
+            return {}
+        meta = doc.get("ohlcv") or {}
+        return dict(meta.get("manifest") or {})
+
+    def iter_ohlcv_hashes(self) -> Iterator[str]:
+        """Yield every OHLCV chunk hash referenced by any bundle.
+
+        Hashes are emitted with possible duplicates (one per
+        ``(handle, key)`` reference); de-duplicate in the caller if
+        needed. Useful as the input for the dedup-upload negotiate
+        step in ``docs/design/ohlcv-dedup-protocol.md``.
+        """
+        for handle in self.iter_handles():
+            for rel in self._read_ohlcv_manifest(handle).values():
+                if rel.endswith(".parquet"):
+                    yield rel[: -len(".parquet")]
+                else:
+                    yield rel
+
+    def ohlcv_referenced_hashes(self) -> set:
+        """Return the de-duplicated set of OHLCV hashes referenced
+        across all bundles in the store.
+        """
+        return set(self.iter_ohlcv_hashes())
+
+    def ohlcv_stored_hashes(self) -> set:
+        """Return the set of OHLCV hashes physically present on disk
+        under ``<root>/ohlcv/``.
+        """
+        if not self._ohlcv_dir.is_dir():
+            return set()
+        out: set = set()
+        for p in self._ohlcv_dir.iterdir():
+            if p.is_file() and p.suffix == ".parquet":
+                out.add(p.stem)
+        return out
+
+    def ohlcv_stats(self) -> dict:
+        """Return a snapshot of the Tier-3 store.
+
+        Keys: ``stored_blobs`` (int), ``stored_bytes`` (int),
+        ``referenced_blobs`` (int), ``orphan_blobs`` (int),
+        ``missing_blobs`` (int — referenced but absent on disk,
+        should be 0 in a healthy store).
+        """
+        stored = self.ohlcv_stored_hashes()
+        referenced = self.ohlcv_referenced_hashes()
+        stored_bytes = 0
+        if self._ohlcv_dir.is_dir():
+            for p in self._ohlcv_dir.iterdir():
+                if p.is_file() and p.suffix == ".parquet":
+                    try:
+                        stored_bytes += p.stat().st_size
+                    except OSError:  # pragma: no cover
+                        pass
+        return {
+            "stored_blobs": len(stored),
+            "stored_bytes": stored_bytes,
+            "referenced_blobs": len(referenced),
+            "orphan_blobs": len(stored - referenced),
+            "missing_blobs": len(referenced - stored),
+        }
+
+    def garbage_collect_ohlcv(
+        self, *, dry_run: bool = False,
+    ) -> List[str]:
+        """Remove OHLCV chunks that no bundle in the store references.
+
+        Args:
+            dry_run: When True, no files are deleted; the list of
+                orphans is returned so callers can audit before
+                committing.
+
+        Returns:
+            The list of hashes that were (or would be) removed.
+        """
+        stored = self.ohlcv_stored_hashes()
+        referenced = self.ohlcv_referenced_hashes()
+        orphans = sorted(stored - referenced)
+        if dry_run:
+            return orphans
+        for digest in orphans:
+            path = self._ohlcv_dir / f"{digest}.parquet"
+            try:
+                path.unlink()
+            except FileNotFoundError:  # pragma: no cover - race
+                pass
+            except OSError as exc:  # pragma: no cover - logged
+                logger.warning(
+                    "garbage_collect_ohlcv: failed to remove %s: %s",
+                    path, exc,
+                )
+        return orphans
