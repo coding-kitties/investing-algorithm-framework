@@ -79,24 +79,27 @@
   </g>
 </g>
 
-<text x="344" y="324" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#e0f5ff" font-weight="500">Thousands of backtests, one place.</text>
-<text x="344" y="346" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#9898b0">Filter, rank, diff and annotate every run — with an</text>
-<text x="344" y="362" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#9898b0">AI research analyst at your side.</text>
+<text x="344" y="324" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#e0f5ff" font-weight="500">From thousands of runs to publishable insight.</text>
+<text x="344" y="346" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#9898b0">Rank backtests, plot custom charts, build shareable reports</text>
+<text x="344" y="362" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#9898b0">and let AI agents do the heavy analysis for you.</text>
 
 <g transform="translate(344, 384)">
-<rect x="0" y="0" width="92" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".35"/>
-<text x="46" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#22d3ee" text-anchor="middle" font-weight="600">Filter &amp; Rank</text>
+<rect x="0" y="0" width="78" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".35"/>
+<text x="39" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#22d3ee" text-anchor="middle" font-weight="600">Build reports</text>
 
-<rect x="100" y="0" width="92" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".35"/>
-<text x="146" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#22d3ee" text-anchor="middle" font-weight="600">AI Analyst</text>
+<rect x="86" y="0" width="78" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".35"/>
+<text x="125" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#22d3ee" text-anchor="middle" font-weight="600">AI agents</text>
 
-<rect x="200" y="0" width="92" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".35"/>
-<text x="246" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#22d3ee" text-anchor="middle" font-weight="600">Team Share</text>
+<rect x="172" y="0" width="78" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".35"/>
+<text x="211" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#22d3ee" text-anchor="middle" font-weight="600">Rank runs</text>
+
+<rect x="258" y="0" width="78" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".35"/>
+<text x="297" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#22d3ee" text-anchor="middle" font-weight="600">Custom charts</text>
 </g>
 
 <g transform="translate(660, 232)" opacity=".95">
 <rect x="0" y="0" width="200" height="160" rx="10" fill="#0a1416" stroke="#1c2f33"/>
-<text x="14" y="22" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#8da3a8" letter-spacing="1.5" font-weight="700">TOP RUN · SHARPE 2.14</text>
+<text x="14" y="22" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#8da3a8" letter-spacing="1.5" font-weight="700">RANK #1 · SHARPE 2.14</text>
 <polyline points="14,130 38,118 62,124 86,100 110,92 134,72 158,80 186,46 186,150 14,150" fill="#22d3ee" opacity=".14"/>
 <polyline points="14,130 38,118 62,124 86,100 110,92 134,72 158,80 186,46" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
 <line x1="14" y1="128" x2="186" y2="98" stroke="#5a6970" stroke-width="1.2" stroke-dasharray="3 3"/>
@@ -114,17 +117,17 @@
 
 <g transform="translate(72, 482)">
 <circle cx="0" cy="0" r="3" fill="#22d3ee"/>
-<text x="12" y="4" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#9898b0">Filter thousands of runs in seconds</text>
+<text x="12" y="4" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#9898b0">Rank by Sharpe, CAGR, drawdown…</text>
 </g>
 
-<g transform="translate(540, 482)">
+<g transform="translate(440, 482)">
 <circle cx="0" cy="0" r="3" fill="#a78bfa"/>
-<text x="12" y="4" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#9898b0">AI research analyst on every run</text>
+<text x="12" y="4" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#9898b0">AI agents analyse every run for you</text>
 </g>
 
-<g transform="translate(920, 482)">
+<g transform="translate(820, 482)">
 <circle cx="0" cy="0" r="3" fill="#fbbf24"/>
-<text x="12" y="4" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#9898b0">Diff, annotate &amp; share with team</text>
+<text x="12" y="4" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#9898b0">Custom charts &amp; shareable reports</text>
 </g>
 </g>
 </svg>
