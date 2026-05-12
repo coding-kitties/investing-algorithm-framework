@@ -68,7 +68,7 @@
 <rect x="320" y="190" width="560" height="240" rx="18" fill="url(#fcard)" stroke="url(#border)" stroke-width="1.5"/>
 
 <!-- "FEATURED PARTNER" pill -->
-<rect x="344" y="212" width="128" height="22" rx="11" fill="#ecfeff" stroke="#0891b2" stroke-opacity=".4" stroke-width="1"/>
+<rect x="344" y="212" width="148" height="22" rx="11" fill="#ecfeff" stroke="#0891b2" stroke-opacity=".4" stroke-width="1"/>
 <circle class="pl" cx="358" cy="223" r="3" fill="#0891b2"/>
 <text x="368" y="227" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#0891b2" letter-spacing="1.5" font-weight="700">FEATURED PARTNER</text>
 
