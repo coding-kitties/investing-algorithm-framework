@@ -322,6 +322,78 @@ def migrate_backtests_cmd(
 cli.add_command(migrate_backtests_cmd)
 
 
+_STORE_KINDS = ["local-dir", "local-tiered"]
+
+
+@click.command(name="migrate-store")
+@click.option(
+    "--from", "src_kind",
+    type=click.Choice(_STORE_KINDS),
+    required=True,
+    help="Source store kind.",
+)
+@click.option(
+    "--src",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    required=True,
+    help="Path to the source store root.",
+)
+@click.option(
+    "--to", "dst_kind",
+    type=click.Choice(_STORE_KINDS),
+    required=True,
+    help="Destination store kind.",
+)
+@click.option(
+    "--dst",
+    type=click.Path(file_okay=False, dir_okay=True),
+    required=True,
+    help="Path to the destination store root (created if missing).",
+)
+@click.option(
+    "--handles",
+    default=None,
+    help=(
+        "Optional comma-separated subset of source handles to copy. "
+        "When omitted, every handle is copied."
+    ),
+)
+def migrate_store_cmd(src_kind, src, dst_kind, dst, handles):
+    """Copy backtests between two :class:`BacktestStore` implementations.
+
+    Uses the destination's :class:`SupportsCopyFrom` capability so the
+    operation is incremental, restartable, and tier-aware: when copying
+    into a ``local-tiered`` store, identical OHLCV chunks are written
+    exactly once across the entire destination, regardless of how many
+    bundles reference them (epic #540 phase 3c).
+
+    Example::
+
+        iaf migrate-store --from local-dir --src ./bt-old \\
+                          --to local-tiered --dst ./bt-new
+    """
+    from .migrate_store_command import migrate_store
+
+    handle_list = (
+        [h.strip() for h in handles.split(",") if h.strip()]
+        if handles else None
+    )
+    n = migrate_store(
+        src_kind=src_kind,
+        src_root=src,
+        dst_kind=dst_kind,
+        dst_root=dst,
+        handles=handle_list,
+    )
+    click.echo(
+        f"Migrated {n} backtest(s) from {src_kind}:{src} "
+        f"to {dst_kind}:{dst}"
+    )
+
+
+cli.add_command(migrate_store_cmd)
+
+
 @click.command(name="index")
 @click.argument(
     "directory",

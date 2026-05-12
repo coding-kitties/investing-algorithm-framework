@@ -32,6 +32,10 @@ from investing_algorithm_framework.cli.index_command import (
     rank_index,
     format_table,
 )
+from investing_algorithm_framework.services.backtest_store import (
+    LocalDirStore,
+)
+from investing_algorithm_framework import BacktestReport
 
 
 # Directory-format fixture shipped with the test suite. We use it
@@ -107,6 +111,103 @@ def _print_backtest_report(bt: Backtest) -> None:
         None if s.win_rate is None else s.win_rate * 100,
         ".2f",
     )
+
+
+def _print_backtest_full_report(bt: Backtest) -> None:
+    """Render a detailed multi-section report for a single backtest.
+
+    Goes beyond :func:`_print_backtest_report` by walking the
+    per-run breakdown, listing positions, and showing the first few
+    trades/orders so the demo's "open the winner" step actually
+    looks like a backtest report and not just a summary row.
+    """
+    _print_backtest_report(bt)
+
+    runs = bt.backtest_runs or []
+    if not runs:
+        return
+
+    # ------------------- per-run breakdown -------------------
+    print("\n  --- per-run breakdown ---")
+    header = (
+        f"  {'#':>2} {'window':<20} {'days':>5} {'orders':>7} "
+        f"{'trades':>7} {'positions':>10} {'final_value':>14}"
+    )
+    print(header)
+    print("  " + "-" * (len(header) - 2))
+    for i, r in enumerate(runs, start=1):
+        window = (
+            r.backtest_date_range_name
+            if r.backtest_date_range_name
+            else f"{r.backtest_start_date.date()}..{r.backtest_end_date.date()}"
+        )[:20]
+        m = r.backtest_metrics
+        final = (
+            f"{float(m.final_value):.2f}"
+            if m is not None and getattr(m, "final_value", None) is not None
+            else "n/a"
+        )
+        print(
+            f"  {i:>2} {window:<20} {r.number_of_days:>5} "
+            f"{r.number_of_orders:>7} {r.number_of_trades:>7} "
+            f"{r.number_of_positions:>10} {final:>14}"
+        )
+
+    # ------------------- positions snapshot -------------------
+    last = runs[-1]
+    positions = list(getattr(last, "positions", None) or [])
+    if positions:
+        print(f"\n  --- positions (last run, {len(positions)}) ---")
+        for p in positions[:10]:
+            symbol = getattr(p, "symbol", None) or "?"
+            amount = getattr(p, "amount", None)
+            cost = getattr(p, "cost", None)
+            print(
+                f"  {symbol:<14} amount={amount}  cost={cost}"
+            )
+        if len(positions) > 10:
+            print(f"  ... and {len(positions) - 10} more")
+
+    # ------------------- trades preview -------------------
+    trades = list(getattr(last, "trades", None) or [])
+    if trades:
+        print(f"\n  --- trades (last run, {len(trades)} total, first 5) ---")
+        for t in trades[:5]:
+            print(
+                f"  {getattr(t, 'symbol', '?'):<10} "
+                f"opened={getattr(t, 'opened_at', None)} "
+                f"net_gain={getattr(t, 'net_gain', None)}"
+            )
+
+    # ------------------- richer metrics from first run -------------------
+    m = runs[0].backtest_metrics
+    if m is None:
+        return
+    print("\n  --- additional risk / return metrics (first run) ---")
+    extras = [
+        ("cagr", "cagr", ".4f"),
+        ("annual_volatility", "annual_volatility", ".4f"),
+        ("max_drawdown_abs", "max_drawdown_absolute", ".2f"),
+        ("max_drawdown_dur", "max_drawdown_duration", ""),
+        ("gross_profit", "gross_profit", ".2f"),
+        ("gross_loss", "gross_loss", ".2f"),
+        ("best_trade", "best_trade", ".2f"),
+        ("max_consec_wins", "max_consecutive_wins", ""),
+        ("max_consec_losses", "max_consecutive_losses", ""),
+    ]
+    for label, attr, fmt in extras:
+        val = getattr(m, attr, None)
+        if val is None:
+            rendered = "n/a"
+        elif fmt:
+            try:
+                rendered = format(float(val), fmt)
+            except (TypeError, ValueError):
+                rendered = str(val)
+        else:
+            rendered = str(val)
+        print(f"  {label:<22}: {rendered}")
+
 
 
 def _seed_bundles(out_dir: Path, n: int = 6) -> None:
@@ -241,6 +342,20 @@ def main() -> None:
     _print_backtest_report(winner_bt)
 
     # ------------------------------------------------------------------
+    # 6b. Full backtest report — per-run breakdown, positions, trades
+    # ------------------------------------------------------------------
+    _print_section(
+        "6b. Full backtest report for the winner "
+        "(runs / positions / trades)"
+    )
+    print(
+        "Same bundle, expanded view: per-run breakdown, end-of-backtest "
+        "positions, the first few trades, and a richer slice of "
+        "per-run risk/return metrics.\n"
+    )
+    _print_backtest_full_report(winner_bt)
+
+    # ------------------------------------------------------------------
     # 7. Iterate the index and print a one-line report per backtest
     # ------------------------------------------------------------------
     _print_section(
@@ -273,15 +388,63 @@ def main() -> None:
         _print_backtest_report(bt)
 
     # ------------------------------------------------------------------
+    # 9. Storage layer -> HTML dashboard
+    # ------------------------------------------------------------------
+    _print_section(
+        "9. Storage layer -> HTML dashboard "
+        "(rank in SQLite, load via store, render report)"
+    )
+    print(
+        "Wire the Tier-1 SQLite index, the Tier-2 LocalDirStore and the\n"
+        "BacktestReport HTML dashboard end-to-end:\n"
+        "  1. rank_index() picks the top-N bundles from SQLite alone\n"
+        "     (no Parquet metric blob is decoded yet).\n"
+        "  2. LocalDirStore.open(handle) materialises just those\n"
+        "     bundles through the BacktestStore protocol.\n"
+        "  3. BacktestReport(backtests=[...]).save(path) renders the\n"
+        "     interactive HTML dashboard with every loaded bundle.\n"
+    )
+    store = LocalDirStore(work)
+    print(f"  store          : {type(store).__name__}({work})")
+    print(f"  bundles in store: {len(store)}")
+
+    top = rank_index(str(work), by="sharpe_ratio", limit=3)
+    print(f"  top-3 by sharpe: {[r['algorithm_id'] for r in top]}")
+
+    loaded: list[Backtest] = []
+    for r in top:
+        # The Tier-1 row's bundle_path is relative to the store root,
+        # which is exactly what LocalDirStore uses as a handle.
+        handle = r["bundle_path"]
+        bt = store.open(handle)
+        loaded.append(bt)
+        print(
+            f"    store.open({handle!r}) -> {bt.algorithm_id} "
+            f"({len(bt.backtest_runs)} run(s))"
+        )
+
+    report = BacktestReport(backtests=loaded)
+    html_path = work / "dashboard.html"
+    report.save(str(html_path))
+    html_size_kb = os.path.getsize(html_path) / 1024.0
+    print(
+        f"\n  wrote HTML dashboard -> {html_path}\n"
+        f"  size: {html_size_kb:.1f} KB "
+        f"(self-contained: CSS + JS + data inlined)\n"
+        f"  open it with:  open {html_path}"
+    )
+
+    # ------------------------------------------------------------------
     # Wrap up
     # ------------------------------------------------------------------
     _print_section("Done")
     print(
-        "Bundles + index left in:\n"
+        "Bundles + index + dashboard left in:\n"
         f"  {work}\n"
         "Try the CLI directly:\n"
         f"  iaf list {work} --sort calmar_ratio --json\n"
         f"  iaf rank {work} --by sharpe_ratio -n 3\n"
+        f"  open {work / 'dashboard.html'}\n"
     )
 
 

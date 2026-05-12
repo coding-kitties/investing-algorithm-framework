@@ -6,6 +6,10 @@ sidebar_position: 10
 
 The framework generates self-contained HTML dashboard reports for analyzing backtest results. Reports work for both single and multi-strategy backtests — no external dependencies required.
 
+:::tip Working with hundreds or thousands of backtests?
+A `BacktestReport` inlines every backtest into a single HTML file, which becomes too heavy for a browser past a few dozen backtests. Use the [Backtest Storage Layer](./backtest-storage.md) to filter your collection down (in SQLite, sub-100 ms) and render reports only over the winners.
+:::
+
 ## Quick Start
 
 ```python
