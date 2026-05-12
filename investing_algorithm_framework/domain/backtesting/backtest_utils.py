@@ -551,28 +551,14 @@ def iter_backtests_from_directory(
 
 
 def _backtest_to_index_row(bt: Backtest, bundle_path: Optional[str] = None):
-    """Flatten a backtest's summary + identity into a single row."""
-    summary = (
-        bt.backtest_summary.to_dict() if bt.backtest_summary else {}
-    )
-    row = {
-        "algorithm_id": getattr(bt, "algorithm_id", None),
-        "tag": getattr(bt, "tag", None),
-        "risk_free_rate": getattr(bt, "risk_free_rate", None),
-        "bundle_path": bundle_path,
-        "number_of_runs": len(bt.backtest_runs or []),
-    }
-    # Include scalar summary metrics only (no nested structures).
-    for k, v in summary.items():
-        if isinstance(v, (int, float, str, bool)) or v is None:
-            row[f"summary.{k}"] = v
-    # Parameters as JSON for round-trippability without exploding columns.
-    if getattr(bt, "parameters", None):
-        try:
-            row["parameters"] = json.dumps(bt.parameters, default=str)
-        except (TypeError, ValueError):
-            row["parameters"] = None
-    return row
+    """Flatten a backtest's summary + identity into a single row.
+
+    Thin wrapper around :meth:`Backtest.index_row` for callers that
+    want the legacy flat dict shape (Parquet / SQL columns). The
+    typed :class:`BacktestIndexRow` is the authoritative contract \u2014
+    see ``docs/design/tiered-backtest-storage.md`` \u00a73.1.
+    """
+    return bt.index_row(bundle_path=bundle_path).to_flat_dict()
 
 
 def _write_index(directory_path: Union[str, Path], backtests: List[Backtest]):

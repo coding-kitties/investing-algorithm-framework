@@ -310,4 +310,5 @@ class EventBacktestService:
                 [run.backtest_metrics]
             ),
             risk_free_rate=risk_free_rate,
+            engine_type="event",
         )

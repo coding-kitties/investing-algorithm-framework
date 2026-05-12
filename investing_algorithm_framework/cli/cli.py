@@ -320,3 +320,52 @@ def migrate_backtests_cmd(
 
 
 cli.add_command(migrate_backtests_cmd)
+
+
+@click.command(name="index")
+@click.argument(
+    "directory",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+)
+@click.option(
+    "--output", "-o",
+    type=click.Path(file_okay=True, dir_okay=False),
+    default=None,
+    help="Path to the SQLite index file (default: <directory>/index.sqlite).",
+)
+@click.option(
+    "--absolute-paths", is_flag=True, default=False,
+    help="Store absolute bundle paths in the index "
+         "(default: paths relative to <directory>, so the index stays "
+         "portable when the folder is moved).",
+)
+@click.option(
+    "--no-progress", is_flag=True, default=False,
+    help="Suppress the progress bar.",
+)
+def index_cmd(directory, output, absolute_paths, no_progress):
+    """Build a SQLite Tier-1 index over a folder of ``.iafbt`` bundles.
+
+    The resulting ``index.sqlite`` file holds one row per bundle with
+    identity / provenance / config columns and every scalar
+    ``BacktestSummaryMetrics`` field promoted to its own column, so
+    analysts can run ad-hoc SQL queries (e.g.
+    ``SELECT bundle_path FROM backtest_index
+    WHERE summary_sharpe_ratio > 1.0``) without opening any bundle.
+
+    Each bundle is opened with ``summary_only=True`` so no Parquet
+    metric blobs are decoded \u2014 indexing 12,500 bundles is bounded by
+    msgpack header parsing, not metric reconstruction.
+    """
+    from .index_command import build_index
+
+    out = build_index(
+        directory=directory,
+        output=output,
+        relative_paths=not absolute_paths,
+        show_progress=not no_progress,
+    )
+    click.echo(f"Wrote SQLite index to {out}")
+
+
+cli.add_command(index_cmd)

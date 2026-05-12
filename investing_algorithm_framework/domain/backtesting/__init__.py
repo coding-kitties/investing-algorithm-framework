@@ -1,4 +1,5 @@
 from .backtest_summary_metrics import BacktestSummaryMetrics
+from .backtest_index_row import BacktestIndexRow
 from .backtest_date_range import BacktestDateRange
 from .backtest_metrics import BacktestMetrics
 from .backtest_run import BacktestRun
@@ -25,6 +26,7 @@ from .bundle import (
 __all__ = [
     "Backtest",
     "BacktestSummaryMetrics",
+    "BacktestIndexRow",
     "BacktestDateRange",
     "BacktestMetrics",
     "BacktestRun",
