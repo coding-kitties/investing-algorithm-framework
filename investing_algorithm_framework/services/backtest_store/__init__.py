@@ -19,6 +19,7 @@ from .base import (
     SupportsCopyFrom,
 )
 from .local_dir_store import LocalDirStore
+from .local_tiered_store import LocalTieredStore
 
 __all__ = [
     "BacktestStore",
@@ -27,4 +28,5 @@ __all__ = [
     "StoreHandleNotFoundError",
     "SupportsCopyFrom",
     "LocalDirStore",
+    "LocalTieredStore",
 ]
