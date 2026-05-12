@@ -19,7 +19,6 @@ from __future__ import annotations
 import os
 import sqlite3
 import sys
-import tempfile
 from pathlib import Path
 
 from investing_algorithm_framework.domain import Backtest, BUNDLE_EXT
@@ -252,7 +251,8 @@ def _seed_bundles(out_dir: Path, n: int = 6) -> None:
 
 
 def main() -> None:
-    work = Path(tempfile.mkdtemp(prefix="iaf-storage-demo-"))
+    work = Path.cwd() / "iaf-storage-demo"
+    work.mkdir(exist_ok=True)
     print(f"Working directory: {work}")
 
     # ------------------------------------------------------------------
