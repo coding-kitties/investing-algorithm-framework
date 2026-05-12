@@ -48,18 +48,18 @@
 <text class="a1" x="40" y="100" font-family="system-ui,-apple-system,sans-serif" font-size="38" font-weight="700" fill="url(#hdr)">Backtest Analytics for Teams</text>
 <text class="a2" x="40" y="130" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#9898b0">Search, filter, compare, annotate and share thousands of backtests in a server-backed UI.</text>
 
-<rect x="320" y="170" width="560" height="280" fill="url(#fglow)"/>
+<rect x="200" y="160" width="800" height="300" fill="url(#fglow)"/>
 
 <g class="a5">
-<rect x="316" y="186" width="568" height="248" rx="20" fill="#22d3ee" opacity=".08"/>
-<rect x="320" y="190" width="560" height="240" rx="18" fill="url(#fcard)" stroke="url(#border)" stroke-width="1.5"/>
+<rect x="212" y="182" width="776" height="272" rx="20" fill="#22d3ee" opacity=".08"/>
+<rect x="216" y="186" width="768" height="264" rx="18" fill="url(#fcard)" stroke="url(#border)" stroke-width="1.5"/>
 
-<rect x="344" y="212" width="128" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".5" stroke-width="1"/>
-<circle class="pl" cx="358" cy="223" r="3" fill="#22d3ee"/>
-<text x="368" y="227" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#22d3ee" letter-spacing="1.5" font-weight="700">FEATURED PARTNER</text>
+<rect x="240" y="212" width="148" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".5" stroke-width="1"/>
+<circle class="pl" cx="254" cy="223" r="3" fill="#22d3ee"/>
+<text x="264" y="227" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#22d3ee" letter-spacing="1.5" font-weight="700">FEATURED PARTNER</text>
 
 <!-- Finterion logo (dark variant - white wordmark) -->
-<g transform="translate(336, 244) scale(0.42) translate(-415, -395)">
+<g transform="translate(232, 244) scale(0.42) translate(-415, -395)">
   <!-- F mark (gradients) -->
   <path d="M486.19,403.14v22.74c0,2.29-1.51,4.32-3.72,4.96l-60.88,17.84v-22.74c0-2.29,1.51-4.32,3.72-4.96l60.88-17.84Z" fill="#0091ff"/>
   <path d="M425.31,453.55c-2.2.65-3.72,2.67-3.72,4.96v24.15c0,3.13,1.67,5.96,4.27,7.51-2.35-5.51-1.37-9.98,8.4-12.64l16.58-4.86,19.39-5.67c2.2-.64,3.72-2.67,3.72-4.96v-22.74l-48.64,14.24Z" fill="#0078ff"/>
@@ -79,11 +79,11 @@
   </g>
 </g>
 
-<text x="344" y="324" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#e0f5ff" font-weight="500">From thousands of runs to publishable insight.</text>
-<text x="344" y="346" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#9898b0">Rank backtests, plot custom charts, build shareable reports</text>
-<text x="344" y="362" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#9898b0">and let AI agents do the heavy analysis for you.</text>
+<text x="240" y="324" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#e0f5ff" font-weight="500">From thousands of runs to publishable insight.</text>
+<text x="240" y="346" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#9898b0">Rank backtests, plot custom charts, build shareable</text>
+<text x="240" y="362" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#9898b0">reports and let AI agents do the analysis for you.</text>
 
-<g transform="translate(344, 384)">
+<g transform="translate(240, 388)">
 <rect x="0" y="0" width="78" height="22" rx="11" fill="#0a1416" stroke="#22d3ee" stroke-opacity=".35"/>
 <text x="39" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#22d3ee" text-anchor="middle" font-weight="600">Build reports</text>
 
@@ -97,18 +97,63 @@
 <text x="297" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#22d3ee" text-anchor="middle" font-weight="600">Custom charts</text>
 </g>
 
-<g transform="translate(660, 232)" opacity=".95">
-<rect x="0" y="0" width="200" height="160" rx="10" fill="#0a1416" stroke="#1c2f33"/>
-<text x="14" y="22" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#8da3a8" letter-spacing="1.5" font-weight="700">RANK #1 · SHARPE 2.14</text>
-<polyline points="14,130 38,118 62,124 86,100 110,92 134,72 158,80 186,46 186,150 14,150" fill="#22d3ee" opacity=".14"/>
-<polyline points="14,130 38,118 62,124 86,100 110,92 134,72 158,80 186,46" fill="none" stroke="#22d3ee" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<line x1="14" y1="128" x2="186" y2="98" stroke="#5a6970" stroke-width="1.2" stroke-dasharray="3 3"/>
-<line x1="14" y1="150" x2="186" y2="150" stroke="#1c2f33"/>
-<circle cx="186" cy="46" r="3" fill="#22d3ee"/>
-<text x="14" y="146" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#5a6970">Jan</text>
-<text x="174" y="146" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#5a6970">Dec</text>
-<text x="14" y="62" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="700" fill="#34d399">+38.2%</text>
-<text x="14" y="76" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#9898b0">vs. BTC buy &amp; hold</text>
+<!-- ===== REPORT BUILDER MOCK (right side) ===== -->
+<g transform="translate(620, 210)">
+  <rect x="0" y="0" width="344" height="216" rx="10" fill="#0a1416" stroke="#1c2f33"/>
+  <rect x="0" y="0" width="344" height="26" rx="10" fill="#0d1a1d"/>
+  <rect x="0" y="14" width="344" height="12" fill="#0d1a1d"/>
+  <circle cx="14" cy="13" r="3" fill="#fb7185"/>
+  <circle cx="26" cy="13" r="3" fill="#fbbf24"/>
+  <circle cx="38" cy="13" r="3" fill="#34d399"/>
+  <text x="58" y="17" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9" fill="#8da3a8">report.html · Q3 Momentum Sweep</text>
+  <rect x="288" y="6" width="48" height="14" rx="7" fill="#22d3ee"/>
+  <text x="312" y="16" font-family="system-ui,-apple-system,sans-serif" font-size="8" font-weight="700" fill="#0a1416" text-anchor="middle">PUBLISH</text>
+
+  <g transform="translate(12, 36)">
+    <rect x="0"   y="0" width="76" height="30" rx="5" fill="#0d1a1d" stroke="#1c2f33"/>
+    <text x="6" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="7" fill="#8da3a8" letter-spacing="0.5">SHARPE</text>
+    <text x="6" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" fill="#e0f5ff">2.14</text>
+
+    <rect x="82"  y="0" width="76" height="30" rx="5" fill="#0d1a1d" stroke="#1c2f33"/>
+    <text x="88" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="7" fill="#8da3a8" letter-spacing="0.5">CAGR</text>
+    <text x="88" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" fill="#34d399">+38.2%</text>
+
+    <rect x="164" y="0" width="76" height="30" rx="5" fill="#0d1a1d" stroke="#1c2f33"/>
+    <text x="170" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="7" fill="#8da3a8" letter-spacing="0.5">MAX DD</text>
+    <text x="170" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" fill="#e0f5ff">-9.4%</text>
+
+    <rect x="246" y="0" width="74" height="30" rx="5" fill="#0d1a1d" stroke="#1c2f33"/>
+    <text x="252" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="7" fill="#8da3a8" letter-spacing="0.5">TRADES</text>
+    <text x="252" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" fill="#e0f5ff">412</text>
+  </g>
+
+  <g transform="translate(12, 76)">
+    <rect x="0" y="0" width="194" height="92" rx="5" fill="#0d1a1d" stroke="#1c2f33"/>
+    <text x="8" y="12" font-family="system-ui,-apple-system,sans-serif" font-size="7.5" font-weight="700" fill="#e0f5ff">Equity curve</text>
+    <text x="8" y="22" font-family="system-ui,-apple-system,sans-serif" font-size="6.5" fill="#8da3a8">momentum_v2 vs. BTC</text>
+    <polyline points="8,82 28,74 48,76 70,62 92,66 114,52 134,56 154,40 174,34 186,30 186,86 8,86" fill="#22d3ee" opacity=".15"/>
+    <polyline points="8,82 28,74 48,76 70,62 92,66 114,52 134,56 154,40 174,34 186,30" fill="none" stroke="#22d3ee" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <line x1="8" y1="78" x2="186" y2="58" stroke="#5a6970" stroke-width="1" stroke-dasharray="2 2"/>
+  </g>
+
+  <g transform="translate(212, 76)">
+    <rect x="0" y="0" width="120" height="92" rx="5" fill="#1a0f2e" stroke="#3b246b"/>
+    <circle cx="12" cy="14" r="7" fill="#a78bfa"/>
+    <text x="12" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="7" font-weight="700" fill="#1a0f2e" text-anchor="middle">AI</text>
+    <text x="24" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" font-weight="700" fill="#c4b5fd">Agent note</text>
+
+    <rect x="8" y="28" width="104" height="3" rx="1.5" fill="#5b21b6"/>
+    <rect x="8" y="36" width="96"  height="3" rx="1.5" fill="#5b21b6"/>
+    <rect x="8" y="44" width="100" height="3" rx="1.5" fill="#5b21b6"/>
+    <rect x="8" y="52" width="80"  height="3" rx="1.5" fill="#5b21b6"/>
+    <rect x="8" y="60" width="92"  height="3" rx="1.5" fill="#5b21b6"/>
+    <text x="8" y="80" font-family="system-ui,-apple-system,sans-serif" font-size="7" fill="#c4b5fd" font-weight="600">Beat benchmark by +22%</text>
+  </g>
+
+  <g transform="translate(12, 178)">
+    <rect x="0" y="0" width="320" height="24" rx="5" fill="#0a1416" stroke="#1c2f33" stroke-dasharray="3 3"/>
+    <text x="160" y="15" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#8da3a8" text-anchor="middle">+ chart  ·  + metric  ·  + agent note  ·  + table</text>
+  </g>
 </g>
 </g>
 

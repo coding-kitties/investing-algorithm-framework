@@ -51,25 +51,25 @@
 <text class="a2" x="40" y="130" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#475569">Search, filter, compare, annotate and share thousands of backtests in a server-backed UI.</text>
 
 <!-- AMBIENT GLOW -->
-<rect x="320" y="170" width="560" height="280" fill="url(#fglow)"/>
+<rect x="200" y="160" width="800" height="300" fill="url(#fglow)"/>
 
 <!-- FEATURED CARD -->
 <g class="a5">
-<rect x="316" y="186" width="568" height="248" rx="20" fill="#0891b2" opacity=".08"/>
-<rect x="320" y="190" width="560" height="240" rx="18" fill="url(#fcard)" stroke="url(#border)" stroke-width="1.5"/>
+<rect x="212" y="182" width="776" height="272" rx="20" fill="#0891b2" opacity=".08"/>
+<rect x="216" y="186" width="768" height="264" rx="18" fill="url(#fcard)" stroke="url(#border)" stroke-width="1.5"/>
 
-<rect x="344" y="212" width="128" height="22" rx="11" fill="#ecfeff" stroke="#0891b2" stroke-opacity=".4" stroke-width="1"/>
-<circle class="pl" cx="358" cy="223" r="3" fill="#0891b2"/>
-<text x="368" y="227" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#0891b2" letter-spacing="1.5" font-weight="700">FEATURED PARTNER</text>
+<rect x="240" y="212" width="148" height="22" rx="11" fill="#ecfeff" stroke="#0891b2" stroke-opacity=".4" stroke-width="1"/>
+<circle class="pl" cx="254" cy="223" r="3" fill="#0891b2"/>
+<text x="264" y="227" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#0891b2" letter-spacing="1.5" font-weight="700">FEATURED PARTNER</text>
 
 <!-- Finterion logo (official, embedded) -->
-<image x="336" y="244" width="220" height="52" href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iX9Ch0LvQvtC5XzEiIGRhdGEtbmFtZT0i0KHQu9C+0LkgMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmlld0JveD0iNDE1IDM5NSA0NzAgMTEwIj4KICA8ZGVmcz4KICAgIDxzdHlsZT4KICAgICAgLmNscy0xIHsKICAgICAgICBmaWxsOiB1cmwoI1/QkdC10LfRi9C80Y/QvdC90YvQuV/Qs9GA0LDQtNC40LXQvdGCXzEzLTIpOwogICAgICB9CgogICAgICAuY2xzLTEsIC5jbHMtMiwgLmNscy0zLCAuY2xzLTQsIC5jbHMtNSB7CiAgICAgICAgc3Ryb2tlLXdpZHRoOiAwcHg7CiAgICAgIH0KCiAgICAgIC5jbHMtMiB7CiAgICAgICAgZmlsbDogdXJsKCNf0JHQtdC30YvQvNGP0L3QvdGL0Llf0LPRgNCw0LTQuNC10L3Rgl8xMC0yKTsKICAgICAgfQoKICAgICAgLmNscy0zIHsKICAgICAgICBmaWxsOiAjMDAwOwogICAgICB9CgogICAgICAuY2xzLTQgewogICAgICAgIGZpbGw6IHVybCgjX9CR0LXQt9GL0LzRj9C90L3Ri9C5X9Cz0YDQsNC00LjQtdC90YJfMTMpOwogICAgICB9CgogICAgICAuY2xzLTUgewogICAgICAgIGZpbGw6IHVybCgjX9CR0LXQt9GL0LzRj9C90L3Ri9C5X9Cz0YDQsNC00LjQtdC90YJfMTApOwogICAgICB9CiAgICA8L3N0eWxlPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJf0JHQtdC30YvQvNGP0L3QvdGL0Llf0LPRgNCw0LTQuNC10L3Rgl8xMCIgZGF0YS1uYW1lPSLQkdC10LfRi9C80Y/QvdC90YvQuSDQs9GA0LDQtNC40LXQvdGCIDEwIiB4MT0iNDIxLjYiIHkxPSI0MjUuOSIgeDI9IjQ4Ni4xOSIgeTI9IjQyNS45IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzAwNTJmZiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwMDllZmYiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9Il/QkdC10LfRi9C80Y/QvdC90YvQuV/Qs9GA0LDQtNC40LXQvdGCXzEwLTIiIGRhdGEtbmFtZT0i0JHQtdC30YvQvNGP0L3QvdGL0Lkg0LPRgNCw0LTQuNC10L3RgiAxMCIgeDE9IjQyMS42IiB5MT0iNDY0Ljc0IiB4Mj0iNDczLjk1IiB5Mj0iNDY0Ljc0IiB4bGluazpocmVmPSIjX9CR0LXQt9GL0LzRj9C90L3Ri9C5X9Cz0YDQsNC00LjQtdC90YJfMTAiLz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iX9CR0LXQt9GL0LzRj9C90L3Ri9C5X9Cz0YDQsNC00LjQtdC90YJfMTMiIGRhdGEtbmFtZT0i0JHQtdC30YvQvNGP0L3QvdGL0Lkg0LPRgNCw0LTQuNC10L3RgiAxMyIgeDE9IjQyNS44NyIgeTE9IjQ5MC4xNyIgeDI9IjQyNS44OCIgeTI9IjQ5MC4xNyIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNkYmEyMDMiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmZjMDAwIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJf0JHQtdC30YvQvNGP0L3QvdGL0Llf0LPRgNCw0LTQuNC10L3Rgl8xMy0yIiBkYXRhLW5hbWU9ItCR0LXQt9GL0LzRj9C90L3Ri9C5INCz0YDQsNC00LjQtdC90YIgMTMiIHgxPSI0MjQuOCIgeTE9IjQ4NC43NyIgeDI9IjQ1MC44NSIgeTI9IjQ4NC43NyIgeGxpbms6aHJlZj0iI1/QkdC10LfRi9C80Y/QvdC90YvQuV/Qs9GA0LDQtNC40LXQvdGCXzEzIi8+CiAgPC9kZWZzPgogIDxnPgogICAgPHBhdGggY2xhc3M9ImNscy0zIiBkPSJNNTQ5LjU3LDQyMy4yMnYtNi44MWgtNDAuOTF2NjkuODZoMTEuNDh2LTI4LjM1aDI0LjI3YzIuMywwLDQuMTctMS44Nyw0LjE3LTQuMTd2LTYuOGgtMjguNDR2LTE5LjU2aDI1LjI2YzIuMywwLDQuMTctMS44Nyw0LjE3LTQuMTdaIi8+CiAgICA8cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik01NTcuNjUsNDM2LjM3djQ5LjloMTAuNzd2LTQ5LjloLTEwLjc3Wk01NjcuOTMsNDE3LjIxYy0xLjM0LTEuNC0yLjk3LTIuMDktNC45LTIuMDlzLTMuNTUuNjktNC44OSwyLjA5Yy0xLjM0LDEuMzQtMiwyLjkzLTIsNC43OXMuNjYsMy40OSwyLDQuODljMS40LDEuMzQsMy4wMywyLDQuODksMnMzLjQ2LS42Niw0Ljc5LTJjMS40LTEuNCwyLjA5LTMuMDMsMi4wOS00Ljg5cy0uNjYtMy40Ni0xLjk4LTQuNzlaIi8+CiAgICA8cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik02MTcuNDMsNDQwLjYxYy0zLjQ5LTMuNjktOC4xMy01LjUzLTEzLjkyLTUuNTMtNi45OSwwLTEyLjE0LDIuNTctMTUuNDcsNy42OHYtNi4zOWgtMTAuNzd2NDkuOWgxMC43N3YtMjYuNzVjMC00LjcyLDEuMTQtOC4zLDMuNC0xMC43MiwyLjI2LTIuNDMsNS4zNi0zLjY0LDkuMjgtMy42NCwzLjQ2LDAsNi4xOSwxLDguMTksMywyLDIsMyw0Ljg1LDMsOC41N3YyOS41NGgxMC43N3YtMzAuNjNjMC02LjMzLTEuNzUtMTEuMzItNS4yNC0xNS4wM1oiLz4KICAgIDxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTcxNC40Niw0NjEuNDFjMC03LjMxLTIuMzUtMTMuNTQtNy4wOC0xOC42NS00LjcyLTUuMTItMTAuNzEtNy42OC0xNy45Ni03LjY4LTcuNzksMC0xNC4xLDIuNTItMTguOTYsNy41Ny00LjkzLDUuMDctNy4zOSwxMS4yOC03LjM5LDE4LjY3czIuNSwxMy44Nyw3LjUsMTguODdjNS4wNSw0LjkyLDExLjYsNy4zNywxOS42NSw3LjM3LDkuNzEsMCwxNi45OS0zLjYzLDIxLjg1LTEwLjg4bC04Ljg4LTUuMTljLTIuOTIsNC4xMy03LjIyLDYuMTktMTIuODcsNi4xOS00LjE4LDAtNy43LTEuMDMtMTAuNTItMy4wOS0yLjgzLTIuMDYtNC42NC00Ljk2LTUuNDQtOC42OGgzOS43MWMuMjYtMS42Ni40LTMuMTYuNC00LjVaTTY3NC4yNiw0NTcuMTJjLjcyLTMuNzksMi40My02Ljc4LDUuMDktOC45NywyLjY2LTIuMiw1Ljk5LTMuMyw5Ljk3LTMuMywzLjY3LDAsNi43OCwxLjA4LDkuMzQsMy4yLDIuNTUsMi4xNCw0LjIxLDUuMTYsNC45Myw5LjA4aC0yOS4zM1oiLz4KICAgIDxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTczMi43Myw0NDQuNzZ2LTguMzloLTEwLjc5djQ5LjloMTAuNzl2LTI1LjE1YzAtNS4xMiwxLjUyLTguNzksNC41OC0xMC45NywzLjEzLTIuMjcsNi42NS0zLDEwLjc5LTN2LTEwLjc5Yy03LjUxLDAtMTIuNjQsMi4yLTE1LjM2LDguMzlaIi8+CiAgICA8cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik03NTQuMDgsNDM2LjM3djQ5LjloMTAuNzd2LTQ5LjloLTEwLjc3Wk03NjQuMzUsNDE3LjIxYy0xLjMyLTEuNC0yLjk1LTIuMDktNC44OS0yLjA5cy0zLjU1LjY5LTQuODksMi4wOWMtMS4zNCwxLjM0LTIsMi45My0yLDQuNzlzLjY2LDMuNDksMiw0Ljg5YzEuNCwxLjM0LDMuMDMsMiw0Ljg5LDJzMy40Ni0uNjYsNC43OS0yYzEuNC0xLjQsMi4wOS0zLjAzLDIuMDktNC44OXMtLjY2LTMuNDYtMi00Ljc5WiIvPgogICAgPHBhdGggY2xhc3M9ImNscy0zIiBkPSJNODE3LjUzLDQ0Mi42NWMtNS4wNS01LjA1LTExLjI4LTcuNTctMTguNjUtNy41N3MtMTMuNjEsMi41Mi0xOC42Nyw3LjU3Yy01LjEyLDUuMTMtNy42OCwxMS4zNS03LjY4LDE4LjY3czIuNTcsMTMuNTQsNy42OCwxOC42N2M1LjA1LDUuMDUsMTEuMjgsNy41NywxOC42Nyw3LjU3czEzLjYtMi41MiwxOC42NS03LjU3YzUuMTMtNS4xMyw3LjY4LTExLjM1LDcuNjgtMTguNjdzLTIuNTUtMTMuNTQtNy42OC0xOC42N1pNODA5Ljk2LDQ3Mi42Yy0zLDMtNi43LDQuNDktMTEuMDgsNC40OXMtOC4wOC0xLjQ5LTExLjA4LTQuNDljLTMtMy00LjUtNi43Ni00LjUtMTEuMjhzMS41MS04LjI4LDQuNS0xMS4yOGMzLTMsNi42OC00LjQ5LDExLjA4LTQuNDlzOC4wOCwxLjQ5LDExLjA4LDQuNDljMi45OCwzLDQuNDksNi43Niw0LjQ5LDExLjI4cy0xLjUxLDguMjgtNC40OSwxMS4yOFoiLz4KICAgIDxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTg3My4xNyw0NDAuNjFjLTMuNDktMy42OS04LjEzLTUuNTMtMTMuOTItNS41My02Ljk5LDAtMTIuMTQsMi41Ny0xNS40Nyw3LjY4di02LjM5aC0xMC43N3Y0OS45aDEwLjc3di0yNi43NWMwLTQuNzIsMS4xNC04LjMsMy40LTEwLjcyLDIuMjYtMi40Myw1LjM2LTMuNjQsOS4yOC0zLjY0LDMuNDYsMCw2LjE5LDEsOC4xOSwzLDIsMiwzLDQuODUsMyw4LjU3djI5LjU0aDEwLjc3di0zMC42M2MwLTYuMzMtMS43NS0xMS4zMi01LjI0LTE1LjAzWiIvPgogICAgPHBhdGggY2xhc3M9ImNscy0zIiBkPSJNNjYwLjA5LDQzNi4zN2gtMTIuMzh2LTEzLjk3bC0xMC43NywzLjJ2MTAuNzdoLTkuMTl2MTAuMzloMjguMTdjMi4zLDAsNC4xNy0xLjg3LDQuMTctNC4xN3YtNi4yMVoiLz4KICAgIDxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTY0Ny43MSw0NDYuNzVsLTEwLjc3LDMuMjV2MjAuNzFjMCw2LjUxLDEuOCwxMC45OCw1LjM5LDEzLjQxLDMuNTgsMi40Myw5LjUxLDMuMTUsMTcuNzYsMi4xNXYtOS42OGMtMi43My4xMi01LjAxLjE0LTYuODQuMDUtMS44My0uMTEtMy4yMS0uNi00LjE1LTEuNTEtLjk0LS44OS0xLjQtMi4zNy0xLjQtNC40MnYtMjMuOTVaIi8+CiAgPC9nPgogIDxnPgogICAgPHBhdGggY2xhc3M9ImNscy01IiBkPSJNNDg2LjE5LDQwMy4xNHYyMi43NGMwLDIuMjktMS41MSw0LjMyLTMuNzIsNC45NmwtNjAuODgsMTcuODR2LTIyLjc0YzAtMi4yOSwxLjUxLTQuMzIsMy43Mi00Ljk2bDYwLjg4LTE3Ljg0WiIvPgogICAgPGc+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTQyNS4zMSw0NTMuNTVjLTIuMi42NS0zLjcyLDIuNjctMy43Miw0Ljk2djI0LjE1YzAsMy4xMywxLjY3LDUuOTYsNC4yNyw3LjUxLTIuMzUtNS41MS0xLjM3LTkuOTgsOC40LTEyLjY0bDE2LjU4LTQuODYsMTkuMzktNS42N2MyLjItLjY0LDMuNzItMi42NywzLjcyLTQuOTZ2LTIyLjc0bC00OC42NCwxNC4yNFoiLz4KICAgICAgPHBhdGggY2xhc3M9ImNscy00IiBkPSJNNDI1Ljg3LDQ5MC4xN2guMDFzMCwwLS4wMSwwYzAsMCwwLDAsMCwwWiIvPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik00MzQuMjcsNDc3LjUzYy05Ljc3LDIuNjYtMTAuNzUsNy4xMy04LjQxLDEyLjYzbC4wMi4wMmgwYzEuMzMuNTgsMi43LDEuMDcsNC4wOSwxLjQ4bDE3LjM4LDUuMDljMS43NS41MSwzLjQ5LS44LDMuNDktMi42MnYtMjEuNDZsLTE2LjU4LDQuODZaIi8+CiAgICA8L2c+CiAgPC9nPgo8L3N2Zz4=" preserveAspectRatio="xMinYMid meet"/>
+<image x="232" y="244" width="220" height="52" href="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0iVVRGLTgiPz4KPHN2ZyBpZD0iX9Ch0LvQvtC5XzEiIGRhdGEtbmFtZT0i0KHQu9C+0LkgMSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIiB4bWxuczp4bGluaz0iaHR0cDovL3d3dy53My5vcmcvMTk5OS94bGluayIgdmlld0JveD0iNDE1IDM5NSA0NzAgMTEwIj4KICA8ZGVmcz4KICAgIDxzdHlsZT4KICAgICAgLmNscy0xIHsKICAgICAgICBmaWxsOiB1cmwoI1/QkdC10LfRi9C80Y/QvdC90YvQuV/Qs9GA0LDQtNC40LXQvdGCXzEzLTIpOwogICAgICB9CgogICAgICAuY2xzLTEsIC5jbHMtMiwgLmNscy0zLCAuY2xzLTQsIC5jbHMtNSB7CiAgICAgICAgc3Ryb2tlLXdpZHRoOiAwcHg7CiAgICAgIH0KCiAgICAgIC5jbHMtMiB7CiAgICAgICAgZmlsbDogdXJsKCNf0JHQtdC30YvQvNGP0L3QvdGL0Llf0LPRgNCw0LTQuNC10L3Rgl8xMC0yKTsKICAgICAgfQoKICAgICAgLmNscy0zIHsKICAgICAgICBmaWxsOiAjMDAwOwogICAgICB9CgogICAgICAuY2xzLTQgewogICAgICAgIGZpbGw6IHVybCgjX9CR0LXQt9GL0LzRj9C90L3Ri9C5X9Cz0YDQsNC00LjQtdC90YJfMTMpOwogICAgICB9CgogICAgICAuY2xzLTUgewogICAgICAgIGZpbGw6IHVybCgjX9CR0LXQt9GL0LzRj9C90L3Ri9C5X9Cz0YDQsNC00LjQtdC90YJfMTApOwogICAgICB9CiAgICA8L3N0eWxlPgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJf0JHQtdC30YvQvNGP0L3QvdGL0Llf0LPRgNCw0LTQuNC10L3Rgl8xMCIgZGF0YS1uYW1lPSLQkdC10LfRi9C80Y/QvdC90YvQuSDQs9GA0LDQtNC40LXQvdGCIDEwIiB4MT0iNDIxLjYiIHkxPSI0MjUuOSIgeDI9IjQ4Ni4xOSIgeTI9IjQyNS45IiBncmFkaWVudFVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+CiAgICAgIDxzdG9wIG9mZnNldD0iMCIgc3RvcC1jb2xvcj0iIzAwNTJmZiIvPgogICAgICA8c3RvcCBvZmZzZXQ9IjEiIHN0b3AtY29sb3I9IiMwMDllZmYiLz4KICAgIDwvbGluZWFyR3JhZGllbnQ+CiAgICA8bGluZWFyR3JhZGllbnQgaWQ9Il/QkdC10LfRi9C80Y/QvdC90YvQuV/Qs9GA0LDQtNC40LXQvdGCXzEwLTIiIGRhdGEtbmFtZT0i0JHQtdC30YvQvNGP0L3QvdGL0Lkg0LPRgNCw0LTQuNC10L3RgiAxMCIgeDE9IjQyMS42IiB5MT0iNDY0Ljc0IiB4Mj0iNDczLjk1IiB5Mj0iNDY0Ljc0IiB4bGluazpocmVmPSIjX9CR0LXQt9GL0LzRj9C90L3Ri9C5X9Cz0YDQsNC00LjQtdC90YJfMTAiLz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0iX9CR0LXQt9GL0LzRj9C90L3Ri9C5X9Cz0YDQsNC00LjQtdC90YJfMTMiIGRhdGEtbmFtZT0i0JHQtdC30YvQvNGP0L3QvdGL0Lkg0LPRgNCw0LTQuNC10L3RgiAxMyIgeDE9IjQyNS44NyIgeTE9IjQ5MC4xNyIgeDI9IjQyNS44OCIgeTI9IjQ5MC4xNyIgZ3JhZGllbnRVbml0cz0idXNlclNwYWNlT25Vc2UiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAiIHN0b3AtY29sb3I9IiNkYmEyMDMiLz4KICAgICAgPHN0b3Agb2Zmc2V0PSIxIiBzdG9wLWNvbG9yPSIjZmZjMDAwIi8+CiAgICA8L2xpbmVhckdyYWRpZW50PgogICAgPGxpbmVhckdyYWRpZW50IGlkPSJf0JHQtdC30YvQvNGP0L3QvdGL0Llf0LPRgNCw0LTQuNC10L3Rgl8xMy0yIiBkYXRhLW5hbWU9ItCR0LXQt9GL0LzRj9C90L3Ri9C5INCz0YDQsNC00LjQtdC90YIgMTMiIHgxPSI0MjQuOCIgeTE9IjQ4NC43NyIgeDI9IjQ1MC44NSIgeTI9IjQ4NC43NyIgeGxpbms6aHJlZj0iI1/QkdC10LfRi9C80Y/QvdC90YvQuV/Qs9GA0LDQtNC40LXQvdGCXzEzIi8+CiAgPC9kZWZzPgogIDxnPgogICAgPHBhdGggY2xhc3M9ImNscy0zIiBkPSJNNTQ5LjU3LDQyMy4yMnYtNi44MWgtNDAuOTF2NjkuODZoMTEuNDh2LTI4LjM1aDI0LjI3YzIuMywwLDQuMTctMS44Nyw0LjE3LTQuMTd2LTYuOGgtMjguNDR2LTE5LjU2aDI1LjI2YzIuMywwLDQuMTctMS44Nyw0LjE3LTQuMTdaIi8+CiAgICA8cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik01NTcuNjUsNDM2LjM3djQ5LjloMTAuNzd2LTQ5LjloLTEwLjc3Wk01NjcuOTMsNDE3LjIxYy0xLjM0LTEuNC0yLjk3LTIuMDktNC45LTIuMDlzLTMuNTUuNjktNC44OSwyLjA5Yy0xLjM0LDEuMzQtMiwyLjkzLTIsNC43OXMuNjYsMy40OSwyLDQuODljMS40LDEuMzQsMy4wMywyLDQuODksMnMzLjQ2LS42Niw0Ljc5LTJjMS40LTEuNCwyLjA5LTMuMDMsMi4wOS00Ljg5cy0uNjYtMy40Ni0xLjk4LTQuNzlaIi8+CiAgICA8cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik02MTcuNDMsNDQwLjYxYy0zLjQ5LTMuNjktOC4xMy01LjUzLTEzLjkyLTUuNTMtNi45OSwwLTEyLjE0LDIuNTctMTUuNDcsNy42OHYtNi4zOWgtMTAuNzd2NDkuOWgxMC43N3YtMjYuNzVjMC00LjcyLDEuMTQtOC4zLDMuNC0xMC43MiwyLjI2LTIuNDMsNS4zNi0zLjY0LDkuMjgtMy42NCwzLjQ2LDAsNi4xOSwxLDguMTksMywyLDIsMyw0Ljg1LDMsOC41N3YyOS41NGgxMC43N3YtMzAuNjNjMC02LjMzLTEuNzUtMTEuMzItNS4yNC0xNS4wM1oiLz4KICAgIDxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTcxNC40Niw0NjEuNDFjMC03LjMxLTIuMzUtMTMuNTQtNy4wOC0xOC42NS00LjcyLTUuMTItMTAuNzEtNy42OC0xNy45Ni03LjY4LTcuNzksMC0xNC4xLDIuNTItMTguOTYsNy41Ny00LjkzLDUuMDctNy4zOSwxMS4yOC03LjM5LDE4LjY3czIuNSwxMy44Nyw3LjUsMTguODdjNS4wNSw0LjkyLDExLjYsNy4zNywxOS42NSw3LjM3LDkuNzEsMCwxNi45OS0zLjYzLDIxLjg1LTEwLjg4bC04Ljg4LTUuMTljLTIuOTIsNC4xMy03LjIyLDYuMTktMTIuODcsNi4xOS00LjE4LDAtNy43LTEuMDMtMTAuNTItMy4wOS0yLjgzLTIuMDYtNC42NC00Ljk2LTUuNDQtOC42OGgzOS43MWMuMjYtMS42Ni40LTMuMTYuNC00LjVaTTY3NC4yNiw0NTcuMTJjLjcyLTMuNzksMi40My02Ljc4LDUuMDktOC45NywyLjY2LTIuMiw1Ljk5LTMuMyw5Ljk3LTMuMywzLjY3LDAsNi43OCwxLjA4LDkuMzQsMy4yLDIuNTUsMi4xNCw0LjIxLDUuMTYsNC45Myw5LjA4aC0yOS4zM1oiLz4KICAgIDxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTczMi43Myw0NDQuNzZ2LTguMzloLTEwLjc5djQ5LjloMTAuNzl2LTI1LjE1YzAtNS4xMiwxLjUyLTguNzksNC41OC0xMC45NywzLjEzLTIuMjcsNi42NS0zLDEwLjc5LTN2LTEwLjc5Yy03LjUxLDAtMTIuNjQsMi4yLTE1LjM2LDguMzlaIi8+CiAgICA8cGF0aCBjbGFzcz0iY2xzLTMiIGQ9Ik03NTQuMDgsNDM2LjM3djQ5LjloMTAuNzd2LTQ5LjloLTEwLjc3Wk03NjQuMzUsNDE3LjIxYy0xLjMyLTEuNC0yLjk1LTIuMDktNC44OS0yLjA5cy0zLjU1LjY5LTQuODksMi4wOWMtMS4zNCwxLjM0LTIsMi45My0yLDQuNzlzLjY2LDMuNDksMiw0Ljg5YzEuNCwxLjM0LDMuMDMsMiw0Ljg5LDJzMy40Ni0uNjYsNC43OS0yYzEuNC0xLjQsMi4wOS0zLjAzLDIuMDktNC44OXMtLjY2LTMuNDYtMi00Ljc5WiIvPgogICAgPHBhdGggY2xhc3M9ImNscy0zIiBkPSJNODE3LjUzLDQ0Mi42NWMtNS4wNS01LjA1LTExLjI4LTcuNTctMTguNjUtNy41N3MtMTMuNjEsMi41Mi0xOC42Nyw3LjU3Yy01LjEyLDUuMTMtNy42OCwxMS4zNS03LjY4LDE4LjY3czIuNTcsMTMuNTQsNy42OCwxOC42N2M1LjA1LDUuMDUsMTEuMjgsNy41NywxOC42Nyw3LjU3czEzLjYtMi41MiwxOC42NS03LjU3YzUuMTMtNS4xMyw3LjY4LTExLjM1LDcuNjgtMTguNjdzLTIuNTUtMTMuNTQtNy42OC0xOC42N1pNODA5Ljk2LDQ3Mi42Yy0zLDMtNi43LDQuNDktMTEuMDgsNC40OXMtOC4wOC0xLjQ5LTExLjA4LTQuNDljLTMtMy00LjUtNi43Ni00LjUtMTEuMjhzMS41MS04LjI4LDQuNS0xMS4yOGMzLTMsNi42OC00LjQ5LDExLjA4LTQuNDlzOC4wOCwxLjQ5LDExLjA4LDQuNDljMi45OCwzLDQuNDksNi43Niw0LjQ5LDExLjI4cy0xLjUxLDguMjgtNC40OSwxMS4yOFoiLz4KICAgIDxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTg3My4xNyw0NDAuNjFjLTMuNDktMy42OS04LjEzLTUuNTMtMTMuOTItNS41My02Ljk5LDAtMTIuMTQsMi41Ny0xNS40Nyw3LjY4di02LjM5aC0xMC43N3Y0OS45aDEwLjc3di0yNi43NWMwLTQuNzIsMS4xNC04LjMsMy40LTEwLjcyLDIuMjYtMi40Myw1LjM2LTMuNjQsOS4yOC0zLjY0LDMuNDYsMCw2LjE5LDEsOC4xOSwzLDIsMiwzLDQuODUsMyw4LjU3djI5LjU0aDEwLjc3di0zMC42M2MwLTYuMzMtMS43NS0xMS4zMi01LjI0LTE1LjAzWiIvPgogICAgPHBhdGggY2xhc3M9ImNscy0zIiBkPSJNNjYwLjA5LDQzNi4zN2gtMTIuMzh2LTEzLjk3bC0xMC43NywzLjJ2MTAuNzdoLTkuMTl2MTAuMzloMjguMTdjMi4zLDAsNC4xNy0xLjg3LDQuMTctNC4xN3YtNi4yMVoiLz4KICAgIDxwYXRoIGNsYXNzPSJjbHMtMyIgZD0iTTY0Ny43MSw0NDYuNzVsLTEwLjc3LDMuMjV2MjAuNzFjMCw2LjUxLDEuOCwxMC45OCw1LjM5LDEzLjQxLDMuNTgsMi40Myw5LjUxLDMuMTUsMTcuNzYsMi4xNXYtOS42OGMtMi43My4xMi01LjAxLjE0LTYuODQuMDUtMS44My0uMTEtMy4yMS0uNi00LjE1LTEuNTEtLjk0LS44OS0xLjQtMi4zNy0xLjQtNC40MnYtMjMuOTVaIi8+CiAgPC9nPgogIDxnPgogICAgPHBhdGggY2xhc3M9ImNscy01IiBkPSJNNDg2LjE5LDQwMy4xNHYyMi43NGMwLDIuMjktMS41MSw0LjMyLTMuNzIsNC45NmwtNjAuODgsMTcuODR2LTIyLjc0YzAtMi4yOSwxLjUxLTQuMzIsMy43Mi00Ljk2bDYwLjg4LTE3Ljg0WiIvPgogICAgPGc+CiAgICAgIDxwYXRoIGNsYXNzPSJjbHMtMiIgZD0iTTQyNS4zMSw0NTMuNTVjLTIuMi42NS0zLjcyLDIuNjctMy43Miw0Ljk2djI0LjE1YzAsMy4xMywxLjY3LDUuOTYsNC4yNyw3LjUxLTIuMzUtNS41MS0xLjM3LTkuOTgsOC40LTEyLjY0bDE2LjU4LTQuODYsMTkuMzktNS42N2MyLjItLjY0LDMuNzItMi42NywzLjcyLTQuOTZ2LTIyLjc0bC00OC42NCwxNC4yNFoiLz4KICAgICAgPHBhdGggY2xhc3M9ImNscy00IiBkPSJNNDI1Ljg3LDQ5MC4xN2guMDFzMCwwLS4wMSwwYzAsMCwwLDAsMCwwWiIvPgogICAgICA8cGF0aCBjbGFzcz0iY2xzLTEiIGQ9Ik00MzQuMjcsNDc3LjUzYy05Ljc3LDIuNjYtMTAuNzUsNy4xMy04LjQxLDEyLjYzbC4wMi4wMmgwYzEuMzMuNTgsMi43LDEuMDcsNC4wOSwxLjQ4bDE3LjM4LDUuMDljMS43NS41MSwzLjQ5LS44LDMuNDktMi42MnYtMjEuNDZsLTE2LjU4LDQuODZaIi8+CiAgICA8L2c+CiAgPC9nPgo8L3N2Zz4=" preserveAspectRatio="xMinYMid meet"/>
 
-<text x="344" y="324" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#0f172a" font-weight="500">From thousands of runs to publishable insight.</text>
-<text x="344" y="346" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#475569">Rank backtests, plot custom charts, build shareable reports</text>
-<text x="344" y="362" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#475569">and let AI agents do the heavy analysis for you.</text>
+<text x="240" y="324" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#0f172a" font-weight="500">From thousands of runs to publishable insight.</text>
+<text x="240" y="346" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#475569">Rank backtests, plot custom charts, build shareable</text>
+<text x="240" y="362" font-family="system-ui,-apple-system,sans-serif" font-size="12.5" fill="#475569">reports and let AI agents do the analysis for you.</text>
 
-<g transform="translate(344, 384)">
+<g transform="translate(240, 388)">
 <rect x="0" y="0" width="78" height="22" rx="11" fill="#ecfeff" stroke="#0891b2" stroke-opacity=".25"/>
 <text x="39" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#0891b2" text-anchor="middle" font-weight="600">Build reports</text>
 
@@ -83,19 +83,69 @@
 <text x="297" y="14.5" font-family="system-ui,-apple-system,sans-serif" font-size="10" fill="#0891b2" text-anchor="middle" font-weight="600">Custom charts</text>
 </g>
 
-<!-- Right decorative chart -->
-<g transform="translate(660, 232)" opacity=".95">
-<rect x="0" y="0" width="200" height="160" rx="10" fill="#ffffff" stroke="#e2e8f0"/>
-<text x="14" y="22" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#64748b" letter-spacing="1.5" font-weight="700">RANK #1 · SHARPE 2.14</text>
-<polyline points="14,130 38,118 62,124 86,100 110,92 134,72 158,80 186,46 186,150 14,150" fill="#0891b2" opacity=".08"/>
-<polyline points="14,130 38,118 62,124 86,100 110,92 134,72 158,80 186,46" fill="none" stroke="#0891b2" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
-<line x1="14" y1="128" x2="186" y2="98" stroke="#94a3b8" stroke-width="1.2" stroke-dasharray="3 3"/>
-<line x1="14" y1="150" x2="186" y2="150" stroke="#e2e8f0"/>
-<circle cx="186" cy="46" r="3" fill="#0891b2"/>
-<text x="14" y="146" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#94a3b8">Jan</text>
-<text x="174" y="146" font-family="system-ui,-apple-system,sans-serif" font-size="8" fill="#94a3b8">Dec</text>
-<text x="14" y="62" font-family="system-ui,-apple-system,sans-serif" font-size="14" font-weight="700" fill="#059669">+38.2%</text>
-<text x="14" y="76" font-family="system-ui,-apple-system,sans-serif" font-size="8.5" fill="#475569">vs. BTC buy &amp; hold</text>
+<!-- ===== REPORT BUILDER MOCK (right side) ===== -->
+<g transform="translate(620, 210)">
+  <!-- document frame -->
+  <rect x="0" y="0" width="344" height="216" rx="10" fill="#ffffff" stroke="#cbd5e1"/>
+  <!-- top bar -->
+  <rect x="0" y="0" width="344" height="26" rx="10" fill="#f1f5f9"/>
+  <rect x="0" y="14" width="344" height="12" fill="#f1f5f9"/>
+  <circle cx="14" cy="13" r="3" fill="#fb7185"/>
+  <circle cx="26" cy="13" r="3" fill="#fbbf24"/>
+  <circle cx="38" cy="13" r="3" fill="#34d399"/>
+  <text x="58" y="17" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="9" fill="#64748b">report.html · Q3 Momentum Sweep</text>
+  <rect x="288" y="6" width="48" height="14" rx="7" fill="#0891b2"/>
+  <text x="312" y="16" font-family="system-ui,-apple-system,sans-serif" font-size="8" font-weight="700" fill="#ffffff" text-anchor="middle">PUBLISH</text>
+
+  <!-- KPI strip -->
+  <g transform="translate(12, 36)">
+    <rect x="0"   y="0" width="76" height="30" rx="5" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="6" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="7" fill="#64748b" letter-spacing="0.5">SHARPE</text>
+    <text x="6" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" fill="#0f172a">2.14</text>
+
+    <rect x="82"  y="0" width="76" height="30" rx="5" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="88" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="7" fill="#64748b" letter-spacing="0.5">CAGR</text>
+    <text x="88" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" fill="#059669">+38.2%</text>
+
+    <rect x="164" y="0" width="76" height="30" rx="5" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="170" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="7" fill="#64748b" letter-spacing="0.5">MAX DD</text>
+    <text x="170" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" fill="#0f172a">-9.4%</text>
+
+    <rect x="246" y="0" width="74" height="30" rx="5" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="252" y="11" font-family="system-ui,-apple-system,sans-serif" font-size="7" fill="#64748b" letter-spacing="0.5">TRADES</text>
+    <text x="252" y="24" font-family="system-ui,-apple-system,sans-serif" font-size="11" font-weight="700" fill="#0f172a">412</text>
+  </g>
+
+  <!-- Chart block -->
+  <g transform="translate(12, 76)">
+    <rect x="0" y="0" width="194" height="92" rx="5" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="8" y="12" font-family="system-ui,-apple-system,sans-serif" font-size="7.5" font-weight="700" fill="#0f172a">Equity curve</text>
+    <text x="8" y="22" font-family="system-ui,-apple-system,sans-serif" font-size="6.5" fill="#64748b">momentum_v2 vs. BTC</text>
+    <polyline points="8,82 28,74 48,76 70,62 92,66 114,52 134,56 154,40 174,34 186,30 186,86 8,86" fill="#0891b2" opacity=".10"/>
+    <polyline points="8,82 28,74 48,76 70,62 92,66 114,52 134,56 154,40 174,34 186,30" fill="none" stroke="#0891b2" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/>
+    <line x1="8" y1="78" x2="186" y2="58" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
+  </g>
+
+  <!-- AI agent note block -->
+  <g transform="translate(212, 76)">
+    <rect x="0" y="0" width="120" height="92" rx="5" fill="#f5f0ff" stroke="#d8cdff"/>
+    <circle cx="12" cy="14" r="7" fill="#7c3aed"/>
+    <text x="12" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="7" font-weight="700" fill="#ffffff" text-anchor="middle">AI</text>
+    <text x="24" y="17" font-family="system-ui,-apple-system,sans-serif" font-size="8" font-weight="700" fill="#5b21b6">Agent note</text>
+
+    <rect x="8" y="28" width="104" height="3" rx="1.5" fill="#c4b5fd"/>
+    <rect x="8" y="36" width="96"  height="3" rx="1.5" fill="#c4b5fd"/>
+    <rect x="8" y="44" width="100" height="3" rx="1.5" fill="#c4b5fd"/>
+    <rect x="8" y="52" width="80"  height="3" rx="1.5" fill="#c4b5fd"/>
+    <rect x="8" y="60" width="92"  height="3" rx="1.5" fill="#c4b5fd"/>
+    <text x="8" y="80" font-family="system-ui,-apple-system,sans-serif" font-size="7" fill="#5b21b6" font-weight="600">Beat benchmark by +22%</text>
+  </g>
+
+  <!-- + add block footer -->
+  <g transform="translate(12, 178)">
+    <rect x="0" y="0" width="320" height="24" rx="5" fill="#ffffff" stroke="#cbd5e1" stroke-dasharray="3 3"/>
+    <text x="160" y="15" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#64748b" text-anchor="middle">+ chart  ·  + metric  ·  + agent note  ·  + table</text>
+  </g>
 </g>
 </g>
 
