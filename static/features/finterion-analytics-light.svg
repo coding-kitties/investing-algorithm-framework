@@ -45,7 +45,7 @@
 <!-- HEADER -->
 <g class="a0">
 <rect x="40" y="40" width="11" height="11" rx="2" fill="#0891b2"/>
-<text x="60" y="50" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#0891b2" letter-spacing="2" font-weight="700">ANALYTICS</text>
+<text x="60" y="50" font-family="system-ui,-apple-system,sans-serif" font-size="9" fill="#0891b2" letter-spacing="2" font-weight="700">ANALYTICS INTEGRATION PARTNERS</text>
 </g>
 <text class="a1" x="40" y="100" font-family="system-ui,-apple-system,sans-serif" font-size="38" font-weight="700" fill="url(#hdr)">Backtest Analytics for Teams</text>
 <text class="a2" x="40" y="130" font-family="system-ui,-apple-system,sans-serif" font-size="14" fill="#475569">Search, filter, compare, annotate and share thousands of backtests in a server-backed UI.</text>
