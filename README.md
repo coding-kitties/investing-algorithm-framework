@@ -206,7 +206,11 @@ BacktestReport(backtests=winners).save("top25_by_sharpe.html")
 
 <p align="center">
   <a href="https://www.finterion.com/" target="_blank">
-    <img src="static/features/finterion-analytics.svg" alt="Finterion — explore, compare, annotate and share thousands of backtests with an AI research agent" width="560">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="static/features/finterion-analytics-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="static/features/finterion-analytics-light.svg">
+      <img src="static/features/finterion-analytics-light.svg" alt="Backtest analytics for teams — featuring Finterion" style="max-width: 100%;">
+    </picture>
   </a>
 </p>
 
