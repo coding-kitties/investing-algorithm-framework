@@ -59,6 +59,10 @@ const sidebars = {
                 },
                 {
                     type: 'doc',
+                    id: 'Getting Started/backtest-storage',
+                },
+                {
+                    type: 'doc',
                     id: 'Getting Started/metrics',
                 },
                 {
