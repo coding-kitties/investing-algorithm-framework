@@ -204,6 +204,12 @@ BacktestReport(backtests=winners).save("top25_by_sharpe.html")
 
 > 💡 **Going further than a single HTML file?** A self-contained `report.html` is great for sharing a hand-picked set of winners, but past a few dozen backtests in one document the browser starts to struggle. If you're looking for more advanced features — searching, filtering, comparing and annotating thousands of backtests on the go in a server-backed UI — have a look at **[Finterion](https://www.finterion.com/)**.
 
+<p align="center">
+  <a href="https://www.finterion.com/" target="_blank">
+    <img src="static/features/finterion-analytics.svg" alt="Finterion — explore, compare, annotate and share thousands of backtests with an AI research agent" width="560">
+  </a>
+</p>
+
 → [Backtest dashboard docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtesting) · [MCP server docs](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/mcp-server)
 
 </details>
