@@ -2,7 +2,7 @@ from .analysis import generate_rolling_backtest_windows, \
     select_backtest_date_ranges, rank_results, create_weights, \
     get_missing_timeseries_data_entries, fill_missing_timeseries_data, \
     create_markdown_table, analyze_backtest_windows, \
-    plot_backtest_windows, plot_window_correlation_matrix
+    plot_backtest_windows, plot_window_correlation_matrix  # noqa: F401
 from .app import App, Algorithm, \
     TradingStrategy, StatelessAction, Task, AppHook, Context, \
     add_html_report, BacktestReport, \
@@ -33,7 +33,7 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     CommissionModel, NoCommission, PercentageCommission, FixedCommission, \
     FillModel, FullFill, VolumeBasedFill, \
     FXRateProvider, StaticFXRateProvider, \
-    ScheduledDeposit, SyncResult, PortfolioOutOfSyncError
+    ScheduledDeposit, SyncResult, PortfolioOutOfSyncError  # noqa: F401
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
     JSONURLDataProvider, ParquetURLDataProvider, \
