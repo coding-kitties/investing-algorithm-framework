@@ -45,7 +45,7 @@ tutorial/
 │   ├── 06_robustness_analysis.ipynb   # Robustness and validation
 │   └── 07_final_analysis.ipynb        # Final results and reporting
 ├── strategies/                        # Strategy implementations
-│   └── ema_crossover_rsi_filter/      # Example strategy
+│   └── supertrend_ema_confirmation/      # Example strategy
 ├── data/                              # Downloaded market data
 ├── backtests/                         # Backtest results storage
 └── resources/                         # Additional resources
@@ -129,50 +129,39 @@ Visualize and understand strategy logic:
 
 ---
 
-### 03 - Backtest Baseline
-**File**: `notebooks/03_backtest_baseline.ipynb`
+### 03 - Parameter Sweep
+**File**: `notebooks/03_param_sweep.ipynb`
 
-Run your first backtest:
+Run your first backtest and then scale up to thousands of parameter
+combinations:
+
 - **`run_vector_backtest()`** - Single strategy vectorized backtest
-- **`BacktestReport`** - Generate HTML reports
-- Performance metrics (Sharpe ratio, max drawdown, win rate)
-
-```python
-backtest = app.run_vector_backtest(
-    backtest_date_range=date_range,
-    strategy=strategy,
-    initial_amount=1000,
-    risk_free_rate=0.027
-)
-
-report = BacktestReport(backtest)
-report.show(browser=True)
-```
-
----
-
-### 04 - Parameter Sweep
-**File**: `notebooks/04_param_sweep.ipynb`
-
-Test thousands of parameter combinations:
+  (the baseline run)
 - **`run_vector_backtests()`** - Batch vectorized backtesting
+- **`BacktestReport`** - Generate HTML reports
 - **`rank_results()`** - Rank strategies by performance
 - **`create_weights()`** - Custom ranking weights
 - **Window filtering** - Filter after each date range
 - **Final filtering** - Filter combined results
 
 ```python
-# Create parameter grid
+# Baseline run
+backtest = app.run_vector_backtest(
+    backtest_date_range=date_range,
+    strategy=strategy,
+    initial_amount=1000,
+    risk_free_rate=0.027
+)
+BacktestReport(backtest).show(browser=True)
+
+# Parameter grid
 params = {
     'ema_short_period': [20, 50, 75],
     'ema_long_period': [100, 150, 200],
     'rsi_period': [14, 21],
 }
-
-# Generate all combinations
 strategies = [Strategy(**p) for p in generate_combinations(params)]
 
-# Run vectorized backtests with filtering
 backtests = app.run_vector_backtests(
     backtest_date_ranges=date_ranges,
     strategies=strategies,
@@ -181,7 +170,6 @@ backtests = app.run_vector_backtests(
     show_progress=True
 )
 
-# Rank results
 ranked = rank_results(
     backtests,
     focus=BacktestEvaluationFocus.BALANCED
@@ -190,8 +178,8 @@ ranked = rank_results(
 
 ---
 
-### 05 - Backtest Optimized
-**File**: `notebooks/05_backtest_optimized.ipynb`
+### 04 - Backtest Optimized
+**File**: `notebooks/04_backtest_optimized.ipynb`
 
 Advanced backtesting features:
 - **Parallel processing** - Use multiple CPU cores
@@ -211,8 +199,8 @@ backtests = app.run_vector_backtests(
 
 ---
 
-### 06 - Event Backtest
-**File**: `notebooks/06_event_backtest.ipynb`
+### 05 - Event Backtest
+**File**: `notebooks/05_event_backtest.ipynb`
 
 Realistic trade simulation:
 - **`run_backtest()`** - Event-based backtesting
@@ -237,8 +225,8 @@ backtests = app.run_backtests(
 
 ---
 
-### 07 - Robustness Analysis
-**File**: `notebooks/07_robustness_analysis.ipynb`
+### 06 - Robustness Analysis
+**File**: `notebooks/06_robustness_analysis.ipynb`
 
 Validate strategy robustness:
 - **Walk-forward analysis** - Rolling window validation
@@ -264,8 +252,8 @@ for window in windows:
 
 ---
 
-### 08 - Final Analysis
-**File**: `notebooks/08_final_analysis.ipynb`
+### 07 - Final Analysis
+**File**: `notebooks/07_final_analysis.ipynb`
 
 Generate final reports and analysis:
 - **`create_markdown_table()`** - Format results as markdown

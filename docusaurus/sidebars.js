@@ -73,6 +73,40 @@ const sidebars = {
         },
         {
             type: 'category',
+            label: 'Risk Rules',
+            items: [
+                {
+                    type: 'doc',
+                    id: 'Risk Rules/overview',
+                },
+                {
+                    type: 'doc',
+                    id: 'Risk Rules/position-size',
+                },
+                {
+                    type: 'doc',
+                    id: 'Risk Rules/stop-loss-rule',
+                },
+                {
+                    type: 'doc',
+                    id: 'Risk Rules/take-profit-rule',
+                },
+                {
+                    type: 'doc',
+                    id: 'Risk Rules/scaling-rule',
+                },
+                {
+                    type: 'doc',
+                    id: 'Risk Rules/cooldown-rule',
+                },
+                {
+                    type: 'doc',
+                    id: 'Risk Rules/trading-cost',
+                },
+            ],
+        },
+        {
+            type: 'category',
             label: 'Data',
             items: [
                 {

@@ -1,0 +1,1 @@
+pyindicators>=0.22

@@ -4,7 +4,7 @@ import os
 import threading
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import List, Literal, Optional, Any, Dict, Tuple, Callable, Union
+from typing import List, Optional, Any, Dict, Tuple, Callable, Union
 
 from flask import Flask
 
@@ -279,11 +279,10 @@ class App:
 
         if SQLALCHEMY_DATABASE_URI not in config \
                 or config[SQLALCHEMY_DATABASE_URI] is None:
-            db_path = os.path.join(
+            path = "sqlite:///" + os.path.join(
                 configuration_service.config[DATABASE_DIRECTORY_PATH],
                 configuration_service.config[DATABASE_NAME]
             )
-            path = "sqlite:///" + db_path.replace("\\", "/")
             configuration_service.add_value(SQLALCHEMY_DATABASE_URI, path)
 
     def initialize_backtest_config(
@@ -369,33 +368,10 @@ class App:
                 logger.info(
                     f"Removing existing database at {database_path}"
                 )
-
-                # Dispose the existing engine to release file locks
-                # (required on Windows where locks are mandatory)
-                from investing_algorithm_framework.infrastructure.database \
-                    import Session
-                from sqlalchemy.orm import close_all_sessions
-                close_all_sessions()
-                bind = Session.kw.get("bind")
-
-                if bind is not None:
-
-                    try:
-                        conn = bind.connect()
-                        conn.invalidate()
-                        conn.close()
-                    except Exception:
-                        pass
-
-                    bind.dispose()
-
-                import gc
-                gc.collect()
-
                 os.remove(database_path)
 
         # Create the sqlalchemy database uri
-        path = "sqlite:///" + database_path.replace("\\", "/")
+        path = f"sqlite:///{database_path}"
         self.set_config(SQLALCHEMY_DATABASE_URI, path)
 
         # Setup sql if needed
@@ -985,8 +961,6 @@ class App:
         ] = None,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
         use_checkpoints: bool = False,
-        force_rerun: Union[bool, Literal["stale"]] = False,
-        on_checkpoint_match: Literal["skip", "rerun", "warn"] = "skip",
         batch_size: int = 50,
         checkpoint_batch_size: int = 25,
         n_workers: Optional[int] = None,
@@ -1089,24 +1063,7 @@ class App:
                 instead of running a new backtest. This is useful for
                 long-running backtests that might take a while to complete.
                 When enabled, uses the optimized version with batching and
-                optional parallel processing. Checkpoints are content-aware:
-                each entry stores a manifest hash that fingerprints the
-                strategy code, parameters, data sources, and date range.
-                Strategies whose hash differs from the stored hash are
-                rerun automatically.
-            force_rerun (Union[bool, Literal["stale"]]): Override checkpoint
-                skipping behaviour.
-
-                - False (default): Skip strategies with a matching checkpoint.
-                - "stale": Rerun only strategies whose stored checkpoint hash
-                  differs from the current manifest hash.
-                - True: Ignore checkpoints entirely and rerun all strategies.
-            on_checkpoint_match (Literal["skip", "rerun", "warn"]): Behaviour
-                when a strategy's checkpoint matches.
-
-                - "skip" (default): Silently skip the strategy.
-                - "warn": Skip but emit a single log line per match batch.
-                - "rerun": Rerun the strategy anyway.
+                optional parallel processing.
             batch_size (int): Number of strategies to process in each batch
                 before memory cleanup. Only used when use_checkpoints=True.
                 Default: 100. Higher values use more memory but may be faster.
@@ -1223,8 +1180,6 @@ class App:
             checkpoint_batch_size=checkpoint_batch_size,
             n_workers=n_workers,
             use_checkpoints=use_checkpoints,
-            force_rerun=force_rerun,
-            on_checkpoint_match=on_checkpoint_match,
             dynamic_position_sizing=dynamic_position_sizing,
             fill_missing_data=fill_missing_data,
             iterative_summary_update=iterative_summary_update,
@@ -1402,8 +1357,6 @@ class App:
         metadata: Optional[Dict[str, str]] = None,
         backtest_storage_directory: Optional[Union[str, Path]] = None,
         use_checkpoints: bool = False,
-        force_rerun: Union[bool, Literal["stale"]] = False,
-        on_checkpoint_match: Literal["skip", "rerun", "warn"] = "skip",
         show_progress: bool = False,
         continue_on_error: bool = False,
         window_filter_function: Optional[Callable] = None,
@@ -1443,16 +1396,7 @@ class App:
             backtest_storage_directory (Union[str, Path]): Directory to save
                 backtests to.
             use_checkpoints (bool): Whether to use checkpointing to resume
-                interrupted backtests. Checkpoints are content-aware:
-                strategies whose code or parameters have changed since the
-                last run are detected and rerun automatically.
-            force_rerun (Union[bool, Literal["stale"]]): Override checkpoint
-                skipping behaviour. ``False`` (default) skips matched
-                checkpoints, ``"stale"`` reruns only mismatched ones, and
-                ``True`` reruns everything.
-            on_checkpoint_match (Literal["skip", "rerun", "warn"]): Behaviour
-                on a matching checkpoint. ``"skip"`` (default) silently
-                skips, ``"warn"`` skips and logs, ``"rerun"`` reruns anyway.
+                interrupted backtests.
             show_progress (bool): Whether to show progress bars.
             continue_on_error (bool): Whether to continue on errors.
             window_filter_function: Filter function applied after each
@@ -1565,8 +1509,6 @@ class App:
             final_filter_function=final_filter_function,
             backtest_storage_directory=backtest_storage_directory,
             use_checkpoints=use_checkpoints,
-            force_rerun=force_rerun,
-            on_checkpoint_match=on_checkpoint_match,
             batch_size=batch_size,
             checkpoint_batch_size=checkpoint_batch_size,
             fill_missing_data=fill_missing_data,
@@ -2242,9 +2184,6 @@ class App:
         initial_balance=None,
         fee_percentage=0.0,
         slippage_percentage=0.0,
-        deposit_schedule=None,
-        auto_sync=False,
-        auto_sync_error_mode="raise",
     ):
         """
         Function to add a market to the app. This function is a utility
@@ -2263,28 +2202,10 @@ class App:
             slippage_percentage: Default slippage percentage for all
                 trades on this market (e.g. 0.05 for 0.05%). Can be
                 overridden per-symbol via TradingCost on the strategy.
-            deposit_schedule: Optional list of
-                :class:`ScheduledDeposit` describing simulated external
-                cash flows landing on this market during a backtest
-                (e.g. monthly paychecks). Ignored in live mode — for
-                live deployments the broker is the source of truth and
-                ``Context.sync_portfolio()`` queries it directly.
-            auto_sync: When ``True``, the framework automatically calls
-                ``Context.sync_portfolio(market=market)`` before every
-                strategy iteration so deposits/withdrawals are absorbed
-                without strategy code having to opt in. Defaults to
-                ``False`` (explicit opt-in via ``context.sync_portfolio()``).
-            auto_sync_error_mode: How auto-sync handles failures. One of
-                ``"raise"`` (loud, default — best for development),
-                ``"warn"`` (log and continue with stale state — best for
-                live trading where transient broker glitches should not
-                crash the bot), or ``"halt"`` (log, disable auto-sync
-                for this market, and continue).
 
         Returns:
             None
         """
-        deposit_schedule = self._normalize_deposit_schedule(deposit_schedule)
 
         portfolio_configuration = PortfolioConfiguration(
             market=market,
@@ -2292,7 +2213,6 @@ class App:
             initial_balance=initial_balance,
             fee_percentage=fee_percentage,
             slippage_percentage=slippage_percentage,
-            deposit_schedule=deposit_schedule,
         )
 
         self.add_portfolio_configuration(portfolio_configuration)
@@ -2302,78 +2222,6 @@ class App:
             secret_key=secret_key
         )
         self.add_market_credential(market_credential)
-
-        tracker = self.container.broker_balance_tracker()
-        if deposit_schedule:
-            tracker.set_schedule(market, deposit_schedule)
-        if auto_sync:
-            tracker.set_auto_sync(market, True)
-        tracker.set_auto_sync_error_mode(market, auto_sync_error_mode)
-
-    @staticmethod
-    def _normalize_deposit_schedule(deposit_schedule):
-        """Coerce a deposit_schedule argument to a validated list.
-
-        Accepts ``None`` (treated as no schedule), a list/tuple of
-        :class:`ScheduledDeposit`, or rejects anything else with a clear
-        error. Notably rejects passing a single ``ScheduledDeposit``
-        directly (which would be iterable over its dataclass fields and
-        produce nonsense).
-        """
-        from investing_algorithm_framework.domain import ScheduledDeposit
-        if deposit_schedule is None:
-            return []
-        if isinstance(deposit_schedule, ScheduledDeposit):
-            raise OperationalException(
-                "deposit_schedule must be a list of ScheduledDeposit, not a "
-                "single ScheduledDeposit. Wrap it: [ScheduledDeposit(...)]."
-            )
-        if not isinstance(deposit_schedule, (list, tuple)):
-            raise OperationalException(
-                "deposit_schedule must be a list of ScheduledDeposit, got "
-                f"{type(deposit_schedule).__name__}."
-            )
-        for entry in deposit_schedule:
-            if not isinstance(entry, ScheduledDeposit):
-                raise OperationalException(
-                    "deposit_schedule entries must be ScheduledDeposit, "
-                    f"got {type(entry).__name__}."
-                )
-        return list(deposit_schedule)
-
-    def add_deposit_schedule(self, market, schedule):
-        """Register simulated external deposits for a backtested market.
-
-        Equivalent to passing ``deposit_schedule=`` to :meth:`add_market`,
-        but usable after the market has already been registered. Replaces
-        any previously registered schedule for this market.
-
-        Args:
-            market: Market identifier.
-            schedule: Iterable of :class:`ScheduledDeposit`.
-
-        Returns:
-            None
-        """
-        self.container.broker_balance_tracker().set_schedule(
-            market, self._normalize_deposit_schedule(schedule)
-        )
-
-    def set_market_auto_sync(self, market, enabled=True):
-        """Toggle automatic ``sync_portfolio`` before each strategy iteration.
-
-        Args:
-            market: Market identifier.
-            enabled: When ``True`` (the default), the framework calls
-                ``Context.sync_portfolio(market=market)`` immediately before
-                each strategy ``run_strategy`` invocation.
-
-        Returns:
-            None
-        """
-        self.container.broker_balance_tracker().set_auto_sync(
-            market, enabled
-        )
 
     def set_blotter(self, blotter):
         """

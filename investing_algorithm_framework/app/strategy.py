@@ -7,7 +7,7 @@ import pandas as pd
 from investing_algorithm_framework.domain import OperationalException, \
     Position, PositionSize, TimeUnit, StrategyProfile, Trade, \
     DataSource, DataType, OrderSide, StopLossRule, TakeProfitRule, Order, \
-    INDEX_DATETIME, ScalingRule, TradingCost
+    INDEX_DATETIME, ScalingRule, TradingCost, CooldownRule, CooldownTracker
 from .context import Context
 
 logger = logging.getLogger(__name__)
@@ -57,6 +57,7 @@ class TradingStrategy:
     take_profits: List[TakeProfitRule] = []
     scaling_rules: List[ScalingRule] = []
     trading_costs: List[TradingCost] = []
+    cooldowns: List[CooldownRule] = []
     symbols: List[str] = []
     trading_symbol: str = None
 
@@ -73,6 +74,7 @@ class TradingStrategy:
         take_profits=None,
         scaling_rules=None,
         trading_costs=None,
+        cooldowns=None,
         symbols=None,
         trading_symbol=None,
         decorated=None
@@ -281,6 +283,14 @@ class TradingStrategy:
             self.trading_costs = list(class_trading_costs) \
                 if class_trading_costs else []
 
+        # Initialize cooldowns as a new list per instance
+        if cooldowns is not None:
+            self.cooldowns = list(cooldowns)
+        else:
+            class_cooldowns = getattr(self.__class__, 'cooldowns', [])
+            self.cooldowns = list(class_cooldowns) \
+                if class_cooldowns else []
+
         # context initialization
         self._context = None
         self._last_run = None
@@ -294,6 +304,11 @@ class TradingStrategy:
         # Persists across run_strategy() calls in event-based backtests.
         self._cooldown_remaining = {}   # {symbol: bars remaining}
         self._scale_out_counts = {}     # {symbol: number of scale-outs}
+        # CooldownRule support — bar index is incremented every
+        # ``run_strategy`` call so the tracker can compare events across
+        # bars even when the engine doesn't expose a global bar counter.
+        self._cooldown_tracker = CooldownTracker()
+        self._cooldown_bar_index = 0
 
     def set_parameters(self, params: dict) -> None:
         """
@@ -473,6 +488,12 @@ class TradingStrategy:
                 if self._cooldown_remaining[symbol] <= 0:
                     del self._cooldown_remaining[symbol]
 
+        # Advance the bar index used by CooldownRule evaluation. Each
+        # ``run_strategy`` call counts as one bar from the rule engine's
+        # point of view (matches the legacy ``cooldown_in_bars`` model).
+        self._cooldown_bar_index += 1
+        current_bar_index = self._cooldown_bar_index
+
         # Phase 1: Collect all pending buy orders (new entries + scale-ins)
         pending_buy_orders = []
         portfolio = self.context.get_portfolio()
@@ -485,6 +506,20 @@ class TradingStrategy:
 
             # Check cooldown — skip buy/scale-in if in cooldown
             if symbol in self._cooldown_remaining:
+                continue
+
+            # CooldownRule gate (buy side)
+            blocked, vetoing_rule = self._cooldown_tracker.is_blocked(
+                self.cooldowns,
+                signal_side="buy",
+                symbol=symbol,
+                bar_index=current_bar_index,
+            )
+            if blocked:
+                logger.debug(
+                    "Buy signal for %s suppressed by %r",
+                    symbol, vetoing_rule,
+                )
                 continue
 
             if not self.has_position(symbol):
@@ -658,6 +693,11 @@ class TradingStrategy:
             if scaling_rule and scaling_rule.cooldown_in_bars > 0:
                 self._cooldown_remaining[symbol] = \
                     scaling_rule.cooldown_in_bars
+            self._cooldown_tracker.record(
+                symbol=symbol,
+                order_side="buy",
+                bar_index=current_bar_index,
+            )
 
         # Phase 4: Process sell and scale-out signals.
         # Sell (full exit) ALWAYS takes priority over scale-out.
@@ -671,6 +711,20 @@ class TradingStrategy:
 
             # Check cooldown — skip sell/scale-out if in cooldown
             if symbol in self._cooldown_remaining:
+                continue
+
+            # CooldownRule gate (sell side)
+            blocked, vetoing_rule = self._cooldown_tracker.is_blocked(
+                self.cooldowns,
+                signal_side="sell",
+                symbol=symbol,
+                bar_index=current_bar_index,
+            )
+            if blocked:
+                logger.debug(
+                    "Sell signal for %s suppressed by %r",
+                    symbol, vetoing_rule,
+                )
                 continue
 
             # Phase 4a: Full sell (always checked first — bypasses scaling)
@@ -707,6 +761,11 @@ class TradingStrategy:
                     if scaling_rule and scaling_rule.cooldown_in_bars > 0:
                         self._cooldown_remaining[symbol] = \
                             scaling_rule.cooldown_in_bars
+                    self._cooldown_tracker.record(
+                        symbol=symbol,
+                        order_side="sell",
+                        bar_index=current_bar_index,
+                    )
 
                     continue
 
@@ -754,6 +813,11 @@ class TradingStrategy:
                             if scaling_rule.cooldown_in_bars > 0:
                                 self._cooldown_remaining[symbol] = \
                                     scaling_rule.cooldown_in_bars
+                            self._cooldown_tracker.record(
+                                symbol=symbol,
+                                order_side="sell",
+                                bar_index=current_bar_index,
+                            )
 
     def apply_strategy(self, context, data):
         if self.decorated:

@@ -3,7 +3,7 @@
 </h1>
 
 <p align="center">
-  <i align="center">Create trading strategies. Compare them side by side. Pick the best one and Deploy 🚀</i>
+  <i align="center">The full quant workflow in one framework: build strategies, vector & event-driven backtest at scale, compare in a single dashboard, and deploy the winner 🚀</i>
 </p>
 
 <h4 align="center">
@@ -59,11 +59,11 @@
 
 ## Introduction
 
-`Investing Algorithm Framework` is a Python framework for creating, backtesting, and deploying trading strategies.
+`Investing Algorithm Framework` is a Python framework that covers the entire quant workflow: define a strategy once, vector-backtest thousands of parameter variants to find promising signals, narrow down with a storage layer that ranks 10k+ results in milliseconds, validate the winners in a realistic event-driven simulation, compare everything in a single interactive HTML dashboard, and deploy the best performer live, all with the same `TradingStrategy` class, no code rewrites between stages.
 
-Most quant frameworks stop at "here's your backtest result." You get a number, maybe a chart, and then you're on your own figuring out which strategy is actually better.
+Most quant frameworks stop at "here's your backtest result." You get a number, maybe a chart, and then you're on your own figuring out which strategy variant is actually better, whether the result is robust across time windows, and how to go from research to production. This framework closes that gap.
 
-This framework is built around the full loop: **create strategies → vector backtest for signals analysis → compare them in a single report → event backtest the most promising strategies → deploy the winner.** It generates a self-contained HTML dashboard that lets you rank, filter, and visually compare every strategy you've tested — all in one view, no notebooks required.
+> **Want to see this in practice?** Check out the [`examples/tutorial/`](examples/tutorial/README.md): a series of runnable notebooks that walk you through every stage: defining a strategy, visualizing its signals, sweeping parameters across rolling windows, detecting overfitting with Monte Carlo permutation tests, filtering and ranking with the storage layer, and deploying the winner.
 
 <details open>
 <summary>
@@ -87,8 +87,88 @@ This framework is built around the full loop: **create strategies → vector bac
 - 🗄️ **[Tiered Backtest Storage Layer](examples/storage_layer_demo/README.md)** — Manage thousands of `.iafbt` bundles with a Tier-1 SQLite index (sub-100 ms ranks/filters over 10k+ backtests), a swappable `BacktestStore` protocol (`LocalDirStore`, `LocalTieredStore`), content-addressed Tier-3 OHLCV deduplication, and a CLI (`iaf index` / `iaf list` / `iaf rank` / `iaf migrate-store`) that plugs straight into the HTML dashboard.
 - 🌐 **[Load External Data](https://coding-kitties.github.io/investing-algorithm-framework/Data/external-data)** — Fetch CSV, JSON, or Parquet from any URL with caching and auto-refresh
 - � **[Per-Market Deposit Schedules & Portfolio Sync](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/portfolio-sync)** — Declare recurring or one-shot external cash flows on a market with `deposit_schedule=` / `auto_sync=True`. Backtests simulate the deposits; live mode reconciles with the broker — same `context.sync_portfolio()` API in both modes.
-- �📝 **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
+- 📝 **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
+- ⏱️ **Signal Cooldowns**: Throttle whipsaw with declarative `CooldownRule`s: per-symbol or portfolio-wide, side-aware (`trigger="sell"`, `blocks="buy"`), enforced identically by the vector and event-driven engines
 - 🚀 **[Build → Backtest → Deploy](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/application-setup)** — Local dev, cloud deploy (AWS / Azure), or monetize on Finterion
+
+</details>
+
+<details open>
+<summary>
+  <strong>Strategy Definition</strong>
+</summary> <br>
+
+Declare **what data** your strategy needs and **when to buy or sell** as a `TradingStrategy` subclass — the framework wires up data loading, signal evaluation, order execution, position management, and reporting around it. The same class runs unchanged in vector backtests, event-driven backtests, paper trading and live.
+
+Risk and execution behaviour are expressed as **declarative rule lists** rather than ad-hoc code paths, so the engines can enforce them identically across modes:
+
+- **`position_sizes`**: [`PositionSize`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/position-size) per symbol (fixed amount or percentage of portfolio).
+- **`stop_losses`** / **`take_profits`**: [`StopLossRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/stop-loss-rule) / [`TakeProfitRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/take-profit-rule) with fixed or trailing thresholds and partial-exit `sell_percentage`.
+- **`scaling_rules`**: [`ScalingRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/scaling-rule) for pyramiding (`scale_in_percentage=[…]`, `max_entries`, per-symbol `cooldown_in_bars`).
+- **`cooldowns`**: [`CooldownRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/cooldown-rule) to throttle whipsaw — per-symbol or portfolio-wide, side-aware (e.g. `trigger="sell", blocks="buy", bars=12`). Enforced bar-for-bar in both the vector and event-driven engines.
+- **`trading_costs`**: [`TradingCost`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/trading-cost) per symbol (fees, slippage, fixed costs).
+
+```python
+from investing_algorithm_framework import (
+    TradingStrategy,
+    PositionSize,
+    ScalingRule,
+    StopLossRule,
+    TakeProfitRule,
+    CooldownRule,
+    TradingCost,
+)
+
+
+class MyStrategy(TradingStrategy):
+    symbols = ["BTC", "ETH"]
+
+    position_sizes = [
+        PositionSize(symbol="BTC", percentage_of_portfolio=20),
+        PositionSize(symbol="ETH", percentage_of_portfolio=20),
+    ]
+
+    stop_losses = [
+        StopLossRule(symbol="BTC", percentage_threshold=5, trailing=True),
+        StopLossRule(symbol="ETH", percentage_threshold=5, trailing=True),
+    ]
+
+    take_profits = [
+        TakeProfitRule(
+            symbol="BTC", percentage_threshold=10, sell_percentage=50,
+        ),
+        TakeProfitRule(
+            symbol="ETH", percentage_threshold=10, sell_percentage=50,
+        ),
+    ]
+
+    scaling_rules = [
+        ScalingRule(
+            symbol="BTC", max_entries=3, scale_in_percentage=[50, 25],
+        ),
+        ScalingRule(
+            symbol="ETH", max_entries=3, scale_in_percentage=[50, 25],
+        ),
+    ]
+
+    cooldowns = [
+        CooldownRule(symbol="BTC", trigger="sell", blocks="buy", bars=12),
+        CooldownRule(trigger="any", blocks="any", bars=2),
+    ]
+
+    trading_costs = [
+        TradingCost(symbol="BTC", fee_percentage=0.1),
+        TradingCost(symbol="ETH", fee_percentage=0.1),
+    ]
+
+    def generate_buy_signals(self, data):
+        ...
+
+    def generate_sell_signals(self, data):
+        ...
+```
+
+→ [Strategy docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/strategies)
 
 </details>
 
@@ -355,7 +435,7 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import (
     TradingStrategy, DataSource, TimeUnit, DataType,
-    PositionSize, ScalingRule, StopLossRule,
+    PositionSize, ScalingRule, StopLossRule, CooldownRule,
 )
 
 
@@ -407,6 +487,18 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             symbol="ETH", percentage_threshold=5,
             sell_percentage=100, trailing=True,
         ),
+    ]
+    # Signal throttling: after a stop-out / sell, block re-entries on
+    # the same symbol for 12 bars, plus a portfolio-wide breather of
+    # 2 bars after any order to avoid same-bar pile-ups.
+    cooldowns = [
+        CooldownRule(
+            symbol="BTC", trigger="sell", blocks="buy", bars=12,
+        ),
+        CooldownRule(
+            symbol="ETH", trigger="sell", blocks="buy", bars=12,
+        ),
+        CooldownRule(trigger="any", blocks="any", bars=2),
     ]
 
     def generate_buy_signals(

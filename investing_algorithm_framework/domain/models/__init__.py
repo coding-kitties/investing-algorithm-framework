@@ -13,7 +13,8 @@ from .snapshot_interval import SnapshotInterval
 from .event import Event
 from .data import DataSource, DataType
 from .risk_rules import TakeProfitRule, StopLossRule, ScalingRule, \
-    TradingCost
+    TradingCost, CooldownRule, CooldownTrigger, CooldownBlocks, \
+    CooldownTracker
 
 __all__ = [
     "OrderStatus",
@@ -46,6 +47,10 @@ __all__ = [
     "StopLossRule",
     "TakeProfitRule",
     "TradingCost",
+    "CooldownRule",
+    "CooldownTrigger",
+    "CooldownBlocks",
+    "CooldownTracker",
     "SyncResult",
     "ScheduledDeposit",
 ]
