@@ -555,7 +555,23 @@ cli.add_command(list_cmd)
     "--json", "as_json", is_flag=True, default=False,
     help="Emit JSON instead of a text table.",
 )
-def rank_cmd(index_path, by, limit, ascending, where, columns, as_json):
+@click.option(
+    "--prune", is_flag=True, default=False,
+    help="Remove bundles that fall outside the ranked results. "
+         "Combine with --archive-dir to move instead of delete.",
+)
+@click.option(
+    "--archive-dir", "archive_dir", default=None,
+    type=click.Path(file_okay=False),
+    help="Move pruned bundles here instead of deleting them. "
+         "Implies --prune.",
+)
+@click.option(
+    "--dry-run", is_flag=True, default=False,
+    help="Show what --prune would do without touching files.",
+)
+def rank_cmd(index_path, by, limit, ascending, where, columns, as_json,
+             prune, archive_dir, dry_run):
     """Rank backtests in a Tier-1 index by a single metric.
 
     Sugar over ``iaf list --sort <by> --limit <n>`` with a column set
@@ -586,6 +602,25 @@ def rank_cmd(index_path, by, limit, ascending, where, columns, as_json):
         click.echo(_json.dumps(rows, indent=2, default=str))
     else:
         click.echo(format_table(rows, columns=cols))
+
+    if prune or archive_dir:
+        from .index_command import prune_backtests
+        result = prune_backtests(
+            directory=index_path,
+            keep=rows,
+            archive_dir=archive_dir,
+            dry_run=dry_run,
+            show_progress=True,
+        )
+        action = "Would prune" if dry_run else "Pruned"
+        dest = (
+            f" → {result['archive_dir']}" if result["archive_dir"]
+            else " (deleted)"
+        )
+        click.echo(
+            f"\n{action} {result['pruned']} bundle(s){dest}, "
+            f"kept {result['kept']}."
+        )
 
 
 cli.add_command(rank_cmd)

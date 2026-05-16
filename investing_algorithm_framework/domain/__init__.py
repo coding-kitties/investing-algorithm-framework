@@ -48,8 +48,11 @@ from .backtesting import BacktestRun, BacktestSummaryMetrics, \
     BacktestPermutationTest, BacktestEvaluationFocus, \
     BacktestIndexRow, \
     generate_backtest_summary_metrics, load_backtests_from_directory, \
-    save_backtests_to_directory, retag_backtests, \
-    resolve_backtest_path, BUNDLE_EXT
+    save_backtests_to_directory, retag_backtests, migrate_backtests, \
+    resolve_backtest_path, BUNDLE_EXT, BUNDLE_FORMAT_VERSION, BacktestIndex
+from .pipeline import Pipeline, AverageDollarVolume, AverageTradedValue, \
+    CrossSectionalMean, Neutralize, Returns, RollingBeta, RSI, SMA, \
+    StaticPerSymbol, Volatility, Factor, CustomFactor, Filter
 from .algorithm_id import generate_algorithm_id
 
 __all__ = [
@@ -162,6 +165,7 @@ __all__ = [
     "load_backtests_from_directory",
     "save_backtests_to_directory",
     "retag_backtests",
+    "migrate_backtests",
     "generate_algorithm_id",
     "Blotter",
     "DefaultBlotter",
@@ -186,7 +190,23 @@ __all__ = [
     "PortfolioOutOfSyncError",
     "resolve_backtest_path",
     "BUNDLE_EXT",
+    "BUNDLE_FORMAT_VERSION",
     "BacktestIndexRow",
+    "BacktestIndex",
+    "Pipeline",
+    "Factor",
+    "CustomFactor",
+    "Filter",
+    "AverageDollarVolume",
+    "AverageTradedValue",
+    "CrossSectionalMean",
+    "Neutralize",
+    "Returns",
+    "RollingBeta",
+    "RSI",
+    "SMA",
+    "StaticPerSymbol",
+    "Volatility",
     "CooldownRule",
     "CooldownTrigger",
     "CooldownBlocks",

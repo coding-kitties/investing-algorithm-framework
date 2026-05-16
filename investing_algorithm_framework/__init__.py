@@ -26,7 +26,7 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus, \
     save_backtests_to_directory, BacktestMetrics, DATA_DIRECTORY, \
-    retag_backtests, \
+    retag_backtests, migrate_backtests, \
     Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
     SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage, \
     VolumeImpactSlippage, \
@@ -34,6 +34,10 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     FillModel, FullFill, VolumeBasedFill, \
     FXRateProvider, StaticFXRateProvider, \
     ScheduledDeposit, SyncResult, PortfolioOutOfSyncError  # noqa: F401
+from .domain import Pipeline, Factor, CustomFactor, Filter, \
+    AverageDollarVolume, AverageTradedValue, CrossSectionalMean, \
+    Neutralize, Returns, RollingBeta, RSI, SMA, StaticPerSymbol, \
+    Volatility, BacktestIndex, BUNDLE_FORMAT_VERSION  # noqa: F401
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
     JSONURLDataProvider, ParquetURLDataProvider, \
@@ -71,6 +75,7 @@ from .services import get_annual_volatility, get_sortino_ratio, \
     get_positive_trades, get_number_of_trades, get_current_win_rate, \
     get_current_win_loss_ratio, create_backtest_metrics_for_backtest, \
     recalculate_backtests, TradeTakeProfitService, TradeStopLossService
+from .notebook.magic import load_ipython_extension  # noqa: F401
 
 
 __all__ = [
@@ -219,6 +224,7 @@ __all__ = [
     "load_backtests_from_directory",
     "save_backtests_to_directory",
     "retag_backtests",
+    "migrate_backtests",
     "DataError",
     "create_backtest_metrics_for_backtest",
     "recalculate_backtests",
@@ -261,4 +267,21 @@ __all__ = [
     "VolumeBasedFill",
     "FXRateProvider",
     "StaticFXRateProvider",
+    "BacktestIndex",
+    "BUNDLE_FORMAT_VERSION",
+    "Pipeline",
+    "Factor",
+    "CustomFactor",
+    "Filter",
+    "AverageDollarVolume",
+    "AverageTradedValue",
+    "CrossSectionalMean",
+    "Neutralize",
+    "Returns",
+    "RollingBeta",
+    "RSI",
+    "SMA",
+    "StaticPerSymbol",
+    "Volatility",
+    "load_ipython_extension",
 ]

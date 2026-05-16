@@ -294,3 +294,94 @@ def format_table(
         for row in cells
     )
     return f"{header}\n{rule}\n{body}"
+
+
+# ---------------------------------------------------------------------------
+# prune helpers
+# ---------------------------------------------------------------------------
+
+def prune_backtests(
+    directory: str,
+    keep: List[Dict[str, Any]],
+    *,
+    archive_dir: Optional[str] = None,
+    dry_run: bool = False,
+    show_progress: bool = False,
+) -> Dict[str, Any]:
+    """Move or delete bundles that are **not** in *keep*.
+
+    Args:
+        directory: Folder containing the ``.iafbt`` bundles (same
+            path you passed to :func:`build_index`).
+        keep: List of row dicts (as returned by :func:`rank_index`)
+            whose ``"bundle_path"`` values identify bundles to keep.
+        archive_dir: If given, pruned bundles are *moved* here
+            (preserving relative sub-paths) instead of deleted.
+            Created if it does not exist.
+        dry_run: When True, report what *would* happen without
+            touching the file system.
+        show_progress: Show a tqdm progress bar.
+
+    Returns:
+        ``{"kept": int, "pruned": int, "archive_dir": str | None}``
+    """
+    import shutil
+
+    src = Path(directory).resolve()
+    if not src.is_dir():
+        raise NotADirectoryError(f"Not a directory: {src}")
+
+    keep_set = frozenset(
+        r["bundle_path"] for r in keep if "bundle_path" in r
+    )
+
+    all_bundles = list(_iter_bundle_paths(src))
+
+    archive = Path(archive_dir).resolve() if archive_dir else None
+    if archive is not None and not dry_run:
+        archive.mkdir(parents=True, exist_ok=True)
+
+    pbar = None
+    if show_progress:
+        try:
+            from tqdm import tqdm
+            pbar = tqdm(total=len(all_bundles), desc="Pruning bundles")
+        except ImportError:
+            pbar = None
+
+    n_kept = 0
+    n_pruned = 0
+
+    try:
+        for bundle_path in all_bundles:
+            rel = str(bundle_path.relative_to(src))
+            if rel in keep_set:
+                n_kept += 1
+            else:
+                if not dry_run:
+                    if archive is not None:
+                        dest = archive / rel
+                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.move(str(bundle_path), str(dest))
+                    else:
+                        bundle_path.unlink()
+                n_pruned += 1
+            if pbar is not None:
+                pbar.update(1)
+    finally:
+        if pbar is not None:
+            pbar.close()
+
+    # Refresh the index to remove pruned entries.
+    if not dry_run and n_pruned > 0:
+        build_index(
+            str(src),
+            show_progress=False,
+            incremental=False,
+        )
+
+    return {
+        "kept": n_kept,
+        "pruned": n_pruned,
+        "archive_dir": str(archive) if archive else None,
+    }

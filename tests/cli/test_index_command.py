@@ -3,6 +3,7 @@ import json
 import os
 import shutil
 import tempfile
+from pathlib import Path
 from unittest import TestCase
 
 from click.testing import CliRunner
@@ -15,7 +16,7 @@ from investing_algorithm_framework.cli.cli import (
     index_cmd, list_cmd, rank_cmd,
 )
 from investing_algorithm_framework.cli.index_command import (
-    build_index, list_index, rank_index, format_table,
+    build_index, list_index, rank_index, format_table, prune_backtests,
 )
 from investing_algorithm_framework.services.backtest_index import (
     SqliteBacktestIndex,
@@ -282,3 +283,75 @@ class TestIndexCommand(TestCase):
             self.fixture.scalar_summary(),
             self.fixture.get_backtest_summary(),
         )
+
+    # ------------------------------------------------------------------
+    # prune_backtests
+    # ------------------------------------------------------------------
+    def test_prune_deletes_bundles_not_in_keep(self):
+        self._build_index_with_metrics()
+        top = rank_index(self.tmp, by="sharpe_ratio", limit=1)
+        self.assertEqual(len(top), 1)
+        self.assertEqual(top[0]["algorithm_id"], "algo_1")
+
+        result = prune_backtests(self.tmp, keep=top)
+        self.assertEqual(result["kept"], 1)
+        self.assertEqual(result["pruned"], 2)
+        self.assertIsNone(result["archive_dir"])
+
+        # Only algo_1 remains on disk.
+        remaining = list(
+            p.name for p in sorted(
+                Path(self.tmp).glob(f"*{BUNDLE_EXT}")
+            )
+        )
+        self.assertEqual(remaining, [f"algo_1{BUNDLE_EXT}"])
+
+    def test_prune_moves_to_archive_dir(self):
+        self._build_index_with_metrics()
+        top = rank_index(self.tmp, by="sharpe_ratio", limit=1)
+        archive = os.path.join(self.tmp, "_archive")
+
+        result = prune_backtests(
+            self.tmp, keep=top, archive_dir=archive,
+        )
+        self.assertEqual(result["pruned"], 2)
+        self.assertEqual(result["kept"], 1)
+
+        # Archive dir should contain the two pruned bundles.
+        archived = sorted(
+            p.name for p in Path(archive).glob(f"*{BUNDLE_EXT}")
+        )
+        self.assertEqual(len(archived), 2)
+        self.assertIn(f"algo_0{BUNDLE_EXT}", archived)
+        self.assertIn(f"algo_2{BUNDLE_EXT}", archived)
+
+        # Source still has the winner.
+        remaining = list(
+            p.name for p in Path(self.tmp).glob(f"*{BUNDLE_EXT}")
+        )
+        self.assertEqual(remaining, [f"algo_1{BUNDLE_EXT}"])
+
+    def test_prune_dry_run_does_not_touch_files(self):
+        self._build_index_with_metrics()
+        top = rank_index(self.tmp, by="sharpe_ratio", limit=1)
+
+        result = prune_backtests(self.tmp, keep=top, dry_run=True)
+        self.assertEqual(result["pruned"], 2)
+        self.assertEqual(result["kept"], 1)
+
+        # All three bundles should still be on disk.
+        remaining = sorted(
+            p.name for p in Path(self.tmp).glob(f"*{BUNDLE_EXT}")
+        )
+        self.assertEqual(len(remaining), 3)
+
+    def test_prune_refreshes_index(self):
+        self._build_index_with_metrics()
+        top = rank_index(self.tmp, by="sharpe_ratio", limit=1)
+
+        prune_backtests(self.tmp, keep=top)
+
+        # Index should now contain only the kept bundle.
+        rows = list_index(self.tmp)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["algorithm_id"], "algo_1")

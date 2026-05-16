@@ -238,6 +238,13 @@ class LocalTieredStore(BacktestStore):
                     if target_dir.exists():
                         shutil.rmtree(target_dir)
                     continue
+                # ``run_id`` is encoded in the hive partition path
+                # (run_id=<handle>). Keeping it inside the parquet
+                # payload can cause pyarrow to merge conflicting
+                # string types between file schema and partition
+                # schema on some versions.
+                if "run_id" in table.column_names:
+                    table = table.drop(["run_id"])
                 target_dir = self._partition_dir(name, handle)
                 target_dir.mkdir(parents=True, exist_ok=True)
                 pq.write_table(

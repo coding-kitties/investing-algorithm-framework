@@ -67,7 +67,7 @@ Most quant frameworks stop at "here's your backtest result." You get a number, m
 
 <details open>
 <summary>
- Features
+  <strong>Features</strong>
 </summary> <br>
 
 - 📊 **[30+ Metrics](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/metrics)** — CAGR, Sharpe, Sortino, Calmar, VaR, CVaR, Max DD, Recovery & more
@@ -99,6 +99,8 @@ Most quant frameworks stop at "here's your backtest result." You get a number, m
 </summary> <br>
 
 Declare **what data** your strategy needs and **when to buy or sell** as a `TradingStrategy` subclass — the framework wires up data loading, signal evaluation, order execution, position management, and reporting around it. The same class runs unchanged in vector backtests, event-driven backtests, paper trading and live.
+
+> **Want strategy ideas to start from?** Check out [`examples/strategies_showcase/`](examples/strategies_showcase/README.md): a collection of runnable strategy templates (trend following, mean reversion, cross-sectional momentum, multi-factor, pairs trading, and more).
 
 Risk and execution behaviour are expressed as **declarative rule lists** rather than ad-hoc code paths, so the engines can enforce them identically across modes:
 

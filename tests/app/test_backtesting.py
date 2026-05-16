@@ -9,6 +9,7 @@ Merged from:
 """
 import os
 import shutil
+import tempfile
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
 from unittest import TestCase
@@ -194,11 +195,9 @@ class TestBacktestReportCreation(BacktestTestBase):
         algorithm = Algorithm()
         algorithm.add_strategy(BacktestTestStrategy())
         backtest = self._run_backtest(algorithm=algorithm)
-        path = os.path.join(
-            self.resource_dir,
-            "backtest_reports_for_testing",
-            "test_algorithm_backtest"
-        )
+        tmpdir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmpdir)
+        path = os.path.join(tmpdir, "test_algorithm_backtest")
         backtest.save(directory_path=path)
         self.assertTrue(os.path.isdir(path))
 

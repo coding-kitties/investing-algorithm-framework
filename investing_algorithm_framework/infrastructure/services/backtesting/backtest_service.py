@@ -180,12 +180,12 @@ def _fill_missing_data_for_data_sources(
                     elif hasattr(data_provider, 'get_data_source_file_path'):
                         file_path = data_provider.get_data_source_file_path()
 
-                    # Fill the missing data
+                    # Fill the missing data (never write back to
+                    # the source file during backtest preparation)
                     filled_data = fill_missing_timeseries_data(
                         data,
                         missing_dates=missing_dates,
-                        save_to_file=file_path is not None,
-                        file_path=file_path
+                        save_to_file=False,
                     )
 
                     # Update the data provider's data
