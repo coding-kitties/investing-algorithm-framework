@@ -168,18 +168,6 @@ def _fill_missing_data_for_data_sources(
                             show_progress
                         )
 
-                    # Get file path if available
-                    # (check multiple attribute names)
-                    file_path = None
-                    if hasattr(data_provider, 'data_file_path') and \
-                            data_provider.data_file_path is not None:
-                        file_path = data_provider.data_file_path
-                    elif hasattr(data_provider, 'file_path') and \
-                            data_provider.file_path is not None:
-                        file_path = data_provider.file_path
-                    elif hasattr(data_provider, 'get_data_source_file_path'):
-                        file_path = data_provider.get_data_source_file_path()
-
                     # Fill the missing data (never write back to
                     # the source file during backtest preparation)
                     filled_data = fill_missing_timeseries_data(
