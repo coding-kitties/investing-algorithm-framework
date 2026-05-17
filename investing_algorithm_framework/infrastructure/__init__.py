@@ -1,5 +1,5 @@
 from .database import setup_sqlalchemy, Session, \
-    create_all_tables, clear_db
+    create_all_tables, clear_db, teardown_sqlalchemy
 from .models import SQLPortfolio, SQLOrder, SQLPosition, \
     SQLPortfolioSnapshot, SQLPositionSnapshot, SQLTrade, \
     SQLTradeTakeProfit, SQLTradeStopLoss
@@ -24,6 +24,7 @@ from .portfolio_providers import CCXTPortfolioProvider
 __all__ = [
     "clear_db",
     "create_all_tables",
+    "teardown_sqlalchemy",
     "SQLPositionRepository",
     "SQLPortfolioRepository",
     "SQLOrderRepository",

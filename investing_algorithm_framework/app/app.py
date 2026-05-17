@@ -24,7 +24,7 @@ from investing_algorithm_framework.domain import DATABASE_NAME, TimeUnit, \
     LAST_SNAPSHOT_DATETIME, BACKTESTING_FLAG, DATA_DIRECTORY
 from investing_algorithm_framework.infrastructure import setup_sqlalchemy, \
     create_all_tables, CCXTOrderExecutor, CCXTPortfolioProvider, \
-    CCXTOHLCVDataProvider, clear_db, \
+    CCXTOHLCVDataProvider, clear_db, teardown_sqlalchemy, \
     PandasOHLCVDataProvider
 from investing_algorithm_framework.services import OrderBacktestService, \
     BacktestPortfolioService, DefaultTradeOrderEvaluator
@@ -282,7 +282,7 @@ class App:
             path = "sqlite:///" + os.path.join(
                 configuration_service.config[DATABASE_DIRECTORY_PATH],
                 configuration_service.config[DATABASE_NAME]
-            )
+            ).replace("\\", "/")
             configuration_service.add_value(SQLALCHEMY_DATABASE_URI, path)
 
     def initialize_backtest_config(
@@ -368,10 +368,18 @@ class App:
                 logger.info(
                     f"Removing existing database at {database_path}"
                 )
+
+                # Dispose the existing engine to release file locks
+                # (required on Windows where locks are mandatory)
+                teardown_sqlalchemy()
+
+                import gc
+                gc.collect()
+
                 os.remove(database_path)
 
         # Create the sqlalchemy database uri
-        path = f"sqlite:///{database_path}"
+        path = "sqlite:///" + database_path.replace("\\", "/")
         self.set_config(SQLALCHEMY_DATABASE_URI, path)
 
         # Setup sql if needed
