@@ -1,4 +1,6 @@
 import os
+import tempfile
+import shutil
 from datetime import datetime, timedelta
 from unittest import TestCase
 
@@ -53,6 +55,9 @@ class Test(TestCase):
         if os.path.exists(database_dir):
             os.rmdir(database_dir)
 
+        if hasattr(self, '_tmpdir') and os.path.exists(self._tmpdir):
+            shutil.rmtree(self._tmpdir)
+
     def test_report_json_creation(self):
         """
         Test if the backtest report is created as a CSV file
@@ -79,8 +84,9 @@ class Test(TestCase):
             backtest_date_range=backtest_date_range,
             risk_free_rate=0.027
         )
+        self._tmpdir = tempfile.mkdtemp()
         path = os.path.join(
-            self.resource_dir, "backtest_reports_for_testing", "test_algorithm_backtest"
+            self._tmpdir, "test_algorithm_backtest"
         )
         backtest.save(directory_path=path)
 

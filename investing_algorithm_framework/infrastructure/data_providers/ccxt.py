@@ -290,12 +290,12 @@ class CCXTOHLCVDataProvider(DataProvider):
                     f"{self.symbol} {self.time_frame}"
                 )
 
-                # Fill the missing data
+                # Fill the missing data (never write back to the
+                # source file during backtest preparation)
                 filled_data = fill_missing_timeseries_data(
                     self.data,
                     missing_dates=missing_dates,
-                    save_to_file=self.data_file_path is not None,
-                    file_path=self.data_file_path
+                    save_to_file=False,
                 )
 
                 if filled_data is not None:

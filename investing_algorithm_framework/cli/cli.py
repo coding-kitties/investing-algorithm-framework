@@ -320,3 +320,307 @@ def migrate_backtests_cmd(
 
 
 cli.add_command(migrate_backtests_cmd)
+
+
+_STORE_KINDS = ["local-dir", "local-tiered"]
+
+
+@click.command(name="migrate-store")
+@click.option(
+    "--from", "src_kind",
+    type=click.Choice(_STORE_KINDS),
+    required=True,
+    help="Source store kind.",
+)
+@click.option(
+    "--src",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+    required=True,
+    help="Path to the source store root.",
+)
+@click.option(
+    "--to", "dst_kind",
+    type=click.Choice(_STORE_KINDS),
+    required=True,
+    help="Destination store kind.",
+)
+@click.option(
+    "--dst",
+    type=click.Path(file_okay=False, dir_okay=True),
+    required=True,
+    help="Path to the destination store root (created if missing).",
+)
+@click.option(
+    "--handles",
+    default=None,
+    help=(
+        "Optional comma-separated subset of source handles to copy. "
+        "When omitted, every handle is copied."
+    ),
+)
+def migrate_store_cmd(src_kind, src, dst_kind, dst, handles):
+    """Copy backtests between two :class:`BacktestStore` implementations.
+
+    Uses the destination's :class:`SupportsCopyFrom` capability so the
+    operation is incremental, restartable, and tier-aware: when copying
+    into a ``local-tiered`` store, identical OHLCV chunks are written
+    exactly once across the entire destination, regardless of how many
+    bundles reference them (epic #540 phase 3c).
+
+    Example::
+
+        iaf migrate-store --from local-dir --src ./bt-old \\
+                          --to local-tiered --dst ./bt-new
+    """
+    from .migrate_store_command import migrate_store
+
+    handle_list = (
+        [h.strip() for h in handles.split(",") if h.strip()]
+        if handles else None
+    )
+    n = migrate_store(
+        src_kind=src_kind,
+        src_root=src,
+        dst_kind=dst_kind,
+        dst_root=dst,
+        handles=handle_list,
+    )
+    click.echo(
+        f"Migrated {n} backtest(s) from {src_kind}:{src} "
+        f"to {dst_kind}:{dst}"
+    )
+
+
+cli.add_command(migrate_store_cmd)
+
+
+@click.command(name="index")
+@click.argument(
+    "directory",
+    type=click.Path(exists=True, file_okay=False, dir_okay=True),
+)
+@click.option(
+    "--output", "-o",
+    type=click.Path(file_okay=True, dir_okay=False),
+    default=None,
+    help="Path to the SQLite index file (default: <directory>/index.sqlite).",
+)
+@click.option(
+    "--absolute-paths", is_flag=True, default=False,
+    help="Store absolute bundle paths in the index "
+         "(default: paths relative to <directory>, so the index stays "
+         "portable when the folder is moved).",
+)
+@click.option(
+    "--no-progress", is_flag=True, default=False,
+    help="Suppress the progress bar.",
+)
+@click.option(
+    "--rebuild", is_flag=True, default=False,
+    help="Force a full rebuild instead of incremental refresh "
+         "(default: skip bundles whose mtime+size match an existing "
+         "row).",
+)
+def index_cmd(directory, output, absolute_paths, no_progress, rebuild):
+    """Build a SQLite Tier-1 index over a folder of ``.iafbt`` bundles.
+
+    The resulting ``index.sqlite`` file holds one row per bundle with
+    identity / provenance / config columns and every scalar
+    ``BacktestSummaryMetrics`` field promoted to its own column, so
+    analysts can run ad-hoc SQL queries (e.g.
+    ``SELECT bundle_path FROM backtest_index
+    WHERE summary_sharpe_ratio > 1.0``) without opening any bundle.
+
+    Each bundle is opened with ``summary_only=True`` so no Parquet
+    metric blobs are decoded \u2014 indexing 12,500 bundles is bounded by
+    msgpack header parsing, not metric reconstruction.
+    """
+    from .index_command import build_index
+
+    out = build_index(
+        directory=directory,
+        output=output,
+        relative_paths=not absolute_paths,
+        show_progress=not no_progress,
+        incremental=not rebuild,
+    )
+    click.echo(f"Wrote SQLite index to {out}")
+
+
+cli.add_command(index_cmd)
+
+
+@click.command(name="list")
+@click.argument(
+    "index_path",
+    type=click.Path(exists=True, file_okay=True, dir_okay=True),
+)
+@click.option(
+    "--sort", "sort_by", default=None,
+    help="Metric / column to sort by (e.g. sharpe_ratio, "
+         "summary_total_net_gain_percentage, algorithm_id). "
+         "Bare metric names are auto-prefixed with 'summary_'.",
+)
+@click.option(
+    "--asc", "ascending", is_flag=True, default=False,
+    help="Sort ascending (default: descending / best-first).",
+)
+@click.option(
+    "--limit", "-n", type=int, default=None,
+    help="Maximum number of rows to print.",
+)
+@click.option(
+    "--where", default=None,
+    help='Raw SQL WHERE fragment (no leading WHERE). '
+         'Example: --where "summary_sharpe_ratio > 1.0 AND tag = \'demo\'"',
+)
+@click.option(
+    "--columns", default=None,
+    help="Comma-separated list of columns to print "
+         "(default: a curated set of identity + summary metrics).",
+)
+@click.option(
+    "--json", "as_json", is_flag=True, default=False,
+    help="Emit JSON instead of a text table.",
+)
+def list_cmd(
+    index_path, sort_by, ascending, limit, where, columns, as_json,
+):
+    """List rows from a SQLite Tier-1 index built by ``iaf index``.
+
+    ``INDEX_PATH`` may be either an ``index.sqlite`` file or the
+    directory it lives in.
+
+    Examples:
+
+        iaf list ./backtests --sort sharpe_ratio -n 20
+
+        iaf list index.sqlite --where "summary_max_drawdown > -0.1" \\
+            --sort sortino_ratio
+    """
+    from .index_command import list_index, format_table
+    cols = (
+        [c.strip() for c in columns.split(",")] if columns else None
+    )
+    rows = list_index(
+        index_path=index_path,
+        sort_by=sort_by,
+        ascending=ascending,
+        limit=limit,
+        where=where,
+        columns=cols,
+    )
+    if as_json:
+        import json as _json
+        click.echo(_json.dumps(rows, indent=2, default=str))
+    else:
+        click.echo(format_table(rows, columns=cols))
+
+
+cli.add_command(list_cmd)
+
+
+@click.command(name="rank")
+@click.argument(
+    "index_path",
+    type=click.Path(exists=True, file_okay=True, dir_okay=True),
+)
+@click.option(
+    "--by", "by", required=True,
+    help="Metric to rank by (e.g. sharpe_ratio, sortino_ratio, "
+         "calmar_ratio, profit_factor). Bare metric names are "
+         "auto-prefixed with 'summary_'.",
+)
+@click.option(
+    "--limit", "-n", type=int, default=10,
+    help="Number of rows to return (default: 10).",
+)
+@click.option(
+    "--asc", "ascending", is_flag=True, default=False,
+    help="Rank ascending (e.g. for max_drawdown where smaller is "
+         "better the user typically wants ascending order on the "
+         "magnitude). Default: descending / best-first.",
+)
+@click.option(
+    "--where", default=None,
+    help='Optional SQL WHERE fragment to filter candidates before '
+         'ranking. Example: --where "tag = \'walk-forward\'".',
+)
+@click.option(
+    "--columns", default=None,
+    help="Comma-separated list of columns to print "
+         "(default: identity + key risk-adjusted metrics).",
+)
+@click.option(
+    "--json", "as_json", is_flag=True, default=False,
+    help="Emit JSON instead of a text table.",
+)
+@click.option(
+    "--prune", is_flag=True, default=False,
+    help="Remove bundles that fall outside the ranked results. "
+         "Combine with --archive-dir to move instead of delete.",
+)
+@click.option(
+    "--archive-dir", "archive_dir", default=None,
+    type=click.Path(file_okay=False),
+    help="Move pruned bundles here instead of deleting them. "
+         "Implies --prune.",
+)
+@click.option(
+    "--dry-run", is_flag=True, default=False,
+    help="Show what --prune would do without touching files.",
+)
+def rank_cmd(index_path, by, limit, ascending, where, columns, as_json,
+             prune, archive_dir, dry_run):
+    """Rank backtests in a Tier-1 index by a single metric.
+
+    Sugar over ``iaf list --sort <by> --limit <n>`` with a column set
+    geared toward strategy comparison (Sharpe / Sortino / Calmar /
+    return / drawdown).
+
+    Examples:
+
+        iaf rank ./backtests --by sharpe_ratio -n 5
+
+        iaf rank index.sqlite --by profit_factor \\
+            --where "summary_number_of_trades > 50"
+    """
+    from .index_command import rank_index, format_table
+    cols = (
+        [c.strip() for c in columns.split(",")] if columns else None
+    )
+    rows = rank_index(
+        index_path=index_path,
+        by=by,
+        limit=limit,
+        where=where,
+        columns=cols,
+        ascending=ascending,
+    )
+    if as_json:
+        import json as _json
+        click.echo(_json.dumps(rows, indent=2, default=str))
+    else:
+        click.echo(format_table(rows, columns=cols))
+
+    if prune or archive_dir:
+        from .index_command import prune_backtests
+        result = prune_backtests(
+            directory=index_path,
+            keep=rows,
+            archive_dir=archive_dir,
+            dry_run=dry_run,
+            show_progress=True,
+        )
+        action = "Would prune" if dry_run else "Pruned"
+        dest = (
+            f" → {result['archive_dir']}" if result["archive_dir"]
+            else " (deleted)"
+        )
+        click.echo(
+            f"\n{action} {result['pruned']} bundle(s){dest}, "
+            f"kept {result['kept']}."
+        )
+
+
+cli.add_command(rank_cmd)

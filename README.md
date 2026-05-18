@@ -3,7 +3,7 @@
 </h1>
 
 <p align="center">
-  <i align="center">Create trading strategies. Compare them side by side. Pick the best one and Deploy 🚀</i>
+  <i align="center">The full quant workflow in one framework: build strategies, vector & event-driven backtest at scale, compare in a single dashboard, and deploy the winner 🚀</i>
 </p>
 
 <h4 align="center">
@@ -59,15 +59,15 @@
 
 ## Introduction
 
-`Investing Algorithm Framework` is a Python framework for creating, backtesting, and deploying trading strategies.
+`Investing Algorithm Framework` is a Python framework that covers the entire quant workflow: define a strategy once, vector-backtest thousands of parameter variants to find promising signals, narrow down with a storage layer that ranks 10k+ results in milliseconds, validate the winners in a realistic event-driven simulation, compare everything in a single interactive HTML dashboard, and deploy the best performer live, all with the same `TradingStrategy` class, no code rewrites between stages.
 
-Most quant frameworks stop at "here's your backtest result." You get a number, maybe a chart, and then you're on your own figuring out which strategy is actually better.
+Most quant frameworks stop at "here's your backtest result." You get a number, maybe a chart, and then you're on your own figuring out which strategy variant is actually better, whether the result is robust across time windows, and how to go from research to production. This framework closes that gap.
 
-This framework is built around the full loop: **create strategies → vector backtest for signals analysis → compare them in a single report → event backtest the most promising strategies → deploy the winner.** It generates a self-contained HTML dashboard that lets you rank, filter, and visually compare every strategy you've tested — all in one view, no notebooks required.
+> **Want to see this in practice?** Check out the [`examples/tutorial/`](examples/tutorial/README.md): a series of runnable notebooks that walk you through every stage: defining a strategy, visualizing its signals, sweeping parameters across rolling windows, detecting overfitting with Monte Carlo permutation tests, filtering and ranking with the storage layer, and deploying the winner.
 
 <details open>
 <summary>
- Features
+  <strong>Features</strong>
 </summary> <br>
 
 - 📊 **[30+ Metrics](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/metrics)** — CAGR, Sharpe, Sortino, Calmar, VaR, CVaR, Max DD, Recovery & more
@@ -84,10 +84,93 @@ This framework is built around the full loop: **create strategies → vector bac
 - 📉 **[Benchmark Comparison](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Beat-rate analysis vs Buy & Hold, DCA, risk-free & custom benchmarks
 - 📄 **[One-Click HTML Report](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Self-contained file, no server, dark & light theme, shareable
 - 📦 **[Custom `.iafbt` Backtest Bundle Format](https://coding-kitties.github.io/investing-algorithm-framework/Data/backtest_data)** — An explicit, versioned, compressed, language-portable container (zstd + msgpack with magic-byte header) plus a separate parquet index for fast filtering without loading. ~21× smaller and ~27× fewer files than standard filebased directory layouts, with parallel I/O for fast load/save of large amounts of backtests.
+- 🗄️ **[Tiered Backtest Storage Layer](examples/storage_layer_demo/README.md)** — Manage thousands of `.iafbt` bundles with a Tier-1 SQLite index (sub-100 ms ranks/filters over 10k+ backtests), a swappable `BacktestStore` protocol (`LocalDirStore`, `LocalTieredStore`), content-addressed Tier-3 OHLCV deduplication, and a CLI (`iaf index` / `iaf list` / `iaf rank` / `iaf migrate-store`) that plugs straight into the HTML dashboard.
 - 🌐 **[Load External Data](https://coding-kitties.github.io/investing-algorithm-framework/Data/external-data)** — Fetch CSV, JSON, or Parquet from any URL with caching and auto-refresh
 - � **[Per-Market Deposit Schedules & Portfolio Sync](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/portfolio-sync)** — Declare recurring or one-shot external cash flows on a market with `deposit_schedule=` / `auto_sync=True`. Backtests simulate the deposits; live mode reconciles with the broker — same `context.sync_portfolio()` API in both modes.
-- �📝 **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
+- 📝 **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
+- ⏱️ **Signal Cooldowns**: Throttle whipsaw with declarative `CooldownRule`s: per-symbol or portfolio-wide, side-aware (`trigger="sell"`, `blocks="buy"`), enforced identically by the vector and event-driven engines
 - 🚀 **[Build → Backtest → Deploy](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/application-setup)** — Local dev, cloud deploy (AWS / Azure), or monetize on Finterion
+
+</details>
+
+<details open>
+<summary>
+  <strong>Strategy Definition</strong>
+</summary> <br>
+
+Declare **what data** your strategy needs and **when to buy or sell** as a `TradingStrategy` subclass — the framework wires up data loading, signal evaluation, order execution, position management, and reporting around it. The same class runs unchanged in vector backtests, event-driven backtests, paper trading and live.
+
+> **Want strategy ideas to start from?** Check out [`examples/strategies_showcase/`](examples/strategies_showcase/README.md): a collection of runnable strategy templates (trend following, mean reversion, cross-sectional momentum, multi-factor, pairs trading, and more).
+
+Risk and execution behaviour are expressed as **declarative rule lists** rather than ad-hoc code paths, so the engines can enforce them identically across modes:
+
+- **`position_sizes`**: [`PositionSize`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/position-size) per symbol (fixed amount or percentage of portfolio).
+- **`stop_losses`** / **`take_profits`**: [`StopLossRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/stop-loss-rule) / [`TakeProfitRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/take-profit-rule) with fixed or trailing thresholds and partial-exit `sell_percentage`.
+- **`scaling_rules`**: [`ScalingRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/scaling-rule) for pyramiding (`scale_in_percentage=[…]`, `max_entries`, per-symbol `cooldown_in_bars`).
+- **`cooldowns`**: [`CooldownRule`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/cooldown-rule) to throttle whipsaw — per-symbol or portfolio-wide, side-aware (e.g. `trigger="sell", blocks="buy", bars=12`). Enforced bar-for-bar in both the vector and event-driven engines.
+- **`trading_costs`**: [`TradingCost`](https://coding-kitties.github.io/investing-algorithm-framework/Risk%20Rules/trading-cost) per symbol (fees, slippage, fixed costs).
+
+```python
+from investing_algorithm_framework import (
+    TradingStrategy,
+    PositionSize,
+    ScalingRule,
+    StopLossRule,
+    TakeProfitRule,
+    CooldownRule,
+    TradingCost,
+)
+
+
+class MyStrategy(TradingStrategy):
+    symbols = ["BTC", "ETH"]
+
+    position_sizes = [
+        PositionSize(symbol="BTC", percentage_of_portfolio=20),
+        PositionSize(symbol="ETH", percentage_of_portfolio=20),
+    ]
+
+    stop_losses = [
+        StopLossRule(symbol="BTC", percentage_threshold=5, trailing=True),
+        StopLossRule(symbol="ETH", percentage_threshold=5, trailing=True),
+    ]
+
+    take_profits = [
+        TakeProfitRule(
+            symbol="BTC", percentage_threshold=10, sell_percentage=50,
+        ),
+        TakeProfitRule(
+            symbol="ETH", percentage_threshold=10, sell_percentage=50,
+        ),
+    ]
+
+    scaling_rules = [
+        ScalingRule(
+            symbol="BTC", max_entries=3, scale_in_percentage=[50, 25],
+        ),
+        ScalingRule(
+            symbol="ETH", max_entries=3, scale_in_percentage=[50, 25],
+        ),
+    ]
+
+    cooldowns = [
+        CooldownRule(symbol="BTC", trigger="sell", blocks="buy", bars=12),
+        CooldownRule(trigger="any", blocks="any", bars=2),
+    ]
+
+    trading_costs = [
+        TradingCost(symbol="BTC", fee_percentage=0.1),
+        TradingCost(symbol="ETH", fee_percentage=0.1),
+    ]
+
+    def generate_buy_signals(self, data):
+        ...
+
+    def generate_sell_signals(self, data):
+        ...
+```
+
+→ [Strategy docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/strategies)
 
 </details>
 
@@ -141,7 +224,136 @@ Every backtest produces a **self-contained HTML dashboard** — open it in any b
 - **Built-in MCP server** — let Copilot, Claude, or any MCP-compatible agent query your backtests, rank strategies, and reason over trades through `investing-algorithm-framework mcp`
 - **Notes keeping** — annotate every backtest with hypotheses, observations and conclusions; notes travel with the report so your research is never lost
 
+#### From backtest results to a report
+
+> 💡 **Want state-of-the-art analytics, publishable reports, ranking across thousands of runs and AI agents that do the analysis for you?** Partner with our analytics integration partners below — they pick up where the local `report.html` leaves off.
+
+<p align="center">
+  <a href="https://www.finterion.com/" target="_blank">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="static/features/finterion-analytics-dark.svg">
+      <source media="(prefers-color-scheme: light)" srcset="static/features/finterion-analytics-light.svg">
+      <img src="static/features/finterion-analytics-light.svg" alt="Backtest analytics for teams — featuring Finterion" style="max-width: 100%;">
+    </picture>
+  </a>
+</p>
+
+Every backtest API — vector or event-driven — returns the same `Backtest` object, which the `BacktestReport` consumes directly. So whether you're iterating over an in-memory list or a folder of persisted `.iafbt` bundles, the path to the dashboard is the same:
+
+```python
+from investing_algorithm_framework import BacktestReport
+
+# --- Single event-driven backtest ---
+backtest = app.run_backtest(backtest_date_range=date_range)
+BacktestReport(backtests=[backtest]).save("event_report.html")
+
+# --- A sweep of vector backtests (parameter grid / multi-window) ---
+backtests = app.run_vector_backtests(
+    strategies=[StrategyA(), StrategyB(), StrategyC()],
+    backtest_date_ranges=[range_2022, range_2023, range_2024],
+    n_workers=-1,
+    backtest_storage_directory="./my-backtests/",  # persists .iafbt bundles
+    show_progress=True,
+)
+BacktestReport(backtests=backtests).save("sweep_report.html")
+
+# --- Or: load a folder of bundles back later (parallel decode) ---
+report = BacktestReport.open(
+    directory_path="./my-backtests/",
+    workers=-1,
+    show_progress=True,
+)
+report.save("from_disk_report.html")
+```
+
+For sweeps that grow into the thousands, combine this with the [Backtest Storage Layer](examples/storage_layer_demo/README.md) below — rank in SQLite first, then load only the winners into the report:
+
+```python
+from investing_algorithm_framework import BacktestReport
+from investing_algorithm_framework.cli.index_command import (
+    build_index, rank_index,
+)
+from investing_algorithm_framework.services.backtest_store import (
+    LocalDirStore,
+)
+
+# 1. Build (or refresh) the Tier-1 SQLite index over the folder of bundles.
+build_index("./my-backtests/")
+
+# 2. Pick the top 25 by Sharpe straight from SQLite — no Parquet decoded.
+top = rank_index(
+    "./my-backtests/",
+    by="sharpe_ratio",
+    where="summary_number_of_trades > 50",
+    limit=25,
+)
+
+# 3. Materialise only those 25 bundles through the BacktestStore protocol.
+store = LocalDirStore("./my-backtests/")
+winners = [store.open(row["bundle_path"]) for row in top]
+
+# 4. Render a focused dashboard with just the winners.
+BacktestReport(backtests=winners).save("top25_by_sharpe.html")
+```
+
 → [Backtest dashboard docs](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtesting) · [MCP server docs](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/mcp-server)
+
+</details>
+
+<details open>
+<summary>
+  <strong>Backtest Storage Layer — scale to thousands of backtests</strong>
+</summary> <br>
+
+Once you start sweeping parameter grids and walk-forward windows, a flat folder of `.iafbt` bundles stops scaling: every comparison re-decodes multi-MB Parquet metric blobs just to read a Sharpe number. The storage layer fixes that with three tiers behind a single `BacktestStore` protocol:
+
+- **Tier-1 — SQLite index (`index.sqlite`)**: one row per bundle with every scalar from `BacktestSummaryMetrics` promoted to its own column. Ranking 10k+ bundles becomes a sub-100 ms SQL query — no `.iafbt` is opened.
+- **Tier-2 — `BacktestStore` adapters**: `LocalDirStore` (flat folder of bundles) or `LocalTieredStore` (hive-partitioned layout). Same handle-based API, swap the implementation without touching call sites.
+- **Tier-3 — content-addressed OHLCV chunks**: SHA-256 deduped per-symbol OHLCV blobs shared across every bundle that references them. `garbage_collect_ohlcv()` reclaims orphans.
+
+A CLI ties it all together: `iaf index` builds/refreshes the Tier-1 SQLite, `iaf list` / `iaf rank` query it, and `iaf migrate-store` moves a whole collection between store kinds in one command.
+
+#### Typical workflow
+
+```python
+from investing_algorithm_framework import BacktestReport
+from investing_algorithm_framework.cli.index_command import (
+    build_index, rank_index,
+)
+from investing_algorithm_framework.services.backtest_store import (
+    LocalDirStore,
+)
+
+# 1. Build (or refresh) the Tier-1 SQLite index over a folder of .iafbt bundles.
+build_index("./my-backtests/")          # equivalent to: iaf index ./my-backtests/
+
+# 2. Pick the top 20 by Sharpe straight from SQLite — no Parquet decoded.
+top = rank_index(
+    "./my-backtests/",
+    by="sharpe_ratio",
+    where="summary_number_of_trades > 50",
+    limit=20,
+)
+
+# 3. Materialise just those 20 bundles through the BacktestStore protocol.
+store = LocalDirStore("./my-backtests/")
+backtests = [store.open(row["bundle_path"]) for row in top]
+
+# 4. Feed them straight into the HTML dashboard.
+BacktestReport(backtests=backtests).save("top20.html")
+```
+
+Or from the shell:
+
+```bash
+iaf index ./my-backtests/
+iaf rank  ./my-backtests/ --by sharpe_ratio --where "summary_number_of_trades > 50" -n 20
+iaf list  ./my-backtests/ --sort calmar_ratio --json
+iaf migrate-store --from local-dir --src ./my-backtests/ \
+                  --to   local-tiered --dst ./tiered/
+```
+
+→ End-to-end runnable example: [`examples/storage_layer_demo/`](examples/storage_layer_demo/README.md)
 
 </details>
 
@@ -225,7 +437,7 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import (
     TradingStrategy, DataSource, TimeUnit, DataType,
-    PositionSize, ScalingRule, StopLossRule,
+    PositionSize, ScalingRule, StopLossRule, CooldownRule,
 )
 
 
@@ -277,6 +489,18 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             symbol="ETH", percentage_threshold=5,
             sell_percentage=100, trailing=True,
         ),
+    ]
+    # Signal throttling: after a stop-out / sell, block re-entries on
+    # the same symbol for 12 bars, plus a portfolio-wide breather of
+    # 2 bars after any order to avoid same-bar pile-ups.
+    cooldowns = [
+        CooldownRule(
+            symbol="BTC", trigger="sell", blocks="buy", bars=12,
+        ),
+        CooldownRule(
+            symbol="ETH", trigger="sell", blocks="buy", bars=12,
+        ),
+        CooldownRule(trigger="any", blocks="any", bars=2),
     ]
 
     def generate_buy_signals(

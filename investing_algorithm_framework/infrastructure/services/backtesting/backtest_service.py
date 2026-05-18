@@ -168,24 +168,12 @@ def _fill_missing_data_for_data_sources(
                             show_progress
                         )
 
-                    # Get file path if available
-                    # (check multiple attribute names)
-                    file_path = None
-                    if hasattr(data_provider, 'data_file_path') and \
-                            data_provider.data_file_path is not None:
-                        file_path = data_provider.data_file_path
-                    elif hasattr(data_provider, 'file_path') and \
-                            data_provider.file_path is not None:
-                        file_path = data_provider.file_path
-                    elif hasattr(data_provider, 'get_data_source_file_path'):
-                        file_path = data_provider.get_data_source_file_path()
-
-                    # Fill the missing data
+                    # Fill the missing data (never write back to
+                    # the source file during backtest preparation)
                     filled_data = fill_missing_timeseries_data(
                         data,
                         missing_dates=missing_dates,
-                        save_to_file=file_path is not None,
-                        file_path=file_path
+                        save_to_file=False,
                     )
 
                     # Update the data provider's data
@@ -608,6 +596,7 @@ class BacktestService:
             tag=algorithm.metadata.get('tag') if hasattr(
                 algorithm, 'metadata') and algorithm.metadata
             else None,
+            engine_type="event",
         )
 
     def backtest_exists(
@@ -676,7 +665,11 @@ class BacktestService:
             backtest = Backtest.open(backtest_directory)
             run = backtest.get_backtest_run(backtest_date_range)
             metadata = backtest.get_metadata()
-            return Backtest(backtest_runs=[run], metadata=metadata)
+            return Backtest(
+                backtest_runs=[run],
+                metadata=metadata,
+                engine_type=backtest.engine_type,
+            )
         else:
             raise OperationalException("Backtest does not exist.")
 
@@ -2129,6 +2122,7 @@ class BacktestService:
                     tag=strategy.metadata.get('tag') if hasattr(
                         strategy, 'metadata') and strategy.metadata
                     else None,
+                    engine_type="vector",
                 )
                 batch_results.append(backtest)
 
@@ -2307,7 +2301,8 @@ class BacktestService:
                 algorithm_id=strategy.algorithm_id,
                 backtest_runs=[],
                 risk_free_rate=risk_free_rate or 0.0,
-                metadata=metadata or {}
+                metadata=metadata or {},
+                engine_type="vector",
             )
 
     def _get_risk_free_rate(self) -> float:
@@ -3074,7 +3069,8 @@ class BacktestService:
                 algorithm_id=algorithm_id,
                 backtest_runs=[],
                 risk_free_rate=risk_free_rate or 0.0,
-                metadata=metadata or {}
+                metadata=metadata or {},
+                engine_type="event",
             ), {}
 
     def create_ohlcv_permutation(

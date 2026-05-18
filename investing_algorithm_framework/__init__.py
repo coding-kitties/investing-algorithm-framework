@@ -1,7 +1,8 @@
 from .analysis import generate_rolling_backtest_windows, \
     select_backtest_date_ranges, rank_results, create_weights, \
     get_missing_timeseries_data_entries, fill_missing_timeseries_data, \
-    create_markdown_table
+    create_markdown_table, analyze_backtest_windows, \
+    plot_backtest_windows, plot_window_correlation_matrix  # noqa: F401
 from .app import App, Algorithm, \
     TradingStrategy, StatelessAction, Task, AppHook, Context, \
     add_html_report, BacktestReport, \
@@ -17,10 +18,10 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     Position, TimeFrame, INDEX_DATETIME, MarketCredential, TakeProfitRule, \
     PortfolioConfiguration, RESOURCE_DIRECTORY, AWS_LAMBDA_LOGGING_CONFIG, \
     Trade, APP_MODE, AppMode, DATETIME_FORMAT, load_backtests_from_directory, \
-    iter_backtests_from_directory, \
     BacktestDateRange, convert_polars_to_pandas, BacktestRun, \
     DEFAULT_LOGGING_CONFIG, DataType, DataProvider, StopLossRule, \
     ScalingRule, TradingCost, \
+    CooldownRule, CooldownTrigger, CooldownBlocks, CooldownTracker, \
     TradeStatus, generate_backtest_summary_metrics, generate_algorithm_id, \
     APPLICATION_DIRECTORY, DataSource, OrderExecutor, PortfolioProvider, \
     SnapshotInterval, AWS_S3_STATE_BUCKET_NAME, BacktestEvaluationFocus, \
@@ -32,11 +33,11 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     CommissionModel, NoCommission, PercentageCommission, FixedCommission, \
     FillModel, FullFill, VolumeBasedFill, \
     FXRateProvider, StaticFXRateProvider, \
-    Pipeline, Factor, CustomFactor, Filter, \
-    Returns, AverageDollarVolume, AverageTradedValue, SMA, RSI, \
-    Volatility, StaticPerSymbol, CrossSectionalMean, RollingBeta, \
-    Neutralize, \
-    SyncResult, ScheduledDeposit, PortfolioOutOfSyncError
+    ScheduledDeposit, SyncResult, PortfolioOutOfSyncError  # noqa: F401
+from .domain import Pipeline, Factor, CustomFactor, Filter, \
+    AverageDollarVolume, AverageTradedValue, CrossSectionalMean, \
+    Neutralize, Returns, RollingBeta, RSI, SMA, StaticPerSymbol, \
+    Volatility, BacktestIndex, BUNDLE_FORMAT_VERSION  # noqa: F401
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
     JSONURLDataProvider, ParquetURLDataProvider, \
@@ -73,10 +74,8 @@ from .services import get_annual_volatility, get_sortino_ratio, \
     get_current_average_trade_loss, get_negative_trades, \
     get_positive_trades, get_number_of_trades, get_current_win_rate, \
     get_current_win_loss_ratio, create_backtest_metrics_for_backtest, \
-    recalculate_backtests, recalculate_backtests_in_directory, \
-    TradeTakeProfitService, TradeStopLossService, \
-    get_cv_consistency, get_normalized_stability, \
-    get_consistency_score, get_stability_score
+    recalculate_backtests, TradeTakeProfitService, TradeStopLossService
+from .notebook.magic import load_ipython_extension  # noqa: F401
 
 
 __all__ = [
@@ -223,17 +222,19 @@ __all__ = [
     "get_number_of_trades",
     "BacktestRun",
     "load_backtests_from_directory",
-    "iter_backtests_from_directory",
     "save_backtests_to_directory",
     "retag_backtests",
     "migrate_backtests",
     "DataError",
     "create_backtest_metrics_for_backtest",
     "recalculate_backtests",
-    "recalculate_backtests_in_directory",
     "TakeProfitRule",
     "StopLossRule",
     "ScalingRule",
+    "CooldownRule",
+    "CooldownTrigger",
+    "CooldownBlocks",
+    "CooldownTracker",
     "TradingCost",
     "TradeStopLossService",
     "TradeTakeProfitService",
@@ -266,35 +267,21 @@ __all__ = [
     "VolumeBasedFill",
     "FXRateProvider",
     "StaticFXRateProvider",
-    # Pipeline API (Phase 1, see docs/design/pipeline-api.md)
+    "BacktestIndex",
+    "BUNDLE_FORMAT_VERSION",
     "Pipeline",
     "Factor",
     "CustomFactor",
     "Filter",
-    "Returns",
     "AverageDollarVolume",
     "AverageTradedValue",
-    "SMA",
-    "RSI",
-    "Volatility",
-    "StaticPerSymbol",
     "CrossSectionalMean",
-    "RollingBeta",
     "Neutralize",
+    "Returns",
+    "RollingBeta",
+    "RSI",
+    "SMA",
+    "StaticPerSymbol",
+    "Volatility",
     "load_ipython_extension",
-    "get_cv_consistency",
-    "get_normalized_stability",
-    "get_consistency_score",
-    "get_stability_score",
-    "SyncResult",
-    "ScheduledDeposit",
-    "PortfolioOutOfSyncError",
 ]
-
-
-def load_ipython_extension(ipython):
-    """Allow ``%load_ext investing_algorithm_framework`` to register
-    the ``%backtest`` / ``%%backtest`` magic commands."""
-    from investing_algorithm_framework.notebook import load_ipython_extension \
-        as _load
-    _load(ipython)

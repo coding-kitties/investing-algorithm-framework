@@ -1,5 +1,5 @@
-from .ema_crossover_rsi_filter import EMACrossoverRSIFFilterStrategy
+from .supertrend_ema_confirmation import SupertrendEmaConfirmationStrategy
 
 __all__ = [
-    "EMACrossoverRSIFFilterStrategy"
+    "SupertrendEmaConfirmationStrategy"
 ]

@@ -1,6 +1,5 @@
-from datetime import datetime
+from datetime import datetime, tzinfo
 from typing import Optional
-import pytz
 
 
 def is_timezone_aware(dt: datetime) -> bool:
@@ -16,7 +15,7 @@ def is_timezone_aware(dt: datetime) -> bool:
     return dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None
 
 
-def get_timezone(dt: datetime) -> Optional[pytz.tzinfo.BaseTzInfo]:
+def get_timezone(dt: datetime) -> Optional[tzinfo]:
     """
     Returns the timezone info from a datetime object.
 
@@ -24,7 +23,7 @@ def get_timezone(dt: datetime) -> Optional[pytz.tzinfo.BaseTzInfo]:
         dt (datetime): The datetime object to check.
 
     Returns:
-        pytz timezone info if available, otherwise None.
+        tzinfo if available, otherwise None.
     """
     if dt.tzinfo is not None and dt.tzinfo.utcoffset(dt) is not None:
         return dt.tzinfo

@@ -8,7 +8,7 @@ import pandas as pd
 from investing_algorithm_framework.domain import BacktestDateRange, \
     BacktestRun, Portfolio, TimeFrame, PortfolioConfiguration, \
     PortfolioSnapshot, OperationalException, Order, OrderType, OrderStatus, \
-    OrderSide, Trade, TradeStatus, DataType, TradingCost
+    OrderSide, Trade, TradeStatus, DataType, TradingCost, CooldownTracker
 from investing_algorithm_framework.services import DataProviderService, \
     create_backtest_metrics
 from investing_algorithm_framework.services.pipeline import \
@@ -250,6 +250,11 @@ class VectorBacktestService:
 
         # Signal event log — records every fired signal and its outcome
         signal_events = []
+
+        # Portfolio-scoped cooldown tracker for CooldownRule evaluation.
+        # Shared across symbols so portfolio-scoped rules (symbol=None) work.
+        cooldown_tracker = CooldownTracker()
+        strategy_cooldowns = list(getattr(strategy, 'cooldowns', None) or [])
 
         # Shared portfolio state for dynamic position sizing
         current_unallocated = initial_amount
@@ -575,6 +580,20 @@ class VectorBacktestService:
 
                 in_cooldown = data['cooldown_remaining'] > 0
 
+                # CooldownRule gating (portfolio-aware, side-specific)
+                rule_block_buy, _rule_buy = cooldown_tracker.is_blocked(
+                    strategy_cooldowns,
+                    signal_side="buy",
+                    symbol=symbol,
+                    bar_index=i,
+                )
+                rule_block_sell, _rule_sell = cooldown_tracker.is_blocked(
+                    strategy_cooldowns,
+                    signal_side="sell",
+                    symbol=symbol,
+                    bar_index=i,
+                )
+
                 # Read raw boolean signals for this bar
                 is_buy = bool(data['buy_signal'].iloc[i])
                 is_sell = bool(data['sell_signal'].iloc[i])
@@ -582,7 +601,16 @@ class VectorBacktestService:
                 is_scale_out = bool(data['scale_out_signal'].iloc[i])
 
                 # ---- SELL always takes priority ----
-                if is_sell and has_position and not in_cooldown:
+                if (is_sell and has_position and not in_cooldown
+                        and rule_block_sell):
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "sell",
+                        "executed": False,
+                        "reason": "in_cooldown_rule",
+                    })
+                elif is_sell and has_position and not in_cooldown:
                     signal_events.append({
                         "date": current_date,
                         "symbol": symbol,
@@ -599,6 +627,17 @@ class VectorBacktestService:
                         data['cooldown_remaining'] = \
                             scaling_rule.cooldown_in_bars
                         in_cooldown = True
+                    cooldown_tracker.record(
+                        symbol=symbol, order_side="sell", bar_index=i,
+                    )
+                    rule_block_sell, _ = cooldown_tracker.is_blocked(
+                        strategy_cooldowns, signal_side="sell",
+                        symbol=symbol, bar_index=i,
+                    )
+                    rule_block_buy, _ = cooldown_tracker.is_blocked(
+                        strategy_cooldowns, signal_side="buy",
+                        symbol=symbol, bar_index=i,
+                    )
                     # Reset is_buy if sell also fired on same bar
                     is_buy = False
                     is_scale_in = False
@@ -622,6 +661,16 @@ class VectorBacktestService:
 
                 # ---- SCALE-OUT (partial close) ----
                 if (is_scale_out and has_position
+                        and scaling_rule is not None and not in_cooldown
+                        and rule_block_sell):
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "scale_out",
+                        "executed": False,
+                        "reason": "in_cooldown_rule",
+                    })
+                elif (is_scale_out and has_position
                         and scaling_rule is not None and not in_cooldown):
                     so_idx = data['scale_out_count']
                     pct = scaling_rule.get_scale_out_percentage(so_idx)
@@ -642,9 +691,29 @@ class VectorBacktestService:
                         data['cooldown_remaining'] = \
                             scaling_rule.cooldown_in_bars
                         in_cooldown = True
+                    cooldown_tracker.record(
+                        symbol=symbol, order_side="sell", bar_index=i,
+                    )
+                    rule_block_sell, _ = cooldown_tracker.is_blocked(
+                        strategy_cooldowns, signal_side="sell",
+                        symbol=symbol, bar_index=i,
+                    )
+                    rule_block_buy, _ = cooldown_tracker.is_blocked(
+                        strategy_cooldowns, signal_side="buy",
+                        symbol=symbol, bar_index=i,
+                    )
 
                 # ---- BUY (new entry) ----
-                if is_buy and not has_position and not in_cooldown:
+                if (is_buy and not has_position and not in_cooldown
+                        and rule_block_buy):
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "buy",
+                        "executed": False,
+                        "reason": "in_cooldown_rule",
+                    })
+                elif is_buy and not has_position and not in_cooldown:
                     capital = _get_capital_for_trade(
                         data, current_price, 100
                     )
@@ -673,6 +742,17 @@ class VectorBacktestService:
                             data['cooldown_remaining'] = \
                                 scaling_rule.cooldown_in_bars
                             in_cooldown = True
+                        cooldown_tracker.record(
+                            symbol=symbol, order_side="buy", bar_index=i,
+                        )
+                        rule_block_sell, _ = cooldown_tracker.is_blocked(
+                            strategy_cooldowns, signal_side="sell",
+                            symbol=symbol, bar_index=i,
+                        )
+                        rule_block_buy, _ = cooldown_tracker.is_blocked(
+                            strategy_cooldowns, signal_side="buy",
+                            symbol=symbol, bar_index=i,
+                        )
                 elif is_buy and has_position and not in_cooldown:
                     # Possible scale-in via buy signal (if no separate
                     # scale_in_signals provided, buy = scale_in)
@@ -697,6 +777,16 @@ class VectorBacktestService:
 
                 # ---- SCALE-IN (add to position) ----
                 if (is_scale_in and has_position
+                        and scaling_rule is not None and not in_cooldown
+                        and rule_block_buy):
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "scale_in",
+                        "executed": False,
+                        "reason": "in_cooldown_rule",
+                    })
+                elif (is_scale_in and has_position
                         and scaling_rule is not None and not in_cooldown):
                     entry_count = data['entry_count']
                     if entry_count >= scaling_rule.max_entries:
@@ -737,6 +827,10 @@ class VectorBacktestService:
                             if scaling_rule.cooldown_in_bars > 0:
                                 data['cooldown_remaining'] = \
                                     scaling_rule.cooldown_in_bars
+                            cooldown_tracker.record(
+                                symbol=symbol, order_side="buy",
+                                bar_index=i,
+                            )
 
             # Update open trade values at each timestamp for
             # accurate portfolio value
