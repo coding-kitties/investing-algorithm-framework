@@ -200,7 +200,6 @@ class RSIEMACrossoverStrategy(TradingStrategy):
             signals[symbol] = sell_signal
         return signals
 
-@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class Test(TestCase):
 
     def test_run_with_backtest_storage_directory(self):
@@ -261,11 +260,11 @@ class Test(TestCase):
         config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=365)
+        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=60)
 
         # Split into multiple date ranges to test progressive filtering
-        mid_date = start_date + timedelta(days=180)
+        mid_date = start_date + timedelta(days=30)
         date_range_1 = BacktestDateRange(
             start_date=start_date, end_date=end_date, name="Period 1"
         )
@@ -353,7 +352,7 @@ class Test(TestCase):
         param_grid = {
             "rsi_time_frame": ["2h"],
             "rsi_period": [14],
-            "rsi_overbought_threshold": [70, 80],
+            "rsi_overbought_threshold": [70],
             "rsi_oversold_threshold": [30],
             "ema_time_frame": ["2h"],
             "ema_short_period": [100],
@@ -376,11 +375,11 @@ class Test(TestCase):
         config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
         app = create_app(name="GoldenCrossStrategy", config=config)
         app.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
-        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=365)
+        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=60)
 
         # Split into multiple date ranges to test progressive filtering
-        mid_date = start_date + timedelta(days=180)
+        mid_date = start_date + timedelta(days=30)
         date_range_1 = BacktestDateRange(
             start_date=start_date, end_date=end_date, name="Period 1"
         )
@@ -418,7 +417,7 @@ class Test(TestCase):
                 )
             )
 
-        self.assertEqual(len(strategies), 4)
+        self.assertEqual(len(strategies), 2)
 
         # Create backtest storage directory
         backtest_storage_dir = os.path.join(
@@ -441,15 +440,14 @@ class Test(TestCase):
             market="BITVAVO",
             backtest_storage_directory=backtest_storage_dir,
             use_checkpoints=True,
-            show_progress=False,
-            n_workers=4
+            show_progress=False
         )
         end_time = time.time()
         duration = end_time - start_time
 
-        # There should be 4 backtests
+        # There should be 2 backtests
         self.assertEqual(
-            len(backtests), 4, "There should be 4 backtests returned"
+            len(backtests), 2, "There should be 2 backtests returned"
         )
 
         # Each backtest should have atleast 2 backtest runs (one for each date range)
@@ -501,9 +499,9 @@ class Test(TestCase):
         )
         config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
 
-        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=365)
-        mid_date = start_date + timedelta(days=180)
+        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=60)
+        mid_date = start_date + timedelta(days=30)
 
         date_range_1 = BacktestDateRange(
             start_date=start_date, end_date=end_date, name="Period 1"
@@ -525,7 +523,7 @@ class Test(TestCase):
         app1 = create_app(name="FirstRun", config=config)
         app1.add_market(market="BITVAVO", trading_symbol="EUR", initial_balance=400)
 
-        # Create first set of strategies (4 strategies)
+        # Create first set of strategies (1 strategy)
         first_param_grid = {
             "rsi_time_frame": ["2h"],
             "rsi_period": [14],
@@ -533,8 +531,8 @@ class Test(TestCase):
             "rsi_oversold_threshold": [30],
             "ema_time_frame": ["2h"],
             "ema_short_period": [100],
-            "ema_long_period": [150, 200],  # 2 variations
-            "ema_cross_lookback_window": [4]  # 2 variations = 4 total
+            "ema_long_period": [150],
+            "ema_cross_lookback_window": [4]
         }
         first_variations = [
             dict(zip(first_param_grid.keys(), values))
@@ -564,7 +562,7 @@ class Test(TestCase):
                 )
             )
 
-        self.assertEqual(len(first_strategies), 2)
+        self.assertEqual(len(first_strategies), 1)
         first_algorithm_ids = set(s.algorithm_id for s in first_strategies)
 
         # Run first batch
@@ -582,16 +580,17 @@ class Test(TestCase):
         )
 
         # Verify first run results
-        self.assertEqual(len(first_backtests), 2)
+        self.assertEqual(len(first_backtests), 1)
         first_result_ids = set(b.algorithm_id for b in first_backtests)
         self.assertEqual(first_result_ids, first_algorithm_ids)
 
-        # Verify backtests were saved to storage
-        saved_dirs_after_first = set(
+        # Verify backtests were saved to storage (one bundle per
+        # algorithm_id in the default ``.iafbt`` bundle format)
+        saved_bundles_after_first = set(
             d for d in os.listdir(backtest_storage_dir)
-            if os.path.isdir(os.path.join(backtest_storage_dir, d))
+            if d.endswith(".iafbt")
         )
-        self.assertEqual(len(saved_dirs_after_first), 2)
+        self.assertEqual(len(saved_bundles_after_first), 1)
 
         # ===== SECOND RUN: Run backtests for DIFFERENT set of strategies =====
         app2 = create_app(name="SecondRun", config=config)
@@ -605,8 +604,8 @@ class Test(TestCase):
             "rsi_oversold_threshold": [20],    # Different from first run
             "ema_time_frame": ["2h"],
             "ema_short_period": [100],
-            "ema_long_period": [150, 200],  # 2 variations
-            "ema_cross_lookback_window": [4]  # 2 variations = 4 total
+            "ema_long_period": [150],
+            "ema_cross_lookback_window": [4]
         }
         second_variations = [
             dict(zip(second_param_grid.keys(), values))
@@ -636,7 +635,7 @@ class Test(TestCase):
                 )
             )
 
-        self.assertEqual(len(second_strategies), 2)
+        self.assertEqual(len(second_strategies), 1)
         second_algorithm_ids = set(s.algorithm_id for s in second_strategies)
 
         # Ensure the two sets of strategies are completely different
@@ -663,8 +662,8 @@ class Test(TestCase):
         # The second run should ONLY return backtests for the second strategies
         # It should NOT include backtests from the first run
         self.assertEqual(
-            len(second_backtests), 2,
-            "Second run should return exactly 2 backtests (one per second strategy)"
+            len(second_backtests), 1,
+            "Second run should return exactly 1 backtest (one per second strategy)"
         )
 
         second_result_ids = set(b.algorithm_id for b in second_backtests)
@@ -681,14 +680,14 @@ class Test(TestCase):
                 "be in second run results"
             )
 
-        # Storage should now contain 8 backtests total (4 from each run)
-        saved_dirs_after_second = set(
+        # Storage should now contain 2 backtests total (1 from each run)
+        saved_bundles_after_second = set(
             d for d in os.listdir(backtest_storage_dir)
-            if os.path.isdir(os.path.join(backtest_storage_dir, d))
+            if d.endswith(".iafbt")
         )
         self.assertEqual(
-            len(saved_dirs_after_second), 4,
-            "Storage should contain 4 backtest directories (2 from each run)"
+            len(saved_bundles_after_second), 2,
+            "Storage should contain 2 backtest bundles (1 from each run)"
         )
 
         # Clean up
@@ -719,9 +718,9 @@ class Test(TestCase):
         )
         config = {RESOURCE_DIRECTORY: resource_directory, DATA_DIRECTORY: "test_data/ohlcv"}
 
-        end_date = datetime(2025, 12, 2, tzinfo=timezone.utc)
-        start_date = end_date - timedelta(days=365)
-        mid_date = start_date + timedelta(days=180)
+        end_date = datetime(2024, 12, 2, tzinfo=timezone.utc)
+        start_date = end_date - timedelta(days=60)
+        mid_date = start_date + timedelta(days=30)
 
         date_range_1 = BacktestDateRange(
             start_date=start_date, end_date=end_date, name="Period 1"
@@ -784,7 +783,7 @@ class Test(TestCase):
 
         first_backtests = app1.run_vector_backtests(
             initial_amount=1000,
-            backtest_date_ranges=[date_range_1, date_range_2],
+            backtest_date_ranges=[date_range_1],
             strategies=first_strategies,
             snapshot_interval=SnapshotInterval.DAILY,
             risk_free_rate=0.027,
@@ -859,7 +858,7 @@ class Test(TestCase):
 
         second_backtests = app2.run_vector_backtests(
             initial_amount=1000,
-            backtest_date_ranges=[date_range_1, date_range_2],
+            backtest_date_ranges=[date_range_1],
             strategies=second_strategies,
             snapshot_interval=SnapshotInterval.DAILY,
             risk_free_rate=0.027,

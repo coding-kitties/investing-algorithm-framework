@@ -1672,9 +1672,61 @@ class BacktestService:
         if len(backtests) == 0:
             return
 
+        # When iterating across multiple date ranges, a bundle for the
+        # same ``algorithm_id`` may already exist on disk from a previous
+        # iteration. ``save_bundle`` keys solely on ``algorithm_id``, so
+        # a naive save would overwrite the prior bundle and lose its
+        # backtest_runs. Merge with the existing bundle so all date
+        # ranges' runs end up in the single per-algorithm bundle.
+        backtests_to_save: List[Backtest] = []
+        for bt in backtests:
+            existing_path = resolve_backtest_path(
+                storage_directory, bt.algorithm_id
+            )
+            if existing_path is None:
+                backtests_to_save.append(bt)
+                continue
+
+            try:
+                existing = Backtest.open(existing_path)
+            except Exception as e:
+                logger.warning(
+                    f"Could not open existing bundle for "
+                    f"{bt.algorithm_id} at {existing_path}: {e}; "
+                    "overwriting."
+                )
+                backtests_to_save.append(bt)
+                continue
+
+            # If the existing bundle already contains a run for one of
+            # the new date ranges (e.g. a forced rerun), drop the
+            # overlapping runs from the existing bundle before merging
+            # so we don't end up with duplicates.
+            new_ranges = {
+                (run.backtest_start_date, run.backtest_end_date)
+                for run in bt.get_all_backtest_runs()
+            }
+            kept_runs = [
+                run for run in existing.get_all_backtest_runs()
+                if (run.backtest_start_date, run.backtest_end_date)
+                not in new_ranges
+            ]
+            existing.backtest_runs = kept_runs
+
+            if kept_runs:
+                merged = combine_backtests([existing, bt])
+                # Preserve the freshly produced backtest's metadata /
+                # parameters by letting the new backtest's values win
+                # on key conflicts (combine_backtests uses dict update
+                # in iteration order — ``bt`` is second so its values
+                # already win).
+                backtests_to_save.append(merged)
+            else:
+                backtests_to_save.append(bt)
+
         # Save backtests to disk
         save_backtests_to_directory(
-            backtests=backtests,
+            backtests=backtests_to_save,
             directory_path=storage_directory,
             show_progress=show_progress
         )
