@@ -17,7 +17,7 @@ import os
 import unittest
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any
-from unittest import TestCase, skip
+from unittest import TestCase
 
 import pandas as pd
 from pyindicators import ema, rsi, crossover, crossunder
@@ -255,7 +255,6 @@ def _run_backtest(app, strategy, days=730, **kwargs):
 # ===================================================================
 # Issue 3 — number_of_days bug (end_date - start_date, not end - end)
 # ===================================================================
-@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class TestNumberOfDaysFix(TestCase):
 
     def test_number_of_days_is_nonzero(self):
@@ -280,7 +279,6 @@ class TestNumberOfDaysFix(TestCase):
 # Verifies that more trades are produced from the same signals
 # and that trades open on the signal bar (no 1-bar delay).
 # ===================================================================
-@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class TestFfillAndShiftRemoval(TestCase):
 
     def test_trades_are_produced(self):
@@ -301,7 +299,7 @@ class TestFfillAndShiftRemoval(TestCase):
         """
         app = _make_app()
         strategy = _make_strategy()
-        run = _run_backtest(app, strategy, days=365)
+        run = _run_backtest(app, strategy, days=730)
         self.assertIsNotNone(run)
 
         # Count closed trades — with the old ffill logic most symbols
@@ -320,7 +318,6 @@ class TestFfillAndShiftRemoval(TestCase):
 # ===================================================================
 # Issue 5 — Buy+sell on same bar: sell takes priority
 # ===================================================================
-@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class TestBuySellSameBarPriority(TestCase):
 
     def test_sell_priority_over_buy(self):
@@ -358,7 +355,6 @@ class TestBuySellSameBarPriority(TestCase):
 # ===================================================================
 # Issue 6 — Static position sizing capital guard
 # ===================================================================
-@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class TestStaticPositionSizingCapitalGuard(TestCase):
 
     def test_total_allocation_does_not_exceed_initial_amount(self):
@@ -394,7 +390,6 @@ class TestStaticPositionSizingCapitalGuard(TestCase):
 # ===================================================================
 # Issue 8 — Raw signals exposed on BacktestRun.signals
 # ===================================================================
-@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class TestRawSignalsExposed(TestCase):
 
     def test_signals_field_present_and_populated(self):
@@ -462,7 +457,6 @@ class TestRawSignalsExposed(TestCase):
             "symbols over 3 years"
         )
 
-    @skip("Known bug: signals dict present in to_dict output")
     def test_signals_not_in_to_dict(self):
         """
         The signals field should appear in to_dict() as serialized
@@ -481,7 +475,6 @@ class TestRawSignalsExposed(TestCase):
 # ===================================================================
 # Signal Events — execution/rejection log for every fired signal
 # ===================================================================
-@unittest.skip("Scenario tests skipped pending optimization — see GitHub issue")
 class TestSignalEvents(TestCase):
 
     def test_signal_events_present(self):
