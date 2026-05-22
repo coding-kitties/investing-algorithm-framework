@@ -166,6 +166,69 @@ In an event-driven backtest, the trigger condition is evaluated against each can
 - A **STOP_LIMIT** that triggers becomes a resting limit order at `price` from the triggering candle onwards, and fills under the normal limit-fill rules (`Low <= price` for BUY, `High >= price` for SELL).
 - The triggering timestamp is stored on the order as `triggered_at` for auditability.
 
+## Convenience Helpers
+
+For common sizing patterns the framework exposes five high-level helpers on `Context` (also available as `self.*` from a `TradingStrategy`). They all produce **LIMIT** orders and require an explicit `price`, delegating internally to `create_limit_order`. The `order_target*` family looks up the current position and submits a BUY or SELL for the difference (no order is placed when the position already matches the target).
+
+| Helper | Computes | Use case |
+|--------|----------|----------|
+| `order_value(symbol, value, side, price)` | `amount = value / price` | Fixed currency-amount orders (e.g. DCA) |
+| `order_percent(symbol, percent, side, price)` | `(net_size * percent / 100) / price` | Allocate a % of portfolio net size |
+| `order_target(symbol, target_amount, price)` | `target_amount - current_amount` | Reach an exact position size in units |
+| `order_target_value(symbol, target_value, price)` | `(target_value / price) - current_amount` | Reach an exact position value |
+| `order_target_percent(symbol, target_percent, price)` | `((net_size * target_percent / 100) / price) - current_amount` | Portfolio rebalancing |
+
+```python
+from investing_algorithm_framework import OrderSide, TradingStrategy
+
+class RebalanceStrategy(TradingStrategy):
+
+    def apply_strategy(self, context, data):
+        price = data["BTC/EUR"]["close"].iloc[-1]
+
+        # Spend exactly 500 EUR on BTC
+        context.order_value(
+            target_symbol="BTC",
+            value=500,
+            order_side=OrderSide.BUY,
+            price=price,
+        )
+
+        # Allocate 25% of portfolio to ETH
+        context.order_percent(
+            target_symbol="ETH",
+            percent=25,
+            order_side=OrderSide.BUY,
+            price=data["ETH/EUR"]["close"].iloc[-1],
+        )
+
+        # End up holding exactly 1.5 BTC (buys or sells the difference)
+        context.order_target(
+            target_symbol="BTC",
+            target_amount=1.5,
+            price=price,
+        )
+
+        # Rebalance BTC to 10% of portfolio
+        context.order_target_percent(
+            target_symbol="BTC",
+            target_percent=10,
+            price=price,
+        )
+```
+
+**Validation**
+
+- `value`, `percent`, `price` must be positive.
+- `target_amount`, `target_value`, `target_percent` must be non-negative.
+- `order_target*` returns `None` (no order placed) when the current position already matches the target.
+
+All helpers accept the same optional `market`, `precision` and `metadata` parameters as `create_limit_order`.
+
+:::tip MARKET variant & auto-price
+The helpers currently require an explicit `price` and always produce LIMIT orders. A future enhancement (tracked as a follow-up to #440) will add `order_type=OrderType.MARKET` support and fall back to `context.get_latest_price()` when `price` is omitted.
+:::
+
 ## Order Parameters
 
 ### Market Order Parameters

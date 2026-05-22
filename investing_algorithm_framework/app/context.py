@@ -673,6 +673,245 @@ class Context:
             market=market,
         )
 
+    def order_value(
+        self,
+        target_symbol,
+        value,
+        order_side,
+        price,
+        market=None,
+        precision=None,
+        metadata=None,
+    ) -> Order:
+        """
+        Place a LIMIT order for a fixed currency amount.
+
+        The order amount is computed as ``value / price``.
+
+        Args:
+            target_symbol: The symbol of the asset to trade.
+            value: Currency amount to spend (BUY) or to sell (SELL).
+            order_side: ``OrderSide.BUY`` or ``OrderSide.SELL``.
+            price: Limit price.
+            market: Optional market identifier.
+            precision: Optional decimal precision to round the
+              computed amount down.
+            metadata: Optional order metadata.
+
+        Returns:
+            Order: The created order.
+        """
+        if value is None or value <= 0:
+            raise OperationalException(
+                "`value` must be a positive number."
+            )
+        if price is None or price <= 0:
+            raise OperationalException(
+                "`price` must be a positive number."
+            )
+        amount = value / price
+        if precision is not None:
+            amount = RoundingService.round_down(amount, precision)
+        return self.create_limit_order(
+            target_symbol=target_symbol,
+            price=price,
+            order_side=order_side,
+            amount=amount,
+            market=market,
+            metadata=metadata,
+        )
+
+    def order_percent(
+        self,
+        target_symbol,
+        percent,
+        order_side,
+        price,
+        market=None,
+        precision=None,
+        metadata=None,
+    ) -> Order:
+        """
+        Place a LIMIT order for ``percent`` of the portfolio's net size.
+
+        Args:
+            target_symbol: The symbol of the asset to trade.
+            percent: Percentage (0-100) of portfolio net size to allocate.
+            order_side: ``OrderSide.BUY`` or ``OrderSide.SELL``.
+            price: Limit price.
+            market: Optional market identifier.
+            precision: Optional decimal precision to round the
+              computed amount down.
+            metadata: Optional order metadata.
+
+        Returns:
+            Order: The created order.
+        """
+        if percent is None or percent <= 0:
+            raise OperationalException(
+                "`percent` must be a positive number."
+            )
+        portfolio = self.portfolio_service.find({"market": market})
+        net_size = portfolio.get_net_size()
+        value = net_size * (percent / 100.0)
+        return self.order_value(
+            target_symbol=target_symbol,
+            value=value,
+            order_side=order_side,
+            price=price,
+            market=market,
+            precision=precision,
+            metadata=metadata,
+        )
+
+    def order_target(
+        self,
+        target_symbol,
+        target_amount,
+        price,
+        market=None,
+        precision=None,
+        metadata=None,
+    ) -> Order:
+        """
+        Adjust the position in ``target_symbol`` to hold exactly
+        ``target_amount`` units.
+
+        The difference between the current position size and
+        ``target_amount`` is submitted as a BUY (positive diff) or
+        SELL (negative diff) LIMIT order. If the position already
+        matches the target, no order is placed.
+
+        Args:
+            target_symbol: The symbol of the asset to adjust.
+            target_amount: Desired position size in units.
+            price: Limit price.
+            market: Optional market identifier.
+            precision: Optional decimal precision to round the diff down.
+            metadata: Optional order metadata.
+
+        Returns:
+            Order: The created order, or ``None`` if no adjustment
+              was required.
+        """
+        if target_amount is None or target_amount < 0:
+            raise OperationalException(
+                "`target_amount` must be a non-negative number."
+            )
+        if price is None or price <= 0:
+            raise OperationalException(
+                "`price` must be a positive number."
+            )
+        portfolio = self.portfolio_service.find({"market": market})
+        try:
+            position = self.position_service.find(
+                {"symbol": target_symbol, "portfolio": portfolio.id}
+            )
+            current_amount = position.get_amount() \
+                if position is not None else 0
+        except OperationalException:
+            current_amount = 0
+        diff = target_amount - current_amount
+        if precision is not None:
+            sign = 1 if diff >= 0 else -1
+            diff = sign * RoundingService.round_down(abs(diff), precision)
+        if diff == 0:
+            return None
+        order_side = OrderSide.BUY if diff > 0 else OrderSide.SELL
+        return self.create_limit_order(
+            target_symbol=target_symbol,
+            price=price,
+            order_side=order_side,
+            amount=abs(diff),
+            market=market,
+            metadata=metadata,
+        )
+
+    def order_target_value(
+        self,
+        target_symbol,
+        target_value,
+        price,
+        market=None,
+        precision=None,
+        metadata=None,
+    ) -> Order:
+        """
+        Adjust the position in ``target_symbol`` so its market value at
+        ``price`` equals ``target_value``.
+
+        Args:
+            target_symbol: The symbol of the asset to adjust.
+            target_value: Desired position market value in trading currency.
+            price: Limit price.
+            market: Optional market identifier.
+            precision: Optional decimal precision to round the diff down.
+            metadata: Optional order metadata.
+
+        Returns:
+            Order: The created order, or ``None`` if no adjustment
+              was required.
+        """
+        if target_value is None or target_value < 0:
+            raise OperationalException(
+                "`target_value` must be a non-negative number."
+            )
+        if price is None or price <= 0:
+            raise OperationalException(
+                "`price` must be a positive number."
+            )
+        target_amount = target_value / price
+        return self.order_target(
+            target_symbol=target_symbol,
+            target_amount=target_amount,
+            price=price,
+            market=market,
+            precision=precision,
+            metadata=metadata,
+        )
+
+    def order_target_percent(
+        self,
+        target_symbol,
+        target_percent,
+        price,
+        market=None,
+        precision=None,
+        metadata=None,
+    ) -> Order:
+        """
+        Adjust the position in ``target_symbol`` so its market value
+        equals ``target_percent`` of the portfolio's net size.
+
+        Args:
+            target_symbol: The symbol of the asset to adjust.
+            target_percent: Desired position size as a percentage (0-100)
+              of portfolio net size.
+            price: Limit price.
+            market: Optional market identifier.
+            precision: Optional decimal precision to round the diff down.
+            metadata: Optional order metadata.
+
+        Returns:
+            Order: The created order, or ``None`` if no adjustment
+              was required.
+        """
+        if target_percent is None or target_percent < 0:
+            raise OperationalException(
+                "`target_percent` must be a non-negative number."
+            )
+        portfolio = self.portfolio_service.find({"market": market})
+        net_size = portfolio.get_net_size()
+        target_value = net_size * (target_percent / 100.0)
+        return self.order_target_value(
+            target_symbol=target_symbol,
+            target_value=target_value,
+            price=price,
+            market=market,
+            precision=precision,
+            metadata=metadata,
+        )
+
     def get_portfolio(self, market=None) -> Portfolio:
         """
         Function to get the portfolio of the algorithm. This function
