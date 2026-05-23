@@ -33,6 +33,21 @@ class SlippageModel(ABC):
         """
         raise NotImplementedError
 
+    def max_fill_amount(self, order_amount, volume=None):
+        """
+        Return the maximum fillable amount for this bar.
+
+        Override in subclasses that enforce volume limits.
+
+        Args:
+            order_amount: The remaining order amount.
+            volume: Available market volume for this bar.
+
+        Returns:
+            float: The maximum amount that can be filled.
+        """
+        return order_amount
+
 
 class NoSlippage(SlippageModel):
     """No slippage — fills at the exact order price."""
@@ -146,6 +161,97 @@ class VolumeImpactSlippage(SlippageModel):
             )
         else:
             impact = self.base_percentage
+
+        if OrderSide.BUY.equals(order_side):
+            return price * (1 + impact)
+        else:
+            return price * (1 - impact)
+
+
+class VolumeShareSlippage(SlippageModel):
+    """
+    Volume-aware slippage model.
+
+    Models slippage as a function of the order's share of
+    historical bar volume, with a quadratic price impact:
+
+        impact = price_impact * (amount / volume) ** 2
+
+    Also enforces a volume limit — at most ``volume_limit``
+    fraction of the bar's volume can be filled per bar.
+
+    Usage::
+
+        VolumeShareSlippage(
+            volume_limit=0.025,   # max 2.5% of bar volume
+            price_impact=0.1      # price impact coefficient
+        )
+    """
+
+    def __init__(self, volume_limit=0.025, price_impact=0.1):
+        """
+        Args:
+            volume_limit: Maximum fraction of bar volume that can
+                be filled (0.025 = 2.5%).
+            price_impact: Coefficient for quadratic price impact.
+        """
+        self.volume_limit = volume_limit
+        self.price_impact = price_impact
+
+    def calculate_slippage(
+        self, price, order_side, amount=None, volume=None
+    ):
+        from investing_algorithm_framework.domain.models.order.order_side \
+            import OrderSide
+
+        if (
+            volume is not None
+            and volume > 0
+            and amount is not None
+            and amount > 0
+        ):
+            participation = amount / volume
+            impact = self.price_impact * (participation ** 2)
+        else:
+            impact = 0.0
+
+        if OrderSide.BUY.equals(order_side):
+            return price * (1 + impact)
+        else:
+            return price * (1 - impact)
+
+    def max_fill_amount(self, order_amount, volume=None):
+        if volume is not None and volume > 0:
+            max_volume = volume * self.volume_limit
+            return min(order_amount, max_volume)
+        return order_amount
+
+
+class FixedBasisPointsSlippage(SlippageModel):
+    """
+    Slippage expressed in basis points of price.
+
+    One basis point = 0.01% of price.
+
+    Usage::
+
+        FixedBasisPointsSlippage(basis_points=5)  # 5 bps = 0.05%
+    """
+
+    def __init__(self, basis_points=5):
+        """
+        Args:
+            basis_points: Slippage in basis points (1 bp = 0.01%).
+        """
+        self.basis_points = basis_points
+
+    def calculate_slippage(
+        self, price, order_side, amount=None, volume=None
+    ):
+        from investing_algorithm_framework.domain.models.order.order_side \
+            import OrderSide
+
+        impact = self.basis_points / 10000
 
         if OrderSide.BUY.equals(order_side):
             return price * (1 + impact)

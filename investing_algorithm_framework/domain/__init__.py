@@ -30,7 +30,7 @@ from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
 from .blotter import Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
     SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage, \
-    VolumeImpactSlippage, \
+    VolumeImpactSlippage, VolumeShareSlippage, FixedBasisPointsSlippage, \
     CommissionModel, NoCommission, PercentageCommission, FixedCommission, \
     FillModel, FullFill, VolumeBasedFill
 from .fx import FXRateProvider, StaticFXRateProvider
@@ -176,6 +176,8 @@ __all__ = [
     "PercentageSlippage",
     "FixedSlippage",
     "VolumeImpactSlippage",
+    "VolumeShareSlippage",
+    "FixedBasisPointsSlippage",
     "CommissionModel",
     "NoCommission",
     "PercentageCommission",

@@ -29,7 +29,7 @@ from .domain import ApiException, combine_backtests, PositionSize, \
     retag_backtests, migrate_backtests, \
     Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
     SlippageModel, NoSlippage, PercentageSlippage, FixedSlippage, \
-    VolumeImpactSlippage, \
+    VolumeImpactSlippage, VolumeShareSlippage, FixedBasisPointsSlippage, \
     CommissionModel, NoCommission, PercentageCommission, FixedCommission, \
     FillModel, FullFill, VolumeBasedFill, \
     FXRateProvider, StaticFXRateProvider, \
@@ -258,6 +258,8 @@ __all__ = [
     "PercentageSlippage",
     "FixedSlippage",
     "VolumeImpactSlippage",
+    "VolumeShareSlippage",
+    "FixedBasisPointsSlippage",
     "CommissionModel",
     "NoCommission",
     "PercentageCommission",
