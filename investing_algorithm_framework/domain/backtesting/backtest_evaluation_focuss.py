@@ -73,6 +73,8 @@ class BacktestEvaluationFocus(Enum):
         - current_average_trade_return
         - current_average_trade_duration
         - current_average_trade_loss
+        - consistency_score
+        - stability_score
     """
     BALANCED = "balanced"
     PROFIT = "profit"

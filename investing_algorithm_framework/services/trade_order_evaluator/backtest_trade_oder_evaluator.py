@@ -251,13 +251,19 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
             fee_rate = self._blotter.get_commission_rate()
         else:
             tc = self._resolve_trading_cost(order.symbol)
+            fill_amount = min(
+                tc.get_max_fill_amount(remaining, volume), remaining,
+            )
             if OrderSide.BUY.equals(order_side):
-                fill_price = tc.get_buy_fill_price(base_price)
+                fill_price = tc.get_buy_fill_price(
+                    base_price, amount=fill_amount, volume=volume,
+                )
                 slippage = fill_price - base_price
             else:
-                fill_price = tc.get_sell_fill_price(base_price)
+                fill_price = tc.get_sell_fill_price(
+                    base_price, amount=fill_amount, volume=volume,
+                )
                 slippage = base_price - fill_price
-            fill_amount = remaining
             fee = tc.get_fee(fill_price * fill_amount)
             fee_rate = (
                 tc.fee_percentage / 100 if tc.fee_percentage else None

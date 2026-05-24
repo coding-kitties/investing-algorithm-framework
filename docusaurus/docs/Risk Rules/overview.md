@@ -66,7 +66,7 @@ class MyStrategy(TradingStrategy):
 | `take_profits` | [`TakeProfitRule`](./take-profit-rule.md) | Bar-end exit when price rises a fixed or trailing percentage from entry / peak. |
 | `scaling_rules` | [`ScalingRule`](./scaling-rule.md) | Pyramid into winners and partially close — `max_entries`, `scale_in_percentage`, `scale_out_percentage`, optional `max_position_percentage` cap. |
 | `cooldowns` | [`CooldownRule`](./cooldown-rule.md) | Side-aware, per-symbol or portfolio-wide signal throttling after fills. |
-| `trading_costs` | [`TradingCost`](./trading-cost.md) | Per-symbol fees and slippage applied during fill simulation. |
+| `trading_costs` | [`TradingCost`](./trading-cost.md) | Per-symbol fees and slippage applied during fill simulation. Supports [pluggable slippage models](./trading-cost.md#slippage-models) (volume-based, fixed spread, basis points). |
 
 ## Where Rules Are Enforced
 
