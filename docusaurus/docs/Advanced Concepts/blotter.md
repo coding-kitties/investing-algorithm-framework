@@ -75,6 +75,37 @@ app.set_blotter(SimulationBlotter(
 ))
 ```
 
+### VolumeShareSlippage
+
+Volume-aware model with quadratic price impact. Limits fills to a fraction of bar volume, producing partial fills for large orders relative to liquidity.
+
+```python
+from investing_algorithm_framework import SimulationBlotter, VolumeShareSlippage
+
+app.set_blotter(SimulationBlotter(
+    slippage_model=VolumeShareSlippage(
+        volume_limit=0.025,    # max 2.5% of bar volume
+        price_impact=0.1,      # quadratic impact coefficient
+    )
+))
+```
+
+### FixedBasisPointsSlippage
+
+Slippage expressed in basis points (1 bp = 0.01 % of price).
+
+```python
+from investing_algorithm_framework import SimulationBlotter, FixedBasisPointsSlippage
+
+app.set_blotter(SimulationBlotter(
+    slippage_model=FixedBasisPointsSlippage(basis_points=5)  # 5 bps = 0.05%
+))
+```
+
+:::tip TradingCost Integration
+Slippage models can also be attached directly to a `TradingCost` via the `slippage_model` parameter, without needing a custom blotter. See [TradingCost — Slippage Models](../Risk%20Rules/trading-cost.md#slippage-models) for details.
+:::
+
 ### Custom Slippage Model
 
 Create your own by extending `SlippageModel`:

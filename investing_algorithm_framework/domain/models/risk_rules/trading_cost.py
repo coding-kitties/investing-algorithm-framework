@@ -7,6 +7,11 @@ class TradingCost:
     TradingStrategy (overrides market-level defaults) or set as
     market-level defaults on PortfolioConfiguration / app.add_market().
 
+    Slippage can be specified either as a flat percentage
+    (``slippage_percentage``) or via a pluggable ``slippage_model``
+    (e.g. ``VolumeShareSlippage``, ``FixedBasisPointsSlippage``).
+    When both are provided, ``slippage_model`` takes precedence.
+
     Attributes:
         symbol (str): The target symbol this cost applies to
             (e.g. "BTC"). Use ``None`` for market-level defaults.
@@ -16,6 +21,8 @@ class TradingCost:
             price. Default 0.0. Buy fills higher, sell fills lower.
         fee_fixed (float): Fixed fee per trade in the trading
             currency. Default 0.0.
+        slippage_model: Optional pluggable ``SlippageModel`` instance.
+            When set, overrides ``slippage_percentage``.
     """
 
     def __init__(
@@ -24,19 +31,42 @@ class TradingCost:
         fee_percentage=0.0,
         slippage_percentage=0.0,
         fee_fixed=0.0,
+        slippage_model=None,
     ):
         self.symbol = symbol.upper() if symbol else None
         self.fee_percentage = fee_percentage
         self.slippage_percentage = slippage_percentage
         self.fee_fixed = fee_fixed
+        self.slippage_model = slippage_model
 
-    def get_buy_fill_price(self, price):
+    def get_buy_fill_price(self, price, amount=None, volume=None):
         """Return the slippage-adjusted buy fill price."""
+        if self.slippage_model is not None:
+            return self.slippage_model.calculate_slippage(
+                price, "BUY", amount=amount, volume=volume,
+            )
         return price * (1 + self.slippage_percentage / 100)
 
-    def get_sell_fill_price(self, price):
+    def get_sell_fill_price(self, price, amount=None, volume=None):
         """Return the slippage-adjusted sell fill price."""
+        if self.slippage_model is not None:
+            return self.slippage_model.calculate_slippage(
+                price, "SELL", amount=amount, volume=volume,
+            )
         return price * (1 - self.slippage_percentage / 100)
+
+    def get_max_fill_amount(self, order_amount, volume=None):
+        """Return the maximum fillable amount for this bar.
+
+        Delegates to the slippage model's ``max_fill_amount`` when
+        a model is configured; otherwise returns the full
+        ``order_amount`` (no volume limit).
+        """
+        if self.slippage_model is not None:
+            return self.slippage_model.max_fill_amount(
+                order_amount, volume=volume,
+            )
+        return order_amount
 
     def get_fee(self, trade_value):
         """Return the fee for a given trade value."""

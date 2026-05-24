@@ -246,15 +246,61 @@ def list_index(
 
 def rank_index(
     index_path: str,
-    by: str,
+    by: Optional[str] = None,
     limit: int = 10,
     where: Optional[str] = None,
     columns: Optional[Sequence[str]] = None,
     ascending: bool = False,
+    focus: Optional["BacktestEvaluationFocus | str"] = None,
+    weights: Optional[Dict[str, float]] = None,
 ) -> List[Dict[str, Any]]:
-    """Rank bundles by a metric. Thin wrapper around :func:`list_index`
-    with a different default column set and a required ``by`` arg."""
+    """Rank bundles by a single metric or a weighted combination.
+
+    **Single-metric mode** (original behaviour):
+        Pass ``by="sharpe_ratio"`` to sort by one column.
+
+    **Weighted-score mode**:
+        Pass ``focus`` (a :class:`BacktestEvaluationFocus` or its
+        string name, e.g. ``"balanced"``) and/or ``weights`` to rank
+        by a normalised weighted score across many metrics.
+
+        When both ``focus`` and ``weights`` are given, ``weights``
+        entries override those from the focus preset.  A ``_score``
+        column is added to each result dict.
+
+    Args:
+        index_path: Path to ``index.sqlite`` or its parent directory.
+        by: Column to sort by (single-metric mode).  Ignored when
+            *focus* or *weights* is set.
+        limit: Maximum rows to return.
+        where: Optional SQL ``WHERE`` fragment.
+        columns: Columns to project.
+        ascending: Sort direction (default best-first / descending).
+        focus: A :class:`BacktestEvaluationFocus` value or string
+            (e.g. ``"balanced"``).
+        weights: Custom ``{metric: weight}`` dict.  Metric names
+            without a ``summary_`` prefix are accepted (they are
+            mapped automatically).
+    """
     cols = list(columns) if columns else list(DEFAULT_RANK_COLUMNS)
+
+    if focus is not None or weights is not None:
+        return _rank_index_weighted(
+            index_path,
+            focus=focus,
+            weights=weights,
+            limit=limit,
+            where=where,
+            columns=cols,
+            ascending=ascending,
+        )
+
+    if by is None:
+        raise ValueError(
+            "Either 'by' (single metric) or 'focus'/'weights' "
+            "(weighted score) must be provided."
+        )
+
     return list_index(
         index_path,
         sort_by=by,
@@ -263,6 +309,94 @@ def rank_index(
         where=where,
         columns=cols,
     )
+
+
+def _rank_index_weighted(
+    index_path: str,
+    *,
+    focus=None,
+    weights: Optional[Dict[str, float]] = None,
+    limit: int = 10,
+    where: Optional[str] = None,
+    columns: Sequence[str] = (),
+    ascending: bool = False,
+) -> List[Dict[str, Any]]:
+    """Score every row in the index using normalised weighted metrics.
+
+    Mirrors the logic in :func:`rank_results` /
+    :func:`compute_score` but works directly on the flat SQLite
+    index — no Parquet decode, no :class:`Backtest` instantiation.
+    """
+    import math
+    from investing_algorithm_framework.domain import BacktestEvaluationFocus
+    from investing_algorithm_framework.analysis.ranking import (
+        create_weights, normalize,
+    )
+
+    effective_weights = create_weights(
+        focus=focus, custom_weights=weights,
+    )
+
+    # Map bare metric names → summary_ prefixed column names so we
+    # can read them from the flat row dicts.
+    col_weights: Dict[str, float] = {}
+    for metric, w in effective_weights.items():
+        col = _resolve_metric_column(metric)
+        col_weights[col] = w
+
+    # Ensure every weighted column is included in the projection so
+    # we can compute the score.
+    all_cols = list(dict.fromkeys(list(columns) + list(col_weights)))
+
+    rows = list_index(
+        index_path,
+        sort_by=None,
+        limit=None,
+        where=where,
+        columns=all_cols,
+    )
+
+    if not rows:
+        return []
+
+    # Compute per-metric normalisation ranges.
+    ranges: Dict[str, tuple] = {}
+    for col in col_weights:
+        values = [
+            r[col] for r in rows
+            if isinstance(r.get(col), (int, float))
+            and r[col] is not None
+            and not math.isnan(r[col])
+            and not math.isinf(r[col])
+        ]
+        if values:
+            ranges[col] = (min(values), max(values))
+
+    # Score each row.
+    for row in rows:
+        score = 0.0
+        for col, w in col_weights.items():
+            v = row.get(col)
+            if not isinstance(v, (int, float)):
+                continue
+            if v is None or math.isnan(v) or math.isinf(v):
+                continue
+            if col in ranges:
+                v = normalize(v, ranges[col][0], ranges[col][1])
+            score += w * v
+        row["_score"] = round(score, 6)
+
+    rows.sort(key=lambda r: r["_score"], reverse=not ascending)
+
+    if limit is not None:
+        rows = rows[:limit]
+
+    # Project back to requested columns + _score.
+    out_cols = list(columns) + ["_score"]
+    return [
+        {k: r.get(k) for k in out_cols}
+        for r in rows
+    ]
 
 
 def format_table(
@@ -307,6 +441,7 @@ def prune_backtests(
     archive_dir: Optional[str] = None,
     dry_run: bool = False,
     show_progress: bool = False,
+    flatten: bool = False,
 ) -> Dict[str, Any]:
     """Move or delete bundles that are **not** in *keep*.
 
@@ -321,6 +456,9 @@ def prune_backtests(
         dry_run: When True, report what *would* happen without
             touching the file system.
         show_progress: Show a tqdm progress bar.
+        flatten: When True and *archive_dir* is set, place all
+            pruned bundles directly into *archive_dir* instead of
+            preserving the original sub-directory structure.
 
     Returns:
         ``{"kept": int, "pruned": int, "archive_dir": str | None}``
@@ -360,8 +498,11 @@ def prune_backtests(
             else:
                 if not dry_run:
                     if archive is not None:
-                        dest = archive / rel
-                        dest.parent.mkdir(parents=True, exist_ok=True)
+                        if flatten:
+                            dest = archive / bundle_path.name
+                        else:
+                            dest = archive / rel
+                            dest.parent.mkdir(parents=True, exist_ok=True)
                         shutil.move(str(bundle_path), str(dest))
                     else:
                         bundle_path.unlink()
