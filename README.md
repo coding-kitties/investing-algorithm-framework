@@ -343,6 +343,60 @@ backtests = [store.open(row["bundle_path"]) for row in top]
 BacktestReport(backtests=backtests).save("top20.html")
 ```
 
+#### Weighted multi-metric ranking with `BacktestEvaluationFocus`
+
+Instead of sorting by a single column, use a **focus preset** to score every bundle across multiple metrics at once — profit, risk, consistency, win rate — weighted by what matters most to your workflow:
+
+```python
+from investing_algorithm_framework import (
+    BacktestReport, BacktestEvaluationFocus,
+)
+from investing_algorithm_framework.cli.index_command import (
+    build_index, rank_index,
+)
+from investing_algorithm_framework.services.backtest_store import (
+    LocalDirStore,
+)
+
+# 1. Build (or refresh) the Tier-1 SQLite index.
+build_index("./my-backtests/")
+
+# 2. Rank with a built-in focus preset (BALANCED, PROFIT, FREQUENCY, RISK_ADJUSTED).
+top = rank_index(
+    "./my-backtests/",
+    focus=BacktestEvaluationFocus.RISK_ADJUSTED,
+    where="summary_number_of_trades > 50",
+    limit=25,
+)
+
+# 3. Or supply fully custom weights — positive favours higher, negative penalises.
+top = rank_index(
+    "./my-backtests/",
+    weights={
+        "sharpe_ratio": 3.0,
+        "sortino_ratio": 2.5,
+        "max_drawdown": -3.0,
+        "win_rate": 2.0,
+        "consistency_score": 1.5,
+    },
+    limit=25,
+)
+
+# 4. Materialise only the winners and render a focused dashboard.
+store = LocalDirStore("./my-backtests/")
+winners = [store.open(row["bundle_path"]) for row in top]
+BacktestReport(backtests=winners).save("top25_risk_adjusted.html")
+```
+
+**Built-in focus presets:**
+
+| Preset | Prioritises |
+|--------|------------|
+| `BALANCED` | Equal mix of profit, risk-adjusted returns, drawdown penalties, and consistency |
+| `PROFIT` | Absolute and relative gains (CAGR, net gain, win rate, profit factor) |
+| `FREQUENCY` | High trade count, short durations, and per-trade efficiency |
+| `RISK_ADJUSTED` | Sharpe, Sortino, Calmar with strong drawdown and volatility penalties |
+
 Or from the shell:
 
 ```bash
