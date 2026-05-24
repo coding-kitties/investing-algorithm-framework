@@ -12,7 +12,10 @@ from __future__ import annotations
 import logging
 from dataclasses import fields as dc_fields
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from investing_algorithm_framework.domain import BacktestEvaluationFocus
 
 from investing_algorithm_framework.domain import (
     Backtest,
@@ -328,7 +331,6 @@ def _rank_index_weighted(
     index — no Parquet decode, no :class:`Backtest` instantiation.
     """
     import math
-    from investing_algorithm_framework.domain import BacktestEvaluationFocus
     from investing_algorithm_framework.analysis.ranking import (
         create_weights, normalize,
     )
