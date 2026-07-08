@@ -105,8 +105,43 @@ The framework ships with built-in data providers for multiple markets. Set the `
 | **Crypto trading** (live) | CCXT exchanges (`BINANCE`, `BITVAVO`, etc.) | Direct exchange connection, supports order execution |
 | **US stocks / ETFs** (research & backtesting) | `YAHOO` | Free, no API key, broad coverage |
 | **US stocks** (production-grade) | `POLYGON` | High reliability, real-time data, official exchange feeds |
+| **Daily FX reference rates** | `FXMACRODATA` | Official-source daily FX spot/reference rates for macro and FX research |
 | **Stocks + forex + crypto** (lightweight) | `ALPHA_VANTAGE` | Simple API, good for prototyping |
 | **Local / offline data** | CSV or Pandas provider | Full control, no network dependency |
+
+---
+
+### FXMacroData — `market="FXMACRODATA"`
+
+**Best for:** Daily FX spot/reference rates in macro and FX research backtests.
+
+FXMacroData serves daily official-source FX reference-rate time series. The
+provider exposes each daily value as close-only OHLCV data: `Open`, `High`,
+`Low`, and `Close` all contain the same daily value, and `Volume` is `0`.
+
+```python
+from investing_algorithm_framework import DataSource, MarketCredential
+
+app.add_market_credential(
+    MarketCredential(market="FXMACRODATA", api_key="your_fxmacrodata_api_key")
+)
+
+DataSource(
+    identifier="eurusd_daily",
+    market="FXMACRODATA",
+    symbol="EURUSD",
+    data_type="OHLCV",
+    time_frame="1d",
+    warmup_window=200,
+)
+```
+
+**Supported timeframes:** `1d`
+
+**Symbol format:** Six-letter FX pairs such as `EURUSD`, `GBPUSD`, or separated
+pairs such as `EUR/USD`.
+
+> API keys can also be configured with `FXMACRODATA_API_KEY` or `FXMD_API_KEY`.
 
 ---
 
