@@ -2,15 +2,25 @@ import os
 import tempfile
 from unittest import TestCase
 from datetime import datetime, timezone
+from investing_algorithm_framework.domain import BacktestWindow, BacktestDateRange
 
 from investing_algorithm_framework import (
     Backtest,
     BacktestRun,
     BacktestMetrics,
 )
+from investing_algorithm_framework.domain.backtesting.study import Study
 from investing_algorithm_framework.cli.validate_backtest_checkpoints import (
     validate_and_create_checkpoints
 )
+
+
+def _make_backtest(algorithm_id, run):
+    bt = Backtest(algorithm_id=algorithm_id)
+    st = Study(name="default")
+    st.get_engine("vector").runs = [run]
+    bt._studies["default"] = st
+    return bt
 
 
 class TestValidateCheckpoints(TestCase):
@@ -35,14 +45,18 @@ class TestValidateCheckpoints(TestCase):
             )
 
             run1 = BacktestRun(
-                backtest_start_date=start_date1,
-                backtest_end_date=end_date1,
+                backtest_window=BacktestWindow(
+                    train_range=BacktestDateRange(
+                        start_date=start_date1,
+                        end_date=end_date1,
+                    )
+                ),
                 trading_symbol="EUR",
                 backtest_metrics=metrics1,
                 created_at=datetime.now(timezone.utc)
             )
 
-            backtest1 = Backtest(algorithm_id="algo_001", backtest_runs=[run1])
+            backtest1 = _make_backtest("algo_001", run1)
             backtest1.save(backtest1_dir)
 
             # Backtest 2 (different date range, different algorithm)
@@ -58,17 +72,18 @@ class TestValidateCheckpoints(TestCase):
             )
 
             run2 = BacktestRun(
-                backtest_start_date=start_date2,
-                backtest_end_date=end_date2,
+                backtest_window=BacktestWindow(
+                    train_range=BacktestDateRange(
+                        start_date=start_date2,
+                        end_date=end_date2,
+                    )
+                ),
                 backtest_metrics=metrics2,
                 trading_symbol="EUR",
                 created_at=datetime.now(timezone.utc)
             )
 
-            backtest2 = Backtest(
-                algorithm_id="algo_002",
-                backtest_runs=[run2]
-            )
+            backtest2 = _make_backtest("algo_002", run2)
 
             backtest2.save(backtest2_dir)
 
@@ -85,17 +100,18 @@ class TestValidateCheckpoints(TestCase):
             )
 
             run3 = BacktestRun(
-                backtest_start_date=start_date3,
-                backtest_end_date=end_date3,
+                backtest_window=BacktestWindow(
+                    train_range=BacktestDateRange(
+                        start_date=start_date3,
+                        end_date=end_date3,
+                    )
+                ),
                 backtest_metrics=metrics3,
                 trading_symbol="EUR",
                 created_at=datetime.now(timezone.utc)
             )
 
-            backtest3 = Backtest(
-                algorithm_id="algo_003",
-                backtest_runs=[run3]
-            )
+            backtest3 = _make_backtest("algo_003", run3)
 
             backtest3.save(backtest3_dir)
 

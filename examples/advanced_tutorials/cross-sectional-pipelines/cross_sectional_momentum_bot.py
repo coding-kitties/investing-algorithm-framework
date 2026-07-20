@@ -41,6 +41,7 @@ from dotenv import load_dotenv
 from investing_algorithm_framework import (
     AverageDollarVolume,
     BacktestDateRange,
+    BacktestWindow,
     Context,
     DataSource,
     DEFAULT_LOGGING_CONFIG,
@@ -48,9 +49,12 @@ from investing_algorithm_framework import (
     OrderType,
     Pipeline,
     Returns,
+    Study,
     TimeUnit,
     TradingStrategy,
+    Universe,
     create_app,
+    Schedule,
 )
 
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
@@ -97,8 +101,7 @@ class MomentumScreener(Pipeline):
 # Strategy: rebalance into the top-N pipeline picks
 class CrossSectionalMomentumBot(TradingStrategy):
     algorithm_id = "pipeline-momentum-bot"
-    time_unit = TimeUnit.DAY
-    interval = 1
+    schedule = Schedule.every(1, TimeUnit.DAY)
     market = MARKET
     trading_symbol = TRADING_SYMBOL
     symbols = SYMBOLS
@@ -200,11 +203,30 @@ if __name__ == "__main__":
     # live (requires bitvavo credentials in your .env file).
     end = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     start = end - timedelta(days=365)
-    backtest_date_range = BacktestDateRange(start_date=start, end_date=end)
-    backtest = app.run_backtest(
-        backtest_date_range=backtest_date_range,
+
+    study = Study(
+        name="cross-sectional-momentum",
+        universe=Universe(
+            symbols=SYMBOLS,
+            market=MARKET,
+            trading_symbol=TRADING_SYMBOL,
+            initial_capital=1000,
+        ),
+        backtest_windows=[
+            BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=start,
+                    end_date=end,
+                )
+            )
+        ],
     )
+    backtests = app.run_backtest(
+        study=study,
+    )
+    backtest = backtests[0]
     # Inspect the result interactively with the BacktestReport dashboard:
     #     from investing_algorithm_framework import BacktestReport
     #     BacktestReport(backtest).show()
-    print(backtest)
+    metrics = backtest.get_backtest_metrics(study_name=study.name)
+    print(metrics)

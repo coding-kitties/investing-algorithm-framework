@@ -30,6 +30,9 @@ from investing_algorithm_framework import (
     DataSource,
     DataType,
     PositionSize,
+    Schedule,
+    SignalSeries,
+    SignalSide,
     TimeUnit,
     TradingCost,
     TradingStrategy,
@@ -66,9 +69,7 @@ def _rsi(series: pd.Series, period: int) -> pd.Series:
 class EmaRsiSweepStrategy(TradingStrategy):
     """Long-only EMA crossover with RSI oversold confirmation."""
 
-    time_unit = TimeUnit.HOUR
-    interval = 1
-
+    schedule = Schedule.every(1, TimeUnit.HOUR)
     def __init__(
         self,
         algorithm_id: str,
@@ -116,8 +117,6 @@ class EmaRsiSweepStrategy(TradingStrategy):
             data_sources=data_sources,
             position_sizes=position_sizes,
             trading_costs=trading_costs,
-            time_unit=self.time_unit,
-            interval=self.interval,
         )
         self.ema_short = ema_short
         self.ema_long = ema_long
@@ -134,10 +133,8 @@ class EmaRsiSweepStrategy(TradingStrategy):
             }
         )
 
-    def generate_buy_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        signals: Dict[str, pd.Series] = {}
+    def generate_signal_series(self, data: Dict[str, Any]):
+        """v9.0 vector-backtest entry point."""
         for symbol in self.symbols:
             df = data[f"ohlcv_{symbol}"]
             close = df["Close"]
@@ -145,24 +142,23 @@ class EmaRsiSweepStrategy(TradingStrategy):
             ema_l = _ema(close, self.ema_long)
             rsi_v = _rsi(close, self.rsi_period)
             crossover = (ema_s > ema_l) & (ema_s.shift(1) <= ema_l.shift(1))
-            sig = crossover & (rsi_v < self.rsi_oversold)
-            signals[symbol] = sig.fillna(False).astype(bool)
-        return signals
-
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        signals: Dict[str, pd.Series] = {}
-        for symbol in self.symbols:
-            df = data[f"ohlcv_{symbol}"]
-            close = df["Close"]
-            ema_s = _ema(close, self.ema_short)
-            ema_l = _ema(close, self.ema_long)
-            rsi_v = _rsi(close, self.rsi_period)
             crossunder = (ema_s < ema_l) & (ema_s.shift(1) >= ema_l.shift(1))
-            sig = crossunder & (rsi_v > self.rsi_overbought)
-            signals[symbol] = sig.fillna(False).astype(bool)
-        return signals
+            entry = (crossover & (rsi_v < self.rsi_oversold)) \
+                .fillna(False).astype(bool)
+            exit_ = (crossunder & (rsi_v > self.rsi_overbought)) \
+                .fillna(False).astype(bool)
+            yield SignalSeries(
+                symbol=symbol,
+                side=SignalSide.OPEN_LONG,
+                series=entry,
+                source="ema_rsi",
+            )
+            yield SignalSeries(
+                symbol=symbol,
+                side=SignalSide.CLOSE_LONG,
+                series=exit_,
+                source="ema_rsi",
+            )
 
 
 def _build_param_grid(n_combos: int) -> list[dict]:

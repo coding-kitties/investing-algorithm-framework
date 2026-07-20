@@ -22,14 +22,13 @@ See ``docs/Advanced Concepts/pipelines-event-backtest.md``.
 from __future__ import annotations
 
 import logging.config
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
 from dotenv import load_dotenv
 
 from investing_algorithm_framework import (
     AverageDollarVolume,
-    BacktestDateRange,
     Context,
     DataSource,
     DEFAULT_LOGGING_CONFIG,
@@ -38,6 +37,10 @@ from investing_algorithm_framework import (
     TimeUnit,
     TradingStrategy,
     create_app,
+    Schedule,
+    Study,
+    create_rolling_backtest_windows,
+    Universe,
 )
 
 logging.config.dictConfig(DEFAULT_LOGGING_CONFIG)
@@ -48,6 +51,20 @@ SYMBOLS = ["BTC/EUR", "ETH/EUR", "SOL/EUR", "ADA/EUR", "XRP/EUR"]
 MARKET = "bitvavo"
 TRADING_SYMBOL = "EUR"
 
+study = Study(
+    name="Cross-sectional Momentum Study",
+    description="Study for cross-sectional momentum screener example",
+    universe=Universe(symbols=SYMBOLS, market=MARKET),
+    backtest_windows=create_rolling_backtest_windows(
+        start_date=datetime.now(timezone.utc) - timedelta(days=120),
+        end_date=datetime.now(timezone.utc),
+        train_days=60,
+        test_days=30,
+        step_days=30,
+        gap_days=0,
+        warmup_days=30,
+    ),
+)
 
 class MomentumScreener(Pipeline):
     """Top-2 momentum names within the most liquid 3 of the universe."""
@@ -61,8 +78,7 @@ class MomentumScreener(Pipeline):
 
 class CrossSectionalMomentum(TradingStrategy):
     algorithm_id = "cross-sectional-momentum"
-    time_unit = TimeUnit.DAY
-    interval = 1
+    schedule = Schedule.every(1, TimeUnit.DAY)
     market = MARKET
     trading_symbol = TRADING_SYMBOL
     symbols = SYMBOLS
@@ -99,9 +115,13 @@ app.add_market(market=MARKET, trading_symbol=TRADING_SYMBOL, initial_balance=100
 
 
 if __name__ == "__main__":
-    end = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-    start = end - timedelta(days=120)
-    backtest_date_range = BacktestDateRange(start_date=start, end_date=end)
-    backtest = app.run_backtest(backtest_date_range=backtest_date_range)
-    metrics = backtest.get_backtest_metrics(date_range=backtest_date_range)
+    backtest = app.run_backtest(
+        strategy=CrossSectionalMomentum,
+        study=study,
+        risk_free_rate=0.027,
+        continue_on_error=False,
+        n_workers=1,
+        dynamic_position_sizing=True,
+    )
+    metrics = backtest.get_backtest_metrics(study_name=study.name)
     print(metrics)

@@ -18,7 +18,7 @@ import pandas as pd
 
 from investing_algorithm_framework import TradingStrategy, Algorithm, \
     create_app, RESOURCE_DIRECTORY, PortfolioConfiguration, \
-    BacktestDateRange, TimeUnit
+    BacktestDateRange, TimeUnit, Schedule
 from investing_algorithm_framework.infrastructure.database import \
     teardown_sqlalchemy
 from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI
@@ -30,9 +30,7 @@ from investing_algorithm_framework.domain import SQLALCHEMY_DATABASE_URI
 
 class BacktestTestStrategy(TradingStrategy):
     strategy_id = "test_strategy"
-    time_unit = TimeUnit.MINUTE
-    interval = 1
-
+    schedule = Schedule.every(1, TimeUnit.MINUTE)
     def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
         pass
 
@@ -42,9 +40,7 @@ class BacktestTestStrategy(TradingStrategy):
 
 class HourlyTestStrategy(TradingStrategy):
     """Strategy with hourly interval (used for initial_amount/balance tests)."""
-    interval = 2
-    time_unit = "hour"
-
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
         pass
 

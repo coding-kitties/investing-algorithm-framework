@@ -16,20 +16,17 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import create_app, BacktestDateRange, \
     SnapshotInterval, RESOURCE_DIRECTORY, DATA_DIRECTORY, TimeUnit, TradingStrategy, \
-    DataSource, DataType, PositionSize, generate_algorithm_id
+    DataSource, DataType, PositionSize, generate_algorithm_id, Schedule
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
-
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     def __init__(
         self,
         algorithm_id,
         symbols,
         position_sizes,
-        time_unit: TimeUnit,
-        interval: int,
+        schedule: Schedule,
         market: str,
         rsi_time_frame: str,
         rsi_period: int,
@@ -82,8 +79,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         super().__init__(
             algorithm_id=algorithm_id,
             data_sources=data_sources,
-            time_unit=time_unit,
-            interval=interval,
+            schedule=schedule,
             symbols=symbols,
             position_sizes=position_sizes
         )
@@ -246,8 +242,7 @@ class Test(TestCase):
         }
         strategy = RSIEMACrossoverStrategy(
             algorithm_id=generate_algorithm_id(params=param_set),
-            time_unit=TimeUnit.HOUR,
-            interval=2,
+            schedule=Schedule.every(2, TimeUnit.HOUR),
             market="BITVAVO",
             rsi_time_frame=param_set["rsi_time_frame"],
             rsi_period=param_set["rsi_period"],
@@ -339,8 +334,7 @@ class Test(TestCase):
         }
         strategy_one = RSIEMACrossoverStrategy(
             algorithm_id=generate_algorithm_id(params=param_set_one),
-            time_unit=TimeUnit.HOUR,
-            interval=2,
+            schedule=Schedule.every(2, TimeUnit.HOUR),
             market="BITVAVO",
             rsi_time_frame=param_set_one["rsi_time_frame"],
             rsi_period=param_set_one["rsi_period"],
@@ -372,8 +366,7 @@ class Test(TestCase):
 
         strategy_two = RSIEMACrossoverStrategy(
             algorithm_id=generate_algorithm_id(params=param_set_two),
-            time_unit=TimeUnit.HOUR,
-            interval=2,
+            schedule=Schedule.every(2, TimeUnit.HOUR),
             market="BITVAVO",
             rsi_time_frame=param_set_two["rsi_time_frame"],
             rsi_period=param_set_two["rsi_period"],

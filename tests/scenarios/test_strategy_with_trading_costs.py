@@ -24,6 +24,7 @@ from investing_algorithm_framework import (
     TradingStrategy, DataSource, TimeUnit, DataType,
     create_app, BacktestDateRange, PositionSize,
     RESOURCE_DIRECTORY, CSVOHLCVDataProvider, TradingCost,
+    Schedule, SignalSide, signal_series_from_column,
 )
 
 
@@ -48,27 +49,28 @@ def _make_data_source():
 
 # ── Strategy with NO costs (baseline) ──────────────────────────────
 class NoCostStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
         PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
     ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 110}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
+    def generate_signal_series(self, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["open_long"] = df['Close'] == 110
+        df["close_long"] = df['Close'] == 90
+        yield signal_series_from_column(
+            df, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
 
 # ── Strategy with symbol-level TradingCost ─────────────────────────
 class SymbolCostStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
@@ -82,19 +84,21 @@ class SymbolCostStrategy(TradingStrategy):
         ),
     ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 110}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
+    def generate_signal_series(self, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["open_long"] = df['Close'] == 110
+        df["close_long"] = df['Close'] == 90
+        yield signal_series_from_column(
+            df, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
 
 # ── Strategy with fee only (no slippage) ───────────────────────────
 class FeeOnlyStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
@@ -107,19 +111,21 @@ class FeeOnlyStrategy(TradingStrategy):
         ),
     ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 110}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
+    def generate_signal_series(self, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["open_long"] = df['Close'] == 110
+        df["close_long"] = df['Close'] == 90
+        yield signal_series_from_column(
+            df, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
 
 # ── Strategy with slippage only (no fee) ───────────────────────────
 class SlippageOnlyStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
@@ -132,13 +138,16 @@ class SlippageOnlyStrategy(TradingStrategy):
         ),
     ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 110}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
+    def generate_signal_series(self, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["open_long"] = df['Close'] == 110
+        df["close_long"] = df['Close'] == 90
+        yield signal_series_from_column(
+            df, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
 
 def _run_backtest(strategy_class, fee_pct=0.0, slippage_pct=0.0):
@@ -172,7 +181,7 @@ def _run_backtest(strategy_class, fee_pct=0.0, slippage_pct=0.0):
             start_date=START_DATE, end_date=END_DATE
         ),
     )
-    runs = backtest.backtest_runs
+    runs = backtest.get_all_backtest_runs()
     assert len(runs) == 1, f"Expected 1 run, got {len(runs)}"
     trades = runs[0].trades
     closed = [t for t in trades if t.status == "CLOSED"]

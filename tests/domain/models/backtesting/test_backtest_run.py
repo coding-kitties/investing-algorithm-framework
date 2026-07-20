@@ -4,7 +4,8 @@ import tempfile
 from pathlib import Path
 
 from investing_algorithm_framework.domain import BacktestMetrics, Trade, \
-    BacktestRun, PortfolioSnapshot, Order, Position
+    BacktestRun, BacktestWindow, BacktestDateRange, PortfolioSnapshot, Order, \
+    Position
 
 
 class TestBacktestMetrics(TestCase):
@@ -118,8 +119,12 @@ class TestBacktestMetrics(TestCase):
         )
 
         backtest_run = BacktestRun(
-            backtest_start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
-            backtest_end_date=datetime(2020, 12, 31, tzinfo=timezone.utc),
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
+                    end_date=datetime(2020, 12, 31, tzinfo=timezone.utc),
+                )
+            ),
             trading_symbol="EUR",
             initial_unallocated=1000.0,
             number_of_runs=50,
@@ -303,8 +308,12 @@ class TestBacktestMetrics(TestCase):
         )
 
         backtest_run = BacktestRun(
-            backtest_start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
-            backtest_end_date=datetime(2020, 12, 31, tzinfo=timezone.utc),
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=datetime(2020, 1, 1, tzinfo=timezone.utc),
+                    end_date=datetime(2020, 12, 31, tzinfo=timezone.utc),
+                )
+            ),
             trading_symbol="EUR",
             initial_unallocated=1000.0,
             number_of_runs=50,

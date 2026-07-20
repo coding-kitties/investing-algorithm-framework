@@ -1,6 +1,6 @@
 from unittest import TestCase
 
-from investing_algorithm_framework import Task, AppHook
+from investing_algorithm_framework import Task, AppHook, Schedule, TimeUnit
 from investing_algorithm_framework.app.algorithm import AlgorithmFactory, \
     Algorithm
 from tests.resources.strategies_for_testing.strategy_v1 import \
@@ -8,6 +8,7 @@ from tests.resources.strategies_for_testing.strategy_v1 import \
 
 
 class TestTask(Task):
+    schedule = Schedule.every(1, TimeUnit.MINUTE)
 
     def run(self, algorithm):
         pass

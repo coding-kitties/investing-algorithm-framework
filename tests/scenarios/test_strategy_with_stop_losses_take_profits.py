@@ -9,12 +9,11 @@ import pandas as pd
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    RESOURCE_DIRECTORY, StopLossRule, TakeProfitRule, CSVOHLCVDataProvider
+    RESOURCE_DIRECTORY, StopLossRule, TakeProfitRule, CSVOHLCVDataProvider, Schedule
 
 
 class FixedStopLossTakeProfitStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [
         DataSource(

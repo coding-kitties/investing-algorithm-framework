@@ -32,7 +32,8 @@ class Test(TestBase):
             amount=20
         )
         self.assertIsNotNone(order)
-        self.assertEqual(1, len(self.app.context.get_trades()))
+        # v9.0 (#431) — BUY trade is deferred until the order fills.
+        self.assertEqual(0, len(self.app.context.get_trades()))
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
         self.assertEqual(1, len(self.app.context.get_trades()))

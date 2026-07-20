@@ -51,17 +51,51 @@ logger = logging.getLogger(__name__)
 
 # Bumped on any additive schema change. Old files are upgraded
 # in-place by :meth:`SqliteBacktestIndex._migrate`.
-SCHEMA_VERSION = 2
+#
+# v3 (v9.0): composite primary key ``(bundle_path, engine_type)`` so a
+# single dual-engine bundle can carry two rows — one per engine —
+# without colliding. ``engine_type`` is now NOT NULL with a default of
+# ``'vector'`` to keep the composite PK well-defined for legacy data.
+# v4 (multi-universe / studies): adds ``universe_key`` /
+# ``study_name`` / ``study_description`` columns and extends the
+# composite PK to ``(bundle_path, engine_type, universe_key)`` so a
+# single bundle can carry one pooled row per engine *plus* one row
+# per (engine, universe). The pooled row stores ``universe_key=''``
+# at the SQL level (mapped to/from ``None`` at the typed-row
+# boundary) because SQLite treats NULLs in composite primary keys
+# as distinct, which would defeat the upsert contract.
+# v5 (Phase 3d — multi-study runner): extends the composite PK to
+# ``(bundle_path, engine_type, universe_key, study_name)`` so a
+# single bundle can carry one row set per study (each study having
+# its own per-engine and per-(engine, universe) rows). Legacy rows
+# with ``study_name IS NULL`` are coerced to ``'default'`` — the
+# canonical sentinel for the unnamed default study (see
+# ``docs/design/multi-study-bundle.md`` §4.3).
+SCHEMA_VERSION = 5
 
 # Columns of BacktestIndexRow that map 1:1 to typed SQL columns.
 # (parameters / strategy_ids are emitted as JSON text columns; the
 # scalar metrics are promoted from BacktestSummaryMetrics below.)
+#
+# The composite primary key
+# ``(bundle_path, engine_type, universe_key)`` is emitted as a
+# separate ``PRIMARY KEY (...)`` table constraint in
+# :meth:`SqliteBacktestIndex._init_schema`, so the listed columns
+# carry no per-column ``PRIMARY KEY`` modifier here.
 _IDENTITY_COLUMNS: Tuple[Tuple[str, str], ...] = (
-    ("bundle_path", "TEXT PRIMARY KEY"),
+    ("bundle_path", "TEXT NOT NULL"),
     ("algorithm_id", "TEXT"),
+    # Optional lineage pointer used by ``rank_index(
+    # anchor_algorithm_id=...)`` to pull a champion's whole
+    # sibling-bundle neighbourhood (param-robustness, cooldown
+    # stress, ...) in one SQL hop. ``NULL`` on anchor bundles. v5+.
+    ("anchor_algorithm_id", "TEXT"),
     ("tag", "TEXT"),
     ("framework_version", "TEXT"),
-    ("engine_type", "TEXT"),
+    ("engine_type", "TEXT NOT NULL DEFAULT 'vector'"),
+    ("universe_key", "TEXT NOT NULL DEFAULT ''"),
+    ("study_name", "TEXT NOT NULL DEFAULT 'default'"),
+    ("study_description", "TEXT"),
     ("risk_free_rate", "REAL"),
     ("number_of_runs", "INTEGER"),
     ("parameters_json", "TEXT"),
@@ -153,31 +187,72 @@ class SqliteBacktestIndex:
     # ------------------------------------------------------------------
     @staticmethod
     def _init_schema(conn: sqlite3.Connection) -> None:
+        """Create the table on first use, leaving existing tables alone.
+
+        ``PRAGMA user_version`` is only stamped when this method
+        actually creates the table; otherwise it is left for
+        :meth:`_migrate` to read and update.
+        """
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA synchronous=NORMAL")
-        cols = ", ".join(
-            f'"{name}" {sql_type}' for name, sql_type in _all_columns()
-        )
-        conn.execute(f'CREATE TABLE IF NOT EXISTS "{_TABLE}" ({cols})')
-        conn.execute(
-            f'CREATE INDEX IF NOT EXISTS idx_{_TABLE}_algorithm_id '
-            f'ON "{_TABLE}"(algorithm_id)'
-        )
-        conn.execute(
-            f'CREATE INDEX IF NOT EXISTS idx_{_TABLE}_tag '
-            f'ON "{_TABLE}"(tag)'
-        )
-        conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
+        existing = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            (_TABLE,),
+        ).fetchone()
+        if existing is None:
+            cols = ", ".join(
+                f'"{name}" {sql_type}' for name, sql_type in _all_columns()
+            )
+            conn.execute(
+                f'CREATE TABLE "{_TABLE}" ({cols}, '
+                f'PRIMARY KEY ("bundle_path", "engine_type", '
+                f'"universe_key", "study_name"))'
+            )
+            conn.execute(
+                f'CREATE INDEX IF NOT EXISTS idx_{_TABLE}_algorithm_id '
+                f'ON "{_TABLE}"(algorithm_id)'
+            )
+            conn.execute(
+                f'CREATE INDEX IF NOT EXISTS '
+                f'idx_{_TABLE}_anchor_algorithm_id '
+                f'ON "{_TABLE}"(anchor_algorithm_id)'
+            )
+            conn.execute(
+                f'CREATE INDEX IF NOT EXISTS idx_{_TABLE}_tag '
+                f'ON "{_TABLE}"(tag)'
+            )
+            conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         conn.commit()
 
     @staticmethod
     def _migrate(conn: sqlite3.Connection) -> None:
-        """Additive forward-only migration based on PRAGMA user_version.
+        """Forward-only migration based on ``PRAGMA user_version``.
 
-        Adds any columns that the current code knows about but the
-        on-disk file is missing. Never drops or rewrites existing
-        columns.
+        * ``< 3``: rebuild the table with the v9.0 composite primary
+          key ``(bundle_path, engine_type)``; legacy rows whose
+          ``engine_type`` is NULL are coerced to ``'vector'`` per
+          design doc §2.6.1 / §5.
+        * ``< 4``: extend the composite primary key to include
+          ``universe_key`` (defaulted to ``''`` for legacy rows) and
+          add the ``study_name`` / ``study_description`` columns.
+        * ``< 5``: extend the composite primary key to include
+          ``study_name`` (defaulted to ``'default'`` for legacy rows)
+          so a single bundle can carry one row set per study slot.
+        * Then add any columns that the current code knows about but
+          the on-disk file is missing (additive, never drops).
         """
+        cur_version = int(
+            conn.execute("PRAGMA user_version").fetchone()[0]
+        )
+        if cur_version < 3:
+            SqliteBacktestIndex._migrate_to_v3(conn)
+            cur_version = 3
+        if cur_version < 4:
+            SqliteBacktestIndex._migrate_to_v4(conn)
+            cur_version = 4
+        if cur_version < 5:
+            SqliteBacktestIndex._migrate_to_v5(conn)
+
         existing = {
             row["name"]
             for row in conn.execute(f'PRAGMA table_info("{_TABLE}")')
@@ -190,6 +265,190 @@ class SqliteBacktestIndex:
                 )
         conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         conn.commit()
+
+    @staticmethod
+    def _migrate_to_v3(conn: sqlite3.Connection) -> None:
+        """Rebuild the table with the composite PK introduced in v9.0.
+
+        SQLite does not support changing a table's primary key in
+        place, so we create a sibling table with the new schema,
+        copy rows across (defaulting ``engine_type`` to ``'vector'``
+        when NULL), drop the original, and rename the new table into
+        position. The migration is idempotent: a no-op when no rows
+        exist or when the table already declares the composite PK.
+        """
+        old_cols = [
+            row["name"]
+            for row in conn.execute(f'PRAGMA table_info("{_TABLE}")')
+        ]
+        if not old_cols:
+            return  # fresh DB — _init_schema will set things up
+
+        tmp_table = f"{_TABLE}__v3_tmp"
+        new_cols_sql = ", ".join(
+            f'"{name}" {sql_type}' for name, sql_type in _all_columns()
+        )
+        conn.execute(
+            f'CREATE TABLE "{tmp_table}" ({new_cols_sql}, '
+            f'PRIMARY KEY ("bundle_path", "engine_type"))'
+        )
+
+        # Carry over the intersection of old/new columns; coerce NULL
+        # engine_type to 'vector' so the composite PK is well-defined.
+        new_col_names = [name for name, _ in _all_columns()]
+        shared = [c for c in old_cols if c in new_col_names]
+        select_exprs = [
+            ("COALESCE(\"engine_type\", 'vector')"
+             if c == "engine_type" else f'"{c}"')
+            for c in shared
+        ]
+        insert_cols = ", ".join(f'"{c}"' for c in shared)
+        conn.execute(
+            f'INSERT OR IGNORE INTO "{tmp_table}" ({insert_cols}) '
+            f'SELECT {", ".join(select_exprs)} FROM "{_TABLE}"'
+        )
+
+        conn.execute(f'DROP TABLE "{_TABLE}"')
+        conn.execute(
+            f'ALTER TABLE "{tmp_table}" RENAME TO "{_TABLE}"'
+        )
+        conn.execute(
+            f'CREATE INDEX IF NOT EXISTS idx_{_TABLE}_algorithm_id '
+            f'ON "{_TABLE}"(algorithm_id)'
+        )
+        conn.execute(
+            f'CREATE INDEX IF NOT EXISTS '
+            f'idx_{_TABLE}_anchor_algorithm_id '
+            f'ON "{_TABLE}"(anchor_algorithm_id)'
+        )
+        conn.execute(
+            f'CREATE INDEX IF NOT EXISTS idx_{_TABLE}_tag '
+            f'ON "{_TABLE}"(tag)'
+        )
+
+    @staticmethod
+    def _migrate_to_v4(conn: sqlite3.Connection) -> None:
+        """Rebuild the table with the v4 composite primary key
+        ``(bundle_path, engine_type, universe_key)`` and add the
+        ``study_name`` / ``study_description`` columns.
+
+        Pre-existing rows are pooled rows by definition (no
+        per-universe summaries existed before v4), so they get
+        ``universe_key=''`` — the SQL-level sentinel for the pooled
+        cross-universe row. The migration is idempotent: a no-op
+        when no rows exist.
+        """
+        old_cols = [
+            row["name"]
+            for row in conn.execute(f'PRAGMA table_info("{_TABLE}")')
+        ]
+        if not old_cols:
+            return
+
+        tmp_table = f"{_TABLE}__v4_tmp"
+        new_cols_sql = ", ".join(
+            f'"{name}" {sql_type}' for name, sql_type in _all_columns()
+        )
+        conn.execute(
+            f'CREATE TABLE "{tmp_table}" ({new_cols_sql}, '
+            f'PRIMARY KEY ("bundle_path", "engine_type", '
+            f'"universe_key"))'
+        )
+
+        # Copy over the intersection of old/new columns; legacy rows
+        # are pooled rows so universe_key defaults to '' via the
+        # column DEFAULT clause when not present in the source.
+        new_col_names = [name for name, _ in _all_columns()]
+        shared = [c for c in old_cols if c in new_col_names]
+        select_exprs = [
+            ("COALESCE(\"universe_key\", '')"
+             if c == "universe_key" else f'"{c}"')
+            for c in shared
+        ]
+        insert_cols = ", ".join(f'"{c}"' for c in shared)
+        conn.execute(
+            f'INSERT OR IGNORE INTO "{tmp_table}" ({insert_cols}) '
+            f'SELECT {", ".join(select_exprs)} FROM "{_TABLE}"'
+        )
+
+        conn.execute(f'DROP TABLE "{_TABLE}"')
+        conn.execute(
+            f'ALTER TABLE "{tmp_table}" RENAME TO "{_TABLE}"'
+        )
+        conn.execute(
+            f'CREATE INDEX IF NOT EXISTS idx_{_TABLE}_algorithm_id '
+            f'ON "{_TABLE}"(algorithm_id)'
+        )
+        conn.execute(
+            f'CREATE INDEX IF NOT EXISTS '
+            f'idx_{_TABLE}_anchor_algorithm_id '
+            f'ON "{_TABLE}"(anchor_algorithm_id)'
+        )
+        conn.execute(
+            f'CREATE INDEX IF NOT EXISTS idx_{_TABLE}_tag '
+            f'ON "{_TABLE}"(tag)'
+        )
+
+    @staticmethod
+    def _migrate_to_v5(conn: sqlite3.Connection) -> None:
+        """Rebuild the table with the v5 composite primary key
+        ``(bundle_path, engine_type, universe_key, study_name)`` so a
+        single bundle can carry one row set per study slot (Phase 3d
+        of ``docs/design/multi-study-bundle.md``).
+
+        Pre-existing rows had no notion of ``study_name`` (or carried
+        it as a NULL/free-form string) — they are coerced to the
+        canonical ``'default'`` sentinel so the composite primary key
+        stays well-defined for legacy data. The migration is
+        idempotent: a no-op when no rows exist.
+        """
+        old_cols = [
+            row["name"]
+            for row in conn.execute(f'PRAGMA table_info("{_TABLE}")')
+        ]
+        if not old_cols:
+            return
+
+        tmp_table = f"{_TABLE}__v5_tmp"
+        new_cols_sql = ", ".join(
+            f'"{name}" {sql_type}' for name, sql_type in _all_columns()
+        )
+        conn.execute(
+            f'CREATE TABLE "{tmp_table}" ({new_cols_sql}, '
+            f'PRIMARY KEY ("bundle_path", "engine_type", '
+            f'"universe_key", "study_name"))'
+        )
+
+        new_col_names = [name for name, _ in _all_columns()]
+        shared = [c for c in old_cols if c in new_col_names]
+        select_exprs = [
+            ("COALESCE(NULLIF(\"study_name\", ''), 'default')"
+             if c == "study_name" else f'"{c}"')
+            for c in shared
+        ]
+        insert_cols = ", ".join(f'"{c}"' for c in shared)
+        conn.execute(
+            f'INSERT OR IGNORE INTO "{tmp_table}" ({insert_cols}) '
+            f'SELECT {", ".join(select_exprs)} FROM "{_TABLE}"'
+        )
+
+        conn.execute(f'DROP TABLE "{_TABLE}"')
+        conn.execute(
+            f'ALTER TABLE "{tmp_table}" RENAME TO "{_TABLE}"'
+        )
+        conn.execute(
+            f'CREATE INDEX IF NOT EXISTS idx_{_TABLE}_algorithm_id '
+            f'ON "{_TABLE}"(algorithm_id)'
+        )
+        conn.execute(
+            f'CREATE INDEX IF NOT EXISTS '
+            f'idx_{_TABLE}_anchor_algorithm_id '
+            f'ON "{_TABLE}"(anchor_algorithm_id)'
+        )
+        conn.execute(
+            f'CREATE INDEX IF NOT EXISTS idx_{_TABLE}_tag '
+            f'ON "{_TABLE}"(tag)'
+        )
 
     # ------------------------------------------------------------------
     # Writes
@@ -285,9 +544,23 @@ class SqliteBacktestIndex:
         record: Dict[str, Any] = {
             "bundle_path": row.bundle_path,
             "algorithm_id": row.algorithm_id,
+            "anchor_algorithm_id": row.anchor_algorithm_id,
             "tag": row.tag,
             "framework_version": row.framework_version,
             "engine_type": row.engine_type,
+            # ``None`` (the in-memory pooled-row sentinel) maps to the
+            # SQL-level empty string so the composite PK
+            # ``(bundle_path, engine_type, universe_key)`` collapses
+            # NULLs deterministically (SQLite treats NULLs in a
+            # composite PK as distinct, which would defeat upsert).
+            "universe_key": row.universe_key or "",
+            # ``None`` maps to the canonical ``'default'`` sentinel
+            # so legacy single-study bundles share the v9.0 row
+            # shape and Phase 3d — the composite PK includes
+            # ``study_name`` and SQLite treats NULLs in PKs as
+            # distinct, which would defeat upsert.
+            "study_name": row.study_name or "default",
+            "study_description": row.study_description,
             "risk_free_rate": row.risk_free_rate,
             "number_of_runs": row.number_of_runs,
             "parameters_json": (
@@ -366,10 +639,16 @@ class SqliteBacktestIndex:
 
         kwargs: Dict[str, Any] = {
             "algorithm_id": d.get("algorithm_id"),
+            "anchor_algorithm_id": d.get("anchor_algorithm_id"),
             "tag": d.get("tag"),
             "bundle_path": d.get("bundle_path"),
             "framework_version": d.get("framework_version"),
             "engine_type": d.get("engine_type"),
+            # SQL stores '' for the pooled cross-universe row; the
+            # in-memory contract uses ``None`` for that sentinel.
+            "universe_key": (d.get("universe_key") or None),
+            "study_name": d.get("study_name"),
+            "study_description": d.get("study_description"),
             "risk_free_rate": d.get("risk_free_rate"),
             "number_of_runs": d.get("number_of_runs") or 0,
             "parameters": _safe_loads(params_json) or {},

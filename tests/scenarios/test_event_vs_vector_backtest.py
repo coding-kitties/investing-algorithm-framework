@@ -9,7 +9,7 @@ import pandas as pd
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    RESOURCE_DIRECTORY, CSVOHLCVDataProvider
+    RESOURCE_DIRECTORY, CSVOHLCVDataProvider, Schedule
 
 # ═══════════════════════════════════════════════════════════════════════
 # Fast CSV price sequence (OHLCV_BTC-EUR_BITVAVO_2h_SCALING_FAST.csv):
@@ -52,8 +52,7 @@ class PriceSignalStrategy(TradingStrategy):
 
     Buy when Close == 110, sell when Close == 90.
     """
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
@@ -125,7 +124,7 @@ class TestEventVsVectorBacktest(TestCase):
             backtest_date_range=date_range,
             risk_free_rate=0.027,
         )
-        cls.vector_run = vector_bt.backtest_runs[0]
+        cls.vector_run = vector_bt.get_all_backtest_runs()[0]
         cls.vector_metrics = cls.vector_run.backtest_metrics
 
         # Event backtest
@@ -135,7 +134,7 @@ class TestEventVsVectorBacktest(TestCase):
             backtest_date_range=date_range,
             risk_free_rate=0.027,
         )
-        cls.event_run = event_bt.backtest_runs[0]
+        cls.event_run = event_bt.get_all_backtest_runs()[0]
         cls.event_metrics = cls.event_run.backtest_metrics
 
     def test_compare_trade_counts(self):

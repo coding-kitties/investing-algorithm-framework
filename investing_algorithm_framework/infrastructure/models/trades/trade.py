@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, text
 from sqlalchemy.orm import relationship
 
 from investing_algorithm_framework.domain import Trade, TradeStatus
@@ -71,6 +71,16 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
     high_water_mark_datetime = Column(DateTime, default=None)
     updated_at = Column(DateTime, default=None)
     status = Column(String, default=TradeStatus.CREATED.value)
+    # Direction flag (#433). SHORT trades open with a SELL order and
+    # close with a BUY (cover) order; long trades are the opposite.
+    # ``server_default`` ensures existing rows backfill to False on
+    # SQLite ALTER TABLE without an explicit data migration.
+    is_short = Column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=text("0"),
+    )
     # Stop losses should be actively loaded
     stop_losses = relationship(
         'SQLTradeStopLoss',
@@ -106,6 +116,7 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         sell_orders=[],
         stop_losses=[],
         take_profits=[],
+        is_short=False,
     ):
         self.orders = [buy_order]
         self.open_price = buy_order.price
@@ -127,6 +138,7 @@ class SQLTrade(Trade, SQLBaseModel, SQLAlchemyModelExtension):
         self.status = status
         self.stop_losses = stop_losses
         self.take_profits = take_profits
+        self.is_short = bool(is_short)
 
         if sell_orders is not None:
             self.orders.extend(sell_orders)

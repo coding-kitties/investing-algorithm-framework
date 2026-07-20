@@ -10,12 +10,11 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, \
-    RESOURCE_DIRECTORY, DATA_DIRECTORY, PositionSize
+    RESOURCE_DIRECTORY, DATA_DIRECTORY, PositionSize, Schedule
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     position_sizes = [
         PositionSize(
@@ -27,8 +26,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
     def __init__(
         self,
         algorithm_id: str,
-        time_unit: TimeUnit,
-        interval: int,
+        schedule: Schedule,
         market: str,
         rsi_time_frame: str,
         rsi_period: int,
@@ -82,8 +80,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         super().__init__(
             algorithm_id=algorithm_id,
             data_sources=data_sources,
-            time_unit=time_unit,
-            interval=interval
+            schedule=schedule,
         )
 
         self.buy_signal_dates = {}
@@ -249,8 +246,7 @@ class Test(TestCase):
         )
         strategy = RSIEMACrossoverStrategy(
             algorithm_id="rsi_ema_crossover_strategy",
-            time_unit=TimeUnit.HOUR,
-            interval=2,
+            schedule=Schedule.every(2, TimeUnit.HOUR),
             market="BITVAVO",
             rsi_time_frame="2h",
             rsi_period=14,
@@ -261,7 +257,7 @@ class Test(TestCase):
             ema_long_period=50,
             ema_cross_lookback_window=10
         )
-        backtests = app.run_permutation_test(
+        backtests = app.run_monte_carlo_test(
             initial_amount=1000,
             market="bitvavo",
             trading_symbol="EUR",

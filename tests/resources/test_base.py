@@ -8,7 +8,7 @@ from flask_testing import TestCase as FlaskTestCase
 
 from investing_algorithm_framework import create_app, App, \
     TradingStrategy, TimeUnit, OrderStatus, PortfolioConfiguration, \
-    MarketCredential
+    MarketCredential, Schedule
 from investing_algorithm_framework.domain import RESOURCE_DIRECTORY, \
     ENVIRONMENT, Environment, BACKTEST_DATA_DIRECTORY_NAME
 from investing_algorithm_framework.infrastructure.database import \
@@ -19,9 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class StrategyOne(TradingStrategy):
-    time_unit = TimeUnit.SECOND
-    interval = 10
-
+    schedule = Schedule.every(10, TimeUnit.SECOND)
     def run_strategy(self, algorithm, market_data):
         algorithm.create_order(
             target_symbol="BTC",
@@ -43,6 +41,13 @@ class TestBase(TestCase):
     initialize = True
     resource_directory = os.path.dirname(__file__)
     data_providers = []
+    # v9.0 (#431) — when True, the test order executor synchronously
+    # fills any order it executes. This preserves the pre-v9.0 test
+    # contract where a Trade is created during ``order_service.create``.
+    # The default is False to keep ``order_status`` / pending-order
+    # semantics correct; tests that assert trade/position state right
+    # after creating an order opt-in by setting it to True.
+    auto_fill_orders = False
 
     def setUp(self) -> None:
         self.resource_directory = os.path.dirname(__file__)
@@ -56,6 +61,9 @@ class TestBase(TestCase):
             .portfolio_provider_lookup()
         portfolio_provider_lookup.reset()
         order_executor_test = OrderExecutorTest()
+        if self.auto_fill_orders:
+            order_executor_test.order_status = OrderStatus.CLOSED.value
+            order_executor_test.auto_fill = True
         order_executor_lookup = self.app.container.order_executor_lookup()
         order_executor_lookup.reset()
         self.app.add_order_executor(order_executor_test)

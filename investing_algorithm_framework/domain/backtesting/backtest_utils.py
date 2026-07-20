@@ -550,19 +550,27 @@ def iter_backtests_from_directory(
 # ---------------------------------------------------------------------------
 
 
-def _backtest_to_index_row(bt: Backtest, bundle_path: Optional[str] = None):
-    """Flatten a backtest's summary + identity into a single row.
+def _backtest_to_index_rows(
+    bt: Backtest, bundle_path: Optional[str] = None,
+):
+    """Flatten a backtest's per-engine summary + identity into rows.
 
-    Thin wrapper around :meth:`Backtest.index_row` for callers that
-    want the legacy flat dict shape (Parquet / SQL columns). The
-    typed :class:`BacktestIndexRow` is the authoritative contract \u2014
-    see ``docs/design/tiered-backtest-storage.md`` \u00a73.1.
+    Thin wrapper around :meth:`Backtest.index_rows` for callers that
+    want the legacy flat dict shape (Parquet / SQL columns). Returns
+    one row per populated engine — vector first, then event. The
+    typed :class:`BacktestIndexRow` is the authoritative contract —
+    see ``docs/design/tiered-backtest-storage.md`` §3.1 and the v9.0
+    dual-engine design doc §6.
     """
-    return bt.index_row(bundle_path=bundle_path).to_flat_dict()
+    return [
+        row.to_flat_dict()
+        for row in bt.index_rows(bundle_path=bundle_path)
+    ]
 
 
 def _write_index(directory_path: Union[str, Path], backtests: List[Backtest]):
-    """Write ``<directory_path>/index.parquet`` with one row per backtest.
+    """Write ``<directory_path>/index.parquet`` with one row per
+    (backtest, engine) pair.
 
     Uses pandas + pyarrow. Failures are non-fatal — the caller logs them.
     """
@@ -572,7 +580,7 @@ def _write_index(directory_path: Union[str, Path], backtests: List[Backtest]):
     for bt in backtests:
         base = getattr(bt, "algorithm_id", None) or "backtest"
         rel = f"{base}{BUNDLE_EXT}"
-        rows.append(_backtest_to_index_row(bt, bundle_path=rel))
+        rows.extend(_backtest_to_index_rows(bt, bundle_path=rel))
 
     df = pd.DataFrame(rows)
     target = Path(directory_path) / "index.parquet"
@@ -680,7 +688,7 @@ def _migrate_one(args):
         ohlcv_store=ohlcv_store,
     ))
     rel = os.path.basename(out)
-    row = _backtest_to_index_row(bt, bundle_path=rel)
+    rows = _backtest_to_index_rows(bt, bundle_path=rel)
     # Drop the heavy backtest before returning so the worker process's
     # RSS can be reclaimed before it picks up the next task.
     del bt
@@ -693,7 +701,7 @@ def _migrate_one(args):
                 os.remove(src)
             except OSError:
                 pass
-    return out, row
+    return out, rows
 
 
 def migrate_backtests(
@@ -748,10 +756,19 @@ def migrate_backtests(
                 sources.append(os.path.join(root, fname))
         for dname in list(dirs):
             d = os.path.join(root, dname)
-            if (
-                os.path.isfile(os.path.join(d, "algorithm_id.json"))
-                and os.path.isdir(os.path.join(d, "runs"))
-            ):
+            # A backtest directory is identified by algorithm_id.json
+            # plus at least one runs slot. v9.0 writes per-engine
+            # slots (``vector_runs/`` / ``event_runs/``); legacy v8
+            # layout used a single ``runs/`` directory.
+            has_id = os.path.isfile(
+                os.path.join(d, "algorithm_id.json")
+            )
+            has_runs = (
+                os.path.isdir(os.path.join(d, "runs"))
+                or os.path.isdir(os.path.join(d, "vector_runs"))
+                or os.path.isdir(os.path.join(d, "event_runs"))
+            )
+            if has_id and has_runs:
                 sources.append(d)
                 # Don't descend into a recognised backtest dir.
                 dirs.remove(dname)
@@ -814,9 +831,9 @@ def migrate_backtests(
                     for fut in done_set:
                         args = inflight.pop(fut)
                         try:
-                            _out, row = fut.result()
+                            _out, new_rows = fut.result()
                             if write_index:
-                                rows.append(row)
+                                rows.extend(new_rows)
                         except Exception as e:
                             logger.error(
                                 f"Failed to migrate {args[0]}: {e}"
@@ -831,9 +848,9 @@ def migrate_backtests(
         else:
             for args in plan:
                 try:
-                    _out, row = _migrate_one(args)
+                    _out, new_rows = _migrate_one(args)
                     if write_index:
-                        rows.append(row)
+                        rows.extend(new_rows)
                 except Exception as e:
                     logger.error(f"Failed to migrate {args[0]}: {e}")
                 finally:

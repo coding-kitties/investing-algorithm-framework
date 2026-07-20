@@ -13,15 +13,15 @@ from unittest.mock import Mock, MagicMock, patch
 import pandas as pd
 
 from investing_algorithm_framework import (
-    TradingStrategy, PositionSize, TimeUnit, DataSource, DataType
+    TradingStrategy, PositionSize, TimeUnit, DataSource, DataType,
+    Schedule, SignalSide, signals_from_column,
 )
 from investing_algorithm_framework.domain import OrderSide, INDEX_DATETIME
 
 
 class MultiSymbolStrategy(TradingStrategy):
     """Test strategy with multiple symbols for proportional scaling tests."""
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC", "ETH", "SOL", "ADA", "XRP"]
 
     position_sizes = [
@@ -87,24 +87,25 @@ class MultiSymbolStrategy(TradingStrategy):
         }
         self.created_orders = []
 
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        signals = {}
+    def generate_signals(self, context, data):
+        # v9: yield one OPEN_LONG signal per configured symbol.
+        # We synthesise a one-row frame so signals_from_column will
+        # emit when the latest (only) value is truthy.
         for symbol in self.symbols:
-            # Create a series with the configured buy signal
             should_buy = self.buy_signals_config.get(symbol, False)
-            signals[symbol] = pd.Series([should_buy])
-        return signals
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        signals = {}
-        for symbol in self.symbols:
-            signals[symbol] = pd.Series([False])
-        return signals
+            frame = pd.DataFrame({"buy": [should_buy]})
+            yield from signals_from_column(
+                frame, "buy",
+                side=SignalSide.OPEN_LONG,
+                symbol=symbol,
+            )
 
     def create_limit_order(self, **kwargs):
-        """Override to track created orders."""
+        """Legacy hook kept for tests that still poke the strategy
+        directly. In v9 the pipeline routes through
+        ``context.create_limit_order``; the mock context in this
+        file forwards there via ``_record_order``."""
         self.created_orders.append(kwargs)
-        # Return a mock order with an id
         mock_order = Mock()
         mock_order.id = len(self.created_orders)
         return mock_order
@@ -113,14 +114,23 @@ class MultiSymbolStrategy(TradingStrategy):
 class TestProportionalScaling(TestCase):
     """Tests for proportional scaling of buy orders."""
 
-    def _create_mock_context(self, unallocated=1000.0, allocated=0.0):
-        """Create a mock context for testing."""
+    def _create_mock_context(self, unallocated=1000.0, allocated=0.0,
+                             record_to=None):
+        """Create a mock context for testing.
+
+        If ``record_to`` is a list, every ``create_limit_order`` call
+        is appended to it as the kwargs dict and a fake Order with an
+        incrementing id is returned. The v9 pipeline routes orders
+        through ``context.create_limit_order`` rather than through
+        the strategy.
+        """
         context = Mock()
 
         # Mock portfolio
         portfolio = Mock()
         portfolio.get_unallocated.return_value = unallocated
         portfolio.allocated = allocated
+        portfolio.get_net_size.return_value = unallocated + allocated
 
         context.get_portfolio.return_value = portfolio
         context.get_unallocated.return_value = unallocated
@@ -132,6 +142,7 @@ class TestProportionalScaling(TestCase):
         # Mock has_open_orders and has_position
         context.has_open_orders.return_value = False
         context.has_position.return_value = False
+        context.get_open_trades.return_value = []
 
         # Mock trade retrieval
         mock_trade = Mock()
@@ -143,6 +154,14 @@ class TestProportionalScaling(TestCase):
 
         # Config with INDEX_DATETIME
         context.config = {INDEX_DATETIME: datetime.now(timezone.utc)}
+
+        if record_to is not None:
+            def _record_order(**kwargs):
+                record_to.append(kwargs)
+                mock_order = Mock()
+                mock_order.id = len(record_to)
+                return mock_order
+            context.create_limit_order.side_effect = _record_order
 
         return context
 
@@ -158,6 +177,7 @@ class TestProportionalScaling(TestCase):
         # 1000 EUR available, only 2 symbols want 20% each = 400 EUR total
         context = self._create_mock_context(unallocated=1000.0, allocated=0.0)
         strategy.context = context
+        context.create_limit_order.side_effect = strategy.create_limit_order
 
         # Run the strategy
         strategy.run_strategy(context, data={})
@@ -184,6 +204,7 @@ class TestProportionalScaling(TestCase):
         # Scale factor should be 800/1000 = 0.8
         context = self._create_mock_context(unallocated=800.0, allocated=200.0)
         strategy.context = context
+        context.create_limit_order.side_effect = strategy.create_limit_order
 
         # Run the strategy
         strategy.run_strategy(context, data={})
@@ -216,6 +237,7 @@ class TestProportionalScaling(TestCase):
             # Scale factor = 0.5
             context = self._create_mock_context(unallocated=500.0, allocated=500.0)
             strategy.context = context
+            context.create_limit_order.side_effect = strategy.create_limit_order
 
             strategy.run_strategy(context, data={})
 
@@ -242,6 +264,7 @@ class TestProportionalScaling(TestCase):
         # Each would get 0.008 EUR which is below 0.01 threshold
         context = self._create_mock_context(unallocated=0.04, allocated=999.96)
         strategy.context = context
+        context.create_limit_order.side_effect = strategy.create_limit_order
 
         strategy.run_strategy(context, data={})
 
@@ -260,6 +283,7 @@ class TestProportionalScaling(TestCase):
         # Scale factor = 450/600 = 0.75
         context = self._create_mock_context(unallocated=450.0, allocated=550.0)
         strategy.context = context
+        context.create_limit_order.side_effect = strategy.create_limit_order
 
         strategy.run_strategy(context, data={})
 
@@ -287,6 +311,7 @@ class TestProportionalScaling(TestCase):
 
         context.has_position = Mock(side_effect=has_position_side_effect)
         strategy.context = context
+        context.create_limit_order.side_effect = strategy.create_limit_order
 
         strategy.run_strategy(context, data={})
 
@@ -317,6 +342,7 @@ class TestProportionalScaling(TestCase):
 
         context.has_open_orders = Mock(side_effect=has_open_orders_side_effect)
         strategy.context = context
+        context.create_limit_order.side_effect = strategy.create_limit_order
 
         strategy.run_strategy(context, data={})
 
@@ -337,6 +363,7 @@ class TestProportionalScalingEdgeCases(TestCase):
         portfolio = Mock()
         portfolio.get_unallocated.return_value = unallocated
         portfolio.allocated = allocated
+        portfolio.get_net_size.return_value = unallocated + allocated
 
         context.get_portfolio.return_value = portfolio
         context.get_unallocated.return_value = unallocated
@@ -344,6 +371,7 @@ class TestProportionalScalingEdgeCases(TestCase):
         context.get_latest_price.return_value = 100.0
         context.has_open_orders.return_value = False
         context.has_position.return_value = False
+        context.get_open_trades.return_value = []
 
         mock_trade = Mock()
         context.get_trade.return_value = mock_trade
@@ -358,6 +386,7 @@ class TestProportionalScalingEdgeCases(TestCase):
         strategy = MultiSymbolStrategy()
         context = self._create_mock_context(unallocated=0.0, allocated=1000.0)
         strategy.context = context
+        context.create_limit_order.side_effect = strategy.create_limit_order
 
         strategy.run_strategy(context, data={})
 
@@ -373,6 +402,7 @@ class TestProportionalScalingEdgeCases(TestCase):
         # Exactly 1000 EUR available, 5 symbols want 200 each = 1000 total
         context = self._create_mock_context(unallocated=1000.0, allocated=0.0)
         strategy.context = context
+        context.create_limit_order.side_effect = strategy.create_limit_order
 
         strategy.run_strategy(context, data={})
 
@@ -391,6 +421,7 @@ class TestProportionalScalingEdgeCases(TestCase):
 
         context = self._create_mock_context(unallocated=1000.0, allocated=0.0)
         strategy.context = context
+        context.create_limit_order.side_effect = strategy.create_limit_order
 
         strategy.run_strategy(context, data={})
 
@@ -406,6 +437,7 @@ class TestProportionalScalingEdgeCases(TestCase):
         # Scale factor = 0.01
         context = self._create_mock_context(unallocated=10.0, allocated=990.0)
         strategy.context = context
+        context.create_limit_order.side_effect = strategy.create_limit_order
 
         strategy.run_strategy(context, data={})
 
@@ -426,6 +458,7 @@ class TestProportionalScalingWithFixedAmount(TestCase):
         portfolio = Mock()
         portfolio.get_unallocated.return_value = unallocated
         portfolio.allocated = allocated
+        portfolio.get_net_size.return_value = unallocated + allocated
 
         context.get_portfolio.return_value = portfolio
         context.get_unallocated.return_value = unallocated
@@ -433,6 +466,7 @@ class TestProportionalScalingWithFixedAmount(TestCase):
         context.get_latest_price.return_value = 100.0
         context.has_open_orders.return_value = False
         context.has_position.return_value = False
+        context.get_open_trades.return_value = []
 
         mock_trade = Mock()
         context.get_trade.return_value = mock_trade
@@ -461,6 +495,7 @@ class TestProportionalScalingWithFixedAmount(TestCase):
         # Scale factor = 0.5
         context = self._create_mock_context(unallocated=300.0, allocated=700.0)
         strategy.context = context
+        context.create_limit_order.side_effect = strategy.create_limit_order
 
         strategy.run_strategy(context, data={})
 

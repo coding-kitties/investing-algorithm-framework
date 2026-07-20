@@ -30,7 +30,8 @@ from .win_rate import get_win_rate, get_win_loss_ratio, get_current_win_rate, \
     get_current_win_loss_ratio
 from .calmar_ratio import get_calmar_ratio
 from .generate import create_backtest_metrics, \
-    create_backtest_metrics_for_backtest, recalculate_backtests, \
+    create_backtest_metrics_for_backtest, \
+    recalculate_backtests, \
     recalculate_backtests_in_directory
 from .risk_free_rate import get_risk_free_rate_us
 from .trades import get_negative_trades, get_positive_trades, \
@@ -124,5 +125,7 @@ __all__ = [
     "get_cv_consistency",
     "get_normalized_stability",
     "get_consistency_score",
-    "get_stability_score"
+    "get_stability_score",
+    "recalculate_backtests",
+    "recalculate_backtests_in_directory"
 ]

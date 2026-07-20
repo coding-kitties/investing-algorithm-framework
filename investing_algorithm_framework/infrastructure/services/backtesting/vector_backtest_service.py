@@ -6,9 +6,10 @@ import logging
 import pandas as pd
 
 from investing_algorithm_framework.domain import BacktestDateRange, \
-    BacktestRun, Portfolio, TimeFrame, PortfolioConfiguration, \
+    BacktestRun, BacktestWindow, Portfolio, TimeFrame, PortfolioConfiguration, \
     PortfolioSnapshot, OperationalException, Order, OrderType, OrderStatus, \
-    OrderSide, Trade, TradeStatus, DataType, TradingCost, CooldownTracker
+    OrderSide, Trade, TradeStatus, DataType, TradingCost, CooldownTracker, \
+    SignalSide
 from investing_algorithm_framework.services import DataProviderService, \
     create_backtest_metrics
 from investing_algorithm_framework.services.pipeline import \
@@ -87,13 +88,26 @@ class VectorBacktestService:
             backtest_date_range=backtest_date_range,
         )
 
-        # Compute signals from strategy
-        buy_signals = strategy.generate_buy_signals(data)
-        sell_signals = strategy.generate_sell_signals(data)
-
-        # Generate optional scale-in/scale-out signals
-        scale_in_signals = strategy.generate_scale_in_signals(data)
-        scale_out_signals = strategy.generate_scale_out_signals(data)
+        # Compute signals from strategy via the v9.0 SignalSeries
+        # protocol. The strategy yields one SignalSeries per
+        # (symbol, side) pair; we bucket them back into the six
+        # per-side dicts the downstream per-bar loop already speaks.
+        # Strategies that target the vector engine must override
+        # ``generate_signal_series(data)``; see
+        # docs/migration-v8-to-v9.md §10.
+        (
+            buy_signals,
+            sell_signals,
+            scale_in_signals,
+            scale_out_signals,
+            short_signals,
+            cover_signals,
+        ) = self._bucket_signal_series(
+            strategy.generate_signal_series(data)
+        )
+        shorting_enabled = (
+            short_signals is not None and cover_signals is not None
+        )
 
         # Generate optional recorded values
         raw_recorded = strategy.generate_recorded_values(data)
@@ -129,6 +143,15 @@ class VectorBacktestService:
                 k: v[v.index >= backtest_date_range.start_date]
                 for k, v in scale_out_signals.items()
             }
+        if shorting_enabled:
+            short_signals = {
+                k: v[v.index >= backtest_date_range.start_date]
+                for k, v in short_signals.items()
+            }
+            cover_signals = {
+                k: v[v.index >= backtest_date_range.start_date]
+                for k, v in cover_signals.items()
+            }
 
         index = index.union(most_granular_ohlcv_data.index)
         index = index.sort_values()
@@ -150,7 +173,20 @@ class VectorBacktestService:
 
         # Pre-compute all data needed for each symbol
         symbol_data = {}
-        for symbol in buy_signals.keys():
+        # v9.0 (#433) — iterate the union of all signal dicts so
+        # short-only strategies (no OPEN_LONG signals) still get a
+        # symbol_data entry. Previously iterating only
+        # ``buy_signals.keys()`` silently dropped every symbol that had
+        # exclusively SHORT / COVER signals.
+        all_signal_symbols = set(buy_signals.keys()) \
+            | set(sell_signals.keys()) \
+            | set(scale_in_signals.keys() if scale_in_signals else [])
+        if scale_out_signals is not None:
+            all_signal_symbols |= set(scale_out_signals.keys())
+        if shorting_enabled:
+            all_signal_symbols |= set(short_signals.keys())
+            all_signal_symbols |= set(cover_signals.keys())
+        for symbol in all_signal_symbols:
             full_symbol = f"{symbol}/{trading_symbol}"
 
             # find PositionSize object
@@ -182,10 +218,14 @@ class VectorBacktestService:
             # state machine (which discards subsequent buy signals
             # in the same cluster). The per-bar last_trade check
             # already enforces one-position-at-a-time per symbol.
-            buy_signal = buy_signals[symbol].reindex(index, fill_value=False)
+            # v9.0 (#433) — default to all-False when this symbol
+            # only emits SHORT / COVER signals.
+            buy_signal = buy_signals[symbol].reindex(
+                index, fill_value=False
+            ) if symbol in buy_signals else pd.Series(False, index=index)
             sell_signal = sell_signals[symbol].reindex(
                 index, fill_value=False
-            )
+            ) if symbol in sell_signals else pd.Series(False, index=index)
 
             # Align scale-in / scale-out signals
             si_signal = scale_in_signals[symbol].reindex(
@@ -199,6 +239,21 @@ class VectorBacktestService:
                 so_signal = scale_out_signals[symbol].reindex(
                     index, fill_value=False
                 )
+
+            # Align SHORT / COVER signals (#433). Defaults to all-False
+            # series when shorting is disabled so the per-bar branches
+            # remain cheap.
+            short_signal = pd.Series(False, index=index)
+            cover_signal = pd.Series(False, index=index)
+            if shorting_enabled:
+                if symbol in short_signals:
+                    short_signal = short_signals[symbol].reindex(
+                        index, fill_value=False
+                    )
+                if symbol in cover_signals:
+                    cover_signal = cover_signals[symbol].reindex(
+                        index, fill_value=False
+                    )
 
             # Find the ScalingRule for this symbol, if any
             scaling_rule = None
@@ -238,11 +293,14 @@ class VectorBacktestService:
                 'sell_signal': sell_signal,
                 'scale_in_signal': si_signal,
                 'scale_out_signal': so_signal,
+                'short_signal': short_signal,
+                'cover_signal': cover_signal,
                 'scaling_rule': scaling_rule,
                 'trading_cost': trading_cost,
                 'initial_capital_for_trade': initial_capital_for_trade,
                 'last_trade': None,  # Track open trade per symbol
                 'open_trades': [],   # All open trades for this symbol
+                'is_short': False,   # True iff last_trade is a short (#433)
                 'cooldown_remaining': 0,  # Bars remaining in cooldown
                 'scale_out_count': 0,     # Number of scale-outs done
                 'entry_count': 0,         # Number of entries so far
@@ -545,6 +603,253 @@ class VectorBacktestService:
                 )
             lt.update(update_dict)
 
+        # ------------------------------------------------------------------
+        # SHORT / COVER helpers (#433)
+        #
+        # A short is a SELL-first / BUY-to-cover trade. Cash mechanics are
+        # the mirror of a long: opening a short *credits* unallocated with
+        # the sale proceeds; covering *debits* unallocated for the cost to
+        # buy the borrowed amount back. P&L therefore equals
+        # ``(open_price - cover_price) * amount - fees``.
+        #
+        # Sizing reuses the existing ``PositionSize`` mechanism: ``capital``
+        # (in quote-currency units) is the *notional* committed to the
+        # short. We allow the proceeds back into ``unallocated`` only on
+        # open; the engine does not currently model margin requirements
+        # — vector backtests are a directional-P&L tool.
+        # ------------------------------------------------------------------
+        def _open_short_trade(
+            sym, sym_data, price, date, capital,
+            order_reason="short_signal"
+        ):
+            nonlocal current_unallocated, total_allocated
+
+            tc = sym_data['trading_cost']
+            # On a SHORT entry the broker fills our SELL — slippage moves
+            # against us in the same direction as a long exit, hence the
+            # sell-side fill price.
+            fill_price = tc.get_sell_fill_price(price)
+
+            amount = float(capital / fill_price)
+            gross_proceeds = amount * fill_price
+            short_fee = tc.get_fee(gross_proceeds)
+            net_proceeds = gross_proceeds - short_fee
+
+            if amount <= 0 or net_proceeds <= 0:
+                return None
+
+            if dynamic_position_sizing:
+                # Short entry releases cash into the wallet (proceeds in,
+                # fee out).
+                current_unallocated += net_proceeds
+            else:
+                # Static mode still reserves notional against the original
+                # budget so a short cannot exceed portfolio capacity.
+                total_allocated += capital
+
+            short_order = Order(
+                id=uuid4(),
+                target_symbol=sym,
+                trading_symbol=trading_symbol,
+                order_type=OrderType.LIMIT,
+                price=fill_price,
+                amount=amount,
+                status=OrderStatus.CLOSED,
+                created_at=date,
+                updated_at=date,
+                order_side=OrderSide.SELL,
+                order_fee=short_fee,
+                order_fee_rate=tc.fee_percentage / 100
+                if tc.fee_percentage else None,
+                slippage=price - fill_price,
+                metadata={"order_reason": order_reason, "is_short": True},
+            )
+            orders.append(short_order)
+            trade = Trade(
+                id=uuid4(),
+                orders=[short_order],
+                target_symbol=sym,
+                trading_symbol=trading_symbol,
+                available_amount=amount,
+                remaining=0,
+                filled_amount=amount,
+                open_price=fill_price,
+                opened_at=date,
+                closed_at=None,
+                amount=amount,
+                status=TradeStatus.OPEN.value,
+                # ``cost`` for a short is the notional (proceeds before
+                # fees). This keeps net_gain_percentage and percentage
+                # change calculations consistent with the long path.
+                cost=gross_proceeds,
+                total_fees=short_fee,
+                is_short=True,
+                metadata={"is_short": True},
+            )
+            sym_data['last_trade'] = trade
+            sym_data['open_trades'].append(trade)
+            sym_data['entry_count'] += 1
+            sym_data['is_short'] = True
+            trades.append(trade)
+
+            if dynamic_position_sizing:
+                # Track the short's notional liability so portfolio value
+                # computations see the open position. At open the
+                # liability matches the gross proceeds, so the residual
+                # (proceeds - liability) is ~0 — the per-bar reprice
+                # loop updates it as price drifts.
+                open_trades_value[sym] = 0.0
+
+            return trade
+
+        def _close_short_trade(sym, sym_data, price, date):
+            nonlocal current_unallocated, total_realized_gains, \
+                total_allocated
+
+            lt = sym_data['last_trade']
+            if lt is None:
+                return
+
+            tc = sym_data['trading_cost']
+            # Covering = BUY back; pay buy-side slippage.
+            cover_fill = tc.get_buy_fill_price(price)
+            cover_gross = cover_fill * lt.available_amount
+            cover_fee = tc.get_fee(cover_gross)
+            # P&L mirror: long is gross_sell - cost - fee; short is
+            # proceeds(=cost) - gross_buy - fee.
+            net_gain_val = lt.cost - cover_gross - cover_fee
+
+            if dynamic_position_sizing:
+                current_unallocated -= (cover_gross + cover_fee)
+                total_realized_gains += net_gain_val
+                if sym in open_trades_value:
+                    del open_trades_value[sym]
+            else:
+                total_allocated -= lt.cost
+
+            cover_order = Order(
+                id=uuid4(),
+                target_symbol=sym,
+                trading_symbol=trading_symbol,
+                order_type=OrderType.LIMIT,
+                price=cover_fill,
+                amount=lt.available_amount,
+                status=OrderStatus.CLOSED,
+                created_at=date,
+                updated_at=date,
+                order_side=OrderSide.BUY,
+                order_fee=cover_fee,
+                order_fee_rate=tc.fee_percentage / 100
+                if tc.fee_percentage else None,
+                slippage=cover_fill - price,
+                metadata={"order_reason": "cover_signal", "is_cover": True},
+            )
+            orders.append(cover_order)
+            trade_orders = lt.orders
+            trade_orders.append(cover_order)
+
+            lt_total_fees = (lt.total_fees or 0) + cover_fee
+            lt.update(
+                {
+                    "orders": trade_orders,
+                    "closed_at": date,
+                    "status": TradeStatus.CLOSED.value,
+                    "updated_at": date,
+                    "net_gain": net_gain_val,
+                    "total_fees": lt_total_fees,
+                }
+            )
+            sym_data['last_trade'] = None
+            sym_data['open_trades'] = []
+            sym_data['entry_count'] = 0
+            sym_data['scale_out_count'] = 0
+            sym_data['is_short'] = False
+
+        # v9.0 (#487) — fixed-percentage TP / SL evaluators for the
+        # vector engine. Trailing rules are intentionally NOT supported
+        # here yet; strategies that need trailing TP/SL should run in
+        # event mode (which uses ``trade_service`` with full state).
+        strategy_take_profits = list(
+            getattr(strategy, 'take_profits', None) or []
+        )
+        strategy_stop_losses = list(
+            getattr(strategy, 'stop_losses', None) or []
+        )
+
+        def _matches_symbol(rule, sym):
+            rule_sym = getattr(rule, 'symbol', None)
+            return rule_sym is None or rule_sym == sym
+
+        def _tp_triggered(rule, entry_price, current, is_short):
+            pct = float(rule.percentage_threshold) / 100.0
+            if is_short:
+                threshold = entry_price * (1.0 - pct)
+                return current <= threshold
+            threshold = entry_price * (1.0 + pct)
+            return current >= threshold
+
+        def _sl_triggered(rule, entry_price, current, is_short):
+            pct = float(rule.percentage_threshold) / 100.0
+            if is_short:
+                threshold = entry_price * (1.0 + pct)
+                return current >= threshold
+            threshold = entry_price * (1.0 - pct)
+            return current <= threshold
+
+        def _evaluate_tp_sl(sym, sym_data, current_price, current_date, i):
+            """Close the open trade if any fixed TP / SL rule has
+            triggered against ``current_price``. Returns the reason
+            string (``"take_profit"`` / ``"stop_loss"``) or ``None``.
+            """
+            last = sym_data['last_trade']
+            if last is None:
+                return None
+            entry_price = float(last.open_price)
+            is_short = bool(getattr(last, 'is_short', False))
+            # Take-profit wins ties with stop-loss to match the event
+            # engine's evaluation order.
+            for rule in strategy_take_profits:
+                if not _matches_symbol(rule, sym):
+                    continue
+                if getattr(rule, 'trailing', False):
+                    continue
+                if _tp_triggered(rule, entry_price, current_price, is_short):
+                    if is_short:
+                        _close_short_trade(
+                            sym, sym_data, current_price, current_date
+                        )
+                    else:
+                        _close_trade(
+                            sym, sym_data, current_price, current_date
+                        )
+                    cooldown_tracker.record(
+                        symbol=sym,
+                        order_side="buy" if is_short else "sell",
+                        bar_index=i,
+                    )
+                    return "take_profit"
+            for rule in strategy_stop_losses:
+                if not _matches_symbol(rule, sym):
+                    continue
+                if getattr(rule, 'trailing', False):
+                    continue
+                if _sl_triggered(rule, entry_price, current_price, is_short):
+                    if is_short:
+                        _close_short_trade(
+                            sym, sym_data, current_price, current_date
+                        )
+                    else:
+                        _close_trade(
+                            sym, sym_data, current_price, current_date
+                        )
+                    cooldown_tracker.record(
+                        symbol=sym,
+                        order_side="buy" if is_short else "sell",
+                        bar_index=i,
+                    )
+                    return "stop_loss"
+            return None
+
         # Process all timestamps in chronological order
         for i in range(len(index)):
             current_date = index[i]
@@ -574,6 +879,27 @@ class VectorBacktestService:
                 scaling_rule = data['scaling_rule']
                 has_position = last_trade is not None
 
+                # v9.0 (#487) — evaluate fixed TP / SL before signal
+                # processing. A triggered TP/SL closes the open trade
+                # for ``symbol`` immediately, records a side-specific
+                # cooldown via ``cooldown_tracker``, and emits a
+                # ``signal_event`` so downstream tooling can attribute
+                # the exit.
+                if has_position:
+                    tp_sl_reason = _evaluate_tp_sl(
+                        symbol, data, current_price, current_date, i
+                    )
+                    if tp_sl_reason is not None:
+                        signal_events.append({
+                            "date": current_date,
+                            "symbol": symbol,
+                            "signal": tp_sl_reason,
+                            "executed": True,
+                            "reason": "executed",
+                        })
+                        last_trade = data['last_trade']  # now None
+                        has_position = False
+
                 # Tick down cooldown
                 if data['cooldown_remaining'] > 0:
                     data['cooldown_remaining'] -= 1
@@ -599,9 +925,15 @@ class VectorBacktestService:
                 is_sell = bool(data['sell_signal'].iloc[i])
                 is_scale_in = bool(data['scale_in_signal'].iloc[i])
                 is_scale_out = bool(data['scale_out_signal'].iloc[i])
+                # SHORT / COVER (#433). When shorting is disabled these
+                # series are all-False and the branches are no-ops.
+                is_short_sig = bool(data['short_signal'].iloc[i])
+                is_cover_sig = bool(data['cover_signal'].iloc[i])
+                is_short_pos = data['is_short']
+                is_long_pos = has_position and not is_short_pos
 
-                # ---- SELL always takes priority ----
-                if (is_sell and has_position and not in_cooldown
+                # ---- SELL always takes priority (long-only close) ----
+                if (is_sell and is_long_pos and not in_cooldown
                         and rule_block_sell):
                     signal_events.append({
                         "date": current_date,
@@ -610,7 +942,7 @@ class VectorBacktestService:
                         "executed": False,
                         "reason": "in_cooldown_rule",
                     })
-                elif is_sell and has_position and not in_cooldown:
+                elif is_sell and is_long_pos and not in_cooldown:
                     signal_events.append({
                         "date": current_date,
                         "symbol": symbol,
@@ -659,8 +991,49 @@ class VectorBacktestService:
                         "reason": "in_cooldown",
                     })
 
+                # ---- COVER (close short) — mirror of SELL (#433) ----
+                if is_cover_sig and is_short_pos and not in_cooldown:
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "cover",
+                        "executed": True,
+                        "reason": "executed",
+                    })
+                    _close_short_trade(
+                        symbol, data, current_price, current_date
+                    )
+                    last_trade = data['last_trade']
+                    has_position = False
+                    is_short_pos = False
+                    is_long_pos = False
+                    cooldown_tracker.record(
+                        symbol=symbol, order_side="buy", bar_index=i,
+                    )
+                    # A cover on the same bar shouldn't also re-enter
+                    # short / long.
+                    is_buy = False
+                    is_short_sig = False
+                elif is_cover_sig and not is_short_pos:
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "cover",
+                        "executed": False,
+                        "reason": "no_short_position_to_cover",
+                    })
+                elif is_cover_sig and in_cooldown:
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "cover",
+                        "executed": False,
+                        "reason": "in_cooldown",
+                    })
+
                 # ---- SCALE-OUT (partial close) ----
-                if (is_scale_out and has_position
+                # Scaling rules apply to long positions only.
+                if (is_scale_out and is_long_pos
                         and scaling_rule is not None and not in_cooldown
                         and rule_block_sell):
                     signal_events.append({
@@ -670,7 +1043,7 @@ class VectorBacktestService:
                         "executed": False,
                         "reason": "in_cooldown_rule",
                     })
-                elif (is_scale_out and has_position
+                elif (is_scale_out and is_long_pos
                         and scaling_rule is not None and not in_cooldown):
                     so_idx = data['scale_out_count']
                     pct = scaling_rule.get_scale_out_percentage(so_idx)
@@ -753,7 +1126,7 @@ class VectorBacktestService:
                             strategy_cooldowns, signal_side="buy",
                             symbol=symbol, bar_index=i,
                         )
-                elif is_buy and has_position and not in_cooldown:
+                elif is_buy and is_long_pos and not in_cooldown:
                     # Possible scale-in via buy signal (if no separate
                     # scale_in_signals provided, buy = scale_in)
                     if scaling_rule is not None:
@@ -766,6 +1139,16 @@ class VectorBacktestService:
                             "executed": False,
                             "reason": "already_in_position",
                         })
+                elif is_buy and is_short_pos and not in_cooldown:
+                    # Buy signals never flip an open short — the
+                    # strategy must cover first (#433).
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "buy",
+                        "executed": False,
+                        "reason": "open_short_position",
+                    })
                 elif is_buy and in_cooldown:
                     signal_events.append({
                         "date": current_date,
@@ -776,7 +1159,8 @@ class VectorBacktestService:
                     })
 
                 # ---- SCALE-IN (add to position) ----
-                if (is_scale_in and has_position
+                # Scaling rules apply to long positions only.
+                if (is_scale_in and is_long_pos
                         and scaling_rule is not None and not in_cooldown
                         and rule_block_buy):
                     signal_events.append({
@@ -786,7 +1170,16 @@ class VectorBacktestService:
                         "executed": False,
                         "reason": "in_cooldown_rule",
                     })
-                elif (is_scale_in and has_position
+                elif (is_scale_in and is_long_pos
+                        and scaling_rule is not None and in_cooldown):
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "scale_in",
+                        "executed": False,
+                        "reason": "in_cooldown",
+                    })
+                elif (is_scale_in and is_long_pos
                         and scaling_rule is not None and not in_cooldown):
                     entry_count = data['entry_count']
                     if entry_count >= scaling_rule.max_entries:
@@ -832,17 +1225,95 @@ class VectorBacktestService:
                                 bar_index=i,
                             )
 
+                # ---- SHORT (open short, #433) ----
+                # Open a new short only when flat. Buy signals on the
+                # same bar take priority because an opened long already
+                # consumed ``has_position``; check both to be defensive.
+                if (is_short_sig and not has_position
+                        and not in_cooldown and rule_block_sell):
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "short",
+                        "executed": False,
+                        "reason": "in_cooldown_rule",
+                    })
+                elif (is_short_sig and not has_position
+                        and not in_cooldown):
+                    capital = _get_capital_for_trade(
+                        data, current_price, 100
+                    )
+                    if capital <= 0:
+                        signal_events.append({
+                            "date": current_date,
+                            "symbol": symbol,
+                            "signal": "short",
+                            "executed": False,
+                            "reason": "insufficient_capital",
+                        })
+                    else:
+                        opened = _open_short_trade(
+                            symbol, data, current_price,
+                            current_date, capital,
+                        )
+                        if opened is not None:
+                            signal_events.append({
+                                "date": current_date,
+                                "symbol": symbol,
+                                "signal": "short",
+                                "executed": True,
+                                "reason": "executed",
+                            })
+                            cooldown_tracker.record(
+                                symbol=symbol, order_side="sell",
+                                bar_index=i,
+                            )
+                elif is_short_sig and has_position:
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "short",
+                        "executed": False,
+                        "reason": "already_in_position",
+                    })
+                elif is_short_sig and in_cooldown:
+                    signal_events.append({
+                        "date": current_date,
+                        "symbol": symbol,
+                        "signal": "short",
+                        "executed": False,
+                        "reason": "in_cooldown",
+                    })
+
             # Update open trade values at each timestamp for
             # accurate portfolio value
             if dynamic_position_sizing:
                 for symbol, data in symbol_data.items():
                     if data['open_trades']:
                         current_price = float(data['close'].iloc[i])
-                        open_trades_value[symbol] = sum(
-                            t.available_amount * current_price
-                            for t in data['open_trades']
-                            if TradeStatus.OPEN.equals(t.status)
-                        )
+                        if data['is_short']:
+                            # For shorts the proceeds are already in
+                            # ``current_unallocated``; this slot holds
+                            # the residual = proceeds - live liability
+                            # so total portfolio value = unallocated +
+                            # sum(open_trades_value) stays correct.
+                            liability = sum(
+                                t.available_amount * current_price
+                                for t in data['open_trades']
+                                if TradeStatus.OPEN.equals(t.status)
+                            )
+                            proceeds = sum(
+                                t.cost
+                                for t in data['open_trades']
+                                if TradeStatus.OPEN.equals(t.status)
+                            )
+                            open_trades_value[symbol] = proceeds - liability
+                        else:
+                            open_trades_value[symbol] = sum(
+                                t.available_amount * current_price
+                                for t in data['open_trades']
+                                if TradeStatus.OPEN.equals(t.status)
+                            )
 
         unallocated = initial_amount
         total_net_gain = 0.0
@@ -875,13 +1346,23 @@ class VectorBacktestService:
             for trade in trades:
 
                 if trade.opened_at == interval_datetime:
-                    # Snapshot taken at the moment a trade is opened
-                    unallocated -= trade.cost
+                    if trade.is_short:
+                        # Short entry credits the wallet with sale
+                        # proceeds (#433).
+                        unallocated += trade.cost
+                    else:
+                        # Snapshot taken at the moment a trade is opened
+                        unallocated -= trade.cost
                     open_trades.append(trade)
 
                 if trade.closed_at == interval_datetime:
-                    # Snapshot taken at the moment a trade is closed
-                    unallocated += trade.cost + trade.net_gain
+                    if trade.is_short:
+                        # Covering pays cover_cost = cost - net_gain
+                        # back out of unallocated.
+                        unallocated -= (trade.cost - trade.net_gain)
+                    else:
+                        # Snapshot taken at the moment a trade is closed
+                        unallocated += trade.cost + trade.net_gain
                     total_net_gain += trade.net_gain
                     open_trades.remove(trade)
 
@@ -895,7 +1376,12 @@ class VectorBacktestService:
                 except IndexError:
                     continue  # skip if no price yet
 
-                allocated += open_trade.filled_amount * price
+                if open_trade.is_short:
+                    # Open short = liability of ``amount * current_price``
+                    # against the proceeds already in unallocated.
+                    allocated -= open_trade.filled_amount * price
+                else:
+                    allocated += open_trade.filled_amount * price
 
             # total_value = invested_value + unallocated
             # total_net_gain = total_value - initial_amount - sum(cash_flow)
@@ -935,6 +1421,11 @@ class VectorBacktestService:
                 raw_signals[symbol]["scale_out"] = \
                     scale_out_signals[symbol]
 
+            if shorting_enabled and symbol in short_signals:
+                raw_signals[symbol]["short"] = short_signals[symbol]
+            if shorting_enabled and symbol in cover_signals:
+                raw_signals[symbol]["cover"] = cover_signals[symbol]
+
         # Create a backtest run object
         run = BacktestRun(
             trading_symbol=trading_symbol,
@@ -945,9 +1436,7 @@ class VectorBacktestService:
             orders=orders,
             positions=[],
             created_at=datetime.now(timezone.utc),
-            backtest_start_date=backtest_date_range.start_date,
-            backtest_end_date=backtest_date_range.end_date,
-            backtest_date_range_name=backtest_date_range.name,
+            backtest_window=BacktestWindow(train_range=backtest_date_range),
             number_of_days=(
                 backtest_date_range.end_date - backtest_date_range.start_date
             ).days,
@@ -967,6 +1456,60 @@ class VectorBacktestService:
             run, risk_free_rate=risk_free_rate
         )
         return run
+
+    @staticmethod
+    def _bucket_signal_series(signal_series_iterable):
+        """Bucket a stream of :class:`SignalSeries` into per-side dicts.
+
+        The vector backtest engine's per-bar loop is structured
+        around six per-side dicts (``buy_signals``, ``sell_signals``,
+        ``scale_in_signals``, ``scale_out_signals``, ``short_signals``,
+        ``cover_signals``). The v9.0 strategy surface emits a single
+        flat stream of :class:`SignalSeries`. This helper translates
+        between the two without changing downstream code.
+
+        For a given symbol the *last* SignalSeries for a given side
+        wins (strategies are expected to emit at most one per pair).
+        ``scale_in_signals`` defaults to ``buy_signals`` if the
+        strategy emits no SCALE_IN series, matching legacy semantics.
+        ``short_signals`` / ``cover_signals`` are returned as ``None``
+        when no SignalSeries with the corresponding side was emitted,
+        which the downstream loop interprets as "shorting disabled".
+
+        Args:
+            signal_series_iterable: Result of
+                ``strategy.generate_signal_series(data)``.
+
+        Returns:
+            tuple: ``(buy, sell, scale_in, scale_out, short, cover)``
+            where each element is either ``Dict[str, pd.Series]`` or
+            ``None`` (for the optional short/cover/scale_out pair).
+        """
+        per_side: dict = {side: {} for side in SignalSide}
+
+        for series in signal_series_iterable:
+            per_side[series.side][series.symbol] = series.series
+
+        buy = per_side[SignalSide.OPEN_LONG]
+        sell = per_side[SignalSide.CLOSE_LONG]
+        scale_in = (
+            per_side[SignalSide.SCALE_IN]
+            if per_side[SignalSide.SCALE_IN] else None
+        )
+        scale_out = (
+            per_side[SignalSide.SCALE_OUT]
+            if per_side[SignalSide.SCALE_OUT] else None
+        )
+        short = (
+            per_side[SignalSide.OPEN_SHORT]
+            if per_side[SignalSide.OPEN_SHORT] else None
+        )
+        cover = (
+            per_side[SignalSide.CLOSE_SHORT]
+            if per_side[SignalSide.CLOSE_SHORT] else None
+        )
+
+        return buy, sell, scale_in, scale_out, short, cover
 
     @staticmethod
     def _resolve_deposit_schedule(

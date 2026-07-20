@@ -17,6 +17,7 @@ from investing_algorithm_framework.cli.cli import (
 )
 from investing_algorithm_framework.cli.index_command import (
     build_index, list_index, rank_index, format_table, prune_backtests,
+    promote_backtests,
 )
 from investing_algorithm_framework.services.backtest_index import (
     SqliteBacktestIndex,
@@ -109,8 +110,8 @@ class TestIndexCommand(TestCase):
             bt = Backtest.from_dict(self.fixture.to_dict())
             bt.algorithm_id = f"algo_{i}"
             bt.tag = "demo"
-            if bt.backtest_summary is not None:
-                bt.backtest_summary.sharpe_ratio = s
+            if bt.vector_summary is not None:
+                bt.vector_summary.sharpe_ratio = s
             save_bundle(
                 bt, os.path.join(self.tmp, f"algo_{i}{BUNDLE_EXT}"),
             )
@@ -279,9 +280,16 @@ class TestIndexCommand(TestCase):
         self.assertIn("algo_2_changed", algos)
 
     def test_scalar_summary_alias_matches_get_backtest_summary(self):
+        # v9.0: ``scalar_summary()`` / ``get_backtest_summary()`` aliases
+        # were removed alongside the single-engine model. The canonical
+        # access path is now :meth:`Backtest.get_summary` with an
+        # explicit engine, or the deprecated ``backtest_summary`` shim
+        # property. We assert the shim returns the vector summary
+        # (which is what the legacy methods previously returned for
+        # single-engine bundles).
         self.assertIs(
-            self.fixture.scalar_summary(),
-            self.fixture.get_backtest_summary(),
+            self.fixture.vector_summary,
+            self.fixture.get_summary("vector"),
         )
 
     # ------------------------------------------------------------------
@@ -355,3 +363,160 @@ class TestIndexCommand(TestCase):
         rows = list_index(self.tmp)
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["algorithm_id"], "algo_1")
+
+    # ------------------------------------------------------------------
+    # promote_backtests
+    # ------------------------------------------------------------------
+    def test_promote_copies_winners_to_dest(self):
+        """``promote_backtests`` (default ``mode="copy"``) duplicates
+        the keep set into ``dest_dir`` while leaving the source
+        directory untouched."""
+        self._build_index_with_metrics()
+        top = rank_index(self.tmp, by="sharpe_ratio", limit=2)
+        dest = os.path.join(self.tmp, "_top")
+
+        result = promote_backtests(
+            self.tmp, keep=top, dest_dir=dest,
+        )
+
+        self.assertEqual(result["promoted"], 2)
+        self.assertEqual(result["missing"], 0)
+        self.assertEqual(result["mode"], "copy")
+
+        # Destination has the winners.
+        promoted = sorted(
+            p.name for p in Path(dest).glob(f"*{BUNDLE_EXT}")
+        )
+        self.assertEqual(len(promoted), 2)
+
+        # Source still has all three bundles.
+        remaining = sorted(
+            p.name for p in Path(self.tmp).glob(f"*{BUNDLE_EXT}")
+        )
+        self.assertEqual(len(remaining), 3)
+
+    def test_promote_move_relocates_winners(self):
+        """``mode="move"`` is the inverse of ``prune_backtests`` —
+        winners are removed from the source and placed in ``dest``."""
+        self._build_index_with_metrics()
+        top = rank_index(self.tmp, by="sharpe_ratio", limit=1)
+        dest = os.path.join(self.tmp, "_top")
+
+        result = promote_backtests(
+            self.tmp, keep=top, dest_dir=dest, mode="move",
+        )
+
+        self.assertEqual(result["promoted"], 1)
+        self.assertEqual(result["mode"], "move")
+
+        promoted = sorted(
+            p.name for p in Path(dest).glob(f"*{BUNDLE_EXT}")
+        )
+        self.assertEqual(promoted, [f"algo_1{BUNDLE_EXT}"])
+
+        # Source lost the moved bundle.
+        remaining = sorted(
+            p.name for p in Path(self.tmp).glob(f"*{BUNDLE_EXT}")
+        )
+        self.assertEqual(remaining, [f"algo_0{BUNDLE_EXT}", f"algo_2{BUNDLE_EXT}"])
+
+    def test_promote_clear_dest_wipes_existing_contents(self):
+        """``clear_dest=True`` (default) removes any pre-existing
+        bundles in ``dest_dir`` so the folder reflects exactly the
+        current keep selection — guards against the leakage bug
+        where stale bundles from prior runs polluted the analysis."""
+        self._build_index_with_metrics()
+        top = rank_index(self.tmp, by="sharpe_ratio", limit=1)
+        dest = os.path.join(self.tmp, "_top")
+
+        # Seed dest with a stale bundle that is NOT in ``keep``.
+        os.makedirs(dest, exist_ok=True)
+        stale = os.path.join(dest, f"stale{BUNDLE_EXT}")
+        Path(stale).write_bytes(b"stale")
+        self.assertTrue(os.path.exists(stale))
+
+        promote_backtests(
+            self.tmp, keep=top, dest_dir=dest, clear_dest=True,
+        )
+
+        self.assertFalse(
+            os.path.exists(stale),
+            "clear_dest=True must wipe the destination first",
+        )
+        promoted = sorted(
+            p.name for p in Path(dest).glob(f"*{BUNDLE_EXT}")
+        )
+        self.assertEqual(promoted, [f"algo_1{BUNDLE_EXT}"])
+
+    def test_promote_clear_dest_false_preserves_existing(self):
+        """With ``clear_dest=False`` the destination keeps any prior
+        contents — useful when callers manage cleanup themselves."""
+        self._build_index_with_metrics()
+        top = rank_index(self.tmp, by="sharpe_ratio", limit=1)
+        dest = os.path.join(self.tmp, "_top")
+
+        os.makedirs(dest, exist_ok=True)
+        stale = os.path.join(dest, "stale.txt")
+        Path(stale).write_bytes(b"stale")
+
+        promote_backtests(
+            self.tmp, keep=top, dest_dir=dest, clear_dest=False,
+        )
+
+        self.assertTrue(os.path.exists(stale))
+
+    def test_promote_dry_run_does_not_touch_files(self):
+        self._build_index_with_metrics()
+        top = rank_index(self.tmp, by="sharpe_ratio", limit=2)
+        dest = os.path.join(self.tmp, "_top")
+
+        result = promote_backtests(
+            self.tmp, keep=top, dest_dir=dest, dry_run=True,
+        )
+        self.assertEqual(result["promoted"], 2)
+
+        # Destination should not be populated with bundles.
+        promoted = list(Path(dest).glob(f"*{BUNDLE_EXT}")) if Path(dest).exists() else []
+        self.assertEqual(len(promoted), 0)
+        # Source still has all bundles.
+        remaining = sorted(
+            p.name for p in Path(self.tmp).glob(f"*{BUNDLE_EXT}")
+        )
+        self.assertEqual(len(remaining), 3)
+
+    def test_promote_deduplicates_dual_engine_rows(self):
+        """``rank_index`` may return one row per ``(bundle, engine)``
+        pair. ``promote_backtests`` must collapse those to a single
+        copy operation per bundle."""
+        self._build_index_with_metrics()
+        # Simulate two rows pointing at the same bundle.
+        top = rank_index(self.tmp, by="sharpe_ratio", limit=1)
+        duplicated_keep = top + [dict(top[0])]
+        dest = os.path.join(self.tmp, "_top")
+
+        result = promote_backtests(
+            self.tmp, keep=duplicated_keep, dest_dir=dest,
+        )
+
+        self.assertEqual(result["promoted"], 1)
+
+    def test_promote_invalid_mode_raises(self):
+        self._build_index_with_metrics()
+        top = rank_index(self.tmp, by="sharpe_ratio", limit=1)
+        with self.assertRaises(ValueError):
+            promote_backtests(
+                self.tmp, keep=top, dest_dir=os.path.join(self.tmp, "_x"),
+                mode="archive",
+            )
+
+    def test_promote_refreshes_dest_index(self):
+        """After promoting, the destination has its own Tier-1 index
+        rebuilt so ``list_index(dest)`` returns the promoted set."""
+        self._build_index_with_metrics()
+        top = rank_index(self.tmp, by="sharpe_ratio", limit=2)
+        dest = os.path.join(self.tmp, "_top")
+
+        promote_backtests(self.tmp, keep=top, dest_dir=dest)
+
+        rows = list_index(dest)
+        self.assertEqual(len(rows), 2)

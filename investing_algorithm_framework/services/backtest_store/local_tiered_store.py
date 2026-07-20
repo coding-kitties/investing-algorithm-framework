@@ -201,16 +201,18 @@ class LocalTieredStore(BacktestStore):
         else:
             backtest.save_bundle(bundle_path)
 
-        # 2. Tier-1 — SQLite row.
+        # 2. Tier-1 — SQLite row(s). v9.0: one row per populated
+        # engine slot (vector / event).
         stat = bundle_path.stat()
-        row = backtest.index_row(bundle_path=bare)
+        rows = backtest.index_rows(bundle_path=bare)
         index = self._open_index()
         try:
-            index.upsert(
-                row,
-                bundle_mtime_ns=stat.st_mtime_ns,
-                bundle_size=stat.st_size,
-            )
+            for row in rows:
+                index.upsert(
+                    row,
+                    bundle_mtime_ns=stat.st_mtime_ns,
+                    bundle_size=stat.st_size,
+                )
         finally:
             index.close()
 
@@ -434,11 +436,12 @@ class LocalTieredStore(BacktestStore):
                         "rebuild_index: skipping %s: %s", handle, exc,
                     )
                     continue
-                index.upsert(
-                    bt.index_row(bundle_path=handle),
-                    bundle_mtime_ns=stat.st_mtime_ns,
-                    bundle_size=stat.st_size,
-                )
+                for row in bt.index_rows(bundle_path=handle):
+                    index.upsert(
+                        row,
+                        bundle_mtime_ns=stat.st_mtime_ns,
+                        bundle_size=stat.st_size,
+                    )
                 n += 1
         finally:
             index.close()

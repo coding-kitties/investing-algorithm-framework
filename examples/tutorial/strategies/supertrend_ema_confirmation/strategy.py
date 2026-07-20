@@ -1,12 +1,35 @@
 
-from typing import Dict, Any
+from typing import Dict, Any, Iterable
 
 import pandas as pd
 from pyindicators import ema, rsi, crossover, crossunder, supertrend, bollinger_bands
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
-    TimeUnit, DataType, PositionSize, StopLossRule, TakeProfitRule, \
-    ScalingRule, TradingCost, CooldownRule
+    DataType, PositionSize, StopLossRule, TakeProfitRule, \
+    ScalingRule, TradingCost, CooldownRule, Schedule, TimeUnit, \
+    Signal, SignalSeries, SignalSide
+
+
+def _schedule_from_timeframe(timeframe: str) -> Schedule:
+    """Build a default ``Schedule`` from an OHLCV timeframe string
+    (e.g. ``"2h"``, ``"15m"``, ``"1d"``). Used so the strategy works
+    out of the box in v9 event-mode without forcing every caller to
+    pass ``schedule=`` explicitly."""
+    tf = timeframe.strip().lower()
+    unit_map = {
+        "s": TimeUnit.SECOND,
+        "m": TimeUnit.MINUTE,
+        "h": TimeUnit.HOUR,
+        "d": TimeUnit.DAY,
+    }
+    suffix = tf[-1]
+    if suffix not in unit_map:
+        return Schedule.every(1, TimeUnit.HOUR)
+    try:
+        interval = int(tf[:-1]) if tf[:-1] else 1
+    except ValueError:
+        interval = 1
+    return Schedule.every(max(1, interval), unit_map[suffix])
 
 
 class SupertrendEmaConfirmationStrategy(TradingStrategy):
@@ -50,8 +73,7 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
         bollinger_period: int = 20,
         bollinger_std_dev: float = 2.0,
         use_bollinger_filter: bool = True,
-        time_unit: TimeUnit = TimeUnit.HOUR,
-        interval: int = 2,
+        schedule: Schedule = None,
         market: str = "BITVAVO",
         metadata: dict = None,
         # Risk management parameters
@@ -73,6 +95,26 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
         # Trading cost parameters
         fee_percentage: float = 0.1,
         slippage_percentage: float = 0.05,
+        # Short-selling. Off by default so long-only behaviour
+        # is unchanged. When enabled the strategy emits SHORT/COVER
+        # signals that mirror the long-side hierarchy (SuperTrend +
+        # EMA confirmation + RSI/Bollinger guardrails).
+        enable_shorting: bool = False,
+        # Cover-tightening knobs. The default cover trigger is the
+        # mirror of the long-entry trigger which fires on *any* bullish
+        # SuperTrend flip + *any* EMA crossover inside the lookback
+        # window. In a sustained downtrend that closes shorts on every
+        # minor bounce. These two parameters tighten cover specifically:
+        #   * ``cover_requires_current_trend`` — only cover when the
+        #     SuperTrend is *currently* bullish (not just flipped at
+        #     some point in the lookback). Default True.
+        #   * ``cover_min_confirmation_bars`` — require EMA short to
+        #     be ABOVE EMA long for at least N consecutive bars (held
+        #     dominance, not a fleeting cross). Default 3.
+        # Set both to their disabling values (False, 0) to restore the
+        # symmetric-with-entry behaviour.
+        cover_requires_current_trend: bool = True,
+        cover_min_confirmation_bars: int = 3,
     ):
         self.rsi_timeframe = rsi_timeframe
         self.rsi_period = rsi_period
@@ -97,6 +139,16 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
         self.bollinger_period = bollinger_period
         self.bollinger_std_dev = bollinger_std_dev
         self.use_bollinger_filter = use_bollinger_filter
+
+        # Short-selling toggle (#433).
+        self.enable_shorting = enable_shorting
+        self.cover_requires_current_trend = cover_requires_current_trend
+        self.cover_min_confirmation_bars = int(cover_min_confirmation_bars)
+
+        # Default schedule derived from ema_timeframe if caller didn't
+        # provide one — required by v9 event-mode (vector mode ignores).
+        if schedule is None:
+            schedule = _schedule_from_timeframe(ema_timeframe)
 
         # Determine the warmup window needed (largest indicator period)
         warmup = max(
@@ -142,7 +194,7 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
             position_sizes.append(
                 PositionSize(
                     symbol=symbol,
-                    percentage_of_portfolio=1 / len(symbols)
+                    percentage_of_portfolio=100 / len(symbols)
                 )
             )
             stop_losses.append(
@@ -206,8 +258,7 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
             scaling_rules=scaling_rules,
             trading_costs=trading_costs,
             cooldowns=cooldowns,
-            time_unit=time_unit,
-            interval=interval,
+            schedule=schedule,
             metadata=metadata,
         )
 
@@ -237,6 +288,9 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
             "portfolio_cooldown_bars": portfolio_cooldown_bars,
             "fee_percentage": fee_percentage,
             "slippage_percentage": slippage_percentage,
+            "enable_shorting": enable_shorting,
+            "cover_requires_current_trend": cover_requires_current_trend,
+            "cover_min_confirmation_bars": cover_min_confirmation_bars,
         })
 
     def prepare_indicators(
@@ -292,7 +346,96 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
 
         return ema_data, rsi_data
 
-    def generate_buy_signals(
+    def generate_signal_series(
+        self, data: Dict[str, Any]
+    ) -> Iterable[SignalSeries]:
+        """v9.0 vector-backtest entry point.
+
+        Computes the four per-side boolean panels (long entry, long
+        exit, optional short entry, optional cover) using the same
+        signal hierarchy documented on the legacy helpers, and yields
+        one :class:`SignalSeries` per (symbol, side).
+        """
+        buys = self._compute_buy_signals(data)
+        for symbol, series in buys.items():
+            yield SignalSeries(
+                symbol=symbol,
+                side=SignalSide.OPEN_LONG,
+                series=series,
+                source="supertrend_ema",
+            )
+        sells = self._compute_sell_signals(data)
+        for symbol, series in sells.items():
+            yield SignalSeries(
+                symbol=symbol,
+                side=SignalSide.CLOSE_LONG,
+                series=series,
+                source="supertrend_ema",
+            )
+        if self.enable_shorting:
+            shorts = self._compute_short_signals(data) or {}
+            for symbol, series in shorts.items():
+                yield SignalSeries(
+                    symbol=symbol,
+                    side=SignalSide.OPEN_SHORT,
+                    series=series,
+                    source="supertrend_ema",
+                )
+            covers = self._compute_cover_signals(data) or {}
+            for symbol, series in covers.items():
+                yield SignalSeries(
+                    symbol=symbol,
+                    side=SignalSide.CLOSE_SHORT,
+                    series=series,
+                    source="supertrend_ema",
+                )
+
+    def generate_signals(
+        self, context, data: Dict[str, Any]
+    ) -> Iterable[Signal]:
+        """v9.0 event-mode entry point.
+
+        Reuses the same ``_compute_*_signals`` helpers as the vector
+        path; only the latest bar of each boolean series is consulted.
+        """
+        def _latest(series) -> bool:
+            if series is None or len(series) == 0:
+                return False
+            return bool(series.iloc[-1])
+
+        for symbol, series in self._compute_buy_signals(data).items():
+            if _latest(series):
+                yield Signal(
+                    symbol=symbol,
+                    side=SignalSide.OPEN_LONG,
+                    source="supertrend_ema",
+                )
+        for symbol, series in self._compute_sell_signals(data).items():
+            if _latest(series):
+                yield Signal(
+                    symbol=symbol,
+                    side=SignalSide.CLOSE_LONG,
+                    source="supertrend_ema",
+                )
+        if self.enable_shorting:
+            for symbol, series in (self._compute_short_signals(data)
+                                   or {}).items():
+                if _latest(series):
+                    yield Signal(
+                        symbol=symbol,
+                        side=SignalSide.OPEN_SHORT,
+                        source="supertrend_ema",
+                    )
+            for symbol, series in (self._compute_cover_signals(data)
+                                   or {}).items():
+                if _latest(series):
+                    yield Signal(
+                        symbol=symbol,
+                        side=SignalSide.CLOSE_SHORT,
+                        source="supertrend_ema",
+                    )
+
+    def _compute_buy_signals(
         self, data: Dict[str, Any]
     ) -> Dict[str, pd.Series]:
         """
@@ -365,7 +508,7 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
 
         return signals
 
-    def generate_sell_signals(
+    def _compute_sell_signals(
         self, data: Dict[str, Any]
     ) -> Dict[str, pd.Series]:
         """
@@ -436,5 +579,168 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
 
             sell_signal = sell_signal.fillna(False).astype(bool)
             signals[symbol] = sell_signal
+
+        return signals
+
+    # ------------------------------------------------------------------
+    # SHORT / COVER signals
+    #
+    # Mirror image of the long-side hierarchy:
+    #
+    # SHORT entry  = bearish SuperTrend flip + EMA crossunder
+    #                confirmation + guardrails reject if RSI is already
+    #                deeply oversold or price is below the Bollinger
+    #                lower band (overextended to the downside — risk
+    #                of an upward bounce).
+    # COVER exit   = bullish SuperTrend flip + EMA crossover
+    #                confirmation + guardrails suppress when RSI is
+    #                overbought AND price is at/above the upper band
+    #                (potential blow-off top; let stop / take-profit
+    #                rules manage the close).
+    #
+    # Both methods short-circuit to ``None`` when ``enable_shorting``
+    # is False so the vector engine treats shorting as disabled.
+    # ------------------------------------------------------------------
+    def _compute_short_signals(
+        self, data: Dict[str, Any]
+    ):
+        if not self.enable_shorting:
+            return None
+
+        signals = {}
+
+        for symbol in self.symbols:
+            ema_data_identifier = f"ema_data_{symbol}"
+            rsi_data_identifier = f"rsi_data_{symbol}"
+            ema_data, rsi_data = self.prepare_indicators(
+                ema_data=data[ema_data_identifier],
+                rsi_data=data[rsi_data_identifier]
+            )
+
+            # 1. PRIMARY: SuperTrend bearish flip in the lookback window.
+            if self.use_supertrend_filter \
+                    and "supertrend_signal" in ema_data.columns:
+                supertrend_flip = (
+                    (ema_data["supertrend_signal"] == -1)
+                    .rolling(window=self.ema_cross_lookback_window).sum()
+                    > 0
+                )
+            else:
+                supertrend_flip = ema_data.get(
+                    "supertrend_trend",
+                    pd.Series(False, index=ema_data.index)
+                ) == 0
+
+            # 2. CONFIRMATION: EMA crossunder in the lookback window.
+            ema_confirmation = (
+                ema_data[self.ema_crossunder_result_column]
+                .rolling(window=self.ema_cross_lookback_window).sum() > 0
+            )
+
+            short_signal = supertrend_flip & ema_confirmation
+
+            # 3. GUARDRAILS — don't short into capitulation lows.
+            rsi_not_oversold = rsi_data[self.rsi_result_column] \
+                > self.rsi_oversold_threshold
+            short_signal = short_signal & rsi_not_oversold.reindex(
+                short_signal.index, method="ffill"
+            ).fillna(True)
+
+            if self.use_bollinger_filter \
+                    and "bollinger_lower" in ema_data.columns:
+                not_overextended = ema_data["Close"] \
+                    > ema_data["bollinger_lower"]
+                short_signal = short_signal & not_overextended
+
+            short_signal = short_signal.fillna(False).astype(bool)
+            signals[symbol] = short_signal
+
+        return signals
+
+    def _compute_cover_signals(
+        self, data: Dict[str, Any]
+    ):
+        if not self.enable_shorting:
+            return None
+
+        signals = {}
+
+        for symbol in self.symbols:
+            ema_data_identifier = f"ema_data_{symbol}"
+            rsi_data_identifier = f"rsi_data_{symbol}"
+            ema_data, rsi_data = self.prepare_indicators(
+                ema_data=data[ema_data_identifier],
+                rsi_data=data[rsi_data_identifier]
+            )
+
+            # 1. PRIMARY: SuperTrend trend gate.
+            #    Default (``cover_requires_current_trend=True``) only
+            #    covers when the trend is *currently* bullish, so a
+            #    single bullish bar inside the lookback window does
+            #    NOT keep firing covers for the next N bars. Falls back
+            #    to the symmetric-with-entry lookback-flip behaviour
+            #    when the knob is disabled.
+            if self.use_supertrend_filter \
+                    and "supertrend_signal" in ema_data.columns:
+                if self.cover_requires_current_trend \
+                        and "supertrend_trend" in ema_data.columns:
+                    supertrend_flip = ema_data["supertrend_trend"] == 1
+                else:
+                    supertrend_flip = (
+                        (ema_data["supertrend_signal"] == 1)
+                        .rolling(window=self.ema_cross_lookback_window)
+                        .sum() > 0
+                    )
+            else:
+                supertrend_flip = ema_data.get(
+                    "supertrend_trend",
+                    pd.Series(True, index=ema_data.index)
+                ) == 1
+
+            # 2. CONFIRMATION: held EMA dominance (short > long for
+            #    ``cover_min_confirmation_bars`` consecutive bars)
+            #    rather than a single stale crossover in the window.
+            #    Set bars=0 to restore the symmetric-with-entry rule.
+            confirm_bars = max(1, self.cover_min_confirmation_bars)
+            if self.cover_min_confirmation_bars > 0 \
+                    and self.ema_short_result_column in ema_data.columns \
+                    and self.ema_long_result_column in ema_data.columns:
+                ema_above = (
+                    ema_data[self.ema_short_result_column]
+                    > ema_data[self.ema_long_result_column]
+                )
+                ema_confirmation = (
+                    ema_above.rolling(window=confirm_bars).sum()
+                    == confirm_bars
+                )
+            else:
+                ema_confirmation = (
+                    ema_data[self.ema_crossover_result_column]
+                    .rolling(window=self.ema_cross_lookback_window)
+                    .sum() > 0
+                )
+
+            cover_signal = supertrend_flip & ema_confirmation
+
+            # 3. GUARDRAILS — suppress cover when momentum says the
+            # short still has room to run (overbought + upper-band).
+            rsi_overbought = rsi_data[self.rsi_result_column] \
+                >= self.rsi_overbought_threshold
+            rsi_overbought = rsi_overbought.reindex(
+                cover_signal.index, method="ffill"
+            ).fillna(False)
+
+            if self.use_bollinger_filter \
+                    and "bollinger_upper" in ema_data.columns:
+                at_upper_band = ema_data["Close"] \
+                    >= ema_data["bollinger_upper"]
+            else:
+                at_upper_band = pd.Series(False, index=cover_signal.index)
+
+            suppress_cover = rsi_overbought & at_upper_band
+            cover_signal = cover_signal & ~suppress_cover
+
+            cover_signal = cover_signal.fillna(False).astype(bool)
+            signals[symbol] = cover_signal
 
         return signals

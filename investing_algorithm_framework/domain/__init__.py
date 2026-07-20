@@ -25,7 +25,10 @@ from .models import OrderStatus, OrderSide, OrderType, TimeInterval, \
     TradeTakeProfit, TradeStopLoss, Event, SnapshotInterval, \
     TakeProfitRule, StopLossRule, PositionSize, ScalingRule, TradingCost, \
     CooldownRule, CooldownTrigger, CooldownBlocks, CooldownTracker, \
-    SyncResult, ScheduledDeposit
+    SyncResult, ScheduledDeposit, DateRule, TimeRule, Schedule, \
+    ScheduledFunction, Signal, SignalSide, SignalSeries, \
+    signals_from_column, signal_series_from_column, \
+    signals_from_panel, ConflictPolicy, ConflictResolution
 from .order_executor import OrderExecutor
 from .portfolio_provider import PortfolioProvider
 from .blotter import Blotter, DefaultBlotter, SimulationBlotter, Transaction, \
@@ -45,11 +48,14 @@ from .utils import random_string, append_dict_as_row_to_csv, \
     is_timezone_aware, sync_timezones, get_timezone
 from .backtesting import BacktestRun, BacktestSummaryMetrics, \
     BacktestDateRange, Backtest, BacktestMetrics, combine_backtests, \
-    BacktestPermutationTest, BacktestEvaluationFocus, \
-    BacktestIndexRow, \
+    combine_multi_universe_backtest, BacktestEngine, \
+    BacktestMonteCarloTest, BacktestEvaluationFocus, \
+    BacktestIndexRow, Universe, BacktestWindow, \
     generate_backtest_summary_metrics, load_backtests_from_directory, \
     save_backtests_to_directory, retag_backtests, migrate_backtests, \
-    resolve_backtest_path, BUNDLE_EXT, BUNDLE_FORMAT_VERSION, BacktestIndex
+    resolve_backtest_path, BUNDLE_EXT, BUNDLE_FORMAT_VERSION, \
+    BacktestIndex, build_strategy_universe_map, stamp_backtest, \
+    stamp_backtests, Study, EngineSlot
 from .pipeline import Pipeline, AverageDollarVolume, AverageTradedValue, \
     CrossSectionalMean, Neutralize, Returns, RollingBeta, RSI, SMA, \
     StaticPerSymbol, Volatility, Factor, CustomFactor, Filter
@@ -99,6 +105,18 @@ __all__ = [
     "PortfolioSnapshot",
     "BACKTESTING_START_DATE",
     "StrategyProfile",
+    "DateRule",
+    "TimeRule",
+    "Schedule",
+    "ScheduledFunction",
+    "Signal",
+    "SignalSide",
+    "SignalSeries",
+    "signals_from_column",
+    "signals_from_panel",
+    "signal_series_from_column",
+    "ConflictPolicy",
+    "ConflictResolution",
     "CCXT_DATETIME_FORMAT",
     "BACKTEST_DATA_DIRECTORY_NAME",
     "Trade",
@@ -118,6 +136,7 @@ __all__ = [
     "AppMode",
     "RoundingService",
     "BacktestDateRange",
+    "BacktestWindow",
     "convert_polars_to_pandas",
     "DEFAULT_LOGGING_CONFIG",
     "DATABASE_DIRECTORY_NAME",
@@ -143,9 +162,10 @@ __all__ = [
     "DataType",
     "DataSource",
     "Backtest",
+    "Universe",
     "BacktestMetrics",
     "BacktestSummaryMetrics",
-    "BacktestPermutationTest",
+    "BacktestMonteCarloTest",
     "LAST_SNAPSHOT_DATETIME",
     "DATA_DIRECTORY",
     "INDEX_DATETIME",
@@ -155,6 +175,7 @@ __all__ = [
     "DEFAULT_DATETIME_FORMAT",
     "BacktestEvaluationFocus",
     'combine_backtests',
+    'combine_multi_universe_backtest',
     'PositionSize',
     'generate_backtest_summary_metrics',
     'DataError',
@@ -195,6 +216,11 @@ __all__ = [
     "BUNDLE_FORMAT_VERSION",
     "BacktestIndexRow",
     "BacktestIndex",
+    "build_strategy_universe_map",
+    "stamp_backtest",
+    "stamp_backtests",
+    "Study",
+    "EngineSlot",
     "Pipeline",
     "Factor",
     "CustomFactor",
@@ -213,4 +239,5 @@ __all__ = [
     "CooldownTrigger",
     "CooldownBlocks",
     "CooldownTracker",
+    "BacktestEngine"
 ]

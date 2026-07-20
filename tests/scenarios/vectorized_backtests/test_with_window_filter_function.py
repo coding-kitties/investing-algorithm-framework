@@ -10,20 +10,18 @@ from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    TradeStatus, RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval, generate_algorithm_id
+    TradeStatus, RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval, \
+    generate_algorithm_id, Schedule, SignalSeries, SignalSide
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
-
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     def __init__(
         self,
         algorithm_id,
         symbols,
         position_sizes,
-        time_unit: TimeUnit,
-        interval: int,
+        schedule: Schedule,
         market: str,
         rsi_time_frame: str,
         rsi_period: int,
@@ -78,8 +76,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         super().__init__(
             algorithm_id=algorithm_id,
             data_sources=data_sources,
-            time_unit=time_unit,
-            interval=interval,
+            schedule=schedule,
             symbols=symbols,
             position_sizes=position_sizes
         )
@@ -124,19 +121,11 @@ class RSIEMACrossoverStrategy(TradingStrategy):
 
         return ema_data, rsi_data
 
-    def generate_buy_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
+    def generate_signal_series(self, data: Dict[str, Any]):
         """
-        Generate buy signals based on the moving average crossover.
-
-        data (Dict[str, Any]): Dictionary containing all the data for
-            the strategy data sources.
-
-        Returns:
-            Dict[str, pd.Series]: A dictionary where keys are symbols and values
-                are pandas Series indicating buy signals (True/False).
+        v9 vector-mode signals: yield one SignalSeries per
+        (symbol, side) pair, carrying a boolean series of bar flags.
         """
-
-        signals = {}
         for symbol in self.symbols:
             ema_data_identifier = f"{symbol}_ema_data"
             rsi_data_identifier = f"{symbol}_rsi_data"
@@ -145,60 +134,37 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                 data[rsi_data_identifier].copy()
             )
 
-            # crossover confirmed
             ema_crossover_lookback = ema_data[
                 self.ema_crossover_result_column].rolling(
                 window=self.ema_cross_lookback_window
             ).max().astype(bool)
-
-            # use only RSI column
-            rsi_oversold = rsi_data[self.rsi_result_column] \
-                < self.rsi_oversold_threshold
-
-            # Combine both conditions
-            buy_signal = rsi_oversold & ema_crossover_lookback
-            buy_signals = buy_signal.fillna(False).astype(bool)
-            signals[symbol] = buy_signals
-        return signals
-
-    def generate_sell_signals(self, data: Dict[str, Any]) -> Dict[str, pd.Series]:
-        """
-        Generate sell signals based on the moving average crossover.
-
-        Args:
-            data (Dict[str, Any]): Dictionary containing all the data for
-                the strategy data sources.
-
-        Returns:
-            Dict[str, pd.Series]: A dictionary where keys are symbols and values
-                are pandas Series indicating sell signals (True/False).
-        """
-
-        signals = {}
-        for symbol in self.symbols:
-            ema_data_identifier = f"{symbol}_ema_data"
-            rsi_data_identifier = f"{symbol}_rsi_data"
-            ema_data, rsi_data = self.prepare_indicators(
-                data[ema_data_identifier].copy(),
-                data[rsi_data_identifier].copy()
-            )
-
-            # Confirmed by crossover between short-term EMA and long-term EMA
-            # within a given lookback window
             ema_crossunder_lookback = ema_data[
                 self.ema_crossunder_result_column].rolling(
                 window=self.ema_cross_lookback_window
             ).max().astype(bool)
 
-            # use only RSI column
+            rsi_oversold = rsi_data[self.rsi_result_column] \
+                < self.rsi_oversold_threshold
             rsi_overbought = rsi_data[self.rsi_result_column] \
-               >= self.rsi_overbought_threshold
+                >= self.rsi_overbought_threshold
 
-            # Combine both conditions
-            sell_signal = rsi_overbought & ema_crossunder_lookback
-            sell_signal = sell_signal.fillna(False).astype(bool)
-            signals[symbol] = sell_signal
-        return signals
+            buy_signal = (rsi_oversold & ema_crossover_lookback)\
+                .fillna(False).astype(bool)
+            sell_signal = (rsi_overbought & ema_crossunder_lookback)\
+                .fillna(False).astype(bool)
+
+            yield SignalSeries(
+                symbol=symbol,
+                side=SignalSide.OPEN_LONG,
+                series=buy_signal,
+                source="rsi_ema_cross",
+            )
+            yield SignalSeries(
+                symbol=symbol,
+                side=SignalSide.CLOSE_LONG,
+                series=sell_signal,
+                source="rsi_ema_cross",
+            )
 
 class Test(TestCase):
 
@@ -330,8 +296,7 @@ class Test(TestCase):
             strategies.append(
                 RSIEMACrossoverStrategy(
                     algorithm_id=generate_algorithm_id(params=param_set),
-                    time_unit=TimeUnit.HOUR,
-                    interval=2,
+                    schedule=Schedule.every(2, TimeUnit.HOUR),
                     market="BITVAVO",
                     rsi_time_frame=param_set["rsi_time_frame"],
                     rsi_period=param_set["rsi_period"],
@@ -373,7 +338,7 @@ class Test(TestCase):
         # All remaining backtests should have closed trades
         for backtest in backtests:
             self.assertGreater(
-                backtest.backtest_summary.number_of_trades_closed,
+                backtest.vector_summary.number_of_trades_closed,
                 0,
                 "All filtered backtests should have at "
                 "least one closed trade for the summary"
@@ -390,10 +355,10 @@ class Test(TestCase):
         self.assertGreaterEqual(len(backtests), 1, "Should have at least 1 backtest")
         first_backtest = backtests[0]
         # Check that we have backtest runs
-        self.assertEqual(len(first_backtest.backtest_runs), 2)
+        self.assertEqual(len(first_backtest.get_all_backtest_runs()), 2)
 
         # Get trades from the first run
-        run = first_backtest.backtest_runs[0]
+        run = first_backtest.get_all_backtest_runs()[0]
         trades = run.get_trades()
         self.assertGreater(len(trades), 0, "Should have at least one trade")
 
@@ -455,8 +420,7 @@ class Test(TestCase):
             strategies.append(
                 RSIEMACrossoverStrategy(
                     algorithm_id=generate_algorithm_id(params=param_set),
-                    time_unit=TimeUnit.HOUR,
-                    interval=2,
+                    schedule=Schedule.every(2, TimeUnit.HOUR),
                     market="BITVAVO",
                     rsi_time_frame=param_set["rsi_time_frame"],
                     rsi_period=param_set["rsi_period"],
@@ -502,7 +466,7 @@ class Test(TestCase):
         for backtest in backtests:
 
             self.assertGreater(
-                backtest.backtest_summary.number_of_trades_closed,
+                backtest.vector_summary.number_of_trades_closed,
                 0,
                 "All filtered backtests "
                 "should have at least one closed trade"
@@ -512,10 +476,10 @@ class Test(TestCase):
         self.assertGreaterEqual(len(backtests), 1, "Should have at least 1 backtest")
         first_backtest = backtests[0]
         # Check that we have backtest runs
-        self.assertGreater(len(first_backtest.backtest_runs), 0)
+        self.assertGreater(len(first_backtest.get_all_backtest_runs()), 0)
 
         # Get trades from the first run
-        run = first_backtest.backtest_runs[0]
+        run = first_backtest.get_all_backtest_runs()[0]
         trades = run.get_trades()
         self.assertGreater(len(trades), 0, "Should have at least one trade")
 
@@ -578,8 +542,7 @@ class Test(TestCase):
         for param_set in param_variations:
             strategy = RSIEMACrossoverStrategy(
                 algorithm_id=generate_algorithm_id(params=param_set),
-                time_unit=TimeUnit.HOUR,
-                interval=2,
+                schedule=Schedule.every(2, TimeUnit.HOUR),
                 market="BITVAVO",
                 rsi_time_frame=param_set["rsi_time_frame"],
                 rsi_period=param_set["rsi_period"],

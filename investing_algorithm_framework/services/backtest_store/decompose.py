@@ -28,11 +28,15 @@ def _windowed_records(
 
     Adds ``run_id`` and ``window_name`` columns so downstream
     columnar tools can group / partition cleanly across a Backtest's
-    walk-forward windows.
+    walk-forward windows. In v9.0 the iteration walks both engine
+    slots (vector first, then event) via ``get_all_backtest_runs``;
+    decomposed tables are intentionally engine-agnostic for backwards
+    compatibility with downstream columnar consumers.
     """
-    if not backtest.backtest_runs:
+    runs = backtest.get_all_backtest_runs()
+    if not runs:
         return
-    for window in backtest.backtest_runs:
+    for window in runs:
         items = getattr(window, attr, None) or []
         window_name = getattr(window, "backtest_date_range_name", None) or (
             window.create_directory_name()

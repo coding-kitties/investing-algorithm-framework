@@ -75,6 +75,7 @@ class Trade(BaseModel):
         stop_losses=None,
         take_profits=None,
         metadata=None,
+        is_short=None,
     ):
         self.id = id
         self.orders = orders
@@ -99,6 +100,24 @@ class Trade(BaseModel):
         self.stop_losses = stop_losses
         self.take_profits = take_profits
         self.metadata = metadata if metadata is not None else {}
+        # ``is_short`` is a first-class trade attribute (#433): SHORT
+        # trades open with a SELL and close with a BUY. When the caller
+        # does not pass an explicit value we derive it from (in order):
+        #   1. legacy metadata flag (older vector backtests),
+        #   2. the side of the first order on the trade.
+        if is_short is None:
+            if (isinstance(self.metadata, dict)
+                    and "is_short" in self.metadata):
+                is_short = bool(self.metadata.get("is_short"))
+            elif self.orders:
+                first = self.orders[0]
+                is_short = (
+                    getattr(first, "order_side", None)
+                    == OrderSide.SELL.value
+                )
+            else:
+                is_short = False
+        self.is_short = bool(is_short)
 
     def update(self, data):
 

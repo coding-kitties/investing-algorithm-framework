@@ -20,10 +20,22 @@ Example::
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import ClassVar, Dict, List, Optional, Tuple
+from typing import (
+    Any,
+    ClassVar,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    TYPE_CHECKING,
+)
 
 from .factor import Factor
 from .filter import Filter
+
+if TYPE_CHECKING:  # pragma: no cover - typing-only import
+    from investing_algorithm_framework.domain.models.signal import Signal
 
 UNIVERSE_ATTR = "universe"
 
@@ -140,3 +152,55 @@ class Pipeline:
     def name(cls) -> str:
         """Output key used in the strategy's ``data`` dict."""
         return cls.__name__
+
+    # ------------------------------------------------------------------ #
+    # v9.0 Signal hook (#503 collapse)
+    # ------------------------------------------------------------------ #
+    def to_signals(
+        self, frame: Any, context: Any
+    ) -> Iterable["Signal"]:
+        """Optional hook: turn this pipeline's evaluated ``frame``
+        into a stream of :class:`Signal` instances.
+
+        Pipelines that override :meth:`to_signals` become first-class
+        signal sources: :class:`CollectSignalsPhase` calls this
+        method after :class:`EvaluatePipelinesPhase` has materialised
+        the pipeline's output frame, and merges the emitted signals
+        with whatever ``TradingStrategy.generate_signals`` returns.
+        Pure factor pipelines (RSI, SMA, ...) leave the default
+        empty implementation in place and remain frame-only.
+
+        Args:
+            frame: The pipeline's evaluated long-form ``polars.DataFrame``
+                — same object that is also exposed to ``generate_signals``
+                under ``data[self.__class__.__name__]``.
+            context: The strategy's :class:`Context`. Provided so
+                signal-emitting pipelines can read portfolio /
+                positions state when deciding what to emit.
+
+        Yields:
+            Zero or more :class:`Signal` instances. The default
+            implementation yields nothing.
+
+        Examples:
+            Top-decile entry pipeline::
+
+                class TopDecileMomentum(Pipeline):
+                    momentum = Returns(window=60)
+                    universe = AverageDollarVolume(30).top(200)
+                    rank = momentum.rank(mask=universe)
+
+                    def to_signals(self, frame, context):
+                        from investing_algorithm_framework import (
+                            Signal, SignalSide,
+                        )
+                        top = frame.filter(pl.col("rank") <= 0.1)
+                        for row in top.iter_rows(named=True):
+                            yield Signal(
+                                symbol=row["symbol"],
+                                side=SignalSide.OPEN_LONG,
+                                strength=float(row["rank"]),
+                                source=self.__class__.__name__,
+                            )
+        """
+        return ()

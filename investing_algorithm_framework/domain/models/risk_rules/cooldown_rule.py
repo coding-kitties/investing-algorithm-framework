@@ -207,8 +207,11 @@ class CooldownTracker:
             if last is None:
                 continue
             # The trigger bar counts as bar 0 of the cooldown, so the
-            # rule blocks bars (last, last + bars] — i.e. the next
-            # ``bars`` bars after the order.
+            # rule blocks bars [last + 1, last + bars) — i.e. the
+            # ``bars - 1`` bars immediately after the trigger. With
+            # ``bars=N`` a signal exactly ``N`` ticks after the
+            # trigger is therefore allowed; set ``bars=N+1`` if you
+            # want to also block the Nth tick.
             if bar_index - last < rule.bars:
                 return True, rule
         return False, None

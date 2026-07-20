@@ -6,7 +6,8 @@ import pandas as pd
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    RESOURCE_DIRECTORY, ScalingRule, CSVOHLCVDataProvider
+    RESOURCE_DIRECTORY, ScalingRule, CSVOHLCVDataProvider, Schedule, \
+    SignalSide, signal_series_from_column
 
 # ═══════════════════════════════════════════════════════════════════════
 # Fast CSV price sequence (OHLCV_BTC-EUR_BITVAVO_2h_SCALING_FAST.csv):
@@ -60,8 +61,7 @@ def _make_data_source():
 
 # ── Strategy: Scale-in with buy signals (no separate scale_in override) ──
 class ScaleInWithBuySignalsStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
@@ -74,19 +74,25 @@ class ScaleInWithBuySignalsStrategy(TradingStrategy):
         ),
     ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": (df['Close'] == 110) | (df['Close'] == 115)}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
+    def generate_signal_series(self, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["open_long"] = df['Close'] == 110
+        df["scale_in"] = df['Close'] == 115
+        df["close_long"] = df['Close'] == 90
+        yield signal_series_from_column(
+            df, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "scale_in", side=SignalSide.SCALE_IN, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
 
 # ── Strategy: Separate scale-in and scale-out signal methods ──
 class SeparateScaleSignalsStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
@@ -99,46 +105,50 @@ class SeparateScaleSignalsStrategy(TradingStrategy):
         ),
     ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 110}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
-
-    def generate_scale_in_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 115}
-
-    def generate_scale_out_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 120}
+    def generate_signal_series(self, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["open_long"] = df['Close'] == 110
+        df["close_long"] = df['Close'] == 90
+        df["scale_in"] = df['Close'] == 115
+        df["scale_out"] = df['Close'] == 120
+        yield signal_series_from_column(
+            df, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "scale_in", side=SignalSide.SCALE_IN, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "scale_out", side=SignalSide.SCALE_OUT, symbol="BTC",
+        )
 
 
 # ── Strategy: No scaling rule (backward compatible) ──
 class NoScalingStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
         PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
     ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": (df['Close'] == 110) | (df['Close'] == 115)}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
+    def generate_signal_series(self, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["open_long"] = (df['Close'] == 110) | (df['Close'] == 115)
+        df["close_long"] = df['Close'] == 90
+        yield signal_series_from_column(
+            df, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
 
 # ── Strategy: list percentages [50, 25] ──
 class ListPercentageStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
@@ -152,19 +162,25 @@ class ListPercentageStrategy(TradingStrategy):
         ),
     ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": (df['Close'] == 110) | (df['Close'] == 115)}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
+    def generate_signal_series(self, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["open_long"] = df['Close'] == 110
+        df["scale_in"] = df['Close'] == 115
+        df["close_long"] = df['Close'] == 90
+        yield signal_series_from_column(
+            df, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "scale_in", side=SignalSide.SCALE_IN, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
 
 # ── Strategy: Cooldown ──
 class CooldownStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
@@ -178,13 +194,20 @@ class CooldownStrategy(TradingStrategy):
         ),
     ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": (df['Close'] == 110) | (df['Close'] == 115)}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
+    def generate_signal_series(self, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["open_long"] = df['Close'] == 110
+        df["scale_in"] = df['Close'] == 115
+        df["close_long"] = df['Close'] == 90
+        yield signal_series_from_column(
+            df, "open_long", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "scale_in", side=SignalSide.SCALE_IN, symbol="BTC",
+        )
+        yield signal_series_from_column(
+            df, "close_long", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -517,33 +540,3 @@ class TestScalingRuleOnStrategy(TestCase):
         rule = strategy.get_scaling_rule("BTC")
         self.assertIsNotNone(rule)
         self.assertEqual(rule.max_entries, 2)
-
-    def test_default_scale_in_signals_returns_none(self):
-        strategy = ScaleInWithBuySignalsStrategy(
-            algorithm_id="test"
-        )
-        result = strategy.generate_scale_in_signals({})
-        self.assertIsNone(result)
-
-    def test_default_scale_out_signals_returns_none(self):
-        strategy = ScaleInWithBuySignalsStrategy(
-            algorithm_id="test"
-        )
-        result = strategy.generate_scale_out_signals({})
-        self.assertIsNone(result)
-
-    def test_overridden_scale_in_signals(self):
-        strategy = SeparateScaleSignalsStrategy(
-            algorithm_id="test"
-        )
-        data = {
-            "BTC_EUR_OHLCV": pd.DataFrame({
-                "Close": [100.0, 115.0, 100.0]
-            })
-        }
-        result = strategy.generate_scale_in_signals(data)
-        self.assertIsNotNone(result)
-        self.assertIn("BTC", result)
-        self.assertTrue(result["BTC"].iloc[1])
-        self.assertFalse(result["BTC"].iloc[0])
-        self.assertFalse(result["BTC"].iloc[2])

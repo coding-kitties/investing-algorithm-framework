@@ -59,6 +59,12 @@
 
 ## Introduction
 
+> **Upgrading from v8?** v9.0 makes the framework dual-engine native (separate
+> `vector` / `event` slots on every `Backtest`, bundle format v3, per-engine
+> ranking). See [`docs/migration-v8-to-v9.md`](docs/migration-v8-to-v9.md) and
+> [`CHANGELOG.md`](CHANGELOG.md). Existing bundles upgrade in place with
+> `iaf migrate-bundles --to v3 <dir>`.
+
 `Investing Algorithm Framework` is a Python framework that covers the entire quant workflow: define a strategy once, vector-backtest thousands of parameter variants to find promising signals, narrow down with a storage layer that ranks 10k+ results in milliseconds, validate the winners in a realistic event-driven simulation, compare everything in a single interactive HTML dashboard, and deploy the best performer live, all with the same `TradingStrategy` class, no code rewrites between stages.
 
 Most quant frameworks stop at "here's your backtest result." You get a number, maybe a chart, and then you're on your own figuring out which strategy variant is actually better, whether the result is robust across time windows, and how to go from research to production. This framework closes that gap.
@@ -70,7 +76,9 @@ Most quant frameworks stop at "here's your backtest result." You get a number, m
   <strong>Features</strong>
 </summary> <br>
 
+- 🔁 **Long & Short with Composable Execution Phases** — Build strategies as a pipeline of entry/exit signals, position sizing, and order generation — each independently overridable. Long-only by default; opt into shorts by overriding two methods. The same strategy class runs unchanged in vector backtests, event-driven backtests, and live.
 - 📊 **[30+ Metrics](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/metrics)** — CAGR, Sharpe, Sortino, Calmar, VaR, CVaR, Max DD, Recovery & more
+- 🗂️ **State of the art Algorithm-Centric backtest Bundle Storage** — One `{algorithm_id}.iafbt` per algorithm holds every study (in-sample sweep, time-OOS, universe-OOS, walk-forward, stress test) as a first-class slot with its own universe, windows, runs and summary/
 - 🧮 **[Cross-Sectional Pipelines](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines)** — Rank, filter and score entire universes of symbols every iteration with a tidy factor table
 - ⚡ **[Vector Backtesting for Signal Analysis](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting)** — Quickly test your strategy logic on historical data to see how signals would have behaved before committing to full event-driven backtests
 - 🏃 **[Event-Driven Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/event-backtesting)** — Once promising strategies are identified via vector backtests, run full event-driven backtests to simulate realistic execution and portfolio management
@@ -78,9 +86,7 @@ Most quant frameworks stop at "here's your backtest result." You get a number, m
 - 🚀 **[Deployment](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/deployment)** — Once the best strategy is identified through backtesting and comparison, deploy it to production locally or in the cloud (AWS Lambda / Azure Functions) to start live trading
 - ⚔️ **[Multi-Strategy Comparison](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Rank, filter & compare strategies in a single interactive report
 - 🪟 **[Multi-Window Robustness](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Test across different time periods with window coverage analysis
-- 📈 **[Equity & Drawdown Charts](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Overlay equity curves, rolling Sharpe, drawdown & return distributions
-- 🗓️ **[Monthly Heatmaps & Yearly Returns](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Calendar heatmap per strategy with return/growth toggles
-- 🎯 **[Return Scenario Projections](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Good, average, bad & very bad year projections from backtest data
+- 📈 **[Charts & Performance Analysis](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Equity curves, rolling Sharpe, drawdown & return distributions, monthly heatmaps, yearly returns, and good/average/bad/very-bad return scenario projections — all rendered side-by-side per strategy
 - 📉 **[Benchmark Comparison](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Beat-rate analysis vs Buy & Hold, DCA, risk-free & custom benchmarks
 - 📄 **[One-Click HTML Report](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/backtest-reports)** — Self-contained file, no server, dark & light theme, shareable
 - 📦 **[Custom `.iafbt` Backtest Bundle Format](https://coding-kitties.github.io/investing-algorithm-framework/Data/backtest_data)** — An explicit, versioned, compressed, language-portable container (zstd + msgpack with magic-byte header) plus a separate parquet index for fast filtering without loading. ~21× smaller and ~27× fewer files than standard filebased directory layouts, with parallel I/O for fast load/save of large amounts of backtests.
@@ -89,6 +95,7 @@ Most quant frameworks stop at "here's your backtest result." You get a number, m
 - � **[Per-Market Deposit Schedules & Portfolio Sync](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/portfolio-sync)** — Declare recurring or one-shot external cash flows on a market with `deposit_schedule=` / `auto_sync=True`. Backtests simulate the deposits; live mode reconciles with the broker — same `context.sync_portfolio()` API in both modes.
 - 📝 **[Record Custom Variables](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/recording-variables)** — Track any indicator or metric during backtests with `context.record()`
 - ⏱️ **Signal Cooldowns**: Throttle whipsaw with declarative `CooldownRule`s: per-symbol or portfolio-wide, side-aware (`trigger="sell"`, `blocks="buy"`), enforced identically by the vector and event-driven engines
+- ⚖️ **Short Selling (vector + event engines)**: Open and close short positions by overriding `generate_short_signals` / `generate_cover_signals`. Both the vector engine and the event-driven engine route SHORT-to-open and COVER-to-close orders, persist `Trade.is_short` as a first-class column, support stop-loss / take-profit on shorts (inverted trigger math), and account for cash flows symmetrically with long trades. Long-only behaviour is preserved by default — strategies that don't override the methods are unaffected (#433, #434)
 - 🚀 **[Build → Backtest → Deploy](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/application-setup)** — Local dev, cloud deploy (AWS / Azure), or monetize on Finterion
 
 </details>
@@ -167,6 +174,14 @@ class MyStrategy(TradingStrategy):
         ...
 
     def generate_sell_signals(self, data):
+        ...
+
+    # Optional — opt in to short selling (vector + event engines, #433/#434).
+    # Override BOTH to enable; otherwise the engine stays long-only.
+    def generate_short_signals(self, data):
+        ...
+
+    def generate_cover_signals(self, data):
         ...
 ```
 
@@ -490,7 +505,7 @@ import pandas as pd
 from pyindicators import ema, rsi, crossover, crossunder
 
 from investing_algorithm_framework import (
-    TradingStrategy, DataSource, TimeUnit, DataType,
+    TradingStrategy, DataSource, TimeUnit, Schedule, DataType,
     PositionSize, ScalingRule, StopLossRule, CooldownRule,
 )
 
@@ -503,8 +518,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
     Sell when RSI is overbought AND a recent EMA crossunder occurred.
     Scale into winners, trail a stop loss, and let the framework handle the rest.
     """
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC", "ETH"]
     data_sources = [
         DataSource(
@@ -706,6 +720,7 @@ python -m unittest discover -s tests
 
 - [Open an issue](https://github.com/coding-kitties/investing-algorithm-framework/issues/new) for bugs or ideas
 - Read the [Contributing Guide](https://coding-kitties.github.io/investing-algorithm-framework/Contributing%20Guide/contributing)
+- Read the [Architecture references](/docs/architecture/README.md)
 - PRs go against the `dev` branch
 
 ## Resources

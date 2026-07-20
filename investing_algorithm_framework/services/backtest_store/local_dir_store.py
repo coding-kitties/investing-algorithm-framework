@@ -206,12 +206,13 @@ class LocalDirStore(BacktestStore):
                 ):
                     try:
                         bt = Backtest.open(str(path), summary_only=True)
-                        row = bt.index_row(bundle_path=rel)
-                        index.upsert(
-                            row,
-                            bundle_mtime_ns=stat.st_mtime_ns,
-                            bundle_size=stat.st_size,
-                        )
+                        # v9.0: one row per populated engine slot.
+                        for row in bt.index_rows(bundle_path=rel):
+                            index.upsert(
+                                row,
+                                bundle_mtime_ns=stat.st_mtime_ns,
+                                bundle_size=stat.st_size,
+                            )
                     except Exception as exc:  # pragma: no cover - logged
                         logger.warning(
                             "Skipping bundle %s while building index: %s",
@@ -232,7 +233,9 @@ class LocalDirStore(BacktestStore):
                     "Skipping bundle %s while listing: %s", path, exc,
                 )
                 continue
-            yield bt.index_row(bundle_path=rel)
+            # v9.0: yields one row per populated engine slot. Callers
+            # of this iterator already treat each row independently.
+            yield from bt.index_rows(bundle_path=rel)
 
     # ------------------------------------------------------------------
     # SupportsCopyFrom

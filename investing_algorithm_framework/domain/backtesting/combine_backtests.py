@@ -1,6 +1,6 @@
 import logging
 import math
-from typing import List
+from typing import List, Optional
 
 from .consistency import (
     get_cv_consistency, get_normalized_stability,
@@ -72,15 +72,41 @@ def combine_backtests(backtests):
     Combine multiple backtests into a single backtest by aggregating
     their results.
 
+    Runs and per-engine summaries are combined per engine
+    (vector with vector, event with event), matching the v9.0
+    dual-engine model (see ``docs/design/v9.0-dual-engine-design.md``).
+
     Args:
         backtests (List[Backtest]): List of Backtest instances to combine.
 
     Returns:
         Backtest: A new Backtest instance representing the combined results.
     """
-    backtest_metrics = []
-    backtest_runs = []
+    from .backtest import Backtest, ENGINE_VECTOR, ENGINE_EVENT
+
     algorithm_id = None
+    # v5: lineage pointer; must agree across every input bundle.
+    # ``None`` ride-alongs from un-stamped inputs are tolerated; an
+    # explicit mismatch is an error (you can't combine a primary
+    # bundle with a sibling bundle pointing to a different anchor).
+    anchor_algorithm_id: Optional[str] = None
+    anchor_seen = False
+    vector_runs = []
+    event_runs = []
+
+    # Determine the active study name *before* collecting runs so we can
+    # scope get_runs() to the correct study slot. This is essential when
+    # a bundle contains multiple studies (e.g. in-sample + OOS) and we
+    # are merging windows within one specific study: without the scope,
+    # get_runs() raises OperationalException("Backtest has N studies —
+    # pass study= to disambiguate").
+    _combine_study_name: Optional[str] = None
+    for _bt in backtests:
+        _ds = _bt.get_study() if hasattr(_bt, "get_study") else None
+        _sn = _ds.name if _ds else None
+        if _sn is not None:
+            _combine_study_name = _sn
+            break
 
     for backtest in backtests:
         if algorithm_id is None:
@@ -91,25 +117,49 @@ def combine_backtests(backtests):
                 "to be combined."
             )
 
-        backtest_runs += backtest.get_all_backtest_runs()
-        backtest_metrics += backtest.get_all_backtest_metrics()
+        bt_anchor = getattr(backtest, "anchor_algorithm_id", None)
+        if bt_anchor is not None:
+            if not anchor_seen:
+                anchor_algorithm_id = bt_anchor
+                anchor_seen = True
+            elif anchor_algorithm_id != bt_anchor:
+                raise ValueError(
+                    "All backtests must share the same "
+                    "anchor_algorithm_id to be combined "
+                    f"(got {anchor_algorithm_id!r} and {bt_anchor!r})."
+                )
 
-    summary = generate_backtest_summary_metrics(backtest_metrics)
+        vector_runs += list(backtest.get_runs(ENGINE_VECTOR, study=_combine_study_name))
+        event_runs += list(backtest.get_runs(ENGINE_EVENT, study=_combine_study_name))
+
+    def _summary(runs):
+        per_run_metrics = [
+            r.backtest_metrics for r in runs
+            if r.backtest_metrics is not None
+        ]
+        if not per_run_metrics:
+            return None
+        return generate_backtest_summary_metrics(per_run_metrics)
+
+    vector_summary = _summary(vector_runs)
+    event_summary = _summary(event_runs)
 
     metadata = None
     risk_free_rate = None
 
-    # Check if there are duplicate backtest runs
-    unique_date_ranges = set()
-    for backtest in backtests:
-        for run in backtest.get_all_backtest_runs():
-            date_range = (run.backtest_start_date, run.backtest_end_date)
-            if date_range in unique_date_ranges:
+    # Check if there are duplicate backtest runs (per engine).
+    for engine_runs, engine_label in (
+        (vector_runs, ENGINE_VECTOR), (event_runs, ENGINE_EVENT),
+    ):
+        seen = set()
+        for run in engine_runs:
+            key = (run.backtest_start_date, run.backtest_end_date)
+            if key in seen:
                 logger.warning(
-                    "Duplicate backtest run detected for date range: "
-                    f"{date_range} when combining backtests."
+                    f"Duplicate {engine_label} backtest run detected for "
+                    f"date range: {key} when combining backtests."
                 )
-            unique_date_ranges.add(date_range)
+            seen.add(key)
 
     # Merge all metadata dictionaries
     metadata = {}
@@ -128,17 +178,182 @@ def combine_backtests(backtests):
         if backtest.risk_free_rate is not None:
             risk_free_rate = backtest.risk_free_rate
             break
-    from .backtest import Backtest
 
-    backtest = Backtest(
+    # Phase 3b/3c: preserve the study identity across the combine.
+    # When all inputs share the same ``study_name`` (the typical
+    # multi-window case), the combined backtest stays in that study
+    # slot — otherwise the post-combine save would silently demote it
+    # back to the unnamed ``default`` study and merge-on-save would
+    # then split runs across two studies on disk.
+    study_name = None
+    study_description = None
+    for backtest in backtests:
+        _ds = backtest.get_study() if hasattr(backtest, 'get_study') else None
+        sn = _ds.name if _ds else None
+        if sn is not None:
+            study_name = sn
+            break
+    for backtest in backtests:
+        _ds = backtest.get_study() if hasattr(backtest, 'get_study') else None
+        sd = _ds.description if _ds else None
+        if sd is not None:
+            study_description = sd
+            break
+
+    # Preserve any additional study slots present on the inputs.
+    # Rule 1 of the v5 merge contract (disjoint studies preserved
+    # verbatim, same-name engine slots merged) is applied here
+    # in-memory so the combined backtest can be saved through any of
+    # the existing writers without losing studies.
+    additional_studies: dict = {}
+    for backtest in backtests:
+        for name, study in (
+            getattr(backtest, "studies", None) or {}
+        ).items():
+            if name == (study_name or "default"):
+                # Same name as the legacy slot — its data already
+                # lives on the combined ``vector_runs`` / ``event_runs``.
+                continue
+            if name in additional_studies:
+                # Same-name conflict across inputs: keep the first
+                # one we saw (callers can post-process if they need
+                # different semantics).
+                continue
+            additional_studies[name] = study
+
+    universes = []
+    seen_universe_keys: set = set()
+    for backtest in backtests:
+        for u in (getattr(backtest, "universes", None) or []):
+            key = getattr(u, "key", None)
+            if key in seen_universe_keys:
+                continue
+            seen_universe_keys.add(key)
+            universes.append(u)
+
+    bt = Backtest(
         algorithm_id=algorithm_id,
-        backtest_summary=summary,
+        anchor_algorithm_id=anchor_algorithm_id,
+        vector_runs=vector_runs,
+        vector_summary=vector_summary,
+        event_runs=event_runs,
+        event_summary=event_summary,
         metadata=metadata,
         risk_free_rate=risk_free_rate,
-        backtest_runs=backtest_runs,
-        parameters=parameters
+        parameters=parameters,
+        study_name=study_name,
+        study_description=study_description,
+        universes=universes,
     )
-    return backtest
+    for name, study in additional_studies.items():
+        bt._studies[name] = study
+    return bt
+
+
+def combine_multi_universe_backtest(
+    backtests_by_universe,
+    universes=None,
+    study_name=None,
+    study_description=None,
+):
+    """Merge several per-universe Backtest bundles into one v4
+    multi-universe envelope.
+
+    Each input bundle is assumed to be the result of running the same
+    strategy configuration (same algorithm_id / parameters) against
+    one universe. This helper:
+
+    * Stamps run.metadata['universe_key'] on every run of every input
+      bundle with the corresponding universe key (overwriting any
+      existing tag).
+    * Concatenates runs into a single Backtest via combine_backtests.
+    * Populates the universes catalogue on the result.
+    * Rebuilds per-engine *_summaries_by_universe so each universe
+      has its own roll-up alongside the pooled cross-universe summary.
+
+    Args:
+        backtests_by_universe: Mapping of universe_key to the Backtest
+            produced for that universe.
+        universes: Optional explicit list of Universe records to attach
+            to the output. Keys must match backtests_by_universe. When
+            omitted, a minimal set of Universe records is synthesized
+            from the first run of each input bundle (using run.symbols,
+            trading_symbol, and data_sources[0]['market']).
+        study_name: Optional study label to stamp on the result.
+        study_description: Optional study description.
+
+    Returns:
+        Backtest: A single Backtest whose runs are tagged by universe,
+        with both pooled and per-universe summaries populated and ready
+        for save_bundle.
+
+    Raises:
+        ValueError: If backtests_by_universe is empty or the inputs
+            disagree on algorithm_id (via combine_backtests).
+    """
+    from .universe import Universe
+
+    if not backtests_by_universe:
+        raise ValueError(
+            "combine_multi_universe_backtest requires at least one "
+            "(universe_key, Backtest) entry."
+        )
+
+    # Tag every run with its universe key (overwrite to keep semantics
+    # explicit: this is the canonical multi-universe merge path).
+    ordered_keys = list(backtests_by_universe.keys())
+    for key in ordered_keys:
+        bt = backtests_by_universe[key]
+        bt.tag_runs_universe(key, overwrite=True)
+
+    merged = combine_backtests(
+        [backtests_by_universe[k] for k in ordered_keys]
+    )
+
+    # Populate the universes catalogue. If the caller did not pass one,
+    # synthesize a minimal record per key from the first available run
+    # so the catalogue is never silently empty.
+    if universes is not None:
+        merged.universes = [u for u in universes]
+    else:
+        synth: list = []
+        for key in ordered_keys:
+            bt = backtests_by_universe[key]
+            sample_run = None
+            for engine in ("vector", "event"):
+                runs = bt.get_runs(engine)
+                if runs:
+                    sample_run = runs[0]
+                    break
+            if sample_run is None:
+                synth.append(Universe(key=key))
+                continue
+            market = None
+            ds_list = getattr(sample_run, "data_sources", None) or []
+            if ds_list and isinstance(ds_list[0], dict):
+                market = ds_list[0].get("market")
+            synth.append(
+                Universe(
+                    key=key,
+                    symbols=list(sample_run.symbols or []),
+                    trading_symbol=sample_run.trading_symbol,
+                    market=market,
+                )
+            )
+        merged.universes = synth
+
+    merged.regenerate_summaries_by_universe()
+
+    if study_name is not None:
+        _ds = merged.get_study()
+        if _ds and _ds.name != study_name:
+            merged.rename_study(_ds.name, study_name)
+    if study_description is not None:
+        _ds = merged.get_study()
+        if _ds:
+            _ds.description = study_description
+
+    return merged
 
 
 def generate_backtest_summary_metrics(
@@ -190,12 +405,35 @@ def generate_backtest_summary_metrics(
         if b.total_growth is not None
     )
 
-    # === PERCENTAGE RETURNS (compounded, not summed) ===
-    # Compound returns: (1 + r1) * (1 + r2) * ... - 1
-    # All percentages are stored as decimals (e.g. 0.10 for 10%).
-    total_net_gain_percentage = _compound_percentage_returns(
-        [b.total_net_gain_percentage for b in valid_metrics]
-    )
+    # === PERCENTAGE RETURNS ===
+    # ``total_net_gain_percentage`` aggregates per-run returns into a
+    # single bundle-level figure. We *cannot* compound the per-run
+    # values via ``(1 + r1) * (1 + r2) * ...``: rolling backtest
+    # windows commonly overlap (train_days > step_days), so chained
+    # compounding double-counts the same calendar periods and inflates
+    # the result by orders of magnitude (issue #511 follow-up).
+    #
+    # Instead we use the same definition as the per-run metric — net
+    # PnL divided by capital deployed — but applied to the bundle:
+    # ``sum(total_net_gain) / sum(initial_unallocated)``. This is
+    # invariant to window overlap, agrees with the per-run formula,
+    # and stays internally consistent with ``cagr`` (which is a
+    # duration-weighted mean of per-run CAGRs).
+    total_initial_capital = 0.0
+    for b in valid_metrics:
+        iv = getattr(b, "initial_unallocated", None)
+        if isinstance(iv, (int, float)) and iv > 0:
+            total_initial_capital += iv
+    if total_initial_capital > 0 and total_net_gain is not None:
+        total_net_gain_percentage = total_net_gain / total_initial_capital
+    else:
+        # Fall back to a duration-weighted mean of per-run percentages
+        # when initial-capital figures are missing — still bounded and
+        # never inflates with overlapping windows.
+        total_net_gain_percentage = safe_weighted_mean(
+            [b.total_net_gain_percentage for b in valid_metrics],
+            [b.total_number_of_days for b in valid_metrics],
+        )
     # ``total_loss`` is a non-multiplicative magnitude (it does not
     # compound across windows). Express the aggregate as the sum of
     # gross losses divided by the sum of initial capital across
@@ -210,9 +448,18 @@ def generate_backtest_summary_metrics(
         total_loss_percentage = total_loss / total_initial_value
     else:
         total_loss_percentage = None
-    total_growth_percentage = _compound_percentage_returns(
-        [b.total_growth_percentage for b in valid_metrics]
-    )
+    # ``total_growth_percentage`` follows the same overlap-safe
+    # definition as ``total_net_gain_percentage`` below: divide
+    # aggregate growth by aggregate capital deployed instead of
+    # compounding per-run percentages (which double-counts overlapping
+    # rolling windows).
+    if total_initial_value > 0 and total_growth is not None:
+        total_growth_percentage = total_growth / total_initial_value
+    else:
+        total_growth_percentage = safe_weighted_mean(
+            [b.total_growth_percentage for b in valid_metrics],
+            [b.total_number_of_days for b in valid_metrics],
+        )
 
     # === AVERAGES (weighted by time) ===
     average_total_net_gain = safe_weighted_mean(

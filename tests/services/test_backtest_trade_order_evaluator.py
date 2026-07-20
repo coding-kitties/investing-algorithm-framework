@@ -185,10 +185,11 @@ class TestBacktestTradeOrderEvaluatorStopLoss(TestBase):
         # ---- Order B: pending → will fill during evaluate() ----------
         # Price 39200: the CSV Low values start at 39052 which is ≤ 39200
         order_b = self._create_pending_buy_order("BTC", 39200, 0.05)
-        trade_b = trade_service.find({"order_id": order_b.id})
-        self.assertIsNotNone(trade_b)
+        # v9.0 (#431) — pending BUY orders have no trade yet; attach
+        # the stop-loss to the order so it materializes at fill time.
         trade_service.add_stop_loss(
-            trade_b, percentage=10, trailing=False, sell_percentage=50
+            order=order_b, percentage=10, trailing=False,
+            sell_percentage=50,
         )
 
         # ---- Prepare evaluate() inputs ------------------------------
@@ -241,9 +242,11 @@ class TestBacktestTradeOrderEvaluatorStopLoss(TestBase):
 
         # Order B: pending → will fill during evaluate()
         order_b = self._create_pending_buy_order("BTC", 39200, 0.05)
-        trade_b = trade_service.find({"order_id": order_b.id})
+        # v9.0 (#431) — pending BUY orders have no trade yet; attach
+        # the take-profit to the order so it materializes at fill time.
         trade_service.add_take_profit(
-            trade_b, percentage=10, trailing=False, sell_percentage=50
+            order=order_b, percentage=10, trailing=False,
+            sell_percentage=50,
         )
 
         open_trades = trade_service.get_all(
@@ -281,9 +284,11 @@ class TestBacktestTradeOrderEvaluatorStopLoss(TestBase):
         trade_service = self.app.container.trade_service()
 
         order_b = self._create_pending_buy_order("BTC", 39200, 0.05)
-        trade_b = trade_service.find({"order_id": order_b.id})
+        # v9.0 (#431) — attach stop-loss to the pending order so it
+        # materializes onto the trade created at fill time.
         trade_service.add_stop_loss(
-            trade_b, percentage=10, trailing=False, sell_percentage=50
+            order=order_b, percentage=10, trailing=False,
+            sell_percentage=50,
         )
 
         open_trades = trade_service.get_all(

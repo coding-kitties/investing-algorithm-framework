@@ -4,6 +4,7 @@ from investing_algorithm_framework.domain import BacktestMetrics, \
     BacktestSummaryMetrics, Trade, generate_backtest_summary_metrics, \
     combine_backtests, Backtest
 from datetime import datetime, date
+from investing_algorithm_framework.domain import BacktestWindow, BacktestDateRange
 
 class TestCombine(TestCase):
 

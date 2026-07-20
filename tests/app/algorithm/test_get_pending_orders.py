@@ -98,8 +98,10 @@ class TestPortfolioService(TestBase):
         )
 
         # Check that the portfolio has the correct amount of trades
+        # v9.0 (#431) — only the CLOSED order creates a trade at fill;
+        # the two OPEN orders have no trade until they fill.
         trade_service = self.app.container.trade_service()
-        self.assertEqual(3, trade_service.count())
+        self.assertEqual(1, trade_service.count())
         self.assertEqual(
             1, trade_service.count(
                 {"portfolio_id": portfolio.id, "status": "OPEN"}

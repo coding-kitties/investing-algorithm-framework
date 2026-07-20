@@ -1,29 +1,31 @@
 """Donchian-style volatility breakout (event-driven)."""
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 from investing_algorithm_framework import (
     Context,
     DataSource,
     DataType,
-    OrderSide,
-    OrderType,
+    PositionSize,
+    Signal,
+    SignalSide,
     TimeUnit,
     TradingStrategy,
+    Schedule,
 )
 
 SYMBOL = "BTC/EUR"
+BASE = SYMBOL.split("/")[0]
 WINDOW = 48
 
 
 class VolatilityBreakoutStrategy(TradingStrategy):
     algorithm_id = "vol-breakout-event-driven"
-    time_unit = TimeUnit.HOUR
-    interval = 1
+    schedule = Schedule.every(1, TimeUnit.HOUR)
     market = "BITVAVO"
     trading_symbol = "EUR"
-    symbols = [SYMBOL.split("/")[0]]
+    symbols = [BASE]
 
     data_sources = [
         DataSource(
@@ -33,7 +35,13 @@ class VolatilityBreakoutStrategy(TradingStrategy):
         )
     ]
 
-    def run_strategy(self, context: Context, data: Dict[str, Any]) -> None:
+    position_sizes = [
+        PositionSize(symbol=BASE, percentage_of_portfolio=99.0),
+    ]
+
+    def generate_signals(
+        self, context: Context, data: Dict[str, Any]
+    ) -> Iterable[Signal]:
         df = data[f"{SYMBOL}-ohlcv"]
         if len(df) < WINDOW + 1:
             return
@@ -44,22 +52,13 @@ class VolatilityBreakoutStrategy(TradingStrategy):
         rolling_high = float(prior["High"].max())
         rolling_low = float(prior["Low"].min())
 
-        sym = self.symbols[0]
-        held = context.has_position(sym, market=self.market)
+        held = context.has_position(BASE, market=self.market)
 
         if not held and last_close > rolling_high:
-            cash = context.get_unallocated()
-            if cash <= 0:
-                return
-            amount = (cash * 0.995) / last_close
-            context.create_order(
-                target_symbol=sym, order_side=OrderSide.BUY,
-                order_type=OrderType.LIMIT, price=last_close, amount=amount,
+            yield Signal(
+                symbol=BASE, side=SignalSide.OPEN_LONG, source="breakout",
             )
         elif held and last_close < rolling_low:
-            pos = context.get_position(sym, market=self.market)
-            context.create_order(
-                target_symbol=sym, order_side=OrderSide.SELL,
-                order_type=OrderType.LIMIT, price=last_close,
-                amount=pos.get_amount(),
+            yield Signal(
+                symbol=BASE, side=SignalSide.CLOSE_LONG, source="breakout",
             )

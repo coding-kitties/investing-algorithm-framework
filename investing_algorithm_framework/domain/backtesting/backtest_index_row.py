@@ -59,6 +59,10 @@ class BacktestIndexRow:
 
     # -- Identity --------------------------------------------------------
     algorithm_id: Optional[str] = None
+    # Optional lineage pointer for sibling bundles. ``None`` on
+    # anchors; set on derived bundles (param-robustness, cooldown
+    # stress, etc.) to the anchor's ``algorithm_id``. v5+.
+    anchor_algorithm_id: Optional[str] = None
     tag: Optional[str] = None
     bundle_path: Optional[str] = None
 
@@ -71,6 +75,14 @@ class BacktestIndexRow:
     parameters: Dict[str, Any] = field(default_factory=dict)
     strategy_ids: List[Any] = field(default_factory=list)
     number_of_runs: int = 0
+
+    # -- Multi-universe / study (bundle v4+) ----------------------------
+    # ``universe_key`` is ``None`` for the pooled cross-universe row
+    # (the legacy single-engine row shape) and the universe key for
+    # per-universe rows emitted alongside it.
+    universe_key: Optional[str] = None
+    study_name: Optional[str] = None
+    study_description: Optional[str] = None
 
     # -- Scalar metrics --------------------------------------------------
     summary_metrics: Optional[BacktestSummaryMetrics] = None
@@ -91,12 +103,16 @@ class BacktestIndexRow:
         """
         out: Dict[str, Any] = {
             "algorithm_id": self.algorithm_id,
+            "anchor_algorithm_id": self.anchor_algorithm_id,
             "tag": self.tag,
             "bundle_path": self.bundle_path,
             "framework_version": self.framework_version,
             "engine_type": self.engine_type,
             "risk_free_rate": self.risk_free_rate,
             "number_of_runs": self.number_of_runs,
+            "universe_key": self.universe_key,
+            "study_name": self.study_name,
+            "study_description": self.study_description,
         }
 
         # parameters / strategy_ids → JSON for tabular round-trip

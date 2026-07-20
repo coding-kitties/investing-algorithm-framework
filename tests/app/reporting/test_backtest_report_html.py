@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from unittest import TestCase
 
 from investing_algorithm_framework.app.reporting import BacktestReport
+from investing_algorithm_framework.domain import BacktestWindow, BacktestDateRange
 from investing_algorithm_framework.domain import (
     Backtest, BacktestRun, BacktestMetrics, PortfolioSnapshot,
     BacktestDateRange, OperationalException,
@@ -35,6 +36,7 @@ def _make_backtest(algorithm_id="test_algo", n_runs=1, with_metrics=True):
         if with_metrics:
             metrics = BacktestMetrics(
                 backtest_start_date=start,
+
                 backtest_end_date=end,
                 equity_curve=[
                     (1000, start),
@@ -71,9 +73,13 @@ def _make_backtest(algorithm_id="test_algo", n_runs=1, with_metrics=True):
             )
         runs.append(
             BacktestRun(
-                backtest_start_date=start,
-                backtest_end_date=end,
-                backtest_date_range_name=f"window_{j}",
+                backtest_window=BacktestWindow(
+                    train_range=BacktestDateRange(
+                        start_date=start,
+                        end_date=end,
+                        name=f"window_{j}",
+                    )
+                ),
                 orders=[],
                 trades=[],
                 positions=[],
@@ -86,7 +92,7 @@ def _make_backtest(algorithm_id="test_algo", n_runs=1, with_metrics=True):
         )
     return Backtest(
         algorithm_id=algorithm_id,
-        backtest_runs=runs,
+        vector_runs=runs,
         risk_free_rate=0.0,
     )
 
@@ -299,6 +305,37 @@ class TestBacktestReportDataTransform(TestCase):
         run_data = report._build_run_data()
         self.assertIn("run-0-0", run_data)
         self.assertIn("run-1-0", run_data)
+
+    def test_dual_engine_backtest_produces_two_strategy_entries(self):
+        """Stage 6: vector + event slots render as separate pages."""
+        bt = _make_backtest("dual", n_runs=1)
+        # Promote the legacy compat-shimmed runs into both engines.
+        vector_runs = list(bt.vector_runs)
+        bt.event_runs = list(vector_runs)
+        bt.vector_summary = None
+        bt.event_summary = None
+        # Sanity: bundle now reports both engines populated.
+        self.assertEqual(sorted(bt.engines()), ["event", "vector"])
+
+        report = BacktestReport(backtests=[bt])
+        strategies = report._build_strategies_data()
+        self.assertEqual(len(strategies), 2)
+        names = {s["name"] for s in strategies}
+        self.assertIn("dual (vector)", names)
+        self.assertIn("dual (event)", names)
+        # Strategy IDs stay contiguous across engine views.
+        self.assertEqual(strategies[0]["id"], "strat-0")
+        self.assertEqual(strategies[1]["id"], "strat-1")
+        # Each engine view owns its own run IDs.
+        run_data = report._build_run_data()
+        self.assertIn("run-0-0", run_data)
+        self.assertIn("run-1-0", run_data)
+
+        html = report._build_html()
+        # Dual-engine bundle behaves as a comparison view.
+        self.assertIn("const IS_SINGLE = false", html)
+        self.assertIn("dual (vector)", html)
+        self.assertIn("dual (event)", html)
 
 
 class TestBacktestReportOpen(TestCase):

@@ -5,7 +5,7 @@ import shutil
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     DataType, MarketCredential, PortfolioConfiguration, \
-    DataProvider
+    DataProvider, Schedule, TimeUnit
 from investing_algorithm_framework.app.eventloop import EventLoopService
 from investing_algorithm_framework.services import \
     BacktestTradeOrderEvaluator
@@ -53,9 +53,7 @@ class StrategyForTesting(TradingStrategy):
             market="bitvavo"
         ),
     ]
-    time_unit = "hour"
-    interval = 2
-
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     def run_strategy(self, context, data):
         pass
 
@@ -73,9 +71,7 @@ class StrategyForTestingTwo(TradingStrategy):
             data_provider_identifier="custom_feed_data"
         ),
     ]
-    time_unit = "hour"
-    interval = 4
-
+    schedule = Schedule.every(4, TimeUnit.HOUR)
     def run_strategy(self, context, data):
         pass
 
@@ -94,9 +90,7 @@ class StrategyForTestingThree(TradingStrategy):
             data_provider_identifier="twitter_data"
         ),
     ]
-    time_unit = "day"
-    interval = 1
-
+    schedule = Schedule.every(1, TimeUnit.DAY)
     def run_strategy(self, context, market_data):
         pass
 
@@ -157,18 +151,15 @@ class TestEventloopService(TestBase):
         self.assertEqual(len(event_loop_service.next_run_times), 3)
         self.assertEqual(len(event_loop_service.data_sources), 5)
 
-        # Each next run time should be set to the current datatime
-        # because no runs have been executed yet
+        # Each entry tracks last_run (None until first execution).
         for strategy in event_loop_service.strategies:
             self.assertIn(
                 strategy.strategy_id,
                 event_loop_service.next_run_times
             )
-            self.assertAlmostEqual(
-                event_loop_service\
-                    .next_run_times[strategy.strategy_id]["next_run"],
-                datetime.now(tz=timezone.utc),
-                delta=timedelta(seconds=10)
+            self.assertIsNone(
+                event_loop_service
+                .next_run_times[strategy.strategy_id]["last_run"]
             )
 
     def test_get_data_sources_for_iteration(self):

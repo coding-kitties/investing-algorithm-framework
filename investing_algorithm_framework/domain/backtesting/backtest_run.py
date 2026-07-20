@@ -23,6 +23,7 @@ from investing_algorithm_framework.domain.models.trade.trade_take_profit \
 
 
 from .backtest_metrics import BacktestMetrics
+from .backtest_window import BacktestWindow
 
 
 logger = getLogger(__name__)
@@ -38,10 +39,11 @@ class BacktestRun:
         backtest_metrics (Optional[List[BacktestMetrics]]): A list of
             backtest metrics objects, each representing the performance
             metrics of a single backtest run.
-        backtest_start_date (datetime): The start date of the backtest.
-        backtest_end_date (datetime): The end date of the backtest.
-        backtest_date_range_name (str): The name of the date range used for
-            the backtest.
+        backtest_window (Optional[BacktestWindow]): The window this run
+            belongs to.  Exposes ``backtest_start_date``,
+            ``backtest_end_date``, and ``backtest_date_range_name`` as
+            read-only properties derived from the active date range
+            (``test_range`` when present, otherwise ``train_range``).
         trading_symbol (str): The trading symbol used in the backtest.
         initial_unallocated (float): The initial unallocated amount in the
             backtest.
@@ -89,9 +91,8 @@ class BacktestRun:
             - ``"insufficient_capital"`` — buy signal ignored because
               there was not enough capital to open a position.
     """
-    backtest_start_date: datetime
-    backtest_end_date: datetime
-    trading_symbol: str
+    backtest_window: BacktestWindow
+    trading_symbol: str = ""  # filled in by runner
     initial_unallocated: float = 0.0
     number_of_runs: int = 0
     portfolio_snapshots: List[PortfolioSnapshot] = field(default_factory=list)
@@ -107,12 +108,45 @@ class BacktestRun:
     number_of_orders: int = 0
     number_of_positions: int = 0
     backtest_metrics: BacktestMetrics = None
-    backtest_date_range_name: str = None
     data_sources: List[Dict] = field(default_factory=list)
     metadata: Dict[str, str] = field(default_factory=dict)
     signals: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     signal_events: List[Dict[str, Any]] = field(default_factory=list)
     recorded_values: Dict[str, List] = field(default_factory=dict)
+
+    # ------------------------------------------------------------------
+    # Backward-compat read-only properties
+    # ------------------------------------------------------------------
+
+    @property
+    def backtest_start_date(self) -> datetime:
+        """Start date derived from the window's active range."""
+        r = (
+            self.backtest_window.test_range
+            if self.backtest_window.test_range is not None
+            else self.backtest_window.train_range
+        )
+        return r.start_date
+
+    @property
+    def backtest_end_date(self) -> datetime:
+        """End date derived from the window's active range."""
+        r = (
+            self.backtest_window.test_range
+            if self.backtest_window.test_range is not None
+            else self.backtest_window.train_range
+        )
+        return r.end_date
+
+    @property
+    def backtest_date_range_name(self) -> Optional[str]:
+        """Name of the active date range, derived from the window."""
+        r = (
+            self.backtest_window.test_range
+            if self.backtest_window.test_range is not None
+            else self.backtest_window.train_range
+        )
+        return r.name
 
     def to_dict(self) -> dict:
         """
@@ -130,6 +164,11 @@ class BacktestRun:
             if self.backtest_metrics else None
         return {
             "backtest_metrics": backtest_metrics,
+            "backtest_window": (
+                self.backtest_window.to_dict()
+                if self.backtest_window is not None else None
+            ),
+            # Flat keys kept for backward compatibility with older readers.
             "backtest_start_date": ensure_iso(self.backtest_start_date),
             "backtest_date_range_name": self.backtest_date_range_name,
             "backtest_end_date": ensure_iso(self.backtest_end_date),
@@ -216,8 +255,6 @@ class BacktestRun:
 
         # Validate and set defaults for required fields
         required_fields = {
-            "backtest_start_date": "2020-01-01 00:00:00",
-            "backtest_end_date": "2020-01-02 00:00:00",
             "created_at": "2020-01-01 00:00:00",
             "trading_symbol": "USD",
             "initial_unallocated": 1000.0,
@@ -249,9 +286,7 @@ class BacktestRun:
                 dt = dt.astimezone(timezone.utc)
             return dt
 
-        data["backtest_start_date"] = _parse_dt(data["backtest_start_date"])
-        data["backtest_end_date"] = _parse_dt(data["backtest_end_date"])
-        data["created_at"] = _parse_dt(data["created_at"])
+        data["created_at"] = _parse_dt(data.get("created_at") or "2020-01-01 00:00:00")
 
         # Parse orders with error handling
         orders = []
@@ -324,6 +359,56 @@ class BacktestRun:
                         pass
                 parsed_entries.append((dt, entry.get("value")))
             recorded_values[key] = parsed_entries
+
+        # Reconstruct BacktestWindow: prefer explicit key, fall back to
+        # legacy flat backtest_start_date / backtest_end_date.
+        bw_raw = data.pop("backtest_window", None)
+        if bw_raw is not None and isinstance(bw_raw, dict):
+            from .backtest_date_range import BacktestDateRange
+            tr_raw = bw_raw.get("train_range") or {}
+            te_raw = bw_raw.get("test_range")
+            _bw_train = BacktestDateRange(
+                start_date=_parse_dt(tr_raw.get("start")),
+                end_date=_parse_dt(tr_raw.get("end")),
+                name=tr_raw.get("name"),
+            )
+            _bw_test = (
+                BacktestDateRange(
+                    start_date=_parse_dt(te_raw.get("start")),
+                    end_date=_parse_dt(te_raw.get("end")),
+                    name=te_raw.get("name"),
+                )
+                if te_raw is not None else None
+            )
+            data["backtest_window"] = BacktestWindow(
+                train_range=_bw_train,
+                test_range=_bw_test,
+                warmup_days=bw_raw.get("warmup_days", 0),
+                fold_index=bw_raw.get("fold_index"),
+                name=bw_raw.get("name"),
+            )
+        elif bw_raw is not None:  # already a BacktestWindow instance
+            data["backtest_window"] = bw_raw
+        else:
+            # Legacy flat format — synthesise a BacktestWindow.
+            from .backtest_date_range import BacktestDateRange
+            raw_start = data.get("backtest_start_date")
+            raw_end = data.get("backtest_end_date")
+            raw_name = data.get("backtest_date_range_name")
+            if raw_start is not None:
+                start_dt = _parse_dt(raw_start)
+                end_dt = _parse_dt(raw_end) if raw_end is not None else start_dt
+                data["backtest_window"] = BacktestWindow(
+                    train_range=BacktestDateRange(
+                        start_date=start_dt,
+                        end_date=end_dt,
+                        name=raw_name,
+                    )
+                )
+        # Always drop flat date keys — they are now derived from the window.
+        data.pop("backtest_start_date", None)
+        data.pop("backtest_end_date", None)
+        data.pop("backtest_date_range_name", None)
 
         # Drop fields not present on the dataclass (forward-compat).
         # The dataclass has ``backtest_metrics`` but we set it explicitly

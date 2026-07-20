@@ -7,6 +7,7 @@ from investing_algorithm_framework.app import Algorithm
 from investing_algorithm_framework.domain import  BacktestRun, \
     BacktestDateRange, PortfolioSnapshot, Backtest, BacktestMetrics
 from tests.resources.strategies_for_testing.strategy_one import StrategyOne
+from investing_algorithm_framework.domain import BacktestWindow, BacktestDateRange
 
 
 class Test(TestCase):
@@ -58,9 +59,13 @@ class Test(TestCase):
             name="Test Backtest Date Range"
         )
         run = BacktestRun(
-            backtest_start_date=backtest_date_range.start_date,
-            backtest_end_date=backtest_date_range.end_date,
-            backtest_date_range_name=backtest_date_range.name,
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=backtest_date_range.start_date,
+                    end_date=backtest_date_range.end_date,
+                    name=backtest_date_range.name,
+                )
+            ),
             orders=[],
             trades=[],
             positions=[],
@@ -73,7 +78,7 @@ class Test(TestCase):
 
         backtest = Backtest(
             algorithm_id="alg-025",
-            backtest_runs=[run],
+            vector_runs=[run],
         )
         backtest.save(self.output_path)
 
@@ -81,7 +86,7 @@ class Test(TestCase):
         self.assertTrue(os.path.exists(self.output_path))
 
         # Check if the runs directory exists
-        runs_dir = os.path.join(self.output_path, "runs")
+        runs_dir = os.path.join(self.output_path, "vector_runs")
         self.assertTrue(os.path.exists(runs_dir))
 
         # Check if the backtest run directory exists
@@ -123,9 +128,13 @@ class Test(TestCase):
             name="Test Backtest Date Range"
         )
         results = BacktestRun(
-            backtest_start_date=backtest_date_range.start_date,
-            backtest_end_date=backtest_date_range.end_date,
-            backtest_date_range_name=backtest_date_range.name,
+            backtest_window=BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=backtest_date_range.start_date,
+                    end_date=backtest_date_range.end_date,
+                    name=backtest_date_range.name,
+                )
+            ),
             created_at=datetime.now(tz=timezone.utc),
             orders=[],
             trades=[],
@@ -135,8 +144,8 @@ class Test(TestCase):
             number_of_runs=1000,
             initial_unallocated=1000,
             backtest_metrics=BacktestMetrics(
-                backtest_start_date=datetime(2023, 8, 7, 7, 59, tzinfo=None),
-                backtest_end_date=datetime(2023, 8, 7, 7, 59, tzinfo=None),
+                backtest_start_date=datetime(2023, 8, 7, 7, 0, tzinfo=None),
+                backtest_end_date=datetime(2023, 8, 8, 7, 0, tzinfo=None),
                 equity_curve=[],
                 total_net_gain=0.2,
                 cagr=0.1,
@@ -157,7 +166,7 @@ class Test(TestCase):
 
         backtest = Backtest(
             algorithm_id="alg-025",
-            backtest_runs=[results],
+            vector_runs=[results],
             risk_free_rate=0.0
         )
         backtest.save(self.output_path)
@@ -166,7 +175,7 @@ class Test(TestCase):
         self.assertTrue(os.path.exists(self.output_path))
 
         # Check if the runs directory exists
-        runs_dir = os.path.join(self.output_path, "runs")
+        runs_dir = os.path.join(self.output_path, "vector_runs")
         self.assertTrue(os.path.exists(runs_dir))
 
         # Check if the backtest run directory exists

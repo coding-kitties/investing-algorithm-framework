@@ -1,128 +1,12 @@
 import pandas as pd
 from logging import getLogger
 from datetime import datetime
-from typing import List, Dict, Union
-from datetime import timezone
+from typing import List
 
 from investing_algorithm_framework.domain import BacktestDateRange, \
-    OperationalException
+    BacktestWindow
 
 logger = getLogger(__name__)
-
-
-def select_backtest_date_ranges(
-    df: pd.DataFrame, window: Union[str, int] = '365D'
-) -> List[BacktestDateRange]:
-    """
-    Identifies the best upturn, worst downturn, and sideways periods
-    for the given window duration. This allows you to quickly select
-    interesting periods for backtesting.
-
-    Args:
-        df (pd.DataFrame): DataFrame with a DateTime index
-            and 'Close' column.
-        window (Union[str, int]): Duration of the window
-            to analyze. Can be a string like '365D' or an
-            integer representing days.
-
-    Returns:
-        List[BacktestDateRange]: List of BacktestDateRange
-            objects representing the best upturn, worst
-            downturn, and most sideways periods.
-    """
-    df = df.copy()
-    df = df.sort_index()
-
-    if isinstance(window, int):
-        window = pd.Timedelta(days=window)
-    elif isinstance(window, str):
-        window = pd.to_timedelta(window)
-    else:
-        raise OperationalException("window must be a string or integer")
-
-    # Check if the window is larger than the DataFrame
-    if len(df) == 0:
-        raise OperationalException("DataFrame is empty")
-
-    if df.index[-1] - df.index[0] < window:
-        raise OperationalException(
-            "Window duration is larger than the data duration"
-        )
-
-    if len(df) < 2 or df.index[-1] - df.index[0] < window:
-        raise OperationalException(
-            "DataFrame must contain at least two rows and span "
-            "the full window duration"
-        )
-
-    best_upturn = {
-        "name": "UpTurn", "return": float('-inf'), "start": None, "end": None
-    }
-    worst_downturn = {
-        "name": "DownTurn", "return": float('inf'), "start": None, "end": None
-    }
-    most_sideways = {
-        "name": "SideWays",
-        "volatility": float('inf'),
-        "return": None,
-        "start": None,
-        "end": None
-    }
-
-    for i in range(len(df)):
-        start_time = df.index[i]
-        end_time = start_time + window
-        window_df = df[(df.index >= start_time) & (df.index <= end_time)]
-
-        if len(window_df) < 2 or (window_df.index[-1] - start_time) < window:
-            continue
-
-        start_price = window_df['Close'].iloc[0]
-        end_price = window_df['Close'].iloc[-1]
-        ret = (end_price / start_price) - 1  # relative return
-        volatility = window_df['Close'].std()
-
-        # Ensure datetime for BacktestDateRange and with timezone utc
-        start_time = pd.Timestamp(start_time).to_pydatetime()
-        start_time = start_time.replace(tzinfo=timezone.utc)
-        end_time = pd.Timestamp(window_df.index[-1]).to_pydatetime()
-        end_time = end_time.replace(tzinfo=timezone.utc)
-
-        if ret > best_upturn["return"]:
-            best_upturn.update(
-                {"return": ret, "start": start_time, "end": end_time}
-            )
-
-        if ret < worst_downturn["return"]:
-            worst_downturn.update(
-                {"return": ret, "start": start_time, "end": end_time}
-            )
-
-        if volatility < most_sideways["volatility"]:
-            most_sideways.update({
-                "return": ret,
-                "volatility": volatility,
-                "start": start_time,
-                "end": end_time
-            })
-
-    return [
-        BacktestDateRange(
-            start_date=best_upturn['start'],
-            end_date=best_upturn['end'],
-            name=best_upturn['name']
-        ),
-        BacktestDateRange(
-            start_date=worst_downturn['start'],
-            end_date=worst_downturn['end'],
-            name=worst_downturn['name']
-        ),
-        BacktestDateRange(
-            start_date=most_sideways['start'],
-            end_date=most_sideways['end'],
-            name=most_sideways['name']
-        )
-    ]
 
 
 def generate_rolling_backtest_windows(
@@ -132,7 +16,8 @@ def generate_rolling_backtest_windows(
     test_days: int = 90,
     step_days: int = 90,
     gap_days: int = 0,
-) -> List[Dict[str, BacktestDateRange]]:
+    warmup_days: int = 0,
+) -> List[BacktestWindow]:
     """
     Generate rolling windows for walk-forward backtesting.
 
@@ -151,11 +36,14 @@ def generate_rolling_backtest_windows(
         gap_days (int): Number of days to skip between train and test windows.
             Useful to avoid look-ahead bias in indicators
             with lag (e.g., 26 for MACD). Default is 0 (no gap).
+        warmup_days (int): Number of days at the start of each training
+            window reserved for warming up indicators. Must be less than
+            train_days. Default is 0.
 
     Returns:
-        List[Dict[str, BacktestDateRange]]: A list of dictionaries containing:
-            - "train_range": BacktestDateRange for training period
-            - "test_range": BacktestDateRange for testing period
+        List[BacktestWindow]: A list of BacktestWindow objects, each
+            containing a train_range, test_range, gap_days, and
+            warmup_days.
 
     Example:
         >>> windows = generate_rolling_backtest_windows(
@@ -164,7 +52,8 @@ def generate_rolling_backtest_windows(
         ...     train_days=365,
         ...     test_days=90,
         ...     step_days=90,
-        ...     gap_days=30
+        ...     gap_days=30,
+        ...     warmup_days=26,
         ... )
     """
     windows = []
@@ -192,11 +81,105 @@ def generate_rolling_backtest_windows(
             start_date=test_start,
             end_date=test_end
         )
-        windows.append({
-            "train_range": train_backtest_date_range,
-            "test_range": test_backtest_date_range,
-        })
+        windows.append(BacktestWindow(
+            train_range=train_backtest_date_range,
+            test_range=test_backtest_date_range,
+            warmup_days=warmup_days,
+        ))
 
         current_start += pd.Timedelta(days=step_days)
+
+    return windows
+
+
+def generate_k_fold_backtest_windows(
+    start_date: datetime,
+    end_date: datetime,
+    n_splits: int = 5,
+    gap_days: int = 0,
+    min_train_days: int = 0,
+    warmup_days: int = 0,
+) -> List[BacktestWindow]:
+    """
+    Generate time-series k-fold windows for walk-forward cross-validation.
+
+    The total date range is divided into ``n_splits`` equal-sized test folds
+    in strictly chronological order. For fold ``i``, the training window is
+    an *expanding* window covering ``[start_date, test_fold_i.start - gap_days)``,
+    so every day in the range appears in exactly one test fold and there is
+    no look-ahead bias.
+
+    This is especially useful for parameter selection and strategy ranking:
+    pick parameter sets that perform consistently well across *all* k folds,
+    not just a single rolling split.
+
+    Args:
+        start_date (datetime): Start of the overall date range.
+        end_date (datetime): End of the overall date range.
+        n_splits (int): Number of folds. Default is 5.
+        gap_days (int): Days to skip between the end of training and the
+            start of the test fold. Mirrors the same parameter in
+            ``generate_rolling_backtest_windows``. Default is 0.
+        min_train_days (int): Minimum number of effective training days
+            required for a fold to be included. Early folds whose training
+            history is shorter than this are silently skipped (e.g. set to
+            200 if your strategy needs a 200-day SMA). Default is 0.
+        warmup_days (int): Days at the start of each training window
+            reserved for warming up indicators. Must be less than the
+            effective training duration for any included fold. Default is 0.
+
+    Returns:
+        List[BacktestWindow]: One ``BacktestWindow`` per included fold, with
+            ``fold_index`` set to the zero-based fold number.
+
+    Example:
+        >>> windows = generate_k_fold_backtest_windows(
+        ...     start_date=datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ...     end_date=datetime(2024, 12, 31, tzinfo=timezone.utc),
+        ...     n_splits=5,
+        ...     gap_days=0,
+        ...     min_train_days=200,
+        ...     warmup_days=26,
+        ... )
+    """
+    if n_splits < 2:
+        raise ValueError("n_splits must be >= 2")
+
+    total_days = (end_date - start_date).days
+    fold_size = total_days // n_splits
+    windows = []
+
+    for i in range(n_splits):
+        test_start = start_date + pd.Timedelta(days=i * fold_size)
+
+        # Last fold absorbs any leftover days so the full range is covered.
+        if i == n_splits - 1:
+            test_end = end_date
+        else:
+            test_end = test_start + pd.Timedelta(days=fold_size)
+
+        train_end = test_start - pd.Timedelta(days=gap_days)
+        train_days = (train_end - start_date).days
+
+        # Skip folds where there is no usable training history.
+        if train_days < min_train_days or train_end <= start_date:
+            continue
+
+        train_backtest_date_range = BacktestDateRange(
+            name=f"train_fold_{i}",
+            start_date=start_date,
+            end_date=train_end,
+        )
+        test_backtest_date_range = BacktestDateRange(
+            name=f"test_fold_{i}",
+            start_date=test_start,
+            end_date=test_end,
+        )
+        windows.append(BacktestWindow(
+            train_range=train_backtest_date_range,
+            test_range=test_backtest_date_range,
+            warmup_days=warmup_days,
+            fold_index=i,
+        ))
 
     return windows

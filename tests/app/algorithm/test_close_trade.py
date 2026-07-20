@@ -36,7 +36,8 @@ class Test(TestBase):
         btc_position = self.app.context.get_position("BTC")
         self.assertIsNotNone(btc_position)
         self.assertEqual(0, btc_position.get_amount())
-        self.assertEqual(1, len(self.app.context.get_trades()))
+        # v9.0 (#431) — BUY trade is deferred until the order fills.
+        self.assertEqual(0, len(self.app.context.get_trades()))
 
         with patch.object(
             self.app.container.data_provider_service(),
@@ -87,7 +88,8 @@ class Test(TestBase):
         btc_position = self.app.context.get_position("BTC")
         self.assertIsNotNone(btc_position)
         self.assertEqual(0, btc_position.get_amount())
-        self.assertEqual(1, len(self.app.context.get_trades()))
+        # v9.0 (#431) — BUY trade is deferred until the order fills.
+        self.assertEqual(0, len(self.app.context.get_trades()))
 
         with patch.object(
             self.app.container.data_provider_service(),

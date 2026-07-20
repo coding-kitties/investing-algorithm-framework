@@ -22,7 +22,8 @@ class TestGetTrades(BitvavoTestBase):
             target_symbol="BTC", price=10, order_side="BUY", amount=20
         )
         self.assertIsNotNone(order)
-        self.assertEqual(1, len(self.app.context.get_trades()))
+        # v9.0 (#431) — BUY trade is deferred until fill.
+        self.assertEqual(0, len(self.app.context.get_trades()))
         order_service = self.app.container.order_service()
         order_service.check_pending_orders()
         self.assertEqual(1, len(self.app.context.get_trades()))
@@ -196,7 +197,8 @@ class TestCloseTrade(BitvavoTestBase):
         btc_position = self.app.context.get_position("BTC")
         self.assertIsNotNone(btc_position)
         self.assertEqual(0, btc_position.get_amount())
-        self.assertEqual(1, len(self.app.context.get_trades()))
+        # v9.0 (#431) — BUY trade is deferred until fill.
+        self.assertEqual(0, len(self.app.context.get_trades()))
 
         with patch.object(
             self.app.container.data_provider_service(),
@@ -234,7 +236,8 @@ class TestCloseTrade(BitvavoTestBase):
         btc_position = self.app.context.get_position("BTC")
         self.assertIsNotNone(btc_position)
         self.assertEqual(0, btc_position.get_amount())
-        self.assertEqual(1, len(self.app.context.get_trades()))
+        # v9.0 (#431) — BUY trade is deferred until fill.
+        self.assertEqual(0, len(self.app.context.get_trades()))
 
         with patch.object(
             self.app.container.data_provider_service(),
@@ -268,4 +271,3 @@ class TestCloseTrade(BitvavoTestBase):
 
         with self.assertRaises(OperationalException):
             self.app.context.close_trade(trade)
-

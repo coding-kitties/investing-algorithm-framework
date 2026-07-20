@@ -17,6 +17,7 @@ from investing_algorithm_framework.cli.mcp_server import (
     _save_notes,
 )
 from investing_algorithm_framework.domain.backtesting.backtest import Backtest
+from investing_algorithm_framework.domain import BacktestWindow, BacktestDateRange
 from investing_algorithm_framework.domain.backtesting.backtest_run import (
     BacktestRun,
 )
@@ -40,7 +41,9 @@ def _make_metrics(
 ):
     return BacktestMetrics(
         backtest_start_date=start,
+
         backtest_end_date=end,
+
         backtest_date_range_name=name,
         trading_symbol="EUR",
         initial_unallocated=10000.0,
@@ -68,12 +71,16 @@ def _make_metrics(
 def _make_run(start, end, name, **kw):
     m = _make_metrics(start, end, name, **kw)
     return BacktestRun(
-        backtest_start_date=start,
-        backtest_end_date=end,
+        backtest_window=BacktestWindow(
+            train_range=BacktestDateRange(
+                start_date=start,
+                end_date=end,
+                name=name,
+            )
+        ),
         trading_symbol="EUR",
         initial_unallocated=10000.0,
         backtest_metrics=m,
-        backtest_date_range_name=name,
         number_of_trades=kw.get("trades", 20),
     )
 
@@ -94,7 +101,7 @@ def _make_backtest(algo_id, tag="", **kw):
     summary = generate_backtest_summary_metrics(metrics_list)
     return Backtest(
         algorithm_id=algo_id,
-        backtest_runs=[run1, run2],
+        vector_runs=[run1, run2],
         backtest_summary=summary,
         parameters={"sma": 20, "rsi": 30},
         tag=tag,

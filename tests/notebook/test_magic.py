@@ -1,6 +1,7 @@
 from unittest import TestCase
 from unittest.mock import MagicMock
 
+from investing_algorithm_framework import Schedule, TimeUnit
 from investing_algorithm_framework.notebook.magic import (
     _build_parser,
     _parse_date,
@@ -100,9 +101,7 @@ class TestFindStrategyClasses(TestCase):
         from investing_algorithm_framework.app.strategy import TradingStrategy
 
         class DummyStrategy(TradingStrategy):
-            time_unit = "DAY"
-            interval = 1
-
+            schedule = Schedule.every(1, TimeUnit.DAY)
         ns = {"DummyStrategy": DummyStrategy, "x": 42, "s": "hello"}
         found = _find_strategy_classes(ns)
         self.assertEqual(len(found), 1)
@@ -112,13 +111,9 @@ class TestFindStrategyClasses(TestCase):
         from investing_algorithm_framework.app.strategy import TradingStrategy
 
         class StratA(TradingStrategy):
-            time_unit = "DAY"
-            interval = 1
-
+            schedule = Schedule.every(1, TimeUnit.DAY)
         class StratB(TradingStrategy):
-            time_unit = "HOUR"
-            interval = 4
-
+            schedule = Schedule.every(4, TimeUnit.HOUR)
         ns = {"StratA": StratA, "StratB": StratB}
         found = _find_strategy_classes(ns)
         self.assertEqual(len(found), 2)

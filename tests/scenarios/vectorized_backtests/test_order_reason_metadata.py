@@ -16,7 +16,8 @@ import pandas as pd
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    RESOURCE_DIRECTORY, ScalingRule, CSVOHLCVDataProvider
+    RESOURCE_DIRECTORY, ScalingRule, CSVOHLCVDataProvider, Schedule, \
+    SignalSeries, SignalSide
 
 # ═══════════════════════════════════════════════════════════════════════
 # Reuses OHLCV_BTC-EUR_BITVAVO_2h_SCALING_FAST.csv:
@@ -49,8 +50,7 @@ def _make_data_source():
 
 class ScalingStrategy(TradingStrategy):
     """Buy at 110, scale-in at 115, scale-out at 120, sell at 90."""
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
@@ -63,40 +63,45 @@ class ScalingStrategy(TradingStrategy):
         ),
     ]
 
-    def generate_buy_signals(self, data):
+    def generate_signal_series(self, data):
         df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 110}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
-
-    def generate_scale_in_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 115}
-
-    def generate_scale_out_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 120}
+        yield SignalSeries(
+            symbol="BTC", side=SignalSide.OPEN_LONG,
+            series=df['Close'] == 110,
+        )
+        yield SignalSeries(
+            symbol="BTC", side=SignalSide.CLOSE_LONG,
+            series=df['Close'] == 90,
+        )
+        yield SignalSeries(
+            symbol="BTC", side=SignalSide.SCALE_IN,
+            series=df['Close'] == 115,
+        )
+        yield SignalSeries(
+            symbol="BTC", side=SignalSide.SCALE_OUT,
+            series=df['Close'] == 120,
+        )
 
 
 class SimpleBuySellStrategy(TradingStrategy):
     """Buy at 110, sell at 90. No scaling."""
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
         PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
     ]
 
-    def generate_buy_signals(self, data):
+    def generate_signal_series(self, data):
         df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 110}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
+        yield SignalSeries(
+            symbol="BTC", side=SignalSide.OPEN_LONG,
+            series=df['Close'] == 110,
+        )
+        yield SignalSeries(
+            symbol="BTC", side=SignalSide.CLOSE_LONG,
+            series=df['Close'] == 90,
+        )
 
 
 def _run(strategy_class, algorithm_id):

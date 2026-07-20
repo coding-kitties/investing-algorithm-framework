@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Union
 
 from investing_algorithm_framework.services import ConfigurationService, \
     MarketCredentialService, OrderService, PortfolioConfigurationService, \
@@ -482,6 +482,189 @@ class Context:
             "trading_symbol": portfolio.trading_symbol,
             "metadata": order_metadata,
         }
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            order_data["created_at"] = \
+                self.configuration_service.config[INDEX_DATETIME]
+
+        order_data["_execute"] = execute
+        order_data["_validate"] = validate
+        order_data["_sync"] = sync
+
+        return self._blotter.place_order(order_data, self)
+
+    # ------------------------------------------------------------------
+    # Short-selling order creation (#434 phase 1).
+    #
+    # Plumbing only: ``execute`` and ``sync`` default to ``False`` so
+    # the order is validated and persisted but never reaches the
+    # event-engine sync paths (which are implemented in phase 2). Use
+    # ``validate=True, execute=False, sync=False`` (the defaults) to
+    # exercise the SHORT/COVER validators in tests today. The vector
+    # backtest engine routes SHORT/COVER independently via
+    # ``generate_signal_series`` with SignalSide.OPEN_SHORT /
+    # SignalSide.CLOSE_SHORT (#433).
+    # ------------------------------------------------------------------
+    def create_short_order(
+        self,
+        target_symbol,
+        price,
+        amount=None,
+        percentage_of_portfolio=None,
+        order_type=OrderType.LIMIT,
+        market=None,
+        execute=True,
+        validate=True,
+        sync=True,
+        metadata=None,
+    ) -> Order:
+        """
+        Create a SHORT (short-entry) order.
+
+        Sizing: pass either ``amount`` (units of the underlying) or
+        ``percentage_of_portfolio`` (cash collateral as a percentage
+        of the portfolio's net size, full collateral, no leverage).
+
+        Args:
+            target_symbol (str): The symbol to short.
+            price (float): Limit price (or reference price for
+                MARKET/STOP orders).
+            amount (float, optional): Units of the underlying to
+                short.
+            percentage_of_portfolio (float, optional): Cash collateral
+                as a percentage of portfolio net size (1–100).
+            order_type (OrderType): Order type (defaults to LIMIT).
+            market (str, optional): Market the order routes through.
+            execute (bool): Whether to execute via the configured
+                order executor (default True).
+            validate (bool): Run the SHORT validator (default True).
+            sync (bool): Whether to sync the portfolio/position state
+                with the created order (default True).
+            metadata (dict, optional): Order metadata.
+
+        Returns:
+            Order: The created order.
+        """
+        if amount is None and percentage_of_portfolio is None:
+            raise OperationalException(
+                "Either amount or percentage_of_portfolio must be "
+                "specified to create a short order."
+            )
+
+        portfolio = self.portfolio_service.find({"market": market})
+
+        if percentage_of_portfolio is not None:
+            if price is None or price <= 0:
+                raise OperationalException(
+                    "A positive price is required to size a short "
+                    "order by percentage_of_portfolio."
+                )
+            net_size = portfolio.get_net_size()
+            collateral = net_size * (percentage_of_portfolio / 100)
+            amount = collateral / price
+
+        order_data = {
+            "target_symbol": target_symbol,
+            "price": price,
+            "amount": amount,
+            "order_type": OrderType.from_value(order_type).value,
+            "order_side": OrderSide.SHORT.value,
+            "portfolio_id": portfolio.id,
+            "status": OrderStatus.CREATED.value,
+            "trading_symbol": portfolio.trading_symbol,
+        }
+
+        if metadata is not None:
+            order_data["metadata"] = metadata
+
+        if BACKTESTING_FLAG in self.configuration_service.config \
+                and self.configuration_service.config[BACKTESTING_FLAG]:
+            order_data["created_at"] = \
+                self.configuration_service.config[INDEX_DATETIME]
+
+        order_data["_execute"] = execute
+        order_data["_validate"] = validate
+        order_data["_sync"] = sync
+
+        return self._blotter.place_order(order_data, self)
+
+    def create_cover_order(
+        self,
+        target_symbol,
+        price,
+        amount=None,
+        percentage_of_position=None,
+        order_type=OrderType.LIMIT,
+        market=None,
+        execute=True,
+        validate=True,
+        sync=True,
+        metadata=None,
+    ) -> Order:
+        """
+        Create a COVER (short-close) order.
+
+        Sizing: pass either ``amount`` (units of the underlying) or
+        ``percentage_of_position`` (percentage of the open short to
+        close, 1–100).
+
+        Args:
+            target_symbol (str): The symbol of the open short.
+            price (float): Limit price (or reference price for
+                MARKET/STOP orders).
+            amount (float, optional): Units to cover.
+            percentage_of_position (float, optional): Percentage of
+                the open short to close.
+            order_type (OrderType): Order type (defaults to LIMIT).
+            market (str, optional): Market the order routes through.
+            execute (bool): Whether to execute via the configured
+                order executor (default True).
+            validate (bool): Run the COVER validator (default True).
+            sync (bool): Whether to sync the portfolio/position state
+                with the created order (default True).
+            metadata (dict, optional): Order metadata.
+
+        Returns:
+            Order: The created order.
+        """
+        if amount is None and percentage_of_position is None:
+            raise OperationalException(
+                "Either amount or percentage_of_position must be "
+                "specified to create a cover order."
+            )
+
+        portfolio = self.portfolio_service.find({"market": market})
+
+        if percentage_of_position is not None:
+            position = self.position_service.find(
+                {
+                    "symbol": target_symbol,
+                    "portfolio": portfolio.id,
+                }
+            )
+            position_amount = position.get_amount() or 0
+            if position_amount >= 0:
+                raise OperationalException(
+                    f"Can't size cover by percentage_of_position: "
+                    f"no open short on {target_symbol} "
+                    f"(amount={position_amount})"
+                )
+            amount = abs(position_amount) * (percentage_of_position / 100)
+
+        order_data = {
+            "target_symbol": target_symbol,
+            "price": price,
+            "amount": amount,
+            "order_type": OrderType.from_value(order_type).value,
+            "order_side": OrderSide.COVER.value,
+            "portfolio_id": portfolio.id,
+            "status": OrderStatus.CREATED.value,
+            "trading_symbol": portfolio.trading_symbol,
+        }
+
+        if metadata is not None:
+            order_data["metadata"] = metadata
 
         if BACKTESTING_FLAG in self.configuration_service.config \
                 and self.configuration_service.config[BACKTESTING_FLAG]:
@@ -2280,14 +2463,21 @@ class Context:
 
     def add_stop_loss(
         self,
-        trade: Trade,
-        percentage: float,
+        trade: Trade = None,
+        percentage: float = None,
         trailing: bool = False,
         sell_percentage: float = 100,
         created_at: datetime = None,
-    ) -> TradeStopLoss:
+        order: Order = None,
+    ) -> Union[TradeStopLoss, None]:
         """
-        Function to add a stop loss to a trade.
+        Function to add a stop loss to a trade or a pending buy order.
+
+        v9.0 (#431) — you may now pass ``order=`` to attach a stop-loss
+        rule to a BUY order that has not been filled yet. The rule
+        will be materialized onto each trade created as the order
+        fills (one trade per fill event). This is the recommended
+        pattern since BUY orders no longer create trades eagerly.
 
         Example of fixed stop loss:
             * You buy BTC at $40,000.
@@ -2303,7 +2493,8 @@ class Context:
             * BTC price drops to $39,900 → SL level reached, trade closes.
 
         Args:
-            trade (Trade): Trade object representing the trade
+            trade (Trade): An already-open trade to attach the rule to.
+                Mutually exclusive with ``order``.
             percentage (float): float representing the percentage
                 of the open price that the stop loss should
                 be set at. This must be a positive
@@ -2316,10 +2507,55 @@ class Context:
             created_at: datetime: The date and time when the stop loss
                 was created. If not specified, the current date and time
                 will be used.
+            order (Order): A pending BUY order to attach the rule to.
+                The rule will be queued on the order and applied to
+                each trade created at fill time. Mutually exclusive
+                with ``trade``.
 
         Returns:
-            None
+            TradeStopLoss when attached to a trade, ``None`` when
+            queued on an unfilled order.
         """
+        if percentage is None:
+            raise OperationalException(
+                "add_stop_loss requires a 'percentage' argument."
+            )
+
+        if trade is None and order is None:
+            raise OperationalException(
+                "add_stop_loss requires either a 'trade' or an 'order' "
+                "argument."
+            )
+
+        if trade is not None and order is not None:
+            raise OperationalException(
+                "add_stop_loss accepts either 'trade' or 'order', "
+                "not both."
+            )
+
+        if order is not None:
+            stored = self.order_service.get(order.id)
+            # Preserve original updated_at so backtest fill checks
+            # (which filter OHLCV by Datetime >= updated_at) still
+            # match historical bars after a metadata-only save (#434).
+            prev_updated_at = stored.updated_at
+            stored.add_pending_stop_loss(
+                percentage=percentage,
+                trailing=trailing,
+                sell_percentage=sell_percentage,
+            )
+            # SQLAlchemy doesn't observe in-place mutations of the
+            # JSON metadata dict — sync the persisted column manually
+            # so pending rules survive a reload at fill time (#434).
+            if hasattr(stored, "metadata_json"):
+                import json as _json
+                stored.metadata_json = _json.dumps(stored.metadata)
+            stored.updated_at = prev_updated_at
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(stored, "updated_at")
+            self.order_service.repository.save(stored)
+            return None
+
         return self.trade_service.add_stop_loss(
             trade,
             percentage=percentage,
@@ -2330,16 +2566,20 @@ class Context:
 
     def add_take_profit(
         self,
-        trade: Trade,
-        percentage: float,
+        trade: Trade = None,
+        percentage: float = None,
         trailing: bool = False,
         sell_percentage: float = 100,
         created_at: datetime = None,
-    ) -> TradeTakeProfit:
+        order: Order = None,
+    ) -> Union[TradeTakeProfit, None]:
         """
-        Function to add a take profit to a trade. This function will add a
-        take profit to the specified trade. If the take profit is triggered,
-        the trade will be closed.
+        Function to add a take profit to a trade or a pending buy order.
+
+        v9.0 (#431) — you may now pass ``order=`` to attach a
+        take-profit rule to a BUY order that has not been filled yet.
+        The rule will be materialized onto each trade created as the
+        order fills (one trade per fill event).
 
         Example of take profit:
             * You buy BTC at $40,000.
@@ -2355,23 +2595,63 @@ class Context:
             * BTC drops to $42,750 → Trade closes, securing profit.
 
         Args:
-            trade (Trade): Trade object representing the trade
+            trade (Trade): An already-open trade to attach the rule to.
+                Mutually exclusive with ``order``.
             percentage (float): float representing the percentage
-                of the open price that the stop loss should
+                of the open price that the take profit should
                 be set at. This must be a positive
                 number, e.g. 5 for 5%, or 10 for 10%.
             trailing (bool): Whether the take profit should be trailing
                 or fixed.
             sell_percentage (float): float representing the
                 percentage of the trade that should be sold if the
-                stop loss is triggered
+                take profit is triggered
             created_at: datetime: The date and time when the take profit
                 was created. If not specified, the current date and time
                 will be used.
+            order (Order): A pending BUY order to attach the rule to.
+                The rule will be queued on the order and applied to
+                each trade created at fill time. Mutually exclusive
+                with ``trade``.
 
         Returns:
-            None
+            TradeTakeProfit when attached to a trade, ``None`` when
+            queued on an unfilled order.
         """
+        if percentage is None:
+            raise OperationalException(
+                "add_take_profit requires a 'percentage' argument."
+            )
+
+        if trade is None and order is None:
+            raise OperationalException(
+                "add_take_profit requires either a 'trade' or an 'order' "
+                "argument."
+            )
+
+        if trade is not None and order is not None:
+            raise OperationalException(
+                "add_take_profit accepts either 'trade' or 'order', "
+                "not both."
+            )
+
+        if order is not None:
+            stored = self.order_service.get(order.id)
+            prev_updated_at = stored.updated_at
+            stored.add_pending_take_profit(
+                percentage=percentage,
+                trailing=trailing,
+                sell_percentage=sell_percentage,
+            )
+            if hasattr(stored, "metadata_json"):
+                import json as _json
+                stored.metadata_json = _json.dumps(stored.metadata)
+            stored.updated_at = prev_updated_at
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(stored, "updated_at")
+            self.order_service.repository.save(stored)
+            return None
+
         return self.trade_service.add_take_profit(
             trade,
             percentage=percentage,

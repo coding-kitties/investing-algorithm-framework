@@ -17,6 +17,7 @@ from investing_algorithm_framework import (
     TimeFrame,
     TimeUnit,
     TradingStrategy,
+    Schedule,
 )
 from investing_algorithm_framework.domain import OperationalException
 
@@ -30,8 +31,7 @@ class _LongPipeline(Pipeline):
 
 
 class _PipelineStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 1
+    schedule = Schedule.every(1, TimeUnit.HOUR)
     symbols = ["BTC"]
 
     def generate_buy_signals(self, data):  # pragma: no cover - not exercised

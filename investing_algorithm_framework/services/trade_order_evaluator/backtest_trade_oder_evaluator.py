@@ -164,6 +164,15 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
             triggered_candle = trigger_candles.head(1)
             order.set_triggered_at(triggered_candle["Datetime"][0])
 
+            # v9.0 (#431) — persist the trigger timestamp immediately
+            # so that a STOP_LIMIT that triggers but doesn't fill in
+            # the same bar still remembers it triggered when the
+            # evaluator reloads the order in a later iteration.
+            self.order_service.repository.update(
+                order.id,
+                {"triggered_at": order.get_triggered_at()},
+            )
+
             if is_stop:
                 # STOP becomes a market order — fill at the stop price
                 # using the triggering candle's volume.
@@ -189,12 +198,16 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
                 return
 
         # Limit orders (including triggered STOP_LIMIT):
-        # check if OHLCV data triggers a fill
-        if OrderSide.BUY.equals(order_side):
+        # check if OHLCV data triggers a fill.
+        # BUY / COVER fill when Low <= limit (a seller meets our bid).
+        # SELL / SHORT fill when High >= limit (a buyer meets our ask).
+        if OrderSide.BUY.equals(order_side) \
+                or OrderSide.COVER.equals(order_side):
             fill_candles = ohlcv_data_after_order.filter(
                 pl.col('Low') <= order_price
             )
-        elif OrderSide.SELL.equals(order_side):
+        elif OrderSide.SELL.equals(order_side) \
+                or OrderSide.SHORT.equals(order_side):
             fill_candles = ohlcv_data_after_order.filter(
                 pl.col('High') >= order_price
             )
@@ -240,7 +253,8 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
                 self._blotter.get_fill_amount(remaining, volume),
                 remaining
             )
-            if OrderSide.BUY.equals(order_side):
+            if OrderSide.BUY.equals(order_side) \
+                    or OrderSide.COVER.equals(order_side):
                 slippage = fill_price - base_price
             else:
                 slippage = base_price - fill_price
@@ -254,7 +268,8 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
             fill_amount = min(
                 tc.get_max_fill_amount(remaining, volume), remaining,
             )
-            if OrderSide.BUY.equals(order_side):
+            if OrderSide.BUY.equals(order_side) \
+                    or OrderSide.COVER.equals(order_side):
                 fill_price = tc.get_buy_fill_price(
                     base_price, amount=fill_amount, volume=volume,
                 )
@@ -301,44 +316,11 @@ class BacktestTradeOrderEvaluator(TradeOrderEvaluator):
         if order.is_triggered():
             update_data['triggered_at'] = order.get_triggered_at()
 
-        # Market order portfolio reconciliation
-        if is_market_order and new_remaining <= 0:
-            estimated_price = order.estimated_price
-
-            if estimated_price is not None:
-                price_delta = fill_price - estimated_price
-                cost_adjustment = price_delta * order.amount
-
-                if cost_adjustment != 0:
-                    position = self.order_service.position_service.get(
-                        order.position_id
-                    )
-                    portfolio = \
-                        self.order_service.portfolio_repository.get(
-                            position.portfolio_id
-                        )
-
-                    if OrderSide.BUY.equals(order_side):
-                        new_unallocated = \
-                            portfolio.get_unallocated() - cost_adjustment
-                        self.order_service.portfolio_repository.update(
-                            portfolio.id,
-                            {"unallocated": new_unallocated}
-                        )
-                        trading_position = \
-                            self.order_service.position_service.find(
-                                {
-                                    "symbol": portfolio.trading_symbol,
-                                    "portfolio": portfolio.id
-                                }
-                            )
-                        self.order_service.position_service.update(
-                            trading_position.id,
-                            {
-                                "amount":
-                                    trading_position.get_amount()
-                                    - cost_adjustment
-                            }
-                        )
+        # v9.0 (#431) — the market-order portfolio reconciliation that
+        # used to live here has been removed. Slippage between the
+        # reservation price (captured at order-creation time) and the
+        # actual fill price is now settled uniformly inside
+        # ``OrderService._sync_with_buy_order_filled`` for LIMIT,
+        # MARKET, STOP and STOP_LIMIT orders.
 
         self.order_service.update(order.id, update_data)

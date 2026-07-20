@@ -34,6 +34,9 @@ from investing_algorithm_framework import (
     SnapshotInterval,
     generate_algorithm_id,
     TradeStatus,
+    Schedule,
+    SignalSeries,
+    SignalSide,
 )
 
 
@@ -41,16 +44,13 @@ from investing_algorithm_framework import (
 # Shared strategy used by most tests (simple RSI + EMA crossover)
 # ---------------------------------------------------------------------------
 class RSIEMACrossoverStrategy(TradingStrategy):
-    time_unit = TimeUnit.HOUR
-    interval = 2
-
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     def __init__(
         self,
         algorithm_id,
         symbols,
         position_sizes,
-        time_unit: TimeUnit,
-        interval: int,
+        schedule: Schedule,
         market: str,
         rsi_time_frame: str = "2h",
         rsi_period: int = 14,
@@ -102,8 +102,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         super().__init__(
             algorithm_id=algorithm_id,
             data_sources=data_sources,
-            time_unit=time_unit,
-            interval=interval,
+            schedule=schedule,
             symbols=symbols,
             position_sizes=position_sizes,
         )
@@ -141,10 +140,7 @@ class RSIEMACrossoverStrategy(TradingStrategy):
         )
         return ema_data, rsi_data
 
-    def generate_buy_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        signals = {}
+    def generate_signal_series(self, data: Dict[str, Any]):
         for symbol in self.symbols:
             ema_data, rsi_data = self.prepare_indicators(
                 data[f"{symbol}_rsi_data"].copy(),
@@ -156,36 +152,37 @@ class RSIEMACrossoverStrategy(TradingStrategy):
                 .max()
                 .astype(bool)
             )
-            rsi_oversold = (
-                rsi_data[self.rsi_result_column]
-                < self.rsi_oversold_threshold
-            )
-            buy_signal = rsi_oversold & ema_crossover_lookback
-            signals[symbol] = buy_signal.fillna(False).astype(bool)
-        return signals
-
-    def generate_sell_signals(
-        self, data: Dict[str, Any]
-    ) -> Dict[str, pd.Series]:
-        signals = {}
-        for symbol in self.symbols:
-            ema_data, rsi_data = self.prepare_indicators(
-                data[f"{symbol}_rsi_data"].copy(),
-                data[f"{symbol}_ema_data"].copy(),
-            )
             ema_crossunder_lookback = (
                 ema_data[self.ema_crossunder_result_column]
                 .rolling(window=self.ema_cross_lookback_window)
                 .max()
                 .astype(bool)
             )
+            rsi_oversold = (
+                rsi_data[self.rsi_result_column]
+                < self.rsi_oversold_threshold
+            )
             rsi_overbought = (
                 rsi_data[self.rsi_result_column]
                 >= self.rsi_overbought_threshold
             )
-            sell_signal = rsi_overbought & ema_crossunder_lookback
-            signals[symbol] = sell_signal.fillna(False).astype(bool)
-        return signals
+            buy_signal = (rsi_oversold & ema_crossover_lookback)\
+                .fillna(False).astype(bool)
+            sell_signal = (rsi_overbought & ema_crossunder_lookback)\
+                .fillna(False).astype(bool)
+
+            yield SignalSeries(
+                symbol=symbol,
+                side=SignalSide.OPEN_LONG,
+                series=buy_signal,
+                source="rsi_ema_cross",
+            )
+            yield SignalSeries(
+                symbol=symbol,
+                side=SignalSide.CLOSE_LONG,
+                series=sell_signal,
+                source="rsi_ema_cross",
+            )
 
 
 def _resource_directory():
@@ -220,8 +217,7 @@ def _make_strategy(
         algorithm_id=generate_algorithm_id(
             params={"fix_test": True}
         ),
-        time_unit=TimeUnit.HOUR,
-        interval=2,
+        schedule=Schedule.every(2, TimeUnit.HOUR),
         market="BITVAVO",
         symbols=symbols,
         position_sizes=position_sizes,

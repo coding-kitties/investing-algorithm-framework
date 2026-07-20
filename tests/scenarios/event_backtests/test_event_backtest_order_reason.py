@@ -16,7 +16,8 @@ import pandas as pd
 
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
-    RESOURCE_DIRECTORY, CSVOHLCVDataProvider, ScalingRule
+    RESOURCE_DIRECTORY, CSVOHLCVDataProvider, ScalingRule, Schedule, \
+    SignalSide, SignalSeries, signals_from_column
 
 # Reuse the same CSV as test_event_vs_vector_backtest.py
 CSV_FILENAME = "OHLCV_BTC-EUR_BITVAVO_2h_SCALING_FAST.csv"
@@ -39,27 +40,39 @@ def _make_data_source():
 
 class SimpleBuySellStrategy(TradingStrategy):
     """Buy at 110, sell at 90. No scaling."""
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
         PositionSize(symbol="BTC", percentage_of_portfolio=20.0),
     ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 110}
+    def generate_signals(self, context, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["buy"] = df['Close'] == 110
+        df["sell"] = df['Close'] == 90
+        yield from signals_from_column(
+            df, "buy", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "sell", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
 
-    def generate_sell_signals(self, data):
+    def generate_signal_series(self, data):
         df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
+        yield SignalSeries(
+            symbol="BTC", side=SignalSide.OPEN_LONG,
+            series=df['Close'] == 110,
+        )
+        yield SignalSeries(
+            symbol="BTC", side=SignalSide.CLOSE_LONG,
+            series=df['Close'] == 90,
+        )
 
 
 class ScalingStrategy(TradingStrategy):
     """Buy at 110, scale-in at 115, scale-out at 120, sell at 90."""
-    time_unit = TimeUnit.HOUR
-    interval = 2
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     symbols = ["BTC"]
     data_sources = [_make_data_source()]
     position_sizes = [
@@ -72,21 +85,24 @@ class ScalingStrategy(TradingStrategy):
         ),
     ]
 
-    def generate_buy_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 110}
-
-    def generate_sell_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 90}
-
-    def generate_scale_in_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 115}
-
-    def generate_scale_out_signals(self, data):
-        df = data["BTC_EUR_OHLCV"]
-        return {"BTC": df['Close'] == 120}
+    def generate_signals(self, context, data):
+        df = data["BTC_EUR_OHLCV"].copy()
+        df["buy"] = df['Close'] == 110
+        df["sell"] = df['Close'] == 90
+        df["scale_in"] = df['Close'] == 115
+        df["scale_out"] = df['Close'] == 120
+        yield from signals_from_column(
+            df, "buy", side=SignalSide.OPEN_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "sell", side=SignalSide.CLOSE_LONG, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "scale_in", side=SignalSide.SCALE_IN, symbol="BTC",
+        )
+        yield from signals_from_column(
+            df, "scale_out", side=SignalSide.SCALE_OUT, symbol="BTC",
+        )
 
 
 def _create_app(name):
@@ -133,7 +149,7 @@ class TestEventBacktestBuySellMetadata(TestCase):
             backtest_date_range=date_range,
             risk_free_rate=0.027,
         )
-        cls.backtest_run = backtest.backtest_runs[0]
+        cls.backtest_run = backtest.get_all_backtest_runs()[0]
 
     def test_orders_exist(self):
         orders = self.backtest_run.orders
@@ -187,7 +203,7 @@ class TestEventBacktestScalingMetadata(TestCase):
             backtest_date_range=date_range,
             risk_free_rate=0.027,
         )
-        cls.backtest_run = backtest.backtest_runs[0]
+        cls.backtest_run = backtest.get_all_backtest_runs()[0]
 
     def test_orders_exist(self):
         orders = self.backtest_run.orders
@@ -195,7 +211,10 @@ class TestEventBacktestScalingMetadata(TestCase):
 
     def test_initial_buy_has_buy_signal(self):
         orders = self.backtest_run.orders
-        buy_orders = [o for o in orders if o.order_side == "BUY"]
+        buy_orders = sorted(
+            [o for o in orders if o.order_side == "BUY"],
+            key=lambda o: o.created_at,
+        )
         self.assertGreaterEqual(len(buy_orders), 1)
         # First buy should be buy_signal
         self.assertEqual(
@@ -235,7 +254,7 @@ class TestEventVsVectorMetadataConsistency(TestCase):
             backtest_date_range=date_range,
             risk_free_rate=0.027,
         )
-        cls.vector_run = vbt.backtest_runs[0]
+        cls.vector_run = vbt.get_all_backtest_runs()[0]
 
         # Event
         app_e = _create_app("EventMetaComp")
@@ -244,7 +263,7 @@ class TestEventVsVectorMetadataConsistency(TestCase):
             backtest_date_range=date_range,
             risk_free_rate=0.027,
         )
-        cls.event_run = ebt.backtest_runs[0]
+        cls.event_run = ebt.get_all_backtest_runs()[0]
 
     def test_same_order_count(self):
         self.assertEqual(

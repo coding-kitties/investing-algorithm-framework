@@ -4,10 +4,15 @@ from investing_algorithm_framework.app.web.controllers.portfolio \
     import blueprint as portfolio_blueprint
 from investing_algorithm_framework.app.web.controllers.positions import \
     blueprint as positions_blueprint
+from investing_algorithm_framework.app.web.controllers.backtest_results \
+    import blueprint as backtest_results_blueprint
 
 
 def setup_blueprints(flask_app):
     flask_app.register_blueprint(portfolio_blueprint, prefix="/api")
     flask_app.register_blueprint(orders_blueprint, prefix="/api")
     flask_app.register_blueprint(positions_blueprint, prefix="/api")
+    flask_app.register_blueprint(
+        backtest_results_blueprint, prefix="/api"
+    )
     return flask_app

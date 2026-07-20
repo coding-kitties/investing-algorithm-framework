@@ -33,6 +33,7 @@ from investing_algorithm_framework import (
     SnapshotInterval,
     Backtest,
     OperationalException,
+    Schedule,
 )
 from investing_algorithm_framework.infrastructure import BacktestService
 
@@ -66,9 +67,7 @@ class SimpleVectorStrategy(TradingStrategy):
     Simple vector strategy for testing purposes.
     Always generates a buy signal at the start and sell signal at the end.
     """
-    time_unit = TimeUnit.HOUR
-    interval = 2
-
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     def __init__(
         self,
         algorithm_id: str,
@@ -92,8 +91,7 @@ class SimpleVectorStrategy(TradingStrategy):
         super().__init__(
             algorithm_id=algorithm_id,
             data_sources=data_sources,
-            time_unit=TimeUnit.HOUR,
-            interval=2,
+            schedule=Schedule.every(2, TimeUnit.HOUR),
             symbols=[symbol],
             position_sizes=[
                 PositionSize(symbol=symbol, percentage_of_portfolio=50.0)
@@ -130,9 +128,7 @@ class SimpleVectorStrategy(TradingStrategy):
 class SimpleEventStrategy(TradingStrategy):
     """Simple event-driven strategy for testing purposes."""
     strategy_id = "simple_event_strategy"
-    time_unit = TimeUnit.HOUR
-    interval = 2
-
+    schedule = Schedule.every(2, TimeUnit.HOUR)
     def __init__(self, algorithm_id: str = None):
         super().__init__(algorithm_id=algorithm_id)
 
@@ -174,8 +170,8 @@ class TestFilteredOutMetadataUpdate(TestCase):
         ) -> List[Backtest]:
             return [
                 b for b in backtests
-                if b.backtest_summary is not None
-                and b.backtest_summary.number_of_trades_closed >= min_trades
+                if b.vector_summary is not None
+                and b.vector_summary.number_of_trades_closed >= min_trades
             ]
         return window_filter
 

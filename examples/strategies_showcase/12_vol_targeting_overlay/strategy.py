@@ -12,6 +12,7 @@ from investing_algorithm_framework import (
     OrderType,
     TimeUnit,
     TradingStrategy,
+    Schedule,
 )
 
 SYMBOL = "BTC/EUR"
@@ -23,8 +24,7 @@ W_MAX = 1.0
 
 class VolTargetStrategy(TradingStrategy):
     algorithm_id = "vol-targeting-overlay"
-    time_unit = TimeUnit.DAY
-    interval = 1
+    schedule = Schedule.every(1, TimeUnit.DAY)
     market = "BITVAVO"
     trading_symbol = "EUR"
     symbols = [SYMBOL.split("/")[0]]
