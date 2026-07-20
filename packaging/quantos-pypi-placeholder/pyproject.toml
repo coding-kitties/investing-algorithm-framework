@@ -1,0 +1,46 @@
+[build-system]
+requires = ["hatchling>=1.18"]
+build-backend = "hatchling.build"
+
+[project]
+name = "QuantOS"
+version = "0.0.1"
+description = "Name reservation for the QuantOS open-source algorithmic trading framework (formerly investing-algorithm-framework)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Apache-2.0" }
+authors = [
+    { name = "coding-kitties" },
+]
+maintainers = [
+    { name = "coding-kitties" },
+]
+keywords = [
+    "quantos",
+    "algorithmic-trading",
+    "trading",
+    "backtesting",
+    "quant",
+]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial :: Investment",
+]
+
+[project.urls]
+Homepage = "https://github.com/coding-kitties/investing-algorithm-framework"
+Repository = "https://github.com/coding-kitties/investing-algorithm-framework"
+Issues = "https://github.com/coding-kitties/investing-algorithm-framework/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/quantos"]
