@@ -8,6 +8,24 @@ from investing_algorithm_framework.services.repository_service \
 
 logger = logging.getLogger("investing_algorithm_framework")
 
+# Cash/collateral checks compare a recomputed ``amount * price`` against
+# the portfolio's unallocated balance. Upstream risk-budget scaling
+# (``ApplyRiskBudgetPhase``) derives ``amount`` from ``quote_amount /
+# price`` and then this check recomputes ``amount * price`` — the
+# divide/multiply round-trip can leave the result a few ULPs above the
+# actual unallocated cash even when the intent was scaled to fit
+# exactly. A tiny relative tolerance absorbs that float noise without
+# masking genuine overspend.
+_CASH_TOLERANCE_REL = 1e-9
+_CASH_TOLERANCE_ABS = 1e-8
+
+
+def _cash_tolerance(*values):
+    return max(
+        _CASH_TOLERANCE_ABS,
+        _CASH_TOLERANCE_REL * max(abs(v) for v in values),
+    )
+
 
 class OrderService(RepositoryService):
     """
@@ -681,7 +699,8 @@ class OrderService(RepositoryService):
                 "Please check if the portfolio configuration is correct."
             )
 
-        if unallocated_amount < total_price:
+        tolerance = _cash_tolerance(unallocated_amount, total_price)
+        if unallocated_amount < total_price - tolerance:
             raise OperationalException(
                 f"Order total: {total_price} "
                 f"{portfolio.trading_symbol}, is "
@@ -718,7 +737,8 @@ class OrderService(RepositoryService):
                 "Please check if the portfolio configuration is correct."
             )
 
-        if unallocated_amount < required_collateral:
+        tolerance = _cash_tolerance(unallocated_amount, required_collateral)
+        if unallocated_amount < required_collateral - tolerance:
             raise OperationalException(
                 f"Short collateral required: {required_collateral} "
                 f"{portfolio.trading_symbol}, exceeds unallocated "

@@ -85,8 +85,8 @@ The dependency direction is **inward only**: `infrastructure` and
    each portfolio against its `PortfolioProvider`.
 3. `EventLoopService` takes over. Each iteration:
    - Computes which strategies and tasks are **due** based on their
-     `Schedule` (see [§6 of the v8→v9 migration
-     guide](../migration-v8-to-v9.md#8-scheduling-api-schedule-replaces-time_unit--interval)).
+     `Schedule` (see *§6 of the v8→v9 migration
+     guide*).
    - Fetches the union of data sources required by the due strategies
      once via `DataProviderService`.
    - Calls `OrderService.check_pending_orders(...)` (live) or the
@@ -116,7 +116,7 @@ full design and the bundle format.
 
 Both engines write into the same `Backtest` envelope and produce
 `.iafbt` bundles in the format described by
-[`bundle-format-v2.md`](bundle-format-v2.md) (v3 supersedes the slot
+[`bundle-format-v2.md`](open_backtest_format.md) (v3 supersedes the slot
 structure).
 
 ---
@@ -218,6 +218,6 @@ singleton.
 | Trade lifecycle | [`investing_algorithm_framework/services/trade_service/trade_service.py`](../../investing_algorithm_framework/services/trade_service/trade_service.py) |
 | Backtest evaluator (event engine) | [`investing_algorithm_framework/services/trade_order_evaluator/backtest_trade_oder_evaluator.py`](../../investing_algorithm_framework/services/trade_order_evaluator/backtest_trade_oder_evaluator.py) |
 | Live order/portfolio sync | [`investing_algorithm_framework/services/trade_order_evaluator/default_trade_order_evaluator.py`](../../investing_algorithm_framework/services/trade_order_evaluator/default_trade_order_evaluator.py) |
-| Scheduling | `domain/models/scheduling/` + [§8 of the migration guide](../migration-v8-to-v9.md#8-scheduling-api-schedule-replaces-time_unit--interval) |
-| Backtest storage format | [`bundle-format-v2.md`](bundle-format-v2.md), [`backtest_storage.md`](backtest_storage.md), [`tiered-backtest-storage.md`](tiered-backtest-storage.md) |
+| Scheduling | `domain/models/scheduling/` + *§8 of the migration guide* |
+| Backtest storage format | [`bundle-format-v2.md`](open_backtest_format.md), [`backtest_storage.md`](backtest_storage.md), [`tiered-backtest-storage.md`](tiered-backtest-storage.md) |
 | Pipeline API | [`pipeline-api.md`](pipeline-api.md) |

@@ -328,6 +328,12 @@ class EventLoopService:
 
         self._trade_order_evaluator = trade_order_evaluator
 
+        dispatcher = getattr(
+            self._trade_service, "trade_hook_dispatcher", None
+        )
+        if dispatcher is not None:
+            dispatcher.configure(self.strategies, self.context)
+
         self.next_run_times = {
             strategy.strategy_id: {
                 "last_run": None,

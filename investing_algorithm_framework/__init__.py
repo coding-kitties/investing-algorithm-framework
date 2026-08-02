@@ -1,11 +1,18 @@
 from .analysis import generate_rolling_backtest_windows, \
+    generate_anchored_backtest_windows, \
     generate_k_fold_backtest_windows, \
     rank_results, create_weights, \
     get_missing_timeseries_data_entries, fill_missing_timeseries_data, \
     create_markdown_table, create_backtest_metrics_table, \
     create_trade_metrics_table, print_bundle_summary, \
+    show_study, show_trade_insights, \
+    show_backtest_summaries, show_backtest_runs, \
+    DEFAULT_TRADE_METRIC_COLUMNS, \
     analyze_backtest_windows, \
-    plot_backtest_windows, plot_window_correlation_matrix  # noqa: F401
+    plot_backtest_windows, plot_window_correlation_matrix, \
+    load_top_selection, TopSelection, \
+    create_cross_study_metrics_table, \
+    rank_by_cross_study_robustness  # noqa: F401
 from .app import App, Algorithm, \
     TradingStrategy, StatelessAction, Task, AppHook, Context, \
     add_html_report, BacktestReport, \
@@ -45,7 +52,8 @@ from .domain import ApiException, combine_backtests, Study, \
 from .domain import Pipeline, Factor, CustomFactor, Filter, \
     AverageDollarVolume, AverageTradedValue, CrossSectionalMean, \
     Neutralize, Returns, RollingBeta, RSI, SMA, StaticPerSymbol, \
-    Volatility, BacktestIndex, BUNDLE_FORMAT_VERSION  # noqa: F401
+    Volatility, BacktestIndex, BUNDLE_FORMAT_VERSION, \
+    ExecutionConfig, StudySampleType, WindowPart  # noqa: F401
 from .infrastructure import AzureBlobStorageStateHandler, \
     CSVOHLCVDataProvider, CSVTickerDataProvider, CSVURLDataProvider, \
     JSONURLDataProvider, ParquetURLDataProvider, \
@@ -128,6 +136,9 @@ from .services import (
     create_backtest_metrics_for_backtest,
     recalculate_backtests,
     recalculate_backtests_in_directory,
+    get_omega_ratio,
+    get_ulcer_index,
+    get_trade_mae_mfe_statistics,
     TradeTakeProfitService,
     TradeStopLossService,
 )
@@ -301,6 +312,9 @@ __all__ = [
     "create_backtest_metrics_for_backtest",
     "recalculate_backtests",
     "recalculate_backtests_in_directory",
+    "get_omega_ratio",
+    "get_ulcer_index",
+    "get_trade_mae_mfe_statistics",
     "TakeProfitRule",
     "StopLossRule",
     "ScalingRule",
@@ -314,6 +328,7 @@ __all__ = [
     "generate_algorithm_id",
     "BacktestMetrics",
     "generate_rolling_backtest_windows",
+    "generate_anchored_backtest_windows",
     "generate_k_fold_backtest_windows",
     "tqdm",
     "get_missing_timeseries_data_entries",
@@ -321,7 +336,16 @@ __all__ = [
     "create_markdown_table",
     "create_backtest_metrics_table",
     "create_trade_metrics_table",
+    "show_study",
+    "show_backtest_summaries",
+    "show_backtest_runs",
+    "DEFAULT_TRADE_METRIC_COLUMNS",
+    "show_trade_insights",
     "print_bundle_summary",
+    "load_top_selection",
+    "TopSelection",
+    "create_cross_study_metrics_table",
+    "rank_by_cross_study_robustness",
     "build_index",
     "rank_index",
     "format_table",
@@ -371,5 +395,8 @@ __all__ = [
     "Volatility",
     "load_ipython_extension",
     "Study",
-    "BacktestWindow"
+    "ExecutionConfig",
+    "WindowPart",
+    "BacktestWindow",
+    "StudySampleType"
 ]

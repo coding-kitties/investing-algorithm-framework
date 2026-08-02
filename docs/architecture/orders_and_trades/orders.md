@@ -10,7 +10,7 @@ and
 implement.
 
 If you are migrating from v8, also read
-[§9 of the v8→v9 migration guide](../migration-v8-to-v9.md#9-order-lifecycle--trades-created-at-fill-not-at-buy-placement) —
+*§9 of the v8→v9 migration guide* —
 this document is the design reference; the migration guide is the
 upgrade checklist.
 
@@ -371,7 +371,7 @@ These hold across the live engine and the event backtest engine:
 
 ## 12. Reference
 
-- [§9 of the v8→v9 migration guide](../migration-v8-to-v9.md#9-order-lifecycle--trades-created-at-fill-not-at-buy-placement) — upgrade checklist for the v9 lifecycle.
+- *§9 of the v8→v9 migration guide* — upgrade checklist for the v9 lifecycle.
 - GitHub issue [#431](https://github.com/coding-kitties/investing-algorithm-framework/issues/431) — the defer-trade-creation refactor.
 - [`architecture.md`](architecture.md) — framework-wide overview.
 - [`v9.0-dual-engine-design.md`](v9.0-dual-engine-design.md) — backtest engine model.

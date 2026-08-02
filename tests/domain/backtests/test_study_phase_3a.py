@@ -25,6 +25,7 @@ from investing_algorithm_framework.domain import (
     BacktestSummaryMetrics,
     EngineSlot,
     Study,
+    StudySampleType,
     Universe,
 )
 from investing_algorithm_framework.domain.exceptions import (
@@ -90,12 +91,46 @@ class StudyDataclassTests(unittest.TestCase):
         self.assertIsInstance(slot, EngineSlot)
         self.assertIs(s.engine_results["vector"], slot)
 
+    def test_study_sample_type_enum_serializes_as_string(self):
+        study = Study(sample_type=StudySampleType.EXPLORATORY)
+
+        self.assertEqual(str(StudySampleType.EXPLORATORY), "exploratory")
+        self.assertEqual(study.to_dict()["sample_type"], "exploratory")
+
     def test_study_populated_engines_canonical_order(self):
         s = Study(name="default")
         s.engine_results["event"] = EngineSlot(summary=_summary(1.0))
         s.engine_results["vector"] = EngineSlot(summary=_summary(2.0))
         # vector first regardless of insertion order
         self.assertEqual(s.populated_engines(), ["vector", "event"])
+
+    def test_study_repr_shows_empty_and_missing_structure(self):
+        representation = repr(Study(name="empty"))
+
+        self.assertIn("description=None", representation)
+        self.assertIn("universe=None", representation)
+        self.assertIn("backtest_windows=[]", representation)
+        self.assertIn("engines=[]", representation)
+        self.assertIn("'vector': <missing>", representation)
+        self.assertIn("'event': <missing>", representation)
+        self.assertIn("metadata={}", representation)
+        self.assertIn("ohlcv_keys=[]", representation)
+
+    def test_study_repr_summarizes_populated_engine_slot(self):
+        study = Study(
+            name="populated",
+            engine_results={
+                "vector": EngineSlot(summary=_summary(1.5)),
+            },
+        )
+
+        representation = repr(study)
+
+        self.assertIn("'vector': EngineSlot(", representation)
+        self.assertIn("state='populated'", representation)
+        self.assertIn("runs=0", representation)
+        self.assertIn("summary='present'", representation)
+        self.assertIn("monte_carlo_tests=0", representation)
 
     def test_study_to_dict_round_trip(self):
         u = Universe(key="majors", symbols=["BTC", "ETH"])

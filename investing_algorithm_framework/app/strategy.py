@@ -25,7 +25,7 @@ class TradingStrategy:
     TradingStrategy is the base class for all trading strategies. A trading
     strategy is a set of rules that defines when to buy or sell an asset.
 
-    Signal surface (v9.0):
+    Signal surface:
         Strategies override a single :py:meth:`generate_signals` method
         which yields :class:`Signal` instances. Each signal carries a
         :class:`SignalSide` (``OPEN_LONG``, ``CLOSE_LONG``, ``SCALE_IN``,
@@ -33,13 +33,6 @@ class TradingStrategy:
         :pyattr:`Signal.strength` in ``[0.0, 1.0]`` used for top-N
         ranking when capital binds, and a free-form ``source`` /
         ``metadata`` payload that flows through to the order.
-
-        The v8 surface (``generate_buy_signals`` / ``generate_sell_signals``
-        / ``generate_scale_in_signals`` / ``generate_scale_out_signals``
-        / ``generate_short_signals`` / ``generate_cover_signals``) was
-        removed; see ``docs/migration-v8-to-v9.md`` §10 for the
-        migration recipe (``signals_from_column`` covers the common
-        boolean-Series case).
 
     Per symbol the engine keeps at most one open position direction
     (long *or* short, never both). When a short position is open,
@@ -65,8 +58,7 @@ class TradingStrategy:
         schedule (Schedule): when this strategy fires. Build with
             ``Schedule.every(interval, time_unit)`` for periodic strategies
             or ``Schedule.on(date_rule, time_rule)`` for calendar-anchored
-            strategies (e.g. month-end at 16:00). Replaces the v8
-            ``time_unit``/``interval`` pair.
+            strategies (e.g. month-end at 16:00).
         scheduled_functions (List[ScheduledFunction]): additional methods on
             this strategy that should run on independent schedules
             (e.g. a rebalance hook on the last trading day of the month).
@@ -177,8 +169,7 @@ class TradingStrategy:
                     f"{self.strategy_id}. Set ``schedule = "
                     f"Schedule.every(...)`` or ``schedule = "
                     f"Schedule.on(...)`` on the class, or pass "
-                    f"``schedule=`` to the constructor. The legacy "
-                    f"``time_unit``/``interval`` API was removed in v9.0."
+                    f"``schedule=`` to the constructor."
                 )
 
         # Resolve scheduled_functions: instance arg > class attribute > [].
@@ -199,9 +190,9 @@ class TradingStrategy:
                 if class_data_sources else []
 
         # Initialize pipelines as a new list per instance. Pipelines
-        # are class-attribute opt-in (Phase 1 of the Pipeline API,
-        # see docs/design/pipeline-api.md). When empty, the engine
-        # is never invoked and there is zero behavioural change.
+        # are class-attribute opt-in (see
+        # docs/architecture/strategy/pipeline-api.md). When empty, the
+        # engine is never invoked and there is zero behavioural change.
         class_pipelines = getattr(self.__class__, 'pipelines', [])
         self.pipelines = list(class_pipelines) if class_pipelines else []
 
@@ -262,7 +253,6 @@ class TradingStrategy:
         # the strategy's OHLCV data sources to compute its longest
         # factor window. Without this check a live strategy starts
         # silently emitting NaN columns until enough bars accrue.
-        # Tracked under #503 (Phase 3 — live hardening).
         if self.pipelines:
             ohlcv_sources = [
                 ds for ds in self.data_sources
@@ -353,7 +343,7 @@ class TradingStrategy:
             self.cooldowns = list(class_cooldowns) \
                 if class_cooldowns else []
 
-        # v9.0 — resolve pipeline composition. Each is instance arg >
+        # Resolve pipeline composition. Each is instance arg >
         # class attribute > sensible default. Phases and executor are
         # stateless by contract so reusing class-level instances is
         # safe, but we copy phases into a new list so per-instance
@@ -475,8 +465,7 @@ class TradingStrategy:
         wants to do on this bar.
 
         This is the **only** signal-producing method on
-        :class:`TradingStrategy` in v9.0; it replaces the six
-        ``generate_*_signals`` hooks from earlier releases. Each
+        :class:`TradingStrategy`. Each
         ``Signal`` carries a :class:`SignalSide`, an optional
         :pyattr:`Signal.strength` (used for top-N ranking when
         capital binds), and an optional ``source`` /
@@ -1007,11 +996,10 @@ class TradingStrategy:
         """
         Thin wrapper around :py:meth:`Context.create_short_order`.
 
-        Phase 1 of #434 — plumbing only. ``execute`` and ``sync``
-        default to ``False`` so the order is validated and persisted
-        but never reaches the event-engine sync paths (phase 2). The
-        vector backtest engine routes shorts independently via
-        :py:meth:`generate_signal_series` with
+        ``execute``/``sync`` default to ``False`` because short orders
+        are not yet wired into the live/event-driven sync path — the
+        order is validated and persisted only. Vector backtests route
+        shorts independently via :py:meth:`generate_signal_series` with
         :pyattr:`SignalSide.OPEN_SHORT`.
         """
         from investing_algorithm_framework.domain import OrderType
@@ -1048,8 +1036,7 @@ class TradingStrategy:
         """
         Thin wrapper around :py:meth:`Context.create_cover_order`.
 
-        Phase 1 of #434 — plumbing only. See
-        :py:meth:`create_short_order` for the execution caveat.
+        See :py:meth:`create_short_order` for the execute/sync caveat.
         """
         from investing_algorithm_framework.domain import OrderType
         kwargs = {

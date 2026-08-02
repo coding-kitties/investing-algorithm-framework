@@ -1,7 +1,7 @@
 # OHLCV Deduplication Protocol — Public Specification
 
 **Status:** Draft. Reference implementation pending.
-**Companion to:** [bundle-format-v2.md](./bundle-format-v2.md)
+**Companion to:** [bundle-format-v2.md](open_backtest_format.md)
 **Audience:** Backtest archival / upload services (e.g. Finterion).
 
 This document specifies a content-addressed protocol for uploading
@@ -183,7 +183,7 @@ def upload_backtests(paths, endpoint, api_key, parallelism=4):
 
 Concrete reference implementation lives outside the framework
 (intentionally — see the rationale in
-[bundle-format-v2.md](./bundle-format-v2.md)).
+[bundle-format-v2.md](open_backtest_format.md)).
 
 ---
 

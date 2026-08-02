@@ -2,12 +2,15 @@ import os
 from pathlib import Path
 from dataclasses import dataclass, field, fields
 from logging import getLogger
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Optional
 from datetime import datetime, date
 import json
 import pandas as pd
 
 from investing_algorithm_framework.domain.models import Trade
+
+from .backtest_date_range import BacktestDateRange
+from .backtest_window import BacktestWindow
 
 
 logger = getLogger(__name__)
@@ -40,7 +43,6 @@ class BacktestMetrics:
             used for the backtest.
         backtest_start_date (datetime): The start date of the backtest.
         backtest_end_date (datetime): The end date of the backtest.
-        trading_symbol (str): The trading symbol used in the backtest.
         initial_unallocated (float): The initial unallocated cash
             at the start of the backtest.
         final_value (float): The final value of the portfolio at the end
@@ -155,10 +157,7 @@ class BacktestMetrics:
         metadata (Dict[str, str]): A dictionary to store any additional
             metadata related to the backtest.
     """
-    backtest_start_date: datetime
-    backtest_end_date: datetime
-    backtest_date_range_name: str = ""
-    trading_symbol: str = ""
+    backtest_window: BacktestWindow
     initial_unallocated: float = 0.0
     equity_curve: List[Tuple[float, datetime]] = field(default_factory=list)
     total_growth: float = 0.0
@@ -177,10 +176,12 @@ class BacktestMetrics:
         field(default_factory=list)
     sortino_ratio: float = 0.0
     calmar_ratio: float = 0.0
+    omega_ratio: float = 0.0
     profit_factor: float = 0.0
     gross_profit: float = None
     gross_loss: float = None
     annual_volatility: float = 0.0
+    ulcer_index: float = 0.0
     monthly_returns: List[Tuple[float, datetime]] = field(default_factory=list)
     yearly_returns: List[Tuple[float, date]] = field(default_factory=list)
     drawdown_series: List[Tuple[float, datetime]] = field(default_factory=list)
@@ -219,6 +220,13 @@ class BacktestMetrics:
     average_trade_gain_percentage: float = 0.0
     average_trade_return: float = 0.0
     average_trade_return_percentage: float = 0.0
+    average_mae: float = 0.0
+    average_mae_percentage: float = 0.0
+    average_mfe: float = 0.0
+    average_mfe_percentage: float = 0.0
+    max_mae: float = 0.0
+    max_mfe: float = 0.0
+    mfe_mae_ratio: float = 0.0
     current_average_trade_gain: float = 0.0
     current_average_trade_gain_percentage: float = 0.0
     current_average_trade_return: float = 0.0
@@ -232,6 +240,16 @@ class BacktestMetrics:
     number_of_trades_closed: int = 0
     number_of_trades_opened: int = 0
     number_of_trades_open_at_end: int = 0
+    number_of_long_trades: int = 0
+    number_of_long_trades_closed: int = 0
+    number_of_winning_long_trades: int = 0
+    number_of_losing_long_trades: int = 0
+    long_win_rate: float = 0.0
+    number_of_short_trades: int = 0
+    number_of_short_trades_closed: int = 0
+    number_of_winning_short_trades: int = 0
+    number_of_losing_short_trades: int = 0
+    short_win_rate: float = 0.0
     win_rate: float = 0.0
     current_win_rate: float = 0.0
     win_loss_ratio: float = 0.0
@@ -252,9 +270,43 @@ class BacktestMetrics:
     max_consecutive_losses: int = 0
     metadata: Dict[str, str] = field(default_factory=dict)
 
+    # ------------------------------------------------------------------
+    # Derived active-range fields
+    # ------------------------------------------------------------------
+
+    @property
+    def _active_range(self) -> BacktestDateRange:
+        w = self.backtest_window
+        return w.test_range if w.test_range is not None else w.train_range
+
+    @property
+    def backtest_start_date(self) -> datetime:
+        """Start of the active range (``test_range`` if set, else ``train_range``)."""
+        return self._active_range.start_date
+
+    @property
+    def backtest_end_date(self) -> datetime:
+        """End of the active range."""
+        return self._active_range.end_date
+
+    @property
+    def backtest_date_range_name(self) -> Optional[str]:
+        """Name of the active range; the join key back to the study's windows."""
+        return self._active_range.name
+
+    @property
+    def window_role(self) -> str:
+        """``"test"`` for OOS runs, ``"train"`` for in-sample-only fits."""
+        return (
+            "test"
+            if self.backtest_window.test_range is not None
+            else "train"
+        )
+
     def __post_init__(self):
-        self.total_number_of_days = (self.backtest_end_date -
-                                     self.backtest_start_date).days
+        self.total_number_of_days = (
+            self.backtest_end_date - self.backtest_start_date
+        ).days
 
     def to_dict(self) -> dict:
         """
@@ -271,10 +323,11 @@ class BacktestMetrics:
                 if hasattr(value, "isoformat") else value
 
         return {
+            "backtest_window": self.backtest_window.to_dict(),
             "backtest_start_date": ensure_iso(self.backtest_start_date),
             "backtest_end_date": ensure_iso(self.backtest_end_date),
             "backtest_date_range_name": self.backtest_date_range_name,
-            "trading_symbol": self.trading_symbol,
+            "window_role": self.window_role,
             "initial_unallocated": self.initial_unallocated,
             "equity_curve": [(value, ensure_iso(date))
                              for value, date in self.equity_curve],
@@ -296,8 +349,10 @@ class BacktestMetrics:
                                      self.rolling_sharpe_ratio],
             "sortino_ratio": self.sortino_ratio,
             "calmar_ratio": self.calmar_ratio,
+            "omega_ratio": self.omega_ratio,
             "profit_factor": self.profit_factor,
             "annual_volatility": self.annual_volatility,
+            "ulcer_index": self.ulcer_index,
             "monthly_returns": [(value, ensure_iso(date))
                                 for value, date in self.monthly_returns],
             "yearly_returns": [(value, ensure_iso(date))
@@ -331,6 +386,13 @@ class BacktestMetrics:
             "average_trade_return": self.average_trade_return,
             "average_trade_return_percentage":
                 self.average_trade_return_percentage,
+            "average_mae": self.average_mae,
+            "average_mae_percentage": self.average_mae_percentage,
+            "average_mfe": self.average_mfe,
+            "average_mfe_percentage": self.average_mfe_percentage,
+            "max_mae": self.max_mae,
+            "max_mfe": self.max_mfe,
+            "mfe_mae_ratio": self.mfe_mae_ratio,
             "median_trade_return": self.median_trade_return,
             "median_trade_return_percentage":
                 self.median_trade_return_percentage,
@@ -349,6 +411,21 @@ class BacktestMetrics:
             "number_of_trades": self.number_of_trades,
             "number_of_trades_closed": self.number_of_trades_closed,
             "number_of_trades_opened": self.number_of_trades_opened,
+            "number_of_long_trades": self.number_of_long_trades,
+            "number_of_long_trades_closed": self.number_of_long_trades_closed,
+            "number_of_winning_long_trades":
+                self.number_of_winning_long_trades,
+            "number_of_losing_long_trades":
+                self.number_of_losing_long_trades,
+            "long_win_rate": self.long_win_rate,
+            "number_of_short_trades": self.number_of_short_trades,
+            "number_of_short_trades_closed":
+                self.number_of_short_trades_closed,
+            "number_of_winning_short_trades":
+                self.number_of_winning_short_trades,
+            "number_of_losing_short_trades":
+                self.number_of_losing_short_trades,
+            "short_win_rate": self.short_win_rate,
             "win_rate": self.win_rate,
             "current_win_rate": self.current_win_rate,
             "win_loss_ratio": self.win_loss_ratio,
@@ -360,10 +437,22 @@ class BacktestMetrics:
                 self.average_monthly_return_losing_months,
             "average_monthly_return_winning_months":
                 self.average_monthly_return_winning_months,
-            "best_month": self.best_month,
-            "best_year": self.best_year,
-            "worst_month": self.worst_month,
-            "worst_year": self.worst_year,
+            "best_month": (
+                (self.best_month[0], ensure_iso(self.best_month[1]))
+                if self.best_month else None
+            ),
+            "best_year": (
+                (self.best_year[0], ensure_iso(self.best_year[1]))
+                if self.best_year else None
+            ),
+            "worst_month": (
+                (self.worst_month[0], ensure_iso(self.worst_month[1]))
+                if self.worst_month else None
+            ),
+            "worst_year": (
+                (self.worst_year[0], ensure_iso(self.worst_year[1]))
+                if self.worst_year else None
+            ),
             "var_95": self.var_95,
             "cvar_95": self.cvar_95,
             "max_consecutive_wins": self.max_consecutive_wins,
@@ -480,13 +569,45 @@ class BacktestMetrics:
         # Work on a shallow copy to avoid mutating the caller's dict
         data = dict(data)
 
-        # Parse datetime fields
-        data['backtest_start_date'] = datetime.fromisoformat(
-            data['backtest_start_date']
-        )
-        data['backtest_end_date'] = datetime.fromisoformat(
-            data['backtest_end_date']
-        )
+        # Rehydrate the parent BacktestWindow
+        window = data.get('backtest_window')
+        if window is None:
+            # Legacy bundles (pre issue #511 window refactor) stored the
+            # active range directly as backtest_start_date/end_date/
+            # backtest_date_range_name instead of a full BacktestWindow.
+            # Reconstruct a single-range window from those so old
+            # bundles keep loading instead of being silently dropped.
+            start = data.get('backtest_start_date')
+            end = data.get('backtest_end_date')
+            if start is None or end is None:
+                raise ValueError(
+                    "BacktestMetrics.from_dict requires a "
+                    "'backtest_window' key (or legacy "
+                    "'backtest_start_date'/'backtest_end_date' keys)."
+                )
+            if isinstance(start, str):
+                start = datetime.fromisoformat(start)
+            if isinstance(end, str):
+                end = datetime.fromisoformat(end)
+            window = BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=start,
+                    end_date=end,
+                    name=data.get('backtest_date_range_name'),
+                )
+            )
+        if not isinstance(window, BacktestWindow):
+            window = BacktestWindow.from_dict(window)
+        data['backtest_window'] = window
+
+        # Drop derived keys — they're read-only properties on the dataclass.
+        for key in (
+            'backtest_start_date',
+            'backtest_end_date',
+            'backtest_date_range_name',
+            'window_role',
+        ):
+            data.pop(key, None)
 
         # Parse tuple lists with datetime
         data['equity_curve'] = cls._parse_tuple_list_datetime(

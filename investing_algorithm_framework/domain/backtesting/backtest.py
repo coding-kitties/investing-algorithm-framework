@@ -16,7 +16,7 @@ from .backtest_summary_metrics import BacktestSummaryMetrics
 from .backtest_index_row import BacktestIndexRow
 from .combine_backtests import generate_backtest_summary_metrics
 from .universe import Universe
-from .study import Study as _Study, EngineSlot  # noqa: WPS433
+from .study import Study as _Study, EngineSlot, StudySampleType  # noqa: WPS433
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from .study import Study
@@ -95,7 +95,7 @@ class Backtest:
     A :class:`Backtest` is the canonical in-memory representation of
     one ``.iafbt`` bundle file. As of v9.0 it carries two independent
     engine slots — a bundle may contain vector-engine results, event-
-    engine results, or both. See ``docs/design/v9.0-dual-engine-design.md``
+    engine results, or both. See ``docs/architecture/backtest/v9.0-dual-engine-design.md``
     for the binding contract.
 
     Attributes:
@@ -196,10 +196,7 @@ class Backtest:
                 # Store the full catalogue so bt.universes returns all of them.
                 self._universe_catalogue = list(_univs)
             if risk_free_rate is not None:
-                if default_study.universe is None:
-                    default_study.universe = _U(risk_free_rate=risk_free_rate)
-                else:
-                    default_study.universe.risk_free_rate = risk_free_rate
+                default_study.risk_free_rate = risk_free_rate
 
             # Vector slot
             if any(v is not None for v in (
@@ -233,9 +230,9 @@ class Backtest:
                     )
 
             if backtest_monte_carlo_tests is not None:
-                default_study.monte_carlo_tests = list(
-                    backtest_monte_carlo_tests
-                )
+                default_study.get_engine(
+                    ENGINE_VECTOR
+                ).monte_carlo_tests = list(backtest_monte_carlo_tests)
             self._studies[_sname] = default_study
 
     def _get_default_study(self) -> Optional["Study"]:
@@ -387,6 +384,62 @@ class Backtest:
             name = name.name
         return self.studies.get(name)
 
+    def get_study_definitions(
+        self,
+        study_name: Optional[str] = None,
+        study_sample_type: Optional[Union[str, "StudySampleType"]] = None,
+    ) -> List["Study"]:
+        """Return a ``copy_definition()`` of every study on this
+        backtest, optionally filtered by ``sample_type``.
+
+        Each returned :class:`Study` has its ``engine_results`` reset
+        (no runs/summaries carried over) — safe to pass straight into
+        ``App.run_backtest(study=...)`` for a new run (e.g. replaying
+        a vector study's exact universe/windows on the event engine)
+        instead of re-declaring the universe/windows by hand.
+
+        ``study_sample_type=StudySampleType.OUT_OF_SAMPLE`` is a
+        query-only convenience matching any study tagged
+        ``OUT_SAMPLE_TIME`` or ``OUT_SAMPLE_UNIVERSE``.
+
+        Args:
+            study_name: Optional study name to filter on. When ``None``,
+                returns all studies.
+            study_sample_type: ``None`` returns every study.
+                Otherwise a :class:`StudySampleType` (or its string
+                value) to filter on.
+        """
+        definitions = [s.copy_definition() for s in self.studies.values()]
+
+        if study_name is not None:
+            definitions = [d for d in definitions if d.name == study_name]
+
+        if study_sample_type is None:
+            return definitions
+
+        want = (
+            study_sample_type.value
+            if isinstance(study_sample_type, StudySampleType)
+            else study_sample_type
+        )
+        if want == StudySampleType.OUT_OF_SAMPLE.value:
+            wanted = {
+                StudySampleType.OUT_SAMPLE_TIME.value,
+                StudySampleType.OUT_SAMPLE_UNIVERSE.value,
+            }
+        else:
+            wanted = {want}
+
+        def _tag(study: "Study") -> Optional[str]:
+            sample_type = study.sample_type
+            return (
+                sample_type.value
+                if isinstance(sample_type, StudySampleType)
+                else sample_type
+            )
+
+        return [d for d in definitions if _tag(d) in wanted]
+
     def rename_study(self, old_name: str, new_name: str) -> None:
         """Rename a study, re-keying it in the ``_studies`` dict."""
         study = self._studies.pop(old_name, None)
@@ -446,6 +499,47 @@ class Backtest:
             })
         return out
 
+    def get_studies_summary(
+        self, engine: str = "vector", study: Optional[str] = None
+    ) -> Dict[str, Optional[BacktestSummaryMetrics]]:
+        """Return every study's own pooled summary, side by side,
+        keyed by study name.
+
+        Deliberately does not merge runs across studies into one
+        pooled metric: studies typically span different universes
+        and/or time windows (e.g. in-sample vs. out-of-sample), so a
+        single blended Sharpe/CAGR across them would mix incomparable
+        regimes and hide the divergence a multi-study comparison is
+        meant to surface. Use this to place each study's summary next
+        to the others (e.g. an in-sample vs. out-of-sample table).
+
+        Args:
+            engine: One of ``"vector"`` or ``"event"``.
+
+        Returns:
+            Dict[str, Optional[BacktestSummaryMetrics]]: study name ->
+                that study's summary (``None`` if ``engine`` isn't
+                populated for that study).
+        """
+        if engine not in ENGINES:
+            raise ValueError(
+                f"Unknown engine {engine!r}, expected one of "
+                f"{list(ENGINES)}."
+            )
+
+        if study is not None:
+            st = self.get_study(study)
+            if st is None:
+                raise OperationalException(
+                    f"No study {study!r}. Available: {self.list_studies()!r}."
+                )
+            return {study: st.get_summary(engine)}
+
+        return {
+            name: study.get_summary(engine)
+            for name, study in self.studies.items()
+        }
+
     def add_study(self, study: "Study") -> None:
         """Append a new study to this backtest.
 
@@ -478,20 +572,17 @@ class Backtest:
 
     @property
     def risk_free_rate(self) -> Optional[float]:
-        """Read the risk-free rate from the default study's universe."""
+        """Read the risk-free rate from the default study."""
         st = self._get_default_study()
-        if st is not None and st.universe is not None:
-            return st.universe.risk_free_rate
+        if st is not None:
+            return st.risk_free_rate
         return None
 
     @risk_free_rate.setter
     def risk_free_rate(self, value: Optional[float]) -> None:
-        """Store the risk-free rate on the default study's universe."""
+        """Store the risk-free rate on the default study."""
         st = self._get_or_create_default_study()
-        if st.universe is None:
-            st.universe = Universe(risk_free_rate=value)
-        else:
-            st.universe.risk_free_rate = value
+        st.risk_free_rate = value
 
     @property
     def vector_runs(self) -> List:
@@ -553,17 +644,27 @@ class Backtest:
 
     @property
     def backtest_monte_carlo_tests(self) -> List[BacktestMonteCarloTest]:
-        """Shortcut: monte carlo tests of the default study."""
+        """Shortcut: Monte-Carlo tests of the default study, concatenated
+        across engine slots (vector first, then event)."""
         st = self._get_default_study()
-        return st.monte_carlo_tests if st is not None else []
+        if st is None:
+            return []
+        out: List[BacktestMonteCarloTest] = []
+        for engine in ENGINES:
+            slot = st.engine_results.get(engine)
+            if slot is not None:
+                out.extend(slot.monte_carlo_tests)
+        return out
 
     @backtest_monte_carlo_tests.setter
     def backtest_monte_carlo_tests(
         self, value: List[BacktestMonteCarloTest]
     ) -> None:
-        self._get_or_create_default_study().monte_carlo_tests = list(
-            value or []
-        )
+        # Landed on the vector slot: the framework only wires MC tests
+        # through the vector engine today (see docs/architecture/backtest/open_backtest_format.md).
+        self._get_or_create_default_study().get_engine(
+            ENGINE_VECTOR
+        ).monte_carlo_tests = list(value or [])
 
     @property
     def vector_summaries_by_universe(self) -> Dict:
@@ -674,10 +775,13 @@ class Backtest:
     def get_all_backtest_monte_carlo_tests(
         self,
     ) -> List[BacktestMonteCarloTest]:
-        """Return all monte carlo tests across all studies."""
+        """Return all monte carlo tests across all studies and engine slots."""
         result: List[BacktestMonteCarloTest] = []
         for st in self._studies.values():
-            result.extend(st.monte_carlo_tests)
+            for engine in ENGINES:
+                slot = st.engine_results.get(engine)
+                if slot is not None:
+                    result.extend(slot.monte_carlo_tests)
         return result
 
     def get_all_backtest_runs(
@@ -783,10 +887,14 @@ class Backtest:
         st = self._get_default_study()
         if st is None:
             return None
-        for mc in st.monte_carlo_tests:
-            if (mc.backtest_start_date == date_range.start_date and
-                    mc.backtest_end_date == date_range.end_date):
-                return mc
+        for engine in ENGINES:
+            slot = st.engine_results.get(engine)
+            if slot is None:
+                continue
+            for mc in slot.monte_carlo_tests:
+                if (mc.backtest_start_date == date_range.start_date and
+                        mc.backtest_end_date == date_range.end_date):
+                    return mc
         return None
 
     def get_all_backtest_metrics(self) -> List[BacktestMetrics]:
@@ -847,8 +955,8 @@ class Backtest:
                 rows before per-universe rows within each engine.
 
         See also:
-            ``docs/design/v9.0-dual-engine-design.md`` §6.
-            ``docs/design/tiered-backtest-storage.md`` §3.1.
+            ``docs/architecture/backtest/v9.0-dual-engine-design.md`` §6.
+            ``docs/architecture/backtest/tiered-backtest-storage.md`` §3.1.
             ``docs/design/multi-study-bundle.md`` §4.3 / Phase 3d.
         """
         rows: List[BacktestIndexRow] = []
@@ -863,11 +971,7 @@ class Backtest:
         for study_name, study in self.studies.items():
             # risk_free_rate is now owned by Universe; fall back to the
             # backtest-level override for legacy bundles without a universe.
-            study_rfr = (
-                study.universe.risk_free_rate
-                if study.universe is not None
-                else None
-            )
+            study_rfr = study.risk_free_rate
             study_kwargs = dict(common_kwargs)
             study_kwargs["study_description"] = study.description
             study_kwargs["study_name"] = study_name
@@ -1021,10 +1125,8 @@ class Backtest:
                     ]
                     default_study.universe = _univs[0]
                     inst._universe_catalogue = list(_univs)
-                if _rfr is not None and default_study.universe is None:
-                    default_study.universe = _Universe(risk_free_rate=_rfr)
-                elif _rfr is not None and default_study.universe is not None:
-                    default_study.universe.risk_free_rate = _rfr
+                if _rfr is not None:
+                    default_study.risk_free_rate = _rfr
 
                 # Vector slot
                 if _vr or _vs or _vsu:
@@ -1071,7 +1173,9 @@ class Backtest:
                 # Monte-Carlo tests
                 if _mc:
                     from .backtest_monte_carlo_test import BacktestMonteCarloTest as _MC
-                    default_study.monte_carlo_tests = [
+                    default_study.get_engine(
+                        ENGINE_VECTOR
+                    ).monte_carlo_tests = [
                         t if not isinstance(t, dict) else _MC.from_dict(t)
                         for t in _mc
                     ]
@@ -1332,7 +1436,14 @@ class Backtest:
                 slot = default_study.get_engine(ENGINE_EVENT)
                 slot.runs = event_runs
                 slot.summary = event_summary
-            default_study.monte_carlo_tests = monte_carlo_metrics
+            if monte_carlo_metrics:
+                # MC tests always attach to the vector slot: the on-disk
+                # ``monte_carlo_tests/`` directory does not preserve engine
+                # attribution, and the vector engine is the only producer
+                # the framework wires today.
+                default_study.get_engine(
+                    ENGINE_VECTOR
+                ).monte_carlo_tests = monte_carlo_metrics
             bt._studies["default"] = default_study
         return bt
 
@@ -1428,7 +1539,12 @@ class Backtest:
             )
             summary.save(summary_file)
 
-        _mc_tests = list(st.monte_carlo_tests) if st else []
+        _mc_tests: List[BacktestMonteCarloTest] = []
+        if st is not None:
+            for engine in ENGINES:
+                slot = st.engine_results.get(engine)
+                if slot is not None:
+                    _mc_tests.extend(slot.monte_carlo_tests)
         if _mc_tests:
             mc_dir_path = os.path.join(
                 directory_path, "monte_carlo_tests"
@@ -1545,9 +1661,26 @@ class Backtest:
                     slot = target.get_engine(engine)
                     slot.runs = combined
                     slot.summary = _regenerate_summary(combined)
-            self_mcts = list(self_st.monte_carlo_tests) if self_st else []
-            other_mcts = list(other_st.monte_carlo_tests) if other_st else []
-            target.monte_carlo_tests = self_mcts + other_mcts
+                # Per-engine MC-test concatenation. See
+                # docs/architecture/backtest/open_backtest_format.md — MC tests live
+                # on the engine slot because their null distributions are
+                # engine-specific.
+                self_mcts = (
+                    list(self_st.engine_results.get(engine).monte_carlo_tests)
+                    if (self_st is not None
+                        and self_st.engine_results.get(engine) is not None)
+                    else []
+                )
+                other_mcts = (
+                    list(other_st.engine_results.get(engine).monte_carlo_tests)
+                    if (other_st is not None
+                        and other_st.engine_results.get(engine) is not None)
+                    else []
+                )
+                if self_mcts or other_mcts:
+                    target.get_engine(engine).monte_carlo_tests = (
+                        self_mcts + other_mcts
+                    )
         merged.metadata = {**self.metadata, **other.metadata}
         merged.parameters = {**self.parameters, **other.parameters}
 
@@ -1598,13 +1731,18 @@ class Backtest:
         """
         Add a Monte-Carlo test to the backtest.
 
+        The test is appended to the vector engine slot of the default
+        study. The vector engine is the only producer the framework
+        wires today; a future event-engine MC test API will target
+        that slot explicitly. See docs/architecture/backtest/open_backtest_format.md.
+
         Args:
             monte_carlo_test (BacktestMonteCarloTest): The Monte-Carlo test
                 to add.
         """
-        self._get_or_create_default_study().monte_carlo_tests.append(
-            monte_carlo_test
-        )
+        self._get_or_create_default_study().get_engine(
+            ENGINE_VECTOR
+        ).monte_carlo_tests.append(monte_carlo_test)
 
     def __hash__(self):
         if self.algorithm_id is None:

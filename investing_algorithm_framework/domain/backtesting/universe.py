@@ -21,7 +21,10 @@ from typing import Any, Dict, List, Optional
 @dataclass
 class Universe:
     """
-    A named tradable asset set. A universe represents a single "basket" of assets that a strategy is evaluated on. A study can contain multiple universes, each with its own set of assets and metadata, but all sharing the same strategy configuration. This allows for easy comparison of strategy performance across different asset sets while keeping the strategy parameters constant.
+    A named tradable asset set. A universe represents a single "basket" of
+    assets that a strategy is evaluated on. A study can contain multiple
+    universes, each with its own set of assets and metadata, but all sharing
+    the same strategy configuration.
 
     Attributes:
         key: Stable identifier used to tag runs and as the dict key in
@@ -33,15 +36,12 @@ class Universe:
         market: Exchange identifier (e.g. ``"BITVAVO"``).
         metadata: Optional free-form notes (data source tags, basket
             provenance, etc.).
-        initial_capital: Optional initial capital for the universe.
     """
     key: Optional[str] = None
     symbols: List[str] = field(default_factory=list)
     trading_symbol: Optional[str] = None
     market: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    initial_capital: Optional[float] = None
-    risk_free_rate: Optional[float] = 0.027 # Default risk-free rate
 
     # Post initialization generate the key if not provided
     def __post_init__(self):
@@ -49,12 +49,9 @@ class Universe:
             self.key = self.generate_key()
 
     def generate_key(self) -> str:
-        """
-        Generate a stable key based on the symbols, trading symbol,
-        market, initial capital, and risk-free rate.
-        """
+        """Generate a stable key based on symbols, trading symbol, and market."""
         symbols_str = ",".join(sorted(self.symbols))
-        return f"{symbols_str}|{self.trading_symbol}|{self.market}|{self.initial_capital}|{self.risk_free_rate}"
+        return f"{symbols_str}|{self.trading_symbol}|{self.market}"
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -63,8 +60,6 @@ class Universe:
             "trading_symbol": self.trading_symbol,
             "market": self.market,
             "metadata": dict(self.metadata),
-            "initial_capital": self.initial_capital,
-            "risk_free_rate": self.risk_free_rate,
         }
 
     @classmethod
@@ -77,6 +72,4 @@ class Universe:
             trading_symbol=data.get("trading_symbol"),
             market=data.get("market"),
             metadata=dict(data.get("metadata") or {}),
-            initial_capital=data.get("initial_capital"),
-            risk_free_rate=data.get("risk_free_rate"),
         )

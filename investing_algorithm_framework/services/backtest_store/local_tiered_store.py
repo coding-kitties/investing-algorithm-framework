@@ -481,7 +481,7 @@ class LocalTieredStore(BacktestStore):
         Hashes are emitted with possible duplicates (one per
         ``(handle, key)`` reference); de-duplicate in the caller if
         needed. Useful as the input for the dedup-upload negotiate
-        step in ``docs/design/ohlcv-dedup-protocol.md``.
+        step in ``docs/architecture/backtest/ohlcv-dedup-protocol.md``.
         """
         for handle in self.iter_handles():
             for rel in self._read_ohlcv_manifest(handle).values():

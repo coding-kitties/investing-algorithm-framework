@@ -52,32 +52,44 @@ def print_bundle_summary(
 
 
 def _print_monte_carlo_tests(bt) -> None:
-    """Print Monte Carlo test p-values for every study that has them."""
+    """Print Monte Carlo test p-values for every study that has them.
+
+    Monte-Carlo tests live on each :class:`EngineSlot` (their null
+    distribution is engine-specific), so we iterate ``vector`` and
+    ``event`` slots per study and label each row with its engine.
+    """
     has_any = False
 
     for name, study in bt.studies.items():
-        mc_tests = study.monte_carlo_tests
-        if not mc_tests:
-            continue
+        for engine in ("vector", "event"):
+            slot = study.engine_results.get(engine)
+            if slot is None:
+                continue
+            mc_tests = slot.monte_carlo_tests
+            if not mc_tests:
+                continue
 
-        if not has_any:
-            print("  monte carlo tests:")
-            has_any = True
+            if not has_any:
+                print("  monte carlo tests:")
+                has_any = True
 
-        for mct in mc_tests:
-            window_label = mct.backtest_date_range_name or (
-                f"{mct.backtest_start_date} -> {mct.backtest_end_date}"
-            )
-            n_perms = len(mct.permutated_metrics) if mct.permutated_metrics else 0
-            print(
-                f"    - study={name!r} window={window_label!r} "
-                f"n_permutations={n_perms}"
-            )
-            p_values = mct.p_values or {}
-            if p_values:
-                for metric, pval in sorted(p_values.items()):
-                    sig = " *" if pval is not None and pval < 0.05 else ""
-                    print(f"        {metric:30s} p={pval}{sig}")
+            for mct in mc_tests:
+                window_label = mct.backtest_date_range_name or (
+                    f"{mct.backtest_start_date} -> {mct.backtest_end_date}"
+                )
+                n_perms = (
+                    len(mct.permutated_metrics)
+                    if mct.permutated_metrics else 0
+                )
+                print(
+                    f"    - study={name!r} engine={engine!r} "
+                    f"window={window_label!r} n_permutations={n_perms}"
+                )
+                p_values = mct.p_values or {}
+                if p_values:
+                    for metric, pval in sorted(p_values.items()):
+                        sig = " *" if pval is not None and pval < 0.05 else ""
+                        print(f"        {metric:30s} p={pval}{sig}")
 
 
 def _resolve_bundles(source, backtest_cls):

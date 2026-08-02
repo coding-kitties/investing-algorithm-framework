@@ -93,7 +93,7 @@ and will break backtests. Use
 ## 3. Scheduling — when does a strategy run?
 
 Each strategy declares its cadence as a `Schedule` object (see
-[§8 of the v8→v9 migration guide](../migration-v8-to-v9.md#8-scheduling-api-schedule-replaces-time_unit--interval)).
+*§8 of the v8→v9 migration guide*).
 `EventLoopService` keeps a per-strategy `next_run_times` dict and
 asks each `Schedule` whether it is due:
 
@@ -336,4 +336,4 @@ These hold across both engines:
 - [`orders.md`](orders.md) — what happens inside `OrderService.update(...)` that the evaluator calls in Step 3.
 - [`trades.md`](trades.md) — what happens inside `TradeService` when fills are detected.
 - [`pipeline-api.md`](pipeline-api.md) — Step 5b internals.
-- [§8 of the v8→v9 migration guide](../migration-v8-to-v9.md#8-scheduling-api-schedule-replaces-time_unit--interval) — `Schedule` replaces `time_unit + interval`.
+- *§8 of the v8→v9 migration guide* — `Schedule` replaces `time_unit + interval`.

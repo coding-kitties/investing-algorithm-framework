@@ -4,7 +4,7 @@ A :class:`SqliteBacktestIndex` is a single-file SQLite database that
 holds one row per backtest bundle, derived from
 :class:`BacktestIndexRow`. It is the local-disk implementation of the
 Tier-1 store described in
-``docs/design/tiered-backtest-storage.md`` \u00a73.1.
+``docs/architecture/backtest/tiered-backtest-storage.md`` \u00a73.1.
 
 Schema
 ------

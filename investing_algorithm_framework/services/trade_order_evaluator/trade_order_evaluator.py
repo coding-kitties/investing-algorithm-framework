@@ -74,6 +74,9 @@ class TradeOrderEvaluator(ABC):
                 ],
                 trigger_date=current_date
             )
+            self._dispatch_hook_for_trades(
+                take_profit_order, "on_trade_take_profit_triggered"
+            )
 
     def _check_stop_losses(self):
         current_date = self.configuration_service.config[INDEX_DATETIME]
@@ -91,3 +94,38 @@ class TradeOrderEvaluator(ABC):
                 ],
                 trigger_date=current_date
             )
+            dispatcher = getattr(
+                self.trade_service, "trade_hook_dispatcher", None
+            )
+            if dispatcher is None:
+                continue
+            trailing = any(
+                getattr(
+                    self.trade_stop_loss_service.get(
+                        stop_loss.get("stop_loss_id")
+                    ),
+                    "trailing",
+                    False,
+                )
+                for stop_loss in stop_losses
+            )
+            hook_name = (
+                "on_trade_trailing_stop_loss_triggered" if trailing
+                else "on_trade_stop_loss_triggered"
+            )
+            self._dispatch_hook_for_trades(stop_loss_order, hook_name)
+
+    def _dispatch_hook_for_trades(self, order_data, hook_name):
+        """
+        Notify the owning strategy for each trade referenced in an
+        order dict built by ``get_triggered_stop_loss_orders`` /
+        ``get_triggered_take_profit_orders``. No-op if no hooks are
+        active for any strategy.
+        """
+        dispatcher = getattr(self.trade_service, "trade_hook_dispatcher", None)
+        if dispatcher is None:
+            return
+
+        for trade_ref in order_data.get("trades", []):
+            trade = self.trade_service.get(trade_ref["trade_id"])
+            dispatcher.dispatch(hook_name, trade)

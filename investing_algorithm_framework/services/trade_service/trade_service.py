@@ -97,7 +97,8 @@ class TradeService(RepositoryService):
         position_repository,
         portfolio_repository,
         configuration_service,
-        trade_allocation_repository
+        trade_allocation_repository,
+        trade_hook_dispatcher=None
     ):
         super(TradeService, self).__init__(trade_repository)
         self.order_repository = order_repository
@@ -107,6 +108,14 @@ class TradeService(RepositoryService):
         self.trade_stop_loss_repository = trade_stop_loss_repository
         self.trade_take_profit_repository = trade_take_profit_repository
         self.trade_allocation_repository = trade_allocation_repository
+        self.trade_hook_dispatcher = trade_hook_dispatcher
+
+    def _dispatch_trade_hook(self, hook_name, trade):
+        """Best-effort notify the owning strategy of a trade-lifecycle
+        event. No-op when no dispatcher is wired or no hook is active.
+        """
+        if self.trade_hook_dispatcher is not None and trade is not None:
+            self.trade_hook_dispatcher.dispatch(hook_name, trade)
 
     def create_trade_at_fill(
         self, buy_order, fill_amount, fill_price, opened_at
@@ -158,6 +167,9 @@ class TradeService(RepositoryService):
             "cost": fill_amount * fill_price,
             "status": TradeStatus.OPEN.value,
         }
+        strategy_id = (buy_order.metadata or {}).get("strategy_id")
+        if strategy_id is not None:
+            data["metadata"] = {"strategy_id": strategy_id}
 
         trade = self.create(data)
 
@@ -188,6 +200,8 @@ class TradeService(RepositoryService):
                 created_at=opened_at,
             )
 
+        self._dispatch_trade_hook("on_trade_created", trade)
+        self._dispatch_trade_hook("on_trade_opened", trade)
         return trade
 
     # ------------------------------------------------------------------
@@ -238,6 +252,9 @@ class TradeService(RepositoryService):
             "status": TradeStatus.OPEN.value,
             "is_short": True,
         }
+        strategy_id = (short_order.metadata or {}).get("strategy_id")
+        if strategy_id is not None:
+            data["metadata"] = {"strategy_id": strategy_id}
 
         trade = self.create(data)
 
@@ -271,6 +288,8 @@ class TradeService(RepositoryService):
                 created_at=opened_at,
             )
 
+        self._dispatch_trade_hook("on_trade_created", trade)
+        self._dispatch_trade_hook("on_trade_opened", trade)
         return trade
 
     def close_short_trade_with_filled_cover_order(
@@ -361,6 +380,16 @@ class TradeService(RepositoryService):
                 updates["closed_at"] = closed_at
 
             self.update(trade.id, updates)
+            if self.trade_hook_dispatcher is not None:
+                updated_trade = self.get(trade.id)
+                if updates.get("status") == TradeStatus.CLOSED.value:
+                    self._dispatch_trade_hook(
+                        "on_trade_closed", updated_trade
+                    )
+                else:
+                    self._dispatch_trade_hook(
+                        "on_trade_updated", updated_trade
+                    )
             local_cover_order = self.order_repository.get(cover_order_id)
             self.repository.add_order_to_trade(trade, local_cover_order)
 
@@ -446,6 +475,12 @@ class TradeService(RepositoryService):
             update_data["closed_at"] = sell_updated_at
 
         self.update(trade_id, update_data)
+        if self.trade_hook_dispatcher is not None:
+            updated_trade = self.get(trade_id)
+            if update_data.get("status") == TradeStatus.CLOSED.value:
+                self._dispatch_trade_hook("on_trade_closed", updated_trade)
+            else:
+                self._dispatch_trade_hook("on_trade_updated", updated_trade)
         return allocation
 
     def _create_trade_allocations_fifo(self, sell_order):
@@ -575,18 +610,39 @@ class TradeService(RepositoryService):
             for stop_loss in stop_losses:
 
                 if stop_loss.active:
+                    prev_price = stop_loss.stop_loss_price
                     stop_loss.update_with_last_reported_price(
                         data["last_reported_price"], last_reported_price_date
                     )
                     to_be_saved_stop_losses.append(stop_loss)
 
+                    if (
+                        self.trade_hook_dispatcher is not None
+                        and stop_loss.stop_loss_price != prev_price
+                    ):
+                        hook_name = (
+                            "on_trade_trailing_stop_loss_updated"
+                            if stop_loss.trailing
+                            else "on_trade_stop_loss_updated"
+                        )
+                        self._dispatch_trade_hook(hook_name, trade)
+
             for take_profit in take_profits:
 
                 if take_profit.active:
+                    prev_price = take_profit.take_profit_price
                     take_profit.update_with_last_reported_price(
                         data["last_reported_price"], last_reported_price_date
                     )
                     to_be_saved_take_profits.append(take_profit)
+
+                    if (
+                        self.trade_hook_dispatcher is not None
+                        and take_profit.take_profit_price != prev_price
+                    ):
+                        self._dispatch_trade_hook(
+                            "on_trade_take_profit_updated", trade
+                        )
 
             self.trade_stop_loss_repository\
                 .save_objects(to_be_saved_stop_losses)
@@ -1060,7 +1116,13 @@ class TradeService(RepositoryService):
             "created_at": created_at if created_at is not None
             else datetime.now(tz=timezone.utc)
         }
-        return self.trade_stop_loss_repository.create(creation_data)
+        created = self.trade_stop_loss_repository.create(creation_data)
+        self._dispatch_trade_hook("on_trade_stop_loss_created", trade)
+        if trailing:
+            self._dispatch_trade_hook(
+                "on_trade_trailing_stop_loss_created", trade
+            )
+        return created
 
     def add_take_profit(
         self,
@@ -1160,7 +1222,9 @@ class TradeService(RepositoryService):
             "created_at": created_at if created_at is not None
             else datetime.now(tz=timezone.utc)
         }
-        return self.trade_take_profit_repository.create(creation_data)
+        created = self.trade_take_profit_repository.create(creation_data)
+        self._dispatch_trade_hook("on_trade_take_profit_created", trade)
+        return created
 
     def get_triggered_stop_loss_orders(self):
         """

@@ -88,18 +88,23 @@ it will fail in production. The format makes this comparison
 trivial because both engines populate the same structure under the
 same study.
 
-### Summaries are pre-computed, not derived
+### Summaries are materialised on disk, always recomputable
 
-Each engine slot carries a pre-computed `summary` that aggregates
-metrics across all runs in that study. This is a deliberate choice:
+Each engine slot carries a `summary` that aggregates metrics across
+all runs in that study. The framework materialises it on disk (so
+rankers don't have to decode and aggregate every bundle), but also
+**recomputes it from the run set** on `Backtest.save()`,
+`Backtest.open()`, and `merge()` so per-engine summaries always
+stay self-consistent with per-run metrics. This gives you three
+properties at once:
 
 - **Speed.** Ranking 10,000 bundles by Sharpe ratio should take
-  milliseconds, not minutes. If summaries were derived on the fly,
-  every ranking query would need to decode and aggregate all runs
-  in every bundle.
-- **Determinism.** The summary is computed once when runs are
-  added, using the same aggregation logic. No risk of different
-  tools producing different numbers from the same data.
+  milliseconds, not minutes. The materialised summary lets the
+  Tier-1 index skip the run decode entirely.
+- **Determinism.** Summaries are derived by one aggregation
+  function (`generate_backtest_summary_metrics`) applied to the
+  canonical run set. No risk of different tools producing
+  different numbers from the same data.
 - **Indexability.** The Tier-1 SQLite index (`build_index()`)
   promotes summary scalars into a flat table. This enables
   pure-SQL ranking and filtering without touching the binary
@@ -144,9 +149,14 @@ them, store the results as runs within a study. The format carries
 arbitrary window sets; CPCV is just a different window generator.
 
 **Monte Carlo permutation tests** — the bundle has a dedicated
-`monte_carlo_tests` slot per engine per study. Store the real
-result, the null distribution, and the p-values together with the
-runs they were computed from.
+`monte_carlo_tests` slot per engine per study. Each entry stores
+the full `BacktestMetrics` from the real (un-permuted) run plus
+the full `BacktestMetrics` from *every* permutation, and a
+`p_values` dict keyed by metric name. One shuffle campaign
+therefore yields p-values for many statistics simultaneously
+(Sharpe, Sortino, CAGR, max-drawdown, …) from the same null pool.
+See `docs/architecture/backtest/open_backtest_format.md` §Monte-Carlo test
+structure.
 
 **Deflated Sharpe Ratio** — requires the number of trials, the
 observed Sharpe, skewness, kurtosis, and track record length. All
@@ -160,19 +170,32 @@ single-object operation, not a cross-file join.
 
 ### It supports any execution model
 
-The event engine slot accepts results from any fill model:
+Cost and fill assumptions are captured per study by three
+pluggable models on `ExecutionConfig`:
 
-- **Zero-cost** — no fees, no slippage (signal development only)
-- **TradingCost** — flat + percentage fees, fixed or percentage
-  slippage (sufficient for liquid markets)
-- **Blotter** — pluggable fill model with custom
-  `get_fill_price()`, `get_fill_amount()`, `on_fill()` callbacks
-  (supports Almgren-Chriss or any volume-aware impact model)
+- **`SlippageModel`** — how much price impact each fill takes.
+  Built-ins range from `NoSlippage` (signal development) through
+  scalar (`PercentageSlippage`, `FixedBasisPointsSlippage`) up to
+  volume-aware (`VolumeImpactSlippage`, `VolumeShareSlippage`).
+  Custom subclasses register automatically via `__init_subclass__`.
+- **`CommissionModel`** — how the fee for each trade is computed.
+  Built-ins: `NoCommission`, `PercentageCommission`,
+  `FixedCommission`. Custom subclasses register the same way.
+- **`FillModel`** — whether an order fills fully on the first bar
+  (`FullFill`) or gets capped by traded volume (`VolumeBasedFill`,
+  and any user extension).
 
-The format does not care which fill model produced the results —
-it stores the same `BacktestRun` regardless. This means you can
-re-run the same study under a more realistic fill model and
-compare directly.
+All three models serialise as `{"type": <class_name>, "params":
+{...}}` on disk, so the study's cost / fill assumptions stay
+auditable and reproducible after the fact. See
+`docs/architecture/backtest/open_backtest_format.md` §Execution config structure
+and §Cost and slippage attribution for how each fill records the
+applied slippage and commission on its `Order`, and how those roll
+up into `Trade.cost` and `Trade.net_gain`.
+
+Because the format stores results, not methodology, you can re-run
+the same study under a more realistic model overlay and compare
+directly — the runs are structurally identical.
 
 ### It scales to large sweeps
 

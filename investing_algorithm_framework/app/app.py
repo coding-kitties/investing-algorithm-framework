@@ -49,24 +49,26 @@ def _apply_study_fields(
     study_description,
     backtest_storage_directory,
     anchor_algorithm_id=None,
+    initial_capital=None,
 ):
     """Stamp ``study_name`` / ``study_description`` /
-    ``anchor_algorithm_id`` on each Backtest and, when the runner
-    persisted bundles to ``backtest_storage_directory``, re-save them
-    with ``merge=True`` so the on-disk envelopes carry the new
-    top-level fields.
+    ``anchor_algorithm_id`` / ``initial_capital`` on each Backtest and,
+    when the runner persisted bundles to ``backtest_storage_directory``,
+    re-save them with ``merge=True`` so the on-disk envelopes carry the
+    new top-level fields.
 
     The merge-on-save contract (see ``bundle._merge_v3_envelopes``)
     guarantees top-level fields are owned by the in-memory backtest, so
     this does not duplicate runs.
 
-    No-op if all of ``study_name``, ``study_description`` and
-    ``anchor_algorithm_id`` are ``None``.
+    No-op if all of ``study_name``, ``study_description``,
+    ``anchor_algorithm_id`` and ``initial_capital`` are ``None``.
     """
     if (
         study_name is None
         and study_description is None
         and anchor_algorithm_id is None
+        and initial_capital is None
     ):
         return
     from investing_algorithm_framework.domain.backtesting.bundle import (
@@ -86,6 +88,10 @@ def _apply_study_fields(
                 _ds.description = study_description
         if anchor_algorithm_id is not None:
             bt.anchor_algorithm_id = anchor_algorithm_id
+        if initial_capital is not None:
+            _ds = bt.get_study()
+            if _ds:
+                _ds.initial_capital = initial_capital
 
     if backtest_storage_directory is None:
         return
@@ -128,6 +134,22 @@ def _apply_backtest_windows(
     for bt in backtests:
         study = bt._get_or_create_default_study()
         study.backtest_windows = list(backtest_windows)
+        for engine in ("vector", "event"):
+            for run in study.get_runs(engine):
+                for window in backtest_windows:
+                    candidate_ranges = [
+                        r for r in (window.train_range, window.test_range)
+                        if r is not None
+                    ]
+                    if any(
+                        run.backtest_start_date == r.start_date
+                        and run.backtest_end_date == r.end_date
+                        for r in candidate_ranges
+                    ):
+                        run.backtest_window = window
+                        if run.backtest_metrics is not None:
+                            run.backtest_metrics.backtest_window = window
+                        break
 
     if backtest_storage_directory is None:
         return
@@ -1482,9 +1504,9 @@ class App:
             universe=_Universe(
                 market=portfolio_configuration.market,
                 trading_symbol=portfolio_configuration.trading_symbol,
-                initial_capital=portfolio_configuration.initial_balance,
-                risk_free_rate=_rfr1,
             ),
+            initial_capital=portfolio_configuration.initial_balance,
+            risk_free_rate=_rfr1,
         )
 
         return backtest_service.run_vector_backtests(
@@ -2193,9 +2215,9 @@ class App:
             universe=_Universe(
                 market=portfolio_configuration.market,
                 trading_symbol=portfolio_configuration.trading_symbol,
-                initial_capital=portfolio_configuration.initial_balance,
-                risk_free_rate=_rfr,
             ),
+            initial_capital=portfolio_configuration.initial_balance,
+            risk_free_rate=_rfr,
         )
 
         return backtest_service.run_vector_backtests(
@@ -2660,6 +2682,7 @@ class App:
         strategy: Optional[TradingStrategy] = None,
         strategies: Optional[List[TradingStrategy]] = None,
         study: Optional[Study] = None,
+        window_part: Optional[str] = None,
         snapshot_interval: SnapshotInterval = SnapshotInterval.DAILY,
         skip_data_sources_initialization: bool = False,
         show_progress: bool = False,
@@ -2703,6 +2726,12 @@ class App:
             strategies: Multiple strategies; each yields one Backtest.
             study: Study configuration — provides ``universe``,
                 ``backtest_windows``, ``name`` and ``description``. Required.
+            window_part: Which part of each ``study.backtest_windows``
+                entry to run — ``"train"``, ``"test"`` or ``"both"``.
+                Overrides ``study.window_part`` for this call only when
+                given; otherwise ``study.window_part`` is used (default
+                ``"test"``, falling back to ``train_range`` for
+                train-only windows). See :class:`WindowPart`.
             snapshot_interval: Portfolio snapshot frequency.
             skip_data_sources_initialization: Skip data provider init when
                 data is already cached.
@@ -2756,9 +2785,9 @@ class App:
                 universe=Universe(
                     market=_market or "",
                     trading_symbol=_trading_symbol or "",
-                    initial_capital=_initial_amount or 0,
-                    risk_free_rate=risk_free_rate,
                 ),
+                initial_capital=_initial_amount or 0,
+                risk_free_rate=risk_free_rate,
                 backtest_windows=[
                     BacktestWindow(train_range=backtest_date_range)
                 ],
@@ -2827,16 +2856,15 @@ class App:
         engine = study.engine
         study_name = study.name
         study_description = study.description
-        risk_free_rate = (
-            universe.risk_free_rate if universe is not None else None
-        )
+        risk_free_rate = study.risk_free_rate
 
-        # Resolve date ranges: prefer test_range, fall back to train_range
-        backtest_date_ranges = [
-            w.test_range if w.test_range is not None else w.train_range
-            for w in backtest_windows
-            if (w.test_range or w.train_range) is not None
-        ]
+        # window_part= overrides study.window_part for this call only.
+        if window_part is not None:
+            study.window_part = window_part
+
+        # Resolve each window to the range(s) that should run, per
+        # study.window_part ("train" / "test" / "both").
+        backtest_date_ranges = study.resolve_backtest_date_ranges()
 
         if not backtest_date_ranges:
             raise OperationalException(
@@ -2886,12 +2914,12 @@ class App:
             # Build portfolio configuration from universe when possible
             if (
                 universe is not None
-                and universe.initial_capital is not None
+                and study.initial_capital is not None
                 and universe.market is not None
                 and universe.trading_symbol is not None
             ):
                 portfolio_configuration = PortfolioConfiguration(
-                    initial_balance=universe.initial_capital,
+                    initial_balance=study.initial_capital,
                     market=universe.market,
                     trading_symbol=universe.trading_symbol,
                 )
@@ -2902,18 +2930,15 @@ class App:
                 if not portfolio_configurations:
                     raise OperationalException(
                         "No portfolio configuration found. "
-                        "Set universe.initial_capital, universe.market "
+                        "Set study.initial_capital, universe.market "
                         "and universe.trading_symbol on the Study, or "
                         "add a portfolio configuration to the app before "
                         "calling run_backtest."
                     )
                 portfolio_configuration = portfolio_configurations[0]
-                if (
-                    universe is not None
-                    and universe.initial_capital is not None
-                ):
+                if study.initial_capital is not None:
                     portfolio_configuration.initial_balance = (
-                        universe.initial_capital
+                        study.initial_capital
                     )
 
             backtest_service: BacktestService = self.container.backtest_service()
@@ -2944,9 +2969,7 @@ class App:
             # ── Event-driven engine ───────────────────────────────────
             first_date_range = backtest_date_ranges[0]
 
-            initial_capital = (
-                universe.initial_capital if universe is not None else None
-            )
+            initial_capital = study.initial_capital
             self.initialize_backtest_config(
                 backtest_date_range=first_date_range,
                 snapshot_interval=snapshot_interval,
@@ -2963,6 +2986,18 @@ class App:
                     dp_tuple[0], priority=dp_tuple[1]
                 )
             data_provider_service.add_data_provider(CCXTOHLCVDataProvider())
+
+            # Inject universe symbols/market into strategies that don't set them
+            if universe is not None:
+                _u_map = _build_strategy_universe_map(strats, universe)
+                for _s in strats:
+                    _matched = _u_map.get(_s.algorithm_id)
+                    if _matched is None:
+                        continue
+                    if not _s.symbols and _matched.symbols:
+                        _s.symbols = list(_matched.symbols)
+                    if not getattr(_s, "market", None) and _matched.market:
+                        _s.market = _matched.market
 
             algorithm_factory = self.container.algorithm_factory()
             final_algorithms = []
@@ -3008,6 +3043,7 @@ class App:
                 study_description,
                 backtest_storage_directory,
                 anchor_algorithm_id=anchor_algorithm_id,
+                initial_capital=study.initial_capital,
             )
             _apply_universes(
                 backtests,

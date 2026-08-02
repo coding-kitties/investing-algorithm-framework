@@ -3,7 +3,7 @@
 Phase 1 (event-driven backtest only) of the Pipeline API tracked in
 issue #438 / #501.
 
-See ``docs/design/pipeline-api.md`` for the design rationale.
+See ``docs/architecture/strategy/pipeline-api.md`` for the design rationale.
 """
 from .factor import Factor
 from .custom_factor import CustomFactor

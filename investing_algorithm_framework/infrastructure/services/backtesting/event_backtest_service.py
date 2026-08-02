@@ -203,17 +203,16 @@ class EventBacktestService:
         run = BacktestRun(
             backtest_window=BacktestWindow(train_range=backtest_date_range),
             initial_unallocated=initial_unallocated,
-            trading_symbol=portfolio.trading_symbol,
             created_at=datetime.now(tz=timezone.utc),
             portfolio_snapshots=self._portfolio_snapshot_service.get_all(
                 {"portfolio_id": portfolio.id}
             ),
             number_of_runs=number_of_runs,
             trades=self._trade_service.get_all(
-                {"portfolio": portfolio.id}
+                {"portfolio_id": portfolio.id}
             ),
             orders=self._order_service.get_all(
-                {"portfolio": portfolio.id}
+                {"portfolio_id": portfolio.id}
             ),
             positions=self._position_repository.get_all(
                 {"portfolio": portfolio.id}

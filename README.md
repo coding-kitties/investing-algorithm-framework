@@ -59,11 +59,13 @@
 
 ## Introduction
 
-> **Upgrading from v8?** v9.0 makes the framework dual-engine native (separate
-> `vector` / `event` slots on every `Backtest`, bundle format v3, per-engine
-> ranking). See [`docs/migration-v8-to-v9.md`](docs/migration-v8-to-v9.md) and
-> [`CHANGELOG.md`](CHANGELOG.md). Existing bundles upgrade in place with
-> `iaf migrate-bundles --to v3 <dir>`.
+> **v9.0.0 alpha is out!** The pre-release of v9.0 is now available on
+> PyPI as an alpha pre-release. Since pip doesn't install pre-releases by
+> default, pin the version explicitly or pass `--pre`:
+> ```bash
+> pip install investing-algorithm-framework==9.0.0a1
+> ```
+> You can find the blog post here: [v9.0 Release](docusaurus/blog/2026-08-02-v9.0-release.md).
 
 `Investing Algorithm Framework` is a Python framework that covers the entire quant workflow: define a strategy once, vector-backtest thousands of parameter variants to find promising signals, narrow down with a storage layer that ranks 10k+ results in milliseconds, validate the winners in a realistic event-driven simulation, compare everything in a single interactive HTML dashboard, and deploy the best performer live, all with the same `TradingStrategy` class, no code rewrites between stages.
 
@@ -76,9 +78,9 @@ Most quant frameworks stop at "here's your backtest result." You get a number, m
   <strong>Features</strong>
 </summary> <br>
 
-- 🔁 **Long & Short with Composable Execution Phases** — Build strategies as a pipeline of entry/exit signals, position sizing, and order generation — each independently overridable. Long-only by default; opt into shorts by overriding two methods. The same strategy class runs unchanged in vector backtests, event-driven backtests, and live.
+- 🔁 **Long & Short signals support for Live trading & Backtesting** — Build strategies as a pipeline of entry/exit signals, position sizing, and order generation — each independently overridable. Long-only by default; opt into shorts by overriding two methods. The same strategy class runs unchanged in vector backtests, event-driven backtests, and live.
+- 🗂️ **Official support for the Open Backtesting Format** — One `{algorithm_id}.ofbt` per algorithm holds every study (in-sample sweep, time-OOS, universe-OOS, walk-forward, stress test) as a first-class slot with its own universe, windows, engine runs and summary. See [Open-Backtest-Format](https://github.com/Quant-Commons/Open-Backtest-Format) for the reference spec.
 - 📊 **[30+ Metrics](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/metrics)** — CAGR, Sharpe, Sortino, Calmar, VaR, CVaR, Max DD, Recovery & more
-- 🗂️ **State of the art Algorithm-Centric backtest Bundle Storage** — One `{algorithm_id}.iafbt` per algorithm holds every study (in-sample sweep, time-OOS, universe-OOS, walk-forward, stress test) as a first-class slot with its own universe, windows, runs and summary/
 - 🧮 **[Cross-Sectional Pipelines](https://coding-kitties.github.io/investing-algorithm-framework/Advanced%20Concepts/pipelines)** — Rank, filter and score entire universes of symbols every iteration with a tidy factor table
 - ⚡ **[Vector Backtesting for Signal Analysis](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/vector-backtesting)** — Quickly test your strategy logic on historical data to see how signals would have behaved before committing to full event-driven backtests
 - 🏃 **[Event-Driven Backtesting](https://coding-kitties.github.io/investing-algorithm-framework/Getting%20Started/event-backtesting)** — Once promising strategies are identified via vector backtests, run full event-driven backtests to simulate realistic execution and portfolio management

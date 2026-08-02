@@ -95,6 +95,22 @@ class BacktestMonteCarloTest:
         )
         return r.name
 
+    @property
+    def window_role(self) -> str:
+        """Which portion of :pyattr:`backtest_window` this test was scoped to.
+
+        Returns ``"test"`` when the parent window has a ``test_range``
+        (the test was scoped to the out-of-sample period) and
+        ``"train"`` otherwise (the test was scoped to an in-sample-only
+        fit). Mirrors :pyattr:`BacktestRun.window_role`.
+        """
+        if (
+            self.backtest_window is not None
+            and self.backtest_window.test_range is not None
+        ):
+            return "test"
+        return "train"
+
     def compute_p_values(
         self, metrics: List[str] = None, one_sided: bool = True
     ) -> None:

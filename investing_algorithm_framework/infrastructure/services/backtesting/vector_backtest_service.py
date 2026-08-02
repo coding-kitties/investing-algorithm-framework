@@ -1428,7 +1428,6 @@ class VectorBacktestService:
 
         # Create a backtest run object
         run = BacktestRun(
-            trading_symbol=trading_symbol,
             initial_unallocated=initial_amount,
             number_of_runs=1,
             portfolio_snapshots=snapshots,
@@ -1445,7 +1444,6 @@ class VectorBacktestService:
             number_of_trades_closed=number_of_trades_closed,
             number_of_trades_open=number_of_trades_open,
             number_of_positions=len(unique_symbols),
-            symbols=list(buy_signals.keys()),
             signals=raw_signals,
             signal_events=signal_events,
             recorded_values=self._convert_recorded_values(raw_recorded),
@@ -1578,7 +1576,7 @@ class VectorBacktestService:
 
         Strategies without ``pipelines`` skip this entirely (zero cost).
         Per Phase 2 of the Pipeline API (#502); see
-        ``docs/design/pipeline-api.md``.
+        ``docs/architecture/strategy/pipeline-api.md``.
 
         ``data[pipeline_cls.__name__]`` is set to a long-form
         ``polars.DataFrame`` with columns

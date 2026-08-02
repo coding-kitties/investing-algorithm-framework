@@ -9,7 +9,7 @@ Companions:
 
 - [`orders.md`](orders.md) — the order lifecycle that feeds this one.
 - [`event_loop.md`](event_loop.md) — when `TradeService` is invoked.
-- [§9 of the v8→v9 migration guide](../migration-v8-to-v9.md#9-order-and-trade-lifecycle) — what changed from v8.
+- *§9 of the v8→v9 migration guide* — what changed from v8.
 
 ---
 
@@ -295,5 +295,5 @@ fields onto trades.
 - [`orders.md`](orders.md) — order-side lifecycle that drives fills into this service.
 - [`event_loop.md`](event_loop.md) — when fills are observed and SL/TP triggers fire.
 - [`general.md`](general.md) — overall layering and persistence model.
-- [§9 of the v8→v9 migration guide](../migration-v8-to-v9.md#9-order-and-trade-lifecycle) — historical context for the "one trade per fill" change.
+- *§9 of the v8→v9 migration guide* — historical context for the "one trade per fill" change.
 - Issues #431 (one-trade-per-fill), #433 (`is_short` first-class), #434 (SHORT / COVER lifecycle).

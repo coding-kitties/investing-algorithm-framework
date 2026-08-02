@@ -46,6 +46,9 @@ from .mean_daily_return import get_mean_daily_return, get_mean_yearly_return
 from .standard_deviation import get_daily_returns_std
 from .consistency import get_cv_consistency, get_normalized_stability, \
     get_consistency_score, get_stability_score
+from .omega_ratio import get_omega_ratio
+from .ulcer import get_ulcer_index
+from .mae_mfe import get_trade_mae_mfe_statistics
 
 __all__ = [
     "get_mean_daily_return",
@@ -127,5 +130,8 @@ __all__ = [
     "get_consistency_score",
     "get_stability_score",
     "recalculate_backtests",
-    "recalculate_backtests_in_directory"
+    "recalculate_backtests_in_directory",
+    "get_omega_ratio",
+    "get_ulcer_index",
+    "get_trade_mae_mfe_statistics",
 ]

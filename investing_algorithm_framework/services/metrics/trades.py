@@ -1,7 +1,38 @@
 from typing import List, Tuple
 
 from investing_algorithm_framework.domain import Trade, TradeStatus, \
-    OperationalException, BacktestRun
+    BacktestRun
+
+
+def get_directional_trade_statistics(trades: List[Trade]) -> dict:
+    """Return long/short trade counts and closed-trade win rates."""
+    statistics = {}
+    for side, is_short in (("long", False), ("short", True)):
+        side_trades = [
+            trade for trade in (trades or [])
+            if bool(getattr(trade, "is_short", False)) is is_short
+        ]
+        closed_trades = [
+            trade for trade in side_trades
+            if TradeStatus.CLOSED.equals(trade.status)
+        ]
+        winning_trades = [
+            trade for trade in closed_trades
+            if trade.net_gain_absolute > 0
+        ]
+        losing_trades = [
+            trade for trade in closed_trades
+            if trade.net_gain_absolute < 0
+        ]
+        statistics[f"number_of_{side}_trades"] = len(side_trades)
+        statistics[f"number_of_{side}_trades_closed"] = len(closed_trades)
+        statistics[f"number_of_winning_{side}_trades"] = len(winning_trades)
+        statistics[f"number_of_losing_{side}_trades"] = len(losing_trades)
+        statistics[f"{side}_win_rate"] = (
+            len(winning_trades) / len(closed_trades)
+            if closed_trades else 0.0
+        )
+    return statistics
 
 
 def get_positive_trades(

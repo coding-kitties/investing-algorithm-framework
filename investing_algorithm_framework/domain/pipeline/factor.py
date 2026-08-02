@@ -9,7 +9,7 @@ on a long-form OHLCV panel. Phase 1 supports a small surface area:
 - ``Factor.top(n)`` / ``Factor.bottom(n)`` — boolean filters.
 
 Arithmetic operators, ``zscore``, ``demean`` and other surface area
-described in ``docs/design/pipeline-api.md`` are intentionally deferred
+described in ``docs/architecture/strategy/pipeline-api.md`` are intentionally deferred
 to a follow-up issue (Phase 1 polish).
 """
 from __future__ import annotations

@@ -14,12 +14,17 @@ class BacktestWindow:
     first and attach the out-of-sample test_range later (e.g. via
     ``window.test_range = out_of_sample_range``).
 
-    gap_days is derived from the difference between test_range.start_date
-    and train_range.end_date when a test_range is present, keeping it
-    always consistent with the ranges.
+    gap_days records the purge period between the end of training and the
+    start of testing (train_range.end_date -> test_range.start_date). It is
+    stored so that producer intent is preserved on the wire, and validated
+    against the actual dates when a test_range is present.
+
+    step_days records the inter-window step used by the walk-forward
+    generator that produced this window (e.g. `step_days=90` for a
+    quarterly rolling walk-forward). It is None for one-off windows and
+    for k-fold windows, which are not step-generated.
 
     Attributes:
-        key (Optional[str]): A unique key for this window, e.g. "window_1". If None, a key will be generated based on the train_range and test_range.
         name (Optional[str]): An optional name for the window, e.g. "Window 1".
         train_range (BacktestDateRange): The full date range used for
             training, including any warmup period.
@@ -28,8 +33,15 @@ class BacktestWindow:
         warmup_days (int): Number of days at the start of train_range
             reserved for warming up indicators (e.g., a 26-day EMA needs
             26 warmup days). Not counted as effective training. Default is 0.
+        gap_days (Optional[int]): Purge period between train_range.end_date
+            and test_range.start_date. If not provided and test_range is
+            set, it is computed from the dates. None when test_range is
+            unset. Default is None.
+        step_days (Optional[int]): Inter-window step used by the generator.
+            None for k-fold and one-off windows. Default is None.
         fold_index (Optional[int]): Zero-based fold index when this window
-            is part of a k-fold split. None for rolling windows.
+            is part of a k-fold split. None for rolling / anchored / one-off
+            windows.
     """
 
     def __init__(
@@ -37,6 +49,8 @@ class BacktestWindow:
         train_range: BacktestDateRange,
         test_range: Optional[BacktestDateRange] = None,
         warmup_days: int = 0,
+        gap_days: Optional[int] = None,
+        step_days: Optional[int] = None,
         fold_index: Optional[int] = None,
         name: Optional[str] = None,
     ):
@@ -45,34 +59,27 @@ class BacktestWindow:
 
         train_duration = (train_range.end_date - train_range.start_date).days
 
-        if warmup_days > 0 and warmup_days >= train_duration:
+        if not (warmup_days < train_duration):
             raise ValueError(
                 f"warmup_days ({warmup_days}) must be less than the total "
                 f"training duration ({train_duration} days)"
             )
 
+        if gap_days is not None and gap_days < 0:
+            raise ValueError("gap_days must be >= 0 when provided")
+
+        if step_days is not None and step_days <= 0:
+            raise ValueError("step_days must be > 0 when provided")
+
         self._name = name
         self._train_range = train_range
         self._warmup_days = warmup_days
         self._fold_index = fold_index
+        self._step_days = step_days
+        # gap_days is stored; the test_range setter fills it in or
+        # verifies it against the actual dates.
+        self._gap_days = gap_days
         self.test_range = test_range  # goes through the setter
-
-    def generate_key(self) -> str:
-        """
-        Generate a stable key based on the name, train_range, test_range,
-        warmup_days, and fold_index.
-        """
-        key = f"name_{self._name}" if self._name is not None else "window"
-        key = f"{self._train_range.start_date.isoformat()}_"
-        key += f"{self._train_range.end_date.isoformat()}"
-        key = (
-            f"{self._test_range.start_date.isoformat()}_"
-            f"{self._test_range.end_date.isoformat()}"
-            if self._test_range is not None else "None"
-        )
-        key = f"warmup_{self._warmup_days}"
-        key = f"fold_{self._fold_index}" if self._fold_index is not None else "fold_None"
-        return f"{key}|{train_key}|{test_key}|{warmup_key}|{fold_key}"
 
     @property
     def test_range(self) -> Optional[BacktestDateRange]:
@@ -87,25 +94,76 @@ class BacktestWindow:
                     f"(train_range.end_date={self._train_range.end_date}, "
                     f"test_range.start_date={value.start_date})"
                 )
+            computed_gap = (
+                value.start_date - self._train_range.end_date
+            ).days
+            if self._gap_days is None:
+                self._gap_days = computed_gap
+            elif self._gap_days != computed_gap:
+                raise ValueError(
+                    f"declared gap_days ({self._gap_days}) does not match "
+                    f"the gap implied by the dates ({computed_gap} days). "
+                    "Adjust either gap_days or test_range."
+                )
+        else:
+            # No test_range -> gap_days has no meaning; clear it unless
+            # the caller declared it explicitly.
+            if self._gap_days is not None and self._test_range is not None:
+                # We had a test_range before and are clearing it; clear
+                # the derived gap too.
+                self._gap_days = None
         self._test_range = value
 
     @classmethod
     def from_dict(cls, d: dict) -> "BacktestWindow":
         """
         Create a BacktestWindow from a dict as returned by
-        generate_rolling_backtest_windows, e.g.:
+        :py:meth:`to_dict`, e.g.::
+
             {
-                "train_range": BacktestDateRange(...),
-                "test_range": BacktestDateRange(...),  # optional
+                "name": "Window 1",
+                "train_range": {"name": "train", "start": iso, "end": iso},
+                "test_range":  {"name": "test",  "start": iso, "end": iso},
                 "warmup_days": 0,
-                "name": "Window 1",  # optional
+                "gap_days": 5,
+                "step_days": 90,
+                "fold_index": None,
             }
+
+        Either range field may already be a :class:`BacktestDateRange`
+        instance (accepted for backward compat with in-memory callers).
         """
+        from datetime import datetime as _dt
+
+        def _to_range(raw) -> Optional[BacktestDateRange]:
+            if raw is None:
+                return None
+            if isinstance(raw, BacktestDateRange):
+                return raw
+            start = raw.get("start", raw.get("start_date"))
+            end = raw.get("end", raw.get("end_date"))
+            if isinstance(start, str):
+                start = _dt.fromisoformat(start)
+            if isinstance(end, str):
+                end = _dt.fromisoformat(end)
+            return BacktestDateRange(
+                start_date=start,
+                end_date=end,
+                name=raw.get("name"),
+            )
+
+        train_range = _to_range(d["train_range"])
+        if train_range is None:
+            raise ValueError(
+                "BacktestWindow.from_dict requires 'train_range'."
+            )
         return cls(
             name=d.get("name"),
-            train_range=d["train_range"],
-            test_range=d.get("test_range"),
+            train_range=train_range,
+            test_range=_to_range(d.get("test_range")),
             warmup_days=d.get("warmup_days", 0),
+            gap_days=d.get("gap_days"),
+            step_days=d.get("step_days"),
             fold_index=d.get("fold_index"),
         )
 
@@ -119,15 +177,26 @@ class BacktestWindow:
 
     @property
     def gap_days(self) -> Optional[int]:
-        """Days between the end of training and the start of testing.
-        Derived from the ranges, so always consistent. None if no test_range."""
-        if self._test_range is None:
-            return None
-        return (self._test_range.start_date - self._train_range.end_date).days
+        """Purge period in days between the end of training and the start
+        of testing (train_range.end_date -> test_range.start_date).
+
+        Stored on the wire. Verified against the actual dates whenever
+        test_range is set. None when test_range is unset.
+        """
+        return self._gap_days
+
+    @property
+    def step_days(self) -> Optional[int]:
+        """Inter-window step used by the generator that produced this window.
+
+        None for k-fold and one-off windows (they are not step-generated).
+        Same value on every window in a rolling / anchored sequence.
+        """
+        return self._step_days
 
     @property
     def fold_index(self) -> Optional[int]:
-        """Zero-based fold index for k-fold windows. None for rolling windows."""
+        """Zero-based fold index for k-fold windows. None otherwise."""
         return self._fold_index
 
     @property
@@ -156,7 +225,8 @@ class BacktestWindow:
             f"name={self._name!r}, "
             f"train_range={self._train_range!r}, "
             f"test_range={self._test_range!r}, "
-            f"gap_days={self.gap_days!r}, "
+            f"gap_days={self._gap_days!r}, "
+            f"step_days={self._step_days!r}, "
             f"warmup_days={self._warmup_days!r}, "
             f"fold_index={self._fold_index!r})"
         )
@@ -170,6 +240,8 @@ class BacktestWindow:
             and self._train_range == other._train_range
             and self._test_range == other._test_range
             and self._warmup_days == other._warmup_days
+            and self._gap_days == other._gap_days
+            and self._step_days == other._step_days
             and self._fold_index == other._fold_index
         )
 
@@ -190,5 +262,7 @@ class BacktestWindow:
             "test_range": _range_to_dict(self._test_range)
             if self._test_range is not None else None,
             "warmup_days": self._warmup_days,
+            "gap_days": self._gap_days,
+            "step_days": self._step_days,
             "fold_index": self._fold_index,
         }

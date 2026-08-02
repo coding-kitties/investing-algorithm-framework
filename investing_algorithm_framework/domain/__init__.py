@@ -55,7 +55,8 @@ from .backtesting import BacktestRun, BacktestSummaryMetrics, \
     save_backtests_to_directory, retag_backtests, migrate_backtests, \
     resolve_backtest_path, BUNDLE_EXT, BUNDLE_FORMAT_VERSION, \
     BacktestIndex, build_strategy_universe_map, stamp_backtest, \
-    stamp_backtests, Study, EngineSlot
+    stamp_backtests, Study, EngineSlot, ExecutionConfig, StudySampleType, \
+    WindowPart
 from .pipeline import Pipeline, AverageDollarVolume, AverageTradedValue, \
     CrossSectionalMean, Neutralize, Returns, RollingBeta, RSI, SMA, \
     StaticPerSymbol, Volatility, Factor, CustomFactor, Filter
@@ -221,6 +222,9 @@ __all__ = [
     "stamp_backtests",
     "Study",
     "EngineSlot",
+    "ExecutionConfig",
+    "StudySampleType",
+    "WindowPart",
     "Pipeline",
     "Factor",
     "CustomFactor",

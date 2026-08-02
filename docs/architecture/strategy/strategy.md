@@ -448,7 +448,7 @@ can:
   strategy hand-sizes everything and you want opens to fail loudly
   on insufficient cash rather than scale silently.
 
-See [`pipeline-api.md`](../design/pipeline-api.md) for the full
+See [`pipeline-api.md`](pipeline-api.md) for the full
 contract and worked examples.
 
 ### 4.5 Vector mode equivalence
@@ -491,4 +491,4 @@ at which the rules are enforced, not the rules themselves.
 | Vector validator | `investing_algorithm_framework/infrastructure/services/backtesting/backtest_service.py` |
 | Vector simulation loop | `investing_algorithm_framework/infrastructure/services/backtesting/vector_backtest_service.py` |
 | Event loop entry point | `investing_algorithm_framework/app/eventloop.py` |
-| Pipeline customisation guide | `docs/design/pipeline-api.md` |
+| Pipeline customisation guide | `docs/architecture/strategy/pipeline-api.md` |

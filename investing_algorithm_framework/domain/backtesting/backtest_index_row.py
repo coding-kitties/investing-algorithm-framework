@@ -40,7 +40,7 @@ class BacktestIndexRow:
     """One row of the backtest index — the Tier-1 contract.
 
     Field groups follow the design doc
-    (``docs/design/tiered-backtest-storage.md`` §3.1):
+    (``docs/architecture/backtest/tiered-backtest-storage.md`` §3.1):
 
     * **Identity** — ``algorithm_id``, ``tag``, ``bundle_path``
     * **Provenance** — ``framework_version``, ``engine_type``,

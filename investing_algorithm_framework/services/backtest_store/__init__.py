@@ -7,7 +7,7 @@ layout, so every consumer (HTML report, ``iaf list/rank``, the MCP
 server, future ``FinterionStore``) can be written against one
 interface.
 
-See ``docs/design/tiered-backtest-storage.md`` §7 and the Phase 3
+See ``docs/architecture/backtest/tiered-backtest-storage.md`` §7 and the Phase 3
 plan in epic #540 for the full architecture.
 """
 

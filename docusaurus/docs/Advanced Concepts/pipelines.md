@@ -225,7 +225,7 @@ touching the rest of your codebase.
 ## See also
 
 - [Pipelines: Event-driven backtest](pipelines-event-backtest.md) — full Phase 1 reference.
-- Design doc: [`docs/design/pipeline-api.md`](https://github.com/coding-kitties/investing-algorithm-framework/blob/dev/docs/design/pipeline-api.md).
+- Design doc: [`docs/architecture/strategy/pipeline-api.md`](https://github.com/coding-kitties/investing-algorithm-framework/blob/dev/docs/architecture/strategy/pipeline-api.md).
 - Tracking issues: [#501 (Phase 1)](https://github.com/coding-kitties/investing-algorithm-framework/issues/501),
   [#502 (Phase 2)](https://github.com/coding-kitties/investing-algorithm-framework/issues/502),
   [#503 (Phase 3)](https://github.com/coding-kitties/investing-algorithm-framework/issues/503).

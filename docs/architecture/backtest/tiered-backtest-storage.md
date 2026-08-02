@@ -2,7 +2,7 @@
 
 > Status: **Proposal**
 > Targets: framework v8.10 (read-side) and v8.11 (store abstraction).
-> Companion docs: [`bundle-format-v2.md`](./bundle-format-v2.md), [`ohlcv-dedup-protocol.md`](./ohlcv-dedup-protocol.md).
+> Companion docs: [`bundle-format-v2.md`](open_backtest_format.md), [`ohlcv-dedup-protocol.md`](./ohlcv-dedup-protocol.md).
 
 ## 1. Motivation
 

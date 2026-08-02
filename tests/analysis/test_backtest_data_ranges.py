@@ -37,6 +37,20 @@ class TestGenerateRollingBacktestWindows(unittest.TestCase):
         self.assertIsInstance(first_window.train_range, BacktestDateRange)
         self.assertIsInstance(first_window.test_range, BacktestDateRange)
 
+    def test_windows_are_named(self):
+        """Each generated window should have a non-empty, unique name."""
+        windows = generate_rolling_backtest_windows(
+            start_date=datetime(2021, 1, 1, tzinfo=timezone.utc),
+            end_date=datetime(2023, 12, 31, tzinfo=timezone.utc),
+            train_days=365,
+            test_days=90,
+            step_days=90,
+        )
+
+        names = [w.name for w in windows]
+        self.assertTrue(all(names))
+        self.assertEqual(len(names), len(set(names)))
+
     def test_train_range_duration(self):
         """Test that train ranges have correct duration."""
         start_date = datetime(2021, 1, 1, tzinfo=timezone.utc)

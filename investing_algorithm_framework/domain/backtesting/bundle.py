@@ -3,7 +3,7 @@
 Implements the bundle format proposed in issue #487, plus the v2
 extensions described in ``docs/design/bundle-format-v2.md`` and the
 v9.0 dual-engine format described in
-``docs/design/v9.0-dual-engine-design.md``.
+``docs/architecture/backtest/v9.0-dual-engine-design.md``.
 
 Format versions
 ---------------

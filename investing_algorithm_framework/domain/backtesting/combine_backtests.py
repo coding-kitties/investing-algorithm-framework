@@ -74,7 +74,7 @@ def combine_backtests(backtests):
 
     Runs and per-engine summaries are combined per engine
     (vector with vector, event with event), matching the v9.0
-    dual-engine model (see ``docs/design/v9.0-dual-engine-design.md``).
+    dual-engine model (see ``docs/architecture/backtest/v9.0-dual-engine-design.md``).
 
     Args:
         backtests (List[Backtest]): List of Backtest instances to combine.
@@ -277,8 +277,8 @@ def combine_multi_universe_backtest(
         universes: Optional explicit list of Universe records to attach
             to the output. Keys must match backtests_by_universe. When
             omitted, a minimal set of Universe records is synthesized
-            from the first run of each input bundle (using run.symbols,
-            trading_symbol, and data_sources[0]['market']).
+            from each input bundle's Study.universe, falling back to
+            the first run's data_sources[0]['market'] for market.
         study_name: Optional study label to stamp on the result.
         study_description: Optional study description.
 
@@ -311,32 +311,40 @@ def combine_multi_universe_backtest(
     )
 
     # Populate the universes catalogue. If the caller did not pass one,
-    # synthesize a minimal record per key from the first available run
-    # so the catalogue is never silently empty.
+    # synthesize a minimal record per key from the bundle's own Study
+    # (symbols/trading_symbol live on Study.universe, not on runs) so
+    # the catalogue is never silently empty.
     if universes is not None:
         merged.universes = [u for u in universes]
     else:
         synth: list = []
         for key in ordered_keys:
             bt = backtests_by_universe[key]
-            sample_run = None
-            for engine in ("vector", "event"):
-                runs = bt.get_runs(engine)
-                if runs:
-                    sample_run = runs[0]
-                    break
-            if sample_run is None:
-                synth.append(Universe(key=key))
-                continue
-            market = None
-            ds_list = getattr(sample_run, "data_sources", None) or []
-            if ds_list and isinstance(ds_list[0], dict):
-                market = ds_list[0].get("market")
+            study = bt.get_study()
+            source_universe = study.universe if study is not None else None
+
+            market = source_universe.market if source_universe else None
+            if market is None:
+                sample_run = None
+                for engine in ("vector", "event"):
+                    runs = bt.get_runs(engine)
+                    if runs:
+                        sample_run = runs[0]
+                        break
+                ds_list = getattr(sample_run, "data_sources", None) or []
+                if ds_list and isinstance(ds_list[0], dict):
+                    market = ds_list[0].get("market")
+
             synth.append(
                 Universe(
                     key=key,
-                    symbols=list(sample_run.symbols or []),
-                    trading_symbol=sample_run.trading_symbol,
+                    symbols=list(
+                        source_universe.symbols if source_universe else []
+                    ),
+                    trading_symbol=(
+                        source_universe.trading_symbol
+                        if source_universe else None
+                    ),
                     market=market,
                 )
             )

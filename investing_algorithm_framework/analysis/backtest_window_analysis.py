@@ -9,6 +9,36 @@ from investing_algorithm_framework.domain import BacktestDateRange
 from .markdown import create_markdown_table
 
 
+class _BacktestWindowChartGrid:
+    def __init__(self, specs: List[Any]):
+        self.specs = specs
+
+    def display_in_jupyter(
+        self,
+        *,
+        base: Optional[str] = None,
+        width: Union[int, str] = "100%",
+        height: Union[int, str] = 480,
+    ) -> Any:
+        from IPython.display import HTML
+
+        width_css = f"{width}px" if isinstance(width, int) else width
+        charts = []
+        for spec in self.specs:
+            chart = spec.display_in_jupyter(
+                base=base,
+                width="100%",
+                height=height,
+            )._repr_html_()
+            charts.append(f'<div style="min-width:0">{chart}</div>')
+
+        return HTML(
+            '<div style="display:grid;gap:16px;'
+            'grid-template-columns:repeat(auto-fit,minmax(min(100%,480px),1fr));'
+            f'width:{width_css}">{"".join(charts)}</div>'
+        )
+
+
 def _hurst_exponent(series: pd.Series, max_lag: int = 100) -> float:
     """
     Estimate the Hurst exponent of a price series using the
@@ -231,15 +261,77 @@ def plot_backtest_windows(
     theme: str = "finterion_dark",
     height: Union[int, str] = 520,
     width: Union[int, str] = "100%",
+    initial_zoom: Optional[float] = None,
+    variant: str = "all-in-one",
 ) -> Any:
     """
     Plot the reference price series with shaded bands for each rolling
     window's ``train_range`` / ``test_range`` (and the gap between them
-    if present). Returns a ``finterion_charts.ChartSpec``.
+    if present). ``all-in-one`` overlays every window in one chart;
+    ``side-by-side`` returns a responsive grid with one chart per window.
 
-    Call ``.display_in_jupyter()`` on the returned spec to render in a
-    notebook, or ``.show()`` to open in a browser.
+    Call ``.display_in_jupyter()`` on the result to render in a notebook.
     """
+    if variant not in {"all-in-one", "overlay", "side-by-side"}:
+        raise ValueError(
+            "variant must be 'all-in-one', 'overlay', or 'side-by-side'"
+        )
+
+    windows = list(rolling_windows)
+    if variant == "side-by-side":
+        index_tz = getattr(price_df.index, "tz", None)
+
+        def _slice_boundary(value: Any) -> pd.Timestamp:
+            boundary = pd.Timestamp(value)
+            if index_tz is None and boundary.tzinfo is not None:
+                return boundary.tz_localize(None)
+            if index_tz is not None and boundary.tzinfo is None:
+                return boundary.tz_localize(index_tz)
+            if index_tz is not None:
+                return boundary.tz_convert(index_tz)
+            return boundary
+
+        specs = []
+        for index, window in enumerate(windows, start=1):
+            if isinstance(window, dict):
+                train = window.get("train_range")
+                test = window.get("test_range")
+                window_name = window.get("name")
+            else:
+                train = window.train_range
+                test = window.test_range
+                window_name = getattr(window, "name", None)
+
+            if train is None:
+                raise ValueError(f"Window {index} has no train_range")
+
+            start = _slice_boundary(train.start_date)
+            end_range = test if test is not None else train
+            end = _slice_boundary(end_range.end_date)
+            window_data = price_df.loc[
+                (price_df.index >= start) & (price_df.index <= end)
+            ]
+            if window_data.empty:
+                raise ValueError(f"No price data overlaps window {index}")
+
+            label = window_name or f"Window {index}"
+            specs.append(plot_backtest_windows(
+                price_df=window_data,
+                rolling_windows=[window],
+                price_column=price_column,
+                title=f"{title} - {label}" if title else label,
+                train_color=train_color,
+                test_color=test_color,
+                gap_color=gap_color,
+                theme=theme,
+                height=height,
+                width=width,
+                initial_zoom=initial_zoom,
+                variant="all-in-one",
+            ))
+
+        return _BacktestWindowChartGrid(specs)
+
     try:
         from finterion_charts import ChartSpec, Indicator, Price
         from finterion_charts.builder import SeriesType
@@ -268,7 +360,11 @@ def plot_backtest_windows(
     time_ms = idx.astype("datetime64[ms]").astype("int64").to_numpy()
     price_vals = price.to_numpy()
 
-    spec = ChartSpec(theme=theme, grid="horizontal")
+    spec = ChartSpec(
+        theme=theme,
+        grid="horizontal",
+        initial_zoom=initial_zoom,
+    )
     spec.with_bars(
         time=time_ms,
         open=price_vals,
@@ -303,7 +399,7 @@ def plot_backtest_windows(
         return dt
 
     overlays: list = []
-    for i, window in enumerate(list(rolling_windows), start=1):
+    for i, window in enumerate(windows, start=1):
         # Support both BacktestWindow objects and legacy plain dicts.
         if isinstance(window, dict):
             train = window.get("train_range")
@@ -370,18 +466,25 @@ def plot_window_correlation_matrix(
     date_range: Optional[BacktestDateRange] = None,
     price_column: str = "Close",
     title: Optional[str] = None,
+    theme: str = "finterion_dark",
+    color_scale: Tuple[str, str, str] = (
+        "#2166ac",
+        "#f7f7f7",
+        "#b2182b",
+    ),
 ) -> Any:
     """
     Pairwise return-correlation heatmap across multiple assets for a given
     window. ``assets_data`` is a mapping ``symbol -> ohlcv_dataframe``.
     If ``date_range`` is ``None`` the full overlapping range is used.
-    Returns a Plotly ``Figure``.
+    Returns a ``finterion_charts.ChartSpec``.
     """
     try:
-        import plotly.graph_objects as go
+        from finterion_charts import ChartSpec, Heatmap
     except ImportError as exc:
         raise ImportError(
-            "plot_window_correlation_matrix requires plotly."
+            "plot_window_correlation_matrix requires finterion-charts. "
+            "Install with `pip install finterion-charts`."
         ) from exc
 
     returns = {}
@@ -398,17 +501,6 @@ def plot_window_correlation_matrix(
     ret_df = pd.DataFrame(returns).dropna(how="all")
     corr = ret_df.corr()
 
-    fig = go.Figure(data=go.Heatmap(
-        z=corr.values,
-        x=list(corr.columns),
-        y=list(corr.index),
-        zmin=-1, zmax=1,
-        colorscale="RdBu",
-        reversescale=True,
-        text=np.round(corr.values, 2),
-        texttemplate="%{text}",
-        hovertemplate="%{y} vs %{x}: %{z:.2f}<extra></extra>",
-    ))
     if title is None:
         if date_range is not None:
             title = (
@@ -418,10 +510,18 @@ def plot_window_correlation_matrix(
             )
         else:
             title = "Return correlations"
-    fig.update_layout(
+
+    spec = ChartSpec(theme=theme).add_panel(Heatmap(
+        id="window-correlations",
         title=title,
-        template="plotly_white",
-        height=520,
-        margin=dict(l=80, r=40, t=80, b=80),
-    )
-    return fig
+        weight=1,
+        rows=list(corr.index),
+        cols=list(corr.columns),
+        values=corr.values.tolist(),
+        format="fixed2",
+        range=1,
+        color_scale=color_scale,
+        x_label="Asset",
+        y_label="Asset",
+    ))
+    return spec.validate()

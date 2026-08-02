@@ -113,7 +113,7 @@ class TestBacktestInitialConfig(BacktestTestBase):
         self.assertEqual(metrics.total_net_gain, 0)
         self.assertEqual(metrics.total_net_gain_percentage, 0)
         self.assertAlmostEqual(run.number_of_runs, 373, places=1)
-        self.assertEqual(run.trading_symbol, "USDT")
+        self.assertEqual(run.portfolio_snapshots[0].trading_symbol, "USDT")
         database_uri = app.config[SQLALCHEMY_DATABASE_URI]
         self.assertIsNotNone(database_uri)
         self.assertTrue(database_uri.endswith("backtest-database.sqlite3"))
@@ -146,7 +146,7 @@ class TestBacktestInitialConfig(BacktestTestBase):
         self.assertEqual(metrics.total_net_gain, 0)
         self.assertEqual(metrics.total_net_gain_percentage, 0)
         self.assertAlmostEqual(run.number_of_runs, 373, places=1)
-        self.assertEqual(run.trading_symbol, "USDT")
+        self.assertEqual(run.portfolio_snapshots[0].trading_symbol, "USDT")
         database_uri = app.config[SQLALCHEMY_DATABASE_URI]
         self.assertIsNotNone(database_uri)
         self.assertTrue(database_uri.endswith("backtest-database.sqlite3"))

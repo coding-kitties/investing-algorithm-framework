@@ -33,6 +33,9 @@ from .returns import get_total_return, get_final_value, \
     get_total_growth
 from .sharpe_ratio import get_sharpe_ratio, get_rolling_sharpe_ratio
 from .sortino_ratio import get_sortino_ratio
+from .omega_ratio import get_omega_ratio
+from .ulcer import get_ulcer_index
+from .mae_mfe import get_trade_mae_mfe_statistics
 from .volatility import get_annual_volatility
 from .win_rate import get_win_rate, get_win_loss_ratio, get_current_win_rate, \
     get_current_win_loss_ratio
@@ -44,7 +47,8 @@ from .trades import get_average_trade_duration, get_average_trade_size, \
     get_current_average_trade_gain, get_current_average_trade_return, \
     get_current_average_trade_duration, get_current_average_trade_loss, \
     get_average_win_duration, get_average_loss_duration, \
-    get_max_consecutive_wins, get_max_consecutive_losses
+    get_max_consecutive_wins, get_max_consecutive_losses, \
+    get_directional_trade_statistics
 from .value_at_risk import get_value_at_risk, \
     get_conditional_value_at_risk
 
@@ -108,13 +112,9 @@ def _recalculate_one(args):
     """
     backtest, risk_free_rate, metrics = args
     _st = backtest._get_default_study()
-    _universe_rfr = (
-        _st.universe.risk_free_rate
-        if _st is not None and _st.universe is not None
-        else None
-    )
+    _study_rfr = _st.risk_free_rate if _st is not None else None
     rfr = risk_free_rate if risk_free_rate is not None \
-        else (_universe_rfr or 0.0)
+        else (_study_rfr or 0.0)
 
     run_metrics = [
         create_backtest_metrics(run, rfr, metrics)
@@ -178,11 +178,7 @@ def _recalculate_one_path(args):
     bt = open_bundle(src_path) if is_bundle_file(src_path) \
         else _Backtest.open(src_path)
     _bt_st = bt._get_default_study()
-    _bt_rfr = (
-        _bt_st.universe.risk_free_rate
-        if _bt_st is not None and _bt_st.universe is not None
-        else None
-    )
+    _bt_rfr = _bt_st.risk_free_rate if _bt_st is not None else None
     rfr = risk_free_rate if risk_free_rate is not None \
         else (_bt_rfr or 0.0)
 
@@ -573,7 +569,9 @@ def recalculate_backtests_in_directory(
 
 
 def create_backtest_metrics(
-    backtest_run: BacktestRun, risk_free_rate: float, metrics: List[str] = None
+    backtest_run: BacktestRun,
+    risk_free_rate: float,
+    metrics: List[str] = None,
 ) -> BacktestMetrics:
     """
     Create a BacktestMetrics instance and optionally save it to a file.
@@ -585,7 +583,6 @@ def create_backtest_metrics(
             metric calculations.
         metrics (List[str], optional): List of metric names to compute.
             If None, a default set of metrics will be computed.
-
     Returns:
         BacktestMetrics: The computed backtest metrics.
     """
@@ -609,8 +606,10 @@ def create_backtest_metrics(
             "rolling_sharpe_ratio",
             "sortino_ratio",
             "calmar_ratio",
+            "omega_ratio",
             "profit_factor",
             "annual_volatility",
+            "ulcer_index",
             "monthly_returns",
             "yearly_returns",
             "drawdown_series",
@@ -644,11 +643,28 @@ def create_backtest_metrics(
             "average_trade_gain_percentage",
             "average_trade_return",
             "average_trade_return_percentage",
+            "average_mae",
+            "average_mae_percentage",
+            "average_mfe",
+            "average_mfe_percentage",
+            "max_mae",
+            "max_mfe",
+            "mfe_mae_ratio",
             "median_trade_return",
             "number_of_trades",
             "number_of_trades_closed",
             "number_of_trades_opened",
             "number_of_trades_open_at_end",
+            "number_of_long_trades",
+            "number_of_long_trades_closed",
+            "number_of_winning_long_trades",
+            "number_of_losing_long_trades",
+            "long_win_rate",
+            "number_of_short_trades",
+            "number_of_short_trades_closed",
+            "number_of_winning_short_trades",
+            "number_of_losing_short_trades",
+            "short_win_rate",
             "win_rate",
             "current_win_rate",
             "win_loss_ratio",
@@ -676,12 +692,7 @@ def create_backtest_metrics(
         ]
 
     backtest_metrics = BacktestMetrics(
-        backtest_start_date=backtest_run.backtest_start_date,
-        backtest_end_date=backtest_run.backtest_end_date,
-        backtest_date_range_name=(
-            backtest_run.backtest_date_range_name or ""
-        ),
-        trading_symbol=backtest_run.trading_symbol or "",
+        backtest_window=backtest_run.backtest_window,
         initial_unallocated=backtest_run.initial_unallocated or 0.0,
     )
 
@@ -834,15 +845,25 @@ def create_backtest_metrics(
         except OperationalException as e:
             logger.warning(f"current_average_trade_loss failed: {e}")
 
-    safe_set("number_of_positive_trades", get_positive_trades, backtest_run.trades)
+    safe_set("number_of_positive_trades", get_positive_trades, backtest_run.trades, index=0)
     safe_set("percentage_positive_trades", get_positive_trades, backtest_run.trades, index=1)
-    safe_set("number_of_negative_trades", get_negative_trades, backtest_run.trades)
+    safe_set("number_of_negative_trades", get_negative_trades, backtest_run.trades, index=0)
     safe_set("percentage_negative_trades", get_negative_trades, backtest_run.trades, index=1)
     safe_set("median_trade_return", get_median_trade_return, backtest_run.trades, index=0)
     safe_set("median_trade_return_percentage", get_median_trade_return, backtest_run.trades, index=1)
     safe_set("number_of_trades", get_number_of_trades, backtest_run.trades)
     safe_set("number_of_trades_closed", get_number_of_closed_trades, backtest_run.trades)
     safe_set("number_of_trades_opened", get_number_of_open_trades, backtest_run.trades)
+    directional_statistics = get_directional_trade_statistics(
+        backtest_run.trades
+    )
+    for metric_name, value in directional_statistics.items():
+        if metric_name in metrics:
+            setattr(backtest_metrics, metric_name, value)
+    mae_mfe_statistics = get_trade_mae_mfe_statistics(backtest_run.trades)
+    for metric_name, value in mae_mfe_statistics.items():
+        if metric_name in metrics:
+            setattr(backtest_metrics, metric_name, value)
     safe_set("average_trade_duration", get_average_trade_duration, backtest_run.trades)
     safe_set("average_win_duration", get_average_win_duration, backtest_run.trades)
     safe_set("average_loss_duration", get_average_loss_duration, backtest_run.trades)
@@ -853,12 +874,14 @@ def create_backtest_metrics(
     safe_set("sharpe_ratio", get_sharpe_ratio, backtest_run.portfolio_snapshots, risk_free_rate)
     safe_set("rolling_sharpe_ratio", get_rolling_sharpe_ratio, backtest_run.portfolio_snapshots, risk_free_rate)
     safe_set("sortino_ratio", get_sortino_ratio, backtest_run.portfolio_snapshots, risk_free_rate)
+    safe_set("omega_ratio", get_omega_ratio, backtest_run.portfolio_snapshots)
     safe_set("profit_factor", get_profit_factor, backtest_run.trades)
     safe_set("calmar_ratio", get_calmar_ratio, backtest_run.portfolio_snapshots)
     safe_set("annual_volatility", get_annual_volatility, backtest_run.portfolio_snapshots)
     safe_set("monthly_returns", get_monthly_returns, backtest_run.portfolio_snapshots)
     safe_set("yearly_returns", get_yearly_returns, backtest_run.portfolio_snapshots)
     safe_set("drawdown_series", get_drawdown_series, backtest_run.portfolio_snapshots)
+    safe_set("ulcer_index", get_ulcer_index, backtest_run.portfolio_snapshots)
     safe_set("max_drawdown", get_max_drawdown, backtest_run.portfolio_snapshots)
     safe_set("max_drawdown_absolute", get_max_drawdown_absolute, backtest_run.portfolio_snapshots)
     safe_set("max_daily_drawdown", get_max_daily_drawdown, backtest_run.portfolio_snapshots)

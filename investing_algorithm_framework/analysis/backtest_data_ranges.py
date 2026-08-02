@@ -82,12 +82,111 @@ def generate_rolling_backtest_windows(
             end_date=test_end
         )
         windows.append(BacktestWindow(
+            name=f"window_{iteration}",
             train_range=train_backtest_date_range,
             test_range=test_backtest_date_range,
             warmup_days=warmup_days,
+            gap_days=gap_days,
+            step_days=step_days,
         ))
 
         current_start += pd.Timedelta(days=step_days)
+
+    return windows
+
+
+def generate_anchored_backtest_windows(
+    start_date: datetime,
+    end_date: datetime,
+    initial_train_days: int = 365,
+    test_days: int = 90,
+    step_days: int = 90,
+    gap_days: int = 0,
+    warmup_days: int = 0,
+) -> List[BacktestWindow]:
+    """
+    Generate anchored walk-forward windows.
+
+    The training window is *anchored* at ``start_date`` and grows with each
+    iteration — every window trains on all history from ``start_date`` up
+    to just before the test range. This differs from rolling walk-forward,
+    where the training window has a fixed size and slides forward.
+
+    Args:
+        start_date (datetime): Anchor date. Every window's training range
+            starts here.
+        end_date (datetime): The ending date for the last testing window.
+        initial_train_days (int): Length of the first window's training
+            range in days. Subsequent windows extend this by
+            ``step_days`` per iteration.
+        test_days (int): Number of days in each testing window.
+        step_days (int): Number of days to step the training end (and,
+            equivalently, the test start) forward for the next window.
+        gap_days (int): Number of days to skip between the end of
+            training and the start of testing. Default is 0.
+        warmup_days (int): Number of days at the start of each training
+            window reserved for warming up indicators. Must be less than
+            ``initial_train_days``. Default is 0.
+
+    Returns:
+        List[BacktestWindow]: A list of BacktestWindow objects, each with
+            an anchored training range and a sliding test range.
+
+    Example:
+        >>> windows = generate_anchored_backtest_windows(
+        ...     start_date=datetime(2021, 1, 1, tzinfo=timezone.utc),
+        ...     end_date=datetime(2024, 12, 31, tzinfo=timezone.utc),
+        ...     initial_train_days=365,
+        ...     test_days=90,
+        ...     step_days=90,
+        ...     gap_days=30,
+        ...     warmup_days=26,
+        ... )
+    """
+    if initial_train_days <= 0:
+        raise ValueError("initial_train_days must be > 0")
+    if test_days <= 0:
+        raise ValueError("test_days must be > 0")
+    if step_days <= 0:
+        raise ValueError("step_days must be > 0")
+    if gap_days < 0:
+        raise ValueError("gap_days must be >= 0")
+
+    windows = []
+    max_iterations = 10000  # safety limit
+    iteration = 0
+
+    while iteration < max_iterations:
+        iteration += 1
+        # Anchor: train always starts at start_date, grows toward test.
+        train_start = start_date
+        train_end = start_date + pd.Timedelta(
+            days=initial_train_days + (iteration - 1) * step_days
+        )
+        test_start = train_end + pd.Timedelta(days=gap_days)
+        test_end = test_start + pd.Timedelta(days=test_days)
+
+        if test_end > end_date:
+            break
+
+        train_backtest_date_range = BacktestDateRange(
+            name=f"train_anchored_{iteration}",
+            start_date=train_start,
+            end_date=train_end,
+        )
+        test_backtest_date_range = BacktestDateRange(
+            name=f"test_anchored_{iteration}",
+            start_date=test_start,
+            end_date=test_end,
+        )
+        windows.append(BacktestWindow(
+            name=f"anchored_window_{iteration}",
+            train_range=train_backtest_date_range,
+            test_range=test_backtest_date_range,
+            warmup_days=warmup_days,
+            gap_days=gap_days,
+            step_days=step_days,
+        ))
 
     return windows
 
@@ -176,9 +275,11 @@ def generate_k_fold_backtest_windows(
             end_date=test_end,
         )
         windows.append(BacktestWindow(
+            name=f"fold_{i}",
             train_range=train_backtest_date_range,
             test_range=test_backtest_date_range,
             warmup_days=warmup_days,
+            gap_days=gap_days,
             fold_index=i,
         ))
 

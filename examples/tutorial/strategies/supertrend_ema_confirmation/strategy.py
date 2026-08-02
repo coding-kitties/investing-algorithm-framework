@@ -50,7 +50,7 @@ class SupertrendEmaConfirmationStrategy(TradingStrategy):
     def __init__(
         self,
         algorithm_id: str,
-        symbols: list[str],
+        symbols: list,
         trading_symbol: str,
         rsi_timeframe: str,
         rsi_period: int,

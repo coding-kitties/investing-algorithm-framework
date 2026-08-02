@@ -71,6 +71,8 @@ class Trade(BaseModel):
         last_reported_price_datetime=None,
         high_water_mark=None,
         high_water_mark_datetime=None,
+        low_water_mark=None,
+        low_water_mark_datetime=None,
         updated_at=None,
         stop_losses=None,
         take_profits=None,
@@ -93,17 +95,23 @@ class Trade(BaseModel):
         self.total_fees = total_fees or 0
         self.last_reported_price = last_reported_price
         self.last_reported_price_datetime = last_reported_price_datetime
+        # Highest / lowest price ever reported for this trade,
+        # regardless of direction. Together with ``open_price`` these
+        # give the Maximum Favorable/Adverse Excursion for both long
+        # and short trades (see ``services/metrics/mae_mfe.py``).
         self.high_water_mark = high_water_mark
         self.high_water_mark_datetime = high_water_mark_datetime
+        self.low_water_mark = low_water_mark
+        self.low_water_mark_datetime = low_water_mark_datetime
         self.status = TradeStatus.from_value(status).value
         self.updated_at = updated_at
         self.stop_losses = stop_losses
         self.take_profits = take_profits
         self.metadata = metadata if metadata is not None else {}
-        # ``is_short`` is a first-class trade attribute (#433): SHORT
+        # ``is_short`` is a first-class trade attribute: SHORT
         # trades open with a SELL and close with a BUY. When the caller
         # does not pass an explicit value we derive it from (in order):
-        #   1. legacy metadata flag (older vector backtests),
+        #   1. metadata flag
         #   2. the side of the first order on the trade.
         if is_short is None:
             if (isinstance(self.metadata, dict)
@@ -148,6 +156,17 @@ class Trade(BaseModel):
                 if data["last_reported_price"] > self.high_water_mark:
                     self.high_water_mark = data["last_reported_price"]
                     self.high_water_mark_datetime = \
+                        data["last_reported_price_datetime"]
+
+            if self.low_water_mark is None:
+                self.low_water_mark = data["last_reported_price"]
+                self.low_water_mark_datetime = \
+                    data["last_reported_price_datetime"]
+            else:
+
+                if data["last_reported_price"] < self.low_water_mark:
+                    self.low_water_mark = data["last_reported_price"]
+                    self.low_water_mark_datetime = \
                         data["last_reported_price_datetime"]
 
         return super().update(data)
@@ -295,6 +314,18 @@ class Trade(BaseModel):
         opened_at = ensure_iso(self.opened_at) if self.opened_at else None
         closed_at = ensure_iso(self.closed_at) if self.closed_at else None
         updated_at = ensure_iso(self.updated_at) if self.updated_at else None
+        last_reported_price_datetime = (
+            ensure_iso(self.last_reported_price_datetime)
+            if self.last_reported_price_datetime else None
+        )
+        high_water_mark_datetime = (
+            ensure_iso(self.high_water_mark_datetime)
+            if self.high_water_mark_datetime else None
+        )
+        low_water_mark_datetime = (
+            ensure_iso(self.low_water_mark_datetime)
+            if self.low_water_mark_datetime else None
+        )
 
         # Ensure status is a string
         self.status = TradeStatus.from_value(self.status).value
@@ -307,15 +338,22 @@ class Trade(BaseModel):
             ],
             "target_symbol": self.target_symbol,
             "trading_symbol": self.trading_symbol,
+            "is_short": bool(self.is_short),
             "status": self.status,
             "amount": self.amount,
             "remaining": self.remaining if self.remaining is not None else 0,
             "open_price": self.open_price,
             "last_reported_price": self.last_reported_price,
+            "last_reported_price_datetime": last_reported_price_datetime,
+            "high_water_mark": self.high_water_mark,
+            "high_water_mark_datetime": high_water_mark_datetime,
+            "low_water_mark": self.low_water_mark,
+            "low_water_mark_datetime": low_water_mark_datetime,
             "opened_at": opened_at,
             "closed_at": closed_at,
             "updated_at": updated_at,
             "net_gain": self.net_gain if self.net_gain is not None else 0,
+            "total_fees": self.total_fees if self.total_fees is not None else 0,
             "cost": self.cost if self.cost is not None else 0,
             "stop_losses": [
                 stop_loss.to_dict(datetime_format=datetime_format)
@@ -335,6 +373,9 @@ class Trade(BaseModel):
         opened_at = None
         closed_at = None
         updated_at = None
+        last_reported_price_datetime = None
+        high_water_mark_datetime = None
+        low_water_mark_datetime = None
         stop_losses = None
         take_profits = None
         orders = None
@@ -347,6 +388,30 @@ class Trade(BaseModel):
 
         if "updated_at" in data and data["updated_at"] is not None:
             updated_at = _parse_dt(data["updated_at"])
+
+        if (
+            "last_reported_price_datetime" in data
+            and data["last_reported_price_datetime"] is not None
+        ):
+            last_reported_price_datetime = _parse_dt(
+                data["last_reported_price_datetime"]
+            )
+
+        if (
+            "high_water_mark_datetime" in data
+            and data["high_water_mark_datetime"] is not None
+        ):
+            high_water_mark_datetime = _parse_dt(
+                data["high_water_mark_datetime"]
+            )
+
+        if (
+            "low_water_mark_datetime" in data
+            and data["low_water_mark_datetime"] is not None
+        ):
+            low_water_mark_datetime = _parse_dt(
+                data["low_water_mark_datetime"]
+            )
 
         if "stop_losses" in data and data["stop_losses"] is not None:
             stop_losses = [
@@ -379,13 +444,20 @@ class Trade(BaseModel):
             available_amount=data.get("available_amount", 0),
             remaining=data.get("remaining", 0),
             net_gain=data.get("net_gain", 0),
+            total_fees=data.get("total_fees", 0),
             last_reported_price=data.get("last_reported_price"),
+            last_reported_price_datetime=last_reported_price_datetime,
+            high_water_mark=data.get("high_water_mark"),
+            high_water_mark_datetime=high_water_mark_datetime,
+            low_water_mark=data.get("low_water_mark"),
+            low_water_mark_datetime=low_water_mark_datetime,
             status=TradeStatus.from_value(data.get("status", "OPEN")).value,
             cost=data.get("cost", 0),
             updated_at=updated_at,
             stop_losses=stop_losses,
             take_profits=take_profits,
             metadata=data.get("metadata", {}),
+            is_short=data.get("is_short"),
         )
 
     def __repr__(self):

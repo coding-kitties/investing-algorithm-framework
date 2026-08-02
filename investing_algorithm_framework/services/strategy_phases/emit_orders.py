@@ -34,7 +34,7 @@ class EmitOrdersPhase(StrategyPhase):
         executor = self._resolve_executor(state)
 
         for intent in state.sized_intents:
-            metadata = self._build_metadata(intent)
+            metadata = self._build_metadata(intent, state.strategy)
             try:
                 order = executor.execute(intent, state.context, metadata)
             except Exception as exc:  # pragma: no cover - executor errors
@@ -68,9 +68,16 @@ class EmitOrdersPhase(StrategyPhase):
         return executor
 
     @staticmethod
-    def _build_metadata(intent: SizedIntent) -> Dict[str, Any]:
+    def _build_metadata(
+        intent: SizedIntent, strategy: Any = None
+    ) -> Dict[str, Any]:
         meta: Dict[str, Any] = {"order_reason": intent.order_reason}
         if intent.signal.source:
             meta["signal_source"] = intent.signal.source
         meta.update(intent.extra_metadata or {})
+        strategy_identifier = getattr(
+            strategy, "strategy_identifier", None
+        )
+        if strategy_identifier is not None:
+            meta["strategy_id"] = strategy_identifier
         return meta

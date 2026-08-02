@@ -584,7 +584,6 @@ class BacktestService:
         run = BacktestRun(
             backtest_window=BacktestWindow(train_range=backtest_date_range),
             initial_unallocated=self._get_initial_unallocated(),
-            trading_symbol=portfolio.trading_symbol,
             created_at=datetime.now(tz=timezone.utc),
             portfolio_snapshots=self._portfolio_snapshot_service.get_all(
                 {"portfolio_id": portfolio.id}
@@ -857,12 +856,7 @@ class BacktestService:
             data_sources.extend(strategy.data_sources)
 
         # --- Derive everything needed from the Study object -----------
-        risk_free_rate = (
-            study.universe.risk_free_rate
-            if study.universe is not None
-            and study.universe.risk_free_rate is not None
-            else None
-        )
+        risk_free_rate = study.risk_free_rate
         if risk_free_rate is None:
             if show_progress:
                 _print_progress(
@@ -877,13 +871,14 @@ class BacktestService:
                     show_progress
                 )
 
-        # Portfolio configuration from study.universe
+        # Portfolio configuration from study
+        initial_capital = study.initial_capital
         if study.universe is not None:
             portfolio_configuration = PortfolioConfiguration(
                 identifier="backtest_portfolio",
                 market=study.universe.market or "BACKTEST",
                 trading_symbol=study.universe.trading_symbol or "USDT",
-                initial_balance=study.universe.initial_capital or 1000.0,
+                initial_balance=initial_capital or 1000.0,
             )
         else:
             _pcs = self._portfolio_configuration_service.get_all()
@@ -894,16 +889,13 @@ class BacktestService:
                     "PortfolioConfiguration must exist."
                 )
 
-        # Date ranges from study windows
-        backtest_date_ranges = [
-            w.train_range
-            for w in (study.backtest_windows or [])
-            if w.train_range is not None
-        ]
+        # Date ranges from study windows, per study.window_part
+        # ("train" / "test" / "both", default "test").
+        backtest_date_ranges = study.resolve_backtest_date_ranges()
         if not backtest_date_ranges:
             raise OperationalException(
                 "Study must have at least one backtest_window "
-                "with a train_range set."
+                "with a train_range or test_range set."
             )
 
         # Stamping fields derived from the study
@@ -911,13 +903,36 @@ class BacktestService:
             (study.name and study.name != "default")
             or study.description
             or study.universe is not None
+            or study.backtest_windows
+            or study.initial_capital is not None
         )
         study_name = study.name
         study_description = study.description
+        # Stamped on every checkpoint save (not just a final post-hoc
+        # pass over survivors) so a strategy eliminated mid-sweep by a
+        # progressive ``window_filter_function`` still has the full
+        # window list on disk — it never reaches the final survivor
+        # list that ``_apply_backtest_windows`` (app.py) restamps.
+        study_backtest_windows = list(study.backtest_windows or [])
+        # Same rationale as ``study_backtest_windows`` above — without
+        # this, a mid-sweep checkpoint save writes a study with
+        # ``initial_capital=None`` that a survivor list never corrects.
+        study_initial_capital = study.initial_capital
         universe_map = build_strategy_universe_map(
             strategies,
             [study.universe] if study.universe else [],
         )
+
+        # Inject universe symbols/market into strategies that don't set them
+        for s in strategies:
+            matched = universe_map.get(s.algorithm_id)
+            if matched is None:
+                continue
+            if not s.symbols and matched.symbols:
+                s.symbols = list(matched.symbols)
+            if not getattr(s, "market", None) and matched.market:
+                s.market = matched.market
+
         anchor_algorithm_id = None
         # ------------------------------------------------------------------
 
@@ -1199,6 +1214,12 @@ class BacktestService:
                                             anchor_algorithm_id=(
                                                 anchor_algorithm_id
                                             ),
+                                            backtest_windows=(
+                                                study_backtest_windows
+                                            ),
+                                            initial_capital=(
+                                                study_initial_capital
+                                            ),
                                         )
                                     # Add all results from this batch
                                     all_backtests.extend(batch_result)
@@ -1306,6 +1327,12 @@ class BacktestService:
                                         universe_map=universe_map,
                                         anchor_algorithm_id=(
                                             anchor_algorithm_id
+                                        ),
+                                        backtest_windows=(
+                                            study_backtest_windows
+                                        ),
+                                        initial_capital=(
+                                            study_initial_capital
                                         ),
                                     )
                                 all_backtests.extend(batch_result)
@@ -2451,9 +2478,9 @@ class BacktestService:
             universe=Universe(
                 market=portfolio_configuration.market,
                 trading_symbol=portfolio_configuration.trading_symbol,
-                initial_capital=portfolio_configuration.initial_balance,
-                risk_free_rate=_rfr,
             ),
+            initial_capital=portfolio_configuration.initial_balance,
+            risk_free_rate=_rfr,
         )
 
         # Use the optimized run_vector_backtests method
@@ -2519,6 +2546,42 @@ class BacktestService:
             "(2.7%%). Provide risk_free_rate to override."
         )
         return 0.027
+
+    def _reset_event_backtest_state(self):
+        """
+        Wipe all portfolio/order/trade/position state and recreate
+        fresh portfolios from their configurations.
+
+        This is called before every isolated (algorithm, window) event
+        backtest run so that each run starts from a clean, freshly
+        capitalized portfolio instead of accumulating orders/trades
+        from prior windows or other algorithms that share the same
+        underlying SQL database.
+
+        Also resets ``LAST_SNAPSHOT_DATETIME`` -- otherwise the event
+        loop's snapshot-cadence guard (see ``EventLoopService``) thinks
+        a snapshot was already taken from a previous algorithm's/
+        window's run and skips taking a fresh one for this run.
+        """
+        from investing_algorithm_framework.domain import \
+            BACKTESTING_INITIAL_AMOUNT, LAST_SNAPSHOT_DATETIME
+        from investing_algorithm_framework.infrastructure.database \
+            .sql_alchemy import Session, SQLBaseModel
+
+        with Session() as db:
+            for table in reversed(SQLBaseModel.metadata.sorted_tables):
+                db.execute(table.delete())
+            db.commit()
+
+        initial_amount = self._configuration_service.config.get(
+            BACKTESTING_INITIAL_AMOUNT, None
+        )
+        for pc in self._portfolio_configuration_service.get_all():
+            self._portfolio_service.create_portfolio_from_configuration(
+                pc, initial_amount=initial_amount
+            )
+
+        self._configuration_service.add_value(LAST_SNAPSHOT_DATETIME, None)
 
     def run_backtests(
         self,
@@ -2786,6 +2849,14 @@ class BacktestService:
                         )
 
                         try:
+                            # Reset portfolio/order/trade/position state
+                            # before every isolated (algorithm, window) run
+                            # so this run starts from a clean, freshly
+                            # capitalized portfolio instead of accumulating
+                            # trades from prior windows or other algorithms
+                            # sharing this run.
+                            self._reset_event_backtest_state()
+
                             # Create event backtest service
                             event_backtest_service = EventBacktestService(
                                 data_provider_service=(

@@ -102,11 +102,20 @@ class AlgorithmFactory:
                         data_sources.append(ds)
                         seen_data_source_ids.add(ds_id)
 
-        # Generate algorithm_id if not provided
+        # Generate algorithm_id if not provided. Prefer an explicit id
+        # already assigned to the first strategy (e.g. a param-hash id
+        # set by the caller via ``generate_algorithm_id(params=...)``) so
+        # the Algorithm-level id matches the strategy-level id used by
+        # the vector engine — otherwise event-engine bundles land under
+        # a class-name-derived id instead of the same
+        # ``<algorithm_id>.iafbt`` envelope as the vector run for the
+        # same strategy/params, breaking multi-engine study comparisons.
         if algorithm_id is None and len(final_strategies) > 0:
-            algorithm_id = generate_algorithm_id(
-                strategy=final_strategies[0]
-            )
+            first_strategy = final_strategies[0]
+            if getattr(first_strategy, "algorithm_id", None) is not None:
+                algorithm_id = first_strategy.algorithm_id
+            else:
+                algorithm_id = generate_algorithm_id(strategy=first_strategy)
 
         algorithm = Algorithm(
             algorithm_id=algorithm_id,

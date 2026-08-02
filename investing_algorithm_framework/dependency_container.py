@@ -13,7 +13,7 @@ from investing_algorithm_framework.services import OrderService, \
     PositionSnapshotService, MarketCredentialService, TradeService, \
     PortfolioSyncService, OrderExecutorLookup, PortfolioProviderLookup, \
     DataProviderService, TradeTakeProfitService, TradeStopLossService, \
-    BrokerBalanceTracker
+    BrokerBalanceTracker, TradeHookDispatcher
 
 
 def setup_dependency_container(app, modules=None, packages=None):
@@ -48,6 +48,9 @@ class DependencyContainer(containers.DeclarativeContainer):
     )
     broker_balance_tracker = providers.ThreadSafeSingleton(
         BrokerBalanceTracker,
+    )
+    trade_hook_dispatcher = providers.ThreadSafeSingleton(
+        TradeHookDispatcher,
     )
     portfolio_repository = providers.Factory(SQLPortfolioRepository)
     position_snapshot_repository = providers.Factory(
@@ -93,6 +96,7 @@ class DependencyContainer(containers.DeclarativeContainer):
         portfolio_repository=portfolio_repository,
         position_repository=position_repository,
         trade_allocation_repository=trade_allocation_repository,
+        trade_hook_dispatcher=trade_hook_dispatcher,
     )
     trade_take_profit_service = providers.Factory(
         TradeTakeProfitService,
