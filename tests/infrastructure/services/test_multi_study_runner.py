@@ -28,6 +28,7 @@ from investing_algorithm_framework import (
     create_app,
 )
 from investing_algorithm_framework.domain.backtesting.backtest import Backtest
+from investing_algorithm_framework.domain import BUNDLE_EXT
 
 from tests.infrastructure.services.test_backtest_service import (
     SimpleVectorStrategy,
@@ -81,7 +82,7 @@ class TestMultiStudyRunnerIntegration(unittest.TestCase):
 
     def _open(self) -> Backtest:
         return Backtest.open(
-            os.path.join(self.storage, f"{self.algo_id}.iafbt")
+            os.path.join(self.storage, f"{self.algo_id}{BUNDLE_EXT}")
         )
 
     def test_single_study_round_trips_through_runner(self):

@@ -124,7 +124,7 @@ These are intentional and acceptable for a baseline benchmark:
   The *distribution* of params is matched, the exact ordering is not.
   This does not affect throughput numbers.
 - **Metrics:** both sides compute the standard metric pack (total return,\n  CAGR, annual volatility, Sharpe, Sortino, max drawdown + duration,\n  Calmar) over the equity curve. The Python side runs the **full**\n  framework `BacktestMetrics` + `BacktestSummaryMetrics` pipeline\n  (which has a longer tail of metrics: rolling Sharpe, exposure ratio,\n  trades per day, win/loss ratio, ...). Issue #523 will port the\n  metric kernel; the Rust pack here is the subset that drives 95% of\n  user decisions and is enough to make the timing comparison honest.
-- **Bundle I/O:** the Python side writes `.iafbt` bundles for every
+- **Bundle I/O:** the Python side writes `.obtf` bundles for every
   backtest (issue #524 will port the writer). The Rust side does not
   write bundles. This is a deliberate inclusion of framework overhead
   on the Python side — it's part of what users actually pay today.

@@ -49,12 +49,10 @@ def _make_run(
             )
         ),
         initial_unallocated=10_000.0,
-        trading_symbol="USDT",
         number_of_runs=1,
         number_of_days=30,
         number_of_orders=trades,
         number_of_trades=trades,
-        symbols=["BTC/USDT"],
         metadata={"universe_key": universe_key} if universe_key else {},
     )
 

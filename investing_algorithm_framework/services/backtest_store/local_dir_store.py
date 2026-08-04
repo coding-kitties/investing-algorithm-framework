@@ -1,6 +1,6 @@
 """``LocalDirStore`` — directory-of-bundles :class:`BacktestStore`.
 
-Thin adapter over the existing ``.iafbt`` storage layout. Every
+Thin adapter over the existing ``.obtf`` storage layout. Every
 backtest is one bundle file under the store's *root* directory.
 Optionally maintains a sidecar :class:`SqliteBacktestIndex` to serve
 :meth:`iter_index_rows` without re-decoding bundles on every call.
@@ -41,10 +41,10 @@ SIDECAR_INDEX_NAME = "index.sqlite"
 
 
 class LocalDirStore(BacktestStore):
-    """A directory of ``.iafbt`` bundles, addressable by relative path.
+    """A directory of ``.obtf`` bundles, addressable by relative path.
 
     Handles are bundle paths *relative to the store root* — e.g.
-    ``"my_strategy.iafbt"`` or ``"sweep_a/run_03.iafbt"``. Relative
+    ``"my_strategy.obtf"`` or ``"sweep_a/run_03.obtf"``. Relative
     handles keep the store portable: moving the root directory does
     not invalidate any handle.
 
@@ -165,7 +165,7 @@ class LocalDirStore(BacktestStore):
         if target.is_file():
             target.unlink()
         elif target.is_dir():
-            # Shouldn't happen for .iafbt, but tolerate legacy
+            # Shouldn't happen for .obtf, but tolerate legacy
             # directory-style bundles for symmetry.
             shutil.rmtree(target)
 

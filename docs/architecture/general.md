@@ -67,7 +67,7 @@ The dependency direction is **inward only**: `infrastructure` and
 | `services/` | Use-cases that orchestrate repositories and external providers. Stateless w.r.t. user data — all state goes through repositories. Includes `OrderService`, `TradeService`, `PortfolioService`, `PositionService`, `DataProviderService`, the `pipeline` engine, the `backtest_store` / `backtest_index`, and the two `TradeOrderEvaluator` implementations. |
 | `infrastructure/` | SQLAlchemy ORM models + repositories (under `database/`, `models/`, `repositories/`), CCXT-backed `PortfolioProvider` / `OrderExecutor` / OHLCV `DataProvider` implementations. This is the only layer that talks to a real exchange or a real DB. |
 | `app/` | The application shell: `App`, `Context`, `EventLoopService`, `Algorithm`, `TradingStrategy`, `Task`, `AppHook`, the Flask web app, and the stateless action entry points. |
-| `cli/` | Command-line entry points (e.g. `iaf migrate-bundles`, `iaf index`). |
+| `cli/` | Command-line entry points (e.g. `iaf migrate-backtests`, `iaf index`). |
 | `analysis/`, `notebook/` | Read-only utilities for inspecting backtest results from scripts and notebooks. |
 
 ---

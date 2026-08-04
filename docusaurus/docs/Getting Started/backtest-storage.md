@@ -4,75 +4,17 @@ sidebar_position: 11
 
 # Backtest Storage Layer
 
-Once you start sweeping parameter grids and walk-forward windows, you quickly end up with **hundreds or thousands of backtests on disk**. A flat folder of `.iafbt` bundles works for tens of them, but it stops scaling once you want to compare them all in a single HTML dashboard — every comparison re-decodes multi-MB Parquet metric blobs just to read a Sharpe number, and the resulting `report.html` becomes too heavy for a browser to open.
+Once you start sweeping parameter grids and walk-forward windows, you quickly end up with **hundreds or thousands of backtests on disk**. Comparing them all in a single HTML dashboard stops scaling at that point — every comparison re-decodes multi-MB metric blobs just to read a Sharpe number, and the resulting `report.html` becomes too heavy for a browser to open.
 
-The **backtest storage layer** is the framework's answer to that. It separates *where bundles live* from *how you query them*, and it gives you the tools to keep your dashboards fast even when the backing collection grows into the thousands.
+The **backtest storage layer** solves this with a simple idea: save your backtests to a folder, build a small SQLite index next to them, and filter/rank in that index *before* you ever open a bundle or render a report.
 
-## Mental model
+:::tip Just have a handful of backtests?
+If you're only running a few backtests at a time, you probably don't need any of this — just pass them straight to `BacktestReport` as shown in [Backtest Reports](./backtest-reports.md). Come back here once you're sweeping large parameter grids.
+:::
 
-```
-                ┌─────────────────────────────────────────────┐
-                │  Tier-1: SQLite index   (index.sqlite)      │
-                │   - one row per .iafbt                      │
-                │   - all summary metrics promoted to columns │
-                │   - sub-100 ms ranks / filters over 10k+    │
-                └─────────────────────────────────────────────┘
-                                    │ derived from
-                                    ▼
-                ┌─────────────────────────────────────────────┐
-                │  Tier-2: Parquet sidecars (analytics-ready) │
-                │   - hive-partitioned on run_id              │
-                │   - portfolio_snapshots / trades / orders   │
-                └─────────────────────────────────────────────┘
-                                    │ derived from
-                                    ▼
-                ┌─────────────────────────────────────────────┐
-                │  CANONICAL: .iafbt bundles                  │
-                │   - the single source of truth              │
-                │   - everything else can be rebuilt from it  │
-                └─────────────────────────────────────────────┘
-                                    │ references
-                                    ▼
-                ┌─────────────────────────────────────────────┐
-                │  Tier-3: content-addressed OHLCV chunks     │
-                │   - <sha256>.parquet, deduped across all    │
-                │     bundles that reference the same data    │
-                └─────────────────────────────────────────────┘
-```
+## Quick Start: the 5-step workflow
 
-The `.iafbt` bundle is **canonical**. The SQLite index, the Tier-2 Parquet sidecars and the Tier-3 OHLCV chunks are all *derived* — they can be rebuilt from the bundles at any time and they're best-effort: a malformed sidecar never blocks a write or read against the bundle.
-
-## The `BacktestStore` protocol
-
-Two concrete implementations ship today, both exposing the same API:
-
-| Store | Layout | Best for |
-|---|---|---|
-| `LocalDirStore` | flat folder of `.iafbt` files (+ `index.sqlite`) | Most users, simple to inspect, fast `ls` |
-| `LocalTieredStore` | full Tier-1/2/3 layout | Large collections, OHLCV dedup, analytics workflows |
-
-Both are drop-in interchangeable — swap the implementation without touching call sites:
-
-```python
-from investing_algorithm_framework.services.backtest_store import (
-    LocalDirStore,
-)
-from investing_algorithm_framework.services.backtest_store.\
-local_tiered_store import LocalTieredStore
-
-store = LocalDirStore("./my-backtests/")
-# store = LocalTieredStore("./my-backtests/")  # same API
-
-len(store)                       # how many bundles?
-"momentum_v1.iafbt" in store     # exists?
-bt = store.open("momentum_v1.iafbt")
-for handle in store.iter_handles():
-    ...
-```
-
-## The normal developer workflow
-
-Below is the canonical loop most users will run. The **same five steps** hold whether you have 10 backtests or 10,000 — you just lean harder on the index as the collection grows.
+This is the loop most users run, whether they have 10 backtests or 10,000.
 
 ### 1. Run a sweep, persist the bundles
 
@@ -81,14 +23,14 @@ backtests = app.run_vector_backtests(
     strategies=[StrategyA(), StrategyB(), StrategyC()],
     backtest_date_ranges=[range_2022, range_2023, range_2024],
     n_workers=-1,
-    backtest_storage_directory="./my-backtests/",   # writes .iafbt here
+    backtest_storage_directory="./my-backtests/",   # writes .obtf here
     show_progress=True,
 )
 ```
 
-After this you have a folder of `.iafbt` bundles on disk. That folder is *the* artifact — everything downstream operates on it.
+This gives you a folder of `.obtf` bundle files — the single source of truth for everything downstream.
 
-### 2. Build the Tier-1 index
+### 2. Build the index
 
 ```bash
 iaf index ./my-backtests/
@@ -98,19 +40,16 @@ Or from Python:
 
 ```python
 from investing_algorithm_framework.cli.index_command import build_index
+
 build_index("./my-backtests/")
 ```
 
-This walks the folder once, writes `index.sqlite` with every scalar from `BacktestSummaryMetrics` promoted to its own column, and is **idempotent** — re-run it any time after adding new bundles.
+This writes an `index.sqlite` file next to your bundles, with every summary metric (Sharpe, Calmar, number of trades, etc.) promoted to its own column. It's **idempotent** — re-run it any time after adding new bundles.
 
-### 3. Filter / rank in SQLite (no bundles opened)
-
-The point of the index is that **you never need to decode a Parquet metric blob just to choose which backtests are interesting**. Pick winners with a SQL `WHERE` clause:
+### 3. Filter / rank without opening any bundles
 
 ```python
-from investing_algorithm_framework.cli.index_command import (
-    list_index, rank_index,
-)
+from investing_algorithm_framework.cli.index_command import rank_index
 
 # Top 20 by Sharpe, but only among bundles with > 50 trades.
 top = rank_index(
@@ -127,22 +66,24 @@ for r in top:
 Or from the shell:
 
 ```bash
-iaf rank ./my-backtests/ \
-    --by sharpe_ratio \
+iaf rank ./my-backtests/ --by sharpe_ratio \
     --where "summary_number_of_trades > 50" -n 20
-iaf list ./my-backtests/ --sort calmar_ratio --json
 ```
 
-This step is **sub-100 ms** even over 10k+ bundles. No Parquet, no decompression, no bundle opens.
+This is **sub-100 ms** even over 10k+ bundles — no bundles are opened at this step.
 
-### 4. Materialise only the bundles you actually need
+### 4. Load only the bundles you need
 
 ```python
+from investing_algorithm_framework.services.backtest_store import (
+    LocalDirStore,
+)
+
 store = LocalDirStore("./my-backtests/")
 backtests = [store.open(row["bundle_path"]) for row in top]
 ```
 
-`bundle_path` from the index row is exactly the store handle, so this is a one-liner. **You only pay the bundle-decode cost for the bundles you selected**, not the whole collection.
+You only pay the decode cost for the backtests you actually selected.
 
 ### 5. Render the report
 
@@ -152,37 +93,25 @@ from investing_algorithm_framework import BacktestReport
 BacktestReport(backtests=backtests).save("top20.html")
 ```
 
-That's the whole loop.
+## Keeping `report.html` fast
 
-## Avoid overloading your `report.html`
-
-The `BacktestReport` produces a **self-contained** HTML file: every backtest's full per-run data (equity curve, drawdown series, trades, positions, monthly returns) is inlined into the document so the dashboard works offline with no server.
-
-The trade-off: file size grows linearly with the number of backtests inlined. Rough orders of magnitude:
+`BacktestReport` inlines every backtest's full data (equity curve, trades, positions, etc.) into one self-contained HTML file, so size grows with how many backtests you put in it:
 
 | Backtests in report | Approx. HTML size | Browser experience |
 |---|---|---|
 | 1 – 10 | tens of KB to ~1 MB | instant |
 | 10 – 50 | a few MB | smooth |
-| 50 – 200 | 10 – 50 MB | slower load, still usable |
+| 50 – 200 | 10 – 50 MB | slower, still usable |
 | 200+ | 100 MB+ | browsers struggle / refuse to open |
 
-The point of the storage layer is that **you don't need to put 200 backtests in one report to compare them**. The Tier-1 index is your comparison surface for the full collection; the HTML report is your deep-dive surface for a small, hand-picked subset.
-
-### Anti-pattern
+**Rule of thumb: keep any single report to ≤ 50 backtests.** Use the index (step 3 above) to pick the winners, and render a few focused reports (top strategies, best Calmar, one per regime) instead of one giant one:
 
 ```python
-# DON'T do this with thousands of bundles.
-report = BacktestReport.open(directory_path="./my-backtests/", workers=-1)
-report.save("everything.html")     # multi-hundred-MB file, browser dies
-```
+# DON'T: decodes and inlines every bundle in the folder.
+report = BacktestReport.open(directory_path="./my-backtests/")
+report.save("everything.html")     # can be 100s of MB
 
-This decodes every bundle in the folder and inlines all of them. Fine for a few dozen; fatal at scale.
-
-### The right pattern
-
-```python
-# Filter in SQLite first, then render only the winners.
+# DO: filter first, then render only the winners.
 top = rank_index("./my-backtests/", by="sharpe_ratio", limit=25)
 store = LocalDirStore("./my-backtests/")
 BacktestReport(
@@ -190,41 +119,36 @@ BacktestReport(
 ).save("top25_by_sharpe.html")
 ```
 
-Same principle applies for slicing by anything else — most-trades, best-Calmar, lowest-drawdown, only-2024-windows, only-momentum-strategies, etc. Compose multiple narrow reports rather than one giant one.
+## Scaling further: `LocalTieredStore`
 
-### Rules of thumb
+`LocalDirStore` (a flat folder of `.obtf` files) is the default and is enough for most users — it's simple to inspect and works with normal tools (`ls`, `rsync`, `git lfs`).
 
-- **Keep any single `report.html` to ≤ 50 backtests.** Past that, render multiple narrower reports (one per strategy family, one per regime, one for the top-N) instead of one mega-report.
-- **Use the index as your comparison plane** for the full collection. CLI: `iaf list` / `iaf rank`. Python: `list_index` / `rank_index`. SQL: `sqlite3 index.sqlite` for anything ad-hoc.
-- **Render for the audience.** A "winners" report (top 10–20) is what you actually send to teammates. A "full deep-dive" report on one strategy is what you keep for yourself.
-- **Don't trust `BacktestReport.open(directory_path=…)` at scale.** It walks and decodes the whole folder; it's a convenience for ≤ 50-bundle directories, not a scaling story.
+If your collection grows very large, `LocalTieredStore` is a drop-in replacement with the same API that adds:
+- **Cross-bundle analytics** over Parquet sidecars, without decoding bundles (e.g. with DuckDB/Polars).
+- **OHLCV deduplication** across bundles that reference the same market data.
 
-## When to use which store
+```python
+from investing_algorithm_framework.services.backtest_store.\
+local_tiered_store import LocalTieredStore
 
-- **`LocalDirStore`** — start here. A flat folder of `.iafbt` files is what every other tool understands (you can `ls`, `rsync`, `tar`, `git lfs` it). Tier-1 SQLite gets built next to the bundles. This is the default for `app.run_vector_backtests(backtest_storage_directory=...)`.
+store = LocalTieredStore("./my-backtests/")  # same API as LocalDirStore
+```
 
-- **`LocalTieredStore`** — switch to this when you need any of:
-  - **Cross-bundle analytics** without decoding bundles (DuckDB / Polars over the Tier-2 Parquet sidecars: `read_parquet('store/parquet/trades/**/*.parquet', hive_partitioning=True)`).
-  - **OHLCV deduplication** — every bundle that references the same `BTC/EUR:1h` data shares one `<sha256>.parquet` blob on disk; reclaim orphans with `store.garbage_collect_ohlcv()`.
-  - **Migration target** for archival / production pipelines.
-
-Move a whole collection between store kinds with a single command:
+Migrate an existing collection with:
 
 ```bash
 iaf migrate-store --from local-dir    --src ./my-backtests/ \
                   --to   local-tiered --dst ./tiered/
 ```
 
-## End-to-end runnable example
+## Full example
 
-A complete worked example (seed bundles → build index → rank → load winners → render dashboard) lives in the repo at [`examples/storage_layer_demo/`](https://github.com/coding-kitties/investing-algorithm-framework/tree/main/examples/storage_layer_demo). Run it from a checkout:
+A complete, runnable example (seed bundles → build index → rank → load winners → render dashboard) lives at [`examples/storage_layer_demo/`](https://github.com/coding-kitties/investing-algorithm-framework/tree/main/examples/storage_layer_demo):
 
 ```bash
 source .venv/bin/activate
 python examples/storage_layer_demo/demo.py
 ```
-
-It prints each step, leaves the bundles + index + dashboard in a temp directory, and shows you the exact `iaf` CLI commands you could run by hand against the same data.
 
 ## Reference
 

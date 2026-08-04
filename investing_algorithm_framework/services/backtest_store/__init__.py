@@ -2,7 +2,7 @@
 
 A :class:`BacktestStore` is the single seam between the framework and
 *where* backtest results actually live. Phase 3a ships the Protocol
-and a thin :class:`LocalDirStore` adapter over the existing ``.iafbt``
+and a thin :class:`LocalDirStore` adapter over the existing ``.obtf``
 layout, so every consumer (HTML report, ``iaf list/rank``, the MCP
 server, future ``FinterionStore``) can be written against one
 interface.

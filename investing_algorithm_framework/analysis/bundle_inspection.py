@@ -5,11 +5,11 @@ from typing import List, Union
 def print_bundle_summary(
     source: Union[str, Path, List["Backtest"], List[Union[str, Path]]],
 ) -> None:
-    """Print studies and universes for every ``.iafbt`` bundle.
+    """Print studies and universes for every ``.obtf`` bundle.
 
     Args:
         source: One of:
-            * A directory path (str or Path) — all ``*.iafbt`` files
+            * A directory path (str or Path) — all ``*<BUNDLE_EXT>`` files
               in that directory are opened.
             * A list of file paths (str or Path) — each path is opened
               as a bundle.
@@ -105,9 +105,12 @@ def _resolve_bundles(source, backtest_cls):
     # A single directory or file path.
     path = Path(source)
     if path.is_dir():
+        from investing_algorithm_framework.domain.backtesting.bundle import (
+            BUNDLE_EXT,
+        )
         return [
             backtest_cls.open(p)
-            for p in sorted(path.glob("*.iafbt"))
+            for p in sorted(path.glob(f"*{BUNDLE_EXT}"))
         ]
 
     # Single file.

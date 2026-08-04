@@ -1,5 +1,5 @@
 """Helper for loading and materialising a ranked ``top_selection``
-folder of ``.iafbt`` bundles — the load/rank/dedupe/recover-params
+folder of ``.obtf`` bundles — the load/rank/dedupe/recover-params
 workflow shared by the param-sweep and out-of-sample notebooks.
 """
 
@@ -64,7 +64,7 @@ def load_top_selection(
     strategy params.
 
     Args:
-        top_selection_path: Folder of ``.iafbt`` bundles to rank.
+        top_selection_path: Folder of ``.obtf`` bundles to rank.
         focus: Weighted ranking focus (default ``BALANCED``); passed
             straight to ``rank_index``.
         engine: Engine slot to rank on (``"vector"`` or ``"event"``).

@@ -7,7 +7,7 @@ output is shaped for direct ingestion by
 :func:`pyarrow.dataset.write_dataset` with hive partitioning on
 ``run_id``.
 
-The bundle (``.iafbt``) remains the canonical source of truth in
+The bundle (``.obtf``) remains the canonical source of truth in
 Phase 3b; these Parquet datasets are *auxiliary* — they make
 DuckDB / Polars analytics work across thousands of runs without
 re-decoding bundles. Round-tripping Tier-2 back to a Backtest is

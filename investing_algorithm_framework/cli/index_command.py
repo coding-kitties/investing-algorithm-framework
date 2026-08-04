@@ -1,5 +1,5 @@
 """``iaf index`` CLI \u2014 build a SQLite Tier-1 index over a folder of
-``.iafbt`` bundles (epic #540 phase 2).
+``.obtf`` bundles (epic #540 phase 2).
 
 Walks the directory, opens each bundle with ``summary_only=True`` (no
 Parquet metric-blob decode), derives a :class:`BacktestIndexRow` via
@@ -37,7 +37,7 @@ def _iter_bundle_paths(
     directory: Path,
     exclude_dirs: Optional[List[str]] = None,
 ) -> Iterable[Path]:
-    """Yield every ``*.iafbt`` file under *directory* (sorted).
+    """Yield every ``*.obtf`` file under *directory* (sorted).
 
     Args:
         directory: Root folder to scan.
@@ -65,7 +65,7 @@ def build_index(
     """Build (or refresh) a SQLite Tier-1 index over *directory*.
 
     Args:
-        directory: Folder to scan for ``.iafbt`` bundles.
+        directory: Folder to scan for ``.obtf`` bundles.
         output: Path to the SQLite file. Defaults to
             ``<directory>/index.sqlite``.
         relative_paths: if True, store ``bundle_path`` relative to
@@ -568,7 +568,7 @@ def prune_backtests(
     """Move or delete bundles that are **not** in *keep*.
 
     Args:
-        directory: Folder containing the ``.iafbt`` bundles (same
+        directory: Folder containing the ``.obtf`` bundles (same
             path you passed to :func:`build_index`).
         keep: List of row dicts (as returned by :func:`rank_index`)
             whose ``"bundle_path"`` values identify bundles to keep.
@@ -673,7 +673,7 @@ def promote_backtests(
     touching the original sweep results.
 
     Args:
-        directory: Folder containing the source ``.iafbt`` bundles
+        directory: Folder containing the source ``.obtf`` bundles
             (the directory passed to :func:`build_index`).
         keep: List of row dicts (as returned by :func:`rank_index`)
             whose ``"bundle_path"`` values identify bundles to

@@ -421,7 +421,7 @@ def recalculate_backtests_in_directory(
     constant regardless of how many backtests are processed.
 
     Args:
-        src_dir: Directory containing ``.iafbt`` bundles (and/or
+        src_dir: Directory containing ``.obtf`` bundles (and/or
             legacy backtest directories).
         dst_dir: Output directory. If ``None``, bundles are rewritten
             in place inside *src_dir*.

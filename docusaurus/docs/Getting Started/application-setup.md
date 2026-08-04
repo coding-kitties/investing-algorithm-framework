@@ -4,8 +4,9 @@ sidebar_position: 2
 
 # Application Setup
 
-A real trading project usually has three concerns that pull in different
-directions:
+The framework is designed to support research, backtesting and production from the same strategy code. To make that work, we recommend a project layout that separates concerns and keeps research and production in sync.
+
+A typical workflow looks like this:
 
 1. **Research** — exploring data, designing strategies and tuning parameters
    in Jupyter notebooks.
@@ -18,10 +19,12 @@ The Investing Algorithm Framework is designed to support all three from the
 **same** strategy code. To make that work, we recommend the following
 project layout for any non-trivial bot.
 
+Our cli also supports this layout for production deployments for both Azure and AWS Lambda. See [How to deploy a trading bot](/deployment) for details.
+
 ## Recommended Project Structure
 
 ```text
-my_trading_bot/
+<project_name>/
 ├── app.py                  # Production entry point (live trading)
 ├── run_backtest.py         # Backtest entry point
 ├── strategies/             # Strategy implementations (importable package)
@@ -34,7 +37,7 @@ my_trading_bot/
 │   ├── 03_backtest_baseline.ipynb
 │   └── 04_param_grid_search.ipynb
 ├── data/                   # Downloaded market data (OHLCV, etc.)
-├── backtest_results/       # Saved backtest bundles (.iafbt)
+├── backtest_results/       # Saved backtest bundles (.obft)
 ├── resources/              # Misc assets (databases, configs)
 ├── requirements.txt
 ├── .env.example
@@ -87,17 +90,27 @@ class MyStrategy(TradingStrategy):
     interval = 2
     symbols = ["BTC"]
 
-    def run_strategy(self, context: Context, data: Dict[str, Any]):
-        # Your trading logic here.
-        # `context` exposes the portfolio, positions, orders and trades.
-        # `data` is a dict of the data sources declared on the strategy.
-        pass
+    def generate_signal_series(
+        self, data: Dict[str, Any]
+    ) -> Iterable[SignalSeries]:
+      """
+      Vector backtest entry point. Called once per backtest, with all data loaded.
+      """
+        ...
+
+    def generate_signals(
+        self, context, data: Dict[str, Any]
+    ) -> Iterable[Signal]:
+      """
+      Event backtest and live trading entry point. Called once per time step, with only the current data.
+      """
+        ...
 ```
 
-> The framework instantiates the class for you, so pass the **class**
-> (not an instance) to `app.add_strategy(...)`.
-
 ## The Production Entry Point (`app.py`)
+
+> The framework instantiates the class for you, so pass the **class**
+> (not an instance) to `app.add_strategy(...)`. You can also pass an instance.
 
 `app.py` is the file you run in production (locally, in a container, or as
 a serverless function). It should be small, declarative, and free of any
@@ -121,15 +134,14 @@ app.add_market(
     trading_symbol="EUR",
     initial_balance=1000,
 )
-app.add_strategy(MyStrategy)
+app.add_strategy(MyStrategy) # Or app.add_strategy(MyStrategy()) if you prefer to pass an instance
 
 
 if __name__ == "__main__":
     app.run()
 ```
 
-API keys belong in environment variables (`.env`), not in source. Use
-`.env.example` to document which variables are required.
+> Market credentials are automatically loaded from the `.env` file using the expected naming convention. See [Credential Management](credentials) for all the ways to configure API keys and secrets.
 
 ## The Backtest Entry Point (`run_backtest.py`)
 
@@ -137,10 +149,25 @@ API keys belong in environment variables (`.env`), not in source. Use
 of `run()`. Because both files import the same `MyStrategy`, the strategy
 under test is identical to the one that will run live.
 
+Backtests are configured through a `Study`: it bundles the `Universe`
+(market, trading symbol), the initial capital and one or more
+`BacktestWindow`s to run over. Setting `engines=[BacktestEngine.VECTOR]`
+runs the fast, vectorized engine — use this when `MyStrategy` implements
+`generate_signal_series`. Omit `engines` to let the framework auto-detect
+the engine from the strategy instead.
+
 ```python
 from datetime import datetime, timezone
 
-from investing_algorithm_framework import create_app, BacktestDateRange
+from investing_algorithm_framework import (
+    create_app,
+    BacktestDateRange,
+    BacktestEngine,
+    BacktestWindow,
+    Study,
+    Universe,
+    StudySampleType
+)
 
 from strategies.my_strategy import MyStrategy
 
@@ -150,17 +177,27 @@ app.add_strategy(MyStrategy)
 
 
 if __name__ == "__main__":
-    backtest_date_range = BacktestDateRange(
-        start_date=datetime(2023, 1, 1, tzinfo=timezone.utc),
-        end_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
+    study = Study(
+        name="my_strategy",
+        universe=Universe(market="bitvavo", trading_symbol="EUR"),
+        initial_capital=1000,
+        engines=[BacktestEngine.VECTOR],
+        sample_type=StudySampleType.EXPLORATORY,
+        backtest_windows=[
+            BacktestWindow(
+                train_range=BacktestDateRange(
+                    start_date=datetime(2023, 1, 1, tzinfo=timezone.utc),
+                    end_date=datetime(2024, 1, 1, tzinfo=timezone.utc),
+                ),
+                name="test_window",
+            )
+        ],
     )
 
-    backtest = app.run_backtest(
-        backtest_date_range=backtest_date_range,
-        initial_amount=1000,
-    )
+    backtests = app.run_backtest(study=study, strategy=MyStrategy)
+    backtest = backtests[0]
 
-    summary = backtest.backtest_summary
+    summary = backtest.get_summary("vector")
     print(f"Total return: {summary.total_growth_percentage:.2f}%")
     print(f"Sharpe ratio: {summary.sharpe_ratio:.2f}")
 ```

@@ -1,12 +1,12 @@
 """``LocalTieredStore`` — Tier-1 SQLite + Tier-2 Parquet + Tier-3
-content-addressed OHLCV chunks + canonical ``.iafbt`` bundles on a
+content-addressed OHLCV chunks + canonical ``.obtf`` bundles on a
 local filesystem (epic #540 phases 3b + 3c).
 
 Layout under *root*::
 
     <root>/
         index.sqlite               # Tier-1, kept in sync on every write
-        bundles/<handle>.iafbt     # canonical bytes (source of truth)
+        bundles/<handle>.obtf     # canonical bytes (source of truth)
         parquet/
             portfolio_snapshots/run_id=<handle>/part-0.parquet
             trades/run_id=<handle>/part-0.parquet
@@ -114,7 +114,7 @@ class LocalTieredStore(BacktestStore):
     (WAL handles it) but per-handle write atomicity is the caller's
     responsibility.
 
-    Phase 3b deliberately keeps the .iafbt bundle as the canonical
+    Phase 3b deliberately keeps the .obtf bundle as the canonical
     representation. Reads always go through the bundle so the
     Backtest round-trip is bit-for-bit identical to today's
     behaviour. Tier-2 sidecars are *auxiliary* — used only for
@@ -138,7 +138,7 @@ class LocalTieredStore(BacktestStore):
     # ------------------------------------------------------------------
     @staticmethod
     def _normalize_handle(handle: StoreHandle) -> str:
-        """Strip the .iafbt suffix; handles are stored bare in Tier-1."""
+        """Strip the .obtf suffix; handles are stored bare in Tier-1."""
         if handle.endswith(BUNDLE_EXT):
             return handle[: -len(BUNDLE_EXT)]
         return handle

@@ -43,8 +43,8 @@ architecture/
 |---|---|
 | [`backtest/README.md`](backtest/README.md) | Overview of the backtest subsystem: engines, storage tiers, workflow. |
 | [`backtest/data_model.md`](backtest/data_model.md) | Entity-relationship diagram and field reference for the in-memory backtest object graph. |
-| [`backtest/open_backtest_format.md`](backtest/open_backtest_format.md) | On-disk `.iafbt` bundle format (OBTF reference implementation): full field-by-field spec of every serialised type, cost / slippage attribution, and Monte-Carlo test layout. |
-| [`backtest/backtest_storage.md`](backtest/backtest_storage.md) | The directory layout of a `.iafbt` bundle, msgpack body shape, Parquet blob extraction, embedded SQLite index, and versioning rules. |
+| [`backtest/open_backtest_format.md`](backtest/open_backtest_format.md) | On-disk `.obtf` bundle format (OBTF reference implementation): full field-by-field spec of every serialised type, cost / slippage attribution, and Monte-Carlo test layout. |
+| [`backtest/backtest_storage.md`](backtest/backtest_storage.md) | The directory layout of a `.obtf` bundle, msgpack body shape, Parquet blob extraction, embedded SQLite index, and versioning rules. |
 | [`backtest/tiered-backtest-storage.md`](backtest/tiered-backtest-storage.md) | Three-tier storage architecture: bundle files, SQLite index, in-memory materialisation. |
 | [`backtest/ohlcv-dedup-protocol.md`](backtest/ohlcv-dedup-protocol.md) | Cross-bundle OHLCV deduplication protocol used by the tiered store. |
 | [`backtest/v9.0-dual-engine-design.md`](backtest/v9.0-dual-engine-design.md) | Design rationale for the vector / event dual-engine split. |

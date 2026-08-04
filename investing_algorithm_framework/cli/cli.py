@@ -1,5 +1,3 @@
-import os
-
 import click
 
 from .deploy_to_aws_lambda import command as deploy_to_aws_lambda_command
@@ -8,7 +6,6 @@ from .deploy_to_azure_function import command as \
 from .initialize_app import command as initialize_app_command
 from .validate_backtest_checkpoints import command as \
     validate_backtest_checkpoints_command
-from investing_algorithm_framework.domain.backtesting import backtest_utils
 
 """
 CLI for Investing Algorithm Framework
@@ -266,7 +263,7 @@ cli.add_command(mcp)
     "--dst", "-d",
     required=True,
     type=click.Path(file_okay=False, dir_okay=True),
-    help="Destination directory for the new ``.iafbt`` bundle files.",
+    help="Destination directory for the new ``.obtf`` bundle files.",
 )
 @click.option(
     "--workers", "-w", type=int, default=None,
@@ -298,7 +295,7 @@ def migrate_backtests_cmd(
     """Convert a directory of legacy backtest folders into the bundled
     binary format introduced in issue #487.
 
-    The new ``.iafbt`` format is a single zstd-compressed MessagePack
+    The new ``.obtf`` format is a single zstd-compressed MessagePack
     file per backtest. Loading bundled directories is dramatically
     faster than the legacy multi-file layout for large batches.
 
@@ -323,212 +320,6 @@ def migrate_backtests_cmd(
 
 
 cli.add_command(migrate_backtests_cmd)
-
-
-# ---------------------------------------------------------------------------
-# `iaf migrate-bundles --to v3 <dir>` — in-place format upgrade (v9.0)
-# ---------------------------------------------------------------------------
-
-
-@click.command(name="migrate-bundles")
-@click.argument(
-    "directory",
-    type=click.Path(exists=True, file_okay=False, dir_okay=True),
-)
-@click.option(
-    "--to",
-    "target_version",
-    required=True,
-    type=click.Choice(["v3", "v4"]),
-    help=(
-        "Target bundle format version. The current writer always "
-        "emits v4 (a superset of v3); ``--to v3`` is preserved as a "
-        "legacy alias and produces v4 bundles too."
-    ),
-)
-@click.option(
-    "--workers", "-w", type=int, default=None,
-    help="Number of parallel workers (default: min(8, CPU count)).",
-)
-@click.option(
-    "--keep-source", is_flag=True, default=False,
-    help=(
-        "Keep legacy source directories after they have been "
-        "rewritten as ``.iafbt`` bundles. By default the legacy "
-        "directory is removed once the bundle is on disk."
-    ),
-)
-@click.option(
-    "--no-index", is_flag=True, default=False,
-    help="Skip writing index.parquet at the destination.",
-)
-@click.option(
-    "--dry-run", is_flag=True, default=False,
-    help="List the bundles/directories that would be upgraded and exit.",
-)
-def migrate_bundles_cmd(
-    directory, target_version, workers, keep_source, no_index, dry_run,
-):
-    """Upgrade bundles in DIRECTORY to the v9.0 ``.iafbt`` format **in place**.
-
-    Walks DIRECTORY and rewrites:
-
-    \b
-    * ``.iafbt`` bundles in older v1/v2 envelopes → v3 envelope.
-    * Legacy backtest directories (``algorithm_id.json`` + ``runs/``
-      or per-engine ``vector_runs/`` / ``event_runs/``) → ``.iafbt``
-      bundles.
-
-    Bundles already at the target version are skipped via a cheap
-    8-byte header read (no Parquet decoded), so the command is safe
-    to re-run.
-
-    Each write is atomic (tmp file + fsync + os.replace), so an
-    interrupted run leaves the source intact.
-
-    Example::
-
-        iaf migrate-bundles --to v3 ./backtest_results
-    """
-    from investing_algorithm_framework.domain.backtesting.bundle import (
-        BUNDLE_EXT, BUNDLE_FORMAT_VERSION, peek_bundle_format_version,
-    )
-    target_int = {"v3": 3, "v4": 4}[target_version]
-    if target_int > BUNDLE_FORMAT_VERSION:
-        # The writer can only emit the version it was compiled
-        # against; refuse to forge a higher target.
-        raise click.ClickException(
-            f"Writer currently targets v{BUNDLE_FORMAT_VERSION} only; "
-            f"cannot migrate to {target_version}."
-        )
-    # ``target_int`` doubles as the discovery filter (skip bundles
-    # whose header already meets it). The writer emits
-    # ``BUNDLE_FORMAT_VERSION`` regardless — passing ``--to v3`` to a
-    # v9.0+ binary therefore still yields v4 on disk.
-
-    # ----- discovery + filter ------------------------------------------------
-    bundles_to_upgrade: list[str] = []
-    legacy_dirs: list[str] = []
-    skipped_current = 0
-
-    for root, dirs, files in os.walk(directory):
-        for fname in files:
-            if not fname.endswith(BUNDLE_EXT):
-                continue
-            path = os.path.join(root, fname)
-            ver = peek_bundle_format_version(path)
-            if ver is None:
-                # Unreadable / not actually a bundle — leave alone.
-                continue
-            if ver >= target_int:
-                skipped_current += 1
-                continue
-            bundles_to_upgrade.append(path)
-        for dname in list(dirs):
-            d = os.path.join(root, dname)
-            has_id = os.path.isfile(os.path.join(d, "algorithm_id.json"))
-            has_runs = (
-                os.path.isdir(os.path.join(d, "runs"))
-                or os.path.isdir(os.path.join(d, "vector_runs"))
-                or os.path.isdir(os.path.join(d, "event_runs"))
-            )
-            if has_id and has_runs:
-                legacy_dirs.append(d)
-                dirs.remove(dname)
-
-    todo = bundles_to_upgrade + legacy_dirs
-    if not todo:
-        click.echo(
-            f"No upgrades needed in {directory} "
-            f"({skipped_current} bundle(s) already at v{target_int})."
-        )
-        return
-
-    if dry_run:
-        click.echo(
-            (
-                f"Would upgrade {len(todo)} item(s) in {directory} "
-                f"(skipping {skipped_current} already at v{target_int}):"
-            )
-        )
-        for p in bundles_to_upgrade:
-            click.echo(f"  bundle  {p}")
-        for p in legacy_dirs:
-            click.echo(f"  legacy  {p}")
-        return
-
-    # ----- in-place rewrite --------------------------------------------------
-    # ``migrate_backtests`` with src_dir == dst_dir handles both the
-    # bundle rewrite (atomic tmp+replace inside ``save_bundle``) and
-    # the legacy directory → bundle conversion. ``skip_existing=False``
-    # is required so already-named ``.iafbt`` targets get rewritten in
-    # place; we have already filtered out same-version bundles above
-    # so this re-encodes only what needs upgrading.
-    #
-    # Note: we cannot pre-filter which paths ``migrate_backtests``
-    # discovers, so it will still find the already-current bundles
-    # and re-encode them. To honour the cheap-skip filter, hide them
-    # from discovery by temporarily renaming, OR call ``_migrate_one``
-    # directly. The latter is cleaner — do that.
-    from concurrent.futures import ProcessPoolExecutor
-    from investing_algorithm_framework.domain import tqdm
-
-    plan = []
-    for src in todo:
-        base = os.path.basename(os.path.normpath(src))
-        if base.endswith(BUNDLE_EXT):
-            base = base[: -len(BUNDLE_EXT)]
-        dst = os.path.join(directory, f"{base}{BUNDLE_EXT}")
-        # delete_source=True only meaningful for legacy dirs; for
-        # bundles src == dst and ``_migrate_one`` no-ops the delete.
-        delete = (not keep_source) and (os.path.isdir(src))
-        plan.append((src, dst, False, None, delete))
-
-    resolved_workers = workers or min(8, (os.cpu_count() or 1))
-    resolved_workers = min(resolved_workers, len(plan))
-
-    rows = []
-    pbar = tqdm(
-        total=len(plan),
-        desc=f"Upgrading to v{target_int}",
-        disable=False,
-    )
-    try:
-        if resolved_workers > 1:
-            with ProcessPoolExecutor(max_workers=resolved_workers) as ex:
-                for out, new_rows in ex.map(backtest_utils._migrate_one, plan):
-                    rows.extend(new_rows)
-                    pbar.update(1)
-        else:
-            for args in plan:
-                out, new_rows = backtest_utils._migrate_one(args)
-                rows.extend(new_rows)
-                pbar.update(1)
-    finally:
-        pbar.close()
-
-    if not no_index:
-        # Refresh the SQLite index so subsequent ``iaf list``/``rank``
-        # reflect the upgraded engine layout.
-        try:
-            from investing_algorithm_framework.cli.index_command import (
-                build_index,
-            )
-            build_index(str(directory), show_progress=False, incremental=False)
-        except Exception as exc:  # pragma: no cover - best effort
-            click.echo(
-                f"Warning: index refresh failed ({exc}); "
-                f"run `iaf index {directory}` manually.",
-                err=True,
-            )
-
-    click.echo(
-        f"Upgraded {len(plan)} item(s) to v{target_int} in {directory} "
-        f"(skipped {skipped_current} already current)."
-    )
-
-
-cli.add_command(migrate_bundles_cmd)
 
 
 _STORE_KINDS = ["local-dir", "local-tiered"]
@@ -631,7 +422,7 @@ cli.add_command(migrate_store_cmd)
          "row).",
 )
 def index_cmd(directory, output, absolute_paths, no_progress, rebuild):
-    """Build a SQLite Tier-1 index over a folder of ``.iafbt`` bundles.
+    """Build a SQLite Tier-1 index over a folder of ``.obtf`` bundles.
 
     The resulting ``index.sqlite`` file holds one row per bundle with
     identity / provenance / config columns and every scalar

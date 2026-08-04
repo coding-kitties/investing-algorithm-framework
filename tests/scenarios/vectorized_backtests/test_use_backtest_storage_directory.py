@@ -13,6 +13,7 @@ from pyindicators import ema, rsi, crossover, crossunder
 from investing_algorithm_framework import TradingStrategy, DataSource, \
     TimeUnit, DataType, create_app, BacktestDateRange, PositionSize, \
     RESOURCE_DIRECTORY, DATA_DIRECTORY, SnapshotInterval, generate_algorithm_id, Schedule
+from investing_algorithm_framework.domain import BUNDLE_EXT
 
 
 class RSIEMACrossoverStrategy(TradingStrategy):
@@ -578,10 +579,10 @@ class Test(TestCase):
         self.assertEqual(first_result_ids, first_algorithm_ids)
 
         # Verify backtests were saved to storage (one bundle per
-        # algorithm_id in the default ``.iafbt`` bundle format)
+        # algorithm_id in the default ``.obtf`` bundle format)
         saved_bundles_after_first = set(
             d for d in os.listdir(backtest_storage_dir)
-            if d.endswith(".iafbt")
+            if d.endswith(BUNDLE_EXT)
         )
         self.assertEqual(len(saved_bundles_after_first), 1)
 
@@ -675,7 +676,7 @@ class Test(TestCase):
         # Storage should now contain 2 backtests total (1 from each run)
         saved_bundles_after_second = set(
             d for d in os.listdir(backtest_storage_dir)
-            if d.endswith(".iafbt")
+            if d.endswith(BUNDLE_EXT)
         )
         self.assertEqual(
             len(saved_bundles_after_second), 2,

@@ -93,7 +93,7 @@ class Backtest:
     or both engines (vectorized and event-based).
 
     A :class:`Backtest` is the canonical in-memory representation of
-    one ``.iafbt`` bundle file. As of v9.0 it carries two independent
+    one ``.obtf`` bundle file. As of v9.0 it carries two independent
     engine slots — a bundle may contain vector-engine results, event-
     engine results, or both. See ``docs/architecture/backtest/v9.0-dual-engine-design.md``
     for the binding contract.
@@ -1198,7 +1198,7 @@ class Backtest:
         summary_only: bool = False,
     ) -> 'Backtest':
         """
-        Open a backtest report from a directory **or** a ``.iafbt``
+        Open a backtest report from a directory **or** a ``.obtf``
         bundle file (issue #487) and return a :class:`Backtest`.
 
         Args:
@@ -1240,7 +1240,7 @@ class Backtest:
         # Fallback: caller passed a path without extension but a sibling
         # bundle file exists (e.g. session_cache stores
         # "<storage>/<algorithm_id>" while the new default save format
-        # writes "<storage>/<algorithm_id>.iafbt").
+        # writes "<storage>/<algorithm_id>.obtf").
         if not os.path.exists(path_str):
             from .bundle import BUNDLE_EXT, open_bundle
             candidate = path_str + BUNDLE_EXT
@@ -1472,10 +1472,10 @@ class Backtest:
             metrics to a file.
         """
         # Bundle-format dispatch (issue #487):
-        #   * If the caller passed a path ending in ``.iafbt``, save as
+        #   * If the caller passed a path ending in ``.obtf``, save as
         #     a bundle file.
         #   * If the caller passed a base path (no extension) and a
-        #     sibling ``<path>.iafbt`` exists, replace it in place.
+        #     sibling ``<path>.obtf`` exists, replace it in place.
         #   * Otherwise fall through to the legacy directory format
         #     below (preserved for backward compatibility).
         from .bundle import BUNDLE_EXT, save_bundle as _save_bundle
@@ -1610,7 +1610,7 @@ class Backtest:
         include_ohlcv: bool = False,
         ohlcv_store: Union[str, Path, None] = None,
     ) -> Path:
-        """Persist this backtest as a single ``.iafbt`` bundle.
+        """Persist this backtest as a single ``.obtf`` bundle.
 
         See :py:func:`investing_algorithm_framework.domain.backtesting.
         bundle.save_bundle` for details. This is a thin convenience
@@ -1630,7 +1630,7 @@ class Backtest:
         *,
         ohlcv_store: Union[str, Path, None] = None,
     ) -> 'Backtest':
-        """Load a :class:`Backtest` from a ``.iafbt`` bundle file."""
+        """Load a :class:`Backtest` from a ``.obtf`` bundle file."""
         from .bundle import open_bundle as _open_bundle
         return _open_bundle(path, ohlcv_store=ohlcv_store)
 

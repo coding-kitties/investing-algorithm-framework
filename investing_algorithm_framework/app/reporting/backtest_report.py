@@ -222,7 +222,7 @@ class BacktestReport:
     def _is_backtest(backtest_path):
         if not os.path.exists(backtest_path):
             return False
-        # Bundle file (.iafbt)
+        # Bundle file (.obtf)
         if os.path.isfile(backtest_path) and \
                 backtest_path.endswith(BUNDLE_EXT):
             return True

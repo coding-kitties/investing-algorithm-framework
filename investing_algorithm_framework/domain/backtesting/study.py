@@ -168,7 +168,7 @@ class Study:
 
     1. Derive on demand — SELECT from the Tier 1 backtest_runs table and re-compute generate_backtest_summary_metrics over the filtered set. This is actually what get_metrics() already does in-memory.
     2. Separate table — a study_summaries table with one row per (study_name, engine), storing the pre-computed aggregate. Mirrors today's summary field.
-    backtest_windows on the study is also redundant in tiered storage — each run row already carries start_date/end_date/date_range_name, so the window catalogue can be reconstructed with SELECT DISTINCT. It stays in the Study for the .iafbt export path and for in-memory filtering without a SQL query.
+    backtest_windows on the study is also redundant in tiered storage — each run row already carries start_date/end_date/date_range_name, so the window catalogue can be reconstructed with SELECT DISTINCT. It stays in the Study for the .obtf export path and for in-memory filtering without a SQL query.
 
     Attributes:
         name: Stable identifier for this study within its parent

@@ -14,7 +14,7 @@ system.
 | File | What it covers |
 |------|----------------|
 | [data_model.md](data_model.md) | Entity-relationship diagram and field reference for all in-memory types: `Backtest`, `Study`, `EngineSlot`, `Universe`, `BacktestWindow`, `BacktestRun`, `BacktestMetrics`, `BacktestSummaryMetrics`, `MonteCarloTest`, `Trade`, `Position`, `PortfolioSnapshot` |
-| [backtest_storage.md](backtest_storage.md) | On-disk `.iafbt` bundle format (v5): outer envelope layout, msgpack body shape, Parquet blob extraction, OHLCV side-store, read/write API contracts, versioning policy |
+| [backtest_storage.md](backtest_storage.md) | On-disk `.obtf` bundle format (v5): outer envelope layout, msgpack body shape, Parquet blob extraction, OHLCV side-store, read/write API contracts, versioning policy |
 | [backtesting_workflow.md](backtesting_workflow.md) | Step-by-step workflow: in-sample sweeps, OOS extension, multi-universe studies, event-engine runs, adding Monte-Carlo significance tests |
 | [sota_quant_workflow.md](sota_quant_workflow.md) | State-of-the-art quant workflow: how the framework maps onto industry-standard walk-forward practices |
 
@@ -72,9 +72,9 @@ For the on-disk format see [backtest_storage.md](backtest_storage.md).
 
 ---
 
-## What is a `.iafbt` file?
+## What is a `.obtf` file?
 
-A `.iafbt` file is the unit of storage for one algorithm's backtest
+A `.obtf` file is the unit of storage for one algorithm's backtest
 results. It is identified by `algorithm_id` — a fingerprint of the
 algorithm code and configuration — so results from different runs of
 the same algorithm naturally co-locate in the same file.

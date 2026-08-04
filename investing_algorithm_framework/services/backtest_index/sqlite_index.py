@@ -144,7 +144,7 @@ _TABLE = "backtest_index"
 
 
 class SqliteBacktestIndex:
-    """Single-file SQLite index over a directory of ``.iafbt`` bundles.
+    """Single-file SQLite index over a directory of ``.obtf`` bundles.
 
     Use :meth:`create` to make a fresh file (overwrites if exists),
     :meth:`open` to connect to an existing one (creating tables if

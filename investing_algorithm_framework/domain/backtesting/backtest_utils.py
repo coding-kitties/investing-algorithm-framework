@@ -39,7 +39,7 @@ def resolve_backtest_path(
 ) -> Optional[str]:
     """Return the on-disk path for a stored backtest, or ``None``.
 
-    Prefers ``<storage>/<algorithm_id>.iafbt`` (issue #487 bundle
+    Prefers ``<storage>/<algorithm_id>.obtf`` (issue #487 bundle
     format) and falls back to the legacy directory at
     ``<storage>/<algorithm_id>``.
     """
@@ -117,7 +117,7 @@ def save_backtests_to_directory(
         show_progress (bool, optional): Whether to display a progress bar
             while saving backtests. Defaults to False.
         format: Persistence layout. ``"bundle"`` (default, issue #487)
-            writes one ``.iafbt`` file per backtest. ``"directory"``
+            writes one ``.obtf`` file per backtest. ``"directory"``
             keeps the legacy human-readable per-file JSON layout.
         workers: Process pool size for parallel saves. Only used in
             ``bundle`` mode. Defaults to ``min(8, os.cpu_count())``.
@@ -344,7 +344,7 @@ def load_backtests_from_directory(
     """
     Loads Backtest objects from the specified directory.
 
-    Auto-detects each entry: ``.iafbt`` bundle files (issue #487) and
+    Auto-detects each entry: ``.obtf`` bundle files (issue #487) and
     legacy backtest directories are both supported and may coexist in
     the same parent directory.
 
@@ -716,7 +716,7 @@ def migrate_backtests(
     delete_source: bool = False,
 ) -> int:
     """Rewrite a directory of legacy backtest folders (or existing
-    ``.iafbt`` bundles) as ``.iafbt`` bundles in *dst_dir*.
+    ``.obtf`` bundles) as ``.obtf`` bundles in *dst_dir*.
 
     The migration is streamed: each backtest is loaded and re-saved
     inside a single worker process, so memory usage stays roughly
@@ -724,7 +724,7 @@ def migrate_backtests(
 
     Args:
         src_dir: Source directory containing legacy backtest folders
-            and/or ``.iafbt`` bundles. Walked recursively.
+            and/or ``.obtf`` bundles. Walked recursively.
         dst_dir: Destination directory. Created if it does not exist.
         workers: Number of parallel workers. ``None`` picks
             ``min(8, cpu_count)``. Pass ``1`` to force serial.
@@ -747,7 +747,7 @@ def migrate_backtests(
     dst_dir = Path(dst_dir)
     dst_dir.mkdir(parents=True, exist_ok=True)
 
-    # Discover sources: any *.iafbt file or any directory shaped like
+    # Discover sources: any *.obtf file or any directory shaped like
     # a legacy backtest (algorithm_id.json + runs/).
     sources: List[str] = []
     for root, dirs, files in os.walk(src_dir):

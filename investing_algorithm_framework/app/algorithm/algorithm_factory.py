@@ -108,7 +108,7 @@ class AlgorithmFactory:
         # the Algorithm-level id matches the strategy-level id used by
         # the vector engine — otherwise event-engine bundles land under
         # a class-name-derived id instead of the same
-        # ``<algorithm_id>.iafbt`` envelope as the vector run for the
+        # ``<algorithm_id>.obtf`` envelope as the vector run for the
         # same strategy/params, breaking multi-engine study comparisons.
         if algorithm_id is None and len(final_strategies) > 0:
             first_strategy = final_strategies[0]

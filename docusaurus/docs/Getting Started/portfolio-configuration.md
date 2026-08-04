@@ -6,9 +6,12 @@ sidebar_position: 3
 
 In this section we will explain how to configure your portfolio from your broker or exchange.
 
-The framework has by default support for CCXT. CCXT is a library that provides a unified API to interact with multiple brokers and exchanges. Please have a look at the ccxt documentation to see which brokers and exchanges are supported.
+> The framework has by default support for CCXT. CCXT is a library that
+> provides a unified API to interact with multiple brokers and exchanges.
+> Please have a look at the ccxt documentation to see which brokers
+> and exchanges are supported.
 
-## ✅ Simplified Registration (Recommended)
+## Simplified Registration (Recommended)
 
 You can use the following syntax to register a portfolio and credentials (from environment variables) in one step:
 
@@ -20,7 +23,7 @@ app.add_market(
 )
 ```
 
-This is the recommended way to register a portfolio. It automatically reads credentials from the .env file using the expected naming convention.
+This is the recommended way to register a portfolio. It automatically reads credentials from the .env file using the expected naming convention. See [Credential Management](credentials) for all the ways to configure API keys and secrets.
 
 ## Basic Configuration with PortfolioConfiguration
 

@@ -74,7 +74,7 @@ logger = logging.getLogger(__name__)
 # per-study engine slots and namespaced blob keys). Writers always
 # emit the current version; readers accept v1, v2, v3, v4 and v5.
 BUNDLE_FORMAT_VERSION = 5
-BUNDLE_EXT = ".iafbt"
+BUNDLE_EXT = ".obtf"
 
 # ``zstd`` compression level. Level 19 is the highest level still in
 # the "fast" tier (i.e. without ``--ultra``). Measured on real
@@ -992,13 +992,13 @@ def save_bundle(
     float32_ohlcv: bool = False,
     merge: bool = True,
 ) -> Path:
-    """Write *backtest* to a single ``.iafbt`` bundle.
+    """Write *backtest* to a single ``.obtf`` bundle.
 
     Args:
         backtest: The :class:`Backtest` to persist.
         path: Destination path. If it is a directory, the file is
-            written as ``<path>/<algorithm_id_or_hash>.iafbt``.
-            Otherwise the path is used as-is (with ``.iafbt`` appended
+            written as ``<path>/<algorithm_id_or_hash>.obtf``.
+            Otherwise the path is used as-is (with ``.obtf`` appended
             if the suffix is missing).
         include_ohlcv: When True, OHLCV blobs attached to
             ``backtest.ohlcv`` are written to ``ohlcv_store`` (defaulting
@@ -1033,8 +1033,8 @@ def save_bundle(
         raise ValueError(
             f"Unsupported bundle format_version {format_version}; "
             f"this version of investing_algorithm_framework only "
-            f"writes v{BUNDLE_FORMAT_VERSION} bundles. Use the "
-            f"`iaf migrate-bundles` CLI to convert legacy archives."
+            f"writes v{BUNDLE_FORMAT_VERSION} bundles. Legacy archives "
+            f"are still readable via `open_bundle()` / `Backtest.open()`."
         )
 
     path = Path(path)
@@ -1088,7 +1088,7 @@ def remove_study_from_bundle(
     top-level fields are preserved.
 
     Args:
-        path: Path to the ``.iafbt`` bundle file.
+        path: Path to the ``.obtf`` bundle file.
         study_name: Name of the study to remove (as it appears under the
             ``studies`` key in the envelope, e.g.
             ``"time_oos_param_sweep"``).
@@ -1099,7 +1099,7 @@ def remove_study_from_bundle(
 
     Raises:
         FileNotFoundError: If *path* does not exist.
-        ValueError: If the file is not a valid ``.iafbt`` bundle.
+        ValueError: If the file is not a valid ``.obtf`` bundle.
     """
     path = Path(path)
     if not path.is_file():
@@ -1107,7 +1107,7 @@ def remove_study_from_bundle(
 
     blob = path.read_bytes()
     if not blob.startswith(_MAGIC):
-        raise ValueError(f"Not a valid .iafbt bundle (missing IAFB magic): {path}")
+        raise ValueError(f"Not a valid .obtf bundle (missing IAFB magic): {path}")
 
     version, doc = _decode_payload(blob)
 
@@ -1146,7 +1146,7 @@ def open_bundle(
     ohlcv_store: Optional[Union[str, Path]] = None,
     summary_only: bool = False,
 ) -> Backtest:
-    """Load a :class:`Backtest` from a ``.iafbt`` bundle file.
+    """Load a :class:`Backtest` from a ``.obtf`` bundle file.
 
     Args:
         path: Path to the bundle file.
@@ -1223,7 +1223,7 @@ def open_bundle(
 
 
 def migrate_v2_to_v5(path: Union[str, Path]) -> Path:
-    """In-place migration of any pre-v5 ``.iafbt`` bundle to v5.
+    """In-place migration of any pre-v5 ``.obtf`` bundle to v5.
 
     Reads *path* via :func:`open_bundle` (which transparently handles
     v1 / v2 / v3 / v4 envelopes), then rewrites the file as v5 via
@@ -1273,8 +1273,8 @@ def peek_bundle_format_version(path: Union[str, Path]) -> Optional[int]:
 
     Reads only the 8-byte header (4-byte magic + uint32 LE version).
     Returns ``None`` when *path* is not a readable bundle file. Used
-    by ``iaf migrate-bundles`` to cheaply skip bundles already at the
-    target format version.
+    to cheaply check a bundle's on-disk version without a full decode
+    (e.g. before deciding whether a merge-on-save needs to upgrade it).
     """
     p = Path(path)
     if not p.is_file():

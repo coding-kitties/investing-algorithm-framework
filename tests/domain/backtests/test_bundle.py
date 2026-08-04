@@ -313,7 +313,7 @@ class TestBackTestsDirectory(TestCase):
         names = sorted(os.listdir(bundle_dir))
         self.assertEqual(
             [n for n in names if n.endswith(BUNDLE_EXT)],
-            ["algo_0.iafbt", "algo_1.iafbt", "algo_2.iafbt", "algo_3.iafbt"],
+            [f"algo_{i}{BUNDLE_EXT}" for i in range(4)],
         )
         loaded = load_backtests_from_directory(bundle_dir, workers=2)
         self.assertEqual(len(loaded), 4)
